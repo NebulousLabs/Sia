@@ -154,6 +154,10 @@ type (
 		// otherwise.
 		Unlocked() bool
 
+		// Lock deletes all keys in memory and prevents the wallet from being
+		// used to spend coins or extract keys until 'Unlock' is called.
+		Lock() error
+
 		// Unlock must be called before the wallet is usable. All wallets and
 		// wallet seeds are encrypted by default, and the wallet will not know
 		// which addresses to watch for on the blockchain until unlock has been
@@ -263,9 +267,6 @@ type (
 		// WatchSiagSiafundAddress adds a siafund address pulled from a siag
 		// keyfile.
 		// WatchSiagSiafundAddress(keyfile string) error
-
-		// Close prepares the wallet for shutdown.
-		Close() error
 	}
 )
 

@@ -38,7 +38,7 @@ func TestIntegrationEncrypted(t *testing.T) {
 	if w0.Encrypted() {
 		t.Error("wallet is reporting that it has been encrypted")
 	}
-	w0.Close()
+	w0.Lock()
 
 	// Create a second wallet using the same directory.
 	w1, err := New(cs, tp, filepath.Join(dir, modules.WalletDir))
@@ -67,7 +67,7 @@ func TestIntegrationEncrypted(t *testing.T) {
 	if err != errAlreadyUnlocked {
 		t.Error(err)
 	}
-	w1.Close()
+	w1.Lock()
 
 	// Create a wallet and see if it loads the encrypted file.
 	w2, err := New(cs, tp, filepath.Join(dir, modules.WalletDir))
@@ -93,17 +93,17 @@ func TestIntegrationEncrypted(t *testing.T) {
 	}
 }
 
-// TestCloseUnlock checks the consistency of the wallet after closing and then
+// TestLockUnlock checks the consistency of the wallet after closing and then
 // later unlocking the wallet.
-func TestCloseUnlock(t *testing.T) {
-	wt, err := createWalletTester("TestCloseUnlock")
+func TestLockUnlock(t *testing.T) {
+	wt, err := createWalletTester("TestLockUnlock")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Close the wallet.
+	// Lock the wallet.
 	siacoinBalance, _, _ := wt.wallet.ConfirmedBalance()
-	err = wt.wallet.Close()
+	err = wt.wallet.Lock()
 	if err != nil {
 		t.Error(err)
 	}

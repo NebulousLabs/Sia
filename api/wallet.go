@@ -127,25 +127,6 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 	}
 }
 
-// walletCloseHandlerPUT handles a PUT request to /wallet/close.
-func (srv *Server) walletCloseHandlerPUT(w http.ResponseWriter, req *http.Request) {
-	err := srv.wallet.Close()
-	if err == nil {
-		writeSuccess(w)
-	} else {
-		writeError(w, err.Error(), http.StatusBadRequest)
-	}
-}
-
-// walletCloseHanlder handles API calls to /wallet/close.
-func (srv *Server) walletCloseHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "PUT" {
-		srv.walletCloseHandlerPUT(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /wallet/close", http.StatusBadRequest)
-	}
-}
-
 // walletHistoryHandlerGET handles a GET request to /wallet/history.
 func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Request) {
 	start, err := strconv.Atoi(req.FormValue("startHeight"))
@@ -204,6 +185,25 @@ func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request
 		return
 	}
 	srv.walletHistoryHandlerGETaddr(w, req, addr)
+}
+
+// walletLockHandlerPUT handles a PUT request to /wallet/lock.
+func (srv *Server) walletLockHandlerPUT(w http.ResponseWriter, req *http.Request) {
+	err := srv.wallet.Lock()
+	if err == nil {
+		writeSuccess(w)
+	} else {
+		writeError(w, err.Error(), http.StatusBadRequest)
+	}
+}
+
+// walletLockHanlder handles API calls to /wallet/lock.
+func (srv *Server) walletLockHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "PUT" {
+		srv.walletLockHandlerPUT(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/lock", http.StatusBadRequest)
+	}
 }
 
 // walletSeedHandlerGET handles a GET request to /wallet/seed.
