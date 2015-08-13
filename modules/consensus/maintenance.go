@@ -19,25 +19,23 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func (cs *ConsensusSet) applyMinerPayouts(pb *processedBlock) error {
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		for i, payout := range pb.Block.MinerPayouts {
-			// Create and apply the delayed miner payout.
-			mpid := pb.Block.MinerPayoutID(uint64(i))
-			dscod := modules.DelayedSiacoinOutputDiff{
-				Direction:      modules.DiffApply,
-				ID:             mpid,
-				SiacoinOutput:  payout,
-				MaturityHeight: pb.Height + types.MaturityDelay,
-			}
-			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
+func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
+	for i, payout := range pb.Block.MinerPayouts {
+		// Create and apply the delayed miner payout.
+		mpid := pb.Block.MinerPayoutID(uint64(i))
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffApply,
+			ID:             mpid,
+			SiacoinOutput:  payout,
+			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
-		return nil
-	})
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
@@ -51,63 +49,48 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
 	}
 
 	// Gather the matured outputs from the delayed outputs map
-	var dscoids []types.SiacoinOutputID
-	var dscos []types.SiacoinOutput
-	cs.db.forEachDelayedSiacoinOutputsHeight(pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) {
-		dscoids = append(dscoids, id)
-		dscos = append(dscos, sco)
-	})
-	// Add all of the matured outputs to the full siaocin output set.
-	for i := 0; i < len(dscos); i++ {
-		dscoid := dscoids[i]
-		dsco := dscos[i]
-
-		// Sanity check - the output should not already be in siacoinOuptuts.
-		if build.DEBUG {
-			exists := cs.db.inSiacoinOutputs(dscoid)
-			if exists {
-				panic(errOutputAlreadyMature)
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		return forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+			// Sanity check - the output should not already be in siacoinOuptuts.
+			if build.DEBUG {
+				exists := cs.db.inSiacoinOutputs(id)
+				if exists {
+					panic(errOutputAlreadyMature)
+				}
 			}
-		}
 
-		// Add the output to the ConsensusSet and record the diff in the
-		// blockNode.
-		scod := modules.SiacoinOutputDiff{
-			Direction:     modules.DiffApply,
-			ID:            dscoid,
-			SiacoinOutput: dsco,
-		}
-		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
-		})
-		if err != nil {
-			return err
-		}
+			// Add the output to the ConsensusSet and record the diff in the
+			// blockNode.
+			scod := modules.SiacoinOutputDiff{
+				Direction:     modules.DiffApply,
+				ID:            id,
+				SiacoinOutput: sco,
+			}
+			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+			err := cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
+			if err != nil {
+				return err
+			}
 
-		// Remove the delayed siacoin output from the consensus set.
-		dscod := modules.DelayedSiacoinOutputDiff{
-			Direction:      modules.DiffRevert,
-			ID:             dscoid,
-			SiacoinOutput:  dsco,
-			MaturityHeight: pb.Height,
-		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err = cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			// Remove the delayed siacoin output from the consensus set.
+			dscod := modules.DelayedSiacoinOutputDiff{
+				Direction:      modules.DiffRevert,
+				ID:             id,
+				SiacoinOutput:  sco,
+				MaturityHeight: pb.Height,
+			}
+			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+			err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+			return nil
 		})
-		if err != nil {
-			return err
-		}
+	})
+	if err != nil {
+		return err
 	}
 
-	// Delete the map that held the now-matured outputs.
-	// Sanity check - map should be empty.
-	if build.DEBUG {
-		if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
-			panic("deleting non-empty map")
-		}
-	}
 	cs.db.rmDelayedSiacoinOutputs(pb.Height)
 	return nil
 }
@@ -195,7 +178,9 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) error {
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
 func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
-	err := cs.applyMinerPayouts(pb)
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		return cs.applyMinerPayouts(tx, pb)
+	})
 	if err != nil {
 		return err
 	}

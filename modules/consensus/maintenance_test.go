@@ -29,7 +29,12 @@ func TestApplyMinerPayouts(t *testing.T) {
 	mpid0 := pb.Block.MinerPayoutID(0)
 
 	// Apply the single miner payout.
-	cst.cs.applyMinerPayouts(pb)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMinerPayouts(tx, pb)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists := cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid0)
 	if !exists {
 		t.Error("miner payout was not created in the delayed outputs set")
@@ -65,7 +70,12 @@ func TestApplyMinerPayouts(t *testing.T) {
 	}
 	mpid1 := pb2.Block.MinerPayoutID(0)
 	mpid2 := pb2.Block.MinerPayoutID(1)
-	cst.cs.applyMinerPayouts(pb2)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMinerPayouts(tx, pb2)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid1)
 	if !exists {
 		t.Error("delayed siacoin output was not created")
@@ -92,9 +102,19 @@ func TestApplyMinerPayouts(t *testing.T) {
 		}
 		cst.cs.db.rmDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid0)
 		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
-		cst.cs.applyMinerPayouts(pb)
+		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			return cst.cs.applyMinerPayouts(tx, pb)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
-	cst.cs.applyMinerPayouts(pb)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMinerPayouts(tx, pb)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestApplyMaturedSiacoinOutputs probes the applyMaturedSiacoinOutputs method
