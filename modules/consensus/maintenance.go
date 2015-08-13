@@ -3,6 +3,8 @@ package consensus
 import (
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -50,11 +52,11 @@ func (cs *ConsensusSet) applyMinerPayouts(pb *processedBlock) {
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
+func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
 	if !(pb.Height > types.MaturityDelay) {
-		return
+		return nil
 	}
 
 	// Gather the matured outputs from the delayed outputs map
@@ -85,7 +87,12 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 			SiacoinOutput: dsco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			return cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
+		})
+		if err != nil {
+			return err
+		}
 
 		// Remove the delayed siacoin output from the consensus set.
 		dscod := modules.DelayedSiacoinOutputDiff{
@@ -106,6 +113,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 		}
 	}
 	cs.db.rmDelayedSiacoinOutputs(pb.Height)
+	return nil
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
@@ -182,8 +190,12 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) {
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
-func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) {
+func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
 	cs.applyMinerPayouts(pb)
-	cs.applyMaturedSiacoinOutputs(pb)
+	err := cs.applyMaturedSiacoinOutputs(pb)
+	if err != nil {
+		return err
+	}
 	cs.applyFileContractMaintenance(pb)
+	return nil
 }
