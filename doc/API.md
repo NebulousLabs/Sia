@@ -147,10 +147,8 @@ Function: Return a list of transactions related to the wallet.
 
 Parameters:
 ```
-struct {
-	startHeight types.BlockHeight (uint64)
-	endHeight   types.BlockHeight (uint64)
-}
+startHeight types.BlockHeight (uint64)
+endHeight   types.BlockHeight (uint64)
 ```
 'startHeight' refers to the height of the block where transaction history
 should begin.
@@ -246,9 +244,7 @@ unavailable when the wallet is locked or closed.
 
 Parameters:
 ```
-struct {
-	dictionary string
-}
+dictionary string
 ```
 'dictionary' is the name of the dictionary that should be used when encoding
 the seed.
@@ -289,10 +285,8 @@ exhaustion is reached. The encryption password is required to make this change.
 
 Parameters:
 ```
-struct {
-	encryptionKey string
-	dictionary    string
-}
+encryptionKey string
+dictionary    string
 ```
 'encryptionKey' is the key that is used to encrypt the new seed when it is
 saved to disk.
@@ -316,10 +310,8 @@ from addresses in the wallet.
 
 Parameters:
 ```
-struct {
-	amount      int
-	destination string
-}
+amount      int
+destination string
 ```
 'amount' is the number of siacoins being sent.
 
@@ -339,10 +331,8 @@ siacoins, while still letting you control the siafunds).
 
 Parameters:
 ```
-struct {
-	amount      int
-	destination string
-}
+amount      int
+destination string
 ```
 'amount' is the number of siafunds being sent.
 
@@ -372,10 +362,8 @@ Raw transactions are missing metadata such as confirmation height.
 
 Parameters:
 ```
-struct {
-	startHeight int
-	endHeight   int
-}
+startHeight int
+endHeight   int
 ```
 'startHeight' refers to the height of the block where transaction history
 should begin.
@@ -406,9 +394,7 @@ used.
 
 Parameters:
 ```
-struct {
-	encryptionKey string
-}
+encryptionKey string
 ```
 
 Response: standard

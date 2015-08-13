@@ -12,9 +12,12 @@ func TestIntegrationConsensusGET(t *testing.T) {
 		t.SkipNow()
 	}
 
-	st := newServerTester("TestConsensusGET", t)
+	st, err := createServerTester("TestConsensusGET")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var cg ConsensusGET
-	err := st.getAPI("/consensus", &cg)
+	err = st.getAPI("/consensus", &cg)
 	if err != nil {
 		t.Fatal(err)
 	}
