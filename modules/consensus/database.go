@@ -10,10 +10,11 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-var meta = persist.Metadata{
-	Version: "0.4.0",
-	Header:  "Consensus Set Database",
-}
+const (
+	ConsistencyGuard = "ConsistencyGuard"
+	GuardStart       = "GuardStart"
+	GuardEnd         = "GuardEnd"
+)
 
 var (
 	errBadSetInsert   = errors.New("attempting to add an already existing item to the consensus set")
@@ -24,6 +25,11 @@ var (
 
 	prefix_dsco = []byte("dsco_")
 	prefix_fcex = []byte("fcex_")
+
+	meta = persist.Metadata{
+		Version: "0.4.0",
+		Header:  "Consensus Set Database",
+	}
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -43,32 +49,33 @@ func openDB(filename string) (*setDB, error) {
 	}
 
 	var buckets []string = []string{
-		"FileContracts",
-		"SiafundOutputs",
-		"SiacoinOutputs",
 		"Path",
 		"BlockMap",
-		"Metadata",
+		"SiacoinOutputs",
+		"FileContracts",
+		"FileContractExpirations",
+		"SiafundOutputs",
 		"SiafundPool",
 		"DelayedSiacoinOutputs",
-		"FileContractExpirations",
 	}
 
-	// Create buckets
+	// Initialize the database.
 	err = db.Update(func(tx *bolt.Tx) error {
+		// Create the buckets.
 		for _, bucketName := range buckets {
 			_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 			if err != nil {
 				return err
 			}
 		}
-		// Initilize the consistency guards
-		b := tx.Bucket([]byte("Metadata"))
-		err := b.Put([]byte("GuardA"), encoding.Marshal(0))
+
+		// Initilize the consistency guards.
+		b, err := tx.CreateBucketIfNotExists([]byte(ConsistencyGuard))
+		err = b.Put([]byte(GuardStart), encoding.Marshal(0))
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte("GuardB"), encoding.Marshal(0))
+		return b.Put([]byte(GuardEnd), encoding.Marshal(0))
 	})
 	return &setDB{db, true}, err
 }
@@ -77,13 +84,13 @@ func openDB(filename string) (*setDB, error) {
 // equal to the second, a transaction is taking place in the database
 func (db *setDB) startConsistencyGuard() {
 	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("Metadata"))
+		b := tx.Bucket([]byte(ConsistencyGuard))
 		var i int
-		err := encoding.Unmarshal(b.Get([]byte("GuardA")), &i)
+		err := encoding.Unmarshal(b.Get([]byte(GuardStart)), &i)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte("GuardA"), encoding.Marshal(i+1))
+		return b.Put([]byte(GuardStart), encoding.Marshal(i+1))
 	})
 	if err != nil {
 		panic(err)
@@ -94,13 +101,13 @@ func (db *setDB) startConsistencyGuard() {
 // equal to the second, a transaction is taking place in the database
 func (db *setDB) stopConsistencyGuard() {
 	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("Metadata"))
+		b := tx.Bucket([]byte(ConsistencyGuard))
 		var i int
-		err := encoding.Unmarshal(b.Get([]byte("GuardB")), &i)
+		err := encoding.Unmarshal(b.Get([]byte(GuardEnd)), &i)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte("GuardB"), encoding.Marshal(i+1))
+		return b.Put([]byte(GuardEnd), encoding.Marshal(i+1))
 	})
 	if err != nil {
 		panic(err)
@@ -113,13 +120,13 @@ func (db *setDB) stopConsistencyGuard() {
 func (db *setDB) checkConsistencyGuard() bool {
 	var guarded bool
 	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("Metadata"))
+		b := tx.Bucket([]byte(ConsistencyGuard))
 		var x, y int
-		err := encoding.Unmarshal(b.Get([]byte("GuardA")), &x)
+		err := encoding.Unmarshal(b.Get([]byte(GuardStart)), &x)
 		if err != nil {
 			return err
 		}
-		err = encoding.Unmarshal(b.Get([]byte("GuardB")), &y)
+		err = encoding.Unmarshal(b.Get([]byte(GuardEnd)), &y)
 		if err != nil {
 			return err
 		}
@@ -380,11 +387,6 @@ func (db *setDB) rmSiafundOutputs(id types.SiafundOutputID) error {
 	return db.rmItem("SiafundOutputs", id)
 }
 
-// lenSiafundOutputs returns the size of the SiafundOutputs bucket
-func (db *setDB) lenSiafundOutputs() uint64 {
-	return db.lenBucket("SiafundOutputs")
-}
-
 func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
 	db.forEachItem("SiafundOutputs", func(kb, vb []byte) error {
 		var key types.SiafundOutputID
@@ -431,11 +433,6 @@ func (db *setDB) inFileContracts(id types.FileContractID) bool {
 // rmFileContracts removes a file contract from the consensus set
 func (db *setDB) rmFileContracts(id types.FileContractID) error {
 	return db.rmItem("FileContracts", id)
-}
-
-// lenFileContracts returns the number of file contracts in the consensus set
-func (db *setDB) lenFileContracts() uint64 {
-	return db.lenBucket("FileContracts")
 }
 
 // forEachFileContracts applies a function to each (file contract id, filecontract)
@@ -485,11 +482,6 @@ func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
 // rmSiacoinOutputs removes a siacoin output form the siacoin outputs map
 func (db *setDB) rmSiacoinOutputs(id types.SiacoinOutputID) error {
 	return db.rmItem("SiacoinOutputs", id)
-}
-
-// lenSiacoinOutputs returns the size of the siacoin outputs bucket
-func (db *setDB) lenSiacoinOutputs() uint64 {
-	return db.lenBucket("SiacoinOutputs")
 }
 
 // forEachSiacoinOutputs applies a function to every siacoin output and ID
@@ -712,12 +704,6 @@ func (db *setDB) rmFCExpirations(h types.BlockHeight) {
 func (db *setDB) rmFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
 	return db.rmItem(string(bucketID), id)
-}
-
-// lenFCExpirationsHeight returns the number of file contracts which expire at a given height
-func (db *setDB) lenFCExpirationsHeight(h types.BlockHeight) uint64 {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	return db.lenBucket(string(bucketID))
 }
 
 // forEachFCExpirationsHeight applies a function to every file

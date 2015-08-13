@@ -48,8 +48,9 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			}
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
-			// these errors are benign
-			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == ErrBlockKnown {
+			// ErrNonExtendingBlock must be ignored until headers-first block
+			// sharing is implemented.
+			if acceptErr == modules.ErrNonExtendingBlock {
 				acceptErr = nil
 			}
 			if acceptErr != nil {

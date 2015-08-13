@@ -21,7 +21,7 @@ func (cs *ConsensusSet) initSetDB() error {
 	cs.db.setSiafundPool(cs.siafundPool)
 
 	// add genesis block
-	err := cs.db.addBlockMap(cs.blockRoot)
+	err := cs.db.addBlockMap(&cs.blockRoot)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (cs *ConsensusSet) initSetDB() error {
 
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
-		cs.db.updateBlockMap(cs.blockRoot)
+		cs.db.updateBlockMap(&cs.blockRoot)
 	}
 
 	cs.db.stopConsistencyGuard()
@@ -115,7 +115,7 @@ func (cs *ConsensusSet) loadDiffs() {
 
 	// Do a consistency check after loading the database. This
 	// will be redundant when debug is turned on
-	if height > 1 {
+	if height > 1 && build.DEBUG {
 		// consistency guard
 		if cs.db.checkConsistencyGuard() {
 			panic(ErrInconsistentSet)
