@@ -264,7 +264,10 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		if err != nil {
 			return modules.ConsensusChange{}, err
 		}
-		cs.applyTransaction(diffHolder, txn)
+		err = cs.applyTransaction(diffHolder, txn)
+		if err != nil {
+			return modules.ConsensusChange{}, err
+		}
 	}
 	cc := modules.ConsensusChange{
 		SiacoinOutputDiffs:        diffHolder.SiacoinOutputDiffs,

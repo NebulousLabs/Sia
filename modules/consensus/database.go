@@ -210,11 +210,24 @@ func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error
 	return item, err
 }
 
+func removeItem(tx *bolt.Tx, bucket []byte, key interface{}) error {
+	k := encoding.Marshal(key)
+	b := tx.Bucket(bucket)
+	if build.DEBUG && b == nil {
+		panic(errNilBucket)
+	}
+	item := b.Get(k)
+	if build.DEBUG && item == nil {
+		panic(errNilItem)
+	}
+	return b.Delete(k)
+}
+
 // rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket []byte, key interface{}) error {
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
+		b := tx.Bucket(bucket)
 		if build.DEBUG {
 			// Sanity check to make sure the bucket exists.
 			if b == nil {
@@ -484,6 +497,10 @@ func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.Fi
 	})
 }
 
+func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	return insertItem(tx, SiacoinOutputs, id, sco)
+}
+
 // addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
 func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 	return db.Update(func(tx *bolt.Tx) error {
@@ -509,6 +526,10 @@ func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput
 // in the siacoin outputs bucket
 func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
 	return db.inBucket(SiacoinOutputs, id)
+}
+
+func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
+	return removeItem(tx, SiacoinOutputs, id)
 }
 
 // rmSiacoinOutputs removes a siacoin output form the siacoin outputs map

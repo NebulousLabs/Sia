@@ -109,8 +109,8 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	// perform a catch to read the error that is created.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplySiacoinInput {
-			t.Error("no panic occured when misusing applySiacoinInput")
+		if r == nil {
+			t.Error("expecting error after corrupting database")
 		}
 	}()
 	cst.cs.applySiacoinInputs(pb, txn)

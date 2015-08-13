@@ -36,22 +36,13 @@ var (
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
-// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding an output twice, or deleting an
-	// output that does not exist.
-	if build.DEBUG {
-		exists := cs.db.inSiacoinOutputs(scod.ID)
-		if exists == (scod.Direction == dir) {
-			panic(errBadCommitSiacoinOutputDiff)
-		}
-	}
-
+// commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
+// a database transaction.
+func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
 	if scod.Direction == dir {
-		cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
-	} else {
-		cs.db.rmSiacoinOutputs(scod.ID)
+		return addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
 	}
+	return removeSiacoinOutput(tx, scod.ID)
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
@@ -212,10 +203,15 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *process
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
 		for _, scod := range pb.SiacoinOutputDiffs {
-			cs.commitSiacoinOutputDiff(scod, dir)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.commitTxSiacoinOutputDiff(tx, scod, dir)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		for _, fcd := range pb.FileContractDiffs {
 			cs.commitFileContractDiff(fcd, dir)
@@ -231,7 +227,12 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 		}
 	} else {
 		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-			cs.commitSiacoinOutputDiff(pb.SiacoinOutputDiffs[i], dir)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.commitTxSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
 			cs.commitFileContractDiff(pb.FileContractDiffs[i], dir)
@@ -246,6 +247,7 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 			cs.commitSiafundPoolDiff(pb.SiafundPoolDiffs[i], dir)
 		}
 	}
+	return nil
 }
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
@@ -358,14 +360,20 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			return err
 		}
 
-		cs.applyTransaction(pb, txn)
+		err = cs.applyTransaction(pb, txn)
+		if err != nil {
+			return err
+		}
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	cs.applyMaintenance(pb)
+	err = cs.applyMaintenance(pb)
+	if err != nil {
+		return err
+	}
 
 	if build.DEBUG {
 		pb.ConsensusSetHash = cs.consensusSetHash()
