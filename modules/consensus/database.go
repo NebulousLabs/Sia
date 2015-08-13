@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -10,17 +11,11 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const (
-	ConsistencyGuard = "ConsistencyGuard"
-	GuardStart       = "GuardStart"
-	GuardEnd         = "GuardEnd"
-)
-
 var (
 	errBadSetInsert   = errors.New("attempting to add an already existing item to the consensus set")
 	errNilBucket      = errors.New("using a bucket that does not exist")
 	errNilItem        = errors.New("requested item does not exist")
-	errNotGuarded     = errors.New("database modification not protected by guard")
+	errDBInconsistent = errors.New("database guard indicates inconsistency within database")
 	errNonEmptyBucket = errors.New("cannot remove a map with objects still in it")
 
 	prefix_dsco = []byte("dsco_")
@@ -30,6 +25,10 @@ var (
 		Version: "0.4.0",
 		Header:  "Consensus Set Database",
 	}
+
+	ConsistencyGuard = []byte("ConsistencyGuard")
+	GuardStart       = []byte("GuardStart")
+	GuardEnd         = []byte("GuardEnd")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -70,73 +69,46 @@ func openDB(filename string) (*setDB, error) {
 		}
 
 		// Initilize the consistency guards.
-		b, err := tx.CreateBucketIfNotExists([]byte(ConsistencyGuard))
-		err = b.Put([]byte(GuardStart), encoding.Marshal(0))
+		cg, err := tx.CreateBucketIfNotExists(ConsistencyGuard)
+		err = cg.Put(GuardStart, encoding.Marshal(0))
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(GuardEnd), encoding.Marshal(0))
+		return cg.Put(GuardEnd, encoding.Marshal(0))
 	})
 	return &setDB{db, true}, err
 }
 
 // startConsistencyGuard increments the first guard. If this is not
 // equal to the second, a transaction is taking place in the database
-func (db *setDB) startConsistencyGuard() {
-	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(ConsistencyGuard))
+func (db *setDB) startConsistencyGuard() error {
+	return db.Update(func(tx *bolt.Tx) error {
+		cg := tx.Bucket(ConsistencyGuard)
+		if !bytes.Equal(cg.Get(GuardStart), cg.Get(GuardEnd)) {
+			return errDBInconsistent
+		}
+
 		var i int
-		err := encoding.Unmarshal(b.Get([]byte(GuardStart)), &i)
+		err := encoding.Unmarshal(cg.Get(GuardStart), &i)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(GuardStart), encoding.Marshal(i+1))
+		return cg.Put(GuardStart, encoding.Marshal(i+1))
 	})
-	if err != nil {
-		panic(err)
-	}
 }
 
 // startConsistencyGuard increments the first guard. If this is not
 // equal to the second, a transaction is taking place in the database
-func (db *setDB) stopConsistencyGuard() {
-	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(ConsistencyGuard))
+func (db *setDB) stopConsistencyGuard() error {
+	return db.Update(func(tx *bolt.Tx) error {
+		cg := tx.Bucket(ConsistencyGuard)
 		var i int
-		err := encoding.Unmarshal(b.Get([]byte(GuardEnd)), &i)
+		err := encoding.Unmarshal(cg.Get(GuardEnd), &i)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(GuardEnd), encoding.Marshal(i+1))
+		return cg.Put(GuardEnd, encoding.Marshal(i+1))
 	})
-	if err != nil {
-		panic(err)
-	}
-}
-
-// checkConsistencyGuard checks the two guards and returns true if
-// they differ. This signifies that thaer there is a transaction
-// taking place.
-func (db *setDB) checkConsistencyGuard() bool {
-	var guarded bool
-	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(ConsistencyGuard))
-		var x, y int
-		err := encoding.Unmarshal(b.Get([]byte(GuardStart)), &x)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(b.Get([]byte(GuardEnd)), &y)
-		if err != nil {
-			return err
-		}
-		guarded = x != y
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-	return guarded
 }
 
 // addItem should only be called from this file, and adds a new item
@@ -147,9 +119,6 @@ func (db *setDB) checkConsistencyGuard() bool {
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	// Check that this transaction is guarded by consensusGuard.
 	// However, allow direct database modifications when testing
-	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
-		panic(errNotGuarded)
-	}
 	v := encoding.Marshal(value)
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -172,9 +141,6 @@ func (db *setDB) addItem(bucket string, key, value interface{}) error {
 // updateItem removes and inserts an item in a single database
 // transaction. The item must exist, otherwise this will panic.
 func (db *setDB) updateItem(bucket string, key, value interface{}) {
-	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
-		panic(errNotGuarded)
-	}
 	v := encoding.Marshal(value)
 	k := encoding.Marshal(key)
 	err := db.Update(func(tx *bolt.Tx) error {
@@ -220,9 +186,6 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 
 // rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket string, key interface{}) error {
-	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
-		panic(errNotGuarded)
-	}
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
@@ -277,9 +240,6 @@ func (db *setDB) forEachItem(bucket string, fn func(k, v []byte) error) {
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
 func (db *setDB) pushPath(bid types.BlockID) error {
-	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
-		panic(errNotGuarded)
-	}
 	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
@@ -291,9 +251,6 @@ func (db *setDB) pushPath(bid types.BlockID) error {
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func (db *setDB) popPath() error {
-	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
-		panic(errNotGuarded)
-	}
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))

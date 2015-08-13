@@ -51,7 +51,7 @@ func (cs *ConsensusSet) earliestChildTimestamp(pb *processedBlock) types.Timesta
 
 		// If we are at the genesis block, keep using the genesis block for the
 		// remaining times.
-		if current.Parent != types.ZeroID {
+		if current.Parent != (types.BlockID{}) {
 			current = cs.db.getBlockMap(current.Parent)
 		}
 	}
@@ -90,7 +90,7 @@ func (cs *ConsensusSet) targetAdjustmentBase(pb *processedBlock) *big.Rat {
 	// block.
 	var windowSize types.BlockHeight
 	windowStart := pb
-	for windowSize = 0; windowSize < types.TargetWindow && windowStart.Parent != types.ZeroID; windowSize++ {
+	for windowSize = 0; windowSize < types.TargetWindow && windowStart.Parent != (types.BlockID{}); windowSize++ {
 		windowStart = cs.db.getBlockMap(windowStart.Parent)
 	}
 
