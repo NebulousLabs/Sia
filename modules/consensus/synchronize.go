@@ -21,6 +21,9 @@ const (
 func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
 	lockID := s.mu.RLock()
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	history := s.blockHistory()
 	s.mu.RUnlock(lockID)
 	if err := encoding.WriteObject(conn, history); err != nil {
@@ -95,9 +98,6 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
-	if !s.db.open {
-		return errors.New("database not open")
-	}
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
@@ -109,6 +109,9 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	found := false
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	for _, id := range knownBlocks {
 		if s.db.inBlockMap(id) {
 			pb := s.db.getBlockMap(id)
@@ -119,11 +122,12 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			}
 		}
 	}
-	s.mu.RUnlock(lockID)
 
 	// If no matching blocks are found, or if the caller has all known blocks,
 	// don't send any blocks.
-	if !found || start > s.Height() {
+	h := s.height()
+	s.mu.RUnlock(lockID)
+	if !found || start > h {
 		// Send 0 blocks.
 		err = encoding.WriteObject(conn, []types.Block{})
 		if err != nil {
@@ -139,6 +143,10 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		// Get the set of blocks to send.
 		var blocks []types.Block
 		lockID = s.mu.RLock()
+		if !s.db.open {
+			return errors.New("database not open")
+		}
+
 		{
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
