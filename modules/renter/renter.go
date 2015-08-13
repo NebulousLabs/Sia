@@ -24,6 +24,7 @@ type Renter struct {
 	blockHeight types.BlockHeight
 
 	files         map[string]*file
+	contracts     map[types.FileContractID]types.FileContract
 	downloadQueue []*download
 	saveDir       string
 
@@ -102,3 +103,6 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	return
 }
+
+// enforce that Renter satisfies the modules.Renter interface
+var _ modules.Renter = (*Renter)(nil)

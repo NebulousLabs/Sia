@@ -30,20 +30,6 @@ type file struct {
 	chunksUploaded uint64
 }
 
-// chunkSize returns the size of one chunk.
-func (f *file) chunkSize() uint64 {
-	return f.pieceSize * uint64(f.ecc.MinPieces())
-}
-
-// numChunks returns the number of chunks that f was split into.
-func (f *file) numChunks() uint64 {
-	n := f.Size / f.chunkSize()
-	if f.Size%f.chunkSize() != 0 {
-		n++
-	}
-	return n
-}
-
 // A fileContract is a contract covering an arbitrary number of file pieces.
 // Chunk/Piece metadata is used to split the raw contract data appropriately.
 type fileContract struct {
@@ -61,6 +47,20 @@ type pieceData struct {
 	Piece  uint64 // the index of the piece in the chunk
 	Offset uint64 // the offset of the piece in the file contract
 	Length uint64 // the length of the piece
+}
+
+// chunkSize returns the size of one chunk.
+func (f *file) chunkSize() uint64 {
+	return f.pieceSize * uint64(f.ecc.MinPieces())
+}
+
+// numChunks returns the number of chunks that f was split into.
+func (f *file) numChunks() uint64 {
+	n := f.Size / f.chunkSize()
+	if f.Size%f.chunkSize() != 0 {
+		n++
+	}
+	return n
 }
 
 // Available indicates whether the file is ready to be downloaded.
