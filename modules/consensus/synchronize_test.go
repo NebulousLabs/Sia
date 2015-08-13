@@ -171,7 +171,7 @@ func TestBlockHistory(t *testing.T) {
 	defer cst.closeCst()
 
 	// mine until we have enough blocks to test blockHistory
-	for cst.cs.Height() < MaxCatchUpBlocks {
+	for cst.cs.Height() < 50 {
 		b, _ := cst.miner.FindBlock()
 		err = cst.cs.AcceptBlock(b)
 		if err != nil {
