@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -26,27 +28,43 @@ var (
 
 // validHeader does some early, low computation verification on the block.
 func (cs *ConsensusSet) validHeader(b types.Block) error {
-	// Grab the parent of the block and verify the ID of the child meets the
-	// target. This is done as early as possible to enforce that any
-	// block-related DoS must use blocks that have sufficient work.
-	exists := cs.db.inBlockMap(b.ParentID)
-	if !exists {
-		return ErrOrphan
-	}
-	parent := cs.db.getBlockMap(b.ParentID)
-	if !b.CheckTarget(parent.ChildTarget) {
-		return ErrMissedTarget
+	// Do read-only verification operations inside of a single read-only boltdb
+	// tx.
+	var parent processedBlock
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Check that the parent exists.
+		blockMap := tx.Bucket(BlockMap)
+
+		// The identifier for the BlockMap is the sia encoding of the parent
+		// id. The sia encoding is the same as ParentID[:].
+		parentBytes := blockMap.Get(b.ParentID[:])
+		if parentBytes == nil {
+			return ErrOrphan
+		}
+		err := encoding.Unmarshal(parentBytes, &parent)
+		if err != nil {
+			return err
+		}
+
+		// Check that the target of the new block is sufficient.
+		if !b.CheckTarget(parent.ChildTarget) {
+			return ErrMissedTarget
+		}
+
+		// Check that the timestamp is not too far in the past to be
+		// acceptable.
+		if earliestChildTimestamp(blockMap, &parent) > b.Timestamp {
+			return ErrEarlyTimestamp
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// Check that the block is below the size limit.
 	if uint64(len(encoding.Marshal(b))) > types.BlockSizeLimit {
 		return ErrLargeBlock
-	}
-
-	// Check that the timestamp is not in 'the past', where the past is defined
-	// by earliestChildTimestamp.
-	if cs.earliestChildTimestamp(parent) > b.Timestamp {
-		return ErrEarlyTimestamp
 	}
 
 	// If the block is in the extreme future, return an error and do nothing

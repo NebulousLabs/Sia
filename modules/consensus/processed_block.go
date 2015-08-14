@@ -1,11 +1,15 @@
 package consensus
 
 import (
+	"encoding/binary"
+	"math/big"
+	"sort"
+
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"math/big"
-	"sort"
 )
 
 // SurpassThreshold is a percentage that dictates how much heavier a competing
@@ -42,18 +46,30 @@ type processedBlock struct {
 // earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
-func (cs *ConsensusSet) earliestChildTimestamp(pb *processedBlock) types.Timestamp {
+//
+// To boost performance, earliestChildTimestamp is passed a bucket that it can
+// use from inside of a boltdb transaction.
+func earliestChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
-	current := pb
-	for i := uint64(0); i < types.MedianTimestampWindow; i++ {
-		windowTimes[i] = current.Block.Timestamp
-
-		// If we are at the genesis block, keep using the genesis block for the
-		// remaining times.
-		if current.Parent != (types.BlockID{}) {
-			current = cs.db.getBlockMap(current.Parent)
+	windowTimes[0] = pb.Block.Timestamp
+	parent := pb.Parent
+	for i := uint64(1); i < types.MedianTimestampWindow; i++ {
+		// If the genesis block is 'parent', use the genesis block timestamp
+		// for all remaining times.
+		if parent == (types.BlockID{}) {
+			windowTimes[i] = windowTimes[i-1]
+			continue
 		}
+
+		// Get the next parent's bytes. Because the ordering is specific, the
+		// parent does not need to be decoded entirely to get the desired
+		// information. This provides a performance boost. The id of the next
+		// parent lies at the first 32 bytes, and the timestamp of the block
+		// lies at bytes 40-48.
+		parentBytes := blockMap.Get(parent[:])
+		copy(parent[:], parentBytes[:crypto.HashSize])
+		windowTimes[i] = types.Timestamp(binary.LittleEndian.Uint64(parentBytes[40:48]))
 	}
 	sort.Sort(windowTimes)
 
