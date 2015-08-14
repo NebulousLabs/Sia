@@ -145,6 +145,21 @@ func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
 	return b.Put(k, v)
 }
 
+// removeItem deletes an item from a bucket. In debug mode, a panic is thrown
+// if the bucket does not exist or if the item is not in the bucket.
+func removeItem(tx *bolt.Tx, bucket []byte, key interface{}) error {
+	k := encoding.Marshal(key)
+	b := tx.Bucket(bucket)
+	if build.DEBUG && b == nil {
+		panic(errNilBucket)
+	}
+	item := b.Get(k)
+	if build.DEBUG && item == nil {
+		panic(errNilItem)
+	}
+	return b.Delete(k)
+}
+
 // getItem returns an item from a bucket. In debug mode, a panic is thrown if
 // the bucket does not exist or if the item does not exist.
 func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
@@ -158,6 +173,24 @@ func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
 		panic(errNilItem)
 	}
 	return item, nil
+}
+
+// forEach iterates through a bucket, calling the supplied closure on each
+// element.
+func forEach(tx *bolt.Tx, bucket []byte, fn func(k, v []byte) error) error {
+	b := tx.Bucket(bucket)
+	if build.DEBUG && b == nil {
+		panic(errNilBucket)
+	}
+	return b.ForEach(fn)
+}
+
+// pushPath adds a block to the BlockPath at current height + 1.
+func pushPath(tx *bolt.Tx, bid types.BlockID) error {
+	b := tx.Bucket(BlockPath)
+	key := encoding.EncUint64(uint64(b.Stats().KeyN))
+	value := encoding.Marshal(bid)
+	return b.Put(key, value)
 }
 
 // getItem is a generic function to insert an item into the set database
@@ -179,19 +212,6 @@ func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error
 		return nil
 	})
 	return item, err
-}
-
-func removeItem(tx *bolt.Tx, bucket []byte, key interface{}) error {
-	k := encoding.Marshal(key)
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	item := b.Get(k)
-	if build.DEBUG && item == nil {
-		panic(errNilItem)
-	}
-	return b.Delete(k)
 }
 
 // rmItem removes an item from a bucket
@@ -232,14 +252,6 @@ func (db *setDB) lenBucket(bucket []byte) uint64 {
 	return s
 }
 
-func forEach(tx *bolt.Tx, bucket []byte, fn func(k, v []byte) error) error {
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	return b.ForEach(fn)
-}
-
 // forEachItem runs a given function on every element in a given
 // bucket name, and will panic on any error
 func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
@@ -253,14 +265,6 @@ func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-// pushPath adds a block to the BlockPath at current height + 1.
-func pushPath(tx *bolt.Tx, bid types.BlockID) error {
-	b := tx.Bucket(BlockPath)
-	key := encoding.EncUint64(uint64(b.Stats().KeyN))
-	value := encoding.Marshal(bid)
-	return b.Put(key, value)
 }
 
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
