@@ -48,8 +48,8 @@ func (cs *ConsensusSet) initSetDB() error {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
 		cs.db.updateBlockMap(&cs.blockRoot)
 	}
-
-	return cs.db.stopConsistencyGuard()
+	cs.db.stopConsistencyGuard()
+	return nil
 }
 
 // load pulls all the blocks that have been saved to disk into memory, using
@@ -125,9 +125,6 @@ func (cs *ConsensusSet) loadDiffs() {
 		if err != nil {
 			panic(err)
 		}
-		err = cs.db.stopConsistencyGuard()
-		if err != nil {
-			panic(err)
-		}
+		cs.db.stopConsistencyGuard()
 	}
 }

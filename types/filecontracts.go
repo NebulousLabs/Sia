@@ -110,12 +110,12 @@ func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i uint6
 
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
-	// COMPATv0.4.0 - until the first 15,000 blocks have been archived, they
+	// COMPATv0.4.0 - until the first 20,000 blocks have been archived, they
 	// will need to be handled in a special way.
 	CurrentHeightLock.Lock()
 	height := CurrentHeight
 	CurrentHeightLock.Unlock()
-	if (height < 15e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
+	if (height < 20e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
 		return fc.Payout.MulFloat(0.039).RoundDown(SiafundCount)
 	}
 	return fc.Payout.MulTax().RoundDown(SiafundCount)

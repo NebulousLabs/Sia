@@ -32,11 +32,11 @@ func startDaemon() error {
 	go func() {
 		for {
 			time.Sleep(time.Second * 15)
-			fmt.Println(profile.PrintTimes())
 			fmt.Println("Uptime:", profile.Uptime())
 			types.CurrentHeightLock.Lock()
 			fmt.Println("Height:", types.CurrentHeight)
 			types.CurrentHeightLock.Unlock()
+			fmt.Println(profile.PrintTimes())
 		}
 	}()
 
