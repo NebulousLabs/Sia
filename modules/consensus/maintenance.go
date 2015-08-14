@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,13 +21,13 @@ var (
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
 func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
-	for i, payout := range pb.Block.MinerPayouts {
+	for i := range pb.Block.MinerPayouts {
 		// Create and apply the delayed miner payout.
 		mpid := pb.Block.MinerPayoutID(uint64(i))
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
 			ID:             mpid,
-			SiacoinOutput:  payout,
+			SiacoinOutput:  pb.Block.MinerPayouts[i],
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
@@ -170,17 +171,23 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) error {
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
 func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
+	profile.ToggleTimer("MP")
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		return cs.applyMinerPayouts(tx, pb)
 	})
+	profile.ToggleTimer("MP")
 	if err != nil {
 		return err
 	}
+	profile.ToggleTimer("FCM")
 	err = cs.applyFileContractMaintenance(pb)
+	profile.ToggleTimer("FCM")
 	if err != nil {
 		return err
 	}
+	profile.ToggleTimer("MSO")
 	err = cs.applyMaturedSiacoinOutputs(pb)
+	profile.ToggleTimer("MSO")
 	if err != nil {
 		return err
 	}
