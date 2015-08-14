@@ -232,13 +232,18 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *process
 // commitNodeDiffs commits all of the diffs in a block node.
 func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
-		for _, scod := range pb.SiacoinOutputDiffs {
-			err := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.commitTxSiacoinOutputDiff(tx, scod, dir)
-			})
-			if err != nil {
-				return err
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			scoBucket := tx.Bucket(SiacoinOutputs)
+			for _, scod := range pb.SiacoinOutputDiffs {
+				err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, dir)
+				if err != nil {
+					return err
+				}
 			}
+			return nil
+		})
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
 		for _, fcd := range pb.FileContractDiffs {
 			cs.commitFileContractDiff(fcd, dir)
