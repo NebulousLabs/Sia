@@ -71,10 +71,14 @@ func TestRenterDeleteFile(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt := newRenterTester("TestRenterDeleteFile", t)
+	rt, err := newRenterTester("TestRenterDeleteFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
 
 	// Delete a file from an empty renter.
-	err := rt.renter.DeleteFile("dne")
+	err = rt.renter.DeleteFile("dne")
 	if err != ErrUnknownNickname {
 		t.Error("Expected ErrUnknownNickname:", err)
 	}
@@ -119,7 +123,11 @@ func TestRenterFileList(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt := newRenterTester("TestRenterFileList", t)
+	rt, err := newRenterTester("TestRenterFileList")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
 
 	// Get the file list of an empty renter.
 	if len(rt.renter.FileList()) != 0 {
@@ -157,10 +165,14 @@ func TestRenterRenameFile(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt := newRenterTester("TestRenterRenameFile", t)
+	rt, err := newRenterTester("TestRenterRenameFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
 
 	// Rename a file that doesn't exist.
-	err := rt.renter.RenameFile("1", "1a")
+	err = rt.renter.RenameFile("1", "1a")
 	if err != ErrUnknownNickname {
 		t.Error("Expecting ErrUnknownNickname:", err)
 	}
