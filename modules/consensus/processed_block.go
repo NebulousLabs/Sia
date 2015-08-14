@@ -124,15 +124,6 @@ func (cs *ConsensusSet) targetAdjustmentBase(pb *processedBlock) *big.Rat {
 	return big.NewRat(int64(timePassed), int64(expectedTimePassed))
 }
 
-// setChildTarget computes the target of a blockNode's child. All children of a node
-// have the same target.
-func (cs *ConsensusSet) setChildTarget(pb *processedBlock) {
-	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(pb))
-	parent := cs.db.getBlockMap(pb.Parent)
-	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
-	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
-}
-
 // clampTargetAdjustment returns a clamped version of the base adjustment
 // value. The clamp keeps the maximum adjustment to ~7x every 2000 blocks. This
 // ensures that raising and lowering the difficulty requires a minimum amount
@@ -147,8 +138,19 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 	return base
 }
 
+// setChildTarget computes the target of a blockNode's child. All children of a node
+// have the same target.
+func (cs *ConsensusSet) setChildTarget(pb *processedBlock) {
+	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(pb))
+	parent := cs.db.getBlockMap(pb.Parent)
+	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
+	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
+}
+
 // newChild creates a blockNode from a block and adds it to the parent's set of
 // children. The new node is also returned. It necessairly modifies the database
+//
+// TODO: newChild has a fair amount of room for optimization.
 func (cs *ConsensusSet) newChild(pb *processedBlock, b types.Block) *processedBlock {
 	// Create the child node.
 	child := &processedBlock{
