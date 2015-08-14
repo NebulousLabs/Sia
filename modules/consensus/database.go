@@ -153,8 +153,7 @@ func removeItem(tx *bolt.Tx, bucket []byte, key interface{}) error {
 	if build.DEBUG && b == nil {
 		panic(errNilBucket)
 	}
-	item := b.Get(k)
-	if build.DEBUG && item == nil {
+	if build.DEBUG && b.Get(k) == nil {
 		panic(errNilItem)
 	}
 	return b.Delete(k)
@@ -508,7 +507,11 @@ func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.Fi
 }
 
 func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	return insertItem(tx, SiacoinOutputs, id, sco)
+	siacoinOutputs := tx.Bucket(SiacoinOutputs)
+	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
+		panic(errRepeatInsert)
+	}
+	return siacoinOutputs.Put(id[:], encoding.Marshal(sco))
 }
 
 // addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
@@ -627,19 +630,17 @@ func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.Sia
 }
 
 func removeDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
-	b := tx.Bucket(bucketID)
-	if b == nil {
-		return errNilBucket
-	}
-	if b.Stats().KeyN != 0 {
-		return errNonEmptyBucket
-	}
+	bhBytes := encoding.EncUint64(uint64(bh))
+	bucketID := append(prefix_dsco, bhBytes...)
 	err := tx.DeleteBucket(bucketID)
 	if err != nil {
 		return err
 	}
-	return removeItem(tx, DSCOBuckets, bh)
+	b := tx.Bucket(DSCOBuckets)
+	if build.DEBUG && b.Get(bhBytes) == nil {
+		panic(errNilItem)
+	}
+	return b.Delete(bhBytes)
 }
 
 // rmDelayedSiacoinOutputs removes a height and its corresponding
