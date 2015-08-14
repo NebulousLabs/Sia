@@ -6,11 +6,7 @@ import (
 	"testing"
 )
 
-func (h *testHost) connect() (fileContract, error) {
-	return fileContract{}, nil
-}
-
-func (h *testHost) addPiece(p uploadPiece) (fileContract, error) {
+func (h *testHost) addPiece(p uploadPiece) (*fileContract, error) {
 	h.pieceMap[p.chunkIndex] = append(h.pieceMap[p.chunkIndex], pieceData{
 		p.chunkIndex,
 		p.pieceIndex,
@@ -18,7 +14,7 @@ func (h *testHost) addPiece(p uploadPiece) (fileContract, error) {
 		uint64(len(p.data)),
 	})
 	h.data = append(h.data, p.data...)
-	return fileContract{}, nil
+	return nil, nil
 }
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.

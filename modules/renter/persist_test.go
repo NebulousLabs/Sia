@@ -126,6 +126,9 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 	defer rt.Close()
 
+	// Generate initial renter.json
+	rt.renter.save()
+
 	// Create and save some files
 	f1 := newTestingFile()
 	rt.renter.saveFile(f1)
@@ -133,9 +136,6 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f2)
 	f3 := newTestingFile()
 	rt.renter.saveFile(f3)
-
-	// Clear the files from the renter.
-	rt.renter.files = map[string]*file{}
 
 	// load should now load the files into memory.
 	err = rt.renter.load()

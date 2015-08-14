@@ -141,12 +141,7 @@ func (r *Renter) saveFile(f *file) error {
 		return err
 	}
 
-	// Update file entry in renter.
-	id := r.mu.Lock()
-	r.files[f.Name] = f
-	r.mu.Unlock(id)
-
-	return r.save()
+	return nil
 }
 
 // save stores the current renter data to disk.

@@ -3,9 +3,12 @@ package renter
 import (
 	"errors"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -18,33 +21,75 @@ type uploadPiece struct {
 
 // An uploader uploads pieces to a host. This interface exists to facilitate
 // easy testing.
-// TODO: once fileContracts are stored in the renter, have these return IDs?
 type uploader interface {
-	// connect initiates the connection to the uploader.
-	connect() (fileContract, error)
-
 	// addPiece uploads a piece to the uploader.
-	addPiece(uploadPiece) (fileContract, error)
+	addPiece(uploadPiece) (*fileContract, error)
+}
+
+// A hostUploader uploads pieces to a host. It implements the uploader interface.
+type hostUploader struct {
+	conn      net.Conn
+	masterKey crypto.TwofishKey
+	contract  fileContract
+	renter    *Renter
+}
+
+// addPiece uploads a piece to a host, and returns the updated fileContract.
+func (hu *hostUploader) addPiece(p uploadPiece) (*fileContract, error) {
+	// encrypt piece data
+	key := deriveKey(hu.masterKey, p.chunkIndex, p.pieceIndex)
+	encPiece, err := key.EncryptBytes(p.data)
+	if err != nil {
+		return nil, err
+	}
+
+	// revise contract with host (see negotiate.go)
+	offset, err := hu.renter.revise(hu.contract.ID, encPiece)
+	if err != nil {
+		return nil, err
+	}
+
+	// update fileContract
+	hu.contract.Pieces = append(hu.contract.Pieces, pieceData{
+		Chunk:  p.chunkIndex,
+		Piece:  p.pieceIndex,
+		Offset: offset,
+		Length: uint64(len(encPiece)),
+	})
+
+	return &hu.contract, nil
+}
+
+// newHostUploader establishes a connection to a host.
+func (r *Renter) newHostUploader(host modules.HostSettings, masterKey crypto.TwofishKey) (*hostUploader, error) {
+	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	// initialize file contract (see negotiate.go)
+	fcid, err := r.negotiateContract(conn, host)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hostUploader{
+		conn:      conn,
+		masterKey: masterKey,
+		contract:  fileContract{ID: fcid, IP: host.IPAddress},
+		renter:    r,
+	}, nil
 }
 
 // worker uploads pieces to a host as directed by reqChan. It sends the
 // updated fileContract down respChan.
 func (f *file) worker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
-	// TODO: move connect outside worker
-	_, err := host.connect()
-	if err != nil {
-		for range reqChan {
-			respChan <- nil
-		}
-		return
-	}
 	for req := range reqChan {
 		contract, err := host.addPiece(req)
 		if err != nil {
-			respChan <- nil
-			continue
+			contract = nil
 		}
-		respChan <- &contract
+		respChan <- contract
 	}
 }
 
@@ -142,6 +187,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return err
 	}
 
+	// Check that we have enough money to finance the upload.
 	err = r.checkWalletBalance(up)
 	if err != nil {
 		return err
@@ -186,9 +232,13 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 
 	// Upload to hosts in parallel.
 	var hosts []uploader
-	// TODO: hostDB needs to provide uploaders, or we need to convert them somehow
-	for range r.hostDB.RandomHosts(up.ECC.NumPieces()) {
-		hosts = append(hosts, nil)
+	for _, host := range r.hostDB.RandomHosts(up.ECC.NumPieces()) {
+		host, err := r.newHostUploader(host, f.MasterKey)
+		if err != nil {
+			return err
+		}
+		defer host.conn.Close()
+		hosts = append(hosts, host)
 	}
 	err = f.upload(handle, hosts)
 	if err != nil {
