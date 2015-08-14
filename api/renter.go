@@ -134,6 +134,7 @@ func (srv *Server) renterFilesLoadAsciiHandler(w http.ResponseWriter, req *http.
 
 // renterFilesShareHandler handles the API call to create a '.sia' file that
 // shares a file.
+// TODO: allow sharing of multiple files.
 func (srv *Server) renterFilesShareHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.ShareFiles([]string{req.FormValue("nickname")}, req.FormValue("filepath"))
 	if err != nil {

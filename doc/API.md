@@ -884,16 +884,24 @@ Parameters: none
 Response:
 ```
 []struct {
-	Available     bool
-	Nickname      string
-	TimeRemaining int
+	Available      bool
+	UploadProgress float32
+	Nickname       string
+	Filesize       uint64
+	TimeRemaining  types.BlockHeight (uint64)
 }
 ```
 Each uploaded file is represented by the above struct.
 
 `Available` indicates whether or not the file can be downloaded immediately.
 
+`UploadProgress` is the current upload percentage of the file, including
+redundancy. In general, files will be available for download before
+UploadProgress == 100.
+
 `Nickname` is the nickname given to the file when it was uploaded.
+
+`Filesize` is the size of the file in bytes.
 
 `TimeRemaining` indicates how many blocks the file will be available for.
 
