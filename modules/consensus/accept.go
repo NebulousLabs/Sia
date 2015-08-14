@@ -121,6 +121,9 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	defer func() {
 		types.CurrentHeightLock.Lock()
 		types.CurrentHeight = cs.height()
+		if cs.height() == 1000 {
+			profile.StopCPUProfile()
+		}
 		types.CurrentHeightLock.Unlock()
 	}()
 

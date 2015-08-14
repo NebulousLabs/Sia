@@ -81,11 +81,19 @@ func openDB(filename string) (*setDB, error) {
 
 		// Initilize the consistency guards.
 		cg, err := tx.CreateBucketIfNotExists(ConsistencyGuard)
-		err = cg.Put(GuardStart, encoding.Marshal(0))
 		if err != nil {
 			return err
 		}
-		return cg.Put(GuardEnd, encoding.Marshal(0))
+		gs := cg.Get(GuardStart)
+		ge := cg.Get(GuardEnd)
+		// Database is consistent if both are nil, or if both are equal.
+		// Database is inconsistent otherwise.
+		if (gs != nil && ge != nil && bytes.Equal(gs, ge)) || gs == nil && ge == nil {
+			cg.Put(GuardStart, encoding.EncUint64(1))
+			cg.Put(GuardEnd, encoding.EncUint64(1))
+			return nil
+		}
+		return errDBInconsistent
 	})
 	return &setDB{db, true}, err
 }
@@ -100,16 +108,12 @@ func openDB(filename string) (*setDB, error) {
 func (db *setDB) startConsistencyGuard() error {
 	return db.Update(func(tx *bolt.Tx) error {
 		cg := tx.Bucket(ConsistencyGuard)
-		if !bytes.Equal(cg.Get(GuardStart), cg.Get(GuardEnd)) {
+		gs := cg.Get(GuardStart)
+		if !bytes.Equal(gs, cg.Get(GuardEnd)) {
 			return errDBInconsistent
 		}
-
-		var i int
-		err := encoding.Unmarshal(cg.Get(GuardStart), &i)
-		if err != nil {
-			return err
-		}
-		return cg.Put(GuardStart, encoding.Marshal(i+1))
+		i := encoding.DecUint64(gs)
+		return cg.Put(GuardStart, encoding.EncUint64(i+1))
 	})
 }
 
@@ -121,28 +125,22 @@ func (db *setDB) startConsistencyGuard() error {
 func (db *setDB) stopConsistencyGuard() error {
 	return db.Update(func(tx *bolt.Tx) error {
 		cg := tx.Bucket(ConsistencyGuard)
-		var i int
-		err := encoding.Unmarshal(cg.Get(GuardEnd), &i)
-		if err != nil {
-			return err
-		}
-		return cg.Put(GuardEnd, encoding.Marshal(i+1))
+		i := encoding.DecUint64(cg.Get(GuardEnd))
+		return cg.Put(GuardEnd, encoding.EncUint64(i+1))
 	})
 }
 
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
 // the bucket does not exist or if the item is already in the bucket.
 func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
+	b := tx.Bucket(bucket)
+	if build.DEBUG && b == nil {
+		panic(errNilBucket)
+	}
 	k := encoding.Marshal(key)
 	v := encoding.Marshal(value)
-	b := tx.Bucket(bucket)
-	if build.DEBUG {
-		if b == nil {
-			panic(errNilBucket)
-		}
-		if b.Get(k) != nil {
-			panic(errRepeatInsert)
-		}
+	if build.DEBUG && b.Get(k) != nil {
+		panic(errRepeatInsert)
 	}
 	return b.Put(k, v)
 }
@@ -150,39 +148,16 @@ func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
 // getItem returns an item from a bucket. In debug mode, a panic is thrown if
 // the bucket does not exist or if the item does not exist.
 func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
-	k := encoding.Marshal(key)
 	b := tx.Bucket(bucket)
 	if build.DEBUG && b == nil {
 		panic(errNilBucket)
 	}
+	k := encoding.Marshal(key)
 	item := b.Get(k)
 	if build.DEBUG && item == nil {
 		panic(errNilItem)
 	}
 	return item, nil
-}
-
-// updateItem removes and inserts an item in a single database
-// transaction. The item must exist, otherwise this will panic.
-func (db *setDB) updateItem(bucket []byte, key, value interface{}) {
-	v := encoding.Marshal(value)
-	k := encoding.Marshal(key)
-	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		if build.DEBUG {
-			if b == nil {
-				panic(errNilBucket)
-			}
-			i := b.Get(k)
-			if i == nil {
-				panic(errNilItem)
-			}
-		}
-		return b.Put(k, v)
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
 }
 
 // getItem is a generic function to insert an item into the set database
@@ -193,17 +168,13 @@ func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error
 	err = db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		// Sanity check to make sure the bucket exists.
-		if build.DEBUG {
-			if b == nil {
-				panic(errNilBucket)
-			}
+		if build.DEBUG && b == nil {
+			panic(errNilBucket)
 		}
 		item = b.Get(k)
 		// Sanity check to make sure the item requested exists
-		if build.DEBUG {
-			if item == nil {
-				panic(errNilItem)
-			}
+		if build.DEBUG && item == nil {
+			panic(errNilItem)
 		}
 		return nil
 	})
@@ -400,7 +371,14 @@ func (db *setDB) rmBlockMap(id types.BlockID) error {
 
 // updateBlockMap is a wrapper function for modification of
 func (db *setDB) updateBlockMap(pb *processedBlock) {
-	db.updateItem(BlockMap, pb.Block.ID(), *pb)
+	err := db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(BlockMap)
+		id := pb.Block.ID()
+		return bucket.Put(id[:], encoding.Marshal(*pb))
+	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 // addSiafundOutputs is a wrapper around addItem for adding a siafundOutput.
@@ -864,28 +842,33 @@ func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(types.F
 	})
 }
 
-// setSiafundPool sets the siafund pool
-func (db *setDB) setSiafundPool(sfp types.Currency) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, SiafundPool, SiafundPool, sfp)
+// setSiafundPool updates the saved siafund pool on disk
+func (db *setDB) setSiafundPool(c types.Currency) {
+	err := db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(SiafundPool)
+		return bucket.Put(SiafundPool, encoding.Marshal(c))
 	})
-}
-
-// updateSiafundPool updates the saved siafund pool on disk
-func (db *setDB) updateSiafundPool(sfp types.Currency) {
-	db.updateItem(SiafundPool, SiafundPool, sfp)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // getSiafundPool retrieves the value of the saved siafund pool
 func (db *setDB) getSiafundPool() types.Currency {
-	sfpBytes, err := db.getItem(SiafundPool, SiafundPool)
+	var cBytes []byte
+	var c types.Currency
+	err := db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(SiafundPool)
+		cBytes = bucket.Get(SiafundPool)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	err = encoding.Unmarshal(cBytes, &c)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	var sfp types.Currency
-	err = encoding.Unmarshal(sfpBytes, &sfp)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sfp
+	return c
 }

@@ -6,9 +6,20 @@ import (
 )
 
 var (
+	uptime       int64
 	times        map[string]int64
 	activeTimers map[string]int64
 )
+
+// Uptime() returns the number of nanoseconds that have passed since the first
+// call to uptime.
+func Uptime() int64 {
+	if uptime == 0 {
+		uptime = time.Now().UnixNano()
+		return 0
+	}
+	return time.Now().UnixNano() - uptime
+}
 
 // PrintTimes prints how much time has passed at each timer.
 func PrintTimes() string {

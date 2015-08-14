@@ -27,7 +27,7 @@ func TestSaveLoad(t *testing.T) {
 	oldHash := cst.cs.consensusSetHash()
 	cst.cs.Close()
 
-	// Reassigning this will loose subscribers and such, but we
+	// Reassigning this will lose subscribers and such, but we
 	// just want to call load and get a hash
 	d := filepath.Join(build.SiaTestingDir, filepath.Join(modules.ConsensusDir, filepath.Join("TestSaveLoad", modules.ConsensusDir)))
 	cst.cs, err = New(cst.gateway, d)
