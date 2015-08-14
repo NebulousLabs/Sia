@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -148,13 +147,6 @@ func TestResynchronize(t *testing.T) {
 	if cst1.cs.Height() == cst2.cs.Height() {
 		t.Fatal("Consensus Sets should not have the same height")
 	}
-
-	// cst1 will receive the block only after its resync loop runs
-	time.Sleep(ResynchronizeBatchTimeout)
-
-	if cst1.cs.Height() != cst2.cs.Height() {
-		t.Fatal("Consensus Sets should have the same height", cst1.cs.Height(), cst2.cs.Height())
-	}
 }
 
 // TestBlockHistory tests that blockHistory returns the expected sequence of
@@ -171,7 +163,7 @@ func TestBlockHistory(t *testing.T) {
 	defer cst.closeCst()
 
 	// mine until we have enough blocks to test blockHistory
-	for cst.cs.Height() < MaxCatchUpBlocks {
+	for cst.cs.Height() < 50 {
 		b, _ := cst.miner.FindBlock()
 		err = cst.cs.AcceptBlock(b)
 		if err != nil {

@@ -100,8 +100,9 @@ func (srv *Server) initAPI(addr string) {
 	// Wallet API Calls
 	if srv.wallet != nil {
 		handleHTTPRequest(mux, "/wallet", srv.walletHandler)                          // GET
-		handleHTTPRequest(mux, "/wallet/close", srv.walletCloseHandler)               // PUT
+		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)           // POST
 		handleHTTPRequest(mux, "/wallet/history", srv.walletHistoryHandler)           // GET, $(addr) GET
+		handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                 // PUT
 		handleHTTPRequest(mux, "/wallet/seed", srv.walletSeedHandler)                 // GET, PUT, POST
 		handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)         // PUT
 		handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)         // PUT

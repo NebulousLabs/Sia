@@ -5,9 +5,9 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
-	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -47,13 +47,11 @@ type serverTester struct {
 	walletKey crypto.TwofishKey
 
 	server *Server
-
-	t *testing.T
 }
 
-// newServerTester creates a server tester object that is ready for testing,
+// createServerTester creates a server tester object that is ready for testing,
 // including money in the wallet and all modules initalized.
-func newServerTester(name string, t *testing.T) *serverTester {
+func createServerTester(name string) (*serverTester, error) {
 	// Create the testing directory and assign the api port.
 	testdir := build.TempDir("api", name)
 	APIAddr := ":" + strconv.Itoa(APIPort)
@@ -62,51 +60,51 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	// Create the modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
-		t.Fatal("Failed to create gateway:", err)
+		return nil, err
 	}
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
-		t.Fatal("Failed to create consensus set:", err)
+		return nil, err
 	}
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
-		t.Fatal("Failed to create tpool:", err)
+		return nil, err
 	}
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
-		t.Fatal("Failed to create wallet:", err)
+		return nil, err
 	}
 	key, err := crypto.GenerateTwofishKey()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	err = w.Unlock(key)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
-		t.Fatal("Failed to create miner:", err)
+		return nil, err
 	}
 	hdb, err := hostdb.New(cs, g)
 	if err != nil {
-		t.Fatal("Failed to create hostdb:", err)
+		return nil, err
 	}
 	h, err := host.New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
-		t.Fatal("Failed to create host:", err)
+		return nil, err
 	}
 	r, err := renter.New(cs, hdb, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
-		t.Fatal("Failed to create renter:", err)
+		return nil, err
 	}
 	exp, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
-		t.Fatal("Failed to create explorer:", err)
+		return nil, err
 	}
 	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, r, tp, w, exp)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	// Assemble the serverTester.
@@ -123,28 +121,25 @@ func newServerTester(name string, t *testing.T) *serverTester {
 		walletKey: key,
 
 		server: srv,
-
-		t: t,
 	}
 
 	// TODO: A more reasonable way of listening for server errors.
 	go func() {
 		listenErr := srv.Serve()
 		if listenErr != nil {
-			t.Fatal("API server quit:", listenErr)
+			panic(listenErr)
 		}
 	}()
 
 	// Mine blocks until the wallet has confirmed money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		b, _ := st.miner.FindBlock()
-		err := st.cs.AcceptBlock(b)
+		_, err := st.miner.AddBlock()
 		if err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 	}
 
-	return st
+	return st, nil
 }
 
 // netAddress returns the NetAddress of the caller.
@@ -186,9 +181,53 @@ func (st *serverTester) getAPI(call string, obj interface{}) error {
 	return nil
 }
 
-// callAPI makes an API call and discards the response.
-func (st *serverTester) callAPI(call string) error {
+// postAPI makes an API call and decodes the response.
+func (st *serverTester) postAPI(call string, values url.Values, obj interface{}) error {
+	resp, err := http.PostForm("http://localhost"+st.server.apiServer.Addr+call, values)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check for a call error.
+	if resp.StatusCode != http.StatusOK {
+		respErr, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(string(respErr))
+	}
+
+	// Decode the response into 'obj'.
+	err = json.NewDecoder(resp.Body).Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// stdGetAPI makes an API call and discards the response.
+func (st *serverTester) stdGetAPI(call string) error {
 	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + call)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check for a call error.
+	if resp.StatusCode != http.StatusOK {
+		respErr, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(string(respErr))
+	}
+	return nil
+}
+
+// stdPostAPI makes an API call and discards the response.
+func (st *serverTester) stdPostAPI(call string, values url.Values) error {
+	resp, err := http.PostForm("http://localhost"+st.server.apiServer.Addr+call, values)
 	if err != nil {
 		return err
 	}

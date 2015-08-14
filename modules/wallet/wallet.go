@@ -96,8 +96,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 	return w, nil
 }
 
-// Close will save the wallet before shutting down.
-func (w *Wallet) Close() error {
+// Lock will erase all keys from memory and prevent the wallet from spending
+// coins until it is unlocked.
+func (w *Wallet) Lock() error {
 	lockID := w.mu.RLock()
 	defer w.mu.RUnlock(lockID)
 	w.log.Println("INFO: Closing wallet")
