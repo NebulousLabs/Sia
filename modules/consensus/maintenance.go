@@ -50,14 +50,12 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
 	}
 
 	// Gather the matured outputs from the delayed outputs map
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		return forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		scoBucket := tx.Bucket(SiacoinOutputs)
+		err := forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 			// Sanity check - the output should not already be in siacoinOuptuts.
-			if build.DEBUG {
-				exists := cs.db.inSiacoinOutputs(id)
-				if exists {
-					panic(errOutputAlreadyMature)
-				}
+			if build.DEBUG && isSiacoinOutput(tx, id) {
+				panic(errOutputAlreadyMature)
 			}
 
 			// Add the output to the ConsensusSet and record the diff in the
@@ -68,7 +66,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
 				SiacoinOutput: sco,
 			}
 			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-			err := cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
+			err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
 			if err != nil {
 				return err
 			}
@@ -87,13 +85,11 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
 			}
 			return nil
 		})
+		if err != nil {
+			return err
+		}
+		return removeDSCOBucket(tx, pb.Height)
 	})
-	if err != nil {
-		return err
-	}
-
-	cs.db.rmDelayedSiacoinOutputs(pb.Height)
-	return nil
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
