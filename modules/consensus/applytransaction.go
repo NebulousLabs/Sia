@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -263,21 +264,33 @@ func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transact
 func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction) error {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
+	profile.ToggleTimer("SI")
 	err := cs.applySiacoinInputs(pb, t)
+	profile.ToggleTimer("SI")
 	if err != nil {
 		return err
 	}
+	profile.ToggleTimer("SO")
 	err = cs.applySiacoinOutputs(pb, t)
+	profile.ToggleTimer("SO")
 	if err != nil {
 		return err
 	}
+	profile.ToggleTimer("FC")
 	cs.applyFileContracts(pb, t)
+	profile.ToggleTimer("FC")
+	profile.ToggleTimer("FCR")
 	cs.applyFileContractRevisions(pb, t)
+	profile.ToggleTimer("FCR")
+	profile.ToggleTimer("SP")
 	err = cs.applyStorageProofs(pb, t)
+	profile.ToggleTimer("SP")
 	if err != nil {
 		return err
 	}
+	profile.ToggleTimer("SF")
 	cs.applySiafundInputs(pb, t)
 	cs.applySiafundOutputs(pb, t)
+	profile.ToggleTimer("SF")
 	return nil
 }

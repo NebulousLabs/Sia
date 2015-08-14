@@ -426,7 +426,10 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// previous transactions have been applied.
 	profile.ToggleTimer("Txn")
 	for _, txn := range pb.Block.Transactions {
+		profile.ToggleTimer("VT")
 		err := cs.validTransaction(txn)
+		profile.ToggleTimer("VT")
+		profile.ToggleTimer("RW")
 		if err != nil {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
@@ -435,16 +438,22 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 				return cs.applyMaturedSiacoinOutputs(tx, pb)
 			})
 			if updateErr != nil {
+				profile.ToggleTimer("RW")
+				profile.ToggleTimer("Txn")
 				return err
 			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			cs.deleteNode(pb)
+			profile.ToggleTimer("RW")
 			profile.ToggleTimer("Txn")
 			return err
 		}
+		profile.ToggleTimer("RW")
 
+		profile.ToggleTimer("AP")
 		err = cs.applyTransaction(pb, txn)
+		profile.ToggleTimer("AP")
 		if err != nil {
 			profile.ToggleTimer("Txn")
 			return err
