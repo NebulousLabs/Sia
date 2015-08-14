@@ -7,7 +7,9 @@ import (
 
 	"github.com/boltdb/bolt"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -68,7 +70,7 @@ func earliestChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Tim
 		// parent lies at the first 32 bytes, and the timestamp of the block
 		// lies at bytes 40-48.
 		parentBytes := blockMap.Get(parent[:])
-		copy(parent[:], parentBytes[:crypto.HashSize])
+		copy(parent[:], parentBytes[:32])
 		windowTimes[i] = types.Timestamp(binary.LittleEndian.Uint64(parentBytes[40:48]))
 	}
 	sort.Sort(windowTimes)
@@ -95,20 +97,18 @@ func (pb *processedBlock) childDepth() types.Target {
 
 // targetAdjustmentBase returns the magnitude that the target should be
 // adjusted by before a clamp is applied.
-func (cs *ConsensusSet) targetAdjustmentBase(pb *processedBlock) *big.Rat {
-	// Target only adjusts twice per window.
-	if pb.Height%(types.TargetWindow/2) != 0 {
-		return big.NewRat(1, 1)
-	}
-
+func (cs *ConsensusSet) targetAdjustmentBase(blockMap *bolt.Bucket, pb *processedBlock) *big.Rat {
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
 	var windowSize types.BlockHeight
-	windowStart := pb
-	for windowSize = 0; windowSize < types.TargetWindow && windowStart.Parent != (types.BlockID{}); windowSize++ {
-		windowStart = cs.db.getBlockMap(windowStart.Parent)
+	parent := pb.Block.ParentID
+	current := pb.Block.ID()
+	for windowSize = 0; windowSize < types.TargetWindow && parent != (types.BlockID{}); windowSize++ {
+		current = parent
+		copy(parent[:], blockMap.Get(parent[:])[:32])
 	}
+	timestamp := types.Timestamp(encoding.DecUint64(blockMap.Get(current[:])[40:48]))
 
 	// The target of a child is determined by the amount of time that has
 	// passed between the generation of its immediate parent and its
@@ -119,7 +119,7 @@ func (cs *ConsensusSet) targetAdjustmentBase(pb *processedBlock) *big.Rat {
 	// The target is converted to a big.Rat to provide infinite precision
 	// during the calculation. The big.Rat is just the int representation of a
 	// target.
-	timePassed := pb.Block.Timestamp - windowStart.Block.Timestamp
+	timePassed := pb.Block.Timestamp - timestamp
 	expectedTimePassed := types.BlockFrequency * windowSize
 	return big.NewRat(int64(timePassed), int64(expectedTimePassed))
 }
@@ -140,11 +140,23 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (cs *ConsensusSet) setChildTarget(pb *processedBlock) {
-	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(pb))
-	parent := cs.db.getBlockMap(pb.Parent)
+func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock) error {
+	// Fetch the parent block.
+	var parent processedBlock
+	parentBytes := blockMap.Get(pb.Block.ParentID[:])
+	err := encoding.Unmarshal(parentBytes, &parent)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	if pb.Height%(types.TargetWindow/2) != 0 {
+		pb.ChildTarget = parent.ChildTarget
+		return nil
+	}
+	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(blockMap, pb))
 	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
 	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
+	return nil
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
@@ -153,19 +165,29 @@ func (cs *ConsensusSet) setChildTarget(pb *processedBlock) {
 // TODO: newChild has a fair amount of room for optimization.
 func (cs *ConsensusSet) newChild(pb *processedBlock, b types.Block) *processedBlock {
 	// Create the child node.
+	childID := b.ID()
 	child := &processedBlock{
 		Block:  b,
-		Parent: pb.Block.ID(),
+		Parent: b.ParentID,
 
 		Height: pb.Height + 1,
 		Depth:  pb.childDepth(),
 	}
-	cs.setChildTarget(child)
-
-	// Add the child to the parent.
-	pb.Children = append(pb.Children, child.Block.ID())
-
-	cs.db.updateBlockMap(pb)
-
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		blockMap := tx.Bucket(BlockMap)
+		err := cs.setChildTarget(blockMap, child)
+		if err != nil {
+			return err
+		}
+		pb.Children = append(pb.Children, childID)
+		err = blockMap.Put(child.Block.ParentID[:], encoding.Marshal(*pb))
+		if err != nil {
+			return err
+		}
+		return blockMap.Put(childID[:], encoding.Marshal(*child))
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 	return child
 }

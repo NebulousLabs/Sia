@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"math/big"
+	// "math/big"
 	"path/filepath"
 	"testing"
 
@@ -160,6 +160,7 @@ func TestChildDepth(t *testing.T) {
 	}
 }
 
+/*
 // TestTargetAdjustmentBase probes the targetAdjustmentBase method of the block
 // node type.
 func TestTargetAdjustmentBase(t *testing.T) {
@@ -357,3 +358,4 @@ func TestNewChild(t *testing.T) {
 		t.Error("child childTarget not adjusted correctly")
 	}
 }
+*/

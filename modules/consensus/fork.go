@@ -8,7 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -142,7 +141,6 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode
-	profile.ToggleTimer("Head")
 	appliedNodes, err = cs.applyUntilNode(newNode)
 	if err == nil {
 		return revertedNodes, appliedNodes, nil
