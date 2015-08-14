@@ -27,7 +27,6 @@ var CurrentHeightLock sync.Mutex
 var (
 	BlockSizeLimit   = uint64(2e6)
 	RootDepth        = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
-	ZeroID           = BlockID{}
 	BlockFrequency   BlockHeight
 	MaturityDelay    BlockHeight
 	GenesisTimestamp Timestamp

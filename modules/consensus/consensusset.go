@@ -24,17 +24,36 @@ var (
 // consensus.  It accepts blocks and constructs a blockchain, forking when
 // necessary.
 type ConsensusSet struct {
-	// The blockRoot is the block node that contains the genesis block.
-	blockRoot *processedBlock
+	// The gateway manages peer connections and keeps the consensus set
+	// synchronized to the rest of the network.
+	gateway modules.Gateway
 
-	// dosBlocks keeps track of seen blocks. It is a
-	// "blacklist" of blocks known to be invalid, but expensive to
-	// prove
-	dosBlocks map[types.BlockID]struct{}
+	// The block root contains the genesis block.
+	blockRoot processedBlock
 
-	// The siafundPool tracks the total number of siacoins that have been
-	// taxed from file contracts. Unless a reorg occurs, the siafundPool
-	// should never decrease.
+	// The set database stores the consensus set on disk. The variables it
+	// contains are siacoinOutputs, fileContracts, and siafundOutputs. They
+	// keep track of the unspent outputs and active contracts present in the
+	// current path. If an output is spent or a contract expires, it is removed
+	// from the consensus set.
+	//
+	// It also holds delayedSiacoinOutputs, which are siacoin outputs that have
+	// been created in a block, but are not allowed to be spent until a certain
+	// height. When that height is reached, they are moved to the
+	// siacoinOutputs map.
+	//
+	// The database also holds the file contract expirations.
+	// FileContractExpirations is not actually a part of the consensus set, but
+	// it is needed to get decent order notation on the file contract lookups.
+	// It is a map of heights to maps of file contract ids. The other table is
+	// needed because of file contract revisions - you need to have random
+	// access lookups to file contracts for when revisions are submitted to the
+	// blockchain.
+	db *setDB
+
+	// The siafundPool tracks the total number of siacoins that have been taxed
+	// from file contracts. Unless a reorg occurs, the siafundPool should never
+	// decrease.
 	siafundPool types.Currency
 
 	// Modules subscribed to the consensus set will receive an ordered list of
@@ -42,38 +61,13 @@ type ConsensusSet struct {
 	changeLog   []changeEntry
 	subscribers []modules.ConsensusSetSubscriber
 
-	// The set database stores the consensus set on disk. The
-	// variables it contains are siacoinOutputs, fileContracts,
-	// and siafundOutputs. They keep track of the unspent outputs
-	// and active contracts present in the current path. If an
-	// output is spent or a contract expires, it is removed from
-	// the consensus set.
-	//
-	// It also holds delayedSiacoinOutputs, which are siacoin
-	// outputs that have been created in a block, but are not
-	// allowed to be spent until a certain height. When that
-	// height is reached, they are moved to the siacoinOutputs
-	// map.
-	//
-	// The database also holds the file contract expirations.
-	// FileContractExpirations is not actually a part of the
-	// consensus set, but it is needed to get decent order
-	// notation on the file contract lookups.  It is a map of
-	// heights to maps of file contract ids. The other table is
-	// needed because of file contract revisions - you need to
-	// have random access lookups to file contracts for when
-	// revisions are submitted to the blockchain.
-	db *setDB
+	// dosBlocks keeps track of seen blocks. It is a "blacklist" of blocks
+	// known to the expensive part of block validation.
+	dosBlocks map[types.BlockID]struct{}
 
-	// gateway, for receiving/relaying blocks to/from peers
-	gateway modules.Gateway
-
-	// Per convention, all exported functions in the consensus package can be
-	// called concurrently. The state mutex helps to orchestrate thread safety.
-	// To keep things simple, the entire state was chosen to have a single
-	// mutex, as opposed to putting frequently accessed fields under separate
-	// mutexes. The performance advantage was decided to be not worth the
-	// complexity tradeoff.
+	// The entire consensus set is protected by a single mutex. While this
+	// inhibits parallel lookups to parallel data, it reduces overall
+	// complexity.
 	mu *sync.RWMutex
 }
 
@@ -85,28 +79,29 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, ErrNilGateway
 	}
 
-	// Create the ConsensusSet object.
-	cs := &ConsensusSet{
-		dosBlocks: make(map[types.BlockID]struct{}),
-
-		gateway: gateway,
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
-	}
-
-	// Create the genesis block and add it as the BlockRoot.
+	// Create the genesis block.
 	genesisBlock := types.Block{
 		Timestamp: types.GenesisTimestamp,
 		Transactions: []types.Transaction{
 			{SiafundOutputs: types.GenesisSiafundAllocation},
 		},
 	}
-	cs.blockRoot = &processedBlock{
-		Block:       genesisBlock,
-		ChildTarget: types.RootTarget,
-		Depth:       types.RootDepth,
 
-		DiffsGenerated: true,
+	// Create the ConsensusSet object.
+	cs := &ConsensusSet{
+		gateway: gateway,
+
+		blockRoot: processedBlock{
+			Block:       genesisBlock,
+			ChildTarget: types.RootTarget,
+			Depth:       types.RootDepth,
+
+			DiffsGenerated: true,
+		},
+
+		dosBlocks: make(map[types.BlockID]struct{}),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Allocate the Siafund addresses by putting them all in a big transaction inside the genesis block
@@ -132,10 +127,10 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
-	// Send out genesis block update.
-	cs.updateSubscribers(nil, []*processedBlock{cs.blockRoot})
+	// Send the genesis block to subscribers.
+	cs.updateSubscribers(nil, []*processedBlock{&cs.blockRoot})
 
-	// Load the saved processed blocks into memory and send out updates
+	// Send any blocks that were loaded from disk to subscribers.
 	cs.loadDiffs()
 
 	// Register RPCs

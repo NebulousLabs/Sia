@@ -13,7 +13,7 @@ import (
 const (
 	WalletDir = "wallet"
 
-	PublicKeysPerSeed = 100
+	PublicKeysPerSeed = 2500
 
 	SeedChecksumSize = 6
 )

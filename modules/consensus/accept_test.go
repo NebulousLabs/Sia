@@ -14,9 +14,6 @@ import (
 
 // TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestDoSBlockHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
 	cst, err := createConsensusSetTester("TestDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -221,8 +218,7 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	earliestTimestamp := cst.cs.earliestChildTimestamp(cst.cs.db.getBlockMap(block.ParentID))
-	block.Timestamp = earliestTimestamp - 1
+	block.Timestamp = 0
 	earlyBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(earlyBlock)
 	if err != ErrEarlyTimestamp {

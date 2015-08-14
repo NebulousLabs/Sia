@@ -109,8 +109,8 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	// perform a catch to read the error that is created.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplySiacoinInput {
-			t.Error("no panic occured when misusing applySiacoinInput")
+		if r == nil {
+			t.Error("expecting error after corrupting database")
 		}
 	}()
 	cst.cs.applySiacoinInputs(pb, txn)
@@ -205,7 +205,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	// perform a catch to read the error that is created.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplySiacoinOutput {
+		if r == nil {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()
@@ -304,7 +304,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	// perform a catch to read the error that is created.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplyFileContracts {
+		if r == nil {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()
