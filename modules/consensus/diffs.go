@@ -317,7 +317,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		if pb.DiffsGenerated {
 			panic(errRegenerateDiffs)
 		}
-
 		// Current node must be the input node's parent.
 		if pb.Parent != cs.currentBlockID() {
 			panic(errInvalidSuccessor)

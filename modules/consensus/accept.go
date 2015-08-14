@@ -112,6 +112,9 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	//
 	// This is so that the Tax() logic correctly handles the hardfork that
 	// changes the tax from a float64 to a big.Rat during computation.
+	//
+	// TODO: Upon removing this compatibility code, optimize everything up to
+	// forkBlockchain into a single bolt tx, among other speedups.
 	types.CurrentHeightLock.Lock()
 	types.CurrentHeight = parentNode.Height
 	types.CurrentHeightLock.Unlock()

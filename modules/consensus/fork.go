@@ -102,21 +102,19 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 
 // applyUntilNode will successively apply the blocks between the consensus
 // set's current path and 'pb'.
-func (s *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
+func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
-	newPath := s.backtrackToCurrentPath(pb)
+	newPath := cs.backtrackToCurrentPath(pb)
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.DiffsGenerated {
-			profile.ToggleTimer("Commit")
-			err := s.commitDiffSet(node, modules.DiffApply)
-			profile.ToggleTimer("Commit")
+			err := cs.commitDiffSet(node, modules.DiffApply)
 			if build.DEBUG && err != nil {
 				panic(err)
 			}
 		} else {
-			err = s.generateAndApplyDiff(node)
+			err = cs.generateAndApplyDiff(node)
 			if err != nil {
 				break
 			}
