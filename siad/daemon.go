@@ -26,6 +26,14 @@ func startDaemon() error {
 	// Establish multithreading.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	// Start the rudimentary profile timer.
+	go func() {
+		for {
+			time.Sleep(time.Second * 15)
+			fmt.Println(profile.PrintTimes())
+		}
+	}()
+
 	// Print a startup message.
 	//
 	// TODO: This message can be removed once the api starts up in under 1/2
