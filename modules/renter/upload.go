@@ -88,6 +88,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		}
 		f.bytesUploaded += uint64(n) // TODO: move inside workers
 		f.chunksUploaded++
+		// TODO: saveSingleFile(f)
 	}
 	return nil
 }

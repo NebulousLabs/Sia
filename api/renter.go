@@ -109,10 +109,9 @@ func (srv *Server) renterFilesRenameHandler(w http.ResponseWriter, req *http.Req
 	writeSuccess(w)
 }
 
-// renterFilesLoadHandler handles the API call to load a '.sia' that
-// contains filesharing information.
+// renterFilesLoadHandler handles the API call to load a '.sia' file.
 func (srv *Server) renterFilesLoadHandler(w http.ResponseWriter, req *http.Request) {
-	files, err := srv.renter.LoadSharedFile(req.FormValue("filename"))
+	files, err := srv.renter.LoadSharedFiles(req.FormValue("filename"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return

@@ -146,7 +146,7 @@ func (r *Renter) load() error {
 			// maybe just skip?
 			return err
 		}
-		_, err = r.loadSharedFile(file)
+		_, err = r.loadSharedFiles(file)
 		if err != nil {
 			// maybe just skip?
 			return err
@@ -155,37 +155,59 @@ func (r *Renter) load() error {
 	return nil
 }
 
-// ShareFile saves the specified file to destination.
-func (r *Renter) ShareFile(nickname, destination string) error {
+// shareFiles writes the specified files to w.
+func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	file, exists := r.files[nickname]
-	if !exists {
-		return ErrUnknownNickname
-	}
-
-	handle, err := os.Open(destination)
+	// Write number of files.
+	err := encoding.NewEncoder(w).Encode(uint64(len(nicknames)))
 	if err != nil {
 		return err
 	}
 
-	return file.save(handle)
+	// Write each file.
+	for _, name := range nicknames {
+		file, exists := r.files[name]
+		if !exists {
+			return ErrUnknownNickname
+		}
+		err = file.save(w)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// ShareFileAscii returns the named file in ASCII format.
-func (r *Renter) ShareFileAscii(nickname string) (string, error) {
+// ShareFile saves the specified files to sharedest.
+func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	file, exists := r.files[nickname]
-	if !exists {
-		return "", ErrUnknownNickname
+	file, err := os.Open(sharedest)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	err = r.shareFiles(nicknames, file)
+	if err != nil {
+		os.Remove(sharedest)
+		return err
 	}
 
-	// pipe to a base64 encoder
+	return nil
+}
+
+// ShareFilesAscii returns the specified files in ASCII format.
+func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
+
 	buf := new(bytes.Buffer)
-	err := file.save(base64.NewEncoder(base64.URLEncoding, buf))
+	err := r.shareFiles(nicknames, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
 		return "", err
 	}
@@ -193,56 +215,72 @@ func (r *Renter) ShareFileAscii(nickname string) (string, error) {
 	return buf.String(), nil
 }
 
-// loadSharedFile reads a shared file from reader and registers it in the
-// renter. It returns the nickname of the loaded file.
-func (r *Renter) loadSharedFile(reader io.Reader) (string, error) {
-	f := new(file)
-	err := f.load(reader)
+// loadSharedFiles reads .sia data from reader and registers the contained
+// files in the renter. It returns the nicknames of the loaded files.
+func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
+	// Read number of files
+	var numFiles uint64
+	err := encoding.NewDecoder(reader).Decode(&numFiles)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// Make sure the file's name does not conflict with existing files.
-	dupCount := 0
-	origName := f.Name
-	for {
-		_, exists := r.files[f.Name]
-		if !exists {
-			break
+	// Read each file.
+	files := make([]*file, numFiles)
+	for i := range files {
+		files[i] = new(file)
+		err := files[i].load(reader)
+		if err != nil {
+			return nil, err
 		}
-		dupCount++
-		f.Name = origName + "_" + strconv.Itoa(dupCount)
+
+		// Make sure the file's name does not conflict with existing files.
+		dupCount := 0
+		origName := files[i].Name
+		for {
+			_, exists := r.files[files[i].Name]
+			if !exists {
+				break
+			}
+			dupCount++
+			files[i].Name = origName + "_" + strconv.Itoa(dupCount)
+		}
 	}
 
-	// Add file to renter.
-	r.files[f.Name] = f
+	// Add files to renter.
+	names := make([]string, numFiles)
+	for i, f := range files {
+		r.files[f.Name] = f
+		names[i] = f.Name
+	}
 	err = r.save()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return f.Name, nil
+	return names, nil
 }
 
-// LoadSharedFile loads a shared file into the renter. It returns the nickname
-// of the loaded file.
-func (r *Renter) LoadSharedFile(filename string) (string, error) {
+// LoadSharedFiles loads a .sia file into the renter. It returns the nicknames
+// of the loaded files.
+func (r *Renter) LoadSharedFiles(filename string) ([]string, error) {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
 	file, err := os.Open(filename)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return r.loadSharedFile(file)
+	defer file.Close()
+	return r.loadSharedFiles(file)
 }
 
-// LoadSharedFileAscii loads an ASCII-encoded file into the renter. It returns
-// the nickname of the loaded file.
-func (r *Renter) LoadSharedFileAscii(asciiSia string) (string, error) {
+// LoadSharedFilesAscii loads an ASCII-encoded .sia file into the renter. It
+// returns the nicknames of the loaded files.
+func (r *Renter) LoadSharedFilesAscii(asciiSia string) ([]string, error) {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
 	dec := base64.NewDecoder(base64.URLEncoding, bytes.NewBufferString(asciiSia))
-	return r.loadSharedFile(dec)
+	return r.loadSharedFiles(dec)
 }

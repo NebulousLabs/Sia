@@ -111,24 +111,22 @@ type Renter interface {
 	// Info returns the list of all files by nickname. (deprecated)
 	Info() RentInfo
 
-	// LoadSharedFile loads a '.sia' file into the renter, so that the user can
-	// download a file that has been shared with them.
-	LoadSharedFile(filename string) (string, error)
+	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
+	// contain multiple files. The nicknames of the added files are returned.
+	LoadSharedFiles(filename string) ([]string, error)
 
-	// LoadSharedFileAscii loads a '.sia' file into the renter, except instead
-	// of taking a filename it takes a base64 encoded string of the file.
-	LoadSharedFileAscii(asciiSia string) (string, error)
+	// LoadSharedFilesAscii loads an ASCII-encoded '.sia' file into the
+	// renter.
+	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
 	// Rename changes the nickname of a file.
 	RenameFile(currentName, newName string) error
 
-	// ShareFile creates a '.sia' file that can be shared with others, so that
-	// they may download files which they have not uploaded.
-	ShareFile(nickname string, sharedest string) error
+	// ShareFiles creates a '.sia' file that can be shared with others.
+	ShareFiles(nicknames []string, sharedest string) error
 
-	// ShareFileAscii creates a '.sia' file that can be shared with others,
-	// except it returns the bytes of the file in base64.
-	ShareFileAscii(nicknames string) (asciiSia string, err error)
+	// ShareFilesAscii creates an ASCII-encoded '.sia' file.
+	ShareFilesAscii(nicknames []string) (asciiSia string, err error)
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error
