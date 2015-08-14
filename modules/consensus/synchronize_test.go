@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -147,13 +146,6 @@ func TestResynchronize(t *testing.T) {
 	// cst1 should not have the block
 	if cst1.cs.Height() == cst2.cs.Height() {
 		t.Fatal("Consensus Sets should not have the same height")
-	}
-
-	// cst1 will receive the block only after its resync loop runs
-	time.Sleep(ResynchronizeBatchTimeout)
-
-	if cst1.cs.Height() != cst2.cs.Height() {
-		t.Fatal("Consensus Sets should have the same height", cst1.cs.Height(), cst2.cs.Height())
 	}
 }
 

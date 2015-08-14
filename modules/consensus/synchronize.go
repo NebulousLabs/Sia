@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -11,10 +10,8 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks          = 10
-	MaxSynchronizeAttempts    = 8
-	ResynchronizePeerTimeout  = time.Second * 30
-	ResynchronizeBatchTimeout = time.Minute * 3
+	MaxCatchUpBlocks       = 10
+	MaxSynchronizeAttempts = 8
 )
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
