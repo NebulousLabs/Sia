@@ -591,8 +591,13 @@ func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco ty
 	if build.DEBUG && isSiacoinOutput(tx, id) {
 		panic(errOutputAlreadyMature)
 	}
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
-	return insertItem(tx, bucketID, id, sco)
+	dscoBucketID := append(prefix_dsco, encoding.EncUint64(uint64(bh))...)
+	dscoBucket := tx.Bucket(dscoBucketID)
+	if build.DEBUG && dscoBucket.Get(id[:]) != nil {
+		panic(errRepeatInsert)
+	}
+	emsco := encoding.Marshal(sco)
+	return dscoBucket.Put(id[:], emsco)
 }
 
 // getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
