@@ -53,6 +53,24 @@ func (cs *ConsensusSet) commitBucketSiacoinOutputDiff(scoBucket *bolt.Bucket, sc
 	return scoBucket.Delete(scod.ID[:])
 }
 
+// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
+func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
+	// Sanity check - should not be adding an output twice, or deleting an
+	// output that does not exist.
+	if build.DEBUG {
+		exists := cs.db.inSiacoinOutputs(scod.ID)
+		if exists == (scod.Direction == dir) {
+			panic(errBadCommitSiacoinOutputDiff)
+		}
+	}
+
+	if scod.Direction == dir {
+		cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
+	} else {
+		cs.db.rmSiacoinOutputs(scod.ID)
+	}
+}
+
 // commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
 // a database transaction.
 func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
@@ -160,6 +178,16 @@ func (cs *ConsensusSet) commitTxDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modu
 	return removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
 }
 
+// commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
+func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		if dscod.Direction == dir {
+			return addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
+		}
+		return removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
+	})
+}
+
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
 func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
 	// Sanity check - siafund pool should only ever increase.
@@ -232,18 +260,8 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *process
 // commitNodeDiffs commits all of the diffs in a block node.
 func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			scoBucket := tx.Bucket(SiacoinOutputs)
-			for _, scod := range pb.SiacoinOutputDiffs {
-				err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, dir)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if build.DEBUG && err != nil {
-			panic(err)
+		for _, scod := range pb.SiacoinOutputDiffs {
+			cs.commitSiacoinOutputDiff(scod, dir)
 		}
 		for _, fcd := range pb.FileContractDiffs {
 			cs.commitFileContractDiff(fcd, dir)
@@ -252,24 +270,14 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 			cs.commitSiafundOutputDiff(sfod, dir)
 		}
 		for _, dscod := range pb.DelayedSiacoinOutputDiffs {
-			err := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, dir)
-			})
-			if err != nil {
-				return err
-			}
+			cs.commitDelayedSiacoinOutputDiff(dscod, dir)
 		}
 		for _, sfpd := range pb.SiafundPoolDiffs {
 			cs.commitSiafundPoolDiff(sfpd, dir)
 		}
 	} else {
 		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-			err := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.commitTxSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
-			})
-			if err != nil {
-				return err
-			}
+			cs.commitSiacoinOutputDiff(pb.SiacoinOutputDiffs[i], dir)
 		}
 		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
 			cs.commitFileContractDiff(pb.FileContractDiffs[i], dir)
@@ -278,12 +286,7 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 			cs.commitSiafundOutputDiff(pb.SiafundOutputDiffs[i], dir)
 		}
 		for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			err := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.commitTxDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
-			})
-			if err != nil {
-				return err
-			}
+			cs.commitDelayedSiacoinOutputDiff(pb.DelayedSiacoinOutputDiffs[i], dir)
 		}
 		for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
 			cs.commitSiafundPoolDiff(pb.SiafundPoolDiffs[i], dir)
