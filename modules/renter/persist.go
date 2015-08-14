@@ -155,6 +155,24 @@ func (r *Renter) load() error {
 	return nil
 }
 
+// ShareFile saves the specified file to destination.
+func (r *Renter) ShareFile(nickname, destination string) error {
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
+
+	file, exists := r.files[nickname]
+	if !exists {
+		return ErrUnknownNickname
+	}
+
+	handle, err := os.Open(destination)
+	if err != nil {
+		return err
+	}
+
+	return file.save(handle)
+}
+
 // ShareFileAscii returns the named file in ASCII format.
 func (r *Renter) ShareFileAscii(nickname string) (string, error) {
 	lockID := r.mu.RLock()

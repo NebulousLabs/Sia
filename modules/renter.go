@@ -122,6 +122,10 @@ type Renter interface {
 	// Rename changes the nickname of a file.
 	RenameFile(currentName, newName string) error
 
+	// ShareFile creates a '.sia' file that can be shared with others, so that
+	// they may download files which they have not uploaded.
+	ShareFile(nickname string, sharedest string) error
+
 	// ShareFileAscii creates a '.sia' file that can be shared with others,
 	// except it returns the bytes of the file in base64.
 	ShareFileAscii(nicknames string) (asciiSia string, err error)
