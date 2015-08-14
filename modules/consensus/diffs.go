@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
@@ -44,6 +45,30 @@ func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.Siac
 		return addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
 	}
 	return removeSiacoinOutput(tx, scod.ID)
+}
+
+// commitTxFileContractDiff applies or reverts a FileContractDiff.
+func (cs *ConsensusSet) commitTxFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) error {
+	if fcd.Direction == dir {
+		addFileContract(tx, fcd.ID, fcd.FileContract)
+
+		bucketID := append(prefix_fcex, encoding.Marshal(fcd.FileContract.WindowEnd)...)
+		fcesByHeight := tx.Bucket(FileContractExpirations)
+		err := fcesByHeight.Put(encoding.Marshal(fcd.FileContract.WindowEnd), bucketID)
+		if err != nil {
+			return err
+		}
+		fceSet, err := tx.CreateBucketIfNotExists(bucketID)
+		if err != nil {
+			return err
+		}
+		return fceSet.Put(encoding.Marshal(fcd.ID), encoding.Marshal(struct{}{}))
+	}
+	err := removeFileContract(tx, fcd.ID)
+	if err != nil {
+		return err
+	}
+	return removeFCExpiration(tx, fcd.FileContract.WindowEnd, fcd.ID)
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
@@ -337,12 +362,13 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
-	// invalid, the diffs can be safely reversed from whatever point.
+	// invalid, the diffs can be safely reversed.
 	pb.DiffsGenerated = true
 
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
+	profile.ToggleTimer("Txn")
 	for _, txn := range pb.Block.Transactions {
 		err := cs.validTransaction(txn)
 		if err != nil {
@@ -353,14 +379,17 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			cs.deleteNode(pb)
+			profile.ToggleTimer("Txn")
 			return err
 		}
 
 		err = cs.applyTransaction(pb, txn)
 		if err != nil {
+			profile.ToggleTimer("Txn")
 			return err
 		}
 	}
+	profile.ToggleTimer("Txn")
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached

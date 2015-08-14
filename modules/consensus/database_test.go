@@ -38,6 +38,61 @@ func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiac
 	cs.db.rmDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
 }
 
+// applyMissedStorageProof adds the outputs and diffs that result from a file
+// contract expiring.
+func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) error {
+	// Sanity checks.
+	fc := cs.db.getFileContracts(fcid)
+	if build.DEBUG {
+		// Check that the file contract in question expires at pb.Height.
+		if fc.WindowEnd != pb.Height {
+			panic(errStorageProofTiming)
+		}
+	}
+
+	// Add all of the outputs in the missed proof outputs to the consensus set.
+	for i, mpo := range fc.MissedProofOutputs {
+		// Sanity check - output should not already exist.
+		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
+		if build.DEBUG {
+			exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
+			if exists {
+				panic(errPayoutsAlreadyPaid)
+			}
+			exists = cs.db.inSiacoinOutputs(spoid)
+			if exists {
+				panic(errPayoutsAlreadyPaid)
+			}
+		}
+
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffApply,
+			ID:             spoid,
+			SiacoinOutput:  mpo,
+			MaturityHeight: pb.Height + types.MaturityDelay,
+		}
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Remove the file contract from the consensus set and record the diff in
+	// the blockNode.
+	fcd := modules.FileContractDiff{
+		Direction:    modules.DiffRevert,
+		ID:           fcid,
+		FileContract: fc,
+	}
+	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+	cs.commitFileContractDiff(fcd, modules.DiffApply)
+
+	return nil
+}
+
 // addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
 func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)

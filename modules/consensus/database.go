@@ -287,7 +287,7 @@ func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
 // pushPath adds a block to the BlockPath at current height + 1.
 func pushPath(tx *bolt.Tx, bid types.BlockID) error {
 	b := tx.Bucket(BlockPath)
-	key := encoding.EncUint64(uint64(b.Stats().KeyN)) // TODO: use the current path?
+	key := encoding.EncUint64(uint64(b.Stats().KeyN))
 	value := encoding.Marshal(bid)
 	return b.Put(key, value)
 }
@@ -453,12 +453,28 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 	})
 }
 
+func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) error {
+	return insertItem(tx, FileContracts, id, fc)
+}
+
 // addFileContracts is a wrapper around addItem for adding a file
 // contract to the consensusset
 func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		return insertItem(tx, FileContracts, id, fc)
 	})
+}
+
+func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContract, err error) {
+	fcBytes, err := getItem(tx, FileContracts, id)
+	if err != nil {
+		return types.FileContract{}, err
+	}
+	err = encoding.Unmarshal(fcBytes, &fc)
+	if err != nil {
+		return types.FileContract{}, err
+	}
+	return fc, nil
 }
 
 // getFileContracts is a wrapper around getItem for retrieving a file contract
@@ -479,6 +495,10 @@ func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 // a file contract is in the consensus set
 func (db *setDB) inFileContracts(id types.FileContractID) bool {
 	return db.inBucket(FileContracts, id)
+}
+
+func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
+	return removeItem(tx, FileContracts, id)
 }
 
 // rmFileContracts removes a file contract from the consensus set
@@ -806,15 +826,32 @@ func (db *setDB) rmFCExpirations(h types.BlockHeight) {
 	}
 }
 
+func removeFCExpiration(tx *bolt.Tx, bh types.BlockHeight, id types.FileContractID) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
+	return removeItem(tx, bucketID, id)
+}
+
 // rmFCExpirationsHeight removes an individual file contract from a given height
 func (db *setDB) rmFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
 	return db.rmItem(bucketID, id)
 }
 
+func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
+	return forEach(tx, bucketID, func(kb, bv []byte) error {
+		var id types.FileContractID
+		err := encoding.Unmarshal(kb, &id)
+		if err != nil {
+			return err
+		}
+		return fn(id)
+	})
+}
+
 // forEachFCExpirationsHeight applies a function to every file
 // contract ID that expires at a given height
-func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(k types.FileContractID)) {
+func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(types.FileContractID)) {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
 	db.forEachItem(bucketID, func(kb, vb []byte) error {
 		var key types.FileContractID
