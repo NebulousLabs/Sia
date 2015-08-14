@@ -407,10 +407,9 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	}
 
 	// Replace the unprocessed block in the block map with a processed one
-	err = cs.db.rmBlockMap(pb.Block.ID())
-	if err != nil {
-		return err
-	}
-
-	return cs.db.addBlockMap(pb)
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		id := pb.Block.ID()
+		blockMap := tx.Bucket(BlockMap)
+		return blockMap.Put(id[:], encoding.Marshal(*pb))
+	})
 }
