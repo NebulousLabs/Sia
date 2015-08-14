@@ -11,11 +11,12 @@ var (
 )
 
 // PrintTimes prints how much time has passed at each timer.
-func PrintTimes() (s string) {
+func PrintTimes() string {
+	s := "Printing Timers:\n"
 	for name, time := range times {
 		s += fmt.Sprintf("\t%v: %v\n", name, time)
 	}
-	return
+	return s
 }
 
 // ToggleTimer actives a timer known by a given string. If the timer does not
