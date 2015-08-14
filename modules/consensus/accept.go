@@ -28,6 +28,16 @@ var (
 
 // validHeader does some early, low computation verification on the block.
 func (cs *ConsensusSet) validHeader(b types.Block) error {
+	// See if the block is known already.
+	_, exists := cs.dosBlocks[b.ID()]
+	if exists {
+		return ErrDoSBlock
+	}
+	exists = cs.db.inBlockMap(b.ID())
+	if exists {
+		return ErrBlockKnown
+	}
+
 	// Do read-only verification operations inside of a single read-only boltdb
 	// tx.
 	var parent processedBlock
@@ -130,7 +140,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	newNode := cs.newChild(parentNode, b)
 	err = cs.db.addBlockMap(newNode)
 	if err != nil {
-		profile.ToggleTimer("EV")
+		profile.ToggleTimer("Head")
 		return nil, nil, err
 	}
 	if newNode.heavierThan(cs.currentProcessedBlock()) {
@@ -150,19 +160,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		profile.ToggleTimer("EV")
 		return err
 	}
-	defer cs.db.stopConsistencyGuard()
-
-	// See if the block is known already.
-	_, exists := cs.dosBlocks[b.ID()]
-	if exists {
-		profile.ToggleTimer("EV")
-		return ErrDoSBlock
-	}
-	exists = cs.db.inBlockMap(b.ID())
-	if exists {
-		profile.ToggleTimer("EV")
-		return ErrBlockKnown
-	}
 
 	// Check that the header is valid. The header is checked first because it
 	// is not computationally expensive to verify, but it is computationally
@@ -170,6 +167,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	err = cs.validHeader(b)
 	if err != nil {
 		profile.ToggleTimer("EV")
+		cs.db.stopConsistencyGuard()
 		return err
 	}
 
@@ -177,13 +175,18 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
+	profile.ToggleTimer("EV")
+	profile.ToggleTimer("Head")
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
+		cs.db.stopConsistencyGuard()
 		return err
 	}
+	profile.ToggleTimer("Sub")
 	if len(appliedNodes) > 0 {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
+	profile.ToggleTimer("Sub")
 
 	// Sanity checks.
 	if build.DEBUG {
@@ -197,6 +200,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
+	cs.db.stopConsistencyGuard()
 	return nil
 }
 

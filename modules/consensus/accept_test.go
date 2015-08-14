@@ -14,9 +14,6 @@ import (
 
 // TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestDoSBlockHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
 	cst, err := createConsensusSetTester("TestDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)

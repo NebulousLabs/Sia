@@ -145,7 +145,9 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height, types.SiacoinOutputID{}, types.SiacoinOutput{})
-	cst.cs.applyMaturedSiacoinOutputs(pb)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMaturedSiacoinOutputs(tx, pb)
+	})
 }
 
 // TestApplyMissedStorageProof probes the applyMissedStorageProof method of the

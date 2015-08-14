@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -42,54 +41,47 @@ func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
+func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
 	if !(pb.Height > types.MaturityDelay) {
 		return nil
 	}
 
-	// Gather the matured outputs from the delayed outputs map
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		scoBucket := tx.Bucket(SiacoinOutputs)
-		err := forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-			// Sanity check - the output should not already be in siacoinOuptuts.
-			if build.DEBUG && isSiacoinOutput(tx, id) {
-				panic(errOutputAlreadyMature)
-			}
+	scoBucket := tx.Bucket(SiacoinOutputs)
+	err := forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+		// Sanity check - the output should not already be in siacoinOuptuts.
+		if build.DEBUG && isSiacoinOutput(tx, id) {
+			panic(errOutputAlreadyMature)
+		}
 
-			// Add the output to the ConsensusSet and record the diff in the
-			// blockNode.
-			scod := modules.SiacoinOutputDiff{
-				Direction:     modules.DiffApply,
-				ID:            id,
-				SiacoinOutput: sco,
-			}
-			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-			err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
-
-			// Remove the delayed siacoin output from the consensus set.
-			dscod := modules.DelayedSiacoinOutputDiff{
-				Direction:      modules.DiffRevert,
-				ID:             id,
-				SiacoinOutput:  sco,
-				MaturityHeight: pb.Height,
-			}
-			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
+		// Add the output to the ConsensusSet and record the diff in the
+		// blockNode.
+		scod := modules.SiacoinOutputDiff{
+			Direction:     modules.DiffApply,
+			ID:            id,
+			SiacoinOutput: sco,
+		}
+		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
-		return removeDSCOBucket(tx, pb.Height)
+
+		// Remove the delayed siacoin output from the consensus set.
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffRevert,
+			ID:             id,
+			SiacoinOutput:  sco,
+			MaturityHeight: pb.Height,
+		}
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	})
+	if err != nil {
+		return err
+	}
+	return removeDSCOBucket(tx, pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
@@ -167,25 +159,15 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) error {
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
 func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
-	profile.ToggleTimer("MP")
 	err := cs.db.Update(func(tx *bolt.Tx) error {
-		return cs.applyMinerPayouts(tx, pb)
+		err := cs.applyMinerPayouts(tx, pb)
+		if err != nil {
+			return err
+		}
+		return cs.applyMaturedSiacoinOutputs(tx, pb)
 	})
-	profile.ToggleTimer("MP")
 	if err != nil {
 		return err
 	}
-	profile.ToggleTimer("FCM")
-	err = cs.applyFileContractMaintenance(pb)
-	profile.ToggleTimer("FCM")
-	if err != nil {
-		return err
-	}
-	profile.ToggleTimer("MSO")
-	err = cs.applyMaturedSiacoinOutputs(pb)
-	profile.ToggleTimer("MSO")
-	if err != nil {
-		return err
-	}
-	return nil
+	return cs.applyFileContractMaintenance(pb)
 }
