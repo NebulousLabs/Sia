@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -366,6 +367,8 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
+	profile.ToggleTimer("Tail")
+	defer profile.ToggleTimer("Tail")
 	err = cs.applyMaintenance(pb)
 	if err != nil {
 		return err

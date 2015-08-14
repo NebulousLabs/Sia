@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -105,6 +106,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	newNode := cs.newChild(parentNode, b)
 	err = cs.db.addBlockMap(newNode)
 	if err != nil {
+		profile.ToggleTimer("EV")
 		return nil, nil, err
 	}
 	if newNode.heavierThan(cs.currentProcessedBlock()) {
@@ -118,8 +120,10 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // transactions. Trusted blocks, like those on disk, should already
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
+	profile.ToggleTimer("EV")
 	err := cs.db.startConsistencyGuard()
 	if err != nil {
+		profile.ToggleTimer("EV")
 		return err
 	}
 	defer cs.db.stopConsistencyGuard()
@@ -127,10 +131,12 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
+		profile.ToggleTimer("EV")
 		return ErrDoSBlock
 	}
 	exists = cs.db.inBlockMap(b.ID())
 	if exists {
+		profile.ToggleTimer("EV")
 		return ErrBlockKnown
 	}
 
@@ -139,6 +145,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// expensive to create.
 	err = cs.validHeader(b)
 	if err != nil {
+		profile.ToggleTimer("EV")
 		return err
 	}
 

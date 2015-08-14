@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -108,7 +109,9 @@ func (s *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*proc
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.DiffsGenerated {
+			profile.ToggleTimer("Commit")
 			err := s.commitDiffSet(node, modules.DiffApply)
+			profile.ToggleTimer("Commit")
 			if build.DEBUG && err != nil {
 				panic(err)
 			}
@@ -141,7 +144,10 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode
+	profile.ToggleTimer("EV")
+	profile.ToggleTimer("Apply")
 	appliedNodes, err = cs.applyUntilNode(newNode)
+	profile.ToggleTimer("Apply")
 	if err == nil {
 		return revertedNodes, appliedNodes, nil
 	}
