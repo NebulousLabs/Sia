@@ -33,11 +33,11 @@ type file struct {
 // A fileContract is a contract covering an arbitrary number of file pieces.
 // Chunk/Piece metadata is used to split the raw contract data appropriately.
 type fileContract struct {
-	types.FileContract // TODO: store this internally in the renter
-
 	ID     types.FileContractID
 	IP     modules.NetAddress
 	Pieces []pieceData
+
+	WindowStart types.BlockHeight
 }
 
 // pieceData contains the metadata necessary to request a piece from a

@@ -62,8 +62,7 @@ func (f *file) save(w io.Writer) error {
 	// encode contracts
 	enc.Encode(uint64(len(f.Contracts)))
 	for _, c := range f.Contracts {
-		enc.Encode(c.ID)
-		enc.Encode(c.Pieces)
+		enc.Encode(c)
 	}
 	return nil
 }
@@ -116,8 +115,7 @@ func (f *file) load(r io.Reader) error {
 	f.Contracts = make(map[modules.NetAddress]fileContract)
 	var contract fileContract
 	for i := uint64(0); i < nContracts; i++ {
-		dec.Decode(&contract.ID)
-		dec.Decode(&contract.Pieces)
+		dec.Decode(&contract)
 		f.Contracts[contract.IP] = contract
 	}
 	return nil

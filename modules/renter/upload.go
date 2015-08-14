@@ -33,14 +33,16 @@ func (f *file) worker(host uploader, reqChan chan uploadPiece, respChan chan *fi
 	// TODO: move connect outside worker
 	_, err := host.connect()
 	if err != nil {
-		respChan <- nil
+		for range reqChan {
+			respChan <- nil
+		}
 		return
 	}
 	for req := range reqChan {
 		contract, err := host.addPiece(req)
 		if err != nil {
 			respChan <- nil
-			return // this host is now dead to us; upload will use a new one
+			continue
 		}
 		respChan <- &contract
 	}
@@ -55,6 +57,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 	for i, h := range hosts {
 		reqChans[i] = make(chan uploadPiece)
 		respChans[i] = make(chan *fileContract)
+		// TODO: need a way to stop workers in the event of an error
 		go f.worker(h, reqChans[i], respChans[i])
 	}
 
@@ -88,8 +91,8 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		}
 		f.bytesUploaded += uint64(n) // TODO: move inside workers
 		f.chunksUploaded++
-		// TODO: saveSingleFile(f)
 	}
+
 	return nil
 }
 
@@ -195,6 +198,12 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		r.save()
 		r.mu.Unlock(lockID)
 		return errors.New("failed to upload any file pieces")
+	}
+
+	// Save the .sia file to the renter directory.
+	err = r.saveFile(f)
+	if err != nil {
+		return err
 	}
 
 	return nil
