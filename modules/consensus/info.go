@@ -1,6 +1,9 @@
 package consensus
 
 import (
+	"github.com/boltdb/bolt"
+
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -55,14 +58,29 @@ func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exis
 // TODO: Right now, this function is only thread safe when called inside of
 // 'ReceiveConsensusSetUpdate', but that should change once boltdb replaces the
 // block mape
-func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
-	exists = s.db.inBlockMap(bid)
-	if !exists {
-		return
+func (cs *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Check that the parent exists.
+		blockMap := tx.Bucket(BlockMap)
+
+		// The identifier for the BlockMap is the sia encoding of the parent
+		// id. The sia encoding is the same as ParentID[:].
+		var parent processedBlock
+		parentBytes := blockMap.Get(bid[:])
+		if parentBytes == nil {
+			return ErrOrphan
+		}
+		err := encoding.Unmarshal(parentBytes, &parent)
+		if err != nil {
+			return err
+		}
+		timestamp = earliestChildTimestamp(blockMap, &parent)
+		return nil
+	})
+	if err != nil {
+		return 0, false
 	}
-	pb := s.db.getBlockMap(bid)
-	timestamp = s.earliestChildTimestamp(pb)
-	return
+	return timestamp, true
 }
 
 // GenesisBlock returns the genesis block.

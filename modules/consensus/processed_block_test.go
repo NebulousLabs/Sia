@@ -2,54 +2,95 @@ package consensus
 
 import (
 	"math/big"
+	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestEarliestChildTimestamp probes the earliestChildTimestamp method of the
+// TestIntegrationEarliestChildTimestamp probes the earliestChildTimestamp method of the
 // block node type.
-func TestEarliestChildTimestamp(t *testing.T) {
-	cst, err := createConsensusSetTester("TestEarliestChildTimestamp")
+func TestIntegrationEarliestChildTimestamp(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a custom consnesus set to control the blocks.
+	testdir := build.TempDir(modules.ConsensusDir, "TestIntegrationEarliestChildTimestamp")
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
 
-	// Check the earliest timestamp generated when the block node has no
-	// parent.
-	pb1 := &processedBlock{Block: types.Block{Timestamp: 1}}
-	if cst.cs.earliestChildTimestamp(pb1) != 1 {
-		t.Error("earliest child timestamp has been calculated incorrectly.")
+	// The earliest child timestamp of the genesis block should be the
+	// timestamp of the genesis block.
+	genesisTime := cs.blockRoot.Block.Timestamp
+	earliest, ok := cs.EarliestChildTimestamp(cs.blockRoot.Block.ID())
+	if !ok || genesisTime != earliest {
+		t.Error("genesis block earliest timestamp producing unexpected results")
 	}
 
-	// Set up a series of targets, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
-	pb2 := &processedBlock{Block: types.Block{Timestamp: 2}, Parent: pb1.Block.ID()}
-	pb3 := &processedBlock{Block: types.Block{Timestamp: 3}, Parent: pb2.Block.ID()}
-	pb4 := &processedBlock{Block: types.Block{Timestamp: 4}, Parent: pb3.Block.ID()}
-	pb5 := &processedBlock{Block: types.Block{Timestamp: 5}, Parent: pb4.Block.ID()}
-	pb6 := &processedBlock{Block: types.Block{Timestamp: 6}, Parent: pb5.Block.ID()}
-	pb7 := &processedBlock{Block: types.Block{Timestamp: 7}, Parent: pb6.Block.ID()}
-	pb8 := &processedBlock{Block: types.Block{Timestamp: 8}, Parent: pb7.Block.ID()}
-	pb9 := &processedBlock{Block: types.Block{Timestamp: 9}, Parent: pb8.Block.ID()}
-	pb10 := &processedBlock{Block: types.Block{Timestamp: 10}, Parent: pb9.Block.ID()}
-	pb11 := &processedBlock{Block: types.Block{Timestamp: 11}, Parent: pb10.Block.ID()}
-
-	pbs := []*processedBlock{pb1, pb2, pb3, pb4, pb5, pb6, pb7, pb8, pb9, pb10, pb11}
-	for _, pb := range pbs {
-		cst.cs.db.addBlockMap(pb)
+	timestampOffsets := []types.Timestamp{1, 3, 2, 5, 4, 6, 7, 8, 9, 10}
+	blockIDs := []types.BlockID{cs.blockRoot.Block.ID()}
+	for _, offset := range timestampOffsets {
+		bfw, _, target, err := m.BlockForWork()
+		if err != nil {
+			t.Fatal(err)
+		}
+		bfw.Timestamp = genesisTime + offset
+		solvedBlock, _ := m.SolveBlock(bfw, target)
+		err = cs.AcceptBlock(solvedBlock)
+		if err != nil {
+			t.Fatal(err)
+		}
+		blockIDs = append(blockIDs, solvedBlock.ID())
 	}
 
-	// Median should be '1' for pb6.
-	if cst.cs.earliestChildTimestamp(pb6) != 1 {
+	// Median should be genesisTime for 6th block.
+	earliest, ok = cs.EarliestChildTimestamp(blockIDs[5])
+	if !ok || earliest != genesisTime {
 		t.Error("incorrect child timestamp")
 	}
-	// Median should be '2' for pb7.
-	if cst.cs.earliestChildTimestamp(pb7) != 2 {
+	// Median should be genesisTime+1 for 7th block.
+	earliest, ok = cs.EarliestChildTimestamp(blockIDs[6])
+	if !ok || earliest != genesisTime+1 {
 		t.Error("incorrect child timestamp")
 	}
-	// Median should be '6' for pb11.
-	if cst.cs.earliestChildTimestamp(pb11) != 6 {
+	// Median should be genesisTime + 5 for pb11.
+	earliest, ok = cs.EarliestChildTimestamp(blockIDs[10])
+	if !ok || earliest != genesisTime+5 {
 		t.Error("incorrect child timestamp")
 	}
 }
