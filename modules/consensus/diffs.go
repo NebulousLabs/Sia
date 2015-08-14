@@ -390,7 +390,12 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
 			// created and destroyed.
-			cs.applyMaturedSiacoinOutputs(pb)
+			updateErr := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.applyMaturedSiacoinOutputs(tx, pb)
+			})
+			if updateErr != nil {
+				return err
+			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			cs.deleteNode(pb)

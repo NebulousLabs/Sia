@@ -122,12 +122,15 @@ func (db *setDB) startConsistencyGuard() error {
 // starting, and stopConsistencyGuard should be called when the consensus
 // changes are finished. The guards are necessary because one set of changes
 // may occur over multiple boltdb transactions.
-func (db *setDB) stopConsistencyGuard() error {
-	return db.Update(func(tx *bolt.Tx) error {
+func (db *setDB) stopConsistencyGuard() {
+	err := db.Update(func(tx *bolt.Tx) error {
 		cg := tx.Bucket(ConsistencyGuard)
 		i := encoding.DecUint64(cg.Get(GuardEnd))
 		return cg.Put(GuardEnd, encoding.EncUint64(i+1))
 	})
+	if err != nil && build.DEBUG {
+		panic(err)
+	}
 }
 
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if

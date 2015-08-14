@@ -142,7 +142,7 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode
-	profile.ToggleTimer("EV")
+	profile.ToggleTimer("Head")
 	appliedNodes, err = cs.applyUntilNode(newNode)
 	if err == nil {
 		return revertedNodes, appliedNodes, nil
