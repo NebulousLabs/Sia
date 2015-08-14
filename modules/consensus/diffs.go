@@ -188,6 +188,39 @@ func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiac
 	})
 }
 
+// commitTxSiafundPoolDiff applies or reverts a SiafundPoolDiff.
+func (cs *ConsensusSet) commitTxSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+	// Sanity check - siafund pool should only ever increase.
+	if build.DEBUG {
+		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
+			panic(errNegativePoolAdjustment)
+		}
+		if sfpd.Direction != modules.DiffApply {
+			panic(errNonApplySiafundPoolDiff)
+		}
+	}
+
+	if dir == modules.DiffApply {
+		// Sanity check - sfpd.Previous should equal the current siafund pool.
+		if build.DEBUG {
+			if cs.siafundPool.Cmp(sfpd.Previous) != 0 {
+				panic(errApplySiafundPoolDiffMismatch)
+			}
+		}
+		cs.siafundPool = sfpd.Adjusted
+		setSiafundPool(tx, sfpd.Adjusted)
+	} else {
+		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
+		if build.DEBUG {
+			if cs.siafundPool.Cmp(sfpd.Adjusted) != 0 {
+				panic(errRevertSiafundPoolDiffMismatch)
+			}
+		}
+		cs.siafundPool = sfpd.Previous
+		setSiafundPool(tx, sfpd.Previous)
+	}
+}
+
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
 func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
 	// Sanity check - siafund pool should only ever increase.

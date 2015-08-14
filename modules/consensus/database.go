@@ -856,6 +856,15 @@ func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(types.F
 }
 
 // setSiafundPool updates the saved siafund pool on disk
+func setSiafundPool(tx *bolt.Tx, c types.Currency) {
+	bucket := tx.Bucket(SiafundPool)
+	err := bucket.Put(SiafundPool, encoding.Marshal(c))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// setSiafundPool updates the saved siafund pool on disk
 func (db *setDB) setSiafundPool(c types.Currency) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(SiafundPool)

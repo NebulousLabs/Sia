@@ -25,86 +25,74 @@ var (
 // applies them to the state, updating the diffs in the processed block.
 func (cs *ConsensusSet) applySiacoinInputs(pb *processedBlock, t types.Transaction) error {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
-	for _, sci := range t.SiacoinInputs {
-		scod := modules.SiacoinOutputDiff{
-			Direction:     modules.DiffRevert,
-			ID:            sci.ParentID,
-			SiacoinOutput: cs.db.getSiacoinOutputs(sci.ParentID),
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		scoBucket := tx.Bucket(SiacoinOutputs)
+		for _, sci := range t.SiacoinInputs {
+			scod := modules.SiacoinOutputDiff{
+				Direction:     modules.DiffRevert,
+				ID:            sci.ParentID,
+				SiacoinOutput: cs.db.getSiacoinOutputs(sci.ParentID),
+			}
+			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+			err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+			if err != nil {
+				return err
+			}
 		}
-		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
 func (cs *ConsensusSet) applySiacoinOutputs(pb *processedBlock, t types.Transaction) error {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
-	for i, sco := range t.SiacoinOutputs {
-		// Sanity check - the output should not exist within the state.
-		scoid := t.SiacoinOutputID(i)
-		if build.DEBUG {
-			exists := cs.db.inSiacoinOutputs(scoid)
-			if exists {
-				panic(ErrMisuseApplySiacoinOutput)
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		scoBucket := tx.Bucket(SiacoinOutputs)
+		for i, sco := range t.SiacoinOutputs {
+			scoid := t.SiacoinOutputID(i)
+			scod := modules.SiacoinOutputDiff{
+				Direction:     modules.DiffApply,
+				ID:            scoid,
+				SiacoinOutput: sco,
+			}
+			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+			err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+			if err != nil {
+				return err
 			}
 		}
-
-		scod := modules.SiacoinOutputDiff{
-			Direction:     modules.DiffApply,
-			ID:            scoid,
-			SiacoinOutput: sco,
-		}
-		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // applyFileContracts iterates through all of the file contracts in a
 // transaction and applies them to the state, updating the diffs in the proccesed
 // block.
-func (cs *ConsensusSet) applyFileContracts(pb *processedBlock, t types.Transaction) {
-	for i, fc := range t.FileContracts {
-		// Sanity check - the file contract should not exists within the state.
-		fcid := t.FileContractID(i)
-		if build.DEBUG {
-			exists := cs.db.inFileContracts(fcid)
-			if exists {
-				panic(ErrMisuseApplyFileContracts)
+func (cs *ConsensusSet) applyFileContracts(pb *processedBlock, t types.Transaction) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		for i, fc := range t.FileContracts {
+			fcid := t.FileContractID(i)
+			fcd := modules.FileContractDiff{
+				Direction:    modules.DiffApply,
+				ID:           fcid,
+				FileContract: fc,
 			}
-		}
+			pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+			cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
 
-		fcd := modules.FileContractDiff{
-			Direction:    modules.DiffApply,
-			ID:           fcid,
-			FileContract: fc,
+			// Get the portion of the contract that goes into the siafund pool and
+			// add it to the siafund pool.
+			sfpd := modules.SiafundPoolDiff{
+				Direction: modules.DiffApply,
+				Previous:  cs.siafundPool,
+				Adjusted:  cs.siafundPool.Add(fc.Tax()),
+			}
+			pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
+			cs.commitTxSiafundPoolDiff(tx, sfpd, modules.DiffApply)
 		}
-		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
-
-		// Get the portion of the contract that goes into the siafund pool and
-		// add it to the siafund pool.
-		sfpd := modules.SiafundPoolDiff{
-			Direction: modules.DiffApply,
-			Previous:  cs.siafundPool,
-			Adjusted:  cs.siafundPool.Add(fc.Tax()),
-		}
-		pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
-		cs.commitSiafundPoolDiff(sfpd, modules.DiffApply)
-	}
-	return
+		return nil
+	})
 }
 
 // applyFileContractRevisions iterates through all of the file contract
