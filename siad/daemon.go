@@ -17,7 +17,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/profile"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/spf13/cobra"
 )
@@ -26,21 +25,6 @@ import (
 func startDaemon() error {
 	// Establish multithreading.
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	// Start the rudimentary profile timer.
-	profile.Uptime()
-	go func() {
-		for {
-			time.Sleep(time.Second * 15)
-			fmt.Println("Uptime:", profile.Uptime())
-			types.CurrentHeightLock.Lock()
-			fmt.Println("Height:", types.CurrentHeight)
-			types.CurrentHeightLock.Unlock()
-			fmt.Println(profile.PrintTimes())
-		}
-	}()
-
-	profile.StartCPUProfile(config.Siad.ProfileDir, "8000Blocks")
 
 	// Print a startup message.
 	//

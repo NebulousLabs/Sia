@@ -9,7 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -131,14 +130,10 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	defer func() {
 		types.CurrentHeightLock.Lock()
 		types.CurrentHeight = cs.height()
-		if cs.height() == 2500 {
-			profile.StopCPUProfile()
-		}
 		types.CurrentHeightLock.Unlock()
 	}()
 
 	newNode := cs.newChild(parentNode, b)
-	profile.ToggleTimer("Int")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -171,7 +166,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	profile.ToggleTimer("Int")
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
 		cs.db.stopConsistencyGuard()
