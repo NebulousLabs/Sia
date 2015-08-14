@@ -97,9 +97,12 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) error {
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) error {
+func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) error {
 	// Sanity checks.
-	fc := cs.db.getFileContracts(fcid)
+	fc, err := getFileContract(tx, fcid)
+	if err != nil {
+		return err
+	}
 	if build.DEBUG {
 		// Check that the file contract in question expires at pb.Height.
 		if fc.WindowEnd != pb.Height {
@@ -112,11 +115,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 		// Sanity check - output should not already exist.
 		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
 		if build.DEBUG {
-			exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
-			if exists {
-				panic(errPayoutsAlreadyPaid)
-			}
-			exists = cs.db.inSiacoinOutputs(spoid)
+			exists := isSiacoinOutput(tx, spoid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
@@ -129,9 +128,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		})
+		err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -145,9 +142,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 		FileContract: fc,
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	cs.commitFileContractDiff(fcd, modules.DiffApply)
-
-	return nil
+	return cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have
@@ -159,16 +154,13 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) error {
 		return nil
 	}
 
-	// Grab all of the expired file contracts.
-	var expiredFileContracts []types.FileContractID
-	cs.db.forEachFCExpirationsHeight(pb.Height, func(id types.FileContractID) {
-		expiredFileContracts = append(expiredFileContracts, id)
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		return forEachFCExpiration(tx, pb.Height, func(id types.FileContractID) error {
+			return cs.applyTxMissedStorageProof(tx, pb, id)
+		})
 	})
-	for _, id := range expiredFileContracts {
-		err := cs.applyMissedStorageProof(pb, id)
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
 	cs.db.rmFCExpirations(pb.Height)
 	return nil
