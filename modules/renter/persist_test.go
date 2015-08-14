@@ -1,202 +1,166 @@
 package renter
 
-/*
-
 import (
+	"bytes"
 	"io/ioutil"
-	"os"
+	//"os"
+	"fmt"
 	"path/filepath"
+	"strconv"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
+	//"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// TestRenterSaveAndLoad probes the save and load methods of the renter type.
-func TestRenterSaveAndLoad(t *testing.T) {
-	rt := newRenterTester("TestRenterSaveAndLoad", t)
+// newTestingFile initializes a file object with random parameters.
+func newTestingFile() *file {
+	key, _ := crypto.GenerateTwofishKey()
+	data, _ := crypto.RandBytes(14)
+	nData, _ := crypto.RandIntn(10)
+	nParity, _ := crypto.RandIntn(10)
+	ecc, _ := NewRSCode(nData+1, nParity+1)
 
-	rt.renter.files["1"] = &file{
-		Name:     "1",
-		Checksum: crypto.HashObject("fake id"),
+	return &file{
+		Name:      "testfile-" + strconv.Itoa(int(data[0])),
+		Size:      encoding.DecUint64(data[1:5]),
+		MasterKey: key,
+		ecc:       ecc,
+		pieceSize: encoding.DecUint64(data[6:8]),
 
-		Pieces: []filePiece{
-			filePiece{
-				Active:    true,
-				Repairing: true,
-			},
-			filePiece{
-				Active:    true,
-				Repairing: false,
-			},
-		},
-
-		renter: rt.renter,
-	}
-	rt.renter.files["2"] = &file{
-		Name: "2",
-		Pieces: []filePiece{
-			filePiece{
-				Active:    false,
-				Repairing: true,
-			},
-			filePiece{
-				Active:    false,
-				Repairing: false,
-			},
-		},
-	}
-	lockID := rt.renter.mu.Lock()
-	rt.renter.save()
-	rt.renter.mu.Unlock(lockID)
-
-	// Create a new renter that calls load.
-	r, err := New(rt.cs, rt.hostdb, rt.wallet, rt.renter.saveDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lockID = rt.renter.mu.Lock()
-	err = r.load()
-	rt.renter.mu.Unlock(lockID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if r.files["1"].Name != "1" {
-		t.Error("Name didn't load correctly")
-	}
-	if r.files["1"].Checksum != crypto.HashObject("fake id") {
-		t.Error("Checksum didn't load correctly")
-	}
-	if r.files["1"].Pieces[0].Active != true {
-		t.Error("Pieces.Active didn't load correctly")
-	}
-	if r.files["1"].Pieces[0].Repairing != true {
-		t.Error("Pieces.Repairing didn't load correctly")
-	}
-	if r.files["1"].Pieces[1].Active != true {
-		t.Error("Pieces.Active didn't load correctly")
-	}
-	if r.files["1"].Pieces[1].Repairing != false {
-		t.Error("Pieces.Repairing didn't load correctly")
-	}
-	if r.files["2"].Name != "2" {
-		t.Error("Name didn't load correctly")
-	}
-	if r.files["2"].Pieces[0].Active != false {
-		t.Error("Pieces.Active didn't load correctly")
-	}
-	if r.files["2"].Pieces[0].Repairing != true {
-		t.Error("Pieces.Repairing didn't load correctly")
-	}
-	if r.files["2"].Pieces[1].Active != false {
-		t.Error("Pieces.Active didn't load correctly")
-	}
-	if r.files["2"].Pieces[1].Repairing != false {
-		t.Error("Pieces.Repairing didn't load correctly")
-	}
-
-	// Check that the mutex for the files was set correctly.
-	_ = r.files["1"].Nickname() // will panic if mutex is wrong.
-
-	// Corrupt the renter file and try to reload it.
-	persistFile := filepath.Join(r.saveDir, PersistFilename)
-	persistBytes, err := ioutil.ReadFile(persistFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(persistFile, persistBytes[1:], 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lockID = rt.renter.mu.Lock()
-	err = r.load()
-	rt.renter.mu.Unlock(lockID)
-	if err == nil {
-		t.Error("failed to corrupt the file")
+		bytesUploaded:  encoding.DecUint64(data[9:11]),
+		chunksUploaded: encoding.DecUint64(data[12:14]),
 	}
 }
 
-// TestFileSharing probes the LoadSharedFile and the ShareFile methods of the
-// renter.
-func TestFileSharing(t *testing.T) {
-	// Create a directory to put all the files shared between the renters in
-	// this test.
-	t.Skip("broken")
-	shareDir := build.TempDir("renter", "TestFileSharing")
-	err := os.MkdirAll(shareDir, 0700)
+// equalFiles is a helper function that compares two files for equality.
+func equalFiles(f1, f2 *file) error {
+	if f1 == nil || f2 == nil {
+		return fmt.Errorf("one or both files are nil")
+	}
+	if f1.Name != f2.Name {
+		return fmt.Errorf("names do not match: %v %v", f1.Name, f2.Name)
+	}
+	if f1.Size != f2.Size {
+		return fmt.Errorf("sizes do not match: %v %v", f1.Size, f2.Size)
+	}
+	if f1.MasterKey != f2.MasterKey {
+		return fmt.Errorf("keys do not match: %v %v", f1.MasterKey, f2.MasterKey)
+	}
+	if f1.pieceSize != f2.pieceSize {
+		return fmt.Errorf("pieceSizes do not match: %v %v", f1.pieceSize, f2.pieceSize)
+	}
+	if f1.bytesUploaded != f2.bytesUploaded {
+		return fmt.Errorf("bytesUploaded does not match: %v %v", f1.bytesUploaded, f2.bytesUploaded)
+	}
+	if f1.chunksUploaded != f2.chunksUploaded {
+		return fmt.Errorf("chunksUploaded does not match: %v %v", f1.chunksUploaded, f2.chunksUploaded)
+	}
+	return nil
+}
+
+// TestFileSaveLoad tests the save and load functions of the file type.
+func TestFileSaveLoad(t *testing.T) {
+	savedFile := newTestingFile()
+	buf := new(bytes.Buffer)
+	savedFile.save(buf)
+
+	loadedFile := new(file)
+	err := loadedFile.load(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rt1 := newRenterTester("TestFileSharing - 1", t)
-	rt2 := newRenterTester("TestFileSharing - 2", t)
-
-	// Try to share a file from an empty renter.
-	err = rt1.renter.ShareFiles([]string{"dne"}, filepath.Join(shareDir, "badshare.sia"))
-	if err != ErrUnknownNickname {
-		t.Error("Expecting ErrUnknownNickname:", err)
-	}
-
-	// Add a file to rt1 and share it with rt2.
-	rt1.renter.files["1"] = &file{
-		Name:     "1",
-		Checksum: crypto.HashObject("fake id"),
-
-		Pieces: []filePiece{
-			filePiece{
-				Active:    true,
-				Repairing: true,
-			},
-			filePiece{
-				Active:    true,
-				Repairing: false,
-			},
-		},
-
-		renter: rt1.renter,
-	}
-	err = rt1.renter.ShareFiles([]string{"1"}, filepath.Join(shareDir, "1share.sia"))
+	err = equalFiles(savedFile, loadedFile)
 	if err != nil {
 		t.Fatal(err)
-	}
-	_, err = rt2.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rt2.renter.files) != 1 {
-		t.Error("rt2 did not load the shared file")
-	}
-
-	// Try sharing nothing, and using an incorrect suffix.
-	err = rt1.renter.ShareFiles([]string{}, filepath.Join(shareDir, "2share.sia"))
-	if err != ErrNoNicknames {
-		t.Error("Expecting ErrNoNicknames")
-	}
-	err = rt1.renter.ShareFiles([]string{"1"}, filepath.Join(shareDir, "3share.sia1"))
-	if err != ErrNonShareSuffix {
-		t.Error("Expecting ErrNonShareSuffix", err)
-	}
-
-	// Load a non-existant file.
-	_, err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "0share.sia"))
-	if err == nil {
-		t.Error("expected error")
-	}
-
-	// Create and load a corrupt file.
-	shareBytes, err := ioutil.ReadFile(filepath.Join(shareDir, "1share.sia"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(filepath.Join(shareDir, "1share.sia"), shareBytes[1:], 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
-	if err == nil {
-		t.Error("Expecting corruption error")
 	}
 }
 
-*/
+// TestFileSaveLoadASCII tests the ASCII saving/loading functions.
+func TestFileSaveLoadASCII(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester("TestRenterSaveLoad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Create a file and add it to the renter.
+	savedFile := newTestingFile()
+	rt.renter.files[savedFile.Name] = savedFile
+
+	ascii, err := rt.renter.ShareFilesAscii([]string{savedFile.Name})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the file from the renter.
+	delete(rt.renter.files, savedFile.Name)
+
+	names, err := rt.renter.LoadSharedFilesAscii(ascii)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 1 || names[0] != savedFile.Name {
+		t.Fatal("nickname not loaded properly")
+	}
+
+	err = equalFiles(rt.renter.files[savedFile.Name], savedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestRenterSaveLoad probes the save and load methods of the renter type.
+func TestRenterSaveLoad(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester("TestRenterSaveLoad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Create and save some files
+	f1 := newTestingFile()
+	rt.renter.saveFile(f1)
+	f2 := newTestingFile()
+	rt.renter.saveFile(f2)
+	f3 := newTestingFile()
+	rt.renter.saveFile(f3)
+
+	// Clear the files from the renter.
+	rt.renter.files = map[string]*file{}
+
+	// load should now load the files into memory.
+	err = rt.renter.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := equalFiles(f1, rt.renter.files[f1.Name]); err != nil {
+		t.Fatal(err)
+	}
+	if err := equalFiles(f2, rt.renter.files[f2.Name]); err != nil {
+		t.Fatal(err)
+	}
+	if err := equalFiles(f3, rt.renter.files[f3.Name]); err != nil {
+		t.Fatal(err)
+	}
+
+	// Corrupt a renter file and try to reload it.
+	err = ioutil.WriteFile(filepath.Join(rt.renter.saveDir, "corrupt"+ShareExtension), []byte{1, 2, 3}, 0660)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = rt.renter.load()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}

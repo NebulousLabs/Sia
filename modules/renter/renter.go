@@ -48,8 +48,9 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, sav
 		hostDB: hdb,
 		wallet: wallet,
 
-		files:   make(map[string]*file),
-		saveDir: saveDir,
+		files:     make(map[string]*file),
+		contracts: make(map[types.FileContractID]types.FileContract),
+		saveDir:   saveDir,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}

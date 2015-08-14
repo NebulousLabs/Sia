@@ -91,7 +91,7 @@ func newRenterTester(name string) (*renterTester, error) {
 	}
 
 	// Create the miner.
-	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.RenterDir))
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err
 	}

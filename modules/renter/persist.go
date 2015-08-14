@@ -13,6 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -37,6 +38,7 @@ var (
 func (f *file) save(w io.Writer) error {
 	// TODO: error checking
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	defer zip.Close()
 	enc := encoding.NewEncoder(zip)
 
 	// encode easy fields
@@ -73,6 +75,7 @@ func (f *file) load(r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	defer zip.Close()
 	dec := encoding.NewDecoder(zip)
 
 	// decode version
@@ -120,18 +123,60 @@ func (f *file) load(r io.Reader) error {
 	return nil
 }
 
+// saveFile saves a file to the renter directory.
+func (r *Renter) saveFile(f *file) error {
+	handle, err := persist.NewSafeFile(filepath.Join(r.saveDir, f.Name+ShareExtension))
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+
+	// Write length of 1.
+	err = encoding.NewEncoder(handle).Encode(uint64(1))
+	if err != nil {
+		return err
+	}
+
+	// Write file.
+	err = f.save(handle)
+	if err != nil {
+		return err
+	}
+
+	// Update file entry in renter.
+	id := r.mu.Lock()
+	r.files[f.Name] = f
+	r.mu.Unlock(id)
+
+	return r.save()
+}
+
 // save stores the current renter data to disk.
 func (r *Renter) save() error {
-	return persist.SaveFile(saveMetadata, r.contracts, filepath.Join(r.saveDir, PersistFilename))
+	// Convert map to JSON-friendly type.
+	contracts := make(map[string]types.FileContract)
+	for id, fc := range r.contracts {
+		b, _ := id.MarshalJSON()
+		contracts[string(b)] = fc
+	}
+	return persist.SaveFile(saveMetadata, contracts, filepath.Join(r.saveDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	err := persist.LoadFile(saveMetadata, &r.contracts, filepath.Join(r.saveDir, PersistFilename))
+	// Load contracts.
+	contracts := make(map[string]types.FileContract)
+	err := persist.LoadFile(saveMetadata, &contracts, filepath.Join(r.saveDir, PersistFilename))
 	if err != nil {
 		return err
 	}
-	// load all files found in renter directory
+	var fcid types.FileContractID
+	for id, fc := range contracts {
+		fcid.UnmarshalJSON([]byte(id))
+		r.contracts[fcid] = fc
+	}
+
+	// Load all files found in renter directory.
 	f, err := os.Open(r.saveDir) // TODO: store in a subdir?
 	if err != nil {
 		return err
@@ -141,7 +186,11 @@ func (r *Renter) load() error {
 		return err
 	}
 	for _, path := range filenames {
-		file, err := os.Open(path)
+		// Skip non-sia files.
+		if filepath.Ext(path) != ShareExtension {
+			continue
+		}
+		file, err := os.Open(filepath.Join(r.saveDir, path))
 		if err != nil {
 			// maybe just skip?
 			return err
@@ -157,9 +206,6 @@ func (r *Renter) load() error {
 
 // shareFiles writes the specified files to w.
 func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
-	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
-
 	// Write number of files.
 	err := encoding.NewEncoder(w).Encode(uint64(len(nicknames)))
 	if err != nil {
@@ -185,6 +231,11 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
+
+	// TODO: consider just appending the proper extension.
+	if filepath.Ext(sharedest) != ShareExtension {
+		return ErrNonShareSuffix
+	}
 
 	file, err := os.Open(sharedest)
 	if err != nil {
