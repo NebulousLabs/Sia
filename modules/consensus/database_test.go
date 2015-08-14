@@ -12,32 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding an output twice, or deleting an
-	// output that does not exist.
-	if build.DEBUG {
-		exists := cs.db.inSiacoinOutputs(scod.ID)
-		if exists == (scod.Direction == dir) {
-			panic(errBadCommitSiacoinOutputDiff)
-		}
-	}
-
-	if scod.Direction == dir {
-		cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
-	} else {
-		cs.db.rmSiacoinOutputs(scod.ID)
-	}
-}
-
-// commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
-func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
-	if dscod.Direction == dir {
-		cs.db.addDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
-	}
-	cs.db.rmDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
-}
-
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
 func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) error {
