@@ -200,7 +200,7 @@ func (r *Renter) loadSharedFile(reader io.Reader) (string, error) {
 	r.files[f.Name] = f
 	err = r.save()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	return f.Name, nil
