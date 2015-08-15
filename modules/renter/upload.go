@@ -81,31 +81,42 @@ func (r *Renter) newHostUploader(host modules.HostSettings, masterKey crypto.Two
 	}, nil
 }
 
-// worker uploads pieces to a host as directed by reqChan. It sends the
-// updated fileContract down respChan.
+// worker uploads pieces to a host as directed by reqChan. When there are no
+// more pieces to upload, it sends the final version of the fileContract down
+// respChan.
 func (f *file) worker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
+	var contract *fileContract
+	var err error
 	for req := range reqChan {
-		contract, err := host.addPiece(req)
+		contract, err = host.addPiece(req)
 		if err != nil {
-			contract = nil
+			// TODO: how should this be handled?
+			break
 		}
-		respChan <- contract
 	}
+	// reqChan has been closed; send final contract
+	respChan <- contract
 }
 
 // upload reads chunks from r and uploads them to hosts. It spawns a worker
 // for each host, and instructs them to upload pieces of each chunk.
 func (f *file) upload(r io.Reader, hosts []uploader) error {
-	// create request/response channels and spawn workers
-	reqChans := make([]chan uploadPiece, len(hosts))
-	respChans := make([]chan *fileContract, len(hosts))
-	for i, h := range hosts {
-		reqChans[i] = make(chan uploadPiece)
-		respChans[i] = make(chan *fileContract)
-		// TODO: need a way to stop workers in the event of an error
-		go f.worker(h, reqChans[i], respChans[i])
+	// All requests are sent down the same channel. Since all workers are
+	// waiting on this channel, pieces will be uploaded by the first idle
+	// worker. This means faster uploaders will get more pieces than slow
+	// uploaders.
+	reqChan := make(chan uploadPiece)
+
+	// Once all requests have been sent, upload will read the resulting
+	// fileContracts from respChan and store them in f.
+	respChan := make(chan *fileContract)
+
+	// spawn workers
+	for _, h := range hosts {
+		go f.worker(h, reqChan, respChan)
 	}
 
+	// encode and upload each chunk
 	chunk := make([]byte, f.chunkSize())
 	for i := uint64(0); ; i++ {
 		// read next chunk
@@ -121,21 +132,21 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 			return err
 		}
 		// send upload requests to workers
-		for j, ch := range reqChans {
-			ch <- uploadPiece{pieces[j], i, uint64(j)}
-		}
-		// read upload responses from workers
-		for _, ch := range respChans {
-			contract := <-ch
-			if contract == nil {
-				// choose new host somehow
-				//go f.worker(newhost, reqChans[j], respChans[j])
-				continue
-			}
-			f.Contracts[contract.IP] = *contract
+		for j := range pieces {
+			reqChan <- uploadPiece{pieces[j], i, uint64(j)}
 		}
 		f.bytesUploaded += uint64(n) // TODO: move inside workers
 		f.chunksUploaded++
+	}
+
+	// signal workers to send their contracts
+	close(reqChan)
+	for range hosts {
+		contract := <-respChan
+		if contract == nil {
+			continue
+		}
+		f.Contracts[contract.IP] = *contract
 	}
 
 	return nil

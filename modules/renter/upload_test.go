@@ -38,10 +38,11 @@ func TestErasureUpload(t *testing.T) {
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap: make(map[uint64][]pieceData),
-			delay:    time.Millisecond,
+			delay:    1 * time.Millisecond,
 		}
 	}
 	// make one host really slow
+	// ideally, the test should take exactly this long.
 	hosts[0].(*testHost).delay = 100 * time.Millisecond
 
 	// upload data to hosts
@@ -58,12 +59,9 @@ func TestErasureUpload(t *testing.T) {
 	chunk := make([][]byte, ecc.NumPieces())
 	for i := uint64(0); i < f.numChunks(); i++ {
 		for _, h := range hosts {
-			host := h.(fetcher)
-			for _, p := range host.pieces(i) {
-				chunk[p.Piece], err = host.fetch(p)
-				if err != nil {
-					t.Fatal(err)
-				}
+			host := h.(*testHost)
+			for _, p := range host.pieceMap[i] {
+				chunk[p.Piece] = host.data[p.Offset : p.Offset+p.Length]
 			}
 		}
 		err = ecc.Recover(chunk, f.chunkSize(), buf)
