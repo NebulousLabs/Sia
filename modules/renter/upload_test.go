@@ -48,8 +48,7 @@ func TestErasureUpload(t *testing.T) {
 	// upload data to hosts
 	const pieceSize = 10
 	f := newFile(ecc, pieceSize, dataSize)
-	r := bytes.NewReader(data)
-	err = f.upload(r, hosts)
+	err = f.upload(bytes.NewReader(data), hosts)
 	if err != nil {
 		t.Fatal(err)
 	}

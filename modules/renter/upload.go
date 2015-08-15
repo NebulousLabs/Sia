@@ -82,10 +82,10 @@ func (r *Renter) newHostUploader(host modules.HostSettings, masterKey crypto.Two
 	}, nil
 }
 
-// worker uploads pieces to a host as directed by reqChan. When there are no
-// more pieces to upload, it sends the final version of the fileContract down
-// respChan.
-func (f *file) worker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
+// uploadWorker uploads pieces to a host as directed by reqChan. When there
+// are no more pieces to upload, it sends the final version of the
+// fileContract down respChan.
+func uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
 	var contract *fileContract
 	var err error
 	for req := range reqChan {
@@ -114,13 +114,13 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 
 	// spawn workers
 	for _, h := range hosts {
-		go f.worker(h, reqChan, respChan)
+		go uploadWorker(h, reqChan, respChan)
 	}
 
 	// encode and upload each chunk
-	chunk := make([]byte, f.chunkSize())
 	for i := uint64(0); ; i++ {
 		// read next chunk
+		chunk := make([]byte, f.chunkSize())
 		n, err := io.ReadFull(r, chunk)
 		if err == io.EOF {
 			break
@@ -133,8 +133,8 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 			return err
 		}
 		// send upload requests to workers
-		for j := range pieces {
-			reqChan <- uploadPiece{pieces[j], i, uint64(j)}
+		for j, data := range pieces {
+			reqChan <- uploadPiece{data, i, uint64(j)}
 		}
 		atomic.AddUint64(&f.bytesUploaded, uint64(n)) // TODO: move inside workers
 		atomic.AddUint64(&f.chunksUploaded, 1)
