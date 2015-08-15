@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -24,76 +23,68 @@ var (
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiacoinInputs(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applySiacoinInputs(scoBucket *bolt.Bucket, pb *processedBlock, t types.Transaction) error {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		scoBucket := tx.Bucket(SiacoinOutputs)
-		for _, sci := range t.SiacoinInputs {
-			scod := modules.SiacoinOutputDiff{
-				Direction:     modules.DiffRevert,
-				ID:            sci.ParentID,
-				SiacoinOutput: cs.db.getSiacoinOutputs(sci.ParentID),
-			}
-			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-			err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
+	for _, sci := range t.SiacoinInputs {
+		scod := modules.SiacoinOutputDiff{
+			Direction:     modules.DiffRevert,
+			ID:            sci.ParentID,
+			SiacoinOutput: cs.db.getSiacoinOutputs(sci.ParentID),
 		}
-		return nil
-	})
+		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiacoinOutputs(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applySiacoinOutputs(scoBucket *bolt.Bucket, pb *processedBlock, t types.Transaction) error {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		scoBucket := tx.Bucket(SiacoinOutputs)
-		for i, sco := range t.SiacoinOutputs {
-			scoid := t.SiacoinOutputID(i)
-			scod := modules.SiacoinOutputDiff{
-				Direction:     modules.DiffApply,
-				ID:            scoid,
-				SiacoinOutput: sco,
-			}
-			pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-			err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
+	for i, sco := range t.SiacoinOutputs {
+		scoid := t.SiacoinOutputID(i)
+		scod := modules.SiacoinOutputDiff{
+			Direction:     modules.DiffApply,
+			ID:            scoid,
+			SiacoinOutput: sco,
 		}
-		return nil
-	})
+		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // applyFileContracts iterates through all of the file contracts in a
 // transaction and applies them to the state, updating the diffs in the proccesed
 // block.
-func (cs *ConsensusSet) applyFileContracts(pb *processedBlock, t types.Transaction) error {
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		for i, fc := range t.FileContracts {
-			fcid := t.FileContractID(i)
-			fcd := modules.FileContractDiff{
-				Direction:    modules.DiffApply,
-				ID:           fcid,
-				FileContract: fc,
-			}
-			pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-			cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
-
-			// Get the portion of the contract that goes into the siafund pool and
-			// add it to the siafund pool.
-			sfpd := modules.SiafundPoolDiff{
-				Direction: modules.DiffApply,
-				Previous:  cs.siafundPool,
-				Adjusted:  cs.siafundPool.Add(fc.Tax()),
-			}
-			pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
-			cs.commitTxSiafundPoolDiff(tx, sfpd, modules.DiffApply)
+func (cs *ConsensusSet) applyFileContracts(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+	for i, fc := range t.FileContracts {
+		fcid := t.FileContractID(i)
+		fcd := modules.FileContractDiff{
+			Direction:    modules.DiffApply,
+			ID:           fcid,
+			FileContract: fc,
 		}
-		return nil
-	})
+		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+		cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+
+		// Get the portion of the contract that goes into the siafund pool and
+		// add it to the siafund pool.
+		sfpd := modules.SiafundPoolDiff{
+			Direction: modules.DiffApply,
+			Previous:  cs.siafundPool,
+			Adjusted:  cs.siafundPool.Add(fc.Tax()),
+		}
+		pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
+		cs.commitTxSiafundPoolDiff(tx, sfpd, modules.DiffApply)
+	}
+	return nil
 }
 
 // applyFileContractRevisions iterates through all of the file contract
@@ -264,33 +255,27 @@ func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transact
 func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction) error {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
-	profile.ToggleTimer("SI")
-	err := cs.applySiacoinInputs(pb, t)
-	profile.ToggleTimer("SI")
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		scoBucket := tx.Bucket(SiacoinOutputs)
+		err := cs.applySiacoinInputs(scoBucket, pb, t)
+		if err != nil {
+			return err
+		}
+		err = cs.applySiacoinOutputs(scoBucket, pb, t)
+		if err != nil {
+			return err
+		}
+		return cs.applyFileContracts(tx, pb, t)
+	})
 	if err != nil {
 		return err
 	}
-	profile.ToggleTimer("SO")
-	err = cs.applySiacoinOutputs(pb, t)
-	profile.ToggleTimer("SO")
-	if err != nil {
-		return err
-	}
-	profile.ToggleTimer("FC")
-	cs.applyFileContracts(pb, t)
-	profile.ToggleTimer("FC")
-	profile.ToggleTimer("FCR")
 	cs.applyFileContractRevisions(pb, t)
-	profile.ToggleTimer("FCR")
-	profile.ToggleTimer("SP")
 	err = cs.applyStorageProofs(pb, t)
-	profile.ToggleTimer("SP")
 	if err != nil {
 		return err
 	}
-	profile.ToggleTimer("SF")
 	cs.applySiafundInputs(pb, t)
 	cs.applySiafundOutputs(pb, t)
-	profile.ToggleTimer("SF")
 	return nil
 }

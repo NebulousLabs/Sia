@@ -41,14 +41,11 @@ var (
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
 // a database transaction.
 func (cs *ConsensusSet) commitBucketSiacoinOutputDiff(scoBucket *bolt.Bucket, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
-	if scod.Direction == dir {
-		if build.DEBUG && scoBucket.Get(scod.ID[:]) != nil {
-			panic(errRepeatInsert)
-		}
-		return scoBucket.Put(scod.ID[:], encoding.Marshal(scod.SiacoinOutput))
+	if build.DEBUG && (scoBucket.Get(scod.ID[:]) == nil) != (scod.Direction == dir) {
+		panic(errRepeatInsert)
 	}
-	if build.DEBUG && scoBucket.Get(scod.ID[:]) == nil {
-		panic(errNilItem)
+	if scod.Direction == dir {
+		return scoBucket.Put(scod.ID[:], encoding.Marshal(scod.SiacoinOutput))
 	}
 	return scoBucket.Delete(scod.ID[:])
 }
@@ -95,7 +92,7 @@ func (cs *ConsensusSet) commitTxFileContractDiff(tx *bolt.Tx, fcd modules.FileCo
 		if err != nil {
 			return err
 		}
-		return fceSet.Put(encoding.Marshal(fcd.ID), encoding.Marshal(struct{}{}))
+		return fceSet.Put(fcd.ID[:], []byte{})
 	}
 	err := removeFileContract(tx, fcd.ID)
 	if err != nil {
@@ -426,10 +423,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// previous transactions have been applied.
 	profile.ToggleTimer("Txn")
 	for _, txn := range pb.Block.Transactions {
-		profile.ToggleTimer("VT")
 		err := cs.validTransaction(txn)
-		profile.ToggleTimer("VT")
-		profile.ToggleTimer("RW")
 		if err != nil {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
@@ -438,22 +432,17 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 				return cs.applyMaturedSiacoinOutputs(tx, pb)
 			})
 			if updateErr != nil {
-				profile.ToggleTimer("RW")
 				profile.ToggleTimer("Txn")
 				return err
 			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			cs.deleteNode(pb)
-			profile.ToggleTimer("RW")
 			profile.ToggleTimer("Txn")
 			return err
 		}
-		profile.ToggleTimer("RW")
 
-		profile.ToggleTimer("AP")
 		err = cs.applyTransaction(pb, txn)
-		profile.ToggleTimer("AP")
 		if err != nil {
 			profile.ToggleTimer("Txn")
 			return err

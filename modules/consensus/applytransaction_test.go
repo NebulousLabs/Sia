@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"testing"
 
@@ -830,3 +831,4 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	}()
 	cst.cs.applySiafundOutputs(pb, txn)
 }
+*/
