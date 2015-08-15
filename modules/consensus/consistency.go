@@ -132,7 +132,7 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	// 4.	current target
 	// 5.	current depth
 	// 6.	current path + diffs
-	// !7	earliest allowed timestamp of next block
+	// (7)	earliest allowed timestamp of next block
 	// 8.	unspent siacoin outputs, sorted by id.
 	// 9.	open file contracts, sorted by id.
 	// 10.	unspent siafund outputs, sorted by id.
