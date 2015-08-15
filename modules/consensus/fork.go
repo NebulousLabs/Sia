@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -113,7 +114,9 @@ func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*pro
 				panic(err)
 			}
 		} else {
+			profile.ToggleTimer("GAAD")
 			err = cs.generateAndApplyDiff(node)
+			profile.ToggleTimer("GAAD")
 			if err != nil {
 				break
 			}
@@ -141,10 +144,15 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode
+	profile.ToggleTimer("BET")
+	profile.ToggleTimer("AUN")
 	appliedNodes, err = cs.applyUntilNode(newNode)
+	profile.ToggleTimer("AUN")
 	if err == nil {
 		return revertedNodes, appliedNodes, nil
 	}
+	profile.ToggleTimer("REP")
+	defer profile.ToggleTimer("REP")
 
 	// restore old path
 	cs.revertToNode(commonParent)

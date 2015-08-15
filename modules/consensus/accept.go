@@ -29,24 +29,23 @@ var (
 // validHeader does some early, low computation verification on the block.
 func (cs *ConsensusSet) validHeader(b types.Block) error {
 	// See if the block is known already.
-	_, exists := cs.dosBlocks[b.ID()]
+	id := b.ID()
+	_, exists := cs.dosBlocks[id]
 	if exists {
 		return ErrDoSBlock
-	}
-	exists = cs.db.inBlockMap(b.ID())
-	if exists {
-		return ErrBlockKnown
 	}
 
 	// Do read-only verification operations inside of a single read-only boltdb
 	// tx.
 	var parent processedBlock
 	err := cs.db.View(func(tx *bolt.Tx) error {
-		// Check that the parent exists.
+		// Check if the block is already known.
 		blockMap := tx.Bucket(BlockMap)
+		if blockMap.Get(id[:]) != nil {
+			return ErrBlockKnown
+		}
 
-		// The identifier for the BlockMap is the sia encoding of the parent
-		// id. The sia encoding is the same as ParentID[:].
+		// Check for the parent.
 		parentBytes := blockMap.Get(b.ParentID[:])
 		if parentBytes == nil {
 			return ErrOrphan
@@ -142,6 +141,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	if err != nil {
 		return nil, nil, err
 	}
+	profile.ToggleTimer("BET")
 	if newNode.heavierThan(cs.currentProcessedBlock()) {
 		return cs.forkBlockchain(newNode)
 	}
@@ -154,9 +154,11 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	profile.ToggleTimer("Accept")
+	profile.ToggleTimer("EV")
 	err := cs.db.startConsistencyGuard()
 	if err != nil {
 		profile.ToggleTimer("Accept")
+		profile.ToggleTimer("EV")
 		return err
 	}
 
@@ -167,6 +169,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	if err != nil {
 		cs.db.stopConsistencyGuard()
 		profile.ToggleTimer("Accept")
+		profile.ToggleTimer("EV")
 		return err
 	}
 
@@ -174,6 +177,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
+	profile.ToggleTimer("EV")
 	profile.ToggleTimer("Int")
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {

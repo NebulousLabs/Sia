@@ -388,29 +388,24 @@ func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirect
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
 func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
-	// Sanity check
-	if build.DEBUG {
-		// Generate should only be called if the diffs have not yet been
-		// generated.
-		if pb.DiffsGenerated {
-			panic(errRegenerateDiffs)
-		}
-		// Current node must be the input node's parent.
-		if pb.Parent != cs.currentBlockID() {
-			panic(errInvalidSuccessor)
-		}
+	// Sanity check - the block being applied should have the current block as
+	// a parent.
+	if build.DEBUG && pb.Parent != cs.currentBlockID() {
+		panic(errInvalidSuccessor)
 	}
 
 	// Update the state to point to the new block.
 	err := cs.db.Update(func(tx *bolt.Tx) error {
-		err := pushPath(tx, pb.Block.ID())
+		bid := pb.Block.ID()
+		err := tx.Bucket(BlockPath).Put(encoding.EncUint64(uint64(pb.Height)), bid[:])
 		if err != nil {
 			return err
 		}
-		return createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+		return nil
 	})
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// diffsGenerated is set to true as soon as we start changing the set of

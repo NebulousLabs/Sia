@@ -584,9 +584,10 @@ func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.
 // input height.
 func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
 	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
-	err := insertItem(tx, DSCOBuckets, bh, bucketID)
+	dscoBuckets := tx.Bucket(DSCOBuckets)
+	err := dscoBuckets.Put(encoding.Marshal(bh), encoding.Marshal(bucketID))
 	if err != nil {
-		return err
+		panic(err)
 	}
 	_, err = tx.CreateBucket(bucketID)
 	return err

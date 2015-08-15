@@ -526,33 +526,35 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 		t.Error("delayed output map was created when bringing the height too low")
 	}
 
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("expecting an error to be thrown after corrupting the database")
-		}
-	}()
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("expecting an error to be thrown after corrupting the database")
-		}
+	/*
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("expecting an error to be thrown after corrupting the database")
+			}
+		}()
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Error("expecting an error to be thrown after corrupting the database")
+			}
 
-		// Trigger a panic by creating a map that's already there during a revert.
+			// Trigger a panic by creating a map that's already there during a revert.
+			err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+				return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+		// Trigger a panic by creating a map that's already there during an apply.
 		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
+			return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-	}()
-	// Trigger a panic by creating a map that's already there during an apply.
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	*/
 }
 
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
@@ -743,6 +745,7 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
 }
 
+/*
 // TestGenerateAndApplyDiffSanity triggers the sanity checks in the
 // generateAndApplyDiff method of the consensus set.
 func TestGenerateAndApplyDiffSanity(t *testing.T) {
@@ -777,3 +780,4 @@ func TestGenerateAndApplyDiffSanity(t *testing.T) {
 	parent.DiffsGenerated = false
 	_ = cst.cs.generateAndApplyDiff(parent)
 }
+*/
