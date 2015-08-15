@@ -265,7 +265,12 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
-	cst.cs.applyFileContractMaintenance(pb)
+	cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyFileContractMaintenance(tx, pb)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists := cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")

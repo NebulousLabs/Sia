@@ -153,8 +153,10 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // transactions. Trusted blocks, like those on disk, should already
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
+	profile.ToggleTimer("Accept")
 	err := cs.db.startConsistencyGuard()
 	if err != nil {
+		profile.ToggleTimer("Accept")
 		return err
 	}
 
@@ -164,6 +166,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	err = cs.validHeader(b)
 	if err != nil {
 		cs.db.stopConsistencyGuard()
+		profile.ToggleTimer("Accept")
 		return err
 	}
 
@@ -175,6 +178,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
 		cs.db.stopConsistencyGuard()
+		profile.ToggleTimer("Accept")
 		return err
 	}
 	if len(appliedNodes) > 0 {
@@ -194,6 +198,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		}
 	}
 	cs.db.stopConsistencyGuard()
+	profile.ToggleTimer("Accept")
 	return nil
 }
 

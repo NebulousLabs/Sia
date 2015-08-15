@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -137,37 +138,38 @@ func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBloc
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) error {
-	// Skip if there are no expirations at this height.
-	if !cs.db.inFCExpirations(pb.Height) {
+func (cs *ConsensusSet) applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) error {
+	// Get the bucket pointing to all of the expiring file contracts.
+	fceBucketID := append(prefix_fcex, encoding.Marshal(pb.Height)...)
+	fceBucket := tx.Bucket(fceBucketID)
+	if fceBucket == nil {
 		return nil
 	}
-
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		return forEachFCExpiration(tx, pb.Height, func(id types.FileContractID) error {
-			return cs.applyTxMissedStorageProof(tx, pb, id)
-		})
+	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
+		var id types.FileContractID
+		copy(id[:], keyBytes)
+		return cs.applyTxMissedStorageProof(tx, pb, id)
 	})
 	if err != nil {
 		return err
 	}
-	cs.db.rmFCExpirations(pb.Height)
 	return nil
+	// return tx.DeleteBucket(fceBucketID)
 }
 
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
 func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
-	err := cs.db.Update(func(tx *bolt.Tx) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
 		err := cs.applyMinerPayouts(tx, pb)
 		if err != nil {
 			return err
 		}
-		return cs.applyMaturedSiacoinOutputs(tx, pb)
+		err = cs.applyMaturedSiacoinOutputs(tx, pb)
+		if err != nil {
+			return err
+		}
+		return cs.applyFileContractMaintenance(tx, pb)
 	})
-	if err != nil {
-		return err
-	}
-	return cs.applyFileContractMaintenance(pb)
 }
