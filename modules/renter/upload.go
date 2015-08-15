@@ -85,7 +85,7 @@ func (r *Renter) newHostUploader(host modules.HostSettings, masterKey crypto.Two
 // uploadWorker uploads pieces to a host as directed by reqChan. When there
 // are no more pieces to upload, it sends the final version of the
 // fileContract down respChan.
-func uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
+func (f *file) uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
 	var contract *fileContract
 	var err error
 	for req := range reqChan {
@@ -94,6 +94,8 @@ func uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan *fileCo
 			// TODO: how should this be handled?
 			break
 		}
+		atomic.AddUint64(&f.bytesUploaded, uint64(len(req.data)))
+
 	}
 	// reqChan has been closed; send final contract
 	respChan <- contract
@@ -114,7 +116,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 
 	// spawn workers
 	for _, h := range hosts {
-		go uploadWorker(h, reqChan, respChan)
+		go f.uploadWorker(h, reqChan, respChan)
 	}
 
 	// encode and upload each chunk
@@ -133,12 +135,9 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 			return err
 		}
 		// send upload requests to workers
-		uploaded := 0
 		for j, data := range pieces {
 			reqChan <- uploadPiece{data, i, uint64(j)}
-			uploaded += len(data)
 		}
-		atomic.AddUint64(&f.bytesUploaded, uint64(uploaded)) // TODO: move inside workers
 		atomic.AddUint64(&f.chunksUploaded, 1)
 	}
 
