@@ -8,7 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -416,7 +415,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
-	profile.ToggleTimer("Txn")
 	for _, txn := range pb.Block.Transactions {
 		err := cs.validTransaction(txn)
 		if err != nil {
@@ -427,30 +425,24 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 				return cs.applyMaturedSiacoinOutputs(tx, pb)
 			})
 			if updateErr != nil {
-				profile.ToggleTimer("Txn")
 				return err
 			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			cs.deleteNode(pb)
-			profile.ToggleTimer("Txn")
 			return err
 		}
 
 		err = cs.applyTransaction(pb, txn)
 		if err != nil {
-			profile.ToggleTimer("Txn")
 			return err
 		}
 	}
-	profile.ToggleTimer("Txn")
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	profile.ToggleTimer("Tail")
-	defer profile.ToggleTimer("Tail")
 	err = cs.applyMaintenance(pb)
 	if err != nil {
 		return err

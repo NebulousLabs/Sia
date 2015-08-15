@@ -9,7 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/profile"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -130,18 +129,13 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	defer func() {
 		types.CurrentHeightLock.Lock()
 		types.CurrentHeight = cs.height()
-		if cs.height() == 2500 {
-			profile.StopCPUProfile()
-		}
 		types.CurrentHeightLock.Unlock()
 	}()
 
 	newNode := cs.newChild(parentNode, b)
-	profile.ToggleTimer("Int")
 	if err != nil {
 		return nil, nil, err
 	}
-	profile.ToggleTimer("BET")
 	if newNode.heavierThan(cs.currentProcessedBlock()) {
 		return cs.forkBlockchain(newNode)
 	}
@@ -153,12 +147,8 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // transactions. Trusted blocks, like those on disk, should already
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
-	profile.ToggleTimer("Accept")
-	profile.ToggleTimer("EV")
 	err := cs.db.startConsistencyGuard()
 	if err != nil {
-		profile.ToggleTimer("Accept")
-		profile.ToggleTimer("EV")
 		return err
 	}
 
@@ -168,8 +158,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	err = cs.validHeader(b)
 	if err != nil {
 		cs.db.stopConsistencyGuard()
-		profile.ToggleTimer("Accept")
-		profile.ToggleTimer("EV")
 		return err
 	}
 
@@ -177,12 +165,9 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	profile.ToggleTimer("EV")
-	profile.ToggleTimer("Int")
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
 		cs.db.stopConsistencyGuard()
-		profile.ToggleTimer("Accept")
 		return err
 	}
 	if len(appliedNodes) > 0 {
@@ -202,7 +187,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		}
 	}
 	cs.db.stopConsistencyGuard()
-	profile.ToggleTimer("Accept")
 	return nil
 }
 
