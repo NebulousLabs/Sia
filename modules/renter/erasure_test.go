@@ -40,6 +40,7 @@ func BenchmarkRSEncode(b *testing.B) {
 	data := make([]byte, 1<<20)
 	rand.Read(data)
 
+	b.SetBytes(1 << 20)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ecc.Encode(data)
@@ -58,8 +59,10 @@ func BenchmarkRSRecover(b *testing.B) {
 		panic(err)
 	}
 
+	b.SetBytes(1 << 20)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		pieces[0] = nil
 		ecc.Recover(pieces, 1<<20, ioutil.Discard)
 	}
 }
