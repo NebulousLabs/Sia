@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -135,8 +136,8 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		for j := range pieces {
 			reqChan <- uploadPiece{pieces[j], i, uint64(j)}
 		}
-		f.bytesUploaded += uint64(n) // TODO: move inside workers
-		f.chunksUploaded++
+		atomic.AddUint64(&f.bytesUploaded, uint64(n)) // TODO: move inside workers
+		atomic.AddUint64(&f.chunksUploaded, 1)
 	}
 
 	// signal workers to send their contracts
