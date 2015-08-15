@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"testing"
+	"time"
 )
 
 func (h *testHost) addPiece(p uploadPiece) (*fileContract, error) {
@@ -14,6 +15,8 @@ func (h *testHost) addPiece(p uploadPiece) (*fileContract, error) {
 		uint64(len(p.data)),
 	})
 	h.data = append(h.data, p.data...)
+	// simulate I/O delay
+	time.Sleep(h.delay)
 	return nil, nil
 }
 
@@ -35,8 +38,11 @@ func TestErasureUpload(t *testing.T) {
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap: make(map[uint64][]pieceData),
+			delay:    time.Millisecond,
 		}
 	}
+	// make one host really slow
+	hosts[0].(*testHost).delay = 100 * time.Millisecond
 
 	// upload data to hosts
 	const pieceSize = 10

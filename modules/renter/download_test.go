@@ -5,11 +5,14 @@ import (
 	"crypto/rand"
 	"io"
 	"testing"
+	"time"
 )
 
 type testHost struct {
 	data     []byte
 	pieceMap map[uint64][]pieceData // key is chunkIndex
+
+	delay time.Duration // used to simulate real-world conditions
 }
 
 func (h *testHost) pieces(chunkIndex uint64) []pieceData {
@@ -17,6 +20,7 @@ func (h *testHost) pieces(chunkIndex uint64) []pieceData {
 }
 
 func (h *testHost) fetch(p pieceData) ([]byte, error) {
+	time.Sleep(h.delay)
 	return h.data[p.Offset : p.Offset+p.Length], nil
 }
 
@@ -38,8 +42,11 @@ func TestErasureDownload(t *testing.T) {
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap: make(map[uint64][]pieceData),
+			delay:    time.Millisecond,
 		}
 	}
+	// make one host really slow
+	hosts[0].(*testHost).delay = 100 * time.Millisecond
 
 	// upload data to hosts
 	const chunkSize = 100
