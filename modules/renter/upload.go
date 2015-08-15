@@ -121,7 +121,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 	for i := uint64(0); ; i++ {
 		// read next chunk
 		chunk := make([]byte, f.chunkSize())
-		n, err := io.ReadFull(r, chunk)
+		_, err := io.ReadFull(r, chunk)
 		if err == io.EOF {
 			break
 		} else if err != nil && err != io.ErrUnexpectedEOF {
@@ -133,10 +133,12 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 			return err
 		}
 		// send upload requests to workers
+		uploaded := 0
 		for j, data := range pieces {
 			reqChan <- uploadPiece{data, i, uint64(j)}
+			uploaded += len(data)
 		}
-		atomic.AddUint64(&f.bytesUploaded, uint64(n)) // TODO: move inside workers
+		atomic.AddUint64(&f.bytesUploaded, uint64(uploaded)) // TODO: move inside workers
 		atomic.AddUint64(&f.chunksUploaded, 1)
 	}
 
