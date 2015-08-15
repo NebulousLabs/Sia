@@ -2,9 +2,9 @@ package renter
 
 import (
 	"bytes"
-	"io/ioutil"
-	//"os"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -126,9 +126,6 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 	defer rt.Close()
 
-	// Generate initial renter.json
-	rt.renter.save()
-
 	// Create and save some files
 	f1 := newTestingFile()
 	rt.renter.saveFile(f1)
@@ -139,7 +136,7 @@ func TestRenterSaveLoad(t *testing.T) {
 
 	// load should now load the files into memory.
 	err = rt.renter.load()
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
 

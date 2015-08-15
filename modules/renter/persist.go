@@ -157,24 +157,12 @@ func (r *Renter) save() error {
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	// Load contracts.
-	contracts := make(map[string]types.FileContract)
-	err := persist.LoadFile(saveMetadata, &contracts, filepath.Join(r.saveDir, PersistFilename))
-	if err != nil {
-		return err
-	}
-	var fcid types.FileContractID
-	for id, fc := range contracts {
-		fcid.UnmarshalJSON([]byte(id))
-		r.contracts[fcid] = fc
-	}
-
 	// Load all files found in renter directory.
-	f, err := os.Open(r.saveDir) // TODO: store in a subdir?
+	dir, err := os.Open(r.saveDir) // TODO: store in a subdir?
 	if err != nil {
 		return err
 	}
-	filenames, err := f.Readdirnames(-1)
+	filenames, err := dir.Readdirnames(-1)
 	if err != nil {
 		return err
 	}
@@ -194,6 +182,19 @@ func (r *Renter) load() error {
 			return err
 		}
 	}
+
+	// Load contracts.
+	contracts := make(map[string]types.FileContract)
+	err = persist.LoadFile(saveMetadata, &contracts, filepath.Join(r.saveDir, PersistFilename))
+	if err != nil {
+		return err
+	}
+	var fcid types.FileContractID
+	for id, fc := range contracts {
+		fcid.UnmarshalJSON([]byte(id))
+		r.contracts[fcid] = fc
+	}
+
 	return nil
 }
 
