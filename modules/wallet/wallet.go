@@ -24,34 +24,71 @@ var (
 	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
 )
 
+// spendableKey is a set of secret keys plus the corresponding unlock
+// conditions.  The public key can be derived from the secret key and then
+// matched to the corresponding public keys in the unlock conditions. All
+// addresses that are to be used in 'FundSiacoins' or 'FundSiafunds' in the
+// transaction builder must conform to this form of spendable key.
 type spendableKey struct {
 	unlockConditions types.UnlockConditions
 	secretKeys       []crypto.SecretKey
 }
 
+// Wallet is an object that tracks balances, creates keys and addresses,
+// manages building and sending transactions.
 type Wallet struct {
+	// unlocked indicates whether the wallet is currently storing secret keys
+	// in memory. subscribed indicates whether the wallet has subscribed to the
+	// consensus set yet - the wallet is unable to subscribe to the consensus
+	// set until it has been unlocked for the first time. The primary seed is
+	// used to generate new addresses for the wallet.
 	unlocked    bool
 	subscribed  bool
 	settings    WalletSettings
 	primarySeed modules.Seed
 
-	state              modules.ConsensusSet
+	// The wallet's dependencies. The items 'consensusSetHeight' and
+	// 'siafundPool' are tracked separately from the consensus set to minimize
+	// the number of queries that the wallet needs to make to the consensus
+	// set; queries to the consensus set are very slow.
+	cs                 modules.ConsensusSet
 	tpool              modules.TransactionPool
 	consensusSetHeight types.BlockHeight
 	siafundPool        types.Currency
 
-	seeds           []modules.Seed
-	keys            map[types.UnlockHash]spendableKey
-	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
-	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
-	historicOutputs map[types.OutputID]types.Currency
-	spentOutputs    map[types.OutputID]types.BlockHeight
+	// The following set of fields are responsible for tracking the confirmed
+	// outputs, and for being able to spend them. The seeds are used to derive
+	// the keys that are tracked on the blockchain. All keys are pregenerated
+	// from the seeds, when checking new outputs or spending outputs, the seeds
+	// are not referenced at all. The seeds are only stored so that the user
+	// may access them.
+	//
+	// siacoinOutptus, siafundOutputs, and spentOutputs are kept so that they
+	// can be scanned when trying to fund transactions.
+	seeds          []modules.Seed
+	keys           map[types.UnlockHash]spendableKey
+	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
+	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
+	spentOutputs   map[types.OutputID]types.BlockHeight
 
-	transactions                  map[types.TransactionID]types.Transaction
+	// The following fields are kept to track transaction history.
+	// walletTransactions are stored in chronological order, and have a map for
+	// constant time random access. The set of full transactions is kept as
+	// well, ordering can be determined by the walletTransactions slice.
+	//
+	// The unconfirmed transactions are kept the same way, except without the
+	// random access. It is assumed that the list of unconfirmed transactions
+	// will be small enough that this will not be a problem.
+	//
+	// historicOutputs is kept so that the values of transaction inputs can be
+	// determined. historicOutputs is never cleared, but in general should be
+	// small compared to the list of transactions.
 	walletTransactions            []modules.WalletTransaction
 	walletTransactionMap          map[modules.WalletTransactionID]*modules.WalletTransaction
-	unconfirmedTransactions       []types.Transaction
+	transactions                  map[types.TransactionID]types.Transaction
 	unconfirmedWalletTransactions []modules.WalletTransaction
+	unconfirmedTransactions       []types.Transaction
+	historicOutputs               map[types.OutputID]types.Currency
 
 	persistDir string
 	log        *log.Logger
@@ -71,7 +108,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 
 	// Initialize the data structure.
 	w := &Wallet{
-		state: cs,
+		cs:    cs,
 		tpool: tpool,
 
 		keys:            make(map[types.UnlockHash]spendableKey),
@@ -86,13 +123,10 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
-
-	// Initialize the persistent structures.
 	err := w.initPersist()
 	if err != nil {
 		return nil, err
 	}
-
 	return w, nil
 }
 
@@ -101,28 +135,34 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 func (w *Wallet) Lock() error {
 	lockID := w.mu.RLock()
 	defer w.mu.RUnlock(lockID)
-	w.log.Println("INFO: Closing wallet")
+	if !w.unlocked {
+		return errLockedWallet
+	}
+	w.log.Println("INFO: Locking wallet.")
+
+	// Wipe all of the seeds and secret keys, they will be replaced upon
+	// calling 'Unlock' again. 'for i := range' must be used to prevent copies
+	// of secret data from being made.
+	for i := range w.keys {
+		for j := range w.keys[i].secretKeys {
+			crypto.SecureWipe(w.keys[i].secretKeys[j][:])
+		}
+	}
+	for i := range w.seeds {
+		crypto.SecureWipe(w.seeds[i][:])
+	}
+	w.seeds = w.seeds[:0]
+	w.unlocked = false
 
 	// Save the wallet data.
 	err := w.saveSettings()
 	if err != nil {
 		return err
 	}
-
-	// Wipe all of the secret keys, they will be replaced upon calling 'Unlock'
-	// again.
-	for _, key := range w.keys {
-		// Must use 'for i :=  range' otherwise a copy of the secret data is
-		// made.
-		for i := range key.secretKeys {
-			crypto.SecureWipe(key.secretKeys[i][:])
-		}
-	}
-	w.unlocked = false
 	return nil
 }
 
-// Unlockd indicates whether the wallet is locked or unlocked.
+// Unlocked indicates whether the wallet is locked or unlocked.
 func (w *Wallet) Unlocked() bool {
 	lockID := w.mu.RLock()
 	defer w.mu.RUnlock(lockID)

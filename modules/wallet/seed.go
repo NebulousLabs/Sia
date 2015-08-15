@@ -150,9 +150,9 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	sek := seedFileEncryptionKey(masterKey, sfuid)
+	sfek := seedFileEncryptionKey(masterKey, sfuid)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
-	encryptionVerification, err := sek.EncryptBytes(plaintextVerification)
+	encryptionVerification, err := sfek.EncryptBytes(plaintextVerification)
 	if err != nil {
 		return modules.Seed{}, err
 	}
@@ -165,16 +165,20 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	}
 
 	// Encrypt the seed and save the seed file.
-	randomSuffix := persist.RandomSuffix()
-	filename := filepath.Join(w.persistDir, seedFilePrefix+randomSuffix+seedFileSuffix)
-	cryptSeed, err := sek.EncryptBytes(seed[:])
+	seedName := seedFilePrefix + persist.RandomSuffix() + seedFileSuffix
+	filename := filepath.Join(w.persistDir, seedName)
+	cryptSeed, err := sfek.EncryptBytes(seed[:])
 	if err != nil {
 		return modules.Seed{}, err
 	}
 	w.primarySeed = seed
-	w.settings.PrimarySeedFile = SeedFile{sfuid, encryptionVerification, cryptSeed}
+	w.settings.PrimarySeedFile = SeedFile{
+		SeedFileUID:            sfuid,
+		EncryptionVerification: encryptionVerification,
+		Seed: cryptSeed,
+	}
 	w.settings.PrimarySeedProgress = 0
-	w.settings.PrimarySeedFilename = seedFilePrefix + randomSuffix + seedFileSuffix
+	w.settings.PrimarySeedFilename = seedName
 	err = persist.SaveFile(seedMetadata, &w.settings.PrimarySeedFile, filename)
 	if err != nil {
 		return modules.Seed{}, err
@@ -184,6 +188,28 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 		return modules.Seed{}, err
 	}
 	return seed, nil
+}
+
+// initPrimarySeed loads the primary seed into the wallet, creating a new one
+// if the primary seed does not exist. The primary seed is used to generate new
+// addresses.
+func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
+	if w.settings.PrimarySeedFilename == "" {
+		w.log.Println("UNLOCK: Primary seed undefined, creating a new seed.")
+		_, err := w.createSeed(masterKey)
+		return err
+	}
+	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeedFilename))
+	if err != nil {
+		w.log.Println("UNLOCK: Issue loading primary seed file:", err)
+		return err
+	}
+	err = w.loadSeedFile(masterKey, fileInfo)
+	if err != nil {
+		w.log.Println("UNLOCK: Issue loading primary seed:", err)
+		return err
+	}
+	return nil
 }
 
 // initAuxiliarySeeds scans the wallet folder for wallet seeds. Auxiliary seeds

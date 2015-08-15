@@ -153,28 +153,6 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 	return w.saveSettings()
 }
 
-// initPrimarySeed loads the primary seed into the wallet, creating a new one
-// if the primary seed does not exist. The primary seed is used to generate new
-// addresses.
-func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
-	if w.settings.PrimarySeedFilename == "" {
-		w.log.Println("UNLOCK: Primary seed undefined, creating a new seed.")
-		_, err := w.createSeed(masterKey)
-		return err
-	}
-	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeedFilename))
-	if err != nil {
-		w.log.Println("UNLOCK: Issue loading primary seed file:", err)
-		return err
-	}
-	err = w.loadSeedFile(masterKey, fileInfo)
-	if err != nil {
-		w.log.Println("UNLOCK: Issue loading primary seed:", err)
-		return err
-	}
-	return nil
-}
-
 // unlock loads all of the encrypted file structures into wallet memory. Even
 // after loading, the structures are kept encrypted, but some data such as
 // addresses are decrypted so that the wallet knows what to track.
@@ -210,7 +188,6 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 		w.tpool.TransactionPoolSubscribe(w)
 		w.subscribed = true
 	}
-
 	w.unlocked = true
 	return nil
 }
@@ -219,11 +196,8 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 func (w *Wallet) Encrypted() bool {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-
-	if build.DEBUG {
-		if w.unlocked && len(w.settings.EncryptionVerification) == 0 {
-			panic("wallet is both unlocked and unencrypted")
-		}
+	if build.DEBUG && w.unlocked && len(w.settings.EncryptionVerification) == 0 {
+		panic("wallet is both unlocked and unencrypted")
 	}
 	return len(w.settings.EncryptionVerification) != 0
 }
