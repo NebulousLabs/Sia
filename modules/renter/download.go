@@ -82,6 +82,12 @@ func newHostFetcher(fc fileContract, masterKey crypto.TwofishKey) (*hostFetcher,
 		return nil, err
 	}
 
+	// send contract ID
+	err = encoding.WriteObject(conn, fc.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	// make piece map
 	pieceMap := make(map[uint64][]pieceData)
 	for _, p := range fc.Pieces {
