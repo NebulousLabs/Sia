@@ -4,8 +4,11 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -26,58 +29,80 @@ var (
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func (cs *ConsensusSet) validSiacoins(t types.Transaction) (err error) {
-	var inputSum types.Currency
-	for _, sci := range t.SiacoinInputs {
-		// Check that the input spends an existing output.
-		exists := cs.db.inSiacoinOutputs(sci.ParentID)
-		if !exists {
-			return ErrMissingSiacoinOutput
-		}
-		sco := cs.db.getSiacoinOutputs(sci.ParentID)
+func (cs *ConsensusSet) validSiacoins(t types.Transaction) error {
+	return cs.db.View(func(tx *bolt.Tx) error {
+		scoBucket := tx.Bucket(SiacoinOutputs)
+		var inputSum types.Currency
+		for _, sci := range t.SiacoinInputs {
+			// Check that the input spends an existing output.
+			scoBytes := scoBucket.Get(sci.ParentID[:])
+			if scoBytes == nil {
+				return ErrMissingSiacoinOutput
+			}
 
-		// Check that the unlock conditions match the required unlock hash.
-		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
-			return ErrWrongUnlockConditions
-		}
+			// Check that the unlock conditions match the required unlock hash.
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(scoBytes, &sco)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
+			if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
+				return ErrWrongUnlockConditions
+			}
 
-		inputSum = inputSum.Add(sco.Value)
-	}
-	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return ErrSiacoinInputOutputMismatch
-	}
-	return
+			inputSum = inputSum.Add(sco.Value)
+		}
+		if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
+			return ErrSiacoinInputOutputMismatch
+		}
+		return nil
+	})
 }
 
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
 func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
-	// Get the file contract associated with the input id.
-	exists := cs.db.inFileContracts(fcid)
-	if !exists {
-		return 0, ErrUnrecognizedFileContractID
-	}
-	fc := cs.db.getFileContracts(fcid)
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		// Check that the parent file contract exists.
+		fcBucket := tx.Bucket(FileContracts)
+		fcBytes := fcBucket.Get(fcid[:])
+		if fcBytes == nil {
+			return ErrUnrecognizedFileContractID
+		}
 
-	// Get the ID of the trigger block.
-	triggerHeight := fc.WindowStart - 1
-	if triggerHeight > cs.height() {
-		return 0, ErrUnfinishedFileContract
-	}
-	triggerID := cs.db.getPath(triggerHeight)
+		// Decode the file contract.
+		var fc types.FileContract
+		err := encoding.Unmarshal(fcBytes, &fc)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 
-	// Get the index by appending the file contract ID to the trigger block and
-	// taking the hash, then converting the hash to a numerical value and
-	// modding it against the number of segments in the file. The result is a
-	// random number in range [0, numSegments]. The probability is very
-	// slightly weighted towards the beginning of the file, but because the
-	// size difference between the number of segments and the random number
-	// being modded, the difference is too small to make any practical
-	// difference.
-	seed := crypto.HashAll(triggerID, fcid)
-	numSegments := int64(crypto.CalculateLeaves(fc.FileSize))
-	seedInt := new(big.Int).SetBytes(seed[:])
-	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
+		// Get the trigger block id.
+		blockPath := tx.Bucket(BlockPath)
+		triggerHeight := fc.WindowStart - 1
+		if triggerHeight > types.BlockHeight(blockPath.Stats().KeyN) {
+			return ErrUnfinishedFileContract
+		}
+		var triggerID types.BlockID
+		copy(triggerID[:], blockPath.Get(encoding.EncUint64(uint64(triggerHeight))))
+
+		// Get the index by appending the file contract ID to the trigger block and
+		// taking the hash, then converting the hash to a numerical value and
+		// modding it against the number of segments in the file. The result is a
+		// random number in range [0, numSegments]. The probability is very
+		// slightly weighted towards the beginning of the file, but because the
+		// size difference between the number of segments and the random number
+		// being modded, the difference is too small to make any practical
+		// difference.
+		seed := crypto.HashAll(triggerID, fcid)
+		numSegments := int64(crypto.CalculateLeaves(fc.FileSize))
+		seedInt := new(big.Int).SetBytes(seed[:])
+		index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
 	return index, nil
 }
 
@@ -101,9 +126,9 @@ func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 		// COMPATv0.4.0
 		//
 		// Fixing the padding situation resulted in a hardfork. The below code
-		// will stop the hardfork from triggering before block 15,000.
+		// will stop the hardfork from triggering before block 20,000.
 		types.CurrentHeightLock.Lock()
-		if (build.Release == "standard" && types.CurrentHeight < 15e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
+		if (build.Release == "standard" && types.CurrentHeight < 20e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
 		types.CurrentHeightLock.Unlock()
@@ -237,7 +262,6 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -247,27 +271,28 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
-	// Simple consistency guard
-	if cs.db.checkConsistencyGuard() {
-		return modules.ConsensusChange{}, ErrInconsistentSet
+	err := cs.db.startConsistencyGuard()
+	if err != nil {
+		return modules.ConsensusChange{}, err
 	}
+	defer cs.db.stopConsistencyGuard()
+
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
 	diffHolder := new(processedBlock)
 	diffHolder.Height = cs.height()
-	cs.db.startConsistencyGuard()
-	defer func() {
-		cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
-		cs.db.stopConsistencyGuard()
-	}()
+	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	for _, txn := range txns {
-		err := cs.validTransaction(txn)
+		err = cs.validTransaction(txn)
 		if err != nil {
 			return modules.ConsensusChange{}, err
 		}
-		cs.applyTransaction(diffHolder, txn)
+		err = cs.applyTransaction(diffHolder, txn)
+		if err != nil {
+			return modules.ConsensusChange{}, err
+		}
 	}
 	cc := modules.ConsensusChange{
 		SiacoinOutputDiffs:        diffHolder.SiacoinOutputDiffs,

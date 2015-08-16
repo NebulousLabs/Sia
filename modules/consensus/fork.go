@@ -3,6 +3,8 @@ package consensus
 import (
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -56,13 +58,20 @@ func (cs *ConsensusSet) deleteNode(pb *processedBlock) {
 // the former.
 func (cs *ConsensusSet) backtrackToCurrentPath(pb *processedBlock) []*processedBlock {
 	path := []*processedBlock{pb}
-	for {
-		// Stop when we reach the common parent.
-		if pb.Height <= cs.height() && cs.db.getPath(pb.Height) == pb.Block.ID() {
-			break
+	csHeight := cs.height()
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		for {
+			// Stop at the common parent.
+			if pb.Height <= csHeight && getPath(tx, pb.Height) == pb.Block.ID() {
+				break
+			}
+			pb = getBlockMap(tx, pb.Parent)
+			path = append([]*processedBlock{pb}, path...) // prepend
 		}
-		pb = cs.db.getBlockMap(pb.Parent)
-		path = append([]*processedBlock{pb}, path...) // prepend
+		return nil
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 	return path
 }
@@ -81,7 +90,10 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 	// Rewind blocks until we reach 'pb'.
 	for cs.currentBlockID() != pb.Block.ID() {
 		node := cs.currentProcessedBlock()
-		cs.commitDiffSet(node, modules.DiffRevert)
+		err := cs.commitDiffSet(node, modules.DiffRevert)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 		revertedNodes = append(revertedNodes, node)
 	}
 	return
@@ -89,16 +101,19 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 
 // applyUntilNode will successively apply the blocks between the consensus
 // set's current path and 'pb'.
-func (s *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
+func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
-	newPath := s.backtrackToCurrentPath(pb)
+	newPath := cs.backtrackToCurrentPath(pb)
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.DiffsGenerated {
-			s.commitDiffSet(node, modules.DiffApply)
+			err := cs.commitDiffSet(node, modules.DiffApply)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
 		} else {
-			err = s.generateAndApplyDiff(node)
+			err = cs.generateAndApplyDiff(node)
 			if err != nil {
 				break
 			}

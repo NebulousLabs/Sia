@@ -3,6 +3,8 @@ package consensus
 import (
 	"testing"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -27,7 +29,12 @@ func TestApplyMinerPayouts(t *testing.T) {
 	mpid0 := pb.Block.MinerPayoutID(0)
 
 	// Apply the single miner payout.
-	cst.cs.applyMinerPayouts(pb)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMinerPayouts(tx, pb)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists := cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid0)
 	if !exists {
 		t.Error("miner payout was not created in the delayed outputs set")
@@ -63,7 +70,12 @@ func TestApplyMinerPayouts(t *testing.T) {
 	}
 	mpid1 := pb2.Block.MinerPayoutID(0)
 	mpid2 := pb2.Block.MinerPayoutID(1)
-	cst.cs.applyMinerPayouts(pb2)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMinerPayouts(tx, pb2)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid1)
 	if !exists {
 		t.Error("delayed siacoin output was not created")
@@ -79,20 +91,30 @@ func TestApplyMinerPayouts(t *testing.T) {
 	// Trigger a panic where the miner payouts have already been applied.
 	defer func() {
 		r := recover()
-		if r != errPayoutsAlreadyPaid {
-			t.Error(r)
+		if r == nil {
+			t.Error("expecting error after corrupting database")
 		}
 	}()
 	defer func() {
 		r := recover()
-		if r != errPayoutsAlreadyPaid {
-			t.Error(r)
+		if r == nil {
+			t.Error("expecting error after corrupting database")
 		}
 		cst.cs.db.rmDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid0)
 		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
-		cst.cs.applyMinerPayouts(pb)
+		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			return cst.cs.applyMinerPayouts(tx, pb)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
-	cst.cs.applyMinerPayouts(pb)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMinerPayouts(tx, pb)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestApplyMaturedSiacoinOutputs probes the applyMaturedSiacoinOutputs method
@@ -116,9 +138,16 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		}
 	}()
 	cst.cs.db.addSiacoinOutputs(types.SiacoinOutputID{}, types.SiacoinOutput{})
-	cst.cs.db.addDelayedSiacoinOutputs(pb.Height)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return createDSCOBucket(tx, pb.Height)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height, types.SiacoinOutputID{}, types.SiacoinOutput{})
-	cst.cs.applyMaturedSiacoinOutputs(pb)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyMaturedSiacoinOutputs(tx, pb)
+	})
 }
 
 // TestApplyMissedStorageProof probes the applyMissedStorageProof method of the
@@ -236,7 +265,12 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
-	cst.cs.applyFileContractMaintenance(pb)
+	cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.applyFileContractMaintenance(tx, pb)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists := cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")

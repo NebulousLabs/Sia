@@ -132,7 +132,7 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	// 4.	current target
 	// 5.	current depth
 	// 6.	current path + diffs
-	// 7.	earliest allowed timestamp of next block
+	// (7)	earliest allowed timestamp of next block
 	// 8.	unspent siacoin outputs, sorted by id.
 	// 9.	open file contracts, sorted by id.
 	// 10.	unspent siafund outputs, sorted by id.
@@ -145,7 +145,7 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	tree.PushObject(cs.height())
 	tree.PushObject(cs.currentProcessedBlock().ChildTarget)
 	tree.PushObject(cs.currentProcessedBlock().Depth)
-	tree.PushObject(cs.earliestChildTimestamp(cs.currentProcessedBlock()))
+	// tree.PushObject(cs.earliestChildTimestamp(cs.currentProcessedBlock()))
 
 	// Add all the blocks in the current path TODO: along with their diffs.
 	for i := 0; i < int(cs.db.pathHeight()); i++ {

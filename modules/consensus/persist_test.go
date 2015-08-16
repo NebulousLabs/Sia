@@ -1,13 +1,11 @@
 package consensus
 
 import (
-	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestSaveLoad populates a blockchain, saves it, loads it, and checks
@@ -29,7 +27,7 @@ func TestSaveLoad(t *testing.T) {
 	oldHash := cst.cs.consensusSetHash()
 	cst.cs.Close()
 
-	// Reassigning this will loose subscribers and such, but we
+	// Reassigning this will lose subscribers and such, but we
 	// just want to call load and get a hash
 	d := filepath.Join(build.SiaTestingDir, filepath.Join(modules.ConsensusDir, filepath.Join("TestSaveLoad", modules.ConsensusDir)))
 	cst.cs, err = New(cst.gateway, d)
@@ -42,24 +40,8 @@ func TestSaveLoad(t *testing.T) {
 	}
 }
 
-// acceptRecover recovers after triggering a panic while calling AcceptBlock.
-func acceptRecover(cs *ConsensusSet, block types.Block) (err error) {
-	defer func() {
-		r := recover()
-		switch x := r.(type) {
-		case string:
-			err = errors.New(x)
-		case error:
-			err = x
-		default:
-			err = errors.New("unknown panic")
-		}
-	}()
-	return cs.AcceptBlock(block)
-}
-
-// TestConsistencyGuard verifies that the database cannot be modified
-// after it has been corrupted
+// TestConsistencyGuard verifies that the database cannot be modified after it
+// has been corrupted
 func TestConsistencyGuard(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -69,24 +51,15 @@ func TestConsistencyGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blockA, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(blockA)
-
-	blockB, _ := cst.miner.FindBlock()
-	// Change the database so that accepting the next block will
-	// trigger a panic
-	pbA := cst.cs.db.getBlockMap(blockA.ID())
-	pbA.Parent = types.ZeroID
-	cst.cs.db.updateBlockMap(pbA)
-	err = acceptRecover(cst.cs, blockB)
-	if err != errNilItem {
+	// Improperly trigger the guard, simulating a situation where the guard is
+	// added at the beginning of editing but not removed at the end of editing.
+	err = cst.cs.db.startConsistencyGuard()
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Attempting to accept this block should now throw an
-	// inconsistent Database error
-	err = cst.cs.AcceptBlock(blockB)
-	if err != ErrInconsistentSet {
+	_, err = cst.miner.AddBlock()
+	if err != errDBInconsistent {
 		t.Fatal(err)
 	}
 }

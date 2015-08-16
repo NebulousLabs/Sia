@@ -3,6 +3,7 @@ package consensus
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -12,16 +13,16 @@ import (
 // initDatabase is run when the database. This has become the true
 // init function for consensus set
 func (cs *ConsensusSet) initSetDB() error {
-	if cs.db.checkConsistencyGuard() {
-		return ErrInconsistentSet
+	err := cs.db.startConsistencyGuard()
+	if err != nil {
+		return err
 	}
-	cs.db.startConsistencyGuard()
 
 	// Initilize the saved siafund pool on disk
 	cs.db.setSiafundPool(cs.siafundPool)
 
 	// add genesis block
-	err := cs.db.addBlockMap(cs.blockRoot)
+	err = cs.db.addBlockMap(&cs.blockRoot)
 	if err != nil {
 		return err
 	}
@@ -45,11 +46,9 @@ func (cs *ConsensusSet) initSetDB() error {
 
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
-		cs.db.updateBlockMap(cs.blockRoot)
+		cs.db.updateBlockMap(&cs.blockRoot)
 	}
-
 	cs.db.stopConsistencyGuard()
-
 	return nil
 }
 
@@ -102,27 +101,27 @@ func (cs *ConsensusSet) load(saveDir string) error {
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
 
-	// load blocks frpom the db, starting after the genesis block
+	// Load all blocks from disk, skipping the genesis block.
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)
 		pb := cs.db.getBlockMap(bid)
 
-		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
+
+		// Yield the processor so that other goroutines have a chance to grab
+		// the lock before it is immeditately grabbed again in the tight loop.
+		runtime.Gosched()
 	}
 
-	// Do a consistency check after loading the database. This
-	// will be redundant when debug is turned on
-	if height > 1 {
-		// consistency guard
-		if cs.db.checkConsistencyGuard() {
-			panic(ErrInconsistentSet)
+	// Do a consistency check after loading the database.
+	if height > 1 && build.DEBUG {
+		err := cs.db.startConsistencyGuard()
+		if err != nil {
+			panic(err)
 		}
-		cs.db.startConsistencyGuard()
-
-		err := cs.checkConsistency()
+		err = cs.checkConsistency()
 		if err != nil {
 			panic(err)
 		}

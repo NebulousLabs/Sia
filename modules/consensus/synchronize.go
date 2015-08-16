@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"runtime"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -48,13 +49,19 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			}
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
-			// these errors are benign
-			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == ErrBlockKnown {
+			// ErrNonExtendingBlock must be ignored until headers-first block
+			// sharing is implemented.
+			if acceptErr == modules.ErrNonExtendingBlock {
 				acceptErr = nil
 			}
 			if acceptErr != nil {
 				return acceptErr
 			}
+
+			// Yield the processor to give other processes time to grab a lock.
+			// The Lock/Unlock cycle in this loop is very tight, and has been
+			// known to prevent interrupts from getting lock access quickly.
+			runtime.Gosched()
 		}
 	}
 
