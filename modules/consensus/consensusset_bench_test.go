@@ -11,9 +11,10 @@ import (
 // likely to generalize to the project as a whole.
 func BenchmarkCreateServerTester(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, err := createConsensusSetTester("BenchmarkCreateServerTester - " + strconv.Itoa(i))
+		cst, err := createConsensusSetTester("BenchmarkCreateServerTester - " + strconv.Itoa(i))
 		if err != nil {
 			b.Fatal(err)
 		}
+		cst.closeCst()
 	}
 }

@@ -7,8 +7,8 @@ import (
 
 var (
 	uptime       int64
-	times        map[string]int64
-	activeTimers map[string]int64
+	times        = make(map[string]int64)
+	activeTimers = make(map[string]int64)
 )
 
 // Uptime() returns the number of nanoseconds that have passed since the first
@@ -33,11 +33,6 @@ func PrintTimes() string {
 // ToggleTimer actives a timer known by a given string. If the timer does not
 // yet exist, it is created.
 func ToggleTimer(s string) {
-	if times == nil {
-		times = make(map[string]int64)
-		activeTimers = make(map[string]int64)
-	}
-
 	toggleTime, exists := activeTimers[s]
 	if exists {
 		times[s] = times[s] + (time.Now().UnixNano() - toggleTime)

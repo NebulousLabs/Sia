@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"encoding/binary"
 	"math/big"
 	"sort"
 
@@ -71,7 +70,7 @@ func earliestChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Tim
 		// lies at bytes 40-48.
 		parentBytes := blockMap.Get(parent[:])
 		copy(parent[:], parentBytes[:32])
-		windowTimes[i] = types.Timestamp(binary.LittleEndian.Uint64(parentBytes[40:48]))
+		windowTimes[i] = types.Timestamp(encoding.DecUint64(parentBytes[40:48]))
 	}
 	sort.Sort(windowTimes)
 
