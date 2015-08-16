@@ -45,14 +45,15 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
+	// request piece
 	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, hf.pieceSize})
 	if err != nil {
 		return nil, err
 	}
-	// TODO: would it be more efficient to do this manually?
-	// i.e. read directly into a bytes.Buffer
-	var b []byte
-	err = encoding.ReadObject(hf.conn, &b, hf.pieceSize)
+
+	// download piece
+	data := make([]byte, hf.pieceSize)
+	_, err = io.ReadFull(hf.conn, data)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
 	key := deriveKey(hf.masterKey, p.Chunk, p.Piece)
 
 	// decrypt and return
-	return key.DecryptBytes(b)
+	return key.DecryptBytes(data)
 }
 
 func (hf *hostFetcher) Close() error {
@@ -70,6 +71,11 @@ func (hf *hostFetcher) Close() error {
 	return hf.conn.Close()
 }
 
+// newHostFetcher creates a new hostFetcher by connecting to a host.
+// TODO: We may not wind up requesting data from this, which means we will
+// connect and then disconnect without making any actual requests (but holding
+// the connection open the entire time). This is wasteful of host resources.
+// Consider only opening the connection after the first request has been made.
 func newHostFetcher(fc fileContract, masterKey crypto.TwofishKey) (*hostFetcher, error) {
 	conn, err := net.DialTimeout("tcp", string(fc.IP), 5*time.Second)
 	if err != nil {
@@ -254,9 +260,6 @@ func (r *Renter) Download(nickname, destination string) error {
 	defer f.Close() // should be okay even if file is Remove'd
 
 	// Initiate connections to each host.
-	// TODO: Ideally, we only need 'file.ecc.MinPieces' hosts. Otherwise we
-	// wind up connecting and then disconnecting without transferring any
-	// data, which is wasteful of host resources.
 	var hosts []fetcher
 	for _, fc := range file.Contracts {
 		// TODO: connect in parallel
