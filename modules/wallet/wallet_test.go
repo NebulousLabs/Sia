@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"crypto/rand"
-	"errors"
 	"path/filepath"
 	"testing"
 
@@ -16,23 +15,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-var (
-	// Sometimes during testing, you get a statement
-	// `if err != expectedErr { return err }`. But if err == nil, then the
-	// calling function will think that the test has passed, even though the
-	// test failed. [This is a developer error, instead return
-	// errors.New("expecting..")] The new type of error catches when the
-	// developer has made a mistake and failed to catch a test suite failure.
-	errTestCompleted = errors.New("test complete")
-)
-
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
 // functions for facilitating wallet integration testing.
 type walletTester struct {
-	cs     modules.ConsensusSet
-	tpool  modules.TransactionPool
-	miner  modules.Miner
-	wallet *Wallet
+	cs      modules.ConsensusSet
+	gateway modules.Gateway
+	tpool   modules.TransactionPool
+	miner   modules.Miner
+	wallet  *Wallet
 
 	walletMasterKey crypto.TwofishKey
 
@@ -79,10 +69,11 @@ func createWalletTester(name string) (*walletTester, error) {
 
 	// Assemble all componenets into a wallet tester.
 	wt := &walletTester{
-		cs:     cs,
-		tpool:  tp,
-		miner:  m,
-		wallet: w,
+		cs:      cs,
+		gateway: g,
+		tpool:   tp,
+		miner:   m,
+		wallet:  w,
 
 		walletMasterKey: masterKey,
 
@@ -98,6 +89,53 @@ func createWalletTester(name string) (*walletTester, error) {
 		}
 	}
 	return wt, nil
+}
+
+// createBlankWalletTester creates a wallet tester that has not mined any
+// blocks or encrypted the wallet.
+func createBlankWalletTester(name string) (*walletTester, error) {
+	// Create the modules
+	testdir := build.TempDir(modules.WalletDir, name)
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		return nil, err
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		return nil, err
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		return nil, err
+	}
+	w, err := New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		return nil, err
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		return nil, err
+	}
+
+	// Assemble all componenets into a wallet tester.
+	wt := &walletTester{
+		gateway: g,
+		cs:      cs,
+		tpool:   tp,
+		miner:   m,
+		wallet:  w,
+
+		persistDir: testdir,
+	}
+	return wt, nil
+}
+
+// closeWt closes all of the modules in the wallet tester.
+func (wt *walletTester) closeWt() {
+	err := wt.gateway.Close()
+	if err != nil {
+		panic(err)
+	}
 }
 
 // TestNilInputs tries starting the wallet using nil inputs.
@@ -142,6 +180,7 @@ func TestSendSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 
 	// Get the initial balance - should be 1 block. The unconfirmed balances
 	// should be 0.

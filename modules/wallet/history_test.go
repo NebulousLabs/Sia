@@ -16,6 +16,7 @@ func TestIntegrationTransactionHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 
 	// Creating the wallet tester results in blocks being mined until the miner
 	// has money, which means types.MaturityDelay+1 blocks are created, and
@@ -85,6 +86,7 @@ func TestIntegrationAddressHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 
 	// Grab an address and send it money.
 	uc, err := wt.wallet.NextAddress()

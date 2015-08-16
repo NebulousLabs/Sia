@@ -116,7 +116,7 @@ func TestRecoverSeed(t *testing.T) {
 	if len(allSeeds) != 1 {
 		t.Error("AllSeeds should be returning the primary seed.")
 	}
-	if !bytes.Equal(allSeeds[0][:], seed[:]) {
+	if allSeeds[0] != seed {
 		t.Error("AllSeeds returned the wrong seed")
 	}
 

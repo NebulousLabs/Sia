@@ -106,7 +106,7 @@ func (w *Wallet) integrateSeed(seed modules.Seed) {
 func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	// Check that the seed is not already known.
 	for _, wSeed := range w.seeds {
-		if bytes.Equal(seed[:], wSeed[:]) {
+		if seed == wSeed {
 			return errKnownSeed
 		}
 	}

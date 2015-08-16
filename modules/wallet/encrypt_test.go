@@ -3,145 +3,112 @@ package wallet
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"path/filepath"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// For some of the encryption testing, a wallet that has not been encrypted,
-// unlocked, or been used to mine coins is necessary.
-func createBlankWallet(name string) (string, modules.ConsensusSet, modules.TransactionPool, modules.Miner, *Wallet, error) {
-	dir := build.TempDir(modules.WalletDir, name)
-	g, err := gateway.New(":0", filepath.Join(dir, modules.GatewayDir))
-	if err != nil {
-		return "", nil, nil, nil, nil, err
-	}
-	cs, err := consensus.New(g, filepath.Join(dir, modules.ConsensusDir))
-	if err != nil {
-		return "", nil, nil, nil, nil, err
-	}
-	tp, err := transactionpool.New(cs, g)
-	if err != nil {
-		return "", nil, nil, nil, nil, err
-	}
-	w, err := New(cs, tp, filepath.Join(dir, modules.WalletDir))
-	if err != nil {
-		return "", nil, nil, nil, nil, err
-	}
-	m, err := miner.New(cs, tp, w, filepath.Join(dir, modules.WalletDir))
-	if err != nil {
-		return "", nil, nil, nil, nil, err
-	}
-	return dir, cs, tp, m, w, nil
-}
 
 // postEncryptionTesting runs a series of checks on the wallet after it has
 // been encrypted, to make sure that locking, unlocking, and spending after
 // unlocking are all happening in the correct order and returning the correct
 // errors.
-func postEncryptionTesting(m modules.Miner, w *Wallet, masterKey crypto.TwofishKey) error {
+func postEncryptionTesting(m modules.Miner, w *Wallet, masterKey crypto.TwofishKey) {
 	if !w.Encrypted() {
-		return errors.New("supplied wallet has not been encrypted")
+		panic("wallet is not encrypted when starting postEncryptionTesting")
 	}
 	if w.Unlocked() {
-		return errors.New("supplied wallet has been unlocked")
+		panic("wallet is unlocked when starting postEncryptionTesting")
 	}
 	if len(w.seeds) != 0 {
-		return errors.New("seeds value should be empty while the wallet is locked")
+		panic("wallet has seeds in it when startin postEncryptionTesting")
 	}
 
 	// Try unlocking and using the wallet.
 	err := w.Unlock(masterKey)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = w.Unlock(masterKey)
 	if err != errAlreadyUnlocked {
-		return errors.New("expecting errAlreadyUnlocked, grep '328'")
+		panic(err)
 	}
 	// Mine enough coins so that a balance appears (and some buffer for the
 	// send later).
 	for i := types.BlockHeight(0); i <= types.MaturityDelay+1; i++ {
 		_, err := m.AddBlock()
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 	siacoinBal, _, _ := w.ConfirmedBalance()
 	if siacoinBal.Cmp(types.NewCurrency64(0)) <= 0 {
-		return errors.New("wallet not receiving coins, grep '626'")
+		panic("wallet balance reported as 0 after maturing some mined blocks")
 	}
 	err = w.Unlock(masterKey)
 	if err != errAlreadyUnlocked {
-		return errors.New("expecting errAlreadyUnlocked, grep '835'")
+		panic(err)
 	}
 
 	// Lock, unlock, and trying using the wallet some more.
 	err = w.Lock()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = w.Lock()
 	if err != modules.ErrLockedWallet {
-		return errors.New("expecting modules.ErrLockedWallet, grep '624'")
+		panic(err)
 	}
 	err = w.Unlock(crypto.TwofishKey{})
 	if err != modules.ErrBadEncryptionKey {
-		return errors.New("expecting modules.ErrBadEncryptionKey, grep '257'")
+		panic(err)
 	}
 	err = w.Unlock(masterKey)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	// Verify that the secret keys have been restored by sending coins to the
 	// void. Send more coins than are received by mining a block.
 	_, err = w.SendSiacoins(types.CalculateCoinbase(0), types.UnlockHash{})
 	if err != nil {
-		return err
+		panic(err)
 	}
 	_, err = m.AddBlock()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	siacoinBal2, _, _ := w.ConfirmedBalance()
 	if siacoinBal2.Cmp(siacoinBal) >= 0 {
-		return errors.New("sending coins failed")
+		panic("balance did not increase")
 	}
-	return errTestCompleted
 }
 
 // TestIntegrationPreEncryption checks that the wallet operates as expected
 // prior to encryption.
 func TestIntegrationPreEncryption(t *testing.T) {
-	dir, cs, tp, _, w0, err := createBlankWallet("TestIntegrationPreEncryption")
+	wt, err := createBlankWalletTester("TestIntegrationPreEncryption")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 	// Check that the wallet knows it's not encrypted.
-	if w0.Encrypted() {
+	if wt.wallet.Encrypted() {
 		t.Error("wallet is reporting that it has been encrypted")
 	}
-	err = w0.Lock()
+	err = wt.wallet.Lock()
 	if err != modules.ErrLockedWallet {
 		t.Fatal(err)
 	}
-	err = w0.Unlock(crypto.TwofishKey{})
+	err = wt.wallet.Unlock(crypto.TwofishKey{})
 	if err != errUnencryptedWallet {
 		t.Fatal(err)
 	}
 
 	// Create a second wallet using the same directory - make sure that if any
 	// files have been created, the wallet is still being treated as new.
-	w1, err := New(cs, tp, filepath.Join(dir, modules.WalletDir))
+	w1, err := New(wt.cs, wt.tpool, filepath.Join(wt.persistDir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,59 +126,53 @@ func TestIntegrationPreEncryption(t *testing.T) {
 func TestIntegrationUserSuppliedEncryption(t *testing.T) {
 	// Create and wallet and user-specified key, then encrypt the wallet and
 	// run post-encryption tests on it.
-	_, _, _, m, w, err := createBlankWallet("TestIntegrationUserSuppliedEncryption")
+	wt, err := createBlankWalletTester("TestIntegrationUserSuppliedEncryption")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 	var masterKey crypto.TwofishKey
 	_, err = rand.Read(masterKey[:])
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Encrypt(masterKey)
+	_, err = wt.wallet.Encrypt(masterKey)
 	if err != nil {
 		t.Error(err)
 	}
-	err = postEncryptionTesting(m, w, masterKey)
-	if err != errTestCompleted {
-		t.Error(err)
-	}
+	postEncryptionTesting(wt.miner, wt.wallet, masterKey)
 }
 
 // TestIntegrationBlankEncryption probes the encryption process when the user
 // supplies a blank encryption key during the encryption process.
 func TestIntegrationBlankEncryption(t *testing.T) {
 	// Create the wallet.
-	_, _, _, m, w, err := createBlankWallet("TestIntegrationBlankEncryption")
+	wt, err := createBlankWalletTester("TestIntegrationBlankEncryption")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 	// Encrypt the wallet using a blank key.
-	seed, err := w.Encrypt(crypto.TwofishKey{})
+	seed, err := wt.wallet.Encrypt(crypto.TwofishKey{})
 	if err != nil {
 		t.Error(err)
 	}
 
 	// Try unlocking the wallet using a blank key.
-	err = w.Unlock(crypto.TwofishKey{})
+	err = wt.wallet.Unlock(crypto.TwofishKey{})
 	if err != modules.ErrBadEncryptionKey {
 		t.Fatal(err)
 	}
 	// Try unlocking the wallet using the correct key.
-	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	err = wt.wallet.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Lock()
+	err = wt.wallet.Lock()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = postEncryptionTesting(m, w, crypto.TwofishKey(crypto.HashObject(seed)))
-	if err != errTestCompleted {
-		t.Fatal(err)
-	}
-
+	postEncryptionTesting(wt.miner, wt.wallet, crypto.TwofishKey(crypto.HashObject(seed)))
 }
 
 // TestLock checks that lock correctly wipes keys when locking the wallet,
@@ -221,6 +182,7 @@ func TestLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 
 	// Grab a block for work - miner will not supply blocks after the wallet
 	// has been locked, and the test needs to mine a block after locking the

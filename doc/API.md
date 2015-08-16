@@ -51,14 +51,14 @@ Queries:
 * /wallet/encrypt           [POST]
 * /wallet/history           [GET]
 * /wallet/history/$(addr)   [GET]
-* /wallet/lock              [PUT]
+* /wallet/lock              [POST]
 * /wallet/seeds             [GET]
 * /wallet/seeds             [POST]
 * /wallet/siacoins          [POST]
 * /wallet/siafunds          [POST]
 * /wallet/transaction/$(id) [GET]
 * /wallet/transactions      [GET]
-* /wallet/unlock            [PUT]
+* /wallet/unlock            [POST]
 
 #### /wallet [GET]
 
@@ -268,7 +268,7 @@ struct {
 'Transactions' is a list of 'WalletTransactions' that affect the input address.
 See the documentation for '/wallet/history' for more information.
 
-#### /wallet/lock [PUT]
+#### /wallet/lock [POST]
 
 Function: Locks the wallet, wiping all secret keys. After being locked, the
 keys are encrypted. Queries for the seed, to send siafunds, and related queries
@@ -428,7 +428,7 @@ between height 'startHeight' and height 'endHeight' (inclusive).
 
 'UnconfirmedTransactions' lists all of the unconfirmed transactions.
 
-#### /wallet/unlock [PUT]
+#### /wallet/unlock [POST]
 
 Function: Unlock the wallet. The wallet is capable of knowing whether the
 correct password was provided.
@@ -463,39 +463,6 @@ in production.
 
 The default port for the API is "localhost:9980". This can be changed using the
 '-a' flag when running siad.
-
-Consensus
----------
-
-Queries:
-
-* /consensus/status
-* /consensus/synchronize
-
-#### /consensus/status
-
-Function: Returns information about the consensus set, such as the current
-block height.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Height       int
-	CurrentBlock [32]byte
-	Target       [32]byte
-}
-```
-
-#### /consensus/synchronize
-
-Function: Will force synchronization of the local node and the rest of the
-network. May take a while. Should only be necessary for debugging.
-
-Parameters: none
-
-Reponse: standard
 
 Daemon
 ------
@@ -1028,112 +995,6 @@ struct {
 ```
 Please see consensus/types/transactions.go for a more detailed explanation on
 what a transaction looks like. There are many fields.
-
-Wallet
-------
-
-Queries:
-
-* /wallet/address
-* /wallet/send
-* /wallet/siafunds/balance
-* /wallet/siafunds/send
-* /wallet/siafunds/watchsiagaddress
-* /wallet/status
-
-#### /wallet/address
-
-Function: Returns an address that is spendable by the wallet.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Address string
-}
-```
-`Address` is the hex representation of a wallet address.
-
-#### /wallet/send
-
-Function: Sends coins to a destination address.
-
-Parameters:
-```
-amount      int
-destination string
-```
-`amount` is a volume of coins to send, in Hastings.
-
-`destination` is the hex representation of the recipient address.
-
-Response: standard
-
-#### /wallet/siafunds/balance
-
-Function: Display the balance of siafunds tracked by the wallet.
-
-Parameters: none
-
-Response:
-```
-struct {
-	SiafundBalance      int
-	SiacoinClaimBalance int
-}
-```
-
-#### /wallet/siafunds/send
-
-Function: Send siafunds tracked by the wallet. The siacoins stored in the
-siafunds are sent to the wallet.
-
-Parameters:
-```
-amount      int
-destination string
-keyfiles    string
-```
-`amount` is a volume of coins to send, in Hastings.
-
-`destination` is the hex representation of the recipient address.
-
-`keyfiles` is a comma-separated list of files containing the keys used to
-unlock the siafunds.
-
-#### /wallet/siafunds/watchsiagaddress
-
-Function: Track a new siafund address.
-
-Parameters:
-```
-keyfile string
-```
-`keyfile` is a file containing a key corresponding to the address.
-
-
-Response: standard
-
-#### /wallet/status
-
-Function: Get the status of the wallet.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Balance      int
-	FullBalance  int
-	NumAddresses int
-}
-```
-`Balance` is the spendable balance of the wallet.
-
-`FullBalance` is the balance of the wallet, including unconfirmed coins.
-
-`NumAddresses` is the number of addresses controlled by the wallet.
 
 Block Explorer
 --------------

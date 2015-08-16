@@ -267,8 +267,8 @@ func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request
 	srv.walletHistoryHandlerGETaddr(w, req, addr)
 }
 
-// walletLockHandlerPUT handles a PUT request to /wallet/lock.
-func (srv *Server) walletLockHandlerPUT(w http.ResponseWriter, req *http.Request) {
+// walletLockHandlerPOST handles a POST request to /wallet/lock.
+func (srv *Server) walletLockHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	err := srv.wallet.Lock()
 	if err == nil {
 		writeSuccess(w)
@@ -279,8 +279,8 @@ func (srv *Server) walletLockHandlerPUT(w http.ResponseWriter, req *http.Request
 
 // walletLockHanlder handles API calls to /wallet/lock.
 func (srv *Server) walletLockHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "PUT" {
-		srv.walletLockHandlerPUT(w, req)
+	if req.Method == "POST" {
+		srv.walletLockHandlerPOST(w, req)
 		return
 	}
 	writeError(w, "unrecognized method when calling /wallet/lock", http.StatusBadRequest)
@@ -490,8 +490,8 @@ func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Re
 	writeError(w, "unrecognized method when calling /wallet/transactions", http.StatusBadRequest)
 }
 
-// walletUnlockHandlerPUT handles a PUT call to /wallet/unlock.
-func (srv *Server) walletUnlockHandlerPUT(w http.ResponseWriter, req *http.Request) {
+// walletUnlockHandlerPOST handles a POST call to /wallet/unlock.
+func (srv *Server) walletUnlockHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	potentialKeys := encryptionKeys(req.FormValue("EncryptionPassword"))
 	for _, key := range potentialKeys {
 		err := srv.wallet.Unlock(key)
@@ -509,8 +509,8 @@ func (srv *Server) walletUnlockHandlerPUT(w http.ResponseWriter, req *http.Reque
 
 // walletUnlockHandler handles API calls to /wallet/unlock.
 func (srv *Server) walletUnlockHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "PUT" {
-		srv.walletUnlockHandlerPUT(w, req)
+	if req.Method == "POST" {
+		srv.walletUnlockHandlerPOST(w, req)
 		return
 	}
 	writeError(w, "unrecognized method when calling /wallet/unlock", http.StatusBadRequest)
