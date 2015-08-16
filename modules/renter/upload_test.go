@@ -12,7 +12,6 @@ func (h *testHost) addPiece(p uploadPiece) (*fileContract, error) {
 		p.chunkIndex,
 		p.pieceIndex,
 		uint64(len(h.data)),
-		uint64(len(p.data)),
 	})
 	h.data = append(h.data, p.data...)
 	// simulate I/O delay
@@ -59,7 +58,7 @@ func TestErasureUpload(t *testing.T) {
 		for _, h := range hosts {
 			host := h.(*testHost)
 			for _, p := range host.pieceMap[i] {
-				chunk[p.Piece] = host.data[p.Offset : p.Offset+p.Length]
+				chunk[p.Piece] = host.data[p.Offset : p.Offset+pieceSize]
 			}
 		}
 		err = ecc.Recover(chunk, f.chunkSize(), buf)

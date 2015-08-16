@@ -55,7 +55,6 @@ func (hu *hostUploader) addPiece(p uploadPiece) (*fileContract, error) {
 		Chunk:  p.chunkIndex,
 		Piece:  p.pieceIndex,
 		Offset: offset,
-		Length: uint64(len(encPiece)),
 	})
 
 	return &hu.contract, nil

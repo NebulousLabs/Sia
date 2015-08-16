@@ -33,6 +33,7 @@ type fetcher interface {
 type hostFetcher struct {
 	conn      net.Conn
 	pieceMap  map[uint64][]pieceData
+	pieceSize uint64
 	masterKey crypto.TwofishKey
 }
 
@@ -44,14 +45,14 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, p.Length})
+	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, hf.pieceSize})
 	if err != nil {
 		return nil, err
 	}
 	// TODO: would it be more efficient to do this manually?
 	// i.e. read directly into a bytes.Buffer
 	var b []byte
-	err = encoding.ReadObject(hf.conn, &b, p.Length)
+	err = encoding.ReadObject(hf.conn, &b, hf.pieceSize)
 	if err != nil {
 		return nil, err
 	}

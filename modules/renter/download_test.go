@@ -9,8 +9,9 @@ import (
 )
 
 type testHost struct {
-	data     []byte
-	pieceMap map[uint64][]pieceData // key is chunkIndex
+	data      []byte
+	pieceMap  map[uint64][]pieceData // key is chunkIndex
+	pieceSize uint64
 
 	delay time.Duration // used to simulate real-world conditions
 }
@@ -21,7 +22,7 @@ func (h *testHost) pieces(chunkIndex uint64) []pieceData {
 
 func (h *testHost) fetch(p pieceData) ([]byte, error) {
 	time.Sleep(h.delay)
-	return h.data[p.Offset : p.Offset+p.Length], nil
+	return h.data[p.Offset : p.Offset+h.pieceSize], nil
 }
 
 // TestErasureDownload tests parallel downloading of erasure-coded data.
@@ -38,18 +39,19 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	// create hosts
+	const pieceSize = 10
 	hosts := make([]fetcher, 3)
 	for i := range hosts {
 		hosts[i] = &testHost{
-			pieceMap: make(map[uint64][]pieceData),
-			delay:    time.Millisecond,
+			pieceMap:  make(map[uint64][]pieceData),
+			delay:     time.Millisecond,
+			pieceSize: pieceSize,
 		}
 	}
 	// make one host really slow
 	hosts[0].(*testHost).delay = 10 * time.Millisecond
 
 	// upload data to hosts
-	const pieceSize = 10
 	r := bytes.NewReader(data) // makes chunking easier
 	chunk := make([]byte, pieceSize*ecc.MinPieces())
 	var i uint64
@@ -70,7 +72,6 @@ func TestErasureDownload(t *testing.T) {
 				uint64(i),
 				uint64(j),
 				uint64(len(host.data)),
-				uint64(len(p)),
 			})
 			host.data = append(host.data, p...)
 		}
