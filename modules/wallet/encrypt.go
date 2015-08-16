@@ -175,6 +175,7 @@ func (w *Wallet) Lock() error {
 	for i := range w.seeds {
 		crypto.SecureWipe(w.seeds[i][:])
 	}
+	crypto.SecureWipe(w.primarySeed[:])
 	w.seeds = w.seeds[:0]
 	w.unlocked = false
 

@@ -36,11 +36,3 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 	}
 	return
 }
-
-// NextAddress returns an unlock hash that is ready to recieve siacoins or
-// siafunds. The address is generated using the primary address seed.
-func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-	return w.nextPrimarySeedAddress()
-}

@@ -254,6 +254,9 @@ func TestLock(t *testing.T) {
 	if len(wt.wallet.seeds) != 0 {
 		t.Error("seeds not wiped from wallet")
 	}
+	if !bytes.Equal(wipedKey, w.primarySeed[:]) {
+		t.Error("primary seed not wiped from memory")
+	}
 
 	// Solve the block generated earlier and add it to the consensus set, this
 	// should boost the balance of the wallet.
