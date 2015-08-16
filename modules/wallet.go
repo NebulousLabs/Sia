@@ -19,8 +19,9 @@ const (
 )
 
 var (
-	ErrLowBalance   = errors.New("insufficient balance")
-	ErrWalletLocked = errors.New("wallet is locked")
+	ErrBadEncryptionKey = errors.New("provided encryption key is incorrect")
+	ErrLowBalance       = errors.New("insufficient balance")
+	ErrLockedWallet     = errors.New("wallet must be unlocked before it can be used")
 )
 
 type (

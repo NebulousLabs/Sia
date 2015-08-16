@@ -91,12 +91,12 @@ func postEncryptionTesting(m modules.Miner, w *Wallet, masterKey crypto.TwofishK
 		return err
 	}
 	err = w.Lock()
-	if err != errLockedWallet {
-		return errors.New("expecting errLockedWallet, grep '624'")
+	if err != modules.ErrLockedWallet {
+		return errors.New("expecting modules.ErrLockedWallet, grep '624'")
 	}
 	err = w.Unlock(crypto.TwofishKey{})
-	if err != errBadEncryptionKey {
-		return errors.New("expecting errBadEncryptionKey, grep '257'")
+	if err != modules.ErrBadEncryptionKey {
+		return errors.New("expecting modules.ErrBadEncryptionKey, grep '257'")
 	}
 	err = w.Unlock(masterKey)
 	if err != nil {
@@ -131,7 +131,7 @@ func TestIntegrationPreEncryption(t *testing.T) {
 		t.Error("wallet is reporting that it has been encrypted")
 	}
 	err = w0.Lock()
-	if err != errLockedWallet {
+	if err != modules.ErrLockedWallet {
 		t.Fatal(err)
 	}
 	err = w0.Unlock(crypto.TwofishKey{})
@@ -194,7 +194,7 @@ func TestIntegrationBlankEncryption(t *testing.T) {
 
 	// Try unlocking the wallet using a blank key.
 	err = w.Unlock(crypto.TwofishKey{})
-	if err != errBadEncryptionKey {
+	if err != modules.ErrBadEncryptionKey {
 		t.Fatal(err)
 	}
 	// Try unlocking the wallet using the correct key.

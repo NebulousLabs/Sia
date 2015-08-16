@@ -76,7 +76,7 @@ func TestPrimarySeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _, err = w.PrimarySeed()
-	if err != errLockedWallet {
+	if err != modules.ErrLockedWallet {
 		t.Error("unexpected err:", err)
 	}
 	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))

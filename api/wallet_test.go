@@ -111,14 +111,14 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 
 	// Send coins to a wallet address through the api.
-	var wap WalletAddressPOST
-	err = st.postAPI("/wallet/address", url.Values{}, &wap)
+	var wag WalletAddressGET
+	err = st.getAPI("/wallet/address", &wag)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sendSiacoinsValues := url.Values{}
-	sendSiacoinsValues.Set("amount", "1234")
-	sendSiacoinsValues.Add("destination", wap.Address.String())
+	sendSiacoinsValues.Set("Amount", "1234")
+	sendSiacoinsValues.Add("Destination", wag.Address.String())
 	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
 	if err != nil {
 		t.Fatal(err)

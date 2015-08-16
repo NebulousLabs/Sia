@@ -13,8 +13,6 @@ import (
 
 var (
 	errAlreadyUnlocked   = errors.New("wallet has already been unlocked")
-	errBadEncryptionKey  = errors.New("provided encryption key is incorrect")
-	errLockedWallet      = errors.New("wallet must be unlocked before it can be used")
 	errReencrypt         = errors.New("wallet is already encrypted, cannot encrypt again")
 	errUnencryptedWallet = errors.New("wallet has not been encrypted yet")
 
@@ -27,11 +25,11 @@ func (w *Wallet) checkMasterKey(masterKey crypto.TwofishKey) error {
 	verification, err := uk.DecryptBytes(w.settings.EncryptionVerification)
 	if err != nil {
 		// Most of the time, the failure is an authentication failure.
-		return errBadEncryptionKey
+		return modules.ErrBadEncryptionKey
 	}
 	expected := make([]byte, encryptionVerificationLen)
 	if !bytes.Equal(expected, verification) {
-		return errBadEncryptionKey
+		return modules.ErrBadEncryptionKey
 	}
 	return nil
 }
@@ -160,7 +158,7 @@ func (w *Wallet) Lock() error {
 	lockID := w.mu.RLock()
 	defer w.mu.RUnlock(lockID)
 	if !w.unlocked {
-		return errLockedWallet
+		return modules.ErrLockedWallet
 	}
 	w.log.Println("INFO: Locking wallet.")
 

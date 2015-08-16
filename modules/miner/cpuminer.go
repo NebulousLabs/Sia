@@ -93,7 +93,7 @@ func (m *Miner) CPUMining() bool {
 func (m *Miner) FindBlock() (types.Block, error) {
 	lockID := m.mu.Lock()
 	if !m.wallet.Unlocked() {
-		return types.Block{}, modules.ErrWalletLocked
+		return types.Block{}, modules.ErrLockedWallet
 	}
 	err := m.checkAddress()
 	if err != nil {

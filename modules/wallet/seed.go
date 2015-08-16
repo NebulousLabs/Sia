@@ -79,7 +79,7 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.See
 		return seed, err
 	}
 	if !bytes.Equal(expectedDecryptedVerification, decryptedVerification) {
-		return seed, errBadEncryptionKey
+		return seed, modules.ErrBadEncryptionKey
 	}
 
 	// Decrypt and return the seed.
@@ -231,7 +231,7 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 func (w *Wallet) nextPrimarySeedAddress() (types.UnlockConditions, error) {
 	// Check that the wallet has been unlocked.
 	if !w.unlocked {
-		return types.UnlockConditions{}, errLockedWallet
+		return types.UnlockConditions{}, modules.ErrLockedWallet
 	}
 
 	// Integrate the next key into the wallet, and return the unlock
@@ -251,7 +251,7 @@ func (w *Wallet) AllSeeds() ([]modules.Seed, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	if !w.unlocked {
-		return nil, errLockedWallet
+		return nil, modules.ErrLockedWallet
 	}
 	return w.seeds, nil
 }
@@ -261,7 +261,7 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	if !w.unlocked {
-		return modules.Seed{}, 0, errLockedWallet
+		return modules.Seed{}, 0, modules.ErrLockedWallet
 	}
 	return w.primarySeed, w.settings.PrimarySeedProgress, nil
 }
@@ -284,7 +284,7 @@ func (w *Wallet) RecoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	if !w.unlocked {
-		return errLockedWallet
+		return modules.ErrLockedWallet
 	}
 	err := w.checkMasterKey(masterKey)
 	if err != nil {

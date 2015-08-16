@@ -54,8 +54,8 @@ Queries:
 * /wallet/lock              [PUT]
 * /wallet/seeds             [GET]
 * /wallet/seeds             [POST]
-* /wallet/siacoins          [PUT]
-* /wallet/siafunds          [PUT]
+* /wallet/siacoins          [POST]
+* /wallet/siafunds          [POST]
 * /wallet/transaction/$(id) [GET]
 * /wallet/transactions      [GET]
 * /wallet/unlock            [PUT]
@@ -143,6 +143,8 @@ Filepath string
 ```
 'Filepath' is the on-disk location that the file is going to be saved.
 
+Response: standard
+
 #### /wallet/encrypt [POST]
 
 Function: Encrypt the wallet. After the wallet has been encrypted once, it does
@@ -165,11 +167,11 @@ the seed. 'english' is the most common choice when picking a dictionary.
 Response:
 ```
 struct {
-	Seed string
+	PrimarySeed string
 }
 ```
-'Seed' is the dictionary encoded seed that is used to generate addresses that
-the wallet is able to spend.
+'PrimarySeed' is the dictionary encoded seed that is used to generate addresses
+that the wallet is able to spend.
 
 #### /wallet/history [GET]
 
@@ -190,8 +192,8 @@ up to and including the most recent block will be provided.
 Response:
 ```
 struct {
-	ConfirmedHistory   []WalletTransaction
-	UnconfirmedHistory []WalletTransaction
+	ConfirmedHistory   []modules.WalletTransaction
+	UnconfirmedHistory []modules.WalletTransaction
 }
 ```
 'ConfirmedHistory' lists all of the confirmed wallet transactions appearing
@@ -209,7 +211,7 @@ returned in chronological order.
 
 A wallet transaction takes the following form:
 ```
-struct WalletTransaction {
+struct modules.WalletTransaction {
 	TransactionID         types.TransactionID (string)
 	ConfirmationHeight    types.BlockHeight   (int)
 	ConfirmationTimestamp types.Timestamp     (uint64)
@@ -260,7 +262,7 @@ Parameters: none
 Response:
 ```
 struct {
-	Transactions []WalletTransaction
+	Transactions []modules.WalletTransaction
 }
 ```
 'Transactions' is a list of 'WalletTransactions' that affect the input address.
@@ -330,11 +332,11 @@ addresses.
 
 Parameters:
 ```
-EncryptionKey string
-Dictionary    string
-Seed          string
+EncryptionPassword string
+Dictionary         string
+Seed               string
 ```
-'EncryptionKey' is the key that is used to encrypt the new seed when it is
+'EncryptionPassword' is the key that is used to encrypt the new seed when it is
 saved to disk.
 
 'Dictionary' is the name of the dictionary that should be used when encoding
