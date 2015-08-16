@@ -20,15 +20,17 @@ var (
 // master key. The pieces are uploaded to hosts in groups, such that one file
 // contract covers many pieces.
 type file struct {
+	// NOTE: these fields are defined first to ensure 64-bit alignment, which
+	// is required for atomic operations.
+	bytesUploaded  uint64
+	chunksUploaded uint64
+
 	Name      string
 	Size      uint64
 	Contracts map[modules.NetAddress]fileContract
 	MasterKey crypto.TwofishKey
 	ecc       modules.ECC
 	pieceSize uint64
-
-	bytesUploaded  uint64
-	chunksUploaded uint64
 }
 
 // A fileContract is a contract covering an arbitrary number of file pieces.
@@ -47,7 +49,7 @@ type pieceData struct {
 	Chunk  uint64 // which chunk the piece belongs to
 	Piece  uint64 // the index of the piece in the chunk
 	Offset uint64 // the offset of the piece in the file contract
-	Length uint64 // the length of the piece
+	Length uint64 // the length of the piece (TODO: remove)
 }
 
 // chunkSize returns the size of one chunk.

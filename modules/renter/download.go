@@ -112,7 +112,8 @@ func checkHosts(hosts []fetcher, minPieces int, numChunks uint64) error {
 type download struct {
 	// NOTE: received is the first field to ensure 64-bit alignment, which is
 	// required for atomic operations.
-	received    uint64
+	received uint64
+
 	startTime   time.Time
 	nickname    string
 	destination string
@@ -121,8 +122,6 @@ type download struct {
 	chunkSize uint64
 	fileSize  uint64
 	hosts     []fetcher
-	reqChans  []chan uint64
-	respChans []chan []byte
 }
 
 // StartTime is when the download was initiated.
@@ -140,7 +139,7 @@ func (d *download) Received() uint64 {
 	return atomic.LoadUint64(&d.received)
 }
 
-// Destination is the filepath that the file was downloaded uint64o.
+// Destination is the filepath that the file was downloaded into.
 func (d *download) Destination() string {
 	return d.destination
 }
@@ -150,16 +149,16 @@ func (d *download) Nickname() string {
 	return d.nickname
 }
 
-// worker fetches pieces from a host as directed by reqChan. It sends the
-// fetched pieces down the appropriate respChan.
-func (d *download) worker(host fetcher, reqChan chan uint64) {
+// downloadWorker fetches pieces from a host as directed by reqChan. It sends
+// the fetched pieces down the appropriate respChan.
+func downloadWorker(host fetcher, reqChan chan uint64, respChans []chan []byte) {
 	for chunkIndex := range reqChan {
 		for _, p := range host.pieces(chunkIndex) {
 			data, err := host.fetch(p)
 			if err != nil {
 				data = nil
 			}
-			d.respChans[p.Piece] <- data
+			respChans[p.Piece] <- data
 		}
 	}
 }
@@ -168,28 +167,32 @@ func (d *download) worker(host fetcher, reqChan chan uint64) {
 // instructs them to sequentially download chunks. It then writes the
 // recovered chunks to w.
 func (d *download) run(w io.Writer) error {
-	// spawn download workers
-	for i, h := range d.hosts {
-		go d.worker(h, d.reqChans[i])
+	// create request and response channels
+	reqChans := make([]chan uint64, len(d.hosts))
+	for i := range reqChans {
+		reqChans[i] = make(chan uint64)
+	}
+	respChans := make([]chan []byte, d.ecc.NumPieces())
+	for i := range respChans {
+		respChans[i] = make(chan []byte)
 	}
 
-	defer func() {
-		// close request channels, terminating the worker goroutines
-		for _, ch := range d.reqChans {
-			close(ch)
-		}
-	}()
+	// spawn download workers
+	for i, h := range d.hosts {
+		go downloadWorker(h, reqChans[i], respChans)
+		defer close(reqChans[i])
+	}
 
-	chunk := make([][]byte, d.ecc.NumPieces())
 	var received uint64
 	for i := uint64(0); received < d.fileSize; i++ {
 		// tell all workers to download chunk i
-		for _, ch := range d.reqChans {
+		for _, ch := range reqChans {
 			ch <- i
 		}
 		// load pieces into chunk
 		// TODO: this deadlocks if any pieces are missing.
-		for j, ch := range d.respChans {
+		chunk := make([][]byte, d.ecc.NumPieces())
+		for j, ch := range respChans {
 			chunk[j] = <-ch
 		}
 
@@ -211,28 +214,16 @@ func (d *download) run(w io.Writer) error {
 }
 
 // newDownload initializes and returns a download object.
-func newDownload(ecc modules.ECC, chunkSize, fileSize uint64, hosts []fetcher, nickname, destination string) *download {
-	// create channels
-	reqChans := make([]chan uint64, len(hosts))
-	for i := range reqChans {
-		reqChans[i] = make(chan uint64)
-	}
-	respChans := make([]chan []byte, ecc.NumPieces())
-	for i := range respChans {
-		respChans[i] = make(chan []byte)
-	}
-
+func (f *file) newDownload(hosts []fetcher, destination string) *download {
 	return &download{
-		ecc:       ecc,
-		chunkSize: chunkSize,
-		fileSize:  fileSize,
+		ecc:       f.ecc,
+		chunkSize: f.chunkSize(),
+		fileSize:  f.Size,
 		hosts:     hosts,
-		reqChans:  reqChans,
-		respChans: respChans,
 
 		startTime:   time.Now(),
 		received:    0,
-		nickname:    nickname,
+		nickname:    f.Name,
 		destination: destination,
 	}
 }
@@ -277,7 +268,7 @@ func (r *Renter) Download(nickname, destination string) error {
 	}
 
 	// Create the download object.
-	d := newDownload(file.ecc, file.chunkSize(), file.Size, hosts, nickname, destination)
+	d := file.newDownload(hosts, destination)
 
 	// Add the download to the download queue.
 	lockID = r.mu.Lock()

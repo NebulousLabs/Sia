@@ -35,7 +35,7 @@ func TestRSEncode(t *testing.T) {
 func BenchmarkRSEncode(b *testing.B) {
 	ecc, err := NewRSCode(80, 20)
 	if err != nil {
-		panic(err)
+		b.Fatal(err)
 	}
 	data := make([]byte, 1<<20)
 	rand.Read(data)
@@ -50,13 +50,13 @@ func BenchmarkRSEncode(b *testing.B) {
 func BenchmarkRSRecover(b *testing.B) {
 	ecc, err := NewRSCode(50, 200)
 	if err != nil {
-		panic(err)
+		b.Fatal(err)
 	}
 	data := make([]byte, 1<<20)
 	rand.Read(data)
 	pieces, err := ecc.Encode(data)
 	if err != nil {
-		panic(err)
+		b.Fatal(err)
 	}
 
 	b.SetBytes(1 << 20)

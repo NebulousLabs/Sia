@@ -38,11 +38,10 @@ func TestErasureUpload(t *testing.T) {
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap: make(map[uint64][]pieceData),
-			delay:    1 * time.Millisecond,
+			delay:    time.Duration(i) * time.Millisecond,
 		}
 	}
 	// make one host really slow
-	// ideally, the test should take exactly this long.
 	hosts[0].(*testHost).delay = 100 * time.Millisecond
 
 	// upload data to hosts

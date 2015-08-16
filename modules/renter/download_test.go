@@ -46,12 +46,12 @@ func TestErasureDownload(t *testing.T) {
 		}
 	}
 	// make one host really slow
-	hosts[0].(*testHost).delay = 100 * time.Millisecond
+	hosts[0].(*testHost).delay = 10 * time.Millisecond
 
 	// upload data to hosts
-	const chunkSize = 100
+	const pieceSize = 10
 	r := bytes.NewReader(data) // makes chunking easier
-	chunk := make([]byte, chunkSize)
+	chunk := make([]byte, pieceSize*ecc.MinPieces())
 	var i uint64
 	for i = uint64(0); ; i++ {
 		_, err := io.ReadFull(r, chunk)
@@ -83,7 +83,7 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	// download data
-	d := newDownload(ecc, chunkSize, dataSize, hosts, "", "")
+	d := newFile(ecc, pieceSize, dataSize).newDownload(hosts, "")
 	buf := new(bytes.Buffer)
 	err = d.run(buf)
 	if err != nil {
