@@ -254,7 +254,7 @@ func TestLock(t *testing.T) {
 	if len(wt.wallet.seeds) != 0 {
 		t.Error("seeds not wiped from wallet")
 	}
-	if !bytes.Equal(wipedKey, w.primarySeed[:]) {
+	if !bytes.Equal(wipedKey[:crypto.EntropySize], wt.wallet.primarySeed[:]) {
 		t.Error("primary seed not wiped from memory")
 	}
 

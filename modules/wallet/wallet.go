@@ -95,7 +95,9 @@ type Wallet struct {
 }
 
 // New creates a new wallet, loading any known addresses from the input file
-// name and then using the file to save in the future.
+// name and then using the file to save in the future. Keys and addresses are
+// not loaded into the wallet during the call to 'new', but rather during the
+// call to 'Unlock'.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {

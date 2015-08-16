@@ -11,10 +11,8 @@ import (
 )
 
 const (
-	logFile        = modules.WalletDir + ".log"
-	settingsFile   = modules.WalletDir + ".json"
-	seedFilePrefix = "Sia Wallet Seed - "
-	seedFileSuffix = ".seed"
+	logFile      = modules.WalletDir + ".log"
+	settingsFile = modules.WalletDir + ".json"
 
 	encryptionVerificationLen = 32
 )
@@ -35,7 +33,12 @@ type WalletSettings struct {
 	// to be generated.
 	PrimarySeedFile     SeedFile
 	PrimarySeedProgress uint64
-	PrimarySeedFilename string
+
+	// AuxiliarySeedFiles is a set of seeds that the wallet can spend from, but is
+	// no longer using to generate addresses. The primary use case is loading
+	// backups in the event of lost files or coins. All auxiliary seeds are
+	// encrypted using the primary seed encryption password.
+	AuxiliarySeedFiles []SeedFile
 }
 
 // unlockKey creates a wallet unlocking key from the input master key.

@@ -44,6 +44,10 @@ func TestIntegrationEarliestChildTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = w.Encrypt(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = w.Unlock(key)
 	if err != nil {
 		t.Fatal(err)
