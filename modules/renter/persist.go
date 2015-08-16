@@ -24,7 +24,10 @@ const (
 var (
 	ErrNoNicknames    = errors.New("at least one nickname must be supplied")
 	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
+	ErrBadFile        = errors.New("not a .sia file")
+	ErrIncompatible   = errors.New("file is not compatible with current version")
 
+	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
 	shareVersion = "0.4"
 
 	saveMetadata = persist.Metadata{
@@ -42,7 +45,6 @@ func (f *file) save(w io.Writer) error {
 	enc := encoding.NewEncoder(zip)
 
 	// encode easy fields
-	enc.Encode(shareVersion)
 	enc.Encode(f.Name)
 	enc.Encode(f.Size)
 	enc.Encode(f.MasterKey)
@@ -76,13 +78,6 @@ func (f *file) load(r io.Reader) error {
 	}
 	defer zip.Close()
 	dec := encoding.NewDecoder(zip)
-
-	// decode version
-	var version string
-	dec.Decode(&version)
-	if version != shareVersion {
-		return errors.New("incompatible version: " + version)
-	}
 
 	// decode easy fields
 	dec.Decode(&f.Name)
@@ -129,8 +124,14 @@ func (r *Renter) saveFile(f *file) error {
 	}
 	defer handle.Close()
 
+	enc := encoding.NewEncoder(handle)
+
+	// Write header.
+	enc.Encode(shareHeader)
+	enc.Encode(shareVersion)
+
 	// Write length of 1.
-	err = encoding.NewEncoder(handle).Encode(uint64(1))
+	err = enc.Encode(uint64(1))
 	if err != nil {
 		return err
 	}
@@ -200,8 +201,14 @@ func (r *Renter) load() error {
 
 // shareFiles writes the specified files to w.
 func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
+	enc := encoding.NewEncoder(w)
+
+	// Write header.
+	enc.Encode(shareHeader)
+	enc.Encode(shareVersion)
+
 	// Write number of files.
-	err := encoding.NewEncoder(w).Encode(uint64(len(nicknames)))
+	err := enc.Encode(uint64(len(nicknames)))
 	if err != nil {
 		return err
 	}
@@ -263,9 +270,25 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 // loadSharedFiles reads .sia data from reader and registers the contained
 // files in the renter. It returns the nicknames of the loaded files.
 func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
+	dec := encoding.NewDecoder(reader)
+
+	// read header
+	var header [15]byte
+	dec.Decode(&header)
+	if header != shareHeader {
+		return nil, ErrBadFile
+	}
+
+	// decode version
+	var version string
+	dec.Decode(&version)
+	if version != shareVersion {
+		return nil, ErrIncompatible
+	}
+
 	// Read number of files
 	var numFiles uint64
-	err := encoding.NewDecoder(reader).Decode(&numFiles)
+	err := dec.Decode(&numFiles)
 	if err != nil {
 		return nil, err
 	}
