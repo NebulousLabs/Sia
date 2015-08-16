@@ -52,6 +52,10 @@ func createMinerTester(name string) (*minerTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, err = w.Encrypt(key)
+	if err != nil {
+		return nil, err
+	}
 	err = w.Unlock(key)
 	if err != nil {
 		return nil, err

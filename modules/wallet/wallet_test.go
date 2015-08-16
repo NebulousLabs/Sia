@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"crypto/rand"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +14,16 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// Sometimes during testing, you get a statement
+	// `if err != expectedErr { return err }`. But if err == nil, then the
+	// calling function will think that the test has passed, even though the
+	// test failed. [This is a developer error, instead return
+	// errors.New("expecting..")] The new type of error catches when the
+	// developer has made a mistake and failed to catch a test suite failure.
+	errTestCompleted = errors.New("test complete")
 )
 
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
@@ -50,6 +61,10 @@ func createWalletTester(name string) (*walletTester, error) {
 	}
 	var masterKey crypto.TwofishKey
 	_, err = rand.Read(masterKey[:])
+	if err != nil {
+		return nil, err
+	}
+	_, err = w.Encrypt(masterKey)
 	if err != nil {
 		return nil, err
 	}

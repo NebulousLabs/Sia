@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -142,26 +143,19 @@ func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 
 // createSeed creates a wallet seed and encrypts it using a key derived from
 // the master key.
-func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
+func (w *Wallet) createSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	// Derive the key used to encrypt the seed file, and create the encryption
 	// verification object.
 	var sfuid SeedFileUID
 	_, err := rand.Read(sfuid[:])
 	if err != nil {
-		return modules.Seed{}, err
+		return err
 	}
 	sfek := seedFileEncryptionKey(masterKey, sfuid)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
 	encryptionVerification, err := sfek.EncryptBytes(plaintextVerification)
 	if err != nil {
-		return modules.Seed{}, err
-	}
-
-	// Create the unencrypted seed.
-	var seed modules.Seed
-	_, err = rand.Read(seed[:])
-	if err != nil {
-		return modules.Seed{}, err
+		return err
 	}
 
 	// Encrypt the seed and save the seed file.
@@ -169,7 +163,7 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	filename := filepath.Join(w.persistDir, seedName)
 	cryptSeed, err := sfek.EncryptBytes(seed[:])
 	if err != nil {
-		return modules.Seed{}, err
+		return err
 	}
 	w.primarySeed = seed
 	w.settings.PrimarySeedFile = SeedFile{
@@ -181,13 +175,13 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	w.settings.PrimarySeedFilename = seedName
 	err = persist.SaveFile(seedMetadata, &w.settings.PrimarySeedFile, filename)
 	if err != nil {
-		return modules.Seed{}, err
+		return err
 	}
 	err = w.saveSettings()
 	if err != nil {
-		return modules.Seed{}, err
+		return err
 	}
-	return seed, nil
+	return nil
 }
 
 // initPrimarySeed loads the primary seed into the wallet, creating a new one
@@ -195,9 +189,19 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 // addresses.
 func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
 	if w.settings.PrimarySeedFilename == "" {
+		// Due to the new encryption design, this codepath should never be
+		// reached. It has been preserved in case of developer error.
+		if build.DEBUG {
+			panic("initPrimarySeed called when no seed existed")
+		}
+
 		w.log.Println("UNLOCK: Primary seed undefined, creating a new seed.")
-		_, err := w.createSeed(masterKey)
-		return err
+		var seed modules.Seed
+		_, err := rand.Read(seed[:])
+		if err != nil {
+			return err
+		}
+		return w.createSeed(masterKey, seed)
 	}
 	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeedFilename))
 	if err != nil {
@@ -262,7 +266,16 @@ func (w *Wallet) NewPrimarySeed(masterKey crypto.TwofishKey) (modules.Seed, erro
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	return w.createSeed(masterKey)
+	var seed modules.Seed
+	_, err = rand.Read(seed[:])
+	if err != nil {
+		return modules.Seed{}, err
+	}
+	err = w.createSeed(masterKey, seed)
+	if err != nil {
+		return modules.Seed{}, err
+	}
+	return seed, nil
 }
 
 // PrimarySeed returns the decrypted primary seed of the wallet.

@@ -56,6 +56,10 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = w.Encrypt(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = w.Unlock(key)
 	if err != nil {
 		t.Fatal(err)

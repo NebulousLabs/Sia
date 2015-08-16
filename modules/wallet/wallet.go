@@ -19,7 +19,6 @@ const (
 )
 
 var (
-	errLockedWallet    = errors.New("wallet must be unlocked before it can be used")
 	errNilConsensusSet = errors.New("wallet cannot initialize with a nil consensus set")
 	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
 )
@@ -128,45 +127,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 	return w, nil
-}
-
-// Lock will erase all keys from memory and prevent the wallet from spending
-// coins until it is unlocked.
-func (w *Wallet) Lock() error {
-	lockID := w.mu.RLock()
-	defer w.mu.RUnlock(lockID)
-	if !w.unlocked {
-		return errLockedWallet
-	}
-	w.log.Println("INFO: Locking wallet.")
-
-	// Wipe all of the seeds and secret keys, they will be replaced upon
-	// calling 'Unlock' again. 'for i := range' must be used to prevent copies
-	// of secret data from being made.
-	for i := range w.keys {
-		for j := range w.keys[i].secretKeys {
-			crypto.SecureWipe(w.keys[i].secretKeys[j][:])
-		}
-	}
-	for i := range w.seeds {
-		crypto.SecureWipe(w.seeds[i][:])
-	}
-	w.seeds = w.seeds[:0]
-	w.unlocked = false
-
-	// Save the wallet data.
-	err := w.saveSettings()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Unlocked indicates whether the wallet is locked or unlocked.
-func (w *Wallet) Unlocked() bool {
-	lockID := w.mu.RLock()
-	defer w.mu.RUnlock(lockID)
-	return w.unlocked
 }
 
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction

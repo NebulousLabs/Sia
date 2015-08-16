@@ -142,13 +142,20 @@ type (
 	// dervied from a single address seed.
 	Wallet interface {
 		// Encrypted returns whether or not the wallet has been encrypted yet.
-		// User facings apps are recommended to check if the wallet is
-		// encrypted before calling Unlock, because the key used in the first
-		// call to 'Unlock' will be the key that encrypts the wallet going
-		// forward. User facing apps should verify that the correct
-		// password/phrase/key was chosen before permanently encrypting the
-		// wallet.
+		// After being encrypted for the first time, the wallet can only be
+		// unlocked using the encryption password.
 		Encrypted() bool
+
+		// Encrypt will encrypt the wallet using the input key. Upon
+		// encryption, a primary seed will be created for the wallet (no seed
+		// exists prior to this point). If the key is blank, then the hash of
+		// the seed that is generated will be used as the key.
+		//
+		// Encrypt can only be called once throughout the life of the wallet,
+		// and will return an error on subsequent calls (even after restarting
+		// the wallet). To reset the wallet, the wallet files must be moved to
+		// a different directory or deleted.
+		Encrypt(masterKey crypto.TwofishKey) (Seed, error)
 
 		// Unlocked returns true if the wallet is currently unlocked, false
 		// otherwise.

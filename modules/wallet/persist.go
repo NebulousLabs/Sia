@@ -1,17 +1,13 @@
 package wallet
 
 import (
-	"bytes"
-	"errors"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -24,13 +20,8 @@ const (
 )
 
 var (
-	errAlreadyUnlocked  = errors.New("wallet has already been unlocked")
-	errBadEncryptionKey = errors.New("provided encryption key is incorrect")
-
 	settingsMetadata = persist.Metadata{"Wallet Settings", "0.4.0"}
 	seedMetadata     = persist.Metadata{"Wallet Seed", "0.4.0"}
-
-	unlockModifier = types.Specifier{'u', 'n', 'l', 'o', 'c', 'k'}
 )
 
 type WalletSettings struct {
@@ -50,20 +41,6 @@ type WalletSettings struct {
 // unlockKey creates a wallet unlocking key from the input master key.
 func unlockKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
 	return crypto.TwofishKey(crypto.HashAll(masterKey, unlockModifier))
-}
-
-// checkMasterKey verifies that the master key is correct.
-func (w *Wallet) checkMasterKey(masterKey crypto.TwofishKey) error {
-	unlockKey := unlockKey(masterKey)
-	verification, err := unlockKey.DecryptBytes(w.settings.EncryptionVerification)
-	if err != nil {
-		return err
-	}
-	expected := make([]byte, encryptionVerificationLen)
-	if !bytes.Equal(expected, verification) {
-		return errBadEncryptionKey
-	}
-	return nil
 }
 
 // saveSettings writes the wallet's settings to the wallet's settings file,
@@ -131,82 +108,4 @@ func (w *Wallet) initPersist() error {
 		return err
 	}
 	return nil
-}
-
-// initEncryption checks that the provided encryption key is the valid
-// encryption key for the wallet. If encryption has not yet been established
-// for the wallet, an encryption key is created.
-func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
-	// Check if the wallet encryption key has already been set.
-	if len(w.settings.EncryptionVerification) != 0 {
-		return w.checkMasterKey(masterKey)
-	}
-
-	// Encryption key has not been created yet - create it.
-	var err error
-	unlockKey := unlockKey(masterKey)
-	encryptionBase := make([]byte, encryptionVerificationLen)
-	w.settings.EncryptionVerification, err = unlockKey.EncryptBytes(encryptionBase)
-	if err != nil {
-		return err
-	}
-	return w.saveSettings()
-}
-
-// unlock loads all of the encrypted file structures into wallet memory. Even
-// after loading, the structures are kept encrypted, but some data such as
-// addresses are decrypted so that the wallet knows what to track.
-func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
-	// Wallet should only be unlocked once.
-	if w.unlocked {
-		return errAlreadyUnlocked
-	}
-
-	// Initialize the encryption of the wallet.
-	err := w.initEncryption(masterKey)
-	if err != nil {
-		return err
-	}
-
-	// Load the wallet seed that is used to generate new addresses.
-	err = w.initPrimarySeed(masterKey)
-	if err != nil {
-		return err
-	}
-
-	// Load all wallet seeds that are not used to generate new addresses.
-	err = w.initAuxiliarySeeds(masterKey)
-	if err != nil {
-		return err
-	}
-
-	// Load all special files.
-
-	// Subscribe to the consensus set if this is the first unlock for the
-	// wallet object.
-	if !w.subscribed {
-		w.tpool.TransactionPoolSubscribe(w)
-		w.subscribed = true
-	}
-	w.unlocked = true
-	return nil
-}
-
-// Encrypted returns whether or not the wallet has been encrypted.
-func (w *Wallet) Encrypted() bool {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-	if build.DEBUG && w.unlocked && len(w.settings.EncryptionVerification) == 0 {
-		panic("wallet is both unlocked and unencrypted")
-	}
-	return len(w.settings.EncryptionVerification) != 0
-}
-
-// Unlock will decrypt the wallet seed and load all of the addresses into
-// memory.
-func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-	w.log.Println("INFO: Unlocking wallet.")
-	return w.unlock(masterKey)
 }
