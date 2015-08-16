@@ -5,7 +5,6 @@ all: install
 # dependencies installs all of the dependencies that are required for building
 # Sia.
 dependencies:
-	go install -race std
 	go get -u github.com/NebulousLabs/ed25519
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
@@ -15,10 +14,14 @@ dependencies:
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/kardianos/osext
-	go get -u github.com/laher/goxc
 	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful
 	go get -u golang.org/x/crypto/twofish
+dev-dependencies: dependencies
+	go install -race std
+	go get -u github.com/dvyukov/go-fuzz/go-fuzz
+	go get -u github.com/dvyukov/go-fuzz/go-fuzz-build
+	go get -u github.com/laher/goxc
 	go get -u golang.org/x/tools/cmd/cover
 
 # fmt calls go fmt on all packages.
@@ -57,7 +60,7 @@ xc-siag: dependencies test test-long REBUILD
 # clean removes all directories that get automatically created during
 # development.
 clean:
-	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
+	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf *Fuzz*
 
 # 3 commands and a variable are available for testing Sia packages. 'pkgs'
 # indicates which packages should be tested, and defaults to all the packages
@@ -99,6 +102,12 @@ cover-unit: clean REBUILD
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
+
+fuzzpkg = crypto
+fuzzfunc = BuildReaderProof
+fuzz: REBUILD
+	go-fuzz-build -func="Fuzz$(fuzzfunc)" -o="$(fuzzpkg)-Fuzz$(fuzzfunc).zip" github.com/NebulousLabs/Sia/$(fuzzpkg)
+	go-fuzz -bin="$(fuzzpkg)-Fuzz$(fuzzfunc).zip" -workdir="$(fuzzpkg)-Fuzz$(fuzzfunc)"
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
 # called twice because references will not update correctly the first time.
