@@ -112,3 +112,8 @@ func (w *Wallet) initPersist() error {
 	}
 	return nil
 }
+
+// CreateBackup creates a backup file at the desired filepath.
+func (w *Wallet) CreateBackup(backupFilepath string) error {
+	return persist.SaveFile(settingsMetadata, w.settings, backupFilepath)
+}

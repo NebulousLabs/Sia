@@ -68,7 +68,7 @@ clean:
 pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
        ./modules/gateway ./modules/host ./modules/hostdb		     \
        ./modules/miner ./modules/renter ./modules/transactionpool    \
-       ./modules/wallet ./modules/explorer ./persist ./siad     \
+       ./modules/wallet ./modules/explorer ./persist                 \
        ./siag ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=10s $(pkgs)

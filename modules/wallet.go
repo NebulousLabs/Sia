@@ -197,7 +197,9 @@ type (
 
 		// RecoverFile will read a file with keys and add them to the wallet.
 
-		// CreateBackup will create a backup of the wallet file.
+		// CreateBackup will create a backup of the wallet at the provided
+		// filepath. The backup will have all seeds and keys.
+		CreateBackup(string) error
 
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
