@@ -94,7 +94,6 @@ func (f *file) uploadWorker(host uploader, reqChan chan uploadPiece, respChan ch
 			break
 		}
 		atomic.AddUint64(&f.bytesUploaded, uint64(len(req.data)))
-
 	}
 	// reqChan has been closed; send final contract
 	respChan <- contract
@@ -227,12 +226,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return errors.New("cannot upload a file larger than 5 GB")
 	}
 
-	// Check that the hostdb is sufficiently large to support an upload.
-	// TODO: ActiveHosts needs to only report hosts >= v0.4
-	if len(r.hostDB.ActiveHosts()) < up.ECC.NumPieces() {
-		return errors.New("not enough hosts on the network to upload a file")
-	}
-
 	// Create file object.
 	f := newFile(up.ECC, up.PieceSize, uint64(fileInfo.Size()))
 
@@ -242,16 +235,21 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.save()
 	r.mu.Unlock(lockID)
 
-	// Upload to hosts in parallel.
+	// Select and connect to hosts.
 	var hosts []uploader
-	for _, host := range r.hostDB.RandomHosts(up.ECC.NumPieces()) {
+	for _, host := range r.hostDB.RandomHosts(up.ECC.NumPieces() * 3 / 2) {
 		host, err := r.newHostUploader(host, f.MasterKey)
 		if err != nil {
-			return err
+			continue
 		}
 		defer host.conn.Close()
 		hosts = append(hosts, host)
 	}
+	if len(hosts) < up.ECC.MinPieces() {
+		return errors.New("not enough hosts to support upload")
+	}
+
+	// Upload in parallel.
 	err = f.upload(handle, hosts)
 	if err != nil {
 		// Upload failed; remove the file object.
