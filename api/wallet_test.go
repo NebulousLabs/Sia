@@ -111,14 +111,14 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 
 	// Send coins to a wallet address through the api.
-	var wap WalletAddressPOST
-	err = st.postAPI("/wallet/address", url.Values{}, &wap)
+	var wag WalletAddressGET
+	err = st.getAPI("/wallet/address", &wag)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sendSiacoinsValues := url.Values{}
-	sendSiacoinsValues.Set("amount", "1234")
-	sendSiacoinsValues.Add("destination", wap.Address.String())
+	sendSiacoinsValues.Set("Amount", "1234")
+	sendSiacoinsValues.Add("Destination", wag.Address.String())
 	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
 	if err != nil {
 		t.Fatal(err)
@@ -166,5 +166,71 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 	if wg.UnconfirmedIncomingSiacoins.Cmp(types.NewCurrency64(0)) != 0 {
 		t.Error("there should not be unconfirmed incoming siacoins")
+	}
+}
+
+// TestIntegrationWalletBlankEncrypt tries to encrypt and unlock the wallet
+// through the api using a blank encryption key - meaning that the wallet seed
+// returned by the encryption call can be used as the encryption key.
+func TestIntegrationWalletBlankEncrypt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Create a server object without encrypting or unlocking the wallet.
+	testdir := build.TempDir("api", "TestIntegrationWalletBlankEncrypt")
+	APIAddr := ":" + strconv.Itoa(APIPort)
+	APIPort++
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := NewServer(APIAddr, cs, g, nil, nil, nil, nil, tp, w, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assemble the serverTester.
+	st := &serverTester{
+		cs:      cs,
+		gateway: g,
+		tpool:   tp,
+		wallet:  w,
+		server:  srv,
+	}
+	go func() {
+		listenErr := srv.Serve()
+		if listenErr != nil {
+			panic(listenErr)
+		}
+	}()
+
+	// Make a call to /wallet/encrypt and get the seed. Provide no encryption
+	// key so that the encryption key is the seed that gets returned.
+	var wep WalletEncryptPOST
+	err = st.postAPI("/wallet/encrypt", url.Values{}, &wep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use the seed to call /wallet/unlock.
+	unlockValues := url.Values{}
+	unlockValues.Set("EncryptionPassword", wep.PrimarySeed)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !w.Unlocked() {
+		t.Error("wallet is not unlocked")
 	}
 }

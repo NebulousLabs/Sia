@@ -73,7 +73,7 @@ func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.T
 	// Check if the wallet is unlocked. If the wallet is unlocked, make sure
 	// that the miner has a recent address.
 	if !m.wallet.Unlocked() {
-		err = modules.ErrWalletLocked
+		err = modules.ErrLockedWallet
 		return
 	}
 	lockID := m.mu.Lock()
@@ -92,7 +92,7 @@ func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.T
 // the root hash of the block.
 func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	if !m.wallet.Unlocked() {
-		return types.BlockHeader{}, types.Target{}, modules.ErrWalletLocked
+		return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
 	}
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
