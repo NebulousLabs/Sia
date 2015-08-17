@@ -153,7 +153,7 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 
 // walletBackupHandlerPOST handles a POST call to /wallet/backup
 func (srv *Server) walletBackupHandlerPOST(w http.ResponseWriter, req *http.Request) {
-	err := srv.wallet.CreateBackup(req.FormValue("Filepath"))
+	err := srv.wallet.CreateBackup(req.FormValue("filepath"))
 	if err != nil {
 		writeError(w, "error after call to /wallet/backup: "+err.Error(), http.StatusBadRequest)
 		return
@@ -173,8 +173,8 @@ func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request)
 // walletEncryptHandlerPOST handles a POST call to /wallet/encrypt.
 func (srv *Server) walletEncryptHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	var encryptionKey crypto.TwofishKey
-	if req.FormValue("EncryptionPassword") != "" {
-		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("EncryptionPassword")))
+	if req.FormValue("encryptionpassword") != "" {
+		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
 	seed, err := srv.wallet.Encrypt(encryptionKey)
 	if err != nil {
@@ -182,7 +182,7 @@ func (srv *Server) walletEncryptHandlerPOST(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	dictID := mnemonics.DictionaryID(req.FormValue("Dictonary"))
+	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictID == "" {
 		dictID = "english"
 	}
@@ -207,12 +207,12 @@ func (srv *Server) walletEncryptHandler(w http.ResponseWriter, req *http.Request
 
 // walletHistoryHandlerGET handles a GET request to /wallet/history.
 func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Request) {
-	start, err := strconv.Atoi(req.FormValue("StartHeight"))
+	start, err := strconv.Atoi(req.FormValue("startheight"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	end, err := strconv.Atoi(req.FormValue("EndHeight"))
+	end, err := strconv.Atoi(req.FormValue("endheight"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -288,7 +288,7 @@ func (srv *Server) walletLockHandler(w http.ResponseWriter, req *http.Request) {
 
 // walletSeedsHandlerGET handles a GET request to /wallet/seeds.
 func (srv *Server) walletSeedsHandlerGET(w http.ResponseWriter, req *http.Request) {
-	dictionary := mnemonics.DictionaryID(req.FormValue("Dictionary"))
+	dictionary := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictionary == "" {
 		dictionary = mnemonics.English
 	}
@@ -330,13 +330,13 @@ func (srv *Server) walletSeedsHandlerGET(w http.ResponseWriter, req *http.Reques
 // walletSeedsHandlerPOST handles a POST request to /wallet/seeds.
 func (srv *Server) walletSeedsHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	// Get the seed using the ditionary + phrase
-	dictID := mnemonics.DictionaryID(req.FormValue("Dictionary"))
-	seed, err := modules.StringToSeed(req.FormValue("Seed"), dictID)
+	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
 	if err != nil {
 		writeError(w, "error when calling /wallet/seeds: "+err.Error(), http.StatusBadRequest)
 	}
 
-	potentialKeys := encryptionKeys(req.FormValue("EncryptionPassword"))
+	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
 		err := srv.wallet.RecoverSeed(key, seed)
 		if err == nil {
@@ -365,12 +365,12 @@ func (srv *Server) walletSeedsHandler(w http.ResponseWriter, req *http.Request) 
 
 // walletSiacoinsHandlerPOST handles a POST request to /wallet/siacoins.
 func (srv *Server) walletSiacoinsHandlerPOST(w http.ResponseWriter, req *http.Request) {
-	amount, ok := scanAmount(req.FormValue("Amount"))
+	amount, ok := scanAmount(req.FormValue("amount"))
 	if !ok {
 		writeError(w, "could not read 'amount' from POST call to /wallet/siacoins", http.StatusBadRequest)
 		return
 	}
-	dest, err := scanAddress(req.FormValue("Destination"))
+	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "error after call to /wallet/siacoins: "+err.Error(), http.StatusBadRequest)
 		return
@@ -395,12 +395,12 @@ func (srv *Server) walletSiacoinsHandler(w http.ResponseWriter, req *http.Reques
 
 // walletSiafundsHandlerPOST handles a POST request to /wallet/siafunds.
 func (srv *Server) walletSiafundsHandlerPOST(w http.ResponseWriter, req *http.Request) {
-	amount, ok := scanAmount(req.FormValue("Amount"))
+	amount, ok := scanAmount(req.FormValue("amount"))
 	if !ok {
 		writeError(w, "could not read 'amount' from POST call to /wallet/siafunds", http.StatusBadRequest)
 		return
 	}
-	dest, err := scanAddress(req.FormValue("Destination"))
+	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "error after call to /wallet/siafunds: "+err.Error(), http.StatusBadRequest)
 		return
@@ -458,12 +458,12 @@ func (srv *Server) walletTransactionHandler(w http.ResponseWriter, req *http.Req
 // walletTransactionsHandlerGET handles a GET call to /wallet/transactions.
 func (srv *Server) walletTransactionsHandlerGET(w http.ResponseWriter, req *http.Request) {
 	// Get the start and end blocks.
-	start, err := strconv.Atoi(req.FormValue("StartHeight"))
+	start, err := strconv.Atoi(req.FormValue("startheight"))
 	if err != nil {
 		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	end, err := strconv.Atoi(req.FormValue("EndHeight"))
+	end, err := strconv.Atoi(req.FormValue("endheight"))
 	if err != nil {
 		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
 		return
@@ -492,7 +492,7 @@ func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Re
 
 // walletUnlockHandlerPOST handles a POST call to /wallet/unlock.
 func (srv *Server) walletUnlockHandlerPOST(w http.ResponseWriter, req *http.Request) {
-	potentialKeys := encryptionKeys(req.FormValue("EncryptionPassword"))
+	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
 		err := srv.wallet.Unlock(key)
 		if err == nil {

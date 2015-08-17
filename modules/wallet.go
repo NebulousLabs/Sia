@@ -295,7 +295,7 @@ func StringToSeed(str string, did mnemonics.DictionaryID) (Seed, error) {
 	var seed Seed
 	copy(seed[:], checksumSeedBytes)
 	fullChecksum := crypto.HashObject(seed)
-	if !bytes.Equal(fullChecksum[:SeedChecksumSize], checksumSeedBytes[crypto.EntropySize:]) {
+	if len(checksumSeedBytes) != crypto.EntropySize+SeedChecksumSize || !bytes.Equal(fullChecksum[:SeedChecksumSize], checksumSeedBytes[crypto.EntropySize:]) {
 		return Seed{}, errors.New("seed failed checksum verification")
 	}
 	return seed, nil
