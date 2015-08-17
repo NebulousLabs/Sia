@@ -60,6 +60,12 @@ Queries:
 * /wallet/transactions      [GET]
 * /wallet/unlock            [POST]
 
+The first time that the wallet is ever created, the wallet will be unencrypted
+and locked. The wallet must be encrypted using a call to /wallet/encrypt. After
+encrypting the wallet, the wallet must be unlocked. From that point forward
+(including restarting siad), the wallet will be encrypted, and only the call to
+/wallet/unlock will be needed.
+
 #### /wallet [GET]
 
 Function: Returns basic information about the wallet, such as whether the
@@ -70,47 +76,47 @@ Parameters: none
 Response:
 ```
 struct {
-	Encrypted bool
-	Unlocked  bool
+	encrypted bool
+	unlocked  bool
 
-	ConfirmedSiacoinBalance     types.Currency (string)
-	UnconfirmedOutgoingSiacoins types.Currency (string)
-	UnconfirmedIncomingSiacoins types.Currency (string)
+	confirmedsiacoinbalance     types.Currency (string)
+	unconfirmedoutgoingsiacoins types.Currency (string)
+	unconfirmedincomingsiacoins types.Currency (string)
 
-	SiafundBalance      types.Currency (string)
-	SiacoinClaimBalance types.Currency (string)
+	siafundbalance      types.Currency (string)
+	siacoinclaimBalance types.Currency (string)
 }
 ```
-'Encrypted' indicates whether the wallet has been encrypted or not. If the
+'encrypted' indicates whether the wallet has been encrypted or not. If the
 wallet has not been encrypted, then no data has been generated at all, and the
 first time the wallet is unlocked, the password given will be used as the
-password for encrypting all of the data. Encrypted will only be set to false if
-the wallet has never been unlocked before (the unlocked wallet is still
+password for encrypting all of the data. 'encrypted' will only be set to false
+if the wallet has never been unlocked before (the unlocked wallet is still
 encryped - but the encryption key is in memory).
 
-'Unlocked' indicates whether the wallet is currently locked or unlocked. Some
+'unlocked' indicates whether the wallet is currently locked or unlocked. Some
 calls become unavailable when the wallet is locked.
 
-'ConfirmedSiacoinBalance' is the number of siacoins available to the wallet as
+'confirmedsiacoinbalance' is the number of siacoins available to the wallet as
 of the most recent block in the blockchain.
 
-'UnconfirmedOutgoingSiacoins' is the number of siacoins that are leaving the
+'unconfirmedoutgoingsiacoins' is the number of siacoins that are leaving the
 wallet according to the set of unconfirmed transactions. Often this number
 appears inflated, because outputs are frequently larger than the number of
 coins being sent, and there is a refund. These coins are counted as outgoing,
 and the refund is counted as incoming. The difference in balance can be
-calculated using 'UnconfirmedIncomingSiacoins' - 'UnconfirmedOutgoingSiacoins'
+calculated using 'unconfirmedincomingsiacoins' - 'unconfirmedoutgoingsiacoins'
 
-'UnconfirmedIncomingSiacoins' is the number of siacoins are entering the wallet
+'unconfirmedincomingsiacoins' is the number of siacoins are entering the wallet
 according to the set of unconfirmed transactions. This number is often inflated
 by outgoing siacoins, because outputs are frequently larger than the amount
 being sent. The refund will be included in the unconfirmed incoming siacoins
 balance.
 
-'SiafundBalance' is the number of siafunds available to the wallet as
+'siafundbalance' is the number of siafunds available to the wallet as
 of the most recent block in the blockchain.
 
-'SiacoinClaimBalance' is the number of siacoins that can be claimed from the
+'siacoinclaimbalance' is the number of siacoins that can be claimed from the
 siafunds as of the most recent block. Because the claim balance increases every
 time a file contract is created, it is possible that the balance will increase
 before any claim transaction is confirmed.
@@ -125,10 +131,10 @@ Parameters: none
 Response:
 ```
 struct {
-	Address types.UnlockHash (string)
+	address types.UnlockHash (string)
 }
 ```
-'Address' is a Sia address that can receive siacoins or siafunds.
+'address' is a Sia address that can receive siacoins or siafunds.
 
 #### /wallet/backup [POST]
 
@@ -139,9 +145,9 @@ find their wallet file.
 
 Parameters:
 ```
-Filepath string
+filepath string
 ```
-'Filepath' is the on-disk location that the file is going to be saved.
+'filepath' is the on-disk location that the file is going to be saved.
 
 Response: standard
 
@@ -154,23 +160,23 @@ is blank, then the password will be set to the same as the seed.
 
 Parameters:
 ```
-EncryptionPassword string
-Dictionary string
+encryptionpassword string
+dictionary string
 ```
-'EncryptionPassword' is the password that will be used to encrypt the wallet.
+'encryptionpassword' is the password that will be used to encrypt the wallet.
 All subsequent calls should use this password. If left blank, the seed that
 gets returned will also be the encryption password.
 
-'Dictionary' is the name of the dictionary that should be used when encoding
+'dictionary' is the name of the dictionary that should be used when encoding
 the seed. 'english' is the most common choice when picking a dictionary.
 
 Response:
 ```
 struct {
-	PrimarySeed string
+	primaryseed string
 }
 ```
-'PrimarySeed' is the dictionary encoded seed that is used to generate addresses
+'primaryseed' is the dictionary encoded seed that is used to generate addresses
 that the wallet is able to spend.
 
 #### /wallet/history [GET]
@@ -179,27 +185,27 @@ Function: Return a list of transactions related to the wallet.
 
 Parameters:
 ```
-StartHeight types.BlockHeight (uint64)
-EndHeight   types.BlockHeight (uint64)
+startheight types.BlockHeight (uint64)
+endheight   types.BlockHeight (uint64)
 ```
-'StartHeight' refers to the height of the block where transaction history
+'startheight' refers to the height of the block where transaction history
 should begin.
 
-'EndHeight' refers to the height of of the block where the transaction history
-should end. If 'EndHeight' is greater than the current height, all transactions
+'endheight' refers to the height of of the block where the transaction history
+should end. If 'endheight' is greater than the current height, all transactions
 up to and including the most recent block will be provided.
 
 Response:
 ```
 struct {
-	ConfirmedHistory   []modules.WalletTransaction
-	UnconfirmedHistory []modules.WalletTransaction
+	confirmedhistory   []modules.WalletTransaction
+	unconfirmedhistory []modules.WalletTransaction
 }
 ```
-'ConfirmedHistory' lists all of the confirmed wallet transactions appearing
-between height 'Start' and height 'End' (inclusive).
+'confirmedhistory' lists all of the confirmed wallet transactions appearing
+between height 'start' and height 'end' (inclusive).
 
-'UnconfirmedHistory' lists all of the unconfirmed wallet transactions.
+'unconfirmedhistory' lists all of the unconfirmed wallet transactions.
 
 Wallet transactions are transactions that have been processed by the wallet and
 given more information, such as a confirmation height and a timestamp. Each
@@ -212,28 +218,28 @@ returned in chronological order.
 A wallet transaction takes the following form:
 ```
 struct modules.WalletTransaction {
-	TransactionID         types.TransactionID (string)
-	ConfirmationHeight    types.BlockHeight   (int)
-	ConfirmationTimestamp types.Timestamp     (uint64)
+	transactionID         types.TransactionID (string)
+	confirmationHeight    types.BlockHeight   (int)
+	confirmationTimestamp types.Timestamp     (uint64)
 
-	FundType       types.Specifier  (string)
-	OutputID       types.OutputID   (string)
-	RelatedAddress types.UnlockHash (string)
-	Value          types.Currency   (string)
+	fundType       types.Specifier  (string)
+	outputID       types.OutputID   (string)
+	relatedAddress types.UnlockHash (string)
+	value          types.Currency   (string)
 }
 ```
-'TransactionID' is the id of the transaction from which the wallet transaction
+'transactionid' is the id of the transaction from which the wallet transaction
 was derived. The full transaction can be obtaied by calling
 '/wallet/transaction/$(id)'
 
-'ConfirmationHeight' is the height at which the transaction was confirmed. The
-height will be set to 'uint64MAX' if the transaction has not been confirmed.
+'confirmationheight' is the height at which the transaction was confirmed. The
+height will be set to 'uint64max' if the transaction has not been confirmed.
 
-'ConfirmationTimestamp' is the time at which a transaction was confirmed. The
+'confirmationtimestamp' is the time at which a transaction was confirmed. The
 timestamp is a 64bit unix timestamp, and will be set to uint64MAX if the
 transaction is unconfirmed.
 
-'FundType' indicates what type of fund is represented by the wallet
+'fundtype' indicates what type of fund is represented by the wallet
 transaction. The options are 'Siacoin Input', 'Siacoin Output', 'Siafund
 Input', and 'Siafund Output', corresponding to whether the fund is related to
 siacoins or siafunds, and to whether the fund is an input to the transaction or
@@ -243,15 +249,15 @@ input to the transaction; they are being spent. A 'Siacoin Output' represents
 incoming coins, because the output is being created by the transaction and made
 available to the wallet.
 
-'OutputID' is the id of the output. OutputIDs will always be unique.
+'outputid' is the id of the output. 'outputid's will always be unique.
 
-'RelatedAddress' is the address that is affected. For inputs (outgoing money),
+'relatedaddress' is the address that is affected. For inputs (outgoing money),
 the related address is usually not important because the wallet arbitrarily
 selects which addresses will fund a transaction. For outputs (incoming money),
 the related address field can be used to determine who has sent money to the
 wallet.
 
-'Value' indicates how much money has been moved in the input or output.
+'value' indicates how much money has been moved in the input or output.
 
 #### /wallet/history/$(addr) [GET]
 
@@ -262,10 +268,10 @@ Parameters: none
 Response:
 ```
 struct {
-	Transactions []modules.WalletTransaction
+	transactions []modules.WalletTransaction
 }
 ```
-'Transactions' is a list of 'WalletTransactions' that affect the input address.
+'transactions' is a list of 'wallettransactions' that affect the input address.
 See the documentation for '/wallet/history' for more information.
 
 #### /wallet/lock [POST]
@@ -287,28 +293,28 @@ when the wallet is locked.
 
 Parameters:
 ```
-Dictionary string
+dictionary string
 ```
-'Dictionary' is the name of the dictionary that should be used when encoding
+'dictionary' is the name of the dictionary that should be used when encoding
 the seed. 'english' is the most common choice when picking a dictionary.
 
 Response:
 ```
 struct {
-	PrimarySeed        mnemonics.Phrase   (string)
-	AddressesRemaining int
-	AllSeeds           []mnemonics.Phrase (array of strings)
+	primaryseed        mnemonics.Phrase   (string)
+	addressesremaining int
+	allseeds           []mnemonics.Phrase (array of strings)
 }
 ```
-'PrimarySeed' is the seed that is actively being used to generate new addresses
+'primaryseed' is the seed that is actively being used to generate new addresses
 for the wallet.
 
-'AddressesRemaining' is the number of addresses that remain in the primary seed
+'addressesremaining' is the number of addresses that remain in the primary seed
 until exhaustion has been reached. Once exhaustion has been reached, new
 addresses will continue to be generated but they will be more difficult to
 recover in the event of a lost wallet file or encryption password.
 
-'AllSeeds' is a list of all seeds that the wallet references when scanning the
+'allseeds' is a list of all seeds that the wallet references when scanning the
 blockchain for outputs. The wallet is able to spend any output generated by any
 of the seeds, however only the primary seed is being used to generate new
 addresses.
@@ -332,17 +338,17 @@ addresses.
 
 Parameters:
 ```
-EncryptionPassword string
-Dictionary         string
-Seed               string
+encryptionpassword string
+dictionary         string
+seed               string
 ```
-'EncryptionPassword' is the key that is used to encrypt the new seed when it is
+'encryptionpassword' is the key that is used to encrypt the new seed when it is
 saved to disk.
 
-'Dictionary' is the name of the dictionary that should be used when encoding
+'dictionary' is the name of the dictionary that should be used when encoding
 the seed. 'english' is the most common choice when picking a dictionary.
 
-'Seed' is the dictionary-encoded phrase that corresponds to the seed being
+'seed' is the dictionary-encoded phrase that corresponds to the seed being
 added to the wallet.
 
 Response: standard
@@ -354,12 +360,12 @@ from addresses in the wallet.
 
 Parameters:
 ```
-Amount      int
-Destination string
+amount      int
+destination string
 ```
-'Amount' is the number of siacoins being sent.
+'amount' is the number of siacoins being sent.
 
-'Destination' is the address that is receiving the coins.
+'destination' is the address that is receiving the coins.
 
 Response: standard
 
@@ -375,12 +381,12 @@ siacoins, while still letting you control the siafunds).
 
 Parameters:
 ```
-Amount      int
-Destination string
+amount      int
+destination string
 ```
-'Amount' is the number of siafunds being sent.
+'amount' is the number of siafunds being sent.
 
-'Destination' is the address that is receiving the funds.
+'destination' is the address that is receiving the funds.
 
 Response: standard
 
@@ -393,10 +399,10 @@ Parameters: none
 Response:
 ```
 struct {
-	Transaction types.Transaction
+	transaction types.Transaction
 }
 ```
-'Transaction' is a 'types.Transaction'. The full transaction can be seen in
+'transaction' is a 'types.Transaction'. The full transaction can be seen in
 types.transaction.go. All hashes in the transaction are encoded as strings.
 
 #### /wallet/transactions [GET]
@@ -409,24 +415,24 @@ Parameters:
 StartHeight int
 EndHeight   int
 ```
-'StartHeight' refers to the height of the block where transaction history
+'startheight' refers to the height of the block where transaction history
 should begin.
 
-'EndHeight' refers to the height of of the block where the transaction history
-should end. If 'EndHeight' is greater than the current height, all transactions
+'endheight' refers to the height of of the block where the transaction history
+should end. If 'endheight' is greater than the current height, all transactions
 up to and including the most recent block will be provided.
 
 Response:
 ```
 struct {
-	ConfirmedTransactions   []types.Transaction
-	UnconfirmedTransactions []types.Transaction
+	confirmedtransactions   []types.Transaction
+	unconfirmedtransactions []types.Transaction
 }
 ```
-'ConfirmedTransactions' lists all of the confirmed transactions appearing
-between height 'startHeight' and height 'endHeight' (inclusive).
+'confirmedtransactions' lists all of the confirmed transactions appearing
+between height 'startheight' and height 'endheight' (inclusive).
 
-'UnconfirmedTransactions' lists all of the unconfirmed transactions.
+'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
 #### /wallet/unlock [POST]
 
@@ -435,9 +441,9 @@ correct password was provided.
 
 Parameters:
 ```
-EncryptionPassword string
+encryptionpassword string
 ```
-'EncryptionPassword' is the password that gets used to decrypt the file. Most
+'encryptionpassword' is the password that gets used to decrypt the file. Most
 frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard

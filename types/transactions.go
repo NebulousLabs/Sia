@@ -65,16 +65,16 @@ type (
 	// but transactions cannot spend outputs that they create or otherwise be
 	// self-dependent.
 	Transaction struct {
-		SiacoinInputs         []SiacoinInput
-		SiacoinOutputs        []SiacoinOutput
-		FileContracts         []FileContract
-		FileContractRevisions []FileContractRevision
-		StorageProofs         []StorageProof
-		SiafundInputs         []SiafundInput
-		SiafundOutputs        []SiafundOutput
-		MinerFees             []Currency
-		ArbitraryData         [][]byte
-		TransactionSignatures []TransactionSignature
+		SiacoinInputs         []SiacoinInput         `json:"siacoininputs"`
+		SiacoinOutputs        []SiacoinOutput        `json:"siacoinoutputs"`
+		FileContracts         []FileContract         `json:"filecontracts"`
+		FileContractRevisions []FileContractRevision `json:"filecontractrevisions"`
+		StorageProofs         []StorageProof         `json:"storageproofs"`
+		SiafundInputs         []SiafundInput         `json:"siafundinputs"`
+		SiafundOutputs        []SiafundOutput        `json:"siafundoutputs"`
+		MinerFees             []Currency             `json:minerfees"`
+		ArbitraryData         [][]byte               `json:"arbitarydata"`
+		TransactionSignatures []TransactionSignature `json:"transactionsignatures"`
 	}
 
 	// A SiacoinInput consumes a SiacoinOutput and adds the siacoins to the set of
@@ -83,8 +83,8 @@ type (
 	// for spending the output. The UnlockConditions must match the UnlockHash of
 	// the output.
 	SiacoinInput struct {
-		ParentID         SiacoinOutputID
-		UnlockConditions UnlockConditions
+		ParentID         SiacoinOutputID  `json:"parentid"`
+		UnlockConditions UnlockConditions `json:"unlockconditions"`
 	}
 
 	// A SiacoinOutput holds a volume of siacoins. Outputs must be spent
@@ -92,8 +92,8 @@ type (
 	// UnlockHash is the hash of the UnlockConditions that must be fulfilled
 	// in order to spend the output.
 	SiacoinOutput struct {
-		Value      Currency
-		UnlockHash UnlockHash
+		Value      Currency   `json:"value"`
+		UnlockHash UnlockHash `json:"unlockhash"`
 	}
 
 	// A SiafundInput consumes a SiafundOutput and adds the siafunds to the set of
@@ -102,9 +102,9 @@ type (
 	// for spending the output. The UnlockConditions must match the UnlockHash of
 	// the output.
 	SiafundInput struct {
-		ParentID         SiafundOutputID
-		UnlockConditions UnlockConditions
-		ClaimUnlockHash  UnlockHash
+		ParentID         SiafundOutputID  `json:"parentid"`
+		UnlockConditions UnlockConditions `json:"unlockconditions"`
+		ClaimUnlockHash  UnlockHash       `json:"claimunlockhash"`
 	}
 
 	// A SiafundOutput holds a volume of siafunds. Outputs must be spent
@@ -121,9 +121,9 @@ type (
 	// equal zero. While the transaction is being processed, the ClaimStart is set
 	// to the value of the SiafundPool.
 	SiafundOutput struct {
-		Value      Currency
-		UnlockHash UnlockHash
-		ClaimStart Currency
+		Value      Currency   `json:"value"`
+		UnlockHash UnlockHash `json:"unlockhash"`
+		ClaimStart Currency   `json:"claimstart"`
 	}
 )
 

@@ -117,8 +117,8 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 		t.Fatal(err)
 	}
 	sendSiacoinsValues := url.Values{}
-	sendSiacoinsValues.Set("Amount", "1234")
-	sendSiacoinsValues.Add("Destination", wag.Address.String())
+	sendSiacoinsValues.Set("amount", "1234")
+	sendSiacoinsValues.Add("destination", wag.Address.String())
 	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +224,7 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	}
 	// Use the seed to call /wallet/unlock.
 	unlockValues := url.Values{}
-	unlockValues.Set("EncryptionPassword", wep.PrimarySeed)
+	unlockValues.Set("encryptionpassword", wep.PrimarySeed)
 	err = st.stdPostAPI("/wallet/unlock", unlockValues)
 	if err != nil {
 		t.Fatal(err)

@@ -33,14 +33,14 @@ type (
 	WalletTransactionID crypto.Hash
 
 	WalletTransaction struct {
-		TransactionID         types.TransactionID
-		ConfirmationHeight    types.BlockHeight
-		ConfirmationTimestamp types.Timestamp
+		TransactionID         types.TransactionID `json:"transactionid"`
+		ConfirmationHeight    types.BlockHeight   `json:"confirmationheight"`
+		ConfirmationTimestamp types.Timestamp     `json:"confirmationtimestamp"`
 
-		FundType       types.Specifier
-		OutputID       types.OutputID
-		RelatedAddress types.UnlockHash
-		Value          types.Currency
+		FundType       types.Specifier  `json:"fundtype"`
+		OutputID       types.OutputID   `json:"outputid"`
+		RelatedAddress types.UnlockHash `json:"relatedaddress"`
+		Value          types.Currency   `json:"value"`
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction
@@ -295,7 +295,7 @@ func StringToSeed(str string, did mnemonics.DictionaryID) (Seed, error) {
 	var seed Seed
 	copy(seed[:], checksumSeedBytes)
 	fullChecksum := crypto.HashObject(seed)
-	if !bytes.Equal(fullChecksum[:SeedChecksumSize], checksumSeedBytes[crypto.EntropySize:]) {
+	if len(checksumSeedBytes) != crypto.EntropySize+SeedChecksumSize || !bytes.Equal(fullChecksum[:SeedChecksumSize], checksumSeedBytes[crypto.EntropySize:]) {
 		return Seed{}, errors.New("seed failed checksum verification")
 	}
 	return seed, nil
