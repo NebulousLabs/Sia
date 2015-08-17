@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	// "github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/api"
 	// "github.com/NebulousLabs/Sia/modules"
 )
 
@@ -68,13 +68,6 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 		Run:   wrap(walletaddresscmd),
 	}
 
-	walletMergeCmd = &cobra.Command{
-		Use:   "merge [walletfile]",
-		Short: "Merge wallet",
-		Long:  "Merge another wallet with the existing wallet. The existing wallet will inherit all keys and addresses.",
-		Run:   wrap(walletmergecmd),
-	}
-
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
@@ -116,6 +109,28 @@ Run 'wallet send --help' to see a list of available units.`,
 		Long:  "View wallet status, including the current balance and number of addresses.",
 		Run:   wrap(walletstatuscmd),
 	}
+
+	walletUnlockCmd = &cobra.Command{
+		Use:   "unlock \"[password]\"",
+		Short: "Unlock the wallet",
+		Long:  "Decrypt and load the wallet into memory",
+		Run:   wrap(walletunlockcmd),
+	}
+
+	walletEncryptCmd = &cobra.Command{
+		Use:   "encrypt",
+		Short: "Initilize and encrypt the wallet",
+		Long: `Generate primary seed used for the wallet and encrypt using that
+The encryption password and primary seed will be output`,
+		Run: wrap(walletencryptcmd),
+	}
+
+	walletLockCmd = &cobra.Command{
+		Use:   "lock",
+		Short: "Lock the wallet",
+		Long:  "Lock the wallet, preventing further use",
+		Run:   wrap(walletlockcmd),
+	}
 )
 
 // TODO: this should be defined outside of siac
@@ -134,15 +149,18 @@ func walletaddresscmd() {
 }
 
 func walletmergecmd(walletfile string) {
-	err := post("/wallet/merge", "walletfile="+abs(walletfile))
-	if err != nil {
-		fmt.Println("Could not merge wallet:", err)
-		return
-	}
-	fmt.Printf(`Added %s to the wallet.
+	/*
+		err := post("/wallet/merge", "walletfile="+abs(walletfile))
+		if err != nil {
+			fmt.Println("Could not merge wallet:", err)
+			return
+		}
+		fmt.Printf(`Added %s to the wallet.
 
-You must restart siad to update your wallet balance.
-`, walletfile)
+			You must restart siad to update your wallet balance.
+			`, walletfile)
+	*/
+	fmt.Printf("Wallet merging not yet implemented\n")
 }
 
 func walletsendcmd(amount, dest string) {
@@ -151,7 +169,7 @@ func walletsendcmd(amount, dest string) {
 		fmt.Println("Could not parse amount:", err)
 		return
 	}
-	err = post("/wallet/send", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
+	err = post("/wallet/siacoins", fmt.Sprintf("Amount=%s&Destination=%s", adjAmount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return
@@ -206,22 +224,58 @@ func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 	*/
 }
 
+// walletstatuscmd retrieves and displays information about the wallet
 func walletstatuscmd() {
-	/*
-			status := new(modules.WalletInfo)
-			err := getAPI("/wallet/status", status)
-			if err != nil {
-				fmt.Println("Could not get wallet status:", err)
-				return
-			}
-			// divide by 1e24 to get SC
-			r := new(big.Rat).SetFrac(status.Balance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-			sc, _ := r.Float64()
-			fmt.Printf(`Wallet status:
-		Balance:   %.2f SC
-		Exact:     %v H
-		Addresses: %d
-		`, sc, status.Balance, status.NumAddresses)
-	*/
-	fmt.Println("wallet status not implemented in siac")
+	status := new(api.WalletGET)
+	err := getAPI("/wallet", status)
+	if err != nil {
+		fmt.Println("Could not get wallet status:", err)
+		return
+	}
+	encStatus := "Unencrypted"
+	if status.Encrypted {
+		encStatus = "Encrypted"
+	}
+	lockStatus := "Locked"
+	if status.Unlocked {
+		lockStatus = "Unlocked"
+	}
+	// divide by 1e24 to get SC
+	r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	sc, _ := r.Float64()
+	fmt.Printf(`Wallet status:
+%s, %s
+Balance:   %.2f SC
+Exact:     %v H
+`, encStatus, lockStatus, sc, status.ConfirmedSiacoinBalance)
+}
+
+// walletunlockcmd unlocks a saved wallet
+func walletunlockcmd(password string) {
+	qs := fmt.Sprintf("EncryptionPassword=%s&Dictonary=%s", password, "english")
+	err := post("/wallet/unlock", qs)
+	if err != nil {
+		fmt.Println("Could not unlock wallet:", err)
+		return
+	}
+	fmt.Println("Wallet unlocked")
+}
+
+// walletencryptcmd encrypts the wallet with the given password
+func walletencryptcmd() {
+	var er api.WalletEncryptPOST
+	qs := fmt.Sprintf("Dictionary=%s", "english")
+	err := postResp("/wallet/encrypt", qs, &er)
+	if err != nil {
+		fmt.Println("Error when encrypting wallet:", err)
+		return
+	}
+	fmt.Printf("Encrypted wallet with primary seed: %s\n", er.PrimarySeed)
+}
+
+func walletlockcmd() {
+	err := post("/wallet/lock", "")
+	if err != nil {
+		fmt.Println("Could not lock wallet:", err)
+	}
 }
