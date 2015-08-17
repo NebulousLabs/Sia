@@ -12,7 +12,8 @@ import (
 var (
 	ErrNilCS     = errors.New("cannot create renter with nil consensus set")
 	ErrNilHostDB = errors.New("cannot create renter with nil hostdb")
-	ErrNilWallet = errors.New("cannot create renter wil nil wlalet")
+	ErrNilWallet = errors.New("cannot create renter wil nil wallet")
+	ErrNilTpool  = errors.New("cannot create renter wil nil transaction pool")
 )
 
 // A Renter is responsible for tracking all of the files that a user has
@@ -21,6 +22,7 @@ type Renter struct {
 	cs          modules.ConsensusSet
 	hostDB      modules.HostDB
 	wallet      modules.Wallet
+	tpool       modules.TransactionPool
 	blockHeight types.BlockHeight
 
 	files         map[string]*file
@@ -32,7 +34,7 @@ type Renter struct {
 }
 
 // New returns an empty renter.
-func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpool modules.TransactionPool, saveDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
 	}
@@ -42,11 +44,15 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, sav
 	if wallet == nil {
 		return nil, ErrNilWallet
 	}
+	if tpool == nil {
+		return nil, ErrNilTpool
+	}
 
 	r := &Renter{
 		cs:     cs,
 		hostDB: hdb,
 		wallet: wallet,
+		tpool:  tpool,
 
 		files:     make(map[string]*file),
 		contracts: make(map[types.FileContractID]types.FileContract),

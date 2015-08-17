@@ -85,7 +85,7 @@ func newRenterTester(name string) (*renterTester, error) {
 	}
 
 	// Create the renter.
-	r, err := New(cs, hdb, w, filepath.Join(testdir, modules.RenterDir))
+	r, err := New(cs, hdb, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
