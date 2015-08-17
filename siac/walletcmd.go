@@ -111,18 +111,32 @@ Run 'wallet send --help' to see a list of available units.`,
 	}
 
 	walletUnlockCmd = &cobra.Command{
-		Use:   "unlock \"[password]\"",
+		Use:   `unlock "[password]"`,
 		Short: "Unlock the wallet",
 		Long:  "Decrypt and load the wallet into memory",
 		Run:   wrap(walletunlockcmd),
 	}
 
-	walletEncryptCmd = &cobra.Command{
-		Use:   "encrypt",
-		Short: "Initilize and encrypt the wallet",
-		Long: `Generate primary seed used for the wallet and encrypt using that
-The encryption password and primary seed will be output`,
-		Run: wrap(walletencryptcmd),
+	walletInitCmd = &cobra.Command{
+		Use:   "init",
+		Short: "Initialize and encrypt a new wallet",
+		Long: `Generate a new wallet from a seed string, and encrypt it.
+The seed string, which is also the encryption password, will be returned.`,
+		Run: wrap(walletinitcmd),
+	}
+
+	walletAddseedCmd = &cobra.Command{
+		Use:   `addseed "[password]" "[seed]"`,
+		Short: "Add a seed to the wallet",
+		Long:  "Uses the given password to create a new wallet with that as the primary seed",
+		Run:   wrap(walletaddseedcmd),
+	}
+
+	walletSeedsCmd = &cobra.Command{
+		Use:   "seeds",
+		Short: "Retrieve information about your seeds",
+		Long:  "Retrieves the current seed, how many addresses are remaining, and the rest of your seeds from the wallet",
+		Run:   wrap(walletseedscmd),
 	}
 
 	walletLockCmd = &cobra.Command{
@@ -169,7 +183,7 @@ func walletsendcmd(amount, dest string) {
 		fmt.Println("Could not parse amount:", err)
 		return
 	}
-	err = post("/wallet/siacoins", fmt.Sprintf("Amount=%s&Destination=%s", adjAmount, dest))
+	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return
@@ -252,7 +266,7 @@ Exact:     %v H
 
 // walletunlockcmd unlocks a saved wallet
 func walletunlockcmd(password string) {
-	qs := fmt.Sprintf("EncryptionPassword=%s&Dictonary=%s", password, "english")
+	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 	err := post("/wallet/unlock", qs)
 	if err != nil {
 		fmt.Println("Could not unlock wallet:", err)
@@ -261,21 +275,57 @@ func walletunlockcmd(password string) {
 	fmt.Println("Wallet unlocked")
 }
 
-// walletencryptcmd encrypts the wallet with the given password
-func walletencryptcmd() {
+// walletinitcmd encrypts the wallet with the given password
+func walletinitcmd() {
 	var er api.WalletEncryptPOST
-	qs := fmt.Sprintf("Dictionary=%s", "english")
+	qs := fmt.Sprintf("dictionary=%s", "english")
+	if initPassword != "" {
+		qs += fmt.Sprintf("&encryptpassword=%s", initPassword)
+	}
+	defer func() { initPassword = "" }()
 	err := postResp("/wallet/encrypt", qs, &er)
 	if err != nil {
 		fmt.Println("Error when encrypting wallet:", err)
 		return
 	}
-	fmt.Printf("Encrypted wallet with primary seed: %s\n", er.PrimarySeed)
+	if initPassword == "" {
+		initPassword = er.PrimarySeed
+	}
+	fmt.Printf("Seed is:\n %s\n\nWallet encrypted with password: %s", er.PrimarySeed, initPassword)
+
 }
 
+// walletlockcmd locks the wallet
 func walletlockcmd() {
 	err := post("/wallet/lock", "")
 	if err != nil {
 		fmt.Println("Could not lock wallet:", err)
+	}
+}
+
+// walletaddseedcmd adds a seed to the wallet's list of seeds
+func walletaddseedcmd(password, seed string) {
+	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
+	err := post("/wallet/seeds", qs)
+	if err != nil {
+		fmt.Println("Could not add seed:", err)
+		return
+	}
+	fmt.Println("Added Key")
+}
+
+// walletseedcmd returns the current seed {
+func walletseedscmd() {
+	var seedInfo api.WalletSeedsGET
+	err := getAPI("/wallet/seeds", &seedInfo)
+	if err != nil {
+		fmt.Println("Error retrieving the current seed:", err)
+		return
+	}
+	fmt.Printf("Primary Seed: %s\n"+
+		"Addresses Remaining %d\n"+
+		"All Seeds:\n", seedInfo.PrimarySeed, seedInfo.AddressesRemaining)
+	for _, seed := range seedInfo.AllSeeds {
+		fmt.Println(seed)
 	}
 }
