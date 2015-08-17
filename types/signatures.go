@@ -61,17 +61,17 @@ type (
 	// fields must be empty (except for the Signatures field, since a signature
 	// cannot sign itself).
 	CoveredFields struct {
-		WholeTransaction      bool
-		SiacoinInputs         []uint64
-		SiacoinOutputs        []uint64
-		FileContracts         []uint64
-		FileContractRevisions []uint64
-		StorageProofs         []uint64
-		SiafundInputs         []uint64
-		SiafundOutputs        []uint64
-		MinerFees             []uint64
-		ArbitraryData         []uint64
-		TransactionSignatures []uint64
+		WholeTransaction      bool     `json:"wholetransaction"`
+		SiacoinInputs         []uint64 `json:"siacoininputs"`
+		SiacoinOutputs        []uint64 `json:"siacoinoutputs"`
+		FileContracts         []uint64 `json:"filecontracts"`
+		FileContractRevisions []uint64 `json:"filecontractrevisions"`
+		StorageProofs         []uint64 `json:"storageproofs"`
+		SiafundInputs         []uint64 `json:"siafundinputs"`
+		SiafundOutputs        []uint64 `json:"siafundoutputs"`
+		MinerFees             []uint64 `json:"minerfees"`
+		ArbitraryData         []uint64 `json:"arbitrarydata"`
+		TransactionSignatures []uint64 `json:"transactionsignatures"`
 	}
 
 	// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
@@ -79,8 +79,8 @@ type (
 	// algorithms will always verify, which allows new algorithms to be added to
 	// the protocol via a soft-fork.
 	SiaPublicKey struct {
-		Algorithm Specifier
-		Key       []byte
+		Algorithm Specifier `json:"algorithm"`
+		Key       []byte    `json:"key"`
 	}
 
 	// A TransactionSignature is a signature that is included in the transaction.
@@ -95,11 +95,11 @@ type (
 	// 'CoveredFields' indicates which parts of the transaction are being signed;
 	// see CoveredFields.
 	TransactionSignature struct {
-		ParentID       crypto.Hash
-		PublicKeyIndex uint64
-		Timelock       BlockHeight
-		CoveredFields  CoveredFields
-		Signature      []byte
+		ParentID       crypto.Hash   `json:"parentid"`
+		PublicKeyIndex uint64        `json:"publickeyindex"`
+		Timelock       BlockHeight   `json:"timelock"`
+		CoveredFields  CoveredFields `json:"coveredfileds"`
+		Signature      []byte        `json:"signature"`
 	}
 
 	// UnlockConditions are a set of conditions which must be met to execute
@@ -118,9 +118,9 @@ type (
 	// unlock." If 'SignaturesRequired' > len('PublicKeys'), then the UnlockConditions
 	// cannot be fulfilled under any circumstances.
 	UnlockConditions struct {
-		Timelock           BlockHeight
-		PublicKeys         []SiaPublicKey
-		SignaturesRequired uint64
+		Timelock           BlockHeight    `json:"timelock"`
+		PublicKeys         []SiaPublicKey `json:"publickeys"`
+		SignaturesRequired uint64         `json:"signaturesrequired"`
 	}
 
 	// An UnlockHash is a specially constructed hash of the UnlockConditions

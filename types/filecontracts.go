@@ -37,15 +37,15 @@ type (
 	// A contract can be terminated early by submitting a FileContractTermination
 	// whose UnlockConditions hash to 'TerminationHash'.
 	FileContract struct {
-		FileSize           uint64
-		FileMerkleRoot     crypto.Hash
-		WindowStart        BlockHeight
-		WindowEnd          BlockHeight
-		Payout             Currency
-		ValidProofOutputs  []SiacoinOutput
-		MissedProofOutputs []SiacoinOutput
-		UnlockHash         UnlockHash
-		RevisionNumber     uint64
+		FileSize           uint64          `json:"filesize"`
+		FileMerkleRoot     crypto.Hash     `json:"filemerkleroot"`
+		WindowStart        BlockHeight     `json:"windowstart"`
+		WindowEnd          BlockHeight     `json:"windowend"`
+		Payout             Currency        `json:"payout"`
+		ValidProofOutputs  []SiacoinOutput `json:"validproofoutputs"`
+		MissedProofOutputs []SiacoinOutput `json:"missedproofoutputs"`
+		UnlockHash         UnlockHash      `json:"unlockhash"`
+		RevisionNumber     uint64          `json:"revisionnumber"`
 	}
 
 	// A FileContractRevision revises an existing file contract. The ParentID
@@ -61,17 +61,17 @@ type (
 	// FileContractRevisions enable trust-free modifications to existing file
 	// contracts.
 	FileContractRevision struct {
-		ParentID          FileContractID
-		UnlockConditions  UnlockConditions
-		NewRevisionNumber uint64
+		ParentID          FileContractID   `json:"parentid"`
+		UnlockConditions  UnlockConditions `json:"unlockconditions"`
+		NewRevisionNumber uint64           `json:"newrevisionnumber"`
 
-		NewFileSize           uint64
-		NewFileMerkleRoot     crypto.Hash
-		NewWindowStart        BlockHeight
-		NewWindowEnd          BlockHeight
-		NewValidProofOutputs  []SiacoinOutput
-		NewMissedProofOutputs []SiacoinOutput
-		NewUnlockHash         UnlockHash
+		NewFileSize           uint64          `json:"newfilesize"`
+		NewFileMerkleRoot     crypto.Hash     `json:"newfilemerkleroot"`
+		NewWindowStart        BlockHeight     `json:"newwindowstart"`
+		NewWindowEnd          BlockHeight     `json:"newwindowend"`
+		NewValidProofOutputs  []SiacoinOutput `json:"newvalidproofoutputs"`
+		NewMissedProofOutputs []SiacoinOutput `json:"newmissedproofoutputs"`
+		NewUnlockHash         UnlockHash      `json:"newunlockhash"`
 	}
 
 	// A StorageProof fulfills a FileContract. The proof contains a specific
@@ -85,9 +85,9 @@ type (
 	// SiafundOutputs, or FileContracts. This is because a mundane reorg can
 	// invalidate the proof, and with it the rest of the transaction.
 	StorageProof struct {
-		ParentID FileContractID
-		Segment  [crypto.SegmentSize]byte
-		HashSet  []crypto.Hash
+		ParentID FileContractID           `json:"parentid"`
+		Segment  [crypto.SegmentSize]byte `json:"segment"`
+		HashSet  []crypto.Hash            `json:"hashset"`
 	}
 
 	ProofStatus bool

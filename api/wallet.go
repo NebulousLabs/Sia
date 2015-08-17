@@ -16,59 +16,59 @@ import (
 type (
 	// WalletGET contains general information about the wallet.
 	WalletGET struct {
-		Encrypted bool
-		Unlocked  bool
+		Encrypted bool `json:"encrypted"`
+		Unlocked  bool `json:"unlocked"`
 
-		ConfirmedSiacoinBalance     types.Currency
-		UnconfirmedOutgoingSiacoins types.Currency
-		UnconfirmedIncomingSiacoins types.Currency
+		ConfirmedSiacoinBalance     types.Currency `json:"confirmedsiacoinbalance"`
+		UnconfirmedOutgoingSiacoins types.Currency `json:"unconfirmedoutgoingsiacoins"`
+		UnconfirmedIncomingSiacoins types.Currency `json:"unconfirmedincomingsiacoins"`
 
-		SiafundBalance      types.Currency
-		SiacoinClaimBalance types.Currency
+		SiafundBalance      types.Currency `json:"siafundbalance"`
+		SiacoinClaimBalance types.Currency `json:"siacoinclaimbalance"`
 	}
 
 	// WalletAddressGET contains an address returned by a GET call to
 	// /wallet/address.
 	WalletAddressGET struct {
-		Address types.UnlockHash
+		Address types.UnlockHash `json:"address"`
 	}
 
 	// WalletEncryptPOST contains the primary seed that gets generated during a
 	// POST call to /wallet/encrypt.
 	WalletEncryptPOST struct {
-		PrimarySeed string
+		PrimarySeed string `json:"primaryseed"`
 	}
 
 	// WalletHistoryGET contains wallet transaction history.
 	WalletHistoryGET struct {
-		ConfirmedHistory   []modules.WalletTransaction
-		UnconfirmedHistory []modules.WalletTransaction
+		ConfirmedHistory   []modules.WalletTransaction `json:"confirmedhistory"`
+		UnconfirmedHistory []modules.WalletTransaction `json:"unconfirmedhistory"`
 	}
 
 	// WalletHistoryGETaddr contains the set of wallet transactions relevnat to
 	// the input address provided in the call to /wallet/history/$(addr)
 	WalletHistoryGETaddr struct {
-		Transactions []modules.WalletTransaction
+		Transactions []modules.WalletTransaction `json:"transactions"`
 	}
 
 	// WalletSeedGet contains the seeds used by the wallet.
 	WalletSeedsGET struct {
-		PrimarySeed        string
-		AddressesRemaining int
-		AllSeeds           []string
+		PrimarySeed        string   `json:"primaryseed"`
+		AddressesRemaining int      `json:"addressesremaining"`
+		AllSeeds           []string `json:"allseeds"`
 	}
 
 	// WalletTransactionGETid contains the transaction returned by a call to
 	// /wallet/transaction/$(id)
 	WalletTransactionGETid struct {
-		Transaction types.Transaction
+		Transaction types.Transaction `json:"transaction"`
 	}
 
 	// WalletTransactionsGET contains the specified set of confirmed and
 	// unconfirmed transactions.
 	WalletTransactionsGET struct {
-		ConfirmedTransactions   []types.Transaction
-		UnconfirmedTransactions []types.Transaction
+		ConfirmedTransactions   []types.Transaction `json:"confirmedtransactions"`
+		UnconfirmedTransactions []types.Transaction `json:"unconfirmedtransactions"`
 	}
 )
 

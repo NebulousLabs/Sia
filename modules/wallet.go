@@ -33,14 +33,14 @@ type (
 	WalletTransactionID crypto.Hash
 
 	WalletTransaction struct {
-		TransactionID         types.TransactionID
-		ConfirmationHeight    types.BlockHeight
-		ConfirmationTimestamp types.Timestamp
+		TransactionID         types.TransactionID `json:"transactionid"`
+		ConfirmationHeight    types.BlockHeight   `json:"confirmationheight"`
+		ConfirmationTimestamp types.Timestamp     `json:"confirmationtimestamp"`
 
-		FundType       types.Specifier
-		OutputID       types.OutputID
-		RelatedAddress types.UnlockHash
-		Value          types.Currency
+		FundType       types.Specifier  `json:"fundtype"`
+		OutputID       types.OutputID   `json:"outputid"`
+		RelatedAddress types.UnlockHash `json:"relatedaddress"`
+		Value          types.Currency   `json:"value"`
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction

@@ -21,21 +21,21 @@ type (
 	// then try to pick a Nonce that results in a block whose BlockID is below a
 	// given Target.
 	Block struct {
-		ParentID     BlockID
-		Nonce        BlockNonce
-		Timestamp    Timestamp
-		MinerPayouts []SiacoinOutput
-		Transactions []Transaction
+		ParentID     BlockID         `json:"parentid"`
+		Nonce        BlockNonce      `json:"nonce"`
+		Timestamp    Timestamp       `json:"timestamp"`
+		MinerPayouts []SiacoinOutput `json:"minerpayouts"`
+		Transactions []Transaction   `json:"transactions"`
 	}
 
 	// A BlockHeader, when encoded, is an 80-byte constant size field
 	// containing enough information to do headers-first block downloading.
 	// Hashing the header results in the block ID.
 	BlockHeader struct {
-		ParentID   BlockID
-		Nonce      BlockNonce
-		Timestamp  Timestamp
-		MerkleRoot crypto.Hash
+		ParentID   BlockID     `json:"parentid"`
+		Nonce      BlockNonce  `json:"nonce"`
+		Timestamp  Timestamp   `json:"timestamp"`
+		MerkleRoot crypto.Hash `json:"merkleroot"`
 	}
 
 	BlockHeight uint64
