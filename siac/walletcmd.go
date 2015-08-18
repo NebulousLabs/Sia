@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	// "github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/api"
 	// "github.com/NebulousLabs/Sia/modules"
 )
 
@@ -68,13 +68,6 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 		Run:   wrap(walletaddresscmd),
 	}
 
-	walletMergeCmd = &cobra.Command{
-		Use:   "merge [walletfile]",
-		Short: "Merge wallet",
-		Long:  "Merge another wallet with the existing wallet. The existing wallet will inherit all keys and addresses.",
-		Run:   wrap(walletmergecmd),
-	}
-
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
@@ -116,6 +109,42 @@ Run 'wallet send --help' to see a list of available units.`,
 		Long:  "View wallet status, including the current balance and number of addresses.",
 		Run:   wrap(walletstatuscmd),
 	}
+
+	walletUnlockCmd = &cobra.Command{
+		Use:   `unlock "[password]"`,
+		Short: "Unlock the wallet",
+		Long:  "Decrypt and load the wallet into memory",
+		Run:   wrap(walletunlockcmd),
+	}
+
+	walletInitCmd = &cobra.Command{
+		Use:   "init",
+		Short: "Initialize and encrypt a new wallet",
+		Long: `Generate a new wallet from a seed string, and encrypt it.
+The seed string, which is also the encryption password, will be returned.`,
+		Run: wrap(walletinitcmd),
+	}
+
+	walletAddseedCmd = &cobra.Command{
+		Use:   `addseed "[password]" "[seed]"`,
+		Short: "Add a seed to the wallet",
+		Long:  "Uses the given password to create a new wallet with that as the primary seed",
+		Run:   wrap(walletaddseedcmd),
+	}
+
+	walletSeedsCmd = &cobra.Command{
+		Use:   "seeds",
+		Short: "Retrieve information about your seeds",
+		Long:  "Retrieves the current seed, how many addresses are remaining, and the rest of your seeds from the wallet",
+		Run:   wrap(walletseedscmd),
+	}
+
+	walletLockCmd = &cobra.Command{
+		Use:   "lock",
+		Short: "Lock the wallet",
+		Long:  "Lock the wallet, preventing further use",
+		Run:   wrap(walletlockcmd),
+	}
 )
 
 // TODO: this should be defined outside of siac
@@ -134,15 +163,18 @@ func walletaddresscmd() {
 }
 
 func walletmergecmd(walletfile string) {
-	err := post("/wallet/merge", "walletfile="+abs(walletfile))
-	if err != nil {
-		fmt.Println("Could not merge wallet:", err)
-		return
-	}
-	fmt.Printf(`Added %s to the wallet.
+	/*
+		err := post("/wallet/merge", "walletfile="+abs(walletfile))
+		if err != nil {
+			fmt.Println("Could not merge wallet:", err)
+			return
+		}
+		fmt.Printf(`Added %s to the wallet.
 
-You must restart siad to update your wallet balance.
-`, walletfile)
+			You must restart siad to update your wallet balance.
+			`, walletfile)
+	*/
+	fmt.Printf("Wallet merging not yet implemented\n")
 }
 
 func walletsendcmd(amount, dest string) {
@@ -151,7 +183,7 @@ func walletsendcmd(amount, dest string) {
 		fmt.Println("Could not parse amount:", err)
 		return
 	}
-	err = post("/wallet/send", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
+	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return
@@ -206,22 +238,94 @@ func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 	*/
 }
 
+// walletstatuscmd retrieves and displays information about the wallet
 func walletstatuscmd() {
-	/*
-			status := new(modules.WalletInfo)
-			err := getAPI("/wallet/status", status)
-			if err != nil {
-				fmt.Println("Could not get wallet status:", err)
-				return
-			}
-			// divide by 1e24 to get SC
-			r := new(big.Rat).SetFrac(status.Balance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-			sc, _ := r.Float64()
-			fmt.Printf(`Wallet status:
-		Balance:   %.2f SC
-		Exact:     %v H
-		Addresses: %d
-		`, sc, status.Balance, status.NumAddresses)
-	*/
-	fmt.Println("wallet status not implemented in siac")
+	status := new(api.WalletGET)
+	err := getAPI("/wallet", status)
+	if err != nil {
+		fmt.Println("Could not get wallet status:", err)
+		return
+	}
+	encStatus := "Unencrypted"
+	if status.Encrypted {
+		encStatus = "Encrypted"
+	}
+	lockStatus := "Locked"
+	if status.Unlocked {
+		lockStatus = "Unlocked"
+	}
+	// divide by 1e24 to get SC
+	r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	sc, _ := r.Float64()
+	fmt.Printf(`Wallet status:
+%s, %s
+Balance:   %.2f SC
+Exact:     %v H
+`, encStatus, lockStatus, sc, status.ConfirmedSiacoinBalance)
+}
+
+// walletunlockcmd unlocks a saved wallet
+func walletunlockcmd(password string) {
+	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
+	err := post("/wallet/unlock", qs)
+	if err != nil {
+		fmt.Println("Could not unlock wallet:", err)
+		return
+	}
+	fmt.Println("Wallet unlocked")
+}
+
+// walletinitcmd encrypts the wallet with the given password
+func walletinitcmd() {
+	var er api.WalletEncryptPOST
+	qs := fmt.Sprintf("dictionary=%s", "english")
+	if initPassword != "" {
+		qs += fmt.Sprintf("&encryptpassword=%s", initPassword)
+	}
+	defer func() { initPassword = "" }()
+	err := postResp("/wallet/encrypt", qs, &er)
+	if err != nil {
+		fmt.Println("Error when encrypting wallet:", err)
+		return
+	}
+	if initPassword == "" {
+		initPassword = er.PrimarySeed
+	}
+	fmt.Printf("Seed is:\n %s\n\nWallet encrypted with password: %s", er.PrimarySeed, initPassword)
+
+}
+
+// walletlockcmd locks the wallet
+func walletlockcmd() {
+	err := post("/wallet/lock", "")
+	if err != nil {
+		fmt.Println("Could not lock wallet:", err)
+	}
+}
+
+// walletaddseedcmd adds a seed to the wallet's list of seeds
+func walletaddseedcmd(password, seed string) {
+	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
+	err := post("/wallet/seeds", qs)
+	if err != nil {
+		fmt.Println("Could not add seed:", err)
+		return
+	}
+	fmt.Println("Added Key")
+}
+
+// walletseedcmd returns the current seed {
+func walletseedscmd() {
+	var seedInfo api.WalletSeedsGET
+	err := getAPI("/wallet/seeds", &seedInfo)
+	if err != nil {
+		fmt.Println("Error retrieving the current seed:", err)
+		return
+	}
+	fmt.Printf("Primary Seed: %s\n"+
+		"Addresses Remaining %d\n"+
+		"All Seeds:\n", seedInfo.PrimarySeed, seedInfo.AddressesRemaining)
+	for _, seed := range seedInfo.AllSeeds {
+		fmt.Println(seed)
+	}
 }

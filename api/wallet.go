@@ -334,6 +334,7 @@ func (srv *Server) walletSeedsHandlerPOST(w http.ResponseWriter, req *http.Reque
 	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
 	if err != nil {
 		writeError(w, "error when calling /wallet/seeds: "+err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
