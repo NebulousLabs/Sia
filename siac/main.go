@@ -19,7 +19,7 @@ import (
 var (
 	addr         string
 	force        bool
-	initPassword string
+	initPassword bool
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -179,7 +179,7 @@ func main() {
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd, walletUnlockCmd, walletLockCmd, walletInitCmd, walletAddseedCmd, walletSeedsCmd)
-	walletInitCmd.Flags().StringVarP(&initPassword, "password", "p", "", "Encryption password used for wallet")
+	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Encryption password used for wallet")
 	// walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
 	walletSiafundsCmd.AddCommand(walletSiafundsSendCmd)
 
