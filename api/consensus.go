@@ -41,7 +41,7 @@ func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request)
 func (srv *Server) consensusHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.consensusHandlerGET(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /consensus", http.StatusBadRequest)
+		return
 	}
+	writeError(w, "unrecognized method when calling /consensus", http.StatusBadRequest)
 }

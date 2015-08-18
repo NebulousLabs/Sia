@@ -125,9 +125,9 @@ func (srv *Server) walletHandlerGET(w http.ResponseWriter, req *http.Request) {
 func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.walletHandlerGET(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
+		return
 	}
+	writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
 }
 
 // walletAddressHandlerGET handles a GET request to /wallet/seed.
@@ -247,6 +247,7 @@ func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request
 	// Check for a vanilla call to /wallet/history.
 	if req.URL.Path == "/wallet/history" && req.Method == "GET" || req.Method == "" {
 		srv.walletHistoryHandlerGET(w, req)
+		return
 	}
 
 	// The only remaining possibility is a GET call to /wallet/history/$(addr);
@@ -389,9 +390,9 @@ func (srv *Server) walletSiacoinsHandlerPOST(w http.ResponseWriter, req *http.Re
 func (srv *Server) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.walletSiacoinsHandlerPOST(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /wallet/siacoins", http.StatusBadRequest)
+		return
 	}
+	writeError(w, "unrecognized method when calling /wallet/siacoins", http.StatusBadRequest)
 }
 
 // walletSiafundsHandlerPOST handles a POST request to /wallet/siafunds.

@@ -41,7 +41,7 @@ type (
 		//
 		// transactionSetDiffs map form a transaction set id to the set of
 		// diffs that resulted from the transaction set.
-		knownObjects        map[ObjectID]struct{}
+		knownObjects        map[ObjectID]TransactionSetID
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
 		transactionListSize int
@@ -77,7 +77,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		consensusSet: cs,
 		gateway:      g,
 
-		knownObjects:        make(map[ObjectID]struct{}),
+		knownObjects:        make(map[ObjectID]TransactionSetID),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
 
