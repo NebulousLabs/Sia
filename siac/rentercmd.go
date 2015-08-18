@@ -36,7 +36,7 @@ var (
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
-		Use:   "delete",
+		Use:   "delete [nickname]",
 		Short: "Delete a file",
 		Long:  "Delete a file. Does not delete the file on disk.",
 		Run:   wrap(renterfilesdeletecmd),
