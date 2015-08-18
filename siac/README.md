@@ -18,11 +18,22 @@ the siad instance launched on the local machine with `siad -a :9000`.
 
 Common tasks
 ------------
+* `siac status` view block height
+
+Wallet:
 * `siac wallet init [-p]` initilize a wallet
 * `siac wallet unlock` unlock a wallet
 * `siac wallet status` retrieve wallet balance
 * `siac wallet address` get a wallet address
 * `siac wallet send [amount] [dest]` sends siacoin to an address
+
+Renter:
+* `siac renter list` list all renter files
+* `siac renter upload [filepath] [nickname]` upload a file
+* `siac renter download [nickname] [filepath]` download a file
+* `siac renter share [nickname] [filepath]` create a .sia file
+* `siac renter load [filepath]` load a .sia file
+
 
 Full Descriptions
 -----------------
@@ -99,7 +110,6 @@ is used to configure hosting.
 | maxfilesize  | The maximum file size you can host in bytes      |
 | minduration  | The smallest duration you can host for in blocks |
 | maxduration  | The largest duration you can host for in blocks  |
-| windowsize   |                                                  |
 | price        | Number of Siacoins per Gigabyte per month.       |
 
 You can call this many times to configure you host before
@@ -170,3 +180,33 @@ your saved list.
 
 * `siac renter queue` shows the download queue. This is only relevant
 if you have multiple downloads happening simultaneously.
+
+#### Gateway tasks
+* `siac gateway add [address:port]` manually adds a peer to your list
+of connected clients
+
+* `siac gateway remove [address:port]` manually removes a peer from
+your list of connected peers
+
+* `siac gateway status` prints a list of all the peers you are
+connected to
+
+#### Miner tasks
+* `siac miner status` returns information about the miner. It is only
+valid for when siad is running.
+
+* `siac miner start` starts running the CPU miner on one thread. This
+is virtually useless outside of debugging.
+
+* `siac miner stop` halts the CPU miner.
+
+#### General commands
+* `siac status` prints the current block ID, current block height, and
+current target.
+
+* `siac stop` sends the stop signal to siad to safely terminate. This
+has the same affect as C^c on the terminal.
+
+* `siac version` displays the version string of siac.
+
+* `siac update` checks the server for updates.
