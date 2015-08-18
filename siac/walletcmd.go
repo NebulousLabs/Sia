@@ -305,7 +305,7 @@ func walletinitcmd() {
 	}
 	fmt.Printf("Seed is:\n %s\n\n", er.PrimarySeed)
 	if initPassword {
-		fmt.Printf("Wallet encrypted with given password")
+		fmt.Printf("Wallet encrypted with given password\n")
 	} else {
 		fmt.Printf("Wallet encrypted with password: %s\n", er.PrimarySeed)
 	}
