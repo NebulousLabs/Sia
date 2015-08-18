@@ -2,6 +2,7 @@ package transactionpool
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -34,7 +35,7 @@ var (
 	TransactionMinFee = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
 )
 
-// relatedObjectIDs determins all of the object ids related to a transction.
+// relatedObjectIDs determines all of the object ids related to a transaction.
 func relatedObjectIDs(ts []types.Transaction) []ObjectID {
 	oidMap := make(map[ObjectID]struct{})
 	for _, t := range ts {
@@ -284,10 +285,22 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	// Notify subscribers and broadcast the transaction set.
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
 	tp.updateSubscribersTransactions()
+
+	// COMPAT 0.3.3.3
+	//
+	// Transactions must be broadcast individually as well so that they will be
+	// seen by older nodes that don't support the "RelayTransactionSet" RPC.
+	go func() {
+		for _, t := range ts {
+			tp.gateway.Broadcast("RelayTransaction", t)
+			time.Sleep(time.Second * 15)
+		}
+	}()
+
 	return nil
 }
 
-// RelayTransaction is an RPC that accepts a transaction set from a peer. If
+// RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
