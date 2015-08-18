@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -257,17 +258,27 @@ func walletstatuscmd() {
 	// divide by 1e24 to get SC
 	r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
 	sc, _ := r.Float64()
+	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins)
+	unconfirmedBalance = unconfirmedBalance.Sub(status.UnconfirmedOutgoingSiacoins)
+	r = new(big.Rat).SetFrac(unconfirmedBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	usc, _ := r.Float64()
 	fmt.Printf(`Wallet status:
 %s, %s
-Balance:   %.2f SC
-Exact:     %v H
-`, encStatus, lockStatus, sc, status.ConfirmedSiacoinBalance)
+Confirmed Balance:   %.2f SC
+Unconfirmed Balance: %.2f SC
+Exact:               %v H
+`, encStatus, lockStatus, sc, usc, status.ConfirmedSiacoinBalance)
 }
 
 // walletunlockcmd unlocks a saved wallet
-func walletunlockcmd(password string) {
+func walletunlockcmd() {
+	password, err := speakeasy.Ask("Wallet password: ")
+	if err != nil {
+		fmt.Println("Reading password failed")
+		return
+	}
 	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
-	err := post("/wallet/unlock", qs)
+	err = post("/wallet/unlock", qs)
 	if err != nil {
 		fmt.Println("Could not unlock wallet:", err)
 		return
@@ -279,20 +290,25 @@ func walletunlockcmd(password string) {
 func walletinitcmd() {
 	var er api.WalletEncryptPOST
 	qs := fmt.Sprintf("dictionary=%s", "english")
-	if initPassword != "" {
-		qs += fmt.Sprintf("&encryptpassword=%s", initPassword)
+	if initPassword {
+		password, err := speakeasy.Ask("Wallet password: ")
+		if err != nil {
+			fmt.Println("Reading password failed")
+			return
+		}
+		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	defer func() { initPassword = "" }()
 	err := postResp("/wallet/encrypt", qs, &er)
 	if err != nil {
 		fmt.Println("Error when encrypting wallet:", err)
 		return
 	}
-	if initPassword == "" {
-		initPassword = er.PrimarySeed
+	fmt.Printf("Seed is:\n %s\n\n", er.PrimarySeed)
+	if initPassword {
+		fmt.Printf("Wallet encrypted with given password")
+	} else {
+		fmt.Printf("Wallet encrypted with password: %s\n", er.PrimarySeed)
 	}
-	fmt.Printf("Seed is:\n %s\n\nWallet encrypted with password: %s", er.PrimarySeed, initPassword)
-
 }
 
 // walletlockcmd locks the wallet
@@ -304,9 +320,19 @@ func walletlockcmd() {
 }
 
 // walletaddseedcmd adds a seed to the wallet's list of seeds
-func walletaddseedcmd(password, seed string) {
+func walletaddseedcmd() {
+	password, err := speakeasy.Ask("Wallet password: ")
+	if err != nil {
+		fmt.Println("Reading password failed")
+		return
+	}
+	seed, err := speakeasy.Ask("New Seed: ")
+	if err != nil {
+		fmt.Println("Reading seed failed")
+		return
+	}
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
-	err := post("/wallet/seeds", qs)
+	err = post("/wallet/seeds", qs)
 	if err != nil {
 		fmt.Println("Could not add seed:", err)
 		return

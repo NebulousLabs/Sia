@@ -10,6 +10,7 @@ dependencies:
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
+	go get -u github.com/bgentry/speakeasy
 	go get -u github.com/boltdb/bolt
 	go get -u github.com/dchest/blake2b
 	go get -u github.com/inconshreveable/go-update
