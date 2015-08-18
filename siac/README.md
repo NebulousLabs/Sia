@@ -1,7 +1,7 @@
 Siac Usage
 ==========
 
-siac is the command line interface to Sia, for use by power users and
+`siac` is the command line interface to Sia, for use by power users and
 those on headless servers. It comes as a part of the command line
 package, and can be run as `./siac` from the same folder, or just by
 calling `siac` if you move the binary into your path.
@@ -14,11 +14,11 @@ command groups that can be used.
 
 Common tasks
 ------------
-`siac wallet init [-p]` initilize a wallet
-`siac wallet unlock` unlock a wallet
-`siac wallet status` retrieve wallet balance
-`siac wallet address` get a wallet address
-`siac wallet send [amount] [dest]` sends siacoin to an address
+* `siac wallet init [-p]` initilize a wallet
+* `siac wallet unlock` unlock a wallet
+* `siac wallet status` retrieve wallet balance
+* `siac wallet address` get a wallet address
+* `siac wallet send [amount] [dest]` sends siacoin to an address
 
 Full Descriptions
 -----------------
@@ -82,3 +82,45 @@ wallet. These can be used to regenerate the wallet
 `siac wallet addseed` prompts the user for his encryption password,
 as well as a new secret seed. The wallet will then incorporate this
 seed into itself. This can be used for wallet recovery and merging.
+
+#### Host tasks
+`host config [setting] [value]` is used to configure hosting.
+
+| Setting      | Value                                            |
+| ------------ | ------------------------------------------------ |
+| totalstorage | The total size you will be hosting from in bytes |
+| minfilisize  | The minimum file size you can host in bytes      |
+| maxfilesize  | The maximum file size you can host in bytes      |
+| minduration  | The smallest duration you can host for in blocks |
+| maxduration  | The largest duration you can host for in blocks  |
+| windowsize   |                                                  |
+| price        | Number of Siacoins per Gigabyte per month.       |
+
+You can call this many times to configure you host before
+announcing. Alternatively, you can manually adjust these parameters
+inside the `host/config.json` file.
+
+`siac host announce [-f]` makes an host announcement. If the `-f` flag
+is passed, it will force the announcement. Otherwise, you cannot
+annonuce multiple times. Announcing a second time after changing
+settings is not necessary, as the announcement only contains enough
+information to reach your host.
+
+`siac host status` outputs some of your hosting settings.
+
+Example:
+```bash
+user@hostname:~$ siac host status
+Host settings:
+Storage:      2.0000 TB (1.524 GB used)
+Price:        0.000 SC per GB per month
+Collateral:   0
+Max Filesize: 10000000000
+Max Duration: 8640
+Contracts:    32
+```
+
+`siac host hostdb` prints a list of all the know active hosts on the
+network. It can also be called through `siac hostdb`
+
+#### Renter tasks
