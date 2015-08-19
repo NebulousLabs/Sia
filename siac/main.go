@@ -179,7 +179,7 @@ func main() {
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd, walletUnlockCmd, walletLockCmd, walletInitCmd, walletAddseedCmd, walletSeedsCmd)
-	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Encryption password used for wallet")
+	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
 	// walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
 	walletSiafundsCmd.AddCommand(walletSiafundsSendCmd)
 

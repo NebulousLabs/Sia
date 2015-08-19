@@ -112,7 +112,7 @@ Run 'wallet send --help' to see a list of available units.`,
 	}
 
 	walletUnlockCmd = &cobra.Command{
-		Use:   `unlock "[password]"`,
+		Use:   `unlock`,
 		Short: "Unlock the wallet",
 		Long:  "Decrypt and load the wallet into memory",
 		Run:   wrap(walletunlockcmd),
@@ -127,7 +127,7 @@ The seed string, which is also the encryption password, will be returned.`,
 	}
 
 	walletAddseedCmd = &cobra.Command{
-		Use:   `addseed "[password]" "[seed]"`,
+		Use:   `addseed`,
 		Short: "Add a seed to the wallet",
 		Long:  "Uses the given password to create a new wallet with that as the primary seed",
 		Run:   wrap(walletaddseedcmd),
@@ -305,7 +305,7 @@ func walletinitcmd() {
 	}
 	fmt.Printf("Seed is:\n %s\n\n", er.PrimarySeed)
 	if initPassword {
-		fmt.Printf("Wallet encrypted with given password")
+		fmt.Printf("Wallet encrypted with given password\n")
 	} else {
 		fmt.Printf("Wallet encrypted with password: %s\n", er.PrimarySeed)
 	}
