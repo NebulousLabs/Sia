@@ -10,7 +10,7 @@ import (
 
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Host",
-	Version: "0.3.3",
+	Version: "0.4",
 }
 
 type savedHost struct {
@@ -19,6 +19,7 @@ type savedHost struct {
 	Profit         types.Currency
 	HostSettings   modules.HostSettings
 	Obligations    []contractObligation
+	MasterKey      types.SiaPublicKey
 }
 
 func (h *Host) save() error {
@@ -28,6 +29,7 @@ func (h *Host) save() error {
 		Profit:         h.profit,
 		HostSettings:   h.HostSettings,
 		Obligations:    make([]contractObligation, 0, len(h.obligationsByID)),
+		MasterKey:      h.masterKey,
 	}
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
@@ -55,6 +57,7 @@ func (h *Host) load() error {
 		// update spaceRemaining
 		h.spaceRemaining -= int64(obligation.FileContract.FileSize)
 	}
+	h.masterKey = sHost.MasterKey
 
 	return nil
 }

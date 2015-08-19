@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
@@ -47,6 +48,7 @@ type Host struct {
 
 	obligationsByID     map[types.FileContractID]contractObligation
 	obligationsByHeight map[types.BlockHeight][]contractObligation
+	masterKey           types.SiaPublicKey
 
 	modules.HostSettings
 
@@ -98,6 +100,17 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 	h.spaceRemaining = h.TotalStorage
+
+	// Generate signing key, for revising contracts.
+	// TODO: what do we do with the secret key??
+	_, pk, err := crypto.GenerateSignatureKeys()
+	if err != nil {
+		return nil, err
+	}
+	h.masterKey = types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
 
 	// Load the old host data.
 	err = h.load()
