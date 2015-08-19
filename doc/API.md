@@ -271,7 +271,15 @@ destination string
 
 'destination' is the address that is receiving the coins.
 
-Response: standard
+Response:
+```
+struct {
+	transactionids []types.TransactionID (string)
+}
+```
+'transactionids' are the ids of the transactions that were created when sending
+the coins. The last transaction contains the output headed to the
+'destination'.
 
 #### /wallet/siafunds [POST]
 
@@ -292,7 +300,15 @@ destination string
 
 'destination' is the address that is receiving the funds.
 
-Response: standard
+Response:
+```
+struct {
+	transactionids []types.TransactionID (string)
+}
+```
+'transactionids' are the ids of the transactions that were created when sending
+the coins. The last transaction contains the output headed to the
+'destination'.
 
 #### /wallet/transaction/$(id) [GET]
 

@@ -39,6 +39,18 @@ type (
 		PrimarySeed string `json:"primaryseed"`
 	}
 
+	// WalletSiacoinsPOST contains the transaction sent in the POST call to
+	// /wallet/siafunds.
+	WalletSiacoinsPOST struct {
+		TransactionIDs []types.TransactionID `json:"transactionids"`
+	}
+
+	// WalletSiafundsPOST contains the transaction sent in the POST call to
+	// /wallet/siafunds.
+	WalletSiafundsPOST struct {
+		TransactionIDs []types.TransactionID `json:"transactionids"`
+	}
+
 	// WalletSeedGet contains the seeds used by the wallet.
 	WalletSeedsGET struct {
 		PrimarySeed        string   `json:"primaryseed"`
@@ -311,12 +323,18 @@ func (srv *Server) walletSiacoinsHandlerPOST(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	_, err = srv.wallet.SendSiacoins(amount, dest)
+	txns, err := srv.wallet.SendSiacoins(amount, dest)
 	if err != nil {
 		writeError(w, "error after call to /wallet/siacoins: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeSuccess(w)
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	writeJSON(w, WalletSiacoinsPOST{
+		TransactionIDs: txids,
+	})
 }
 
 // walletSiacoinsHandler handles API calls to /wallet/siacoins.
@@ -341,12 +359,18 @@ func (srv *Server) walletSiafundsHandlerPOST(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	_, err = srv.wallet.SendSiafunds(amount, dest)
+	txns, err := srv.wallet.SendSiafunds(amount, dest)
 	if err != nil {
 		writeError(w, "error after call to /wallet/siafunds: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeSuccess(w)
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	writeJSON(w, WalletSiafundsPOST{
+		TransactionIDs: txids,
+	})
 }
 
 // walletSiafundsHandler handles API calls to /wallet/siafunds.

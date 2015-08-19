@@ -84,7 +84,7 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// of w.processedTransactions.
 			txn := block.Transactions[i]
 			txid := txn.ID()
-			if txid == w.processedTransactions[len(w.processedTransactions)-1].TransactionID {
+			if len(w.processedTransactions) > 0 && txid == w.processedTransactions[len(w.processedTransactions)-1].TransactionID {
 				w.processedTransactions = w.processedTransactions[:len(w.processedTransactions)-1]
 				delete(w.processedTransactionMap, txid)
 			}
