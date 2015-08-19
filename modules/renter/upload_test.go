@@ -71,4 +71,15 @@ func TestErasureUpload(t *testing.T) {
 	if !bytes.Equal(buf.Bytes(), data) {
 		t.Fatal("recovered data does not match original")
 	}
+
+	/*
+		for i, h := range hosts {
+			host := h.(*testHost)
+			pieces := 0
+			for _, p := range host.pieceMap {
+				pieces += len(p)
+			}
+			t.Logf("Host #: %d\tDelay: %v\t# Pieces: %v\t# Chunks: %d", i, host.delay, pieces, len(host.pieceMap))
+		}
+	*/
 }

@@ -12,6 +12,7 @@ type testHost struct {
 	data      []byte
 	pieceMap  map[uint64][]pieceData // key is chunkIndex
 	pieceSize uint64
+	nFetch    int
 
 	delay time.Duration // used to simulate real-world conditions
 }
@@ -22,6 +23,7 @@ func (h *testHost) pieces(chunkIndex uint64) []pieceData {
 
 func (h *testHost) fetch(p pieceData) ([]byte, error) {
 	time.Sleep(h.delay)
+	h.nFetch++
 	return h.data[p.Offset : p.Offset+h.pieceSize], nil
 }
 
@@ -40,7 +42,7 @@ func TestErasureDownload(t *testing.T) {
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]fetcher, 3)
+	hosts := make([]fetcher, ecc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap:  make(map[uint64][]pieceData),
@@ -94,4 +96,15 @@ func TestErasureDownload(t *testing.T) {
 	if !bytes.Equal(buf.Bytes(), data) {
 		t.Fatal("recovered data does not match original")
 	}
+
+	/*
+		totFetch := 0
+		for i, h := range hosts {
+			t.Logf("Host #: %d  \tFetched: %v", i, h.(*testHost).nFetch)
+			totFetch += h.(*testHost).nFetch
+
+		}
+		t.Log("Optimal fetches:", i*uint64(ecc.MinPieces()))
+		t.Log("Total fetches:  ", totFetch)
+	*/
 }
