@@ -1,8 +1,9 @@
 package renter
 
 import (
+	"bytes"
 	"errors"
-	//"io"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -204,7 +205,17 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	}
 
 	// calculate new merkle root
-	hu.tree.Push(encPiece) // TODO: WRONG!
+	r := bytes.NewReader(encPiece)
+	buf := make([]byte, crypto.SegmentSize)
+	for {
+		_, err := io.ReadFull(r, buf)
+		if err == io.EOF {
+			break
+		} else if err != nil && err != io.ErrUnexpectedEOF {
+			return err
+		}
+		hu.tree.Push(buf)
+	}
 
 	// get old file contract from renter
 	lockID := hu.renter.mu.RLock()
