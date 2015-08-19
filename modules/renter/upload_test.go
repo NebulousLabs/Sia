@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (h *testHost) addPiece(p uploadPiece) (*fileContract, error) {
+func (h *testHost) addPiece(p uploadPiece) error {
 	h.pieceMap[p.chunkIndex] = append(h.pieceMap[p.chunkIndex], pieceData{
 		p.chunkIndex,
 		p.pieceIndex,
@@ -16,8 +16,10 @@ func (h *testHost) addPiece(p uploadPiece) (*fileContract, error) {
 	h.data = append(h.data, p.data...)
 	// simulate I/O delay
 	time.Sleep(h.delay)
-	return nil, nil
+	return nil
 }
+
+func (h *testHost) fileContract() fileContract { return fileContract{} }
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.
 func TestErasureUpload(t *testing.T) {

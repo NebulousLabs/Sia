@@ -13,8 +13,8 @@ import (
 var (
 	ErrNilCS     = errors.New("cannot create renter with nil consensus set")
 	ErrNilHostDB = errors.New("cannot create renter with nil hostdb")
-	ErrNilWallet = errors.New("cannot create renter wil nil wallet")
-	ErrNilTpool  = errors.New("cannot create renter wil nil transaction pool")
+	ErrNilWallet = errors.New("cannot create renter with nil wallet")
+	ErrNilTpool  = errors.New("cannot create renter with nil transaction pool")
 )
 
 // A Renter is responsible for tracking all of the files that a user has
