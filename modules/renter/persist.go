@@ -147,13 +147,16 @@ func (r *Renter) saveFile(f *file) error {
 
 // save stores the current renter data to disk.
 func (r *Renter) save() error {
-	// Convert map to JSON-friendly type.
-	contracts := make(map[string]types.FileContract)
+	data := struct {
+		Contracts map[string]types.FileContract
+		Entropy   [32]byte
+	}{make(map[string]types.FileContract), r.entropy}
+	// Convert renter's contract map to a JSON-friendly type.
 	for id, fc := range r.contracts {
 		b, _ := id.MarshalJSON()
-		contracts[string(b)] = fc
+		data.Contracts[string(b)] = fc
 	}
-	return persist.SaveFile(saveMetadata, contracts, filepath.Join(r.saveDir, PersistFilename))
+	return persist.SaveFile(saveMetadata, data, filepath.Join(r.saveDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
@@ -184,14 +187,18 @@ func (r *Renter) load() error {
 		}
 	}
 
-	// Load contracts.
-	contracts := make(map[string]types.FileContract)
-	err = persist.LoadFile(saveMetadata, &contracts, filepath.Join(r.saveDir, PersistFilename))
+	// Load contracts and entropy.
+	data := struct {
+		Contracts map[string]types.FileContract
+		Entropy   [32]byte
+	}{}
+	err = persist.LoadFile(saveMetadata, &data, filepath.Join(r.saveDir, PersistFilename))
 	if err != nil {
 		return err
 	}
+	r.entropy = data.Entropy
 	var fcid types.FileContractID
-	for id, fc := range contracts {
+	for id, fc := range data.Contracts {
 		fcid.UnmarshalJSON([]byte(id))
 		r.contracts[fcid] = fc
 	}

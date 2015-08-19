@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"crypto/rand"
 	"errors"
 	"os"
 
@@ -27,6 +28,7 @@ type Renter struct {
 
 	files         map[string]*file
 	contracts     map[types.FileContractID]types.FileContract
+	entropy       [32]byte // used to generate signing keys
 	downloadQueue []*download
 	saveDir       string
 
@@ -60,8 +62,12 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
+	_, err := rand.Read(r.entropy[:])
+	if err != nil {
+		return nil, err
+	}
 
-	err := os.MkdirAll(saveDir, 0700)
+	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
 		return nil, err
 	}
