@@ -199,7 +199,7 @@ func TestSendSiacoins(t *testing.T) {
 	// Send 5000 hastings. The wallet will automatically add a fee. Outgoing
 	// unconfirmed siacoins - incoming unconfirmed siacoins should equal 5000 +
 	// fee.
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: tpool fee algo needs to be written.
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
 	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5000), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)

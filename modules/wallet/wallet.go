@@ -82,12 +82,14 @@ type Wallet struct {
 	// historicOutputs is kept so that the values of transaction inputs can be
 	// determined. historicOutputs is never cleared, but in general should be
 	// small compared to the list of transactions.
-	walletTransactions            []modules.WalletTransaction
-	walletTransactionMap          map[modules.WalletTransactionID]*modules.WalletTransaction
-	transactions                  map[types.TransactionID]types.Transaction
-	unconfirmedWalletTransactions []modules.WalletTransaction
-	unconfirmedTransactions       []types.Transaction
-	historicOutputs               map[types.OutputID]types.Currency
+	processedTransactions            []modules.ProcessedTransaction
+	processedTransactionMap          map[types.TransactionID]*modules.ProcessedTransaction
+	unconfirmedProcessedTransactions []modules.ProcessedTransaction
+
+	// TODO: Storing the whole set of historic outputs is expensive and
+	// unnecessary. There's a better way to do it.
+	historicOutputs     map[types.OutputID]types.Currency
+	historicClaimStarts map[types.SiafundOutputID]types.Currency
 
 	persistDir string
 	log        *log.Logger
@@ -112,14 +114,15 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		cs:    cs,
 		tpool: tpool,
 
-		keys:            make(map[types.UnlockHash]spendableKey),
-		siacoinOutputs:  make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		siafundOutputs:  make(map[types.SiafundOutputID]types.SiafundOutput),
-		historicOutputs: make(map[types.OutputID]types.Currency),
-		spentOutputs:    make(map[types.OutputID]types.BlockHeight),
+		keys:           make(map[types.UnlockHash]spendableKey),
+		siacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		siafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
+		spentOutputs:   make(map[types.OutputID]types.BlockHeight),
 
-		transactions:         make(map[types.TransactionID]types.Transaction),
-		walletTransactionMap: make(map[modules.WalletTransactionID]*modules.WalletTransaction),
+		processedTransactionMap: make(map[types.TransactionID]*modules.ProcessedTransaction),
+
+		historicOutputs:     make(map[types.OutputID]types.Currency),
+		historicClaimStarts: make(map[types.SiafundOutputID]types.Currency),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),

@@ -27,11 +27,16 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
-	for _, uwt := range w.unconfirmedWalletTransactions {
-		if uwt.FundType == types.SpecifierSiacoinOutput {
-			incomingSiacoins = incomingSiacoins.Add(uwt.Value)
-		} else if uwt.FundType == types.SpecifierSiacoinInput {
-			outgoingSiacoins = outgoingSiacoins.Add(uwt.Value)
+	for _, upt := range w.unconfirmedProcessedTransactions {
+		for _, input := range upt.Inputs {
+			if input.FundType == types.SpecifierSiacoinInput && input.WalletAddress {
+				outgoingSiacoins = outgoingSiacoins.Add(input.Value)
+			}
+		}
+		for _, output := range upt.Outputs {
+			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress {
+				incomingSiacoins = incomingSiacoins.Add(output.Value)
+			}
 		}
 	}
 	return
