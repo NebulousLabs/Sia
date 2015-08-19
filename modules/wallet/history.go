@@ -12,119 +12,99 @@ var (
 	errNoHistoryForAddr = errors.New("no history found for provided address")
 )
 
-// History returns all of the confirmed transactions between 'startHeight' and
-// 'endHeight' (inclusive).
-func (w *Wallet) History(startHeight types.BlockHeight, endHeight types.BlockHeight) ([]modules.WalletTransaction, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	if startHeight > w.consensusSetHeight || startHeight > endHeight {
-		return nil, errOutOfBounds
-	}
-	if len(w.walletTransactions) == 0 {
-		return nil, nil
-	}
-
-	var start, end int
-	for start = 0; start < len(w.walletTransactions); start++ {
-		if w.walletTransactions[start].ConfirmationHeight >= startHeight {
-			break
-		}
-	}
-	for end = start; end < len(w.walletTransactions); end++ {
-		if w.walletTransactions[end].ConfirmationHeight > endHeight {
-			break
-		}
-	}
-	return w.walletTransactions[start:end], nil
-}
-
-// AddressHistory returns all of the wallet transactions associated with a
+// AddressTransactions returns all of the wallet transactions associated with a
 // single unlock hash.
-func (w *Wallet) AddressHistory(uh types.UnlockHash) (wts []modules.WalletTransaction, err error) {
+func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
-	_, exists := w.keys[uh]
-	if !exists {
-		return nil, errors.New("address not recognized by the wallet")
-	}
-
-	for _, wt := range w.walletTransactions {
-		if wt.RelatedAddress == uh {
-			wts = append(wts, wt)
+	for _, pt := range w.processedTransactions {
+		relevant := false
+		for _, input := range pt.Inputs {
+			if input.RelatedAddress == uh {
+				relevant = true
+				break
+			}
+		}
+		for _, output := range pt.Outputs {
+			if output.RelatedAddress == uh {
+				relevant = true
+				break
+			}
+		}
+		if relevant {
+			pts = append(pts, pt)
 		}
 	}
-	if len(wts) == 0 {
-		return nil, errNoHistoryForAddr
-	}
-	return wts, nil
-}
-
-// UnconfirmedHistory returns the set of unconfirmed wallet transactions.
-func (w *Wallet) UnconfirmedHistory() []modules.WalletTransaction {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-	return w.unconfirmedWalletTransactions
+	return pts
 }
 
 // AddressUnconfirmedHistory returns all of the unconfirmed wallet transactions
 // related to a specific address.
-func (w *Wallet) AddressUnconfirmedHistory(uh types.UnlockHash) (wts []modules.WalletTransaction) {
+func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
-	for _, wt := range w.unconfirmedWalletTransactions {
-		if wt.RelatedAddress == uh {
-			wts = append(wts, wt)
+	// Scan the full list of unconfirmed transactions to see if there are any
+	// related transactions.
+	for _, pt := range w.unconfirmedProcessedTransactions {
+		relevant := false
+		for _, input := range pt.Inputs {
+			if input.RelatedAddress == uh {
+				relevant = true
+				break
+			}
+		}
+		for _, output := range pt.Outputs {
+			if output.RelatedAddress == uh {
+				relevant = true
+				break
+			}
+		}
+		if relevant {
+			pts = append(pts, pt)
 		}
 	}
-	return wts
+	return pts
 }
 
 // Transaction returns the transaction with the given id. 'False' is returned
 // if the transaction does not exist.
-func (w *Wallet) Transaction(txid types.TransactionID) (txn types.Transaction, ok bool) {
+func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransaction, bool) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	txn, ok = w.transactions[txid]
-	return txn, ok
+	pt, exists := w.processedTransactionMap[txid]
+	return *pt, exists
 }
 
 // Transactions returns all transactions relevant to the wallet that were
 // confirmed in the range [startHeight, endHeight].
-func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (txns []types.Transaction, err error) {
+func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []modules.ProcessedTransaction, err error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
 	if startHeight > w.consensusSetHeight || startHeight > endHeight {
 		return nil, errOutOfBounds
 	}
-	if len(w.walletTransactions) == 0 {
+	if len(w.processedTransactions) == 0 {
 		return nil, nil
 	}
 
-	// prevTxid is kept because multiple WalletTransactions can be created from
-	// the same source types.Transaction, and will appear in the slice
-	// consecutively. This is an effective way to prevent duplicates from
-	// appearing in the output.
-	var prevTxid types.TransactionID
-	for _, wt := range w.walletTransactions {
-		if wt.ConfirmationHeight > endHeight {
+	for _, pt := range w.processedTransactions {
+		if pt.ConfirmationHeight > endHeight {
 			break
 		}
-		if wt.ConfirmationHeight >= startHeight && wt.TransactionID != prevTxid {
-			prevTxid = wt.TransactionID
-			txns = append(txns, w.transactions[wt.TransactionID])
+		if pt.ConfirmationHeight >= startHeight {
+			pts = append(pts, pt)
 		}
 	}
-	return txns, nil
+	return pts, nil
 }
 
 // UnconfirmedTransactions returns the set of unconfirmed transactions that are
 // relevant to the wallet.
-func (w *Wallet) UnconfirmedTransactions() []types.Transaction {
+func (w *Wallet) UnconfirmedTransactions() []modules.ProcessedTransaction {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	return w.unconfirmedTransactions
+	return w.unconfirmedProcessedTransactions
 }

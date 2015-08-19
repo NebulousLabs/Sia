@@ -32,15 +32,54 @@ type (
 	// WalletTransactionID is a unique identifier for a wallet transaction.
 	WalletTransactionID crypto.Hash
 
-	WalletTransaction struct {
+	// A ProcessedInput represents funding to a transaction. The input is
+	// coming from an address and going to the outputs. The fund types are
+	// 'SiacoinInput', 'SiafundInput', or 'MinerPayout'. Siacoin inputs and
+	// block subsidies relate to siacoins. Siafund inputs relate to siafunds.
+	// 'MinerPayout' has no related address, so the id of the block is used
+	// instead.
+	ProcessedInput struct {
+		FundType       types.Specifier  `json:"fundtype"`
+		WalletAddress  bool             `json:"walletaddress"`
+		RelatedAddress types.UnlockHash `json:"relatedaddress"`
+		Value          types.Currency   `json:"value"`
+	}
+
+	// A ProcessedOutput is a siacoin output that appears in a transaction.
+	// Some outputs mature immediately, some are delayed, and some may never
+	// mature at all (in the event of storage proofs).
+	//
+	// Fund type can either be 'SiacoinInput', 'SiafundInput', 'ClaimInput', or
+	// 'MinerPayout'. All fund types related to siacoins except for
+	// SiafundInput, which relates to siafunds. Outputs related to file
+	// contracts are not tracked by the wallet.
+	//
+	// MaturityHeight indicates at what block height the output becomes
+	// available. SiacoinInputs and SiafundInputs become available immediately.
+	// ClaimInputs and MinerPayouts become available after 144 confirmations.
+	ProcessedOutput struct {
+		FundType       types.Specifier   `json:"fundtype"`
+		MaturityHeight types.BlockHeight `json:"maturityheight"`
+		WalletAddress  bool              `json:"walletaddress"`
+		RelatedAddress types.UnlockHash  `json:"relatedaddress"`
+		Value          types.Currency    `json:"value"`
+	}
+
+	// A processed transaction is a transaction that has been processed into
+	// explicit inputs and outputs and tagged with some header data such as
+	// confirmation height + timestamp.
+	//
+	// Because of the block subsidy, a block is considered as a transaction.
+	// Since there is technically no transaction id for the block subsidy, the
+	// block id is used instead.
+	ProcessedTransaction struct {
+		Transaction           types.Transaction   `json:"transaction"`
 		TransactionID         types.TransactionID `json:"transactionid"`
 		ConfirmationHeight    types.BlockHeight   `json:"confirmationheight"`
 		ConfirmationTimestamp types.Timestamp     `json:"confirmationtimestamp"`
 
-		FundType       types.Specifier  `json:"fundtype"`
-		OutputID       types.OutputID   `json:"outputid"`
-		RelatedAddress types.UnlockHash `json:"relatedaddress"`
-		Value          types.Currency   `json:"value"`
+		Inputs  []ProcessedInput  `json:"inputs"`
+		Outputs []ProcessedOutput `json:"outputs"`
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction
@@ -214,33 +253,27 @@ type (
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
-		// History returns all of the history that was confirmed at heights
-		// [startHeight, endHeight]. Unconfirmed history not included.
-		History(startHeight types.BlockHeight, endHeight types.BlockHeight) ([]WalletTransaction, error)
+		// AddressTransactions returns all of the transactions that are related
+		// to a given address.
+		AddressTransactions(types.UnlockHash) []ProcessedTransaction
 
-		// AddressHistory returns all of the transactions that are related to a
-		// given address.
-		AddressHistory(types.UnlockHash) ([]WalletTransaction, error)
-
-		// UnconfirmedHistory returns the list of known unconfirmed wallet
-		// transactions.
-		UnconfirmedHistory() []WalletTransaction
-
-		// AddressUnconfirmedHistory returns all of the wallet transactions
-		// related to a given address.
-		AddressUnconfirmedHistory(types.UnlockHash) []WalletTransaction
+		// AddressUnconfirmedHistory returns all of the unconfirmed
+		// transactions related to a given address.
+		AddressUnconfirmedTransactions(types.UnlockHash) []ProcessedTransaction
 
 		// Transaction returns the transaction with the given id. The bool
 		// indicates whether the transaction is in the wallet database. The
 		// wallet only stores transactions that are related to the wallet.
-		Transaction(types.TransactionID) (types.Transaction, bool)
+		Transaction(types.TransactionID) (ProcessedTransaction, bool)
 
-		// Transactions returns all transactions that were confirmed from
-		// height [startHeight, endHeight] that are relevant to the wallet.
-		Transactions(startHeight, endHeight types.BlockHeight) ([]types.Transaction, error)
+		// Transactions returns all of the transactions that were confirmed at
+		// heights [startHeight, endHeight]. Unconfirmed transactions are not
+		// included.
+		Transactions(startHeight types.BlockHeight, endHeight types.BlockHeight) ([]ProcessedTransaction, error)
 
-		// UnconfirmedTransactions returns all unconfirmed transactions.
-		UnconfirmedTransactions() []types.Transaction
+		// UnconfirmedTransactions returns all unconfirmed transactions
+		// relative to the wallet.
+		UnconfirmedTransactions() []ProcessedTransaction
 
 		// RegisterTransaction takes a transaction and its parents and returns
 		// a TransactionBuilder which can be used to expand the transaction.

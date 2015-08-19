@@ -45,20 +45,19 @@ Wallet
 
 Queries:
 
-* /wallet                   [GET]
-* /wallet/address           [GET]
-* /wallet/backup            [POST]
-* /wallet/encrypt           [POST]
-* /wallet/history           [GET]
-* /wallet/history/$(addr)   [GET]
-* /wallet/lock              [POST]
-* /wallet/seeds             [GET]
-* /wallet/seeds             [POST]
-* /wallet/siacoins          [POST]
-* /wallet/siafunds          [POST]
-* /wallet/transaction/$(id) [GET]
-* /wallet/transactions      [GET]
-* /wallet/unlock            [POST]
+* /wallet                      [GET]
+* /wallet/address              [GET]
+* /wallet/backup               [POST]
+* /wallet/encrypt              [POST]
+* /wallet/lock                 [POST]
+* /wallet/seeds                [GET]
+* /wallet/seeds                [POST]
+* /wallet/siacoins             [POST]
+* /wallet/siafunds             [POST]
+* /wallet/transaction/$(id)    [GET]
+* /wallet/transactions         [GET]
+* /wallet/transactions/$(addr) [GET]
+* /wallet/unlock               [POST]
 
 The first time that the wallet is ever created, the wallet will be unencrypted
 and locked. The wallet must be encrypted using a call to /wallet/encrypt. After
@@ -178,101 +177,6 @@ struct {
 ```
 'primaryseed' is the dictionary encoded seed that is used to generate addresses
 that the wallet is able to spend.
-
-#### /wallet/history [GET]
-
-Function: Return a list of transactions related to the wallet.
-
-Parameters:
-```
-startheight types.BlockHeight (uint64)
-endheight   types.BlockHeight (uint64)
-```
-'startheight' refers to the height of the block where transaction history
-should begin.
-
-'endheight' refers to the height of of the block where the transaction history
-should end. If 'endheight' is greater than the current height, all transactions
-up to and including the most recent block will be provided.
-
-Response:
-```
-struct {
-	confirmedhistory   []modules.WalletTransaction
-	unconfirmedhistory []modules.WalletTransaction
-}
-```
-'confirmedhistory' lists all of the confirmed wallet transactions appearing
-between height 'start' and height 'end' (inclusive).
-
-'unconfirmedhistory' lists all of the unconfirmed wallet transactions.
-
-Wallet transactions are transactions that have been processed by the wallet and
-given more information, such as a confirmation height and a timestamp. Each
-wallet transaction contains information about only a single input or output.
-One network transaction with many inputs an outputs can result in many wallet
-transactions. All of the wallet transactions created by a network transaction
-are guaranteed to be consecutive in history. Wallet transactions will always be
-returned in chronological order.
-
-A wallet transaction takes the following form:
-```
-struct modules.WalletTransaction {
-	transactionID         types.TransactionID (string)
-	confirmationHeight    types.BlockHeight   (int)
-	confirmationTimestamp types.Timestamp     (uint64)
-
-	fundType       types.Specifier  (string)
-	outputID       types.OutputID   (string)
-	relatedAddress types.UnlockHash (string)
-	value          types.Currency   (string)
-}
-```
-'transactionid' is the id of the transaction from which the wallet transaction
-was derived. The full transaction can be obtaied by calling
-'/wallet/transaction/$(id)'
-
-'confirmationheight' is the height at which the transaction was confirmed. The
-height will be set to 'uint64max' if the transaction has not been confirmed.
-
-'confirmationtimestamp' is the time at which a transaction was confirmed. The
-timestamp is a 64bit unix timestamp, and will be set to uint64MAX if the
-transaction is unconfirmed.
-
-'fundtype' indicates what type of fund is represented by the wallet
-transaction. The options are 'Siacoin Input', 'Siacoin Output', 'Siafund
-Input', and 'Siafund Output', corresponding to whether the fund is related to
-siacoins or siafunds, and to whether the fund is an input to the transaction or
-an output of the transaction. When looking at transactions, it should be noted
-that a 'Siacoin Input' actually represents outgoing siacoins, as they are an
-input to the transaction; they are being spent. A 'Siacoin Output' represents
-incoming coins, because the output is being created by the transaction and made
-available to the wallet.
-
-'outputid' is the id of the output. 'outputid's will always be unique.
-
-'relatedaddress' is the address that is affected. For inputs (outgoing money),
-the related address is usually not important because the wallet arbitrarily
-selects which addresses will fund a transaction. For outputs (incoming money),
-the related address field can be used to determine who has sent money to the
-wallet.
-
-'value' indicates how much money has been moved in the input or output.
-
-#### /wallet/history/$(addr) [GET]
-
-Function: Return all of the transaction related to a specific address.
-
-Parameters: none
-
-Response:
-```
-struct {
-	transactions []modules.WalletTransaction
-}
-```
-'transactions' is a list of 'wallettransactions' that affect the input address.
-See the documentation for '/wallet/history' for more information.
 
 #### /wallet/lock [POST]
 
@@ -399,21 +303,106 @@ Parameters: none
 Response:
 ```
 struct {
-	transaction types.Transaction
+	transaction modules.ProcessedTransaction
 }
 ```
-'transaction' is a 'types.Transaction'. The full transaction can be seen in
-types.transaction.go. All hashes in the transaction are encoded as strings.
+
+Processed transactions are transactions that have been processed by the wallet
+and given more information, such as a confirmation height and a timestamp.
+Processed transactions will always be returned in chronological order.
+
+A processed transaction takes the following form:
+```
+struct modules.ProcessedTransaction {
+	transaction           types.Transaction
+	transactionid         types.TransactionID (string)
+	confirmationheight    types.BlockHeight   (int)
+	confirmationtimestamp types.Timestamp     (uint64)
+
+	processedinputs  []modules.ProcessedInput
+	processedoutputs []modules.ProcessedOutput
+}
+```
+'transaction' is a types.Transaction, and is defined in types.transaction.go
+
+'transactionid' is the id of the transaction from which the wallet transaction
+was derived.
+
+'confirmationheight' is the height at which the transaction was confirmed. The
+height will be set to 'uint64max' if the transaction has not been confirmed.
+
+'confirmationtimestamp' is the time at which a transaction was confirmed. The
+timestamp is an unsigned 64bit unix timestamp, and will be set to 'uint64max'
+if the transaction is unconfirmed.
+
+'processedinputs' is an array of processed inputs detailing the inputs to the
+transaction. More information below.
+
+'processedoutputs' is an array of processed outputs detailing the outputs of
+the transaction. Outputs related to file contracts are excluded.
+
+A modules.ProcessedInput takes the following form:
+```
+struct modules.ProcessedTransaction {
+	fundtype       types.Specifier  (string)
+	walletaddress  bool
+	relatedaddress types.UnlockHash (string)
+	value          types.Currency   (string)
+}
+```
+
+'fundtype' indicates what type of fund is represented by the input. Inputs can
+be of type 'MinerPayout', 'SiacoinInput', and 'SiafundInput'. Miner payouts and
+siacoin inputs both add siacoins to the transaction. Siafund inputs add
+siafunds to the transaction.
+
+'walletaddress' indicates whether the address is owned by the wallet.
+ 
+'relatedaddress' is the address that is affected. For inputs (outgoing money),
+the related address is usually not important because the wallet arbitrarily
+selects which addresses will fund a transaction. For outputs (incoming money),
+the related address field can be used to determine who has sent money to the
+wallet.
+
+'value' indicates how much money has been moved in the input or output.
+
+A modules.ProcessedOutput takes the following form:
+```
+struct modules.ProcessedTransaction {
+	fundtype       types.Specifier   (string)
+	maturityheight types.BlockHeight (int)
+	walletaddress  bool
+	relatedaddress types.UnlockHash  (string)
+	value          types.Currency    (string)
+}
+```
+
+'fundtype' indicates what type of fund is represented by the output. Outputs
+can be of type 'SiacoinOutput', 'SiafundOutput', and 'ClaimOutput'. Siacoin
+outputs and claim outputs both relate to siacoins. Siafund outputs relate to
+siafunds.
+
+'maturityheight' indicates what height the output becomes available to be
+spent. Siacoin outputs and siafund outputs mature immediately - their maturity
+height will always be the confirmation height of the transaction. Claim outputs
+cannot be spent until they have had 144 confirmations, thus the maturity height
+of a claim output will always be 144 larger than the confirmation height of the
+transaction.
+
+'walletaddress' indicates whether the address is owned by the wallet.
+ 
+'relatedaddress' is the address that is affected.
+
+'value' indicates how much money has been moved in the input or output.
 
 #### /wallet/transactions [GET]
 
-Function: Return all raw transactions relevant to the wallet in a block range.
-Raw transactions are missing metadata such as confirmation height.
+Function: Return a list of transactions related to the wallet.
 
 Parameters:
 ```
-StartHeight int
-EndHeight   int
+startheight types.BlockHeight (uint64)
+endheight   types.BlockHeight (uint64)
 ```
 'startheight' refers to the height of the block where transaction history
 should begin.
@@ -425,14 +414,29 @@ up to and including the most recent block will be provided.
 Response:
 ```
 struct {
-	confirmedtransactions   []types.Transaction
-	unconfirmedtransactions []types.Transaction
+	confirmedhistory   []modules.ProcessedTransaction
+	unconfirmedhistory []modules.ProcessedTransaction
 }
 ```
-'confirmedtransactions' lists all of the confirmed transactions appearing
-between height 'startheight' and height 'endheight' (inclusive).
+'confirmedhistory' lists all of the confirmed transactions appearing between
+height 'startheight' and height 'endheight' (inclusive).
 
-'unconfirmedtransactions' lists all of the unconfirmed transactions.
+'unconfirmedhistory' lists all of the unconfirmed transactions.
+
+#### /wallet/transactions/$(addr) [GET]
+
+Function: Return all of the transaction related to a specific address.
+
+Parameters: none
+
+Response:
+```
+struct {
+	transactions []modules.ProcessedTransaction.
+}
+```
+'transactions' is a list of processed transactions that relate to the input
+address.  See the documentation for '/wallet/transaction' for more information.
 
 #### /wallet/unlock [POST]
 

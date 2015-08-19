@@ -39,18 +39,6 @@ type (
 		PrimarySeed string `json:"primaryseed"`
 	}
 
-	// WalletHistoryGET contains wallet transaction history.
-	WalletHistoryGET struct {
-		ConfirmedHistory   []modules.WalletTransaction `json:"confirmedhistory"`
-		UnconfirmedHistory []modules.WalletTransaction `json:"unconfirmedhistory"`
-	}
-
-	// WalletHistoryGETaddr contains the set of wallet transactions relevnat to
-	// the input address provided in the call to /wallet/history/$(addr)
-	WalletHistoryGETaddr struct {
-		Transactions []modules.WalletTransaction `json:"transactions"`
-	}
-
 	// WalletSeedGet contains the seeds used by the wallet.
 	WalletSeedsGET struct {
 		PrimarySeed        string   `json:"primaryseed"`
@@ -61,14 +49,22 @@ type (
 	// WalletTransactionGETid contains the transaction returned by a call to
 	// /wallet/transaction/$(id)
 	WalletTransactionGETid struct {
-		Transaction types.Transaction `json:"transaction"`
+		Transaction modules.ProcessedTransaction `json:"transaction"`
 	}
 
 	// WalletTransactionsGET contains the specified set of confirmed and
 	// unconfirmed transactions.
 	WalletTransactionsGET struct {
-		ConfirmedTransactions   []types.Transaction `json:"confirmedtransactions"`
-		UnconfirmedTransactions []types.Transaction `json:"unconfirmedtransactions"`
+		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
+		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
+	}
+
+	// WalletTransactionsGETaddr contains the set of wallet transactions
+	// relevant to the input address provided in the call to
+	// /wallet/transaction/$(addr)
+	WalletTransactionsGETaddr struct {
+		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
+		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
 	}
 )
 
@@ -203,69 +199,6 @@ func (srv *Server) walletEncryptHandler(w http.ResponseWriter, req *http.Request
 		return
 	}
 	writeError(w, "unrecognized method when calling /wallet/encrypt", http.StatusBadRequest)
-}
-
-// walletHistoryHandlerGET handles a GET request to /wallet/history.
-func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Request) {
-	start, err := strconv.Atoi(req.FormValue("startheight"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	end, err := strconv.Atoi(req.FormValue("endheight"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	confirmedHistory, err := srv.wallet.History(types.BlockHeight(start), types.BlockHeight(end))
-	if err != nil {
-		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, WalletHistoryGET{
-		ConfirmedHistory:   confirmedHistory,
-		UnconfirmedHistory: srv.wallet.UnconfirmedHistory(),
-	})
-}
-
-// walletHistoryHandlerGETaddr handles a GET request to
-// /wallet/history/$(addr).
-func (srv *Server) walletHistoryHandlerGETaddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
-	addrHistory, err := srv.wallet.AddressHistory(addr)
-	if err != nil {
-		writeError(w, "error after call to /wallet/history/$(addr): "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, WalletHistoryGETaddr{
-		Transactions: addrHistory,
-	})
-}
-
-// walletHistoryHandler handles all API calls to /wallet/history
-func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request) {
-	// Check for a vanilla call to /wallet/history.
-	if req.URL.Path == "/wallet/history" && req.Method == "GET" || req.Method == "" {
-		srv.walletHistoryHandlerGET(w, req)
-		return
-	}
-
-	// The only remaining possibility is a GET call to /wallet/history/$(addr);
-	// check that the method is correct.
-	if req.Method != "GET" && req.Method != "" {
-		writeError(w, "unrecognized method in call to /wallet/history", http.StatusBadRequest)
-		return
-	}
-
-	// Parse the address from the url and call the GETaddr Handler.
-	jsonAddr := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/history/") + "\""
-	var addr types.UnlockHash
-	err := addr.UnmarshalJSON([]byte(jsonAddr))
-	if err != nil {
-		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	srv.walletHistoryHandlerGETaddr(w, req, addr)
 }
 
 // walletLockHandlerPOST handles a POST request to /wallet/lock.
@@ -483,13 +416,40 @@ func (srv *Server) walletTransactionsHandlerGET(w http.ResponseWriter, req *http
 	})
 }
 
+// walletTransactionsHandlerGETaddr handles a GET request to
+// /wallet/transactions/$(addr).
+func (srv *Server) walletTransactionsHandlerGETaddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
+	confirmedATs := srv.wallet.AddressTransactions(addr)
+	unconfirmedATs := srv.wallet.AddressUnconfirmedTransactions(addr)
+	writeJSON(w, WalletTransactionsGETaddr{
+		ConfirmedTransactions:   confirmedATs,
+		UnconfirmedTransactions: unconfirmedATs,
+	})
+}
+
 // walletTransactionsHandler handles API calls to /wallet/transactions.
 func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
+	if req.URL.Path == "/wallet/transactions" && (req.Method == "" || req.Method == "GET") {
 		srv.walletTransactionsHandlerGET(w, req)
 		return
 	}
-	writeError(w, "unrecognized method when calling /wallet/transactions", http.StatusBadRequest)
+
+	// Only a GET call is allowed at this point.
+	if req.Method != "GET" && req.Method != "" {
+		writeError(w, "unrecognized method call to /wallet/transactions", http.StatusBadRequest)
+		return
+	}
+
+	// The only call remaining is /wallet/transactions/$(addr) - parse the
+	// address.
+	jsonAddr := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/transactions/") + "\""
+	var addr types.UnlockHash
+	err := addr.UnmarshalJSON([]byte(jsonAddr))
+	if err != nil {
+		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	srv.walletTransactionsHandlerGETaddr(w, req, addr)
 }
 
 // walletUnlockHandlerPOST handles a POST call to /wallet/unlock.
