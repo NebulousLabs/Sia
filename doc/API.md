@@ -599,27 +599,27 @@ unspecified parameters will be left unchanged.
 
 Parameters:
 ```
-totalStorage int
-minFilesize  int
-maxFilesize  int
-minDuration  int
-maxDuration  int
-windowSize   int
+totalstorage int
+minfilesize  int
+maxfilesize  int
+minduration  int
+maxduration  int
+windowsize   int
 price        int
 collateral   int
 ```
-`totalStorage` is how much storage (in bytes) the host will rent to the
+`totalstorage` is how much storage (in bytes) the host will rent to the
 network.
 
-`minFilesize` is the minimum allowed file size.
+`minfilesize` is the minimum allowed file size.
 
-`maxFilesize` is the maximum allowed file size.
+`maxfilesize` is the maximum allowed file size.
 
-`minDuration` is the minimum amount of time a contract is allowed to last.
+`minduration` is the minimum amount of time a contract is allowed to last.
 
-`maxDuration` is the maximum amount of time a contract is allowed to last.
+`maxduration` is the maximum amount of time a contract is allowed to last.
 
-`windowSize` is the number of blocks a host has to prove they are holding the
+`windowsize` is the number of blocks a host has to prove they are holding the
 file.
 
 `price` is the cost (in Hastings per byte) of data stored.
@@ -649,6 +649,11 @@ struct {
 	Collateral       int
 	StorageRemaining int
 	NumContracts     int
+	Profit           int
+	PotentialProfit  int
+	Competition      int
+	UnlockHash       string
+	IPAddress        string
 }
 ```
 
