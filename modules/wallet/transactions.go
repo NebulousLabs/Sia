@@ -74,6 +74,9 @@ func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransac
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	pt, exists := w.processedTransactionMap[txid]
+	if !exists {
+		return modules.ProcessedTransaction{}, exists
+	}
 	return *pt, exists
 }
 

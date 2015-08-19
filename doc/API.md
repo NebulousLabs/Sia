@@ -359,7 +359,7 @@ the transaction. Outputs related to file contracts are excluded.
 
 A modules.ProcessedInput takes the following form:
 ```
-struct modules.ProcessedTransaction {
+struct modules.ProcessedInput {
 	fundtype       types.Specifier  (string)
 	walletaddress  bool
 	relatedaddress types.UnlockHash (string)
@@ -384,7 +384,7 @@ wallet.
 
 A modules.ProcessedOutput takes the following form:
 ```
-struct modules.ProcessedTransaction {
+struct modules.ProcessedOutput {
 	fundtype       types.Specifier   (string)
 	maturityheight types.BlockHeight (int)
 	walletaddress  bool

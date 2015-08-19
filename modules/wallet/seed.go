@@ -76,16 +76,16 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.See
 	expectedDecryptedVerification := make([]byte, 32)
 	decryptedVerification, err := decryptionKey.DecryptBytes(sf.EncryptionVerification)
 	if err != nil {
-		return seed, err
+		return modules.Seed{}, err
 	}
 	if !bytes.Equal(expectedDecryptedVerification, decryptedVerification) {
-		return seed, modules.ErrBadEncryptionKey
+		return modules.Seed{}, modules.ErrBadEncryptionKey
 	}
 
 	// Decrypt and return the seed.
 	plainSeed, err := decryptionKey.DecryptBytes(sf.Seed)
 	if err != nil {
-		return seed, err
+		return modules.Seed{}, err
 	}
 	copy(seed[:], plainSeed)
 	return seed, nil
