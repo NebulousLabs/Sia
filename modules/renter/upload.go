@@ -3,13 +3,10 @@ package renter
 import (
 	"errors"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"sync/atomic"
-	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -24,79 +21,27 @@ type uploadPiece struct {
 // easy testing.
 type uploader interface {
 	// addPiece uploads a piece to the uploader.
-	addPiece(uploadPiece) (*fileContract, error)
-}
+	addPiece(uploadPiece) error
 
-// A hostUploader uploads pieces to a host. It implements the uploader interface.
-type hostUploader struct {
-	conn      net.Conn
-	masterKey crypto.TwofishKey
-	contract  fileContract
-	renter    *Renter
-}
-
-// addPiece uploads a piece to a host, and returns the updated fileContract.
-func (hu *hostUploader) addPiece(p uploadPiece) (*fileContract, error) {
-	// encrypt piece data
-	key := deriveKey(hu.masterKey, p.chunkIndex, p.pieceIndex)
-	encPiece, err := key.EncryptBytes(p.data)
-	if err != nil {
-		return nil, err
-	}
-
-	// revise contract with host (see negotiate.go)
-	offset, err := hu.renter.revise(hu.contract.ID, encPiece)
-	if err != nil {
-		return nil, err
-	}
-
-	// update fileContract
-	hu.contract.Pieces = append(hu.contract.Pieces, pieceData{
-		Chunk:  p.chunkIndex,
-		Piece:  p.pieceIndex,
-		Offset: offset,
-	})
-
-	return &hu.contract, nil
-}
-
-// newHostUploader establishes a connection to a host.
-func (r *Renter) newHostUploader(host modules.HostSettings, masterKey crypto.TwofishKey) (*hostUploader, error) {
-	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 5*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	// initialize file contract (see negotiate.go)
-	fcid, err := r.negotiateContract(conn, host)
-	if err != nil {
-		return nil, err
-	}
-
-	return &hostUploader{
-		conn:      conn,
-		masterKey: masterKey,
-		contract:  fileContract{ID: fcid, IP: host.IPAddress},
-		renter:    r,
-	}, nil
+	// fileContract returns the fileContract containing the metadata of all
+	// previously added pieces.
+	fileContract() fileContract
 }
 
 // uploadWorker uploads pieces to a host as directed by reqChan. When there
 // are no more pieces to upload, it sends the final version of the
 // fileContract down respChan.
-func (f *file) uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
-	var contract *fileContract
-	var err error
+func (f *file) uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan fileContract) {
 	for req := range reqChan {
-		contract, err = host.addPiece(req)
+		err := host.addPiece(req)
 		if err != nil {
 			// TODO: how should this be handled?
 			break
 		}
 		atomic.AddUint64(&f.bytesUploaded, uint64(len(req.data)))
 	}
-	// reqChan has been closed; send final contract
-	respChan <- contract
+	// reqChan was closed; send final fileContract
+	respChan <- host.fileContract()
 }
 
 // upload reads chunks from r and uploads them to hosts. It spawns a worker
@@ -110,7 +55,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 
 	// Once all requests have been sent, upload will read the resulting
 	// fileContracts from respChan and store them in f.
-	respChan := make(chan *fileContract)
+	respChan := make(chan fileContract)
 
 	// spawn workers
 	for _, h := range hosts {
@@ -143,10 +88,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 	close(reqChan)
 	for range hosts {
 		contract := <-respChan
-		if contract == nil {
-			continue
-		}
-		f.Contracts[contract.IP] = *contract
+		f.Contracts[contract.IP] = contract
 	}
 
 	return nil
@@ -236,13 +178,14 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.mu.Unlock(lockID)
 
 	// Select and connect to hosts.
+	totalsize := up.PieceSize * uint64(up.ECC.NumPieces()) * f.numChunks()
 	var hosts []uploader
 	for _, host := range r.hostDB.RandomHosts(up.ECC.NumPieces() * 3 / 2) {
-		host, err := r.newHostUploader(host, f.MasterKey)
+		host, err := r.newHostUploader(host, totalsize, f.MasterKey)
 		if err != nil {
 			continue
 		}
-		defer host.conn.Close()
+		defer host.Close()
 		hosts = append(hosts, host)
 	}
 	if len(hosts) < up.ECC.MinPieces() {

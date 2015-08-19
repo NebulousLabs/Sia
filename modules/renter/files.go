@@ -51,6 +51,11 @@ type pieceData struct {
 	Offset uint64 // the offset of the piece in the file contract
 }
 
+// deriveKey derives the key used to encrypt and decrypt a specific file piece.
+func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, chunkIndex, pieceIndex))
+}
+
 // chunkSize returns the size of one chunk.
 func (f *file) chunkSize() uint64 {
 	return f.pieceSize * uint64(f.ecc.MinPieces())
@@ -160,7 +165,7 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 
 	// Do the renaming.
 	delete(r.files, currentName)
-	file.Name = newName
+	file.Name = newName // make atomic?
 	r.files[newName] = file
 
 	r.save()

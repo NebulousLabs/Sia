@@ -4,11 +4,12 @@ import (
 	"errors"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/sync"
+	safesync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -26,6 +27,10 @@ type contractObligation struct {
 	ID           types.FileContractID
 	FileContract types.FileContract
 	Path         string // Where on disk the file is stored.
+
+	// each obligation needs a mutex to prevent simultaneous revisions to the
+	// same obligation
+	mu sync.Mutex
 }
 
 // A Host contains all the fields necessary for storing files for clients and
@@ -52,7 +57,7 @@ type Host struct {
 
 	modules.HostSettings
 
-	mu *sync.RWMutex
+	mu *safesync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -97,7 +102,7 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		mu: safesync.New(modules.SafeMutexDelay, 1),
 	}
 	h.spaceRemaining = h.TotalStorage
 

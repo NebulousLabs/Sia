@@ -13,11 +13,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// deriveKey derives the key used to encrypt and decrypt a specific file piece.
-func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypto.TwofishKey {
-	return crypto.TwofishKey(crypto.HashAll(masterKey, chunkIndex, pieceIndex))
-}
-
 // A fetcher fetches pieces from a host. This interface exists to facilitate
 // easy testing.
 type fetcher interface {

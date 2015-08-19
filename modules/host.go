@@ -5,17 +5,18 @@ import (
 )
 
 const (
-	AcceptTermsResponse = "accept"
-	HostDir             = "host"
+	AcceptResponse = "accept"
+	HostDir        = "host"
 )
 
 // RPC identifiers
 var (
-	RPCSettings = [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
-	RPCContract = [8]byte{'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
-	RPCDownload = [8]byte{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
-	// deprecated
-	RPCRetrieve = [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
+	// Each identifier has a version number at the end, which will be
+	// incremented whenever the protocol changes.
+	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 0}
+	RPCUpload   = types.Specifier{'U', 'p', 'l', 'o', 'a', 'd', 0}
+	RPCRevise   = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 0}
+	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 0}
 )
 
 // A DownloadRequest is used to retrieve a particular segment of a file from a
@@ -23,19 +24,6 @@ var (
 type DownloadRequest struct {
 	Offset uint64
 	Length uint64
-}
-
-// ContractTerms are the parameters agreed upon by a client and a host when
-// forming a FileContract.
-type ContractTerms struct {
-	FileSize           uint64                // How large the file is.
-	Duration           types.BlockHeight     // How long the file is to be stored.
-	DurationStart      types.BlockHeight     // The block height that the storing starts (typically required to start immediately, unless it's a chained contract).
-	WindowSize         types.BlockHeight     // How long the host has to submit a proof of storage.
-	Price              types.Currency        // Client contribution towards payout each window
-	Collateral         types.Currency        // Host contribution towards payout each window
-	ValidProofOutputs  []types.SiacoinOutput // Where money goes if the storage proof is successful.
-	MissedProofOutputs []types.SiacoinOutput // Where the money goes if the storage proof fails.
 }
 
 // HostInfo contains HostSettings and details pertinent to the host's understanding
