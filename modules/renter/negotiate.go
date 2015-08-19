@@ -13,8 +13,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const defaultDuration = 6000
-
 // A hostUploader uploads pieces to a host. It implements the uploader interface.
 type hostUploader struct {
 	// constants
@@ -48,7 +46,7 @@ func (hu *hostUploader) Close() error {
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func (hu *hostUploader) negotiateContract(filesize uint64) error {
+func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight) error {
 	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 5*time.Second)
 	if err != nil {
 		return err
@@ -60,9 +58,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64) error {
 	height := hu.renter.blockHeight
 	hu.renter.mu.RUnlock(lockID)
 
-	sizeCurrency := types.NewCurrency64(filesize)
-	durationCurrency := types.NewCurrency64(defaultDuration)
-	renterCost := hu.settings.Price.Mul(sizeCurrency).Mul(durationCurrency)
+	renterCost := hu.settings.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	payout := renterCost // no collateral
 
 	// get an address from the wallet
@@ -101,8 +97,8 @@ func (hu *hostUploader) negotiateContract(filesize uint64) error {
 	fc := types.FileContract{
 		FileSize:       0,
 		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
-		WindowStart:    height + defaultDuration,
-		WindowEnd:      height + defaultDuration + hu.settings.WindowSize,
+		WindowStart:    height + duration,
+		WindowEnd:      height + duration + hu.settings.WindowSize,
 		Payout:         payout,
 		ValidProofOutputs: []types.SiacoinOutput{
 			{Value: renterCost, UnlockHash: ourAddr.UnlockHash()},
@@ -303,7 +299,7 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	return nil
 }
 
-func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, masterKey crypto.TwofishKey) (*hostUploader, error) {
+func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, duration types.BlockHeight, masterKey crypto.TwofishKey) (*hostUploader, error) {
 	hu := &hostUploader{
 		settings:  settings,
 		masterKey: masterKey,
@@ -312,7 +308,7 @@ func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64,
 	}
 
 	// TODO: maybe do this later?
-	err := hu.negotiateContract(filesize)
+	err := hu.negotiateContract(filesize, duration)
 	if err != nil {
 		return nil, err
 	}
