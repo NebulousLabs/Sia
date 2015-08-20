@@ -90,6 +90,11 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 	hu.secretKey = ourSK // used to sign future revisions
 
+	// send our public key
+	if err := encoding.WriteObject(conn, ourPublicKey); err != nil {
+		return err
+	}
+
 	// create unlock conditions
 	hu.unlockConditions = types.UnlockConditions{
 		PublicKeys:         []types.SiaPublicKey{ourPublicKey, hostPublicKey},
