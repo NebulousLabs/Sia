@@ -171,12 +171,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Create file object.
 	f := newFile(up.ECC, up.PieceSize, uint64(fileInfo.Size()))
 
-	// Add file to renter.
-	lockID = r.mu.Lock()
-	r.files[up.Nickname] = f
-	r.save()
-	r.mu.Unlock(lockID)
-
 	// Select and connect to hosts.
 	totalsize := up.PieceSize * uint64(up.ECC.NumPieces()) * f.numChunks()
 	var hosts []uploader
@@ -191,6 +185,12 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if len(hosts) < up.ECC.MinPieces() {
 		return errors.New("not enough hosts to support upload")
 	}
+
+	// Add file to renter.
+	lockID = r.mu.Lock()
+	r.files[up.Nickname] = f
+	r.save()
+	r.mu.Unlock(lockID)
 
 	// Upload in parallel.
 	err = f.upload(handle, hosts)
