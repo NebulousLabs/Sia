@@ -19,7 +19,8 @@ type hostUploader struct {
 	// constants
 	settings         modules.HostSettings
 	masterKey        crypto.TwofishKey
-	unlockConditions types.UnlockConditions // renter needs to save this!
+	unlockConditions types.UnlockConditions
+	secretKey        crypto.SecretKey
 
 	// resources
 	conn   net.Conn
@@ -41,7 +42,7 @@ func (hu *hostUploader) fileContract() fileContract {
 
 func (hu *hostUploader) Close() error {
 	// send an empty revision to indicate that we are finished
-	encoding.WriteObject(hu.conn, types.FileContractRevision{})
+	encoding.WriteObject(hu.conn, types.Transaction{})
 	return hu.conn.Close()
 }
 
@@ -82,14 +83,15 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	// create our own key by combining the renter entropy with the host key
 	entropy := crypto.HashAll(hu.renter.entropy, hostPublicKey)
-	ourPK, _ := crypto.DeterministicSignatureKeys(entropy)
+	ourSK, ourPK := crypto.DeterministicSignatureKeys(entropy)
 	ourPublicKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       ourPK[:],
 	}
+	hu.secretKey = ourSK // used to sign future revisions
 
 	// create unlock conditions
-	uc := types.UnlockConditions{
+	hu.unlockConditions = types.UnlockConditions{
 		PublicKeys:         []types.SiaPublicKey{ourPublicKey, hostPublicKey},
 		SignaturesRequired: 2,
 	}
@@ -111,7 +113,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 			// goes to the void, not the renter
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
-		UnlockHash:     uc.UnlockHash(),
+		UnlockHash:     hu.unlockConditions.UnlockHash(),
 		RevisionNumber: 0,
 	}
 
@@ -122,13 +124,14 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return err
 	}
 	txnBuilder.AddFileContract(fc)
-	txn, _ := txnBuilder.View()
+	txn, parents := txnBuilder.View()
+	txnSet := append(parents, txn)
 
 	// calculate contract ID
 	fcid := txn.FileContractID(0) // TODO: is it actually 0?
 
 	// send txn
-	if err := encoding.WriteObject(conn, txn); err != nil {
+	if err := encoding.WriteObject(conn, txnSet); err != nil {
 		return err
 	}
 
@@ -138,46 +141,49 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return err
 	}
 	if response != modules.AcceptResponse {
-		return errors.New("host rejected terms")
+		return errors.New("host rejected proposed contract")
 	}
 
 	// read back txn with host collateral.
-	var hostTxn types.Transaction
-	if err := encoding.ReadObject(conn, &hostTxn, types.BlockSizeLimit); err != nil {
+	var hostTxnSet []types.Transaction
+	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
 		return err
 	}
 
-	// check that txn is okay. For now, no collateral will be added.
-	// TODO: are additional checks needed?
-	if hostTxn.ID() != txn.ID() {
+	// check that txn is okay. For now, no collateral will be added, so the
+	// transaction sets should be identical.
+	if len(hostTxnSet) != len(txnSet) {
 		return errors.New("host sent bad collateral transaction")
+	}
+	for i := range hostTxnSet {
+		if hostTxnSet[i].ID() != txnSet[i].ID() {
+			return errors.New("host sent bad collateral transaction")
+		}
 	}
 
 	// sign the txn and resend
-	txnBuilder = hu.renter.wallet.RegisterTransaction(hostTxn, nil)
+	// NOTE: for now, we are assuming that the transaction has not changed
+	// since we sent it. Otherwise, the txnBuilder would have to be updated
+	// with whatever fields were added by the host.
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return err
 	}
-	if err := encoding.WriteObject(conn, signedTxnSet[0]); err != nil {
+	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
 		return err
 	}
 
 	// read signed txn from host
-	var signedHostTxn types.Transaction
-	if err := encoding.ReadObject(conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
-		return err
-	}
-
-	// check that the txn is the same
-	if signedTxnSet[0].ID() != signedHostTxn.ID() {
-		return errors.New("host sent bad signed transaction")
-	} else if err = signedHostTxn.StandaloneValid(height); err != nil {
+	var signedHostTxnSet []types.Transaction
+	if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
 		return err
 	}
 
 	// submit to blockchain
-	hu.renter.tpool.AcceptTransactionSet([]types.Transaction{signedHostTxn})
+	err = hu.renter.tpool.AcceptTransactionSet(signedHostTxnSet)
+	if err != nil {
+		return err
+	}
 
 	// create initial fileContract object
 	hu.contract = fileContract{
@@ -248,8 +254,25 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	rev.NewMissedProofOutputs[0].Value = rev.NewMissedProofOutputs[0].Value.Sub(piecePrice) // less returned to renter
 	rev.NewMissedProofOutputs[1].Value = rev.NewMissedProofOutputs[1].Value.Add(piecePrice) // more given to void
 
-	// send revision
-	if err := encoding.WriteObject(hu.conn, rev); err != nil {
+	// create transaction containing the revision
+	signedTxn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{rev},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(hu.contract.ID),
+			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
+			PublicKeyIndex: 0, // renter key is always first -- see negotiateContract
+		}},
+	}
+
+	// sign the transaction
+	encodedSig, err := crypto.SignHash(signedTxn.SigHash(0), hu.secretKey)
+	if err != nil {
+		return err
+	}
+	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
+
+	// send the transaction
+	if err := encoding.WriteObject(hu.conn, signedTxn); err != nil {
 		return err
 	}
 
@@ -267,28 +290,14 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 		return err
 	}
 
-	// create, sign, and send transaction
-	txnBuilder := hu.renter.wallet.StartTransaction()
-	renterCost := rev.NewValidProofOutputs[0].Value
-	err = txnBuilder.FundSiacoins(renterCost)
-	if err != nil {
-		return err
-	}
-	txnBuilder.AddFileContract(fc)
-	signedTxnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		return err
-	}
-	if err := encoding.WriteObject(hu.conn, signedTxnSet); err != nil {
-		return err
-	}
-
 	// read txn signed by host
 	var signedHostTxn types.Transaction
 	if err := encoding.ReadObject(hu.conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
 		return err
 	}
-	if err = signedHostTxn.StandaloneValid(height); err != nil {
+	if signedHostTxn.ID() != signedTxn.ID() {
+		return errors.New("host sent bad signed transaction")
+	} else if err = signedHostTxn.StandaloneValid(height); err != nil {
 		return err
 	}
 

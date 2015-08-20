@@ -1,6 +1,7 @@
 package host
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net"
@@ -41,8 +42,9 @@ func (h *Host) deallocate(path string) error {
 // terms, and doesn't contain any flagrant errors.
 func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublicKey) error {
 	// Check that there is only one file contract.
+	// TODO: check that the txn is empty except for the contract?
 	if len(txn.FileContracts) != 1 {
-		return errors.New("transaction should have only one file contract.")
+		return errors.New("transaction should have only one file contract")
 	}
 	// convenience variables
 	fc := txn.FileContracts[0]
@@ -86,7 +88,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 
 	// check unlock hash
 	uc := types.UnlockConditions{
-		PublicKeys:         []types.SiaPublicKey{renterKey, h.masterKey},
+		PublicKeys:         []types.SiaPublicKey{renterKey, h.publicKey},
 		SignaturesRequired: 2,
 	}
 	if fc.UnlockHash != uc.UnlockHash() {
@@ -98,12 +100,24 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 
 // considerRevision checks that the provided file contract revision is still
 // acceptable to the host.
-func (h *Host) considerRevision(rev types.FileContractRevision, obligation contractObligation) error {
-	fc := obligation.FileContract
+// TODO: should take a txn and check that is only contains the single revision
+func (h *Host) considerRevision(txn types.Transaction, obligation contractObligation) error {
+	// Check that there is only one revision.
+	// TODO: check that the txn is empty except for the revision?
+	if len(txn.FileContractRevisions) != 1 {
+		return errors.New("transaction should have only one revision")
+	}
+	// Check that transaction is valid.
+	err := txn.StandaloneValid(h.blockHeight)
+	if err != nil {
+		return err
+	}
 
-	// calculate minimum expected collateral
+	// calculate minimum expected output value
+	rev := txn.FileContractRevisions[0]
+	fc := obligation.FileContract
 	duration := types.NewCurrency64(uint64(fc.WindowStart - h.blockHeight))
-	minHostPrice := types.NewCurrency64(rev.NewFileSize - fc.FileSize).Mul(duration).Mul(h.Collateral)
+	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.Price)
 
 	switch {
 	// these fields should never change
@@ -117,6 +131,13 @@ func (h *Host) considerRevision(rev types.FileContractRevision, obligation contr
 		return errors.New("bad revision unlock hash")
 	case rev.UnlockConditions.UnlockHash() != fc.UnlockHash:
 		return errors.New("bad revision unlock conditions")
+	case len(rev.NewValidProofOutputs) != 2:
+		return errors.New("bad revision valid proof outputs")
+	case len(rev.NewMissedProofOutputs) != 2:
+		return errors.New("bad revision missed proof outputs")
+	case rev.NewValidProofOutputs[1].UnlockHash != fc.ValidProofOutputs[1].UnlockHash,
+		rev.NewMissedProofOutputs[1].UnlockHash != fc.MissedProofOutputs[1].UnlockHash:
+		return errors.New("bad revision proof outputs")
 
 	case rev.NewRevisionNumber <= fc.RevisionNumber:
 		return errors.New("revision must have higher revision number")
@@ -124,25 +145,16 @@ func (h *Host) considerRevision(rev types.FileContractRevision, obligation contr
 	case rev.NewFileSize > uint64(h.spaceRemaining) || rev.NewFileSize > h.MaxFilesize:
 		return errors.New("revision file size is too large")
 
-	case len(rev.NewValidProofOutputs) != 2:
-		return errors.New("bad revision valid proof outputs")
-
-	case len(rev.NewMissedProofOutputs) != 2:
-		return errors.New("bad revision missed proof outputs")
-
 	// valid and missing outputs should still sum to payout
 	case rev.NewValidProofOutputs[0].Value.Add(rev.NewValidProofOutputs[1].Value).Cmp(fc.Payout) != 0,
 		rev.NewMissedProofOutputs[0].Value.Add(rev.NewMissedProofOutputs[1].Value).Cmp(fc.Payout) != 0:
 		return errors.New("revision outputs do not sum to original payout")
 
+	// outputs should have been adjusted proportional to the new filesize
 	case rev.NewValidProofOutputs[1].Value.Cmp(minHostPrice) <= 0:
 		return errors.New("revision price is too small")
-	case !rev.NewMissedProofOutputs[1].Value.IsZero():
-		return errors.New("revision collateral is not zero")
-
-	case rev.NewValidProofOutputs[1].UnlockHash != fc.ValidProofOutputs[1].UnlockHash,
-		rev.NewMissedProofOutputs[1].UnlockHash != fc.MissedProofOutputs[1].UnlockHash:
-		return errors.New("bad revision proof outputs")
+	case rev.NewMissedProofOutputs[0].Value.Cmp(rev.NewValidProofOutputs[0].Value) != 0:
+		return errors.New("revision missed renter payout does not match valid payout")
 	}
 
 	return nil
@@ -152,7 +164,7 @@ func (h *Host) considerRevision(rev types.FileContractRevision, obligation contr
 // file contracts should not initially hold any data.
 func (h *Host) rpcUpload(conn net.Conn) error {
 	// perform key exchange
-	if err := encoding.WriteObject(conn, h.masterKey); err != nil {
+	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
 		return err
 	}
 	var renterKey types.SiaPublicKey
@@ -160,16 +172,16 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return err
 	}
 
-	// read initial transaction
-	var unsignedTxn types.Transaction
-	if err := encoding.ReadObject(conn, &unsignedTxn, maxContractLen); err != nil {
+	// read initial transaction set
+	var unsignedTxnSet []types.Transaction
+	if err := encoding.ReadObject(conn, &unsignedTxnSet, maxContractLen); err != nil {
 		return err
 	}
 
-	// check the transaction. If the transaction is okay, collateral will be added.
+	// check the contract transaction, which should be the last txn in the set.
+	contractTxn := unsignedTxnSet[len(unsignedTxnSet)-1]
 	lockID := h.mu.RLock()
-	err := h.considerContract(unsignedTxn, renterKey)
-	height := h.blockHeight
+	err := h.considerContract(contractTxn, renterKey)
 	h.mu.RUnlock(lockID)
 	if err != nil {
 		encoding.WriteObject(conn, err.Error())
@@ -181,28 +193,32 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return err
 	}
 
-	// add collateral to txn and send. For now, we never add collateral.
-	if err := encoding.WriteObject(conn, unsignedTxn); err != nil {
+	// add collateral to txn and send. For now, we never add collateral, so no
+	// changes are made.
+	if err := encoding.WriteObject(conn, unsignedTxnSet); err != nil {
 		return err
 	}
 
-	// read signed transaction
-	var signedTxn types.Transaction
-	if err := encoding.ReadObject(conn, &signedTxn, maxContractLen); err != nil {
+	// read signed transaction set
+	var signedTxnSet []types.Transaction
+	if err := encoding.ReadObject(conn, &signedTxnSet, maxContractLen); err != nil {
 		return err
 	}
-	if unsignedTxn.ID() != signedTxn.ID() {
-		return errors.New("renter sent bad signed transaction")
-	} else if err := unsignedTxn.StandaloneValid(height); err != nil {
-		return err
+
+	// check that transaction set was not modified
+	if len(signedTxnSet) != len(unsignedTxnSet) {
+		return errors.New("host sent bad collateral transaction")
+	}
+	for i := range signedTxnSet {
+		if signedTxnSet[i].ID() != unsignedTxnSet[i].ID() {
+			return errors.New("host sent bad collateral transaction")
+		}
 	}
 
 	// sign and submit to blockchain
-	txnBuilder := h.wallet.RegisterTransaction(signedTxn, nil)
-	for _, sig := range signedTxn.TransactionSignatures {
-		txnBuilder.AddTransactionSignature(sig)
-	}
-	signedTxnSet, err := txnBuilder.Sign(true)
+	signedTxn, parents := signedTxnSet[len(signedTxnSet)-1], signedTxnSet[:len(signedTxnSet)-1]
+	txnBuilder := h.wallet.RegisterTransaction(signedTxn, parents)
+	signedTxnSet, err = txnBuilder.Sign(true)
 	if err != nil {
 		return err
 	}
@@ -211,15 +227,15 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return err
 	}
 
-	// send doubly-signed transaction
-	if err := encoding.WriteObject(conn, signedTxnSet[0]); err != nil {
+	// send doubly-signed transaction set
+	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
 		return err
 	}
 
 	// Add this contract to the host's list of obligations.
 	// TODO: is there a race condition here?
-	fcid := signedTxnSet[0].FileContractID(0)
-	fc := signedTxnSet[0].FileContracts[0]
+	fcid := signedTxnSet[len(signedTxnSet)-1].FileContractID(0)
+	fc := signedTxnSet[len(signedTxnSet)-1].FileContracts[0]
 	proofHeight := fc.WindowStart + StorageProofReorgDepth
 	lockID = h.mu.Lock()
 	h.fileCounter++
@@ -257,7 +273,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
 
-	// open the file (or create it if it does not exist)
+	// open the file in append mode
 	file, err := os.OpenFile(obligation.Path, os.O_WRONLY|os.O_APPEND, 0660)
 	if err != nil {
 		return err
@@ -277,21 +293,21 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	}
 
 	// accept new revisions in a loop
+	emptyID := types.Transaction{}.ID()
 	for {
 		// read proposed revision
-		var rev types.FileContractRevision
-		if err := encoding.ReadObject(conn, &rev, types.BlockSizeLimit); err != nil {
+		var revTxn types.Transaction
+		if err := encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
 			return err
 		}
-		// an empty revision indicates completion
-		if rev.ParentID == (types.FileContractID{}) {
+		// an empty transaction indicates completion
+		if revTxn.ID() == emptyID {
 			break
 		}
 
 		// check revision against original file contract
 		lockID = h.mu.RLock()
-		err := h.considerRevision(rev, obligation)
-		height := h.blockHeight
+		err := h.considerRevision(revTxn, obligation)
 		h.mu.RUnlock(lockID)
 		if err != nil {
 			encoding.WriteObject(conn, err.Error())
@@ -304,6 +320,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 
 		// read piece
+		// TODO: simultaneously read into tree?
+		rev := revTxn.FileContractRevisions[0]
 		piece := make([]byte, rev.NewFileSize-obligation.FileContract.FileSize)
 		_, err = io.ReadFull(conn, piece)
 		if err != nil {
@@ -311,32 +329,34 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 
 		// verify Merkle root
-		tree.Push(piece)
+		r := bytes.NewReader(piece)
+		for {
+			_, err := io.ReadFull(r, buf)
+			if err == io.EOF {
+				break
+			} else if err != nil && err != io.ErrUnexpectedEOF {
+				return err
+			}
+			tree.Push(buf)
+		}
 		if tree.Root() != rev.NewFileMerkleRoot {
 			return errors.New("revision has bad Merkle root")
 		}
 
-		// read signed transaction
-		var signedTxn types.Transaction
-		if err := encoding.ReadObject(conn, &signedTxn, types.BlockSizeLimit); err != nil {
-			return err
-		}
-
-		// check signature
-		if err := signedTxn.StandaloneValid(height); err != nil {
-			return err
-		}
-
-		// sign and return transaction
-		txnBuilder := h.wallet.RegisterTransaction(signedTxn, nil)
-		for _, sig := range signedTxn.TransactionSignatures {
-			txnBuilder.AddTransactionSignature(sig)
-		}
-		signedTxnSet, err := txnBuilder.Sign(true)
+		// manually sign the transaction
+		revTxn.TransactionSignatures = append(revTxn.TransactionSignatures, types.TransactionSignature{
+			ParentID:       crypto.Hash(fcid),
+			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
+			PublicKeyIndex: 1, // host key is always second
+		})
+		encodedSig, err := crypto.SignHash(revTxn.SigHash(1), h.secretKey)
 		if err != nil {
 			return err
 		}
-		if err := encoding.WriteObject(conn, signedTxnSet[0]); err != nil {
+		revTxn.TransactionSignatures[1].Signature = encodedSig[:]
+
+		// send the signed transaction
+		if err := encoding.WriteObject(conn, revTxn); err != nil {
 			return err
 		}
 

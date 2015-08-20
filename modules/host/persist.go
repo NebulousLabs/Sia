@@ -3,6 +3,7 @@ package host
 import (
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -19,7 +20,8 @@ type savedHost struct {
 	Profit         types.Currency
 	HostSettings   modules.HostSettings
 	Obligations    []contractObligation
-	MasterKey      types.SiaPublicKey
+	SecretKey      crypto.SecretKey
+	PublicKey      types.SiaPublicKey
 }
 
 func (h *Host) save() error {
@@ -29,7 +31,8 @@ func (h *Host) save() error {
 		Profit:         h.profit,
 		HostSettings:   h.HostSettings,
 		Obligations:    make([]contractObligation, 0, len(h.obligationsByID)),
-		MasterKey:      h.masterKey,
+		SecretKey:      h.secretKey,
+		PublicKey:      h.publicKey,
 	}
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
@@ -57,7 +60,8 @@ func (h *Host) load() error {
 		// update spaceRemaining
 		h.spaceRemaining -= int64(obligation.FileContract.FileSize)
 	}
-	h.masterKey = sHost.MasterKey
+	h.secretKey = sHost.SecretKey
+	h.publicKey = sHost.PublicKey
 
 	return nil
 }
