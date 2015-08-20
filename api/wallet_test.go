@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/url"
 	"path/filepath"
 	"strconv"
@@ -73,6 +74,72 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 	}
 	if wg.Unlocked {
 		t.Error("Wallet has never been unlocked")
+	}
+}
+
+// TestIntegrationWalletBlankEncrypt tries to encrypt and unlock the wallet
+// through the api using a blank encryption key - meaning that the wallet seed
+// returned by the encryption call can be used as the encryption key.
+func TestIntegrationWalletBlankEncrypt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Create a server object without encrypting or unlocking the wallet.
+	testdir := build.TempDir("api", "TestIntegrationWalletBlankEncrypt")
+	APIAddr := ":" + strconv.Itoa(APIPort)
+	APIPort++
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := NewServer(APIAddr, cs, g, nil, nil, nil, nil, tp, w, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assemble the serverTester.
+	st := &serverTester{
+		cs:      cs,
+		gateway: g,
+		tpool:   tp,
+		wallet:  w,
+		server:  srv,
+	}
+	go func() {
+		listenErr := srv.Serve()
+		if listenErr != nil {
+			panic(listenErr)
+		}
+	}()
+
+	// Make a call to /wallet/encrypt and get the seed. Provide no encryption
+	// key so that the encryption key is the seed that gets returned.
+	var wep WalletEncryptPOST
+	err = st.postAPI("/wallet/encrypt", url.Values{}, &wep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use the seed to call /wallet/unlock.
+	unlockValues := url.Values{}
+	unlockValues.Set("encryptionpassword", wep.PrimarySeed)
+	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the wallet actually unlocked.
+	if !w.Unlocked() {
+		t.Error("wallet is not unlocked")
 	}
 }
 
@@ -169,68 +236,46 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 }
 
-// TestIntegrationWalletBlankEncrypt tries to encrypt and unlock the wallet
-// through the api using a blank encryption key - meaning that the wallet seed
-// returned by the encryption call can be used as the encryption key.
-func TestIntegrationWalletBlankEncrypt(t *testing.T) {
+// TestIntegrationWalletTransactionGETid queries the /wallet/transaction/$(id)
+// api call.
+func TestIntegrationWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// Create a server object without encrypting or unlocking the wallet.
-	testdir := build.TempDir("api", "TestIntegrationWalletBlankEncrypt")
-	APIAddr := ":" + strconv.Itoa(APIPort)
-	APIPort++
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	st, err := createServerTester("TestIntegrationWalletGETSiacoins")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tp, err := transactionpool.New(cs, g)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv, err := NewServer(APIAddr, cs, g, nil, nil, nil, nil, tp, w, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Assemble the serverTester.
-	st := &serverTester{
-		cs:      cs,
-		gateway: g,
-		tpool:   tp,
-		wallet:  w,
-		server:  srv,
-	}
-	go func() {
-		listenErr := srv.Serve()
-		if listenErr != nil {
-			panic(listenErr)
-		}
-	}()
 
-	// Make a call to /wallet/encrypt and get the seed. Provide no encryption
-	// key so that the encryption key is the seed that gets returned.
-	var wep WalletEncryptPOST
-	err = st.postAPI("/wallet/encrypt", url.Values{}, &wep)
+	// Mining blocks should have created transactions for the wallet containing
+	// miner payouts. Get the list of transactions.
+	var wtg WalletTransactionsGET
+	err = st.getAPI("/wallet/transactions?startheight=0&endheight=10", &wtg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Use the seed to call /wallet/unlock.
-	unlockValues := url.Values{}
-	unlockValues.Set("encryptionpassword", wep.PrimarySeed)
-	err = st.stdPostAPI("/wallet/unlock", unlockValues)
+	if len(wtg.ConfirmedTransactions) == 0 {
+		t.Error("expecting a few wallet transactions, corresponding to miner payouts.")
+	}
+	if len(wtg.UnconfirmedTransactions) != 0 {
+		t.Error("expecting 0 unconfirmed transactions")
+	}
+
+	// Query the details of the first transaction using
+	// /wallet/transaction/$(id)
+	var wtgid WalletTransactionGETid
+	wtgidQuery := fmt.Sprintf("/wallet/transaction/%s", wtg.ConfirmedTransactions[0].TransactionID)
+	err = st.getAPI(wtgidQuery, &wtgid)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Check that the wallet actually unlocked.
-	if !w.Unlocked() {
-		t.Error("wallet is not unlocked")
+	if len(wtgid.Transaction.Inputs) != 0 {
+		t.Error("miner payout should appear as an output, not an input")
+	}
+	if len(wtgid.Transaction.Outputs) != 1 {
+		t.Fatal("a single miner payout output should have been created")
+	}
+	if wtgid.Transaction.Outputs[0].FundType != types.SpecifierMinerPayout {
+		t.Error("fund type should be a miner payout")
 	}
 }

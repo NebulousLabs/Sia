@@ -34,10 +34,7 @@ type (
 
 	// A ProcessedInput represents funding to a transaction. The input is
 	// coming from an address and going to the outputs. The fund types are
-	// 'SiacoinInput', 'SiafundInput', or 'MinerPayout'. Siacoin inputs and
-	// block subsidies relate to siacoins. Siafund inputs relate to siafunds.
-	// 'MinerPayout' has no related address, so the id of the block is used
-	// instead.
+	// 'SiacoinInput', 'SiafundInput'.
 	ProcessedInput struct {
 		FundType       types.Specifier  `json:"fundtype"`
 		WalletAddress  bool             `json:"walletaddress"`
