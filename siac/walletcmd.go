@@ -59,7 +59,7 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
   MS (mega, 10^6 SC)
   GS (giga, 10^9 SC)
   TS (tera, 10^12 SC)`,
-		Run: wrap(walletsiafundscmd),
+		Run: wrap(walletstatuscmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
