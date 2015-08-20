@@ -48,18 +48,18 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	}
 	// convenience variables
 	fc := txn.FileContracts[0]
-	duration := h.blockHeight - fc.WindowStart
+	duration := fc.WindowStart - h.blockHeight
 
 	// check contract fields for sanity and acceptability
 	switch {
 	case fc.FileSize != 0:
 		return errors.New("initial file size must be 0")
 
-	case duration < h.MinDuration || duration > h.MaxDuration:
-		return errors.New("duration is out of bounds")
-
 	case fc.WindowStart <= h.blockHeight:
 		return errors.New("window start cannot be in the past")
+
+	case duration < h.MinDuration || duration > h.MaxDuration:
+		return errors.New("duration is out of bounds")
 
 	case fc.WindowEnd <= fc.WindowStart:
 		return errors.New("window cannot end before it starts")
