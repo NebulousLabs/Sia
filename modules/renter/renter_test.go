@@ -77,7 +77,7 @@ func newRenterTester(name string) (*renterTester, error) {
 	}
 	_, err = w.Encrypt(key)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	err = w.Unlock(key)
 	if err != nil {
