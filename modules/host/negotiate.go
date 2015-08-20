@@ -49,6 +49,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	// convenience variables
 	fc := txn.FileContracts[0]
 	duration := fc.WindowStart - h.blockHeight
+	voidAddress := types.UnlockHash{}
 
 	// check contract fields for sanity and acceptability
 	switch {
@@ -82,8 +83,10 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	case !fc.ValidProofOutputs[1].Value.IsZero(), !fc.MissedProofOutputs[1].Value.IsZero():
 		return errors.New("file contract collateral is not zero")
 
-	case fc.ValidProofOutputs[1].UnlockHash != h.UnlockHash, fc.MissedProofOutputs[1].UnlockHash != h.UnlockHash:
-		return errors.New("bad file contract proof outputs")
+	case fc.ValidProofOutputs[1].UnlockHash != h.UnlockHash:
+		return errors.New("file contract valid proof output not sent to host")
+	case fc.MissedProofOutputs[1].UnlockHash != voidAddress:
+		return errors.New("file contract missed proof output not sent to void")
 	}
 
 	// check unlock hash
