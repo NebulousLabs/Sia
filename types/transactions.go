@@ -73,7 +73,7 @@ type (
 		StorageProofs         []StorageProof         `json:"storageproofs"`
 		SiafundInputs         []SiafundInput         `json:"siafundinputs"`
 		SiafundOutputs        []SiafundOutput        `json:"siafundoutputs"`
-		MinerFees             []Currency             `json:minerfees"`
+		MinerFees             []Currency             `json:"minerfees"`
 		ArbitraryData         [][]byte               `json:"arbitarydata"`
 		TransactionSignatures []TransactionSignature `json:"transactionsignatures"`
 	}
