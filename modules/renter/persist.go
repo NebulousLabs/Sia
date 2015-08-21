@@ -45,9 +45,9 @@ func (f *file) save(w io.Writer) error {
 	enc := encoding.NewEncoder(zip)
 
 	// encode easy fields
-	enc.Encode(f.Name)
-	enc.Encode(f.Size)
-	enc.Encode(f.MasterKey)
+	enc.Encode(f.name)
+	enc.Encode(f.size)
+	enc.Encode(f.masterKey)
 	enc.Encode(f.pieceSize)
 	enc.Encode(f.bytesUploaded)
 	enc.Encode(f.chunksUploaded)
@@ -62,8 +62,8 @@ func (f *file) save(w io.Writer) error {
 		panic("unknown ECC")
 	}
 	// encode contracts
-	enc.Encode(uint64(len(f.Contracts)))
-	for _, c := range f.Contracts {
+	enc.Encode(uint64(len(f.contracts)))
+	for _, c := range f.contracts {
 		enc.Encode(c)
 	}
 	return nil
@@ -80,9 +80,9 @@ func (f *file) load(r io.Reader) error {
 	dec := encoding.NewDecoder(zip)
 
 	// decode easy fields
-	dec.Decode(&f.Name)
-	dec.Decode(&f.Size)
-	dec.Decode(&f.MasterKey)
+	dec.Decode(&f.name)
+	dec.Decode(&f.size)
+	dec.Decode(&f.masterKey)
 	dec.Decode(&f.pieceSize)
 	dec.Decode(&f.bytesUploaded)
 	dec.Decode(&f.chunksUploaded)
@@ -107,18 +107,18 @@ func (f *file) load(r io.Reader) error {
 	// decode contracts
 	var nContracts uint64
 	dec.Decode(&nContracts)
-	f.Contracts = make(map[modules.NetAddress]fileContract)
+	f.contracts = make(map[modules.NetAddress]fileContract)
 	var contract fileContract
 	for i := uint64(0); i < nContracts; i++ {
 		dec.Decode(&contract)
-		f.Contracts[contract.IP] = contract
+		f.contracts[contract.IP] = contract
 	}
 	return nil
 }
 
 // saveFile saves a file to the renter directory.
 func (r *Renter) saveFile(f *file) error {
-	handle, err := persist.NewSafeFile(filepath.Join(r.saveDir, f.Name+ShareExtension))
+	handle, err := persist.NewSafeFile(filepath.Join(r.saveDir, f.name+ShareExtension))
 	if err != nil {
 		return err
 	}
@@ -311,22 +311,22 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 
 		// Make sure the file's name does not conflict with existing files.
 		dupCount := 0
-		origName := files[i].Name
+		origName := files[i].name
 		for {
-			_, exists := r.files[files[i].Name]
+			_, exists := r.files[files[i].name]
 			if !exists {
 				break
 			}
 			dupCount++
-			files[i].Name = origName + "_" + strconv.Itoa(dupCount)
+			files[i].name = origName + "_" + strconv.Itoa(dupCount)
 		}
 	}
 
 	// Add files to renter.
 	names := make([]string, numFiles)
 	for i, f := range files {
-		r.files[f.Name] = f
-		names[i] = f.Name
+		r.files[f.name] = f
+		names[i] = f.name
 	}
 	err = r.save()
 	if err != nil {

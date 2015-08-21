@@ -88,7 +88,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 	close(reqChan)
 	for range hosts {
 		contract := <-respChan
-		f.Contracts[contract.IP] = contract
+		f.contracts[contract.IP] = contract
 	}
 
 	return nil
@@ -175,7 +175,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	totalsize := up.PieceSize * uint64(up.ECC.NumPieces()) * f.numChunks()
 	var hosts []uploader
 	for _, host := range r.hostDB.RandomHosts(up.ECC.NumPieces() * 3 / 2) {
-		host, err := r.newHostUploader(host, totalsize, up.Duration, f.MasterKey)
+		host, err := r.newHostUploader(host, totalsize, up.Duration, f.masterKey)
 		if err != nil {
 			continue
 		}

@@ -10,7 +10,7 @@ import (
 func TestFileAvailable(t *testing.T) {
 	ecc, _ := NewRSCode(2, 10)
 	f := &file{
-		Size:      1000,
+		size:      1000,
 		ecc:       ecc,
 		pieceSize: 100,
 	}
@@ -27,7 +27,7 @@ func TestFileAvailable(t *testing.T) {
 
 // TestFileNickname probes the Nickname method of the file type.
 func TestFileNickname(t *testing.T) {
-	f := file{Name: "name"}
+	f := file{name: "name"}
 	if f.Nickname() != "name" {
 		t.Error("got the wrong nickname for a file")
 	}
@@ -36,7 +36,7 @@ func TestFileNickname(t *testing.T) {
 // TestFileExpiration probes the Expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
 	f := &file{
-		Contracts: make(map[modules.NetAddress]fileContract),
+		contracts: make(map[modules.NetAddress]fileContract),
 	}
 
 	if f.Expiration() != 0 {
@@ -46,21 +46,21 @@ func TestFileExpiration(t *testing.T) {
 	// Add a contract.
 	fc := fileContract{}
 	fc.WindowStart = 100
-	f.Contracts["foo"] = fc
+	f.contracts["foo"] = fc
 	if f.Expiration() != 100 {
 		t.Error("file with expired contract should report as having no time remaining")
 	}
 
 	// Add a contract with a lower WindowStart.
 	fc.WindowStart = 50
-	f.Contracts["bar"] = fc
+	f.contracts["bar"] = fc
 	if f.Expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a higher WindowStart.
 	fc.WindowStart = 75
-	f.Contracts["baz"] = fc
+	f.contracts["baz"] = fc
 	if f.Expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
@@ -85,7 +85,7 @@ func TestRenterDeleteFile(t *testing.T) {
 
 	// Put a file in the renter.
 	rt.renter.files["1"] = &file{
-		Name: "one",
+		name: "one",
 	}
 	// Delete a different file.
 	err = rt.renter.DeleteFile("one")
@@ -103,7 +103,7 @@ func TestRenterDeleteFile(t *testing.T) {
 
 	// Put a file in the renter, then rename it.
 	rt.renter.files["1"] = &file{
-		Name: "one",
+		name: "one",
 	}
 	rt.renter.RenameFile("1", "one")
 	// Call delete on the previous name.
@@ -136,7 +136,7 @@ func TestRenterFileList(t *testing.T) {
 
 	// Put a file in the renter.
 	rt.renter.files["1"] = &file{
-		Name: "one",
+		name: "one",
 	}
 	if len(rt.renter.FileList()) != 1 {
 		t.Error("FileList is not returning the only file in the renter")
@@ -147,7 +147,7 @@ func TestRenterFileList(t *testing.T) {
 
 	// Put multiple files in the renter.
 	rt.renter.files["2"] = &file{
-		Name: "two",
+		name: "two",
 	}
 	if len(rt.renter.FileList()) != 2 {
 		t.Error("FileList is not returning both files in the renter")
@@ -179,7 +179,7 @@ func TestRenterRenameFile(t *testing.T) {
 
 	// Rename a file that does exist.
 	rt.renter.files["1"] = &file{
-		Name: "1",
+		name: "1",
 	}
 	files := rt.renter.FileList()
 	err = rt.renter.RenameFile("1", "1a")
@@ -195,7 +195,7 @@ func TestRenterRenameFile(t *testing.T) {
 
 	// Rename a file to an existing name.
 	rt.renter.files["1"] = &file{
-		Name: "1",
+		name: "1",
 	}
 	err = rt.renter.RenameFile("1", "1a")
 	if err != ErrNicknameOverload {

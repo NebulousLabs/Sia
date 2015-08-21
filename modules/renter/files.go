@@ -25,10 +25,10 @@ type file struct {
 	bytesUploaded  uint64
 	chunksUploaded uint64
 
-	Name      string
-	Size      uint64
-	Contracts map[modules.NetAddress]fileContract
-	MasterKey crypto.TwofishKey
+	name      string
+	size      uint64
+	contracts map[modules.NetAddress]fileContract
+	masterKey crypto.TwofishKey
 	ecc       modules.ECC
 	pieceSize uint64
 }
@@ -63,8 +63,8 @@ func (f *file) chunkSize() uint64 {
 
 // numChunks returns the number of chunks that f was split into.
 func (f *file) numChunks() uint64 {
-	n := f.Size / f.chunkSize()
-	if f.Size%f.chunkSize() != 0 {
+	n := f.size / f.chunkSize()
+	if f.size%f.chunkSize() != 0 {
 		n++
 	}
 	return n
@@ -85,22 +85,22 @@ func (f *file) UploadProgress() float32 {
 
 // Nickname returns the nickname of the file.
 func (f *file) Nickname() string {
-	return f.Name
+	return f.name
 }
 
 // Filesize returns the size of the file.
 func (f *file) Filesize() uint64 {
-	return f.Size
+	return f.size
 }
 
 // Expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) Expiration() types.BlockHeight {
-	if len(f.Contracts) == 0 {
+	if len(f.contracts) == 0 {
 		return 0
 	}
 	lowest := ^types.BlockHeight(0)
-	for _, fc := range f.Contracts {
+	for _, fc := range f.contracts {
 		if fc.WindowStart < lowest {
 			lowest = fc.WindowStart
 		}
@@ -112,9 +112,9 @@ func (f *file) Expiration() types.BlockHeight {
 func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *file {
 	key, _ := crypto.GenerateTwofishKey()
 	return &file{
-		Size:      fileSize,
-		Contracts: make(map[modules.NetAddress]fileContract),
-		MasterKey: key,
+		size:      fileSize,
+		contracts: make(map[modules.NetAddress]fileContract),
+		masterKey: key,
 		ecc:       ecc,
 		pieceSize: pieceSize,
 	}
@@ -165,7 +165,7 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 
 	// Do the renaming.
 	delete(r.files, currentName)
-	file.Name = newName // make atomic?
+	file.name = newName // make atomic?
 	r.files[newName] = file
 
 	r.save()

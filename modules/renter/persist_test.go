@@ -23,9 +23,9 @@ func newTestingFile() *file {
 	ecc, _ := NewRSCode(nData+1, nParity+1)
 
 	return &file{
-		Name:      "testfile-" + strconv.Itoa(int(data[0])),
-		Size:      encoding.DecUint64(data[1:5]),
-		MasterKey: key,
+		name:      "testfile-" + strconv.Itoa(int(data[0])),
+		size:      encoding.DecUint64(data[1:5]),
+		masterKey: key,
 		ecc:       ecc,
 		pieceSize: encoding.DecUint64(data[6:8]),
 
@@ -39,14 +39,14 @@ func equalFiles(f1, f2 *file) error {
 	if f1 == nil || f2 == nil {
 		return fmt.Errorf("one or both files are nil")
 	}
-	if f1.Name != f2.Name {
-		return fmt.Errorf("names do not match: %v %v", f1.Name, f2.Name)
+	if f1.name != f2.name {
+		return fmt.Errorf("names do not match: %v %v", f1.name, f2.name)
 	}
-	if f1.Size != f2.Size {
-		return fmt.Errorf("sizes do not match: %v %v", f1.Size, f2.Size)
+	if f1.size != f2.size {
+		return fmt.Errorf("sizes do not match: %v %v", f1.size, f2.size)
 	}
-	if f1.MasterKey != f2.MasterKey {
-		return fmt.Errorf("keys do not match: %v %v", f1.MasterKey, f2.MasterKey)
+	if f1.masterKey != f2.masterKey {
+		return fmt.Errorf("keys do not match: %v %v", f1.masterKey, f2.masterKey)
 	}
 	if f1.pieceSize != f2.pieceSize {
 		return fmt.Errorf("pieceSizes do not match: %v %v", f1.pieceSize, f2.pieceSize)
@@ -91,25 +91,25 @@ func TestFileSaveLoadASCII(t *testing.T) {
 
 	// Create a file and add it to the renter.
 	savedFile := newTestingFile()
-	rt.renter.files[savedFile.Name] = savedFile
+	rt.renter.files[savedFile.name] = savedFile
 
-	ascii, err := rt.renter.ShareFilesAscii([]string{savedFile.Name})
+	ascii, err := rt.renter.ShareFilesAscii([]string{savedFile.name})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Remove the file from the renter.
-	delete(rt.renter.files, savedFile.Name)
+	delete(rt.renter.files, savedFile.name)
 
 	names, err := rt.renter.LoadSharedFilesAscii(ascii)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(names) != 1 || names[0] != savedFile.Name {
+	if len(names) != 1 || names[0] != savedFile.name {
 		t.Fatal("nickname not loaded properly")
 	}
 
-	err = equalFiles(rt.renter.files[savedFile.Name], savedFile)
+	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,13 +140,13 @@ func TestRenterSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := equalFiles(f1, rt.renter.files[f1.Name]); err != nil {
+	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
 		t.Fatal(err)
 	}
-	if err := equalFiles(f2, rt.renter.files[f2.Name]); err != nil {
+	if err := equalFiles(f2, rt.renter.files[f2.name]); err != nil {
 		t.Fatal(err)
 	}
-	if err := equalFiles(f3, rt.renter.files[f3.Name]); err != nil {
+	if err := equalFiles(f3, rt.renter.files[f3.name]); err != nil {
 		t.Fatal(err)
 	}
 

@@ -226,12 +226,12 @@ func (f *file) newDownload(hosts []fetcher, destination string) *download {
 	return &download{
 		ecc:       f.ecc,
 		chunkSize: f.chunkSize(),
-		fileSize:  f.Size,
+		fileSize:  f.size,
 		hosts:     hosts,
 
 		startTime:   time.Now(),
 		received:    0,
-		nickname:    f.Name,
+		nickname:    f.name,
 		destination: destination,
 	}
 }
@@ -256,9 +256,9 @@ func (r *Renter) Download(nickname, destination string) error {
 
 	// Initiate connections to each host.
 	var hosts []fetcher
-	for _, fc := range file.Contracts {
+	for _, fc := range file.contracts {
 		// TODO: connect in parallel
-		hf, err := newHostFetcher(fc, file.MasterKey)
+		hf, err := newHostFetcher(fc, file.masterKey)
 		if err != nil {
 			continue
 		}
