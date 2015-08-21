@@ -2,7 +2,6 @@ package miningpool
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -42,8 +41,6 @@ type paymentChannel struct {
 // Communicates with the miner to negotiate a payment channel for sending
 // currency from the pool to the miner.
 func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
-	fmt.Println("Negotiating payment channel (pool)")
-
 	// Get the miner's public key
 	var minerPK crypto.PublicKey
 	err := encoding.ReadObject(conn, &minerPK, ed25519.PublicKeySize)
@@ -186,7 +183,6 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 	// Remember this payment channel
 	mp.channels[pc.payTo] = pc
 
-	fmt.Println("Pool completed the payment channel")
 	return nil
 }
 

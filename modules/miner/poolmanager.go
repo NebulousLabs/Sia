@@ -2,7 +2,6 @@ package miner
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"net"
 
@@ -14,19 +13,16 @@ import (
 
 // Negotiates a new payment channel with the pool
 func (m *Miner) negotiatePaymentChannel() error {
-	fmt.Println("Negotiating payment channel (miner)")
 
 	// Connect to the pool
 	conn, err := net.DialTimeout("tcp", m.poolIP, 10e9)
 	if err != nil {
-		fmt.Println(1)
 		return err
 	}
 	defer conn.Close()
 
 	err = encoding.WriteObject(conn, types.Specifier{'c', 'h', 'a', 'n', 'n', 'e', 'l'})
 	if err != nil {
-		fmt.Println(2)
 		return err
 	}
 
@@ -34,7 +30,6 @@ func (m *Miner) negotiatePaymentChannel() error {
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	err = encoding.WriteObject(conn, pk)
 	if err != nil {
-		fmt.Println(3)
 		return err
 	}
 
@@ -42,7 +37,6 @@ func (m *Miner) negotiatePaymentChannel() error {
 	var channelTxn types.Transaction
 	err = encoding.ReadObject(conn, &channelTxn, 10e3) // TODO: change to txn size
 	if err != nil {
-		fmt.Println(4, err)
 		return err
 	}
 
@@ -50,7 +44,6 @@ func (m *Miner) negotiatePaymentChannel() error {
 	var refundTxn types.Transaction
 	err = encoding.ReadObject(conn, &refundTxn, 10e3) // TODO: change to txn size
 	if err != nil {
-		fmt.Println(5)
 		return err
 	}
 
@@ -62,7 +55,7 @@ func (m *Miner) negotiatePaymentChannel() error {
 	refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
 		ParentID:       crypto.Hash(refundTxn.SiacoinInputs[0].ParentID),
 		PublicKeyIndex: 1,
-		Timelock:       m.height + 30, // TODO: Make this a less arbitrary number
+		Timelock:       m.height + 1008, // 1 week
 		CoveredFields:  types.CoveredFields{WholeTransaction: true},
 	})
 	sigHash := refundTxn.SigHash(1)
@@ -87,7 +80,6 @@ func (m *Miner) negotiatePaymentChannel() error {
 	}
 
 	m.poolSK = sk
-	fmt.Println("Miner completed the payment channel")
 	return nil
 }
 
@@ -151,7 +143,6 @@ func (m *Miner) reconstructPoolBlock(ph types.BlockHeader) (types.Block, error) 
 // channel and gets certain values from the pool, like the payout address(es)
 // and payout ratios (what percent goes to who)
 func (m *Miner) PoolConnect(ip string) error {
-	fmt.Println("connect to pool: ", ip)
 	conn, err := net.DialTimeout("tcp", ip, 10e9)
 	if err != nil {
 		return err
@@ -172,9 +163,6 @@ func (m *Miner) PoolConnect(ip string) error {
 	m.minerPercentCut = mps.MinerPercentCut
 	m.targetMultiple = mps.TargetMultiple
 	m.poolPayoutAddress = mps.Address
-	fmt.Println("Miner payout: ", m.minerPercentCut)
-	fmt.Println("Target multiple: ", m.targetMultiple)
-	fmt.Println("Pool address: ", m.poolPayoutAddress)
 
 	// Negotiate a payment channel with the pool
 	err = m.negotiatePaymentChannel()
@@ -192,7 +180,6 @@ func (m *Miner) PoolConnect(ip string) error {
 func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 	// TODO: make sure we connected to a pool already
 
-	fmt.Println("pool header get")
 	// Get a header from the block manager
 	header, target, err := m.HeaderForWork()
 	if err != nil {
@@ -200,7 +187,6 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 	}
 
 	// TODO: Set the target to be easier
-	fmt.Println(m.targetMultiple)
 	target = target.MulDifficulty(big.NewRat(int64(m.targetMultiple), 1))
 
 	// Change the payouts of the block manager's block
@@ -209,7 +195,6 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 		return types.BlockHeader{}, types.Target{}, err
 	}
 	subsidy := block.MinerPayouts[0].Value
-	fmt.Println("Block subsidy, target: ", subsidy, target)
 	minerPayout := subsidy.Div(types.NewCurrency64(100)).Mul(types.NewCurrency64(uint64(m.minerPercentCut)))
 	poolPayout := subsidy.Sub(minerPayout)
 	blockPayouts := []types.SiacoinOutput{
@@ -236,7 +221,6 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 func (m *Miner) PoolSubmitHeader(bh types.BlockHeader) error {
 	// TODO: make sure we connected to a pool already
 
-	fmt.Println("pool header submit")
 	// Reassamble the block that generated bh
 	lockID := m.mu.Lock()
 	b, err := m.reconstructPoolBlock(bh)
@@ -264,7 +248,6 @@ func (m *Miner) PoolSubmitHeader(bh types.BlockHeader) error {
 	// If the block beats the full target, submit it to the network also
 	if b.CheckTarget(m.target) {
 		err = m.SubmitBlock(b)
-		fmt.Println("Pool block beat the real target (too)", err)
 		err = nil
 	}
 

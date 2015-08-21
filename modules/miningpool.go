@@ -29,6 +29,6 @@ type MiningPoolSettings struct {
 	// keeps PoolPercentCut then uses the rest to pay miners based on work. A
 	// partial block is therefore worth:
 	// subsidy * ((1 - MinerPercentCut/100) * PoolPercentCut/100) / TargetMultiple
-	PoolPercentCut  uint8
+	PoolPercentCut  uint8 // TODO: use big.Rats
 	MinerPercentCut uint8
 }

@@ -30,7 +30,7 @@ type MiningPool struct {
 	wallet modules.Wallet
 
 	// List of headers whose miner has already been paid (prevent double submits)
-	spentHeaders []types.Block // Should this be a map?
+	spentHeaders map[types.BlockHeader]struct{}
 
 	// A list of blocks that have been submitted to the network. netPayout is
 	// the total amount of money sent to miners, while profit is the amount of
