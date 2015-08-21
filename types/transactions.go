@@ -30,6 +30,7 @@ var (
 	SpecifierSiafundInput         = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'i', 'n', 'p', 'u', 't'}
 	SpecifierSiafundOutput        = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 	SpecifierClaimOutput          = Specifier{'c', 'l', 'a', 'i', 'm', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+	SpecifierMinerFee             = Specifier{'m', 'i', 'n', 'e', 'r', ' ', 'f', 'e', 'e'}
 
 	ErrTransactionIDWrongLen = errors.New("input has wrong length to be an encoded transaction id")
 )

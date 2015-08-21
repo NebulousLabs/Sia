@@ -201,6 +201,12 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 				w.historicOutputs[types.OutputID(txn.SiafundOutputID(i))] = sfo.Value
 				w.historicClaimStarts[txn.SiafundOutputID(i)] = sfo.ClaimStart
 			}
+			for _, fee := range txn.MinerFees {
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					FundType: types.SpecifierMinerFee,
+					Value:    fee,
+				})
+			}
 			if relevant {
 				w.processedTransactions = append(w.processedTransactions, pt)
 				w.processedTransactionMap[pt.TransactionID] = &w.processedTransactions[len(w.processedTransactions)-1]
@@ -259,6 +265,12 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 				Value:          sco.Value,
 			})
 			w.historicOutputs[types.OutputID(txn.SiacoinOutputID(i))] = sco.Value
+		}
+		for _, fee := range txn.MinerFees {
+			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				FundType: types.SpecifierMinerFee,
+				Value:    fee,
+			})
 		}
 		if relevant {
 			w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)

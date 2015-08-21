@@ -46,10 +46,10 @@ type (
 	// Some outputs mature immediately, some are delayed, and some may never
 	// mature at all (in the event of storage proofs).
 	//
-	// Fund type can either be 'SiacoinInput', 'SiafundInput', 'ClaimInput', or
-	// 'MinerPayout'. All fund types related to siacoins except for
-	// SiafundInput, which relates to siafunds. Outputs related to file
-	// contracts are not tracked by the wallet.
+	// Fund type can either be 'SiacoinOutput', 'SiafundOutput', 'ClaimOutput',
+	// 'MinerPayout', or 'MinerFee'. All outputs except the miner fee create
+	// outputs accessible to an address. Miner fees are not spendable, and
+	// instead contribute to the block subsidy.
 	//
 	// MaturityHeight indicates at what block height the output becomes
 	// available. SiacoinInputs and SiafundInputs become available immediately.
