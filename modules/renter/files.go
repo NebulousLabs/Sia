@@ -31,6 +31,7 @@ type file struct {
 	masterKey crypto.TwofishKey
 	ecc       modules.ECC
 	pieceSize uint64
+	mode      uint32 // actually an os.FileMode
 }
 
 // A fileContract is a contract covering an arbitrary number of file pieces.

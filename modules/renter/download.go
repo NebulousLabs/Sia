@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -247,12 +248,21 @@ func (r *Renter) Download(nickname, destination string) error {
 		return errors.New("no file of that nickname")
 	}
 
-	// Create file on disk.
-	f, err := os.Create(destination)
+	// If no permissions are found, use a sane default.
+	perm := os.FileMode(file.mode)
+	if perm == 0 {
+		perm = 0666
+	}
+
+	// Create file on disk with the correct permissions.
+	oldMode := syscall.Umask(0000)
+	f, err := os.OpenFile(destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, perm)
 	if err != nil {
+		syscall.Umask(oldMode)
 		return err
 	}
-	defer f.Close() // should be okay even if file is Remove'd
+	defer f.Close()
+	syscall.Umask(oldMode)
 
 	// Initiate connections to each host.
 	var hosts []fetcher

@@ -170,6 +170,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 
 	// Create file object.
 	f := newFile(up.ECC, up.PieceSize, uint64(fileInfo.Size()))
+	f.mode = uint32(fileInfo.Mode())
 
 	// Select and connect to hosts.
 	totalsize := up.PieceSize * uint64(up.ECC.NumPieces()) * f.numChunks()

@@ -49,6 +49,7 @@ func (f *file) save(w io.Writer) error {
 	enc.Encode(f.size)
 	enc.Encode(f.masterKey)
 	enc.Encode(f.pieceSize)
+	enc.Encode(f.mode)
 	enc.Encode(f.bytesUploaded)
 	enc.Encode(f.chunksUploaded)
 
@@ -84,6 +85,7 @@ func (f *file) load(r io.Reader) error {
 	dec.Decode(&f.size)
 	dec.Decode(&f.masterKey)
 	dec.Decode(&f.pieceSize)
+	dec.Decode(&f.mode)
 	dec.Decode(&f.bytesUploaded)
 	dec.Decode(&f.chunksUploaded)
 
