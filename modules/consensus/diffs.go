@@ -3,7 +3,10 @@ package consensus
 import (
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -34,11 +37,20 @@ var (
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
+// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
+// a database transaction.
+func (cs *ConsensusSet) commitBucketSiacoinOutputDiff(scoBucket *bolt.Bucket, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
+	if build.DEBUG && (scoBucket.Get(scod.ID[:]) == nil) != (scod.Direction == dir) {
+		panic(errRepeatInsert)
+	}
+	if scod.Direction == dir {
+		return scoBucket.Put(scod.ID[:], encoding.Marshal(scod.SiacoinOutput))
+	}
+	return scoBucket.Delete(scod.ID[:])
+}
+
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
-	if !cs.updateDatabase {
-		return
-	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -55,63 +67,87 @@ func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, 
 	}
 }
 
+// commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
+// a database transaction.
+func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
+	if scod.Direction == dir {
+		return addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
+	}
+	return removeSiacoinOutput(tx, scod.ID)
+}
+
+// commitTxFileContractDiff applies or reverts a FileContractDiff.
+func (cs *ConsensusSet) commitTxFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) error {
+	if fcd.Direction == dir {
+		addFileContract(tx, fcd.ID, fcd.FileContract)
+
+		bucketID := append(prefix_fcex, encoding.Marshal(fcd.FileContract.WindowEnd)...)
+		fcesByHeight := tx.Bucket(FileContractExpirations)
+		err := fcesByHeight.Put(encoding.Marshal(fcd.FileContract.WindowEnd), bucketID)
+		if err != nil {
+			return err
+		}
+		fceSet, err := tx.CreateBucketIfNotExists(bucketID)
+		if err != nil {
+			return err
+		}
+		return fceSet.Put(fcd.ID[:], []byte{})
+	}
+	err := removeFileContract(tx, fcd.ID)
+	if err != nil {
+		return err
+	}
+	return removeFCExpiration(tx, fcd.FileContract.WindowEnd, fcd.ID)
+}
+
 // commitFileContractDiff applies or reverts a FileContractDiff.
 func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
 	if build.DEBUG {
 		exists := cs.db.inFileContracts(fcd.ID)
-		if exists == (fcd.Direction == dir) && cs.updateDatabase {
+		if exists == (fcd.Direction == dir) {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
-		if cs.updateDatabase {
-			cs.db.addFileContracts(fcd.ID, fcd.FileContract)
-		}
+		cs.db.addFileContracts(fcd.ID, fcd.FileContract)
 
 		// Put a file contract into the file contract expirations map.
-		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+		exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
 		if !exists {
-			cs.fileContractExpirations[fcd.FileContract.WindowEnd] = make(map[types.FileContractID]struct{})
+			cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
 		}
 
 		// Sanity check - file contract expiration pointer should not already
 		// exist.
 		if build.DEBUG {
-			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			exists := cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 			if exists {
 				panic(errExistingFileContractExpiration)
 			}
 		}
-		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
+		cs.db.addFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 	} else {
-		if cs.updateDatabase {
-			cs.db.rmFileContracts(fcd.ID)
-		}
+		cs.db.rmFileContracts(fcd.ID)
 
 		if build.DEBUG {
-			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+			exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
 			if !exists {
 				panic(errBadExpirationPointer)
 			}
-			_, exists = cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			exists = cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 			if !exists {
 				panic(errBadExpirationPointer)
 			}
 		}
-		delete(cs.fileContractExpirations[fcd.FileContract.WindowEnd], fcd.ID)
+		cs.db.rmFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 	}
 }
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
 func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
-	// This function only modifies the database now, so the whole
-	// nothing happens when this flag is false
-	if !cs.updateDatabase {
-		return
-	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -130,25 +166,54 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 	}
 }
 
+// commitTxDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
+func (cs *ConsensusSet) commitTxDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) error {
+	if dscod.Direction == dir {
+		return addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
+	}
+	return removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
+}
+
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
-func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding an output twice, or deleting an
-	// output that does not exist.
-	if build.DEBUG {
-		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight]
-		if !exists {
-			panic(errBadMaturityHeight)
+func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		if dscod.Direction == dir {
+			return addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
 		}
-		_, exists = cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID]
-		if exists == (dscod.Direction == dir) {
-			panic(errBadCommitDelayedSiacoinOutputDiff)
+		return removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
+	})
+}
+
+// commitTxSiafundPoolDiff applies or reverts a SiafundPoolDiff.
+func (cs *ConsensusSet) commitTxSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+	// Sanity check - siafund pool should only ever increase.
+	if build.DEBUG {
+		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
+			panic(errNegativePoolAdjustment)
+		}
+		if sfpd.Direction != modules.DiffApply {
+			panic(errNonApplySiafundPoolDiff)
 		}
 	}
 
-	if dscod.Direction == dir {
-		cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID] = dscod.SiacoinOutput
+	if dir == modules.DiffApply {
+		// Sanity check - sfpd.Previous should equal the current siafund pool.
+		if build.DEBUG {
+			if cs.siafundPool.Cmp(sfpd.Previous) != 0 {
+				panic(errApplySiafundPoolDiffMismatch)
+			}
+		}
+		cs.siafundPool = sfpd.Adjusted
+		setSiafundPool(tx, sfpd.Adjusted)
 	} else {
-		delete(cs.delayedSiacoinOutputs[dscod.MaturityHeight], dscod.ID)
+		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
+		if build.DEBUG {
+			if cs.siafundPool.Cmp(sfpd.Adjusted) != 0 {
+				panic(errRevertSiafundPoolDiffMismatch)
+			}
+		}
+		cs.siafundPool = sfpd.Previous
+		setSiafundPool(tx, sfpd.Previous)
 	}
 }
 
@@ -172,6 +237,7 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 			}
 		}
 		cs.siafundPool = sfpd.Adjusted
+		cs.db.setSiafundPool(sfpd.Adjusted)
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
 		if build.DEBUG {
@@ -180,6 +246,7 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 			}
 		}
 		cs.siafundPool = sfpd.Previous
+		cs.db.setSiafundPool(sfpd.Previous)
 	}
 }
 
@@ -210,35 +277,17 @@ func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.Diff
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
+func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
-		if build.DEBUG {
-			// Sanity check - the output map being created should not already
-			// exist.
-			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
-			if exists {
-				panic(errCreatingExistingUpcomingMap)
-			}
-		}
-		cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
-	} else {
-		// Skip creating maps for heights that can't have delayed outputs.
-		if pb.Height > types.MaturityDelay {
-			// Sanity check - the output map being created should not already
-			// exist.
-			if build.DEBUG {
-				_, exists := cs.delayedSiacoinOutputs[pb.Height]
-				if exists {
-					panic(errCreatingExistingUpcomingMap)
-				}
-			}
-			cs.delayedSiacoinOutputs[pb.Height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
-		}
+		return createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+	} else if pb.Height > types.MaturityDelay {
+		return createDSCOBucket(tx, pb.Height)
 	}
+	return nil
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
 		for _, scod := range pb.SiacoinOutputDiffs {
 			cs.commitSiacoinOutputDiff(scod, dir)
@@ -272,6 +321,7 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 			cs.commitSiafundPoolDiff(pb.SiafundPoolDiffs[i], dir)
 		}
 	}
+	return nil
 }
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
@@ -282,20 +332,20 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 		if pb.Height > types.MaturityDelay {
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
-				if len(cs.delayedSiacoinOutputs[pb.Height]) != 0 {
+				if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
 					panic(errDeletingNonEmptyDelayedMap)
 				}
 			}
-			delete(cs.delayedSiacoinOutputs, pb.Height)
+			cs.db.rmDelayedSiacoinOutputs(pb.Height)
 		}
 	} else {
 		// Sanity check - the map being deleted should be empty
 		if build.DEBUG {
-			if len(cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]) != 0 {
+			if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay) != 0 {
 				panic(errDeletingNonEmptyDelayedMap)
 			}
 		}
-		delete(cs.delayedSiacoinOutputs, pb.Height+types.MaturityDelay)
+		cs.db.rmDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	}
 }
 
@@ -303,30 +353,32 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		if cs.updateDatabase {
-			err := cs.db.pushPath(pb.Block.ID())
-
-			if build.DEBUG && err != nil {
-				panic(err)
-			}
+		err := cs.db.pushPath(pb.Block.ID())
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
-		cs.blocksLoaded += 1
 	} else {
 		err := cs.db.popPath()
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
-		cs.blocksLoaded -= 1
 	}
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) error {
 	cs.commitDiffSetSanity(pb, dir)
-	cs.createUpcomingDelayedOutputMaps(pb, dir)
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		return cs.createUpcomingDelayedOutputMaps(tx, pb, dir)
+	})
+	if err != nil {
+		return err
+	}
 	cs.commitNodeDiffs(pb, dir)
 	cs.deleteObsoleteDelayedOutputMaps(pb, dir)
 	cs.updateCurrentPath(pb, dir)
+
+	return nil
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
@@ -335,31 +387,29 @@ func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirect
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
 func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
-	// Sanity check
-	if build.DEBUG {
-		// Generate should only be called if the diffs have not yet been
-		// generated.
-		if pb.DiffsGenerated {
-			panic(errRegenerateDiffs)
-		}
-
-		// Current node must be the input node's parent.
-		if pb.Parent != cs.currentBlockID() {
-			panic(errInvalidSuccessor)
-		}
+	// Sanity check - the block being applied should have the current block as
+	// a parent.
+	if build.DEBUG && pb.Parent != cs.currentBlockID() {
+		panic(errInvalidSuccessor)
 	}
 
 	// Update the state to point to the new block.
-	err := cs.db.pushPath(pb.Block.ID())
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		bid := pb.Block.ID()
+		err := tx.Bucket(BlockPath).Put(encoding.EncUint64(uint64(pb.Height)), bid[:])
+		if err != nil {
+			return err
+		}
+		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+		return nil
+	})
 	if err != nil {
-		return err
+		panic(err)
 	}
-	cs.blocksLoaded += 1
-	cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
-	// invalid, the diffs can be safely reversed from whatever point.
+	// invalid, the diffs can be safely reversed.
 	pb.DiffsGenerated = true
 
 	// Validate and apply each transaction in the block. They cannot be
@@ -371,31 +421,41 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
 			// created and destroyed.
-			cs.applyMaturedSiacoinOutputs(pb)
+			updateErr := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.applyMaturedSiacoinOutputs(tx, pb)
+			})
+			if updateErr != nil {
+				return err
+			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			cs.deleteNode(pb)
 			return err
 		}
 
-		cs.applyTransaction(pb, txn)
+		err = cs.applyTransaction(pb, txn)
+		if err != nil {
+			return err
+		}
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	cs.applyMaintenance(pb)
+	err = cs.applyMaintenance(pb)
+	if err != nil {
+		return err
+	}
 
 	if build.DEBUG {
 		pb.ConsensusSetHash = cs.consensusSetHash()
 	}
 
 	// Replace the unprocessed block in the block map with a processed one
-	err = cs.db.rmBlockMap(pb.Block.ID())
-	if err != nil {
-		return err
-	}
-
-	return cs.db.addBlockMap(pb)
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		id := pb.Block.ID()
+		blockMap := tx.Bucket(BlockMap)
+		return blockMap.Put(id[:], encoding.Marshal(*pb))
+	})
 }

@@ -52,6 +52,10 @@ func createMinerTester(name string) (*minerTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, err = w.Encrypt(key)
+	if err != nil {
+		return nil, err
+	}
 	err = w.Unlock(key)
 	if err != nil {
 		return nil, err
@@ -102,7 +106,7 @@ func TestMiner(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 50; i++ {
 		b, _ := mt.miner.FindBlock()
 		err = mt.cs.AcceptBlock(b)
 		if err != nil {

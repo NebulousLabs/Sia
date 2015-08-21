@@ -8,6 +8,9 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"hash"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -24,6 +27,10 @@ type (
 
 	// HashSlice is used for sorting
 	HashSlice []Hash
+)
+
+var (
+	ErrHashWrongLen = errors.New("encoded value has the wrong length to be a hash")
 )
 
 // NewHash returns a blake2b 256bit hasher.
@@ -59,3 +66,28 @@ func HashObject(obj interface{}) Hash {
 func (hs HashSlice) Len() int           { return len(hs) }
 func (hs HashSlice) Less(i, j int) bool { return bytes.Compare(hs[i][:], hs[j][:]) < 0 }
 func (hs HashSlice) Swap(i, j int)      { hs[i], hs[j] = hs[j], hs[i] }
+
+// MarshalJSON marshales a hash as a hex string.
+func (h Hash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(h.String())
+}
+
+// String prints the hash in hex.
+func (h Hash) String() string {
+	return fmt.Sprintf("%x", h[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the hash.
+func (h *Hash) UnmarshalJSON(b []byte) error {
+	if len(b) != HashSize*2+2 {
+		return ErrHashWrongLen
+	}
+
+	var hBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &hBytes)
+	if err != nil {
+		return errors.New("could not unmarshal crypto.Hash: " + err.Error())
+	}
+	copy(h[:], hBytes)
+	return nil
+}

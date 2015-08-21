@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"sort"
 	"testing"
 )
@@ -79,5 +80,25 @@ func TestHashSorting(t *testing.T) {
 	}
 	if hashes[4][0] != 14 {
 		t.Error("bad sort")
+	}
+}
+
+// TestHashMarshalling checks that the marshalling of the hash type works as
+// expected.
+func TestHashMarshalling(t *testing.T) {
+	h := HashObject("an object")
+	hBytes, err := json.Marshal(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var uMarH Hash
+	err = uMarH.UnmarshalJSON(hBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if h != uMarH {
+		t.Error("encoded and decoded hash do not match!")
 	}
 }

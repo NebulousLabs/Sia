@@ -189,12 +189,15 @@ func (m *Miner) ConnectToPool(ip string) error {
 // meant to be grinded by a miner and, shuold the target be beat, resubmitted
 // through SubmitHeaderToPool. Note that the target returned is a fraction of
 // the real block target.
-func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target) {
+func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 	// TODO: make sure we connected to a pool already
 
 	fmt.Println("pool header get")
 	// Get a header from the block manager
-	header, target := m.HeaderForWork()
+	header, target, err := m.HeaderForWork()
+	if err != nil {
+		return types.BlockHeader{}, types.Target{}, err
+	}
 
 	// TODO: Set the target to be easier
 	fmt.Println(m.targetMultiple)
@@ -203,7 +206,7 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target) {
 	// Change the payouts of the block manager's block
 	block, err := m.reconstructBlock(header)
 	if err != nil {
-		return types.BlockHeader{}, types.Target{}
+		return types.BlockHeader{}, types.Target{}, err
 	}
 	subsidy := block.MinerPayouts[0].Value
 	fmt.Println("Block subsidy, target: ", subsidy, target)
@@ -225,7 +228,7 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target) {
 	poolHeader := newBlock.Header()
 	m.poolHeaderMem[poolHeader] = header
 
-	return poolHeader, target
+	return poolHeader, target, nil
 }
 
 // SubmitPoolHeader takes a header that has been solved and submits it

@@ -8,68 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// revertOutput reverts an output from the wallet. The output must be the
-// output in the most recent wallet transaction of the wallet transaction array
-// if the unlock hash belongs to the wallet. If the unlock hash is
-// unrecognized, this function is a no-op.
-func (w *Wallet) revertWalletTransaction(uh types.UnlockHash, wtid modules.WalletTransactionID) {
-	_, exists := w.keys[uh]
-	if !exists {
-		// The wallet only applies and reverts transactions that are relevant
-		// to a key it knows.
-		return
-	}
-
-	// Sanity check - the output should exist in the wallet transaction map
-	// because a prior addition to the map is being reverted.
-	_, exists = w.walletTransactionMap[wtid]
-	if build.DEBUG && !exists {
-		panic("wallet transaction not found in the wallet transaction map")
-	}
-	delete(w.walletTransactionMap, wtid)
-
-	// Sanity check - the last element of the wallet transaction array
-	// should be the item we are deleteing.
-	lastIndex := len(w.walletTransactions) - 1
-	if build.DEBUG && wtid != modules.CalculateWalletTransactionID(w.walletTransactions[lastIndex].TransactionID, w.walletTransactions[lastIndex].OutputID) {
-		panic("wallet transactions are being deleted in the wrong order")
-	}
-	w.walletTransactions = w.walletTransactions[:lastIndex]
-}
-
-// applyWalletTransaction adds a wallet transaction to the wallet transaction
-// history.
-func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.UnlockHash, t types.Transaction, confirmationTime types.Timestamp, oid types.OutputID, value types.Currency) {
-	_, exists := w.keys[uh]
-	if !exists {
-		// The wallet only applies and reverts transactions that are relevant
-		// to a key it knows.
-		return
-	}
-
-	// Sanity check - the output should not exist in the wallet transaction
-	// map, this should be the first time it was created.
-	wtid := modules.CalculateWalletTransactionID(t.ID(), oid)
-	_, exists = w.walletTransactionMap[wtid]
-	if exists && build.DEBUG {
-		panic("a wallet transaction is being added for the second time")
-	}
-	wt := modules.WalletTransaction{
-		TransactionID:         t.ID(),
-		ConfirmationHeight:    w.consensusSetHeight,
-		ConfirmationTimestamp: confirmationTime,
-		Transaction:           t,
-
-		FundType:       fundType,
-		OutputID:       oid,
-		RelatedAddress: uh,
-		Value:          value,
-	}
-	w.walletTransactions = append(w.walletTransactions, wt)
-	w.walletTransactionMap[wtid] = &w.walletTransactions[len(w.walletTransactions)-1]
-	w.historicOutputs[oid] = value
-}
-
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
@@ -138,30 +76,28 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// related to the wallet. Wallet transactions must be removed in the same
 	// order they were added.
 	for _, block := range cc.RevertedBlocks {
+		// Remove any transactions that have been reverted.
 		for i := len(block.Transactions) - 1; i >= 0; i-- {
+			// If the transaction is relevant to the wallet, it will be the
+			// most recent transaction appended to w.processedTransactions.
+			// Relevance can be determined just by looking at the last element
+			// of w.processedTransactions.
 			txn := block.Transactions[i]
-			// Revert all wallet transactions made from items in the
-			// transaction - use the reverse order of apply because using a
-			// slice means its easiet to remove the last element.
 			txid := txn.ID()
-			for i := len(txn.SiafundOutputs) - 1; i >= 0; i-- {
-				w.revertWalletTransaction(txn.SiafundOutputs[i].UnlockHash, modules.CalculateWalletTransactionID(txid, types.OutputID(txn.SiafundOutputID(i))))
+			if len(w.processedTransactions) > 0 && txid == w.processedTransactions[len(w.processedTransactions)-1].TransactionID {
+				w.processedTransactions = w.processedTransactions[:len(w.processedTransactions)-1]
+				delete(w.processedTransactionMap, txid)
 			}
-			for i := len(txn.SiafundInputs) - 1; i >= 0; i-- {
-				sfoid := txn.SiafundOutputID(i)
-				w.revertWalletTransaction(txn.SiafundInputs[i].ClaimUnlockHash, modules.CalculateWalletTransactionID(txid, types.OutputID(sfoid.SiaClaimOutputID())))
-				w.revertWalletTransaction(txn.SiafundInputs[i].UnlockConditions.UnlockHash(), modules.CalculateWalletTransactionID(txid, types.OutputID(txn.SiafundInputs[i].ParentID)))
-			}
-			for i := len(txn.SiacoinOutputs) - 1; i >= 0; i-- {
-				w.revertWalletTransaction(txn.SiacoinOutputs[i].UnlockHash, modules.CalculateWalletTransactionID(txid, types.OutputID(txn.SiacoinOutputID(i))))
-			}
-			for i := len(txn.SiacoinInputs) - 1; i >= 0; i-- {
-				w.revertWalletTransaction(txn.SiacoinInputs[i].UnlockConditions.UnlockHash(), modules.CalculateWalletTransactionID(txid, types.OutputID(txn.SiacoinInputs[i].ParentID)))
-			}
-
 		}
-		for i := len(block.MinerPayouts) - 1; i >= 0; i-- {
-			w.revertWalletTransaction(block.MinerPayouts[i].UnlockHash, modules.CalculateWalletTransactionID(types.Transaction{}.ID(), types.OutputID(block.MinerPayoutID(uint64(i)))))
+
+		// Remove the miner payout transaction if applicable.
+		for _, mp := range block.MinerPayouts {
+			_, exists := w.keys[mp.UnlockHash]
+			if exists {
+				w.processedTransactions = w.processedTransactions[:len(w.processedTransactions)-1]
+				delete(w.processedTransactionMap, types.TransactionID(block.ID()))
+				break
+			}
 		}
 		w.consensusSetHeight--
 	}
@@ -169,23 +105,105 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Apply all of the new blocks.
 	for _, block := range cc.AppliedBlocks {
 		w.consensusSetHeight++
-		// Apply any miner outputs.
+		// Apply the miner payout transaction if applicable.
+		minerPT := modules.ProcessedTransaction{
+			Transaction:           types.Transaction{},
+			TransactionID:         types.TransactionID(block.ID()),
+			ConfirmationHeight:    w.consensusSetHeight,
+			ConfirmationTimestamp: block.Timestamp,
+		}
+		relevant := false
 		for i, mp := range block.MinerPayouts {
-			w.applyWalletTransaction(types.SpecifierMinerPayout, mp.UnlockHash, types.Transaction{}, block.Timestamp, types.OutputID(block.MinerPayoutID(uint64(i))), mp.Value)
+			_, exists := w.keys[mp.UnlockHash]
+			if exists {
+				relevant = true
+			}
+			minerPT.Outputs = append(minerPT.Outputs, modules.ProcessedOutput{
+				FundType:       types.SpecifierMinerPayout,
+				MaturityHeight: w.consensusSetHeight + types.MaturityDelay,
+				WalletAddress:  exists,
+				RelatedAddress: mp.UnlockHash,
+				Value:          mp.Value,
+			})
+			w.historicOutputs[types.OutputID(block.MinerPayoutID(uint64(i)))] = mp.Value
+		}
+		if relevant {
+			w.processedTransactions = append(w.processedTransactions, minerPT)
+			w.processedTransactionMap[minerPT.TransactionID] = &w.processedTransactions[len(w.processedTransactions)-1]
 		}
 		for _, txn := range block.Transactions {
-			// Add a wallet transaction for all transaction elements.
+			relevant := false
+			pt := modules.ProcessedTransaction{
+				Transaction:           txn,
+				TransactionID:         txn.ID(),
+				ConfirmationHeight:    w.consensusSetHeight,
+				ConfirmationTimestamp: block.Timestamp,
+			}
 			for _, sci := range txn.SiacoinInputs {
-				w.applyWalletTransaction(types.SpecifierSiacoinInput, sci.UnlockConditions.UnlockHash(), txn, block.Timestamp, types.OutputID(sci.ParentID), w.historicOutputs[types.OutputID(sci.ParentID)])
+				_, exists := w.keys[sci.UnlockConditions.UnlockHash()]
+				if exists {
+					relevant = true
+				}
+				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					FundType:       types.SpecifierSiacoinInput,
+					WalletAddress:  exists,
+					RelatedAddress: sci.UnlockConditions.UnlockHash(),
+					Value:          w.historicOutputs[types.OutputID(sci.ParentID)],
+				})
 			}
 			for i, sco := range txn.SiacoinOutputs {
-				w.applyWalletTransaction(types.SpecifierSiacoinOutput, sco.UnlockHash, txn, block.Timestamp, types.OutputID(txn.SiacoinOutputID(i)), sco.Value)
+				_, exists := w.keys[sco.UnlockHash]
+				if exists {
+					relevant = true
+				}
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					FundType:       types.SpecifierSiacoinOutput,
+					MaturityHeight: w.consensusSetHeight,
+					WalletAddress:  exists,
+					RelatedAddress: sco.UnlockHash,
+					Value:          sco.Value,
+				})
+				w.historicOutputs[types.OutputID(txn.SiacoinOutputID(i))] = sco.Value
 			}
 			for _, sfi := range txn.SiafundInputs {
-				w.applyWalletTransaction(types.SpecifierSiafundInput, sfi.UnlockConditions.UnlockHash(), txn, block.Timestamp, types.OutputID(sfi.ParentID), w.historicOutputs[types.OutputID(sfi.ParentID)])
+				_, exists := w.keys[sfi.UnlockConditions.UnlockHash()]
+				if exists {
+					relevant = true
+				}
+				sfiValue := w.historicOutputs[types.OutputID(sfi.ParentID)]
+				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+					FundType:       types.SpecifierSiafundInput,
+					WalletAddress:  exists,
+					RelatedAddress: sfi.UnlockConditions.UnlockHash(),
+					Value:          sfiValue,
+				})
+				claimValue := w.siafundPool.Sub(w.historicClaimStarts[sfi.ParentID]).Mul(sfiValue)
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					FundType:       types.SpecifierClaimOutput,
+					MaturityHeight: w.consensusSetHeight + types.MaturityDelay,
+					WalletAddress:  exists,
+					RelatedAddress: sfi.ClaimUnlockHash,
+					Value:          claimValue,
+				})
 			}
 			for i, sfo := range txn.SiafundOutputs {
-				w.applyWalletTransaction(types.SpecifierSiafundOutput, sfo.UnlockHash, txn, block.Timestamp, types.OutputID(txn.SiafundOutputID(i)), sfo.Value)
+				_, exists := w.keys[sfo.UnlockHash]
+				if exists {
+					relevant = true
+				}
+				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+					FundType:       types.SpecifierSiafundOutput,
+					MaturityHeight: w.consensusSetHeight,
+					WalletAddress:  exists,
+					RelatedAddress: sfo.UnlockHash,
+					Value:          sfo.Value,
+				})
+				w.historicOutputs[types.OutputID(txn.SiafundOutputID(i))] = sfo.Value
+				w.historicClaimStarts[txn.SiafundOutputID(i)] = sfo.ClaimStart
+			}
+			if relevant {
+				w.processedTransactions = append(w.processedTransactions, pt)
+				w.processedTransactionMap[pt.TransactionID] = &w.processedTransactions[len(w.processedTransactions)-1]
 			}
 		}
 	}
@@ -205,43 +223,45 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 		defer w.mu.Unlock(lockID)
 	}
 
-	w.unconfirmedWalletTransactions = nil
+	w.unconfirmedProcessedTransactions = nil
 	for _, txn := range txns {
+		// To save on  code complexity, relveancy is determined while building
+		// up the wallet transaction.
+		relevant := false
+		pt := modules.ProcessedTransaction{
+			Transaction:           txn,
+			TransactionID:         txn.ID(),
+			ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
+			ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
+		}
 		for _, sci := range txn.SiacoinInputs {
 			_, exists := w.keys[sci.UnlockConditions.UnlockHash()]
 			if exists {
-				wt := modules.WalletTransaction{
-					TransactionID:         txn.ID(),
-					ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
-					ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
-					Transaction:           txn,
-
-					FundType:       types.SpecifierSiacoinInput,
-					OutputID:       types.OutputID(sci.ParentID),
-					RelatedAddress: sci.UnlockConditions.UnlockHash(),
-					Value:          w.historicOutputs[types.OutputID(sci.ParentID)],
-				}
-				w.unconfirmedWalletTransactions = append(w.unconfirmedWalletTransactions, wt)
+				relevant = true
 			}
+			pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
+				FundType:       types.SpecifierSiacoinInput,
+				WalletAddress:  exists,
+				RelatedAddress: sci.UnlockConditions.UnlockHash(),
+				Value:          w.historicOutputs[types.OutputID(sci.ParentID)],
+			})
 		}
 		for i, sco := range txn.SiacoinOutputs {
 			_, exists := w.keys[sco.UnlockHash]
 			if exists {
-				wt := modules.WalletTransaction{
-					TransactionID:         txn.ID(),
-					ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
-					ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
-					Transaction:           txn,
-
-					FundType:       types.SpecifierSiacoinOutput,
-					OutputID:       types.OutputID(txn.SiacoinOutputID(i)),
-					RelatedAddress: sco.UnlockHash,
-					Value:          sco.Value,
-				}
-				w.unconfirmedWalletTransactions = append(w.unconfirmedWalletTransactions, wt)
-				oid := types.OutputID(txn.SiacoinOutputID(i))
-				w.historicOutputs[oid] = sco.Value
+				relevant = true
 			}
+			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
+				FundType:       types.SpecifierSiacoinOutput,
+				MaturityHeight: types.BlockHeight(math.MaxUint64),
+				WalletAddress:  exists,
+				RelatedAddress: sco.UnlockHash,
+				Value:          sco.Value,
+			})
+			w.historicOutputs[types.OutputID(txn.SiacoinOutputID(i))] = sco.Value
+		}
+		if relevant {
+			w.unconfirmedProcessedTransactions = append(w.unconfirmedProcessedTransactions, pt)
 		}
 	}
 }

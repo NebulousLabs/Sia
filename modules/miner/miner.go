@@ -130,12 +130,11 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 			panic("could not get child earliest timestamp")
 		}
 	}
-	addrUC, err := w.NextAddress() // false indicates that the address should not be visible to the user.
-	if err != nil {
-		return nil, err
-	}
 
-	// Assemble the miner.
+	// Assemble the miner. The miner is assembled without an address because
+	// the wallet is likely not unlocked yet. The miner will grab an address
+	// after the miner is unlocked (this must be coded manually for each
+	// function that potentially requires the miner to have an address.
 	m := &Miner{
 		cs:     cs,
 		tpool:  tpool,
@@ -144,7 +143,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		parent:            currentBlock,
 		target:            currentTarget,
 		earliestTimestamp: earliestTimestamp,
-		address:           addrUC.UnlockHash(),
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][]byte),
@@ -155,7 +153,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
-	err = m.initPersist()
+	err := m.initPersist()
 	if err != nil {
 		return nil, err
 	}
@@ -177,4 +175,18 @@ func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
 		}
 	}
 	return
+}
+
+// checkAddress checks that the miner has an address, fetching an address from
+// the wallet if not.
+func (m *Miner) checkAddress() error {
+	if m.address != (types.UnlockHash{}) {
+		return nil
+	}
+	uc, err := m.wallet.NextAddress()
+	if err != nil {
+		return err
+	}
+	m.address = uc.UnlockHash()
+	return nil
 }

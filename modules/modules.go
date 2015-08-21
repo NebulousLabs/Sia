@@ -14,10 +14,10 @@ var (
 
 func init() {
 	if build.Release == "dev" {
-		SafeMutexDelay = 7 * time.Second
+		SafeMutexDelay = 14 * time.Second
 	} else if build.Release == "standard" {
-		SafeMutexDelay = 60 * time.Second
+		SafeMutexDelay = 120 * time.Second
 	} else if build.Release == "testing" {
-		SafeMutexDelay = 3 * time.Second
+		SafeMutexDelay = 6 * time.Second
 	}
 }

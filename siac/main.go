@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	addr  string
-	force bool
+	addr         string
+	force        bool
+	initPassword bool
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -177,8 +178,9 @@ func main() {
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd, walletMergeCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd)
-	walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
+	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd, walletUnlockCmd, walletLockCmd, walletInitCmd, walletAddseedCmd, walletSeedsCmd)
+	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
+	// walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
 	walletSiafundsCmd.AddCommand(walletSiafundsSendCmd)
 
 	root.AddCommand(renterCmd)
@@ -193,7 +195,7 @@ func main() {
 	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
 
 	// consensus cmds have no leading qualifier
-	root.AddCommand(consensusSynchronizeCmd, consensusStatusCmd)
+	root.AddCommand(consensusStatusCmd)
 	root.AddCommand(stopCmd)
 
 	// parse flags

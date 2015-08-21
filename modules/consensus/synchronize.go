@@ -2,7 +2,7 @@ package consensus
 
 import (
 	"errors"
-	"time"
+	"runtime"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -11,16 +11,17 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks          = 50
-	MaxSynchronizeAttempts    = 8
-	ResynchronizePeerTimeout  = time.Second * 30
-	ResynchronizeBatchTimeout = time.Minute * 3
+	MaxCatchUpBlocks       = 10
+	MaxSynchronizeAttempts = 8
 )
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
 func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
 	lockID := s.mu.RLock()
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	history := s.blockHistory()
 	s.mu.RUnlock(lockID)
 	if err := encoding.WriteObject(conn, history); err != nil {
@@ -48,13 +49,19 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			}
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
-			// these errors are benign
-			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == ErrBlockKnown {
+			// ErrNonExtendingBlock must be ignored until headers-first block
+			// sharing is implemented.
+			if acceptErr == modules.ErrNonExtendingBlock {
 				acceptErr = nil
 			}
 			if acceptErr != nil {
 				return acceptErr
 			}
+
+			// Yield the processor to give other processes time to grab a lock.
+			// The Lock/Unlock cycle in this loop is very tight, and has been
+			// known to prevent interrupts from getting lock access quickly.
+			runtime.Gosched()
 		}
 	}
 
@@ -95,9 +102,6 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
-	if !s.db.open {
-		return errors.New("database not open")
-	}
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
@@ -109,6 +113,9 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	found := false
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	for _, id := range knownBlocks {
 		if s.db.inBlockMap(id) {
 			pb := s.db.getBlockMap(id)
@@ -119,11 +126,12 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			}
 		}
 	}
-	s.mu.RUnlock(lockID)
 
 	// If no matching blocks are found, or if the caller has all known blocks,
 	// don't send any blocks.
-	if !found || start > s.Height() {
+	h := s.height()
+	s.mu.RUnlock(lockID)
+	if !found || start > h {
 		// Send 0 blocks.
 		err = encoding.WriteObject(conn, []types.Block{})
 		if err != nil {
@@ -139,6 +147,10 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		// Get the set of blocks to send.
 		var blocks []types.Block
 		lockID = s.mu.RLock()
+		if !s.db.open {
+			return errors.New("database not open")
+		}
+
 		{
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
@@ -164,19 +176,4 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	}
 
 	return nil
-}
-
-// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
-// the network consensus set. The process is as follows: synchronize asks a
-// peer for new blocks. The requester sends 32 block IDs, starting with the 12
-// most recent and then progressing exponentially backwards to the genesis
-// block. The receiver uses these blocks to find the most recent block seen by
-// both peers. From this starting height, it transmits blocks sequentially.
-// The requester then integrates these blocks into its consensus set. Multiple
-// such transmissions may be required to fully synchronize.
-//
-// TODO: Synchronize is a blocking call that involved network traffic. This
-// seems to break convention, but I'm not certain. It does seem weird though.
-func (s *ConsensusSet) Synchronize(peer modules.NetAddress) error {
-	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }

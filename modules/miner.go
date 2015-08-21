@@ -15,12 +15,12 @@ type BlockManager interface {
 	// BlockForWork returns a block that is ready for nonce grinding. All
 	// blocks returned by BlockForWork have a unique merkle root, meaning that
 	// each can safely start from nonce 0.
-	BlockForWork() (types.Block, crypto.Hash, types.Target)
+	BlockForWork() (types.Block, crypto.Hash, types.Target, error)
 
 	// HeaderForWork returns a block header that can be grinded on and
 	// resubmitted to the miner. HeaderForWork() will remember the block that
 	// corresponds to the header for 50 calls.
-	HeaderForWork() (types.BlockHeader, types.Target)
+	HeaderForWork() (types.BlockHeader, types.Target, error)
 
 	// SubmitBlock takes a block that has been worked on and has a valid
 	// target. Typically used with external miners.
@@ -43,7 +43,7 @@ type PoolManager interface {
 	// mining.  The block contains all the correct pool payouts. The header is
 	// meant to be grinded by a miner and, shuold the target be beat,
 	// resubmitted through SubmitHeaderToPool
-	PoolHeaderForWork() (types.BlockHeader, types.Target)
+	PoolHeaderForWork() (types.BlockHeader, types.Target, error)
 
 	// SubmitPoolHeader takes a header that has been solved and submits it to
 	// the pool
@@ -52,6 +52,10 @@ type PoolManager interface {
 
 // A CPUMiner provides access to a single-threaded cpu miner.
 type CPUMiner interface {
+	// AddBlock is an extension of FindBlock - AddBlock will submit the block
+	// after finding it.
+	AddBlock() (types.Block, error)
+
 	// CPUHashrate returns the hashrate of the cpu miner in hashes per second.
 	CPUHashrate() int
 
@@ -62,7 +66,7 @@ type CPUMiner interface {
 	// builds on the current consensus set. It will give up after a few
 	// seconds, returning the block and a bool indicating whether the block is
 	// sovled.
-	FindBlock() (types.Block, bool)
+	FindBlock() (types.Block, error)
 
 	// StartMining turns on the miner, which will endlessly work for new
 	// blocks.

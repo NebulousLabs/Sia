@@ -66,6 +66,10 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = w.Encrypt(masterKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = w.Unlock(masterKey)
 	if err != nil {
 		t.Fatal(err)

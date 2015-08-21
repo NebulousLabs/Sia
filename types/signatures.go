@@ -61,17 +61,17 @@ type (
 	// fields must be empty (except for the Signatures field, since a signature
 	// cannot sign itself).
 	CoveredFields struct {
-		WholeTransaction      bool
-		SiacoinInputs         []uint64
-		SiacoinOutputs        []uint64
-		FileContracts         []uint64
-		FileContractRevisions []uint64
-		StorageProofs         []uint64
-		SiafundInputs         []uint64
-		SiafundOutputs        []uint64
-		MinerFees             []uint64
-		ArbitraryData         []uint64
-		TransactionSignatures []uint64
+		WholeTransaction      bool     `json:"wholetransaction"`
+		SiacoinInputs         []uint64 `json:"siacoininputs"`
+		SiacoinOutputs        []uint64 `json:"siacoinoutputs"`
+		FileContracts         []uint64 `json:"filecontracts"`
+		FileContractRevisions []uint64 `json:"filecontractrevisions"`
+		StorageProofs         []uint64 `json:"storageproofs"`
+		SiafundInputs         []uint64 `json:"siafundinputs"`
+		SiafundOutputs        []uint64 `json:"siafundoutputs"`
+		MinerFees             []uint64 `json:"minerfees"`
+		ArbitraryData         []uint64 `json:"arbitrarydata"`
+		TransactionSignatures []uint64 `json:"transactionsignatures"`
 	}
 
 	// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
@@ -79,8 +79,8 @@ type (
 	// algorithms will always verify, which allows new algorithms to be added to
 	// the protocol via a soft-fork.
 	SiaPublicKey struct {
-		Algorithm Specifier
-		Key       []byte
+		Algorithm Specifier `json:"algorithm"`
+		Key       []byte    `json:"key"`
 	}
 
 	// A TransactionSignature is a signature that is included in the transaction.
@@ -95,11 +95,11 @@ type (
 	// 'CoveredFields' indicates which parts of the transaction are being signed;
 	// see CoveredFields.
 	TransactionSignature struct {
-		ParentID       crypto.Hash
-		PublicKeyIndex uint64
-		Timelock       BlockHeight
-		CoveredFields  CoveredFields
-		Signature      []byte
+		ParentID       crypto.Hash   `json:"parentid"`
+		PublicKeyIndex uint64        `json:"publickeyindex"`
+		Timelock       BlockHeight   `json:"timelock"`
+		CoveredFields  CoveredFields `json:"coveredfileds"`
+		Signature      []byte        `json:"signature"`
 	}
 
 	// UnlockConditions are a set of conditions which must be met to execute
@@ -118,9 +118,9 @@ type (
 	// unlock." If 'SignaturesRequired' > len('PublicKeys'), then the UnlockConditions
 	// cannot be fulfilled under any circumstances.
 	UnlockConditions struct {
-		Timelock           BlockHeight
-		PublicKeys         []SiaPublicKey
-		SignaturesRequired uint64
+		Timelock           BlockHeight    `json:"timelock"`
+		PublicKeys         []SiaPublicKey `json:"publickeys"`
+		SignaturesRequired uint64         `json:"signaturesrequired"`
 	}
 
 	// An UnlockHash is a specially constructed hash of the UnlockConditions
@@ -387,7 +387,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 			}
 
 		default:
-			// If we don't recognize the identifier, assume that the signature
+			// If the identifier is not recognized, assume that the signature
 			// is valid. This allows more signature types to be added via soft
 			// forking.
 		}
@@ -404,6 +404,29 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	}
 
 	return nil
+}
+
+// MarshalJSON is implemented on the unlock hash to always produce a hex string
+// upon marshalling.
+func (uh UnlockHash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(uh.String())
+}
+
+// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
+// that has been encoded to a hex string.
+func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
+	// Check the length of b.
+	if len(b) != crypto.HashSize*2+UnlockHashChecksumSize*2+2 && len(b) != crypto.HashSize*2+2 {
+		return ErrUnlockHashWrongLen
+	}
+	return uh.LoadString(string(b[1 : len(b)-1]))
+}
+
+// String returns the hex representation of the unlock hash as a string - this
+// includes a checksum.
+func (uh UnlockHash) String() string {
+	uhChecksum := crypto.HashObject(uh)
+	return fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
 }
 
 // LoadString loads a hex representation (including checksum) of an unlock hash
@@ -438,27 +461,4 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 	copy(uh[:], byteUnlockHash[:])
 
 	return nil
-}
-
-// MarshalJSON is implemented on the unlock hash to always produce a hex string
-// upon marshalling.
-func (uh UnlockHash) MarshalJSON() ([]byte, error) {
-	return json.Marshal(uh.String())
-}
-
-// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
-// that has been encoded to a hex string.
-func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
-	// Check the length of b.
-	if len(b) != crypto.HashSize*2+UnlockHashChecksumSize*2+2 && len(b) != crypto.HashSize*2+2 {
-		return ErrUnlockHashWrongLen
-	}
-	return uh.LoadString(string(b[1 : len(b)-1]))
-}
-
-// String returns the hex representation of the unlock hash as a string - this
-// includes a checksum.
-func (uh UnlockHash) String() string {
-	uhChecksum := crypto.HashObject(uh)
-	return fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
 }

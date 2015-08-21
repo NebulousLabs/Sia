@@ -20,14 +20,22 @@ type MinerStatus struct {
 // minerBlockforworkHandler handles the API call that retrieves a block for
 // work.
 func (srv *Server) minerBlockforworkHandler(w http.ResponseWriter, req *http.Request) {
-	bfw, _, target := srv.miner.BlockForWork()
+	bfw, _, target, err := srv.miner.BlockForWork()
+	if err != nil {
+		writeError(w, "call to /miner/blockforwork failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Write(encoding.MarshalAll(target, bfw.Header(), bfw))
 }
 
 // minerHeaderforworkHandler handles the API call that retrieves a block header
 // for work.
 func (srv *Server) minerHeaderforworkHandler(w http.ResponseWriter, req *http.Request) {
-	bhfw, target := srv.miner.HeaderForWork()
+	bhfw, target, err := srv.miner.HeaderForWork()
+	if err != nil {
+		writeError(w, "call to /miner/headerforwork failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Write(encoding.MarshalAll(target, bhfw))
 }
 
@@ -125,7 +133,11 @@ func (srv *Server) minerConnectToPoolHandler(w http.ResponseWriter, req *http.Re
 // minerPoolHeaderForWorkHandler handles the API call to request a header
 // from the miner for pool ming
 func (srv *Server) minerPoolHeaderForWorkHandler(w http.ResponseWriter, req *http.Request) {
-	bhfw, target := srv.miner.PoolHeaderForWork()
+	bhfw, target, err := srv.miner.PoolHeaderForWork()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Write(encoding.MarshalAll(target, bhfw))
 }
 

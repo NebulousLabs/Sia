@@ -87,20 +87,37 @@ func (m *Miner) prepareNewBlock() {
 
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
-func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target) {
+func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target, err error) {
+	// Check if the wallet is unlocked. If the wallet is unlocked, make sure
+	// that the miner has a recent address.
+	if !m.wallet.Unlocked() {
+		err = modules.ErrLockedWallet
+		return
+	}
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
+	err = m.checkAddress()
+	if err != nil {
+		return
+	}
 
 	b, t = m.blockForWork()
 	merkleRoot = b.MerkleRoot()
-	return b, merkleRoot, t
+	return b, merkleRoot, t, nil
 }
 
-// BlockForWork returns a block that is ready for nonce grinding, along with
+// HeaderForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
-func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
+func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
+	if !m.wallet.Unlocked() {
+		return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
+	}
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
+	err := m.checkAddress()
+	if err != nil {
+		return types.BlockHeader{}, types.Target{}, err
+	}
 
 	if time.Since(m.lastBlock).Seconds() > secondsBetweenBlocks {
 		m.prepareNewBlock()
@@ -145,7 +162,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	}
 
 	// Return the header and target.
-	return header, m.target
+	return header, m.target, nil
 }
 
 // submitBlock takes a solved block and submits it to the blockchain.
@@ -158,9 +175,11 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 		m.log.Println("ERROR: an invalid block was submitted:", err)
 		return err
 	}
-
-	// Grab a new address for the miner.
 	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
+
+	// Grab a new address for the miner. Call may fail if the wallet is locked
+	// or if the wallet addresses have been exhausted.
 	m.blocksFound = append(m.blocksFound, b.ID())
 	var addr types.UnlockHash
 	addrUC, err := m.wallet.NextAddress() // false indicates that the address should not be visible to the user.
@@ -168,7 +187,6 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	if err == nil { // Special case: only update the address if there was no error.
 		m.address = addr
 	}
-	m.mu.Unlock(lockID)
 	return err
 }
 

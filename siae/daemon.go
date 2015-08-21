@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/explorer"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/hostdb"
 
 	"github.com/spf13/cobra"
 )
@@ -28,11 +29,15 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
+	hostdb, err := hostdb.New(state, gateway)
+	if err != nil {
+		return err
+	}
 	explorer, err := explorer.New(state, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, nil, nil, nil, nil, nil, nil, nil, explorer)
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, nil, hostdb, nil, nil, nil, nil, nil, explorer)
 	if err != nil {
 		return err
 	}

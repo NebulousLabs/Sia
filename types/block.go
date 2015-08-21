@@ -5,6 +5,9 @@ package types
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -18,21 +21,21 @@ type (
 	// then try to pick a Nonce that results in a block whose BlockID is below a
 	// given Target.
 	Block struct {
-		ParentID     BlockID
-		Nonce        BlockNonce
-		Timestamp    Timestamp
-		MinerPayouts []SiacoinOutput
-		Transactions []Transaction
+		ParentID     BlockID         `json:"parentid"`
+		Nonce        BlockNonce      `json:"nonce"`
+		Timestamp    Timestamp       `json:"timestamp"`
+		MinerPayouts []SiacoinOutput `json:"minerpayouts"`
+		Transactions []Transaction   `json:"transactions"`
 	}
 
 	// A BlockHeader, when encoded, is an 80-byte constant size field
 	// containing enough information to do headers-first block downloading.
 	// Hashing the header results in the block ID.
 	BlockHeader struct {
-		ParentID   BlockID
-		Nonce      BlockNonce
-		Timestamp  Timestamp
-		MerkleRoot crypto.Hash
+		ParentID   BlockID     `json:"parentid"`
+		Nonce      BlockNonce  `json:"nonce"`
+		Timestamp  Timestamp   `json:"timestamp"`
+		MerkleRoot crypto.Hash `json:"merkleroot"`
 	}
 
 	BlockHeight uint64
@@ -129,4 +132,29 @@ func (b Block) MinerPayoutID(i uint64) SiacoinOutputID {
 		b.ID(),
 		i,
 	))
+}
+
+// MarshalJSON marshales a block id as a hex string.
+func (bid BlockID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(bid.String())
+}
+
+// String prints the block id in hex.
+func (bid BlockID) String() string {
+	return fmt.Sprintf("%x", bid[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the block id.
+func (bid *BlockID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	var bidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &bidBytes)
+	if err != nil {
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+	}
+	copy(bid[:], bidBytes)
+	return nil
 }

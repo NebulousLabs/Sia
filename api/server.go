@@ -82,7 +82,7 @@ func (srv *Server) Serve() error {
 		srv.gateway.Close()
 	}
 	if srv.wallet != nil {
-		srv.wallet.Close()
+		srv.wallet.Lock()
 	}
 
 	fmt.Println("\rCaught stop signal, quitting.")

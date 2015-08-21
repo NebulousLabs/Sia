@@ -2,6 +2,7 @@ package transactionpool
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -29,9 +30,44 @@ var (
 	errObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
 	errFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
+	errEmptySet            = errors.New("transaction set is empty")
 
 	TransactionMinFee = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
 )
+
+// relatedObjectIDs determines all of the object ids related to a transaction.
+func relatedObjectIDs(ts []types.Transaction) []ObjectID {
+	oidMap := make(map[ObjectID]struct{})
+	for _, t := range ts {
+		for _, sci := range t.SiacoinInputs {
+			oidMap[ObjectID(sci.ParentID)] = struct{}{}
+		}
+		for i := range t.SiacoinOutputs {
+			oidMap[ObjectID(t.SiacoinOutputID(i))] = struct{}{}
+		}
+		for i := range t.FileContracts {
+			oidMap[ObjectID(t.FileContractID(i))] = struct{}{}
+		}
+		for _, fcr := range t.FileContractRevisions {
+			oidMap[ObjectID(fcr.ParentID)] = struct{}{}
+		}
+		for _, sp := range t.StorageProofs {
+			oidMap[ObjectID(sp.ParentID)] = struct{}{}
+		}
+		for _, sfi := range t.SiafundInputs {
+			oidMap[ObjectID(sfi.ParentID)] = struct{}{}
+		}
+		for i := range t.SiafundOutputs {
+			oidMap[ObjectID(t.SiafundOutputID(i))] = struct{}{}
+		}
+	}
+
+	var oids []ObjectID
+	for oid, _ := range oidMap {
+		oids = append(oids, oid)
+	}
+	return oids
+}
 
 // checkMinerFees checks that the total amount of transaction fees in the
 // transaction set is sufficient to earn a spot in the transaction pool.
@@ -94,9 +130,109 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	return nil
 }
 
+// handleConflicts detects whether the conflicts in the transaction pool are
+// legal children of the new transaction pool set or not.
+func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []TransactionSetID) error {
+	// Create a list of all the transaction ids that compose the set of
+	// conflicts.
+	conflictMap := make(map[types.TransactionID]TransactionSetID)
+	for _, conflict := range conflicts {
+		conflictSet := tp.transactionSets[conflict]
+		for _, conflictTxn := range conflictSet {
+			conflictMap[conflictTxn.ID()] = conflict
+		}
+	}
+
+	// Discard all duplicate transactions from the input transaction set.
+	var dedupSet []types.Transaction
+	for _, t := range ts {
+		_, exists := conflictMap[t.ID()]
+		if exists {
+			continue
+		}
+		dedupSet = append(dedupSet, t)
+	}
+	if len(dedupSet) == 0 {
+		return modules.ErrDuplicateTransactionSet
+	}
+	// If transactions were pruned, it's possible that the set of
+	// dependencies/conflicts has also reduced. To minimize computational load
+	// on the consensus set, we want to prune out all of the conflicts that are
+	// no longer relevant. As an example, consider the transaction set {A}, the
+	// set {B}, and the new set {A, C}, where C is dependent on B. {A} and {B}
+	// are both conflicts, but after deduplication {A} is no longer a conflict.
+	// This is recursive, but it is guaranteed to run only once as the first
+	// deduplication is guaranteed to be complete.
+	if len(dedupSet) < len(ts) {
+		oids := relatedObjectIDs(dedupSet)
+		var conflicts []TransactionSetID
+		for _, oid := range oids {
+			conflict, exists := tp.knownObjects[oid]
+			if exists {
+				conflicts = append(conflicts, conflict)
+			}
+		}
+		return tp.handleConflicts(dedupSet, conflicts)
+	}
+
+	// Merge all of the conflict sets with the input set (input set goes last
+	// to preserve dependency ordering), and see if the set as a whole is both
+	// small enough to be legal and valid as a set. If no, return an error. If
+	// yes, add the new set to the pool, and eliminate the old set. The output
+	// diff objects can be repeated, (no need to remove those). Just need to
+	// remove the conflicts from tp.transactionSets.
+	var superset []types.Transaction
+	for _, conflict := range conflictMap {
+		superset = append(superset, tp.transactionSets[conflict]...)
+	}
+	superset = append(superset, dedupSet...)
+
+	// Check the composition of the transaction set, including fees and
+	// IsStandard rules (this is a new set, the rules must be rechecked).
+	err := tp.checkTransactionSetComposition(superset)
+	if err != nil {
+		return err
+	}
+
+	// Check that the transaction set is valid.
+	cc, err := tp.consensusSet.TryTransactionSet(superset)
+	if err != nil {
+		return err
+	}
+
+	// Remove the conflicts from the transaction pool. The diffs do not need to
+	// be removed, they will be overwritten later in the function.
+	for _, conflict := range conflictMap {
+		conflictSet := tp.transactionSets[conflict]
+		tp.transactionListSize -= len(encoding.Marshal(conflictSet))
+		delete(tp.transactionSets, conflict)
+		delete(tp.transactionSetDiffs, conflict)
+	}
+
+	// Add the transaction set to the pool.
+	setID := TransactionSetID(crypto.HashObject(superset))
+	tp.transactionSets[setID] = superset
+	for _, diff := range cc.SiacoinOutputDiffs {
+		tp.knownObjects[ObjectID(diff.ID)] = setID
+	}
+	for _, diff := range cc.FileContractDiffs {
+		tp.knownObjects[ObjectID(diff.ID)] = setID
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		tp.knownObjects[ObjectID(diff.ID)] = setID
+	}
+	tp.transactionSetDiffs[setID] = cc
+	tp.transactionListSize += len(encoding.Marshal(superset))
+	return nil
+}
+
 // acceptTransactionSet verifies that a transaction set is allowed to be in the
 // transaction pool, and then adds it to the transaction pool.
 func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
+	if len(ts) == 0 {
+		return errEmptySet
+	}
+
 	// Check the composition of the transaction set, including fees and
 	// IsStandard rules.
 	err := tp.checkTransactionSetComposition(ts)
@@ -104,42 +240,30 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 		return err
 	}
 
-	// Check that all transactions are valid, and that there is no conflict
-	// with existing transactions.
+	// Check for conflicts with other transactions, which would indicate a
+	// double-spend. Legal children of a transaction set will also trigger the
+	// conflict-detector.
+	oids := relatedObjectIDs(ts)
+	var conflicts []TransactionSetID
+	for _, oid := range oids {
+		conflict, exists := tp.knownObjects[oid]
+		if exists {
+			conflicts = append(conflicts, conflict)
+		}
+	}
+	if len(conflicts) > 0 {
+		return tp.handleConflicts(ts, conflicts)
+	}
 	cc, err := tp.consensusSet.TryTransactionSet(ts)
 	if err != nil {
 		return err
-	}
-	for _, diff := range cc.SiacoinOutputDiffs {
-		_, exists := tp.knownObjects[ObjectID(diff.ID)]
-		if exists {
-			return errObjectConflict
-		}
-	}
-	for _, diff := range cc.FileContractDiffs {
-		_, exists := tp.knownObjects[ObjectID(diff.ID)]
-		if exists {
-			return errObjectConflict
-		}
-	}
-	for _, diff := range cc.SiafundOutputDiffs {
-		_, exists := tp.knownObjects[ObjectID(diff.ID)]
-		if exists {
-			return errObjectConflict
-		}
 	}
 
 	// Add the transaction set to the pool.
 	setID := TransactionSetID(crypto.HashObject(ts))
 	tp.transactionSets[setID] = ts
-	for _, diff := range cc.SiacoinOutputDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
-	}
-	for _, diff := range cc.FileContractDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
-	}
-	for _, diff := range cc.SiafundOutputDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
+	for _, oid := range oids {
+		tp.knownObjects[oid] = setID
 	}
 	tp.transactionSetDiffs[setID] = cc
 	tp.transactionListSize += len(encoding.Marshal(ts))
@@ -161,10 +285,22 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	// Notify subscribers and broadcast the transaction set.
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
 	tp.updateSubscribersTransactions()
+
+	// COMPAT 0.3.3.3
+	//
+	// Transactions must be broadcast individually as well so that they will be
+	// seen by older nodes that don't support the "RelayTransactionSet" RPC.
+	go func() {
+		for _, t := range ts {
+			tp.gateway.Broadcast("RelayTransaction", t)
+			time.Sleep(time.Second * 15)
+		}
+	}()
+
 	return nil
 }
 
-// RelayTransaction is an RPC that accepts a transaction set from a peer. If
+// RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
@@ -173,10 +309,5 @@ func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Ask Luke some stuff about DoS with regards to this function.
-	err = tp.AcceptTransactionSet(ts)
-	if err == modules.ErrDuplicateTransactionSet { // benign error
-		err = nil
-	}
-	return err
+	return tp.AcceptTransactionSet(ts)
 }

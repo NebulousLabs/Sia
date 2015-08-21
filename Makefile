@@ -7,8 +7,10 @@ all: install
 dependencies:
 	go install -race std
 	go get -u github.com/NebulousLabs/ed25519
+	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
+	go get -u github.com/bgentry/speakeasy
 	go get -u github.com/boltdb/bolt
 	go get -u github.com/dchest/blake2b
 	go get -u github.com/inconshreveable/go-update
@@ -32,11 +34,11 @@ REBUILD:
 
 # install builds and installs developer binaries.
 install: fmt REBUILD
-	go install -race -tags='dev debug' ./...
+	go install -race -tags='dev debug profile' ./...
 
 # release builds and installs release binaries.
 release: REBUILD
-	go install -a -race -tags='debug' ./...
+	go install -a -race -tags='debug profile' ./...
 release-std: REBUILD
 	go install -a ./...
 
@@ -67,34 +69,34 @@ clean:
 pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
        ./modules/gateway ./modules/host ./modules/hostdb		     \
        ./modules/miner ./modules/renter ./modules/transactionpool    \
-       ./modules/wallet ./modules/explorer ./persist ./siad     \
+       ./modules/wallet ./modules/explorer ./persist                 \
        ./siag ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=10s $(pkgs)
 test-v: clean fmt REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=20s $(pkgs)
 test-long: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
+	go test -v -race -tags='testing debug' -timeout=360s $(pkgs)
 bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=120s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
-		go test -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
 cover-integration: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestIntegration -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestIntegration -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
 cover-unit: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestUnit -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestUnit -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done

@@ -14,9 +14,6 @@ import (
 
 // TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestDoSBlockHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
 	cst, err := createConsensusSetTester("TestDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +34,10 @@ func TestDoSBlockHandling(t *testing.T) {
 	}
 
 	// Get a block, insert the transaction, and submit the block.
-	block, _, target := cst.miner.BlockForWork()
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
 	block.Transactions = append(block.Transactions, txnSet...)
 	dosBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.AcceptBlock(dosBlock)
@@ -55,17 +55,18 @@ func TestDoSBlockHandling(t *testing.T) {
 // testBlockKnownHandling submits known blocks to the consensus set.
 func (cst *consensusSetTester) testBlockKnownHandling() error {
 	// Get a block destined to be stale.
-	block, _, target := cst.miner.BlockForWork()
-	staleBlock, _ := cst.miner.SolveBlock(block, target)
-
-	// Add two new blocks to the consensus set to block the stale block.
-	block1, _ := cst.miner.FindBlock()
-	err := cst.cs.AcceptBlock(block1)
+	block, _, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		return err
 	}
-	block2, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block2)
+	staleBlock, _ := cst.miner.SolveBlock(block, target)
+
+	// Add two new blocks to the consensus set to block the stale block.
+	block1, err := cst.miner.AddBlock()
+	if err != nil {
+		return err
+	}
+	block2, err := cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -152,7 +153,10 @@ func TestMissedTarget(t *testing.T) {
 	defer cst.closeCst()
 
 	// Mine a block that doesn't meet the target.
-	block, _, target := cst.miner.BlockForWork()
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for block.CheckTarget(target) && block.Nonce[0] != 255 {
 		block.Nonce[0]++
 	}
@@ -184,7 +188,10 @@ func TestLargeBlock(t *testing.T) {
 	}
 
 	// Fetch a block and add the transaction, then submit the block.
-	block, _, target := cst.miner.BlockForWork()
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
 	block.Transactions = append(block.Transactions, txn)
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
@@ -207,9 +214,11 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 
 	// Create a block with a too early timestamp - block should be rejected
 	// outright.
-	block, _, target := cst.miner.BlockForWork()
-	earliestTimestamp := cst.cs.earliestChildTimestamp(cst.cs.db.getBlockMap(block.ParentID))
-	block.Timestamp = earliestTimestamp - 1
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block.Timestamp = 0
 	earlyBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(earlyBlock)
 	if err != ErrEarlyTimestamp {
@@ -230,7 +239,10 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	defer cst.closeCst()
 
 	// Submit a block with a timestamp in the extreme future.
-	block, _, target := cst.miner.BlockForWork()
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
@@ -265,7 +277,10 @@ func TestMinerPayoutHandling(t *testing.T) {
 	// Create a block with the wrong miner payout structure - testing can be
 	// light here because there is heavier testing in the 'types' package,
 	// where the logic is defined.
-	block, _, target := cst.miner.BlockForWork()
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
 	block.MinerPayouts = append(block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(1)})
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
@@ -279,10 +294,13 @@ func TestMinerPayoutHandling(t *testing.T) {
 func (cst *consensusSetTester) testFutureTimestampHandling() error {
 	// Submit a block with a timestamp in the future, but not the extreme
 	// future.
-	block, _, target := cst.miner.BlockForWork()
+	block, _, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		return err
+	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err := cst.cs.acceptBlock(solvedBlock)
+	err = cst.cs.acceptBlock(solvedBlock)
 	if err != ErrFutureTimestamp {
 		return errors.New("Expecting ErrExtremeFutureTimestamp: " + err.Error())
 	}
@@ -346,8 +364,7 @@ func TestInconsistentCheck(t *testing.T) {
 			t.Error("expecting errSiacoinMiscount, got:", r)
 		}
 	}()
-	block, _ := cst.miner.FindBlock()
-	_ = cst.cs.AcceptBlock(block)
+	cst.miner.AddBlock()
 }
 
 // testSimpleBlock mines a simple block (no transactions except those
@@ -357,8 +374,7 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	initialCSSum := cst.cs.consensusSetHash()
 
 	// Mine and submit a block
-	block, _ := cst.miner.FindBlock()
-	err := cst.cs.AcceptBlock(block)
+	block, err := cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -442,8 +458,7 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
 	outputID := txnSet[len(txnSet)-1].SiacoinOutputID(int(outputIndex))
 
 	// Mine and apply the block to the consensus set.
-	block, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -575,8 +590,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	if err != nil {
 		return err
 	}
-	block, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -607,8 +621,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	if err != nil {
 		return err
 	}
-	block, _ = cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -641,8 +654,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	if err != nil {
 		return err
 	}
-	block, _ = cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -661,14 +673,13 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	// Check that the file contract output made it into the set of delayed
 	// outputs.
 	validProofID := validFCID.StorageProofOutputID(types.ProofValid, 0)
-	_, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay][validProofID]
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, validProofID)
 	if !exists {
 		return errors.New("file contract payout is not in the delayed outputs set")
 	}
 
 	// Mine a block to close the window on the missed file contract.
-	block, _ = cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -684,8 +695,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	// Mine enough blocks to get all of the outputs into the set of siacoin
 	// outputs.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		block, _ = cst.miner.FindBlock()
-		err = cst.cs.AcceptBlock(block)
+		_, err = cst.miner.AddBlock()
 		if err != nil {
 			return err
 		}
@@ -719,8 +729,7 @@ func TestFileContractsBlocks(t *testing.T) {
 	// Mine enough blocks to get above the file contract hardfork threshold
 	// (10).
 	for i := 0; i < 10; i++ {
-		block, _ := cst.miner.FindBlock()
-		err = cst.cs.AcceptBlock(block)
+		_, err = cst.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -775,8 +784,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
 
 	// Mine a block containing the txn.
-	block, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -837,8 +845,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	if err != nil {
 		return err
 	}
-	block, _ = cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -879,8 +886,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	}
 	sfoid1 = txn.SiafundOutputID(1)
 	cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
-	block, _ = cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -889,13 +895,17 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	// siafunds.
 	found := false
 	expectedBalance := cst.cs.siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
-	for _, output := range cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay] {
+	cst.cs.db.forEachDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
 		if output.UnlockHash == claimDest {
 			found = true
 			if output.Value.Cmp(expectedBalance) != 0 {
-				return errors.New("siafund output has the wrong balance")
+				// Err is scopedoutside this func
+				err = errors.New("siafund output has the wrong balance")
 			}
 		}
+	})
+	if err != nil {
+		return err
 	}
 	if !found {
 		return errors.New("could not find siafund claim output")
@@ -921,8 +931,7 @@ func TestSpendSiafundsBlock(t *testing.T) {
 	// Mine enough blocks to get above the file contract hardfork threshold
 	// (10).
 	for i := 0; i < 10; i++ {
-		block, _ := cst.miner.FindBlock()
-		err = cst.cs.AcceptBlock(block)
+		_, err = cst.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1115,8 +1124,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		return err
 	}
 	// Put the txn in a block.
-	block, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -1174,8 +1182,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	}
 
 	// Mine the block with the transaction.
-	block, _ = cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		return err
 	}
@@ -1767,8 +1774,7 @@ func TestTaxHardfork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	block, _ := cst.miner.FindBlock()
-	err = cst.cs.AcceptBlock(block)
+	_, err = cst.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1781,8 +1787,7 @@ func TestTaxHardfork(t *testing.T) {
 	// Mine blocks until the file contract expires and see if any problems
 	// occur.
 	for i := 0; i < 12; i++ {
-		block, _ := cst.miner.FindBlock()
-		err = cst.cs.AcceptBlock(block)
+		_, err = cst.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -163,7 +163,7 @@ func (e *Explorer) addBlockDB(b types.Block) error {
 	}
 
 	// Check if the block exists
-	exists, err := e.db.Exists("Blocks", encoding.Marshal(b.ID()))
+	exists, err := e.db.Exists([]byte("Blocks"), encoding.Marshal(b.ID()))
 	if err != nil {
 		return err
 	}
