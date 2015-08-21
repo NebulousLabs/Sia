@@ -24,7 +24,7 @@ func (m *Miner) negotiatePaymentChannel() error {
 	}
 	defer conn.Close()
 
-	err = encoding.WriteObject(conn, [8]byte{'C', 'h', 'a', 'n', 'n', 'e', 'l'})
+	err = encoding.WriteObject(conn, types.Specifier{'c', 'h', 'a', 'n', 'n', 'e', 'l'})
 	if err != nil {
 		fmt.Println(2)
 		return err
@@ -42,7 +42,7 @@ func (m *Miner) negotiatePaymentChannel() error {
 	var channelTxn types.Transaction
 	err = encoding.ReadObject(conn, &channelTxn, 10e3) // TODO: change to txn size
 	if err != nil {
-		fmt.Println(4)
+		fmt.Println(4, err)
 		return err
 	}
 
@@ -159,7 +159,7 @@ func (m *Miner) PoolConnect(ip string) error {
 	defer conn.Close()
 	m.poolIP = ip
 
-	err = encoding.WriteObject(conn, [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'})
+	err = encoding.WriteObject(conn, types.Specifier{'s', 'e', 't', 't', 'i', 'n', 'g', 's'})
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (m *Miner) PoolSubmitHeader(bh types.BlockHeader) error {
 	}
 	defer conn.Close()
 
-	err = encoding.WriteObject(conn, [8]byte{'S', 'u', 'b', 'm', 'i', 't'})
+	err = encoding.WriteObject(conn, types.Specifier{'s', 'u', 'b', 'm', 'i', 't'})
 	if err != nil {
 		return err
 	}

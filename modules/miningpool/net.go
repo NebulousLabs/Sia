@@ -4,14 +4,13 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
-type rpcID [8]byte
-
 var (
-	idChannel  = rpcID{'C', 'h', 'a', 'n', 'n', 'e', 'l'}
-	idSettings = rpcID{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
-	idSubmit   = rpcID{'S', 'u', 'b', 'm', 'i', 't'}
+	idChannel  = types.Specifier{'c', 'h', 'a', 'n', 'n', 'e', 'l'}
+	idSettings = types.Specifier{'s', 'e', 't', 't', 'i', 'n', 'g', 's'}
+	idSubmit   = types.Specifier{'s', 'u', 'b', 'm', 'i', 't'}
 )
 
 func (mp *MiningPool) listen() {
@@ -26,8 +25,8 @@ func (mp *MiningPool) listen() {
 
 func (mp *MiningPool) handleConn(conn net.Conn) {
 	defer conn.Close()
-	var id rpcID
-	if err := encoding.ReadObject(conn, &id, 8); err != nil {
+	var id types.Specifier
+	if err := encoding.ReadObject(conn, &id, types.SpecifierLen); err != nil {
 		// log
 		return
 	}
