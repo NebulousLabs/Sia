@@ -108,7 +108,7 @@ func (srv *Server) minerSubmitheaderHandler(w http.ResponseWriter, req *http.Req
 }
 
 // minerConnectToPoolHandler handles the API call to connect to a mining pool
-func (srv *Server) minerConnectToPoolHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) minerPoolConnectHandler(w http.ResponseWriter, req *http.Request) {
 	var ip string
 	// TODO: actually read ip from req.Body
 	/*encodedIP, err := ioutil.ReadAll(req.Body)
@@ -122,7 +122,7 @@ func (srv *Server) minerConnectToPoolHandler(w http.ResponseWriter, req *http.Re
 		return
 	}*/
 	ip = "localhost:9983" // Miner is temporarily hard-coded to localhost:9983
-	err := srv.miner.ConnectToPool(ip)
+	err := srv.miner.PoolConnect(ip)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -143,7 +143,7 @@ func (srv *Server) minerPoolHeaderForWorkHandler(w http.ResponseWriter, req *htt
 
 // minerSubmitPoolHeaderHandler handles the API call to submit a header to
 // the miner
-func (srv *Server) minerSubmitPoolHeaderHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) minerPoolSubmitHeaderHandler(w http.ResponseWriter, req *http.Request) {
 	var bh types.BlockHeader
 	encodedHeader, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -155,7 +155,7 @@ func (srv *Server) minerSubmitPoolHeaderHandler(w http.ResponseWriter, req *http
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	err = srv.miner.SubmitPoolHeader(bh)
+	err = srv.miner.PoolSubmitHeader(bh)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return

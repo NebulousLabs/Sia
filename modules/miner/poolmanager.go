@@ -150,7 +150,7 @@ func (m *Miner) reconstructPoolBlock(ph types.BlockHeader) (types.Block, error) 
 // Connects to the pool hosted at the given ip. The miner negotiates a payment
 // channel and gets certain values from the pool, like the payout address(es)
 // and payout ratios (what percent goes to who)
-func (m *Miner) ConnectToPool(ip string) error {
+func (m *Miner) PoolConnect(ip string) error {
 	fmt.Println("connect to pool: ", ip)
 	conn, err := net.DialTimeout("tcp", ip, 10e9)
 	if err != nil {
@@ -233,7 +233,7 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 
 // SubmitPoolHeader takes a header that has been solved and submits it
 // to the pool
-func (m *Miner) SubmitPoolHeader(bh types.BlockHeader) error {
+func (m *Miner) PoolSubmitHeader(bh types.BlockHeader) error {
 	// TODO: make sure we connected to a pool already
 
 	fmt.Println("pool header submit")

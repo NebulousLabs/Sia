@@ -37,17 +37,17 @@ type PoolManager interface {
 	// Connects to the pool hosted at the given ip. The miner negotiates a
 	// payment channel and gets certain values from the pool, like the payout
 	// address(es) and payout ratios (what percent goes to who)
-	ConnectToPool(ip string) error
+	PoolConnect(ip string) error
 
-	// HeaderForPool returns the header of a block that is ready for pool
+	// PoolHeaderForWork returns the header of a block that is ready for pool
 	// mining.  The block contains all the correct pool payouts. The header is
 	// meant to be grinded by a miner and, shuold the target be beat,
 	// resubmitted through SubmitHeaderToPool
 	PoolHeaderForWork() (types.BlockHeader, types.Target, error)
 
-	// SubmitPoolHeader takes a header that has been solved and submits it to
+	// PoolSubmitHeader takes a header that has been solved and submits it to
 	// the pool
-	SubmitPoolHeader(types.BlockHeader) error
+	PoolSubmitHeader(types.BlockHeader) error
 }
 
 // A CPUMiner provides access to a single-threaded cpu miner.
