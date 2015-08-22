@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -87,6 +88,14 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	lockID := tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock(lockID)
 
+	// Collect a value-sorted set of siacoin outputs.
+	var so sortedOutputs
+	for scoid, sco := range tb.wallet.siacoinOutputs {
+		so.ids = append(so.ids, scoid)
+		so.outputs = append(so.outputs, sco)
+	}
+	sort.Sort(so)
+
 	// Create and fund a parent transaction that will add the correct amount of
 	// siacoins to the transaction.
 	var fund types.Currency
@@ -97,7 +106,9 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	var potentialFund types.Currency
 	parentTxn := types.Transaction{}
 	var spentScoids []types.SiacoinOutputID
-	for scoid, sco := range tb.wallet.siacoinOutputs {
+	for i := range so.ids {
+		scoid := so.ids[i]
+		sco := so.outputs[i]
 		// Check that this output has not recently been spent by the wallet.
 		spendHeight := tb.wallet.spentOutputs[types.OutputID(scoid)]
 		// Prevent an underflow error.
@@ -190,6 +201,10 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siafund input will not be signed until 'Sign' is called
 // on the transaction builder.
+//
+// TODO: The implementation of FundSiacoins is known to have quirks/bugs
+// (non-fatal), and has diverged from the implementation of FundSiacoins. The
+// implementations should be converged once again.
 func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	lockID := tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock(lockID)
