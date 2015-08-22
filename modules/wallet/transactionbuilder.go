@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -87,22 +88,42 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	lockID := tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock(lockID)
 
+	// Collect a value-sorted set of siacoin outputs.
+	var so sortedOutputs
+	for scoid, sco := range tb.wallet.siacoinOutputs {
+		so.ids = append(so.ids, scoid)
+		so.outputs = append(so.outputs, sco)
+	}
+	sort.Sort(so)
+
 	// Create and fund a parent transaction that will add the correct amount of
 	// siacoins to the transaction.
 	var fund types.Currency
+	// potentialFund tracks the balance of the wallet including outputs that
+	// have been spent in other unconfirmed transactions recently. This is to
+	// provide the user with a more useful error message in the event that they
+	// are overspending.
+	var potentialFund types.Currency
 	parentTxn := types.Transaction{}
-	for scoid, sco := range tb.wallet.siacoinOutputs {
+	var spentScoids []types.SiacoinOutputID
+	for i := range so.ids {
+		scoid := so.ids[i]
+		sco := so.outputs[i]
 		// Check that this output has not recently been spent by the wallet.
 		spendHeight := tb.wallet.spentOutputs[types.OutputID(scoid)]
-		if spendHeight > tb.wallet.consensusSetHeight-RespendTimeout {
+		// Prevent an underflow error.
+		allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
+		if tb.wallet.consensusSetHeight < RespendTimeout {
+			allowedHeight = 0
+		}
+		if spendHeight > allowedHeight {
+			potentialFund = potentialFund.Add(sco.Value)
 			continue
 		}
 		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].unlockConditions
 		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
 			continue
 		}
-		// Mark the output as spent.
-		tb.wallet.spentOutputs[types.OutputID(scoid)] = tb.wallet.consensusSetHeight
 
 		// Add a siacoin input for this output.
 		sci := types.SiacoinInput{
@@ -110,12 +131,17 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			UnlockConditions: outputUnlockConditions,
 		}
 		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
+		spentScoids = append(spentScoids, scoid)
 
 		// Add the output to the total fund
 		fund = fund.Add(sco.Value)
+		potentialFund = potentialFund.Add(sco.Value)
 		if fund.Cmp(amount) >= 0 {
 			break
 		}
+	}
+	if potentialFund.Cmp(amount) > 0 && fund.Cmp(amount) < 0 {
+		return modules.ErrPotentialDoubleSpend
 	}
 	if fund.Cmp(amount) < 0 {
 		return modules.ErrLowBalance
@@ -146,7 +172,8 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, refundOutput)
 	}
 
-	// Sign all of the inputs to the parent trancstion.
+	// Sign all of the inputs to the parent trancstion. This is done at the end
+	// so that the outputs aren't marked as spent in the event of an error.
 	for _, sci := range parentTxn.SiacoinInputs {
 		err := addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
 		if err != nil {
@@ -162,6 +189,11 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	tb.parents = append(tb.parents, parentTxn)
 	tb.siacoinInputs = append(tb.siacoinInputs, len(tb.transaction.SiacoinInputs))
 	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, newInput)
+
+	// Mark all outputs that were spent as spent.
+	for _, scoid := range spentScoids {
+		tb.wallet.spentOutputs[types.OutputID(scoid)] = tb.wallet.consensusSetHeight
+	}
 	return nil
 }
 
@@ -169,6 +201,10 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siafund input will not be signed until 'Sign' is called
 // on the transaction builder.
+//
+// TODO: The implementation of FundSiacoins is known to have quirks/bugs
+// (non-fatal), and has diverged from the implementation of FundSiacoins. The
+// implementations should be converged once again.
 func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	lockID := tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock(lockID)
