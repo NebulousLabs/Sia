@@ -19,30 +19,35 @@ const (
 )
 
 var (
-	seedModifier = types.Specifier{'s', 'e', 'e', 'd'}
-
 	errAddressExhaustion = errors.New("current seed has used all available addresses")
 	errKnownSeed         = errors.New("seed is already known")
 )
 
 type (
-	// SeedFileUID is a unique id randomly generated and put at the front of
-	// every seed file. It is used to make sure that a different encryption key
-	// can be used for every seed file.
-	SeedFileUID [crypto.EntropySize]byte
+	// UniqueID is a unique id randomly generated and put at the front of every
+	// persistence object. It is used to make sure that a different encryption
+	// key can be used for every persistence object.
+	UniqueID [crypto.EntropySize]byte
 
 	// SeedFile stores an encrypted wallet seed on disk.
 	SeedFile struct {
-		SeedFileUID            SeedFileUID
+		UID                    UniqueID
 		EncryptionVerification crypto.Ciphertext
 		Seed                   crypto.Ciphertext
 	}
+
+	// SpendableKeyFile stores an encrypted spendable key on disk.
+	SpendableKeyFile struct {
+		UID                    UniqueID
+		EncryptionVerification crypto.Ciphertext
+		SpendableKey           crypto.Ciphertext
+	}
 )
 
-// seedFileEncryptionKey creates an encryption key that is used to decrypt a
+// uidEncryptionKey creates an encryption key that is used to decrypt a
 // specific key file.
-func seedFileEncryptionKey(masterKey crypto.TwofishKey, sfuid SeedFileUID) crypto.TwofishKey {
-	return crypto.TwofishKey(crypto.HashAll(masterKey, seedModifier, sfuid))
+func uidEncryptionKey(masterKey crypto.TwofishKey, uid UniqueID) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, uid))
 }
 
 // generateUnlockConditions provides the unlock conditions that would be
@@ -72,8 +77,8 @@ func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 // decryptSeedFile decrypts a seed file using the encryption key.
 func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.Seed, err error) {
 	// Verify that the provided master key is the correct key.
-	decryptionKey := seedFileEncryptionKey(masterKey, sf.SeedFileUID)
-	expectedDecryptedVerification := make([]byte, 32)
+	decryptionKey := uidEncryptionKey(masterKey, sf.UID)
+	expectedDecryptedVerification := make([]byte, crypto.EntropySize)
 	decryptedVerification, err := decryptionKey.DecryptBytes(sf.EncryptionVerification)
 	if err != nil {
 		return modules.Seed{}, err
@@ -112,12 +117,12 @@ func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 	}
 
 	// Encrypt the seed and save the seed file.
-	var sfuid SeedFileUID
+	var sfuid UniqueID
 	_, err := rand.Read(sfuid[:])
 	if err != nil {
 		return err
 	}
-	sek := seedFileEncryptionKey(masterKey, sfuid)
+	sek := uidEncryptionKey(masterKey, sfuid)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
 	encryptionVerification, err := sek.EncryptBytes(plaintextVerification)
 	if err != nil {
@@ -129,7 +134,7 @@ func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 	}
 	seedFilename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
 	seedFile := SeedFile{
-		SeedFileUID:            sfuid,
+		UID: sfuid,
 		EncryptionVerification: encryptionVerification,
 		Seed: cryptSeed,
 	}
@@ -156,12 +161,12 @@ func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 func (w *Wallet) createSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	// Derive the key used to encrypt the seed file, and create the encryption
 	// verification object.
-	var sfuid SeedFileUID
+	var sfuid UniqueID
 	_, err := rand.Read(sfuid[:])
 	if err != nil {
 		return err
 	}
-	sfek := seedFileEncryptionKey(masterKey, sfuid)
+	sfek := uidEncryptionKey(masterKey, sfuid)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
 	encryptionVerification, err := sfek.EncryptBytes(plaintextVerification)
 	if err != nil {
@@ -177,7 +182,7 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey, seed modules.Seed) erro
 	}
 	w.primarySeed = seed
 	w.settings.PrimarySeedFile = SeedFile{
-		SeedFileUID:            sfuid,
+		UID: sfuid,
 		EncryptionVerification: encryptionVerification,
 		Seed: cryptSeed,
 	}

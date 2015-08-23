@@ -227,13 +227,16 @@ type (
 		// primary seed.
 		NextAddress() (types.UnlockConditions, error)
 
+		// LoadSiagKeys will take a set of filepaths that point to a siag key
+		// and will have the siag keys loaded into the wallet so that they will
+		// become spendable.
+		LoadSiagKeys(crypto.TwofishKey, []string) error
+
 		// RecoverSeed will recreate a wallet file using the recovery phrase.
 		// RecoverSeed only needs to be called if the original seed file or
 		// encryption password was lost. The master key is used encrypt the
 		// recovery seed before saving it to disk.
 		RecoverSeed(crypto.TwofishKey, Seed) error
-
-		// RecoverFile will read a file with keys and add them to the wallet.
 
 		// CreateBackup will create a backup of the wallet at the provided
 		// filepath. The backup will have all seeds and keys.
