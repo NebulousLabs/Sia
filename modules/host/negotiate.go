@@ -276,10 +276,17 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	defer obligation.mu.Unlock()
 
 	// open the file in append mode
-	file, err := os.OpenFile(obligation.Path, os.O_WRONLY|os.O_APPEND, 0660)
+	file, err := os.OpenFile(obligation.Path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		// if a newly-created file was not updated, remove it
+		if stat, _ := file.Stat(); stat.Size() == 0 {
+			os.Remove(obligation.Path)
+		}
+		file.Close()
+	}()
 
 	// rebuild current Merkle tree
 	tree := crypto.NewTree()
@@ -381,11 +388,6 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 		h.save()
 		h.mu.Unlock(lockID)
-	}
-
-	// if a newly-created file was not updated, remove it
-	if stat, _ := file.Stat(); stat.Size() == 0 {
-		os.Remove(obligation.Path)
 	}
 
 	return nil
