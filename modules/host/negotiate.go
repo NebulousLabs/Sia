@@ -110,11 +110,6 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	if len(txn.FileContractRevisions) != 1 {
 		return errors.New("transaction should have only one revision")
 	}
-	// Check that transaction is valid.
-	err := txn.StandaloneValid(h.blockHeight)
-	if err != nil {
-		return err
-	}
 
 	// calculate minimum expected output value
 	rev := txn.FileContractRevisions[0]
