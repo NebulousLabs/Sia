@@ -121,6 +121,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	fc := obligation.FileContract
 	duration := types.NewCurrency64(uint64(fc.WindowStart - h.blockHeight))
 	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.Price)
+	expectedPayout := fc.Payout.Sub(fc.Tax())
 
 	switch {
 	// these fields should never change
@@ -149,8 +150,8 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 		return errors.New("revision file size is too large")
 
 	// valid and missing outputs should still sum to payout
-	case rev.NewValidProofOutputs[0].Value.Add(rev.NewValidProofOutputs[1].Value).Cmp(fc.Payout) != 0,
-		rev.NewMissedProofOutputs[0].Value.Add(rev.NewMissedProofOutputs[1].Value).Cmp(fc.Payout) != 0:
+	case rev.NewValidProofOutputs[0].Value.Add(rev.NewValidProofOutputs[1].Value).Cmp(expectedPayout) != 0,
+		rev.NewMissedProofOutputs[0].Value.Add(rev.NewMissedProofOutputs[1].Value).Cmp(expectedPayout) != 0:
 		return errors.New("revision outputs do not sum to original payout")
 
 	// outputs should have been adjusted proportional to the new filesize
@@ -210,11 +211,11 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 
 	// check that transaction set was not modified
 	if len(signedTxnSet) != len(unsignedTxnSet) {
-		return errors.New("host sent bad collateral transaction")
+		return errors.New("renter sent bad signed transaction set")
 	}
 	for i := range signedTxnSet {
 		if signedTxnSet[i].ID() != unsignedTxnSet[i].ID() {
-			return errors.New("host sent bad collateral transaction")
+			return errors.New("renter sent bad signed transaction set")
 		}
 	}
 

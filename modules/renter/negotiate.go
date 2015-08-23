@@ -108,23 +108,24 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		WindowStart:    height + duration,
 		WindowEnd:      height + duration + hu.settings.WindowSize,
 		Payout:         payout,
-		ValidProofOutputs: []types.SiacoinOutput{
-			{Value: renterCost, UnlockHash: ourAddr.UnlockHash()},
-			{Value: types.ZeroCurrency, UnlockHash: hu.settings.UnlockHash}, // no collateral
-		},
-		MissedProofOutputs: []types.SiacoinOutput{
-			// same as above
-			{Value: renterCost, UnlockHash: ourAddr.UnlockHash()},
-			// goes to the void, not the renter
-			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
-		},
 		UnlockHash:     hu.unlockConditions.UnlockHash(),
 		RevisionNumber: 0,
+	}
+	// outputs need account for tax
+	fc.ValidProofOutputs = []types.SiacoinOutput{
+		{Value: renterCost.Sub(fc.Tax()), UnlockHash: ourAddr.UnlockHash()},
+		{Value: types.ZeroCurrency, UnlockHash: hu.settings.UnlockHash}, // no collateral
+	}
+	fc.MissedProofOutputs = []types.SiacoinOutput{
+		// same as above
+		fc.ValidProofOutputs[0],
+		// goes to the void, not the renter
+		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 	}
 
 	// build transaction containing fc
 	txnBuilder := hu.renter.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(renterCost)
+	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		return err
 	}
