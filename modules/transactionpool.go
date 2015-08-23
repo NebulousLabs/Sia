@@ -43,6 +43,12 @@ type TransactionPool interface {
 	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
+	// COMPAT v0.3.3.3
+	//
+	// RelayTransaction is an RPC that accepts a transaction set from a
+	// peer.
+	RelayTransaction(PeerConn) error
+
 	// RelayTransactionSet is an RPC that accepts a transaction set from a
 	// peer.
 	RelayTransactionSet(PeerConn) error

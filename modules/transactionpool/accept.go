@@ -286,7 +286,7 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
 	tp.updateSubscribersTransactions()
 
-	// COMPAT 0.3.3.3
+	// COMPAT v0.3.3.3
 	//
 	// Transactions must be broadcast individually as well so that they will be
 	// seen by older nodes that don't support the "RelayTransactionSet" RPC.
@@ -298,6 +298,20 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	}()
 
 	return nil
+}
+
+// COMPAT v0.3.3.3
+//
+// RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
+// the accept is successful, the transaction will be relayed to the gateway's
+// other peers.
+func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
+	var t types.Transaction
+	err := encoding.ReadObject(conn, &t, types.BlockSizeLimit)
+	if err != nil {
+		return err
+	}
+	return tp.AcceptTransactionSet([]types.Transaction{t})
 }
 
 // RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
