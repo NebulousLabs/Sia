@@ -198,6 +198,10 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		WindowStart: fc.WindowStart,
 	}
 
+	lockID = hu.renter.mu.Lock()
+	hu.renter.contracts[fcid] = fc
+	hu.renter.mu.Unlock(lockID)
+
 	return nil
 }
 

@@ -238,18 +238,16 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 
 	// Add this contract to the host's list of obligations.
 	// TODO: is there a race condition here?
-	fcid := signedTxnSet[len(signedTxnSet)-1].FileContractID(0)
-	fc := signedTxnSet[len(signedTxnSet)-1].FileContracts[0]
-	proofHeight := fc.WindowStart + StorageProofReorgDepth
 	lockID = h.mu.Lock()
 	h.fileCounter++
 	co := contractObligation{
-		ID:           fcid,
-		FileContract: fc,
+		ID:           contractTxn.FileContractID(0),
+		FileContract: contractTxn.FileContracts[0],
 		Path:         filepath.Join(h.saveDir, strconv.Itoa(h.fileCounter)),
 	}
+	proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
-	h.obligationsByID[fcid] = co
+	h.obligationsByID[co.ID] = co
 	h.save()
 	h.mu.Unlock(lockID)
 
