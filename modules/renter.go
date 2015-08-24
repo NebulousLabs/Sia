@@ -11,9 +11,8 @@ var (
 	RenterDir = "renter"
 )
 
-// An ECC is an error-correcting code.
-// TODO: rename? (can be confused with Elliptic Curve Crypto)
-type ECC interface {
+// An ErasureCoder is an error-correcting encoder and decoder.
+type ErasureCoder interface {
 	// NumPieces is the number of pieces returned by Encode.
 	NumPieces() int
 
@@ -37,11 +36,11 @@ type ECC interface {
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
 type FileUploadParams struct {
-	Filename  string
-	Duration  types.BlockHeight
-	Nickname  string
-	ECC       ECC
-	PieceSize uint64
+	Filename    string
+	Duration    types.BlockHeight
+	Nickname    string
+	ErasureCode ErasureCoder
+	PieceSize   uint64
 }
 
 // FileInfo is an interface providing information about a file.

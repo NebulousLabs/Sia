@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"testing"
 
-	//"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -20,14 +19,14 @@ func newTestingFile() *file {
 	data, _ := crypto.RandBytes(14)
 	nData, _ := crypto.RandIntn(10)
 	nParity, _ := crypto.RandIntn(10)
-	ecc, _ := NewRSCode(nData+1, nParity+1)
+	rsc, _ := NewRSCode(nData+1, nParity+1)
 
 	return &file{
-		name:      "testfile-" + strconv.Itoa(int(data[0])),
-		size:      encoding.DecUint64(data[1:5]),
-		masterKey: key,
-		ecc:       ecc,
-		pieceSize: encoding.DecUint64(data[6:8]),
+		name:        "testfile-" + strconv.Itoa(int(data[0])),
+		size:        encoding.DecUint64(data[1:5]),
+		masterKey:   key,
+		erasureCode: rsc,
+		pieceSize:   encoding.DecUint64(data[6:8]),
 
 		bytesUploaded:  encoding.DecUint64(data[9:11]),
 		chunksUploaded: encoding.DecUint64(data[12:14]),

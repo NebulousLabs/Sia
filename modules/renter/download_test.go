@@ -34,15 +34,15 @@ func TestErasureDownload(t *testing.T) {
 	data := make([]byte, dataSize)
 	rand.Read(data)
 
-	// create RS encoder
-	ecc, err := NewRSCode(2, 10)
+	// create Reed-Solomon encoder
+	rsc, err := NewRSCode(2, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]fetcher, ecc.NumPieces())
+	hosts := make([]fetcher, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap:  make(map[uint64][]pieceData),
@@ -55,7 +55,7 @@ func TestErasureDownload(t *testing.T) {
 
 	// upload data to hosts
 	r := bytes.NewReader(data) // makes chunking easier
-	chunk := make([]byte, pieceSize*ecc.MinPieces())
+	chunk := make([]byte, pieceSize*rsc.MinPieces())
 	var i uint64
 	for i = uint64(0); ; i++ {
 		_, err := io.ReadFull(r, chunk)
@@ -64,7 +64,7 @@ func TestErasureDownload(t *testing.T) {
 		} else if err != nil && err != io.ErrUnexpectedEOF {
 			t.Fatal(err)
 		}
-		pieces, err := ecc.Encode(chunk)
+		pieces, err := rsc.Encode(chunk)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,13 +80,13 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	// check hosts (not strictly necessary)
-	err = checkHosts(hosts, ecc.MinPieces(), i)
+	err = checkHosts(hosts, rsc.MinPieces(), i)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// download data
-	d := newFile("foo", ecc, pieceSize, dataSize).newDownload(hosts, "")
+	d := newFile("foo", rsc, pieceSize, dataSize).newDownload(hosts, "")
 	buf := new(bytes.Buffer)
 	err = d.run(buf)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestErasureDownload(t *testing.T) {
 			totFetch += h.(*testHost).nFetch
 
 		}
-		t.Log("Optimal fetches:", i*uint64(ecc.MinPieces()))
+		t.Log("Optimal fetches:", i*uint64(rsc.MinPieces()))
 		t.Log("Total fetches:  ", totFetch)
 	*/
 }

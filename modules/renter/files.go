@@ -25,13 +25,13 @@ type file struct {
 	bytesUploaded  uint64
 	chunksUploaded uint64
 
-	name      string
-	size      uint64
-	contracts map[modules.NetAddress]fileContract
-	masterKey crypto.TwofishKey
-	ecc       modules.ECC
-	pieceSize uint64
-	mode      uint32 // actually an os.FileMode
+	name        string
+	size        uint64
+	contracts   map[modules.NetAddress]fileContract
+	masterKey   crypto.TwofishKey
+	erasureCode modules.ErasureCoder
+	pieceSize   uint64
+	mode        uint32 // actually an os.FileMode
 }
 
 // A fileContract is a contract covering an arbitrary number of file pieces.
@@ -59,7 +59,7 @@ func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypt
 
 // chunkSize returns the size of one chunk.
 func (f *file) chunkSize() uint64 {
-	return f.pieceSize * uint64(f.ecc.MinPieces())
+	return f.pieceSize * uint64(f.erasureCode.MinPieces())
 }
 
 // numChunks returns the number of chunks that f was split into.
@@ -80,7 +80,7 @@ func (f *file) Available() bool {
 // been uploaded. Note that a file may be Available long before UploadProgress
 // reaches 100%.
 func (f *file) UploadProgress() float32 {
-	totalBytes := f.pieceSize * uint64(f.ecc.NumPieces()) * f.numChunks()
+	totalBytes := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 	return 100 * float32(atomic.LoadUint64(&f.bytesUploaded)) / float32(totalBytes)
 }
 
@@ -110,15 +110,15 @@ func (f *file) Expiration() types.BlockHeight {
 }
 
 // newFile creates a new file object.
-func newFile(name string, ecc modules.ECC, pieceSize, fileSize uint64) *file {
+func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64) *file {
 	key, _ := crypto.GenerateTwofishKey()
 	return &file{
-		name:      name,
-		size:      fileSize,
-		contracts: make(map[modules.NetAddress]fileContract),
-		masterKey: key,
-		ecc:       ecc,
-		pieceSize: pieceSize,
+		name:        name,
+		size:        fileSize,
+		contracts:   make(map[modules.NetAddress]fileContract),
+		masterKey:   key,
+		erasureCode: code,
+		pieceSize:   pieceSize,
 	}
 }
 

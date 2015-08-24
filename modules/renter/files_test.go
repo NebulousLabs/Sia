@@ -8,11 +8,11 @@ import (
 
 // TestFileAvailable probes the Available method of the file type.
 func TestFileAvailable(t *testing.T) {
-	ecc, _ := NewRSCode(2, 10)
+	rsc, _ := NewRSCode(2, 10)
 	f := &file{
-		size:      1000,
-		ecc:       ecc,
-		pieceSize: 100,
+		size:        1000,
+		erasureCode: rsc,
+		pieceSize:   100,
 	}
 
 	if f.Available() {

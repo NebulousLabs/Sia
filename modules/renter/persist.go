@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -53,14 +54,17 @@ func (f *file) save(w io.Writer) error {
 	enc.Encode(f.bytesUploaded)
 	enc.Encode(f.chunksUploaded)
 
-	// encode ecc
-	switch code := f.ecc.(type) {
+	// encode erasureCode
+	switch code := f.erasureCode.(type) {
 	case *rsCode:
 		enc.Encode("Reed-Solomon")
 		enc.Encode(uint64(code.dataPieces))
 		enc.Encode(uint64(code.numPieces - code.dataPieces))
 	default:
-		panic("unknown ECC")
+		if build.DEBUG {
+			panic("unknown erasure code")
+		}
+		return errors.New("unknown erasure code")
 	}
 	// encode contracts
 	enc.Encode(uint64(len(f.contracts)))
@@ -89,21 +93,21 @@ func (f *file) load(r io.Reader) error {
 	dec.Decode(&f.bytesUploaded)
 	dec.Decode(&f.chunksUploaded)
 
-	// decode ecc
-	var eccID string
-	dec.Decode(&eccID)
-	switch eccID {
+	// decode erasure coder
+	var codeType string
+	dec.Decode(&codeType)
+	switch codeType {
 	case "Reed-Solomon":
 		var nData, nParity uint64
 		dec.Decode(&nData)
 		dec.Decode(&nParity)
-		ecc, err := NewRSCode(int(nData), int(nParity))
+		rsc, err := NewRSCode(int(nData), int(nParity))
 		if err != nil {
 			return err
 		}
-		f.ecc = ecc
+		f.erasureCode = rsc
 	default:
-		return errors.New("unrecognized ECC type: " + eccID)
+		return errors.New("unrecognized erasure code type: " + codeType)
 	}
 
 	// decode contracts

@@ -28,14 +28,14 @@ func TestErasureUpload(t *testing.T) {
 	data := make([]byte, dataSize)
 	rand.Read(data)
 
-	// create RS encoder
-	ecc, err := NewRSCode(2, 10)
+	// create Reed-Solomon encoder
+	rsc, err := NewRSCode(2, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create hosts
-	hosts := make([]uploader, ecc.NumPieces())
+	hosts := make([]uploader, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap: make(map[uint64][]pieceData),
@@ -47,7 +47,7 @@ func TestErasureUpload(t *testing.T) {
 
 	// upload data to hosts
 	const pieceSize = 10
-	f := newFile("foo", ecc, pieceSize, dataSize)
+	f := newFile("foo", rsc, pieceSize, dataSize)
 	err = f.upload(bytes.NewReader(data), hosts)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestErasureUpload(t *testing.T) {
 
 	// download data
 	buf := new(bytes.Buffer)
-	chunk := make([][]byte, ecc.NumPieces())
+	chunk := make([][]byte, rsc.NumPieces())
 	for i := uint64(0); i < f.numChunks(); i++ {
 		for _, h := range hosts {
 			host := h.(*testHost)
@@ -63,7 +63,7 @@ func TestErasureUpload(t *testing.T) {
 				chunk[p.Piece] = host.data[p.Offset : p.Offset+pieceSize]
 			}
 		}
-		err = ecc.Recover(chunk, f.chunkSize(), buf)
+		err = rsc.Recover(chunk, f.chunkSize(), buf)
 		if err != nil {
 			t.Fatal(err)
 		}

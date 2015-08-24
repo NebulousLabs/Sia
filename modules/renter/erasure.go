@@ -8,8 +8,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// rsCode is a Reed-Solomon encoder/decoder. It implements the modules.ECC
-// interface.
+// rsCode is a Reed-Solomon encoder/decoder. It implements the
+// modules.ErasureCoder interface.
 type rsCode struct {
 	enc reedsolomon.Encoder
 
@@ -53,7 +53,7 @@ func (rs *rsCode) Recover(pieces [][]byte, n uint64, w io.Writer) error {
 
 // NewRSCode creates a new Reed-Solomon encoder/decoder using the supplied
 // parameters.
-func NewRSCode(nData, nParity int) (modules.ECC, error) {
+func NewRSCode(nData, nParity int) (modules.ErasureCoder, error) {
 	enc, err := reedsolomon.New(nData, nParity)
 	if err != nil {
 		return nil, err

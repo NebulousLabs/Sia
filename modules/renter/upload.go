@@ -73,7 +73,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 			return err
 		}
 		// encode
-		pieces, err := f.ecc.Encode(chunk)
+		pieces, err := f.erasureCode.Encode(chunk)
 		if err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
 
 	var averagePrice types.Currency
-	sampleSize := up.ECC.NumPieces() * 3 / 2
+	sampleSize := up.ErasureCode.NumPieces() * 3 / 2
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {
 		averagePrice = averagePrice.Add(host.Price)
@@ -169,13 +169,13 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := newFile(up.Nickname, up.ECC, up.PieceSize, uint64(fileInfo.Size()))
+	f := newFile(up.Nickname, up.ErasureCode, up.PieceSize, uint64(fileInfo.Size()))
 	f.mode = uint32(fileInfo.Mode())
 
 	// Select and connect to hosts.
-	totalsize := up.PieceSize * uint64(up.ECC.NumPieces()) * f.numChunks()
+	totalsize := up.PieceSize * uint64(up.ErasureCode.NumPieces()) * f.numChunks()
 	var hosts []uploader
-	for _, host := range r.hostDB.RandomHosts(up.ECC.NumPieces() * 3 / 2) {
+	for _, host := range r.hostDB.RandomHosts(up.ErasureCode.NumPieces() * 3 / 2) {
 		host, err := r.newHostUploader(host, totalsize, up.Duration, f.masterKey)
 		if err != nil {
 			continue
@@ -183,7 +183,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		defer host.Close()
 		hosts = append(hosts, host)
 	}
-	if len(hosts) < up.ECC.MinPieces() {
+	if len(hosts) < up.ErasureCode.MinPieces() {
 		return errors.New("not enough hosts to support upload")
 	}
 

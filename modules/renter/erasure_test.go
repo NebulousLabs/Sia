@@ -8,7 +8,7 @@ import (
 )
 
 func TestRSEncode(t *testing.T) {
-	ecc, err := NewRSCode(10, 3)
+	rsc, err := NewRSCode(10, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,13 +16,13 @@ func TestRSEncode(t *testing.T) {
 	data := make([]byte, 777)
 	rand.Read(data)
 
-	pieces, err := ecc.Encode(data)
+	pieces, err := rsc.Encode(data)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	buf := new(bytes.Buffer)
-	err = ecc.Recover(pieces, 777, buf)
+	err = rsc.Recover(pieces, 777, buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestRSEncode(t *testing.T) {
 }
 
 func BenchmarkRSEncode(b *testing.B) {
-	ecc, err := NewRSCode(80, 20)
+	rsc, err := NewRSCode(80, 20)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -43,18 +43,18 @@ func BenchmarkRSEncode(b *testing.B) {
 	b.SetBytes(1 << 20)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ecc.Encode(data)
+		rsc.Encode(data)
 	}
 }
 
 func BenchmarkRSRecover(b *testing.B) {
-	ecc, err := NewRSCode(50, 200)
+	rsc, err := NewRSCode(50, 200)
 	if err != nil {
 		b.Fatal(err)
 	}
 	data := make([]byte, 1<<20)
 	rand.Read(data)
-	pieces, err := ecc.Encode(data)
+	pieces, err := rsc.Encode(data)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -63,6 +63,6 @@ func BenchmarkRSRecover(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pieces[0] = nil
-		ecc.Recover(pieces, 1<<20, ioutil.Discard)
+		rsc.Recover(pieces, 1<<20, ioutil.Discard)
 	}
 }

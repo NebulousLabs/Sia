@@ -128,10 +128,10 @@ type download struct {
 	nickname    string
 	destination string
 
-	ecc       modules.ECC
-	chunkSize uint64
-	fileSize  uint64
-	hosts     []fetcher
+	erasureCode modules.ErasureCoder
+	chunkSize   uint64
+	fileSize    uint64
+	hosts       []fetcher
 }
 
 // StartTime is when the download was initiated.
@@ -182,7 +182,7 @@ func (d *download) run(w io.Writer) error {
 	for i := range reqChans {
 		reqChans[i] = make(chan uint64)
 	}
-	respChans := make([]chan []byte, d.ecc.NumPieces())
+	respChans := make([]chan []byte, d.erasureCode.NumPieces())
 	for i := range respChans {
 		respChans[i] = make(chan []byte)
 	}
@@ -201,7 +201,7 @@ func (d *download) run(w io.Writer) error {
 		}
 		// load pieces into chunk
 		// TODO: this deadlocks if any pieces are missing.
-		chunk := make([][]byte, d.ecc.NumPieces())
+		chunk := make([][]byte, d.erasureCode.NumPieces())
 		for j, ch := range respChans {
 			chunk[j] = <-ch
 		}
@@ -212,7 +212,7 @@ func (d *download) run(w io.Writer) error {
 		if n > d.fileSize-received {
 			n = d.fileSize - received
 		}
-		err := d.ecc.Recover(chunk, uint64(n), w)
+		err := d.erasureCode.Recover(chunk, uint64(n), w)
 		if err != nil {
 			return err
 		}
@@ -226,10 +226,10 @@ func (d *download) run(w io.Writer) error {
 // newDownload initializes and returns a download object.
 func (f *file) newDownload(hosts []fetcher, destination string) *download {
 	return &download{
-		ecc:       f.ecc,
-		chunkSize: f.chunkSize(),
-		fileSize:  f.size,
-		hosts:     hosts,
+		erasureCode: f.erasureCode,
+		chunkSize:   f.chunkSize(),
+		fileSize:    f.size,
+		hosts:       hosts,
 
 		startTime:   time.Now(),
 		received:    0,
@@ -278,7 +278,7 @@ func (r *Renter) Download(nickname, destination string) error {
 	}
 
 	// Check that this host set is sufficient to download the file.
-	err = checkHosts(hosts, file.ecc.MinPieces(), file.numChunks())
+	err = checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
 	if err != nil {
 		return err
 	}

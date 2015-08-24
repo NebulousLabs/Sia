@@ -164,13 +164,13 @@ func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request)
 
 // renterFilesUploadHandler handles the API call to upload a file.
 func (srv *Server) renterFilesUploadHandler(w http.ResponseWriter, req *http.Request) {
-	ecc, _ := renter.NewRSCode(dataPieces, parityPieces)
+	rsc, _ := renter.NewRSCode(dataPieces, parityPieces)
 	err := srv.renter.Upload(modules.FileUploadParams{
-		Filename:  req.FormValue("source"),
-		Duration:  duration,
-		Nickname:  req.FormValue("nickname"),
-		ECC:       ecc,
-		PieceSize: pieceSize,
+		Filename:    req.FormValue("source"),
+		Duration:    duration,
+		Nickname:    req.FormValue("nickname"),
+		ErasureCode: rsc,
+		PieceSize:   pieceSize,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
