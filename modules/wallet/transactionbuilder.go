@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// transactionBuilder allows transactions to be manually constructed, including
+// the ability to fund transactions with siacoins and siafunds from the wallet.
 type transactionBuilder struct {
 	parents       []types.Transaction
 	transaction   types.Transaction
@@ -22,41 +23,45 @@ type transactionBuilder struct {
 // addSignatures will sign a transaction using a spendable key, with support
 // for multisig spendable keys. Because of the restricted input, the function
 // is compatible with both siacoin inputs and siafund inputs.
-func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, key spendableKey) error {
-	usedIndices := make(map[int]struct{})
-	for i := range key.SecretKeys {
-		found := false
-		keyIndex := 0
-		pubKey := key.SecretKeys[i].PublicKey()
-		for i, siaPublicKey := range uc.PublicKeys {
-			_, exists := usedIndices[i]
-			if !exists && bytes.Compare(pubKey[:], siaPublicKey.Key) == 0 {
-				found = true
-				keyIndex = i
-				break
+func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, spendKey spendableKey) error {
+	// Try to find the matching secret key for each public key - some public
+	// keys may not have a match. Some secret keys may be used multiple times,
+	// which is why public keys are used as the outer loop.
+	totalSignatures := uint64(0)
+	for i, siaPubKey := range uc.PublicKeys {
+		// Search for the matching secret key to the public key.
+		for j := range spendKey.SecretKeys {
+			pubKey := spendKey.SecretKeys[j].PublicKey()
+			if bytes.Compare(siaPubKey.Key, pubKey[:]) != 0 {
+				continue
 			}
-		}
-		if !found && build.DEBUG {
-			panic("transaction builder cannot sign an input that it added")
-		}
-		usedIndices[keyIndex] = struct{}{}
 
-		// Create the unsigned transaction signature.
-		sig := types.TransactionSignature{
-			ParentID:       parentID,
-			CoveredFields:  cf,
-			PublicKeyIndex: uint64(keyIndex),
-		}
-		txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
+			// Found the right secret key, add a signature.
+			sig := types.TransactionSignature{
+				ParentID:       parentID,
+				CoveredFields:  cf,
+				PublicKeyIndex: uint64(i),
+			}
+			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
+			sigIndex := len(txn.TransactionSignatures) - 1
+			sigHash := txn.SigHash(sigIndex)
+			encodedSig, err := crypto.SignHash(sigHash, spendKey.SecretKeys[j])
+			if err != nil {
+				return err
+			}
+			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 
-		// Get the signature.
-		sigIndex := len(txn.TransactionSignatures) - 1
-		sigHash := txn.SigHash(sigIndex)
-		encodedSig, err := crypto.SignHash(sigHash, key.SecretKeys[i])
-		if err != nil {
-			return err
+			// Count that the signature has been added, and break out of the
+			// secret key loop.
+			totalSignatures++
+			break
 		}
-		txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
+
+		// If there are enough signatures to satisfy the unlock conditions,
+		// break out of the outer loop.
+		if totalSignatures == uc.SignaturesRequired {
+			break
+		}
 	}
 	return nil
 }
