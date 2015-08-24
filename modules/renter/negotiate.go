@@ -29,6 +29,7 @@ type hostUploader struct {
 	// these are updated after each revision
 	contract fileContract
 	tree     crypto.MerkleTree
+	lastTxn  types.Transaction
 
 	// revisions need to be serialized; if two threads are revising the same
 	// contract at the same time, a race condition could cause inconsistency
@@ -43,7 +44,10 @@ func (hu *hostUploader) fileContract() fileContract {
 func (hu *hostUploader) Close() error {
 	// send an empty revision to indicate that we are finished
 	encoding.WriteObject(hu.conn, types.Transaction{})
-	return hu.conn.Close()
+	hu.conn.Close()
+	// submit the most recent revision to the blockchain
+	hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+	return nil
 }
 
 // negotiateContract establishes a connection to a host and negotiates an
@@ -148,7 +152,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return err
 	}
 	if response != modules.AcceptResponse {
-		return errors.New("host rejected proposed contract")
+		return errors.New("host rejected proposed contract: " + response)
 	}
 
 	// read back txn with host collateral.
@@ -208,11 +212,19 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 // addPiece revises an existing file contract with a host, and then uploads a
 // piece to it.
-// TODO: if something goes wrong, we need to submit the current revision.
 func (hu *hostUploader) addPiece(p uploadPiece) error {
 	// only one revision can happen at a time
 	hu.revisionLock.Lock()
 	defer hu.revisionLock.Unlock()
+
+	// get old file contract from renter
+	lockID := hu.renter.mu.RLock()
+	fc, exists := hu.renter.contracts[hu.contract.ID]
+	height := hu.renter.blockHeight
+	hu.renter.mu.RUnlock(lockID)
+	if !exists {
+		return errors.New("no record of contract to revise")
+	}
 
 	// encrypt piece data
 	key := deriveKey(hu.masterKey, p.chunkIndex, p.pieceIndex)
@@ -221,8 +233,35 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 		return err
 	}
 
+	// Revise the file contract. If revision fails, submit most recent
+	// successful revision to the blockchain.
+	err = hu.revise(fc, encPiece, height)
+	if err != nil {
+		hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+		return err
+	}
+
+	// update fileContract
+	hu.contract.Pieces = append(hu.contract.Pieces, pieceData{
+		Chunk:  p.chunkIndex,
+		Piece:  p.pieceIndex,
+		Offset: fc.FileSize, // end of old file
+	})
+
+	// update file contract in renter
+	fc.RevisionNumber++
+	fc.FileSize += uint64(len(encPiece))
+	lockID = hu.renter.mu.Lock()
+	hu.renter.contracts[hu.contract.ID] = fc
+	hu.renter.save()
+	hu.renter.mu.Unlock(lockID)
+
+	return nil
+}
+
+func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types.BlockHeight) error {
 	// calculate new merkle root
-	r := bytes.NewReader(encPiece)
+	r := bytes.NewReader(piece)
 	buf := make([]byte, crypto.SegmentSize)
 	for {
 		_, err := io.ReadFull(r, buf)
@@ -234,22 +273,13 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 		hu.tree.Push(buf)
 	}
 
-	// get old file contract from renter
-	lockID := hu.renter.mu.RLock()
-	fc, exists := hu.renter.contracts[hu.contract.ID]
-	height := hu.renter.blockHeight
-	hu.renter.mu.RUnlock(lockID)
-	if !exists {
-		return errors.New("no record of contract to revise")
-	}
-
 	// create revision
 	rev := types.FileContractRevision{
 		ParentID:          hu.contract.ID,
 		UnlockConditions:  hu.unlockConditions,
 		NewRevisionNumber: fc.RevisionNumber + 1,
 
-		NewFileSize:           fc.FileSize + uint64(len(encPiece)),
+		NewFileSize:           fc.FileSize + uint64(len(piece)),
 		NewFileMerkleRoot:     hu.tree.Root(),
 		NewWindowStart:        fc.WindowStart,
 		NewWindowEnd:          fc.WindowEnd,
@@ -259,13 +289,12 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	}
 	// transfer value of piece from renter to host
 	safeDuration := uint64(fc.WindowStart - height + 20) // buffer in case host is behind
-	piecePrice := types.NewCurrency64(uint64(len(encPiece))).Mul(types.NewCurrency64(safeDuration)).Mul(hu.settings.Price)
+	piecePrice := types.NewCurrency64(uint64(len(piece))).Mul(types.NewCurrency64(safeDuration)).Mul(hu.settings.Price)
 	// prevent a negative currency panic
 	if piecePrice.Cmp(fc.ValidProofOutputs[0].Value) > 0 {
 		// probably not enough money, but the host might accept it anyway
 		piecePrice = fc.ValidProofOutputs[0].Value
 	}
-
 	rev.NewValidProofOutputs[0].Value = rev.NewValidProofOutputs[0].Value.Sub(piecePrice)   // less returned to renter
 	rev.NewValidProofOutputs[1].Value = rev.NewValidProofOutputs[1].Value.Add(piecePrice)   // more given to host
 	rev.NewMissedProofOutputs[0].Value = rev.NewMissedProofOutputs[0].Value.Sub(piecePrice) // less returned to renter
@@ -303,7 +332,7 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	}
 
 	// transfer piece
-	if _, err := hu.conn.Write(encPiece); err != nil {
+	if _, err := hu.conn.Write(piece); err != nil {
 		return err
 	}
 
@@ -318,20 +347,7 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 		return err
 	}
 
-	// update fileContract
-	hu.contract.Pieces = append(hu.contract.Pieces, pieceData{
-		Chunk:  p.chunkIndex,
-		Piece:  p.pieceIndex,
-		Offset: fc.FileSize, // end of old file
-	})
-
-	// update file contract in renter
-	fc.RevisionNumber = rev.NewRevisionNumber
-	fc.FileSize = rev.NewFileSize
-	lockID = hu.renter.mu.Lock()
-	hu.renter.contracts[hu.contract.ID] = fc
-	hu.renter.save()
-	hu.renter.mu.Unlock(lockID)
+	hu.lastTxn = signedHostTxn
 
 	return nil
 }
