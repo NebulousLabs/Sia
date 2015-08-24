@@ -72,7 +72,7 @@ func (hf *hostFetcher) Close() error {
 // connect and then disconnect without making any actual requests (but holding
 // the connection open the entire time). This is wasteful of host resources.
 // Consider only opening the connection after the first request has been made.
-func newHostFetcher(fc fileContract, masterKey crypto.TwofishKey) (*hostFetcher, error) {
+func newHostFetcher(fc fileContract, pieceSize uint64, masterKey crypto.TwofishKey) (*hostFetcher, error) {
 	conn, err := net.DialTimeout("tcp", string(fc.IP), 5*time.Second)
 	if err != nil {
 		return nil, err
@@ -98,6 +98,7 @@ func newHostFetcher(fc fileContract, masterKey crypto.TwofishKey) (*hostFetcher,
 	return &hostFetcher{
 		conn:      conn,
 		pieceMap:  pieceMap,
+		pieceSize: pieceSize,
 		masterKey: masterKey,
 	}, nil
 }
@@ -268,7 +269,7 @@ func (r *Renter) Download(nickname, destination string) error {
 	var hosts []fetcher
 	for _, fc := range file.contracts {
 		// TODO: connect in parallel
-		hf, err := newHostFetcher(fc, file.masterKey)
+		hf, err := newHostFetcher(fc, file.pieceSize, file.masterKey)
 		if err != nil {
 			continue
 		}
