@@ -66,25 +66,6 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 	return nil
 }
 
-// RegisterTransaction takes a transaction and its parents and returns a
-// TransactionBuilder which can be used to expand the transaction. The most
-// typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
-// registers a new transaction without parents.
-func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
-	return &transactionBuilder{
-		parents:     parents,
-		transaction: t,
-
-		wallet: w,
-	}
-}
-
-// StartTransaction is a convenience function that calls
-// RegisterTransaction(types.Transaction{}, nil).
-func (w *Wallet) StartTransaction() modules.TransactionBuilder {
-	return w.RegisterTransaction(types.Transaction{}, nil)
-}
-
 // FundSiacoins will add a siacoin input of exaclty 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siacoin input will not be signed until 'Sign' is called
@@ -145,7 +126,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			break
 		}
 	}
-	if potentialFund.Cmp(amount) > 0 && fund.Cmp(amount) < 0 {
+	if potentialFund.Cmp(amount) >= 0 && fund.Cmp(amount) < 0 {
 		return modules.ErrPotentialDoubleSpend
 	}
 	if fund.Cmp(amount) < 0 {
@@ -177,8 +158,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, refundOutput)
 	}
 
-	// Sign all of the inputs to the parent trancstion. This is done at the end
-	// so that the outputs aren't marked as spent in the event of an error.
+	// Sign all of the inputs to the parent trancstion.
 	for _, sci := range parentTxn.SiacoinInputs {
 		err := addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
 		if err != nil {
@@ -206,10 +186,6 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siafund input will not be signed until 'Sign' is called
 // on the transaction builder.
-//
-// TODO: The implementation of FundSiacoins is known to have quirks/bugs
-// (non-fatal), and has diverged from the implementation of FundSiacoins. The
-// implementations should be converged once again.
 func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	lockID := tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock(lockID)
@@ -217,37 +193,51 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	// Create and fund a parent transaction that will add the correct amount of
 	// siafunds to the transaction.
 	var fund types.Currency
+	var potentialFund types.Currency
 	parentTxn := types.Transaction{}
-	for scoid, sco := range tb.wallet.siafundOutputs {
+	var spentSfoids []types.SiafundOutputID
+	for sfoid, sfo := range tb.wallet.siafundOutputs {
 		// Check that this output has not recently been spent by the wallet.
-		spendHeight := tb.wallet.spentOutputs[types.OutputID(scoid)]
-		if spendHeight > tb.wallet.consensusSetHeight-RespendTimeout {
+		spendHeight := tb.wallet.spentOutputs[types.OutputID(sfoid)]
+		// Prevent an underflow error.
+		allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
+		if tb.wallet.consensusSetHeight < RespendTimeout {
+			allowedHeight = 0
+		}
+		if spendHeight > allowedHeight {
+			potentialFund = potentialFund.Add(sfo.Value)
 			continue
 		}
-		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].UnlockConditions
+		outputUnlockConditions := tb.wallet.keys[sfo.UnlockHash].UnlockConditions
 		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
 			continue
 		}
-		// Mark the output as spent.
-		tb.wallet.spentOutputs[types.OutputID(scoid)] = tb.wallet.consensusSetHeight
 
 		// Add a siafund input for this output.
 		parentClaimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 		if err != nil {
 			return err
 		}
-		sci := types.SiafundInput{
-			ParentID:         scoid,
+		sfi := types.SiafundInput{
+			ParentID:         sfoid,
 			UnlockConditions: outputUnlockConditions,
 			ClaimUnlockHash:  parentClaimUnlockConditions.UnlockHash(),
 		}
-		parentTxn.SiafundInputs = append(parentTxn.SiafundInputs, sci)
+		parentTxn.SiafundInputs = append(parentTxn.SiafundInputs, sfi)
+		spentSfoids = append(spentSfoids, sfoid)
 
 		// Add the output to the total fund
-		fund = fund.Add(sco.Value)
+		fund = fund.Add(sfo.Value)
+		potentialFund = potentialFund.Add(sfo.Value)
 		if fund.Cmp(amount) >= 0 {
 			break
 		}
+	}
+	if potentialFund.Cmp(amount) >= 0 && fund.Cmp(amount) < 0 {
+		return modules.ErrPotentialDoubleSpend
+	}
+	if fund.Cmp(amount) < 0 {
+		return modules.ErrLowBalance
 	}
 
 	// Create and add the output that will be used to fund the standard
@@ -296,6 +286,11 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	tb.parents = append(tb.parents, parentTxn)
 	tb.siafundInputs = append(tb.siafundInputs, len(tb.transaction.SiafundInputs))
 	tb.transaction.SiafundInputs = append(tb.transaction.SiafundInputs, newInput)
+
+	// Mark all outputs that were spent as spent.
+	for _, sfoid := range spentSfoids {
+		tb.wallet.spentOutputs[types.OutputID(sfoid)] = tb.wallet.consensusSetHeight
+	}
 	return nil
 }
 
@@ -457,4 +452,23 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 // called because the transaction gets deleted.
 func (tb *transactionBuilder) View() (types.Transaction, []types.Transaction) {
 	return tb.transaction, tb.parents
+}
+
+// RegisterTransaction takes a transaction and its parents and returns a
+// TransactionBuilder which can be used to expand the transaction. The most
+// typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
+// registers a new transaction without parents.
+func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
+	return &transactionBuilder{
+		parents:     parents,
+		transaction: t,
+
+		wallet: w,
+	}
+}
+
+// StartTransaction is a convenience function that calls
+// RegisterTransaction(types.Transaction{}, nil).
+func (w *Wallet) StartTransaction() modules.TransactionBuilder {
+	return w.RegisterTransaction(types.Transaction{}, nil)
 }
