@@ -110,9 +110,10 @@ func (f *file) Expiration() types.BlockHeight {
 }
 
 // newFile creates a new file object.
-func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *file {
+func newFile(name string, ecc modules.ECC, pieceSize, fileSize uint64) *file {
 	key, _ := crypto.GenerateTwofishKey()
 	return &file{
+		name:      name,
 		size:      fileSize,
 		contracts: make(map[modules.NetAddress]fileContract),
 		masterKey: key,

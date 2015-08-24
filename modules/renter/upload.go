@@ -169,7 +169,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := newFile(up.ECC, up.PieceSize, uint64(fileInfo.Size()))
+	f := newFile(up.Nickname, up.ECC, up.PieceSize, uint64(fileInfo.Size()))
 	f.mode = uint32(fileInfo.Mode())
 
 	// Select and connect to hosts.
