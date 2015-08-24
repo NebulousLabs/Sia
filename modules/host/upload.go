@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -64,25 +65,22 @@ func (h *Host) rpcDownload(conn net.Conn) error {
 
 	// Verify the file exists, using a mutex while reading the host.
 	lockID := h.mu.RLock()
-	contractObligation, exists := h.obligationsByID[contractID]
+	co, exists := h.obligationsByID[contractID]
 	if !exists {
 		h.mu.RUnlock(lockID)
 		return errors.New("no record of that file")
 	}
-	path := filepath.Join(h.saveDir, contractObligation.Path)
 	h.mu.RUnlock(lockID)
 
 	// Open the file.
-	file, err := os.Open(path)
+	file, err := os.Open(co.Path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
 	// Process requests until 'stop' signal is received.
-	var request struct {
-		Offset, Length uint64
-	}
+	var request modules.DownloadRequest
 	for {
 		if err := encoding.ReadObject(conn, &request, 16); err != nil {
 			return err
