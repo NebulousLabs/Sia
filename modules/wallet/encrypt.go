@@ -19,10 +19,16 @@ var (
 	unlockModifier = types.Specifier{'u', 'n', 'l', 'o', 'c', 'k'}
 )
 
+// uidEncryptionKey creates an encryption key that is used to decrypt a
+// specific key file.
+func uidEncryptionKey(masterKey crypto.TwofishKey, uid UniqueID) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, uid))
+}
+
 // checkMasterKey verifies that the master key is correct.
 func (w *Wallet) checkMasterKey(masterKey crypto.TwofishKey) error {
-	uk := unlockKey(masterKey)
-	verification, err := uk.DecryptBytes(w.settings.EncryptionVerification)
+	uk := uidEncryptionKey(masterKey, w.persist.UID)
+	verification, err := uk.DecryptBytes(w.persist.EncryptionVerification)
 	if err != nil {
 		// Most of the time, the failure is an authentication failure.
 		return modules.ErrBadEncryptionKey
@@ -39,7 +45,7 @@ func (w *Wallet) checkMasterKey(masterKey crypto.TwofishKey) error {
 // for the wallet, an encryption key is created.
 func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	// Check if the wallet encryption key has already been set.
-	if len(w.settings.EncryptionVerification) != 0 {
+	if len(w.persist.EncryptionVerification) != 0 {
 		return modules.Seed{}, errReencrypt
 	}
 
@@ -63,9 +69,9 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, erro
 
 	// Establish the encryption verification using the masterKey. After this
 	// point, the wallet is encrypted.
-	uk := unlockKey(masterKey)
+	uk := uidEncryptionKey(masterKey, w.persist.UID)
 	encryptionBase := make([]byte, encryptionVerificationLen)
-	w.settings.EncryptionVerification, err = uk.EncryptBytes(encryptionBase)
+	w.persist.EncryptionVerification, err = uk.EncryptBytes(encryptionBase)
 	if err != nil {
 		return modules.Seed{}, err
 	}
@@ -86,7 +92,7 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 	}
 
 	// Check if the wallet encryption key has already been set.
-	if len(w.settings.EncryptionVerification) == 0 {
+	if len(w.persist.EncryptionVerification) == 0 {
 		return errUnencryptedWallet
 	}
 
@@ -124,14 +130,30 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 	return nil
 }
 
+// wipeSecrets erases all of the seeds and secret keys in the wallet.
+func (w *Wallet) wipeSecrets() {
+	// 'for i := range' must be used to prevent copies of secret data from
+	// being made.
+	for i := range w.keys {
+		for j := range w.keys[i].SecretKeys {
+			crypto.SecureWipe(w.keys[i].SecretKeys[j][:])
+		}
+	}
+	for i := range w.seeds {
+		crypto.SecureWipe(w.seeds[i][:])
+	}
+	crypto.SecureWipe(w.primarySeed[:])
+	w.seeds = w.seeds[:0]
+}
+
 // Encrypted returns whether or not the wallet has been encrypted.
 func (w *Wallet) Encrypted() bool {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	if build.DEBUG && w.unlocked && len(w.settings.EncryptionVerification) == 0 {
+	if build.DEBUG && w.unlocked && len(w.persist.EncryptionVerification) == 0 {
 		panic("wallet is both unlocked and unencrypted")
 	}
-	return len(w.settings.EncryptionVerification) != 0
+	return len(w.persist.EncryptionVerification) != 0
 }
 
 // Encrypt will encrypt the wallet using the input key. Upon encryption, a
@@ -167,26 +189,10 @@ func (w *Wallet) Lock() error {
 	w.log.Println("INFO: Locking wallet.")
 
 	// Wipe all of the seeds and secret keys, they will be replaced upon
-	// calling 'Unlock' again. 'for i := range' must be used to prevent copies
-	// of secret data from being made.
-	for i := range w.keys {
-		for j := range w.keys[i].SecretKeys {
-			crypto.SecureWipe(w.keys[i].SecretKeys[j][:])
-		}
-	}
-	for i := range w.seeds {
-		crypto.SecureWipe(w.seeds[i][:])
-	}
-	crypto.SecureWipe(w.primarySeed[:])
-	w.seeds = w.seeds[:0]
+	// calling 'Unlock' again.
+	w.wipeSecrets()
 	w.unlocked = false
-
-	// Save the wallet data.
-	err := w.saveSettings()
-	if err != nil {
-		return err
-	}
-	return nil
+	return w.saveSettings()
 }
 
 // Unlock will decrypt the wallet seed and load all of the addresses into

@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"crypto/rand"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,9 +23,20 @@ var (
 	seedMetadata     = persist.Metadata{"Wallet Seed", "0.4.0"}
 )
 
-type WalletSettings struct {
+// SpendableKeyFile stores an encrypted spendable key on disk.
+type SpendableKeyFile struct {
+	UID                    UniqueID
+	EncryptionVerification crypto.Ciphertext
+	SpendableKey           crypto.Ciphertext
+}
+
+// WalletPersist contains all data that persists on disk during wallet
+// operation.
+type WalletPersist struct {
 	// EncryptionVerification is an encrypted string that, when decrypted, is
-	// 32 '0' bytes.
+	// 32 '0' bytes. The UID is used to prevent leaking information in the
+	// event that the same key gets used for multiple wallets.
+	UID                    UniqueID
 	EncryptionVerification crypto.Ciphertext
 
 	// The primary seed is used to generate new addresses as they are required.
@@ -45,22 +57,17 @@ type WalletSettings struct {
 	UnseededKeys []SpendableKeyFile
 }
 
-// unlockKey creates a wallet unlocking key from the input master key.
-func unlockKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
-	return crypto.TwofishKey(crypto.HashAll(masterKey, unlockModifier))
-}
-
 // saveSettings writes the wallet's settings to the wallet's settings file,
 // replacing the existing file.
 func (w *Wallet) saveSettings() error {
-	return persist.SaveFile(settingsMetadata, w.settings, filepath.Join(w.persistDir, settingsFile))
+	return persist.SaveFile(settingsMetadata, w.persist, filepath.Join(w.persistDir, settingsFile))
 }
 
 // loadSettings reads the wallet's settings from the wallet's settings file,
 // overwriting the settings object in memory. loadSettings should only be
 // called at startup.
 func (w *Wallet) loadSettings() error {
-	return persist.LoadFile(settingsMetadata, &w.settings, filepath.Join(w.persistDir, settingsFile))
+	return persist.LoadFile(settingsMetadata, &w.persist, filepath.Join(w.persistDir, settingsFile))
 }
 
 // initLog begins logging the wallet, appending to any existing wallet file and
@@ -78,12 +85,16 @@ func (w *Wallet) initLog() error {
 
 // initSettings creates the settings object at startup. If a settings file
 // exists, the settings file will be loaded into memory. If the settings file
-// does not exist, a new settings file will be created.
+// does not exist, a new.persist file will be created.
 func (w *Wallet) initSettings() error {
 	// Check if the settings file exists, if not create it.
 	settingsFilename := filepath.Join(w.persistDir, settingsFile)
 	_, err := os.Stat(settingsFilename)
 	if os.IsNotExist(err) {
+		_, err = rand.Read(w.persist.UID[:])
+		if err != nil {
+			return err
+		}
 		return w.saveSettings()
 	} else if err != nil {
 		return err
@@ -119,5 +130,5 @@ func (w *Wallet) initPersist() error {
 
 // CreateBackup creates a backup file at the desired filepath.
 func (w *Wallet) CreateBackup(backupFilepath string) error {
-	return persist.SaveFile(settingsMetadata, w.settings, backupFilepath)
+	return persist.SaveFile(settingsMetadata, w.persist, backupFilepath)
 }

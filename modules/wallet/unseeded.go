@@ -41,7 +41,7 @@ type SiagKeyPair struct {
 // initUnseededKeys loads all of the unseeded keys into the wallet after the
 // wallet gets unlocked.
 func (w *Wallet) initUnseededKeys(masterKey crypto.TwofishKey) error {
-	for _, uk := range w.settings.UnseededKeys {
+	for _, uk := range w.persist.UnseededKeys {
 		// Verify that the decryption key is correct.
 		encKey := uidEncryptionKey(masterKey, uk.UID)
 		expectedDecryptedVerification := make([]byte, crypto.EntropySize)
@@ -127,7 +127,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if err != nil {
 		return err
 	}
-	w.settings.UnseededKeys = append(w.settings.UnseededKeys, skf)
+	w.persist.UnseededKeys = append(w.persist.UnseededKeys, skf)
 	return w.saveSettings()
 }
 

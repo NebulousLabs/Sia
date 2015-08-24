@@ -43,7 +43,7 @@ type Wallet struct {
 	// used to generate new addresses for the wallet.
 	unlocked    bool
 	subscribed  bool
-	settings    WalletSettings
+	persist     WalletPersist
 	primarySeed modules.Seed
 
 	// The wallet's dependencies. The items 'consensusSetHeight' and
