@@ -61,7 +61,8 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	hu.renter.mu.RUnlock(lockID)
 
 	renterCost := hu.settings.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
-	payout := renterCost // no collateral
+	renterCost = renterCost.MulFloat(1.5) // extra buffer to guarantee we won't run out of money during revision
+	payout := renterCost                  // no collateral
 
 	// get an address from the wallet
 	ourAddr, err := hu.renter.wallet.NextAddress()
@@ -259,6 +260,12 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	// transfer value of piece from renter to host
 	safeDuration := uint64(fc.WindowStart - height + 20) // buffer in case host is behind
 	piecePrice := types.NewCurrency64(uint64(len(encPiece))).Mul(types.NewCurrency64(safeDuration)).Mul(hu.settings.Price)
+	// prevent a negative currency panic
+	if piecePrice.Cmp(fc.ValidProofOutputs[0].Value) > 0 {
+		// probably not enough money, but the host might accept it anyway
+		piecePrice = fc.ValidProofOutputs[0].Value
+	}
+
 	rev.NewValidProofOutputs[0].Value = rev.NewValidProofOutputs[0].Value.Sub(piecePrice)   // less returned to renter
 	rev.NewValidProofOutputs[1].Value = rev.NewValidProofOutputs[1].Value.Add(piecePrice)   // more given to host
 	rev.NewMissedProofOutputs[0].Value = rev.NewMissedProofOutputs[0].Value.Sub(piecePrice) // less returned to renter
