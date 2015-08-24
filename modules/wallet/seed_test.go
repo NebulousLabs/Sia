@@ -8,9 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,35 +17,24 @@ func TestPrimarySeed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	// Create a wallet and fetch the seed at startup.
-	dir := build.TempDir(modules.WalletDir, "TestPrimarySeed")
-	g, err := gateway.New(":0", filepath.Join(dir, modules.GatewayDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	cs, err := consensus.New(g, filepath.Join(dir, modules.ConsensusDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tp, err := transactionpool.New(cs, g)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w, err := New(cs, tp, filepath.Join(dir, modules.WalletDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	seed, err := w.Encrypt(crypto.TwofishKey{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	// Start with a blank wallet tester.
+	wt, err := createBlankWalletTester("TestPrimarySeed")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	primarySeed, progress, err := w.PrimarySeed()
+	// Create a seed and unlock the wallet.
+	seed, err := wt.wallet.Encrypt(crypto.TwofishKey{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.wallet.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try getting an address, see that the seed advances correctly.
+	primarySeed, progress, err := wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,11 +44,11 @@ func TestPrimarySeed(t *testing.T) {
 	if progress != 0 {
 		t.Error("primary seed is returning the wrong progress")
 	}
-	_, err = w.NextAddress()
+	_, err = wt.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, progress, err = w.PrimarySeed()
+	_, progress, err = wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,19 +57,19 @@ func TestPrimarySeed(t *testing.T) {
 	}
 
 	// Lock then unlock the wallet and check the responses.
-	err = w.Lock()
+	err = wt.wallet.Lock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = w.PrimarySeed()
+	_, _, err = wt.wallet.PrimarySeed()
 	if err != modules.ErrLockedWallet {
 		t.Error("unexpected err:", err)
 	}
-	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	err = wt.wallet.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	primarySeed, progress, err = w.PrimarySeed()
+	primarySeed, progress, err = wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)
 	}

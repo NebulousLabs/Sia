@@ -29,8 +29,8 @@ var (
 // addresses that are to be used in 'FundSiacoins' or 'FundSiafunds' in the
 // transaction builder must conform to this form of spendable key.
 type spendableKey struct {
-	unlockConditions types.UnlockConditions
-	secretKeys       []crypto.SecretKey
+	UnlockConditions types.UnlockConditions
+	SecretKeys       []crypto.SecretKey
 }
 
 // Wallet is an object that tracks balances, creates keys and addresses,
@@ -43,7 +43,7 @@ type Wallet struct {
 	// used to generate new addresses for the wallet.
 	unlocked    bool
 	subscribed  bool
-	settings    WalletSettings
+	persist     WalletPersist
 	primarySeed modules.Seed
 
 	// The wallet's dependencies. The items 'consensusSetHeight' and

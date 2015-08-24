@@ -8,22 +8,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// ProcessConsensusChange parses a consensus change to update the set of
-// confirmed outputs known to the wallet.
-func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
-	// There are two different situations under which a subscribee calls
-	// ProcessConsensusChange. The first is when w.subscribed is set to false
-	// AND the mutex is already locked. The other situation is that subscribed
-	// is set to true and is not going to be changed. Therefore there is no
-	// race condition here. If w.subscribed is set to false, trying to grab the
-	// lock would cause a deadlock.
-	if w.subscribed {
-		lockID := w.mu.Lock()
-		defer w.mu.Unlock(lockID)
-	}
-
-	// Iterate through the output diffs (siacoin and siafund) and apply all of
-	// them. Only apply the outputs that relate to unlock hashes we understand.
+// updateConfirmedSet uses a consensus change to update the confirmed set of
+// outputs as understood by the wallet.
+func (w *Wallet) updateConfirmedSet(cc modules.ConsensusChange) {
 	for _, diff := range cc.SiacoinOutputDiffs {
 		// Verify that the diff is relevant to the wallet.
 		_, exists := w.keys[diff.SiacoinOutput.UnlockHash]
@@ -33,12 +20,12 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		_, exists = w.siacoinOutputs[diff.ID]
 		if diff.Direction == modules.DiffApply {
-			if exists && build.DEBUG {
+			if build.DEBUG && exists {
 				panic("adding an existing output to wallet")
 			}
 			w.siacoinOutputs[diff.ID] = diff.SiacoinOutput
 		} else {
-			if !exists && build.DEBUG {
+			if build.DEBUG && !exists {
 				panic("deleting nonexisting output from wallet")
 			}
 			delete(w.siacoinOutputs, diff.ID)
@@ -53,12 +40,12 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		_, exists = w.siafundOutputs[diff.ID]
 		if diff.Direction == modules.DiffApply {
-			if exists && build.DEBUG {
+			if build.DEBUG && exists {
 				panic("adding an existing output to wallet")
 			}
 			w.siafundOutputs[diff.ID] = diff.SiafundOutput
 		} else {
-			if !exists && build.DEBUG {
+			if build.DEBUG && !exists {
 				panic("deleting nonexisting output from wallet")
 			}
 			delete(w.siafundOutputs, diff.ID)
@@ -71,10 +58,11 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			w.siafundPool = diff.Previous
 		}
 	}
+}
 
-	// Iterate through the transactions and find every transaction somehow
-	// related to the wallet. Wallet transactions must be removed in the same
-	// order they were added.
+// revertHistory reverts any transaction history that was destroyed by reverted
+// blocks in the consensus change.
+func (w *Wallet) revertHistory(cc modules.ConsensusChange) {
 	for _, block := range cc.RevertedBlocks {
 		// Remove any transactions that have been reverted.
 		for i := len(block.Transactions) - 1; i >= 0; i-- {
@@ -101,8 +89,11 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 		w.consensusSetHeight--
 	}
+}
 
-	// Apply all of the new blocks.
+// applyHistory applies any transaction history that was introduced by the
+// applied blocks.
+func (w *Wallet) applyHistory(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		w.consensusSetHeight++
 		// Apply the miner payout transaction if applicable.
@@ -213,6 +204,24 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 	}
+}
+
+// ProcessConsensusChange parses a consensus change to update the set of
+// confirmed outputs known to the wallet.
+func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
+	// There are two different situations under which a subscribee calls
+	// ProcessConsensusChange. The first is when w.subscribed is set to false
+	// AND the mutex is already locked. The other situation is that subscribed
+	// is set to true and is not going to be changed. Therefore there is no
+	// race condition here. If w.subscribed is set to false, trying to grab the
+	// lock would cause a deadlock.
+	if w.subscribed {
+		lockID := w.mu.Lock()
+		defer w.mu.Unlock(lockID)
+	}
+	w.updateConfirmedSet(cc)
+	w.revertHistory(cc)
+	w.applyHistory(cc)
 }
 
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
