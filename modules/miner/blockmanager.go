@@ -9,6 +9,21 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// reconstructBlock reconstructs a block from its header
+func (m *Miner) reconstructBlock(header types.BlockHeader) (*types.Block, error) {
+	block, exists := m.blockMem[header]
+	if !exists {
+		return nil, errors.New("Header is either invalid or too old")
+	}
+	arbData, exists := m.arbDataMem[header]
+	if !exists {
+		return nil, errors.New("Header is either invalid or too old")
+	}
+
+	block.Transactions[0].ArbitraryData[0] = arbData
+	return block, nil
+}
+
 // Creates a block ready for nonce grinding, also returning the MerkleRoot of
 // the block. Getting the MerkleRoot of a block requires encoding and hashing
 // in a specific way, which are implementation details we didn't want to
@@ -64,6 +79,9 @@ func (m *Miner) prepareNewBlock() {
 		delete(m.blockMem, m.headerMem[m.memProgress])
 		delete(m.arbDataMem, m.headerMem[m.memProgress])
 		m.memProgress++
+		if m.memProgress == headerForWorkMemory {
+			m.memProgress = 0
+		}
 	}
 }
 
@@ -163,10 +181,11 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	// Grab a new address for the miner. Call may fail if the wallet is locked
 	// or if the wallet addresses have been exhausted.
 	m.blocksFound = append(m.blocksFound, b.ID())
-	var uc types.UnlockConditions
-	uc, err = m.wallet.NextAddress()
+	var addr types.UnlockHash
+	addrUC, err := m.wallet.NextAddress() // false indicates that the address should not be visible to the user.
+	addr = addrUC.UnlockHash()
 	if err == nil { // Special case: only update the address if there was no error.
-		m.address = uc.UnlockHash()
+		m.address = addr
 	}
 	return err
 }
@@ -179,16 +198,12 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
 	lockID := m.mu.Lock()
-	b, bExists := m.blockMem[lookupBH]
-	arbData, arbExists := m.arbDataMem[lookupBH]
+	b, err := m.reconstructBlock(lookupBH)
 	m.mu.Unlock(lockID)
-	if !bExists || !arbExists {
-		err := errors.New("block header returned late - block was cleared from memory")
-		m.log.Println("ERROR:", err)
+	if err != nil {
 		return err
 	}
 
-	b.Transactions[0].ArbitraryData[0] = arbData
 	b.Nonce = bh.Nonce
 	return m.SubmitBlock(*b)
 }

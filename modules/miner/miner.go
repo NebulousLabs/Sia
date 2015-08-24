@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -66,6 +67,23 @@ type Miner struct {
 	headerMem   []types.BlockHeader
 	lastBlock   time.Time
 	memProgress int
+
+	// PoolManager variables. This is where addresses and contracts negotiated
+	// with the pool are stored as well as constants like the percentage of a
+	// block's subsidy that goes to the miner.
+	// The poolTransaction is the transaction in the payment channel whose
+	// output is the miner's wallet. The miner may broadcast this transaction
+	// to the network at any time in order to receive payment from the pool.
+	// poolHeaderMap is a map from headers of blocks that payout to the pool to
+	// headers of blocks with normal payouts. This allows the poolmanager to
+	// use the blockmanager and only have to worry about changing payouts.
+	poolIP            string
+	minerPercentCut   uint8
+	targetMultiple    uint32
+	poolPayoutAddress types.UnlockHash
+	poolTransaction   types.Transaction
+	poolSK            crypto.SecretKey
+	poolHeaderMem     map[types.BlockHeader]types.BlockHeader
 
 	// CPUMiner variables. startTime, attempts, and hashRate are used to
 	// calculate the hashrate. When attempts reaches a certain threshold, the
@@ -129,6 +147,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][]byte),
 		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
+
+		poolHeaderMem: make(map[types.BlockHeader]types.BlockHeader),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),

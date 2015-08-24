@@ -66,7 +66,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet, nil)
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, nil, renter, tpool, wallet, nil)
 	if err != nil {
 		return err
 	}

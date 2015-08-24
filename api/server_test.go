@@ -18,6 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/miningpool"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -90,6 +91,10 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	mpool, err := miningpool.New(cs, tp, w, ":0", filepath.Join(testdir, modules.MiningPoolDir))
+	if err != nil {
+		return nil, err
+	}
 	hdb, err := hostdb.New(cs, g)
 	if err != nil {
 		return nil, err
@@ -106,7 +111,7 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, r, tp, w, exp)
+	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, mpool, r, tp, w, exp)
 	if err != nil {
 		return nil, err
 	}
