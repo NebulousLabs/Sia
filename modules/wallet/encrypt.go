@@ -170,8 +170,8 @@ func (w *Wallet) Lock() error {
 	// calling 'Unlock' again. 'for i := range' must be used to prevent copies
 	// of secret data from being made.
 	for i := range w.keys {
-		for j := range w.keys[i].secretKeys {
-			crypto.SecureWipe(w.keys[i].secretKeys[j][:])
+		for j := range w.keys[i].SecretKeys {
+			crypto.SecureWipe(w.keys[i].SecretKeys[j][:])
 		}
 	}
 	for i := range w.seeds {

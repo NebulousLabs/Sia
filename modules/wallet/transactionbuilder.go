@@ -24,10 +24,10 @@ type transactionBuilder struct {
 // is compatible with both siacoin inputs and siafund inputs.
 func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, key spendableKey) error {
 	usedIndices := make(map[int]struct{})
-	for i := range key.secretKeys {
+	for i := range key.SecretKeys {
 		found := false
 		keyIndex := 0
-		pubKey := key.secretKeys[i].PublicKey()
+		pubKey := key.SecretKeys[i].PublicKey()
 		for i, siaPublicKey := range uc.PublicKeys {
 			_, exists := usedIndices[i]
 			if !exists && bytes.Compare(pubKey[:], siaPublicKey.Key) == 0 {
@@ -52,7 +52,7 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 		// Get the signature.
 		sigIndex := len(txn.TransactionSignatures) - 1
 		sigHash := txn.SigHash(sigIndex)
-		encodedSig, err := crypto.SignHash(sigHash, key.secretKeys[i])
+		encodedSig, err := crypto.SignHash(sigHash, key.SecretKeys[i])
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			potentialFund = potentialFund.Add(sco.Value)
 			continue
 		}
-		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].unlockConditions
+		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].UnlockConditions
 		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
 			continue
 		}
@@ -219,7 +219,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		if spendHeight > tb.wallet.consensusSetHeight-RespendTimeout {
 			continue
 		}
-		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].unlockConditions
+		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].UnlockConditions
 		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
 			continue
 		}

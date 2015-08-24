@@ -69,8 +69,8 @@ func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 	entropy := crypto.HashAll(seed, index)
 	sk, pk := crypto.DeterministicSignatureKeys(entropy)
 	return spendableKey{
-		unlockConditions: generateUnlockConditions(pk),
-		secretKeys:       []crypto.SecretKey{sk},
+		UnlockConditions: generateUnlockConditions(pk),
+		SecretKeys:       []crypto.SecretKey{sk},
 	}
 }
 
@@ -102,7 +102,7 @@ func (w *Wallet) integrateSeed(seed modules.Seed) {
 	for i := uint64(0); i < modules.PublicKeysPerSeed; i++ {
 		// Generate the key and check it is new to the wallet.
 		spendableKey := generateSpendableKey(seed, i)
-		w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
+		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	}
 	w.seeds = append(w.seeds, seed)
 }
@@ -208,7 +208,7 @@ func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
 	}
 	for i := uint64(0); i < w.settings.PrimarySeedProgress; i++ {
 		spendableKey := generateSpendableKey(seed, i)
-		w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
+		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	}
 	w.primarySeed = seed
 	w.seeds = append(w.seeds, seed)
@@ -242,13 +242,13 @@ func (w *Wallet) nextPrimarySeedAddress() (types.UnlockConditions, error) {
 	// Integrate the next key into the wallet, and return the unlock
 	// conditions.
 	spendableKey := generateSpendableKey(w.primarySeed, w.settings.PrimarySeedProgress)
-	w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
+	w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	w.settings.PrimarySeedProgress++
 	err := w.saveSettings()
 	if err != nil {
 		return types.UnlockConditions{}, err
 	}
-	return spendableKey.unlockConditions, nil
+	return spendableKey.UnlockConditions, nil
 }
 
 // AllSeeds returns a list of all seeds known to and used by the wallet.

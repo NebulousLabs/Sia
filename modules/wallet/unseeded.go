@@ -63,7 +63,7 @@ func (w *Wallet) initUnseededKeys(masterKey crypto.TwofishKey) error {
 		if err != nil {
 			return err
 		}
-		w.keys[sk.unlockConditions.UnlockHash()] = sk
+		w.keys[sk.UnlockConditions.UnlockHash()] = sk
 	}
 	return nil
 }
@@ -106,9 +106,9 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 
 	// Merge the keys into a single spendableKey.
 	var sk spendableKey
-	sk.unlockConditions = skps[0].UnlockConditions
+	sk.UnlockConditions = skps[0].UnlockConditions
 	for _, skp := range skps {
-		sk.secretKeys = append(sk.secretKeys, skp.SecretKey)
+		sk.SecretKeys = append(sk.SecretKeys, skp.SecretKey)
 	}
 
 	// Create the encrypted spendable key file that gets saved to disk.

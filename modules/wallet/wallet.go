@@ -29,8 +29,8 @@ var (
 // addresses that are to be used in 'FundSiacoins' or 'FundSiafunds' in the
 // transaction builder must conform to this form of spendable key.
 type spendableKey struct {
-	unlockConditions types.UnlockConditions
-	secretKeys       []crypto.SecretKey
+	UnlockConditions types.UnlockConditions
+	SecretKeys       []crypto.SecretKey
 }
 
 // Wallet is an object that tracks balances, creates keys and addresses,
