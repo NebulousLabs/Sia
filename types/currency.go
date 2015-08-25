@@ -8,6 +8,7 @@ package types
 // this value will not result in overflow.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -159,12 +160,16 @@ func (x Currency) Sub(y Currency) (c Currency) {
 
 // MarshalJSON implements the json.Marshaler interface.
 func (c Currency) MarshalJSON() ([]byte, error) {
-	return c.i.MarshalJSON()
+	// Must enclosed the value in quotes; otherwise JS will convert it to a
+	// double and lose precision.
+	return []byte(`"` + c.String() + `"`), nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface. An error is
 // returned if a negative number is provided.
 func (c *Currency) UnmarshalJSON(b []byte) error {
+	// UnmarshalJSON does not expect quotes
+	b = bytes.Trim(b, `"`)
 	err := c.i.UnmarshalJSON(b)
 	if err != nil {
 		return err

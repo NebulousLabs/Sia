@@ -142,7 +142,7 @@ func TestCurrencyMarshalJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(bMar30, cMar30) {
+	if !bytes.Equal(bMar30, bytes.Trim(cMar30, `"`)) {
 		t.Error("Currency does not match the marshalling of its math/big equivalent")
 	}
 
