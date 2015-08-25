@@ -291,8 +291,12 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		tree.Push(buf)
 	}
 
-	// accept new revisions in a loop
-	emptyID := types.Transaction{}.ID()
+	// accept new revisions in a loop. The final good transaction will be
+	// submitted to the blockchain.
+	var finalTxn types.Transaction
+	defer func() {
+		h.tpool.AcceptTransactionSet([]types.Transaction{finalTxn})
+	}()
 	for {
 		// read proposed revision
 		var revTxn types.Transaction
@@ -300,7 +304,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			return err
 		}
 		// an empty transaction indicates completion
-		if revTxn.ID() == emptyID {
+		if revTxn.ID() == (types.Transaction{}).ID() {
 			break
 		}
 
@@ -378,6 +382,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 		h.save()
 		h.mu.Unlock(lockID)
+
+		finalTxn = revTxn
 	}
 
 	return nil
