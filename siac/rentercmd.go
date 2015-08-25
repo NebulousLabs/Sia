@@ -174,7 +174,7 @@ func renterfilesloadcmd(filename string) {
 		fmt.Println("Could not load file:", err)
 		return
 	}
-	fmt.Printf("Loaded %d files:\n", len(info.FilesAdded))
+	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
 	for _, file := range info.FilesAdded {
 		fmt.Printf("\t%s\n", file)
 	}
@@ -187,7 +187,7 @@ func renterfilesloadasciicmd(data string) {
 		fmt.Println("Could not load file:", err)
 		return
 	}
-	fmt.Printf("Loaded %d files:\n", len(info.FilesAdded))
+	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
 	for _, file := range info.FilesAdded {
 		fmt.Printf("\t%s\n", file)
 	}
