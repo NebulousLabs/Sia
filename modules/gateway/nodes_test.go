@@ -113,6 +113,7 @@ func TestShareNodes(t *testing.T) {
 	}
 
 	// g1 should have received the node
+	time.Sleep(100 * time.Millisecond)
 	if g1.addNode(dummyNode) == nil {
 		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
 	}
