@@ -19,8 +19,8 @@ func RandIntn(n int) (int, error) {
 	return int(r.Int64()), err
 }
 
-// Perm returns, as a slice of n ints, a pseudo-random permutation of the
-// integers [0,n).
+// Perm returns, as a slice of n ints, a random permutation of the integers
+// [0,n).
 func Perm(n int) []int {
 	m := make([]int, n)
 	for i := 0; i < n; i++ {
