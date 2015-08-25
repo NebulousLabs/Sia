@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
-	// "github.com/NebulousLabs/Sia/modules"
 )
 
 // coinUnits converts a siacoin amount to base units.
@@ -215,14 +214,14 @@ func walletstatuscmd() {
 	// divide by 1e24 to get SC
 	r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
 	sc, _ := r.Float64()
-	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins)
-	unconfirmedBalance = unconfirmedBalance.Sub(status.UnconfirmedOutgoingSiacoins)
-	r = new(big.Rat).SetFrac(unconfirmedBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
+	unconfirmedDifference := new(big.Int).Sub(unconfirmedBalance.Big(), status.ConfirmedSiacoinBalance.Big())
+	r = new(big.Rat).SetFrac(unconfirmedDifference, new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
 	usc, _ := r.Float64()
 	fmt.Printf(`Wallet status:
 %s, %s
 Confirmed Balance:   %.2f SC
-Unconfirmed Balance: %.2f SC
+Unconfirmed Delta:  %+.2f SC
 Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v SC
