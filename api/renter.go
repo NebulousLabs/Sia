@@ -100,13 +100,17 @@ func (srv *Server) renterFilesDeleteHandler(w http.ResponseWriter, req *http.Req
 // renterFilesRenameHandler handles the API call to rename a file entry in the
 // renter.
 func (srv *Server) renterFilesRenameHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	writeError(w, "renaming temporarily disabled", http.StatusBadRequest)
 
-	writeSuccess(w)
+	/*
+		err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
+		if err != nil {
+			writeError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		writeSuccess(w)
+	*/
 }
 
 // renterFilesLoadHandler handles the API call to load a '.sia' file.
