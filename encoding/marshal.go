@@ -17,10 +17,9 @@ type SiaMarshaler interface {
 	MarshalSia() []byte
 }
 
-// A SiaUnmarshaler can decode itself from a byte slice. If a decoding error
-// occurs, UnmarshalSia should panic.
+// A SiaUnmarshaler can decode itself from a byte slice.
 type SiaUnmarshaler interface {
-	UnmarshalSia([]byte)
+	UnmarshalSia([]byte) error
 }
 
 // An Encoder writes objects to an output stream.
@@ -222,7 +221,10 @@ func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			u.UnmarshalSia(d.readPrefix())
+			err := u.UnmarshalSia(d.readPrefix())
+			if err != nil {
+				panic(err)
+			}
 			return
 		}
 	}

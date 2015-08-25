@@ -1,234 +1,382 @@
 package renter
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net"
-	"os"
-	"sync/atomic"
+	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	defaultWindowSize = 288 // 48 Hours
-)
+// A hostUploader uploads pieces to a host. It implements the uploader interface.
+type hostUploader struct {
+	// constants
+	settings         modules.HostSettings
+	masterKey        crypto.TwofishKey
+	unlockConditions types.UnlockConditions
+	secretKey        crypto.SecretKey
 
-// createContractTransaction takes contract terms and a merkle root and uses
-// them to build a transaction containing a file contract that satisfies the
-// terms, including providing an input balance. The transaction does not get
-// signed.
-func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, txnBuilder modules.TransactionBuilder, err error) {
-	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
-	sizeCurrency := types.NewCurrency64(terms.FileSize)
-	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
-	clientCost := terms.Price.Mul(sizeCurrency).Mul(durationCurrency)
-	hostCollateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
-	payout := clientCost.Add(hostCollateral)
+	// resources
+	conn   net.Conn
+	renter *Renter
 
-	// Fill out the contract.
-	contract := types.FileContract{
-		FileMerkleRoot:     merkleRoot,
-		FileSize:           terms.FileSize,
-		WindowStart:        terms.DurationStart + terms.Duration,
-		WindowEnd:          terms.DurationStart + terms.Duration + terms.WindowSize,
-		Payout:             payout,
-		ValidProofOutputs:  terms.ValidProofOutputs,
-		MissedProofOutputs: terms.MissedProofOutputs,
-	}
+	// these are updated after each revision
+	contract fileContract
+	tree     crypto.MerkleTree
+	lastTxn  types.Transaction
 
-	// Create the transaction.
-	txnBuilder = r.wallet.RegisterTransaction(txn, nil)
-	err = txnBuilder.FundSiacoins(clientCost)
-	if err != nil {
-		return
-	}
-	txnBuilder.AddFileContract(contract)
-	txn, _ = txnBuilder.View()
-	return
+	// revisions need to be serialized; if two threads are revising the same
+	// contract at the same time, a race condition could cause inconsistency
+	// and data loss.
+	revisionLock sync.Mutex
 }
 
-// An uploadWriter writes bytes while updating the piece's 'Transferred'
-// field.
-type uploadWriter struct {
-	piece *filePiece
-	w     io.Writer
+func (hu *hostUploader) fileContract() fileContract {
+	return hu.contract
 }
 
-// Write implements the io.Writer interface. Each write updates the filePiece's
-// Transferred field. This allows upload progress to be monitored in real-time.
-func (uw *uploadWriter) Write(b []byte) (int, error) {
-	n, err := uw.w.Write(b)
-	atomic.AddUint64(&uw.piece.Transferred, uint64(n))
-	return n, err
+func (hu *hostUploader) Close() error {
+	// send an empty revision to indicate that we are finished
+	encoding.WriteObject(hu.conn, types.Transaction{})
+	hu.conn.Close()
+	// submit the most recent revision to the blockchain
+	hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+	return nil
 }
 
-// negotiateContract creates a file contract for a host according to the
-// requests of the host. There is an assumption that only hosts with acceptable
-// terms will be put into the hostdb.
-func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUploadParams, piece *filePiece) error {
-	lockID := r.mu.RLock()
-	height := r.blockHeight
-	r.mu.RUnlock(lockID)
-
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return err
-	}
-
-	file, err := os.Open(up.Filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	info, err := file.Stat()
-	if err != nil {
-		return err
-	}
-
-	filesize := uint64(info.Size())
-
-	// Get the price and payout.
-	sizeCurrency := types.NewCurrency64(filesize)
-	durationCurrency := types.NewCurrency64(uint64(up.Duration))
-	clientCost := host.Price.Mul(sizeCurrency).Mul(durationCurrency)
-	hostCollateral := host.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
-	payout := clientCost.Add(hostCollateral)
-	validOutputValue := payout.Sub(types.FileContract{Payout: payout}.Tax())
-
-	// Create the contract terms.
-	terms := modules.ContractTerms{
-		FileSize:      filesize,
-		Duration:      up.Duration,
-		DurationStart: height - 3,
-		WindowSize:    defaultWindowSize,
-		Price:         host.Price,
-		Collateral:    host.Collateral,
-
-		ValidProofOutputs: []types.SiacoinOutput{
-			{Value: validOutputValue, UnlockHash: host.UnlockHash},
-		},
-
-		MissedProofOutputs: []types.SiacoinOutput{
-			{Value: validOutputValue, UnlockHash: types.UnlockHash{}},
-		},
-	}
-
-	// TODO: This is a hackish sleep, we need to be certain that all dependent
-	// transactions have propgated to the host's transaction pool. Instead,
-	// built into the protocol should be a step where any dependent
-	// transactions are automatically provided.
-	if build.Release == "standard" {
-		time.Sleep(time.Minute)
-	} else if build.Release == "testing" {
-		time.Sleep(time.Second * 15)
-	} else {
-		time.Sleep(time.Second)
-	}
-
-	// Perform the negotiations with the host through a network call.
-	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 10e9)
+// negotiateContract establishes a connection to a host and negotiates an
+// initial file contract according to the terms of the host.
+func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight) error {
+	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 5*time.Second)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	err = encoding.WriteObject(conn, [8]byte{'C', 'o', 'n', 't', 'r', 'a', 'c', 't'})
+
+	// inital calculations before connecting to host
+	lockID := hu.renter.mu.RLock()
+	height := hu.renter.blockHeight
+	hu.renter.mu.RUnlock(lockID)
+
+	renterCost := hu.settings.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
+	renterCost = renterCost.MulFloat(1.5) // extra buffer to guarantee we won't run out of money during revision
+	payout := renterCost                  // no collateral
+
+	// get an address from the wallet
+	ourAddr, err := hu.renter.wallet.NextAddress()
 	if err != nil {
 		return err
 	}
 
-	// Send the contract terms and read the response.
-	if err = encoding.WriteObject(conn, terms); err != nil {
+	// write rpcID
+	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
 		return err
 	}
+
+	// read host key
+	// TODO: need to save this?
+	var hostPublicKey types.SiaPublicKey
+	if err := encoding.ReadObject(conn, &hostPublicKey, 256); err != nil {
+		return err
+	}
+
+	// create our own key by combining the renter entropy with the host key
+	entropy := crypto.HashAll(hu.renter.entropy, hostPublicKey)
+	ourSK, ourPK := crypto.DeterministicSignatureKeys(entropy)
+	ourPublicKey := types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       ourPK[:],
+	}
+	hu.secretKey = ourSK // used to sign future revisions
+
+	// send our public key
+	if err := encoding.WriteObject(conn, ourPublicKey); err != nil {
+		return err
+	}
+
+	// create unlock conditions
+	hu.unlockConditions = types.UnlockConditions{
+		PublicKeys:         []types.SiaPublicKey{ourPublicKey, hostPublicKey},
+		SignaturesRequired: 2,
+	}
+
+	// create file contract
+	fc := types.FileContract{
+		FileSize:       0,
+		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
+		WindowStart:    height + duration,
+		WindowEnd:      height + duration + hu.settings.WindowSize,
+		Payout:         payout,
+		UnlockHash:     hu.unlockConditions.UnlockHash(),
+		RevisionNumber: 0,
+	}
+	// outputs need account for tax
+	fc.ValidProofOutputs = []types.SiacoinOutput{
+		{Value: renterCost.Sub(fc.Tax()), UnlockHash: ourAddr.UnlockHash()},
+		{Value: types.ZeroCurrency, UnlockHash: hu.settings.UnlockHash}, // no collateral
+	}
+	fc.MissedProofOutputs = []types.SiacoinOutput{
+		// same as above
+		fc.ValidProofOutputs[0],
+		// goes to the void, not the renter
+		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
+	}
+
+	// build transaction containing fc
+	txnBuilder := hu.renter.wallet.StartTransaction()
+	err = txnBuilder.FundSiacoins(fc.Payout)
+	if err != nil {
+		return err
+	}
+	txnBuilder.AddFileContract(fc)
+	txn, parents := txnBuilder.View()
+	txnSet := append(parents, txn)
+
+	// calculate contract ID
+	fcid := txn.FileContractID(0) // TODO: is it actually 0?
+
+	// send txn
+	if err := encoding.WriteObject(conn, txnSet); err != nil {
+		return err
+	}
+
+	// read back acceptance
 	var response string
-	if err = encoding.ReadObject(conn, &response, 128); err != nil {
+	if err := encoding.ReadObject(conn, &response, 128); err != nil {
 		return err
 	}
-	if response != modules.AcceptTermsResponse {
-		return errors.New(response)
+	if response != modules.AcceptResponse {
+		return errors.New("host rejected proposed contract: " + response)
 	}
 
-	// Encrypt and transmit the file data while calculating its Merkle root.
-	tee := io.TeeReader(
-		// wrap file reader in encryption layer
-		key.NewReader(file),
-		// each byte we read from tee will also be written to conn;
-		// the uploadWriter updates the piece's 'Transferred' field
-		&uploadWriter{piece, conn},
-	)
-	merkleRoot, err := crypto.ReaderMerkleRoot(tee)
+	// read back txn with host collateral.
+	var hostTxnSet []types.Transaction
+	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
+		return err
+	}
+
+	// check that txn is okay. For now, no collateral will be added, so the
+	// transaction sets should be identical.
+	if len(hostTxnSet) != len(txnSet) {
+		return errors.New("host sent bad collateral transaction")
+	}
+	for i := range hostTxnSet {
+		if hostTxnSet[i].ID() != txnSet[i].ID() {
+			return errors.New("host sent bad collateral transaction")
+		}
+	}
+
+	// sign the txn and resend
+	// NOTE: for now, we are assuming that the transaction has not changed
+	// since we sent it. Otherwise, the txnBuilder would have to be updated
+	// with whatever fields were added by the host.
+	signedTxnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		return err
+	}
+	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
+		return err
+	}
+
+	// read signed txn from host
+	var signedHostTxnSet []types.Transaction
+	if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
+		return err
+	}
+
+	// submit to blockchain
+	err = hu.renter.tpool.AcceptTransactionSet(signedHostTxnSet)
 	if err != nil {
 		return err
 	}
 
-	// Create the transaction holding the contract. This is done first so the
-	// transaction is created sooner, which will impact the user's wallet
-	// balance faster vs. waiting for the whole thing to upload before
-	// affecting the user's balance.
-	unsignedTxn, txnBuilder, err := r.createContractTransaction(terms, merkleRoot)
-	if err != nil {
-		return err
+	// create initial fileContract object
+	hu.contract = fileContract{
+		ID:          fcid,
+		IP:          hu.settings.IPAddress,
+		WindowStart: fc.WindowStart,
 	}
 
-	// Send the unsigned transaction to the host.
-	err = encoding.WriteObject(conn, unsignedTxn)
-	if err != nil {
-		return err
-	}
-
-	// The host will respond with a transaction with the collateral added.
-	// Add the collateral inputs from the host to the original wallet
-	// transaction.
-	var collateralTxn types.Transaction
-	err = encoding.ReadObject(conn, &collateralTxn, 16e3)
-	if err != nil {
-		return err
-	}
-	for i := len(unsignedTxn.SiacoinInputs); i < len(collateralTxn.SiacoinInputs); i++ {
-		txnBuilder.AddSiacoinInput(collateralTxn.SiacoinInputs[i])
-	}
-	signedTxn, err := txnBuilder.Sign(true)
-	if err != nil {
-		return err
-	}
-
-	// Send the signed transaction back to the host.
-	err = encoding.WriteObject(conn, signedTxn)
-	if err != nil {
-		return err
-	}
-
-	// Read an ack from the host that all is well.
-	var ack bool
-	err = encoding.ReadObject(conn, &ack, 1)
-	if err != nil {
-		return err
-	}
-	if !ack {
-		return errors.New("host negotiation failed")
-	}
-
-	// TODO: We don't actually watch the blockchain to make sure that the
-	// file contract made it.
-
-	// Negotiation was successful; update the filePiece.
-	txIndex := len(signedTxn) - 1
-	lockID = r.mu.Lock()
-	piece.Active = true
-	piece.Repairing = false
-	piece.Contract = signedTxn[txIndex].FileContracts[0]
-	piece.ContractID = signedTxn[txIndex].FileContractID(0)
-	piece.HostIP = host.IPAddress
-	piece.EncryptionKey = key
-	r.save()
-	r.mu.Unlock(lockID)
+	lockID = hu.renter.mu.Lock()
+	hu.renter.contracts[fcid] = fc
+	hu.renter.mu.Unlock(lockID)
 
 	return nil
+}
+
+// addPiece revises an existing file contract with a host, and then uploads a
+// piece to it.
+func (hu *hostUploader) addPiece(p uploadPiece) error {
+	// only one revision can happen at a time
+	hu.revisionLock.Lock()
+	defer hu.revisionLock.Unlock()
+
+	// get old file contract from renter
+	lockID := hu.renter.mu.RLock()
+	fc, exists := hu.renter.contracts[hu.contract.ID]
+	height := hu.renter.blockHeight
+	hu.renter.mu.RUnlock(lockID)
+	if !exists {
+		return errors.New("no record of contract to revise")
+	}
+
+	// encrypt piece data
+	key := deriveKey(hu.masterKey, p.chunkIndex, p.pieceIndex)
+	encPiece, err := key.EncryptBytes(p.data)
+	if err != nil {
+		return err
+	}
+
+	// Revise the file contract. If revision fails, submit most recent
+	// successful revision to the blockchain.
+	err = hu.revise(fc, encPiece, height)
+	if err != nil {
+		hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+		return err
+	}
+
+	// update fileContract
+	hu.contract.Pieces = append(hu.contract.Pieces, pieceData{
+		Chunk:  p.chunkIndex,
+		Piece:  p.pieceIndex,
+		Offset: fc.FileSize, // end of old file
+	})
+
+	// update file contract in renter
+	fc.RevisionNumber++
+	fc.FileSize += uint64(len(encPiece))
+	lockID = hu.renter.mu.Lock()
+	hu.renter.contracts[hu.contract.ID] = fc
+	hu.renter.save()
+	hu.renter.mu.Unlock(lockID)
+
+	return nil
+}
+
+func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types.BlockHeight) error {
+	// calculate new merkle root
+	r := bytes.NewReader(piece)
+	buf := make([]byte, crypto.SegmentSize)
+	for {
+		_, err := io.ReadFull(r, buf)
+		if err == io.EOF {
+			break
+		} else if err != nil && err != io.ErrUnexpectedEOF {
+			return err
+		}
+		hu.tree.Push(buf)
+	}
+
+	// create revision
+	rev := types.FileContractRevision{
+		ParentID:          hu.contract.ID,
+		UnlockConditions:  hu.unlockConditions,
+		NewRevisionNumber: fc.RevisionNumber + 1,
+
+		NewFileSize:           fc.FileSize + uint64(len(piece)),
+		NewFileMerkleRoot:     hu.tree.Root(),
+		NewWindowStart:        fc.WindowStart,
+		NewWindowEnd:          fc.WindowEnd,
+		NewValidProofOutputs:  fc.ValidProofOutputs,
+		NewMissedProofOutputs: fc.MissedProofOutputs,
+		NewUnlockHash:         fc.UnlockHash,
+	}
+	// transfer value of piece from renter to host
+	safeDuration := uint64(fc.WindowStart - height + 20) // buffer in case host is behind
+	piecePrice := types.NewCurrency64(uint64(len(piece))).Mul(types.NewCurrency64(safeDuration)).Mul(hu.settings.Price)
+	// prevent a negative currency panic
+	if piecePrice.Cmp(fc.ValidProofOutputs[0].Value) > 0 {
+		// probably not enough money, but the host might accept it anyway
+		piecePrice = fc.ValidProofOutputs[0].Value
+	}
+	rev.NewValidProofOutputs[0].Value = rev.NewValidProofOutputs[0].Value.Sub(piecePrice)   // less returned to renter
+	rev.NewValidProofOutputs[1].Value = rev.NewValidProofOutputs[1].Value.Add(piecePrice)   // more given to host
+	rev.NewMissedProofOutputs[0].Value = rev.NewMissedProofOutputs[0].Value.Sub(piecePrice) // less returned to renter
+	rev.NewMissedProofOutputs[1].Value = rev.NewMissedProofOutputs[1].Value.Add(piecePrice) // more given to void
+
+	// create transaction containing the revision
+	signedTxn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{rev},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(hu.contract.ID),
+			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
+			PublicKeyIndex: 0, // renter key is always first -- see negotiateContract
+		}},
+	}
+
+	// sign the transaction
+	encodedSig, err := crypto.SignHash(signedTxn.SigHash(0), hu.secretKey)
+	if err != nil {
+		return err
+	}
+	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
+
+	// send the transaction
+	if err := encoding.WriteObject(hu.conn, signedTxn); err != nil {
+		return err
+	}
+
+	// host sends acceptance
+	var response string
+	if err := encoding.ReadObject(hu.conn, &response, 128); err != nil {
+		return err
+	}
+	if response != modules.AcceptResponse {
+		return errors.New("host rejected revision")
+	}
+
+	// transfer piece
+	if _, err := hu.conn.Write(piece); err != nil {
+		return err
+	}
+
+	// read txn signed by host
+	var signedHostTxn types.Transaction
+	if err := encoding.ReadObject(hu.conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
+		return err
+	}
+	if signedHostTxn.ID() != signedTxn.ID() {
+		return errors.New("host sent bad signed transaction")
+	} else if err = signedHostTxn.StandaloneValid(height); err != nil {
+		return err
+	}
+
+	hu.lastTxn = signedHostTxn
+
+	return nil
+}
+
+func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, duration types.BlockHeight, masterKey crypto.TwofishKey) (*hostUploader, error) {
+	hu := &hostUploader{
+		settings:  settings,
+		masterKey: masterKey,
+		tree:      crypto.NewTree(),
+		renter:    r,
+	}
+
+	// TODO: maybe do this later?
+	err := hu.negotiateContract(filesize, duration)
+	if err != nil {
+		return nil, err
+	}
+
+	// initiate the revision loop
+	hu.conn, err = net.DialTimeout("tcp", string(hu.settings.IPAddress), 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if err := encoding.WriteObject(hu.conn, modules.RPCRevise); err != nil {
+		return nil, err
+	}
+	if err := encoding.WriteObject(hu.conn, hu.contract.ID); err != nil {
+		return nil, err
+	}
+
+	return hu, nil
 }

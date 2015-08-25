@@ -16,12 +16,10 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
-	fullpath := filepath.Join(h.saveDir, obligation.Path)
-	stat, err := os.Stat(fullpath)
+	err := h.deallocate(obligation.Path)
 	if err != nil {
 		fmt.Println(err)
 	}
-	h.deallocate(uint64(stat.Size()), obligation.Path)
 	delete(h.obligationsByID, obligation.ID)
 
 	// Storage proof was successful, so increment profit tracking

@@ -71,7 +71,7 @@ func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
 		uhChecksum := crypto.HashObject(id)
 
 		givenChecksum := hash[crypto.HashSize : crypto.HashSize+types.UnlockHashChecksumSize]
-		if bytes.Compare(givenChecksum, uhChecksum[:types.UnlockHashChecksumSize]) != 0 {
+		if !bytes.Equal(givenChecksum, uhChecksum[:types.UnlockHashChecksumSize]) {
 			return nil, errors.New("address does not have a valid checksum")
 		}
 

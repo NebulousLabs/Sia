@@ -454,7 +454,7 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 
 		// Verify the checksum - leave uh as-is unless the checksum is valid.
 		expectedChecksum := crypto.HashBytes(byteUnlockHash)
-		if bytes.Compare(expectedChecksum[:UnlockHashChecksumSize], checksum) != 0 {
+		if !bytes.Equal(expectedChecksum[:UnlockHashChecksumSize], checksum) {
 			return ErrInvalidUnlockHashChecksum
 		}
 	}

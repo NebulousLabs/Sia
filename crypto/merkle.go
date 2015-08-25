@@ -12,24 +12,24 @@ const (
 	SegmentSize = 64 // number of bytes that are hashed to form each base leaf of the Merkle tree
 )
 
-type tree struct {
+type MerkleTree struct {
 	*merkletree.Tree
 }
 
 // NewTree returns a tree object that can be used to get the merkle root of a
 // dataset.
-func NewTree() tree {
-	return tree{merkletree.New(NewHash())}
+func NewTree() MerkleTree {
+	return MerkleTree{merkletree.New(NewHash())}
 }
 
 // PushObject encodes and adds the hash of the encoded object to the tree as a
 // leaf.
-func (t tree) PushObject(obj interface{}) {
+func (t MerkleTree) PushObject(obj interface{}) {
 	t.Push(encoding.Marshal(obj))
 }
 
 // Root returns the Merkle root of all the objects pushed to the tree.
-func (t tree) Root() (h Hash) {
+func (t MerkleTree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
 	return
 }
@@ -43,12 +43,11 @@ func (t tree) Root() (h Hash) {
 //  ┌─┴─┐ ┌─┴─┐ │  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   │
 //     (5-leaf)         (6-leaf)             (7-leaf)
 func MerkleRoot(leaves [][]byte) (h Hash) {
-	tree := merkletree.New(NewHash())
+	tree := NewTree()
 	for _, leaf := range leaves {
 		tree.Push(leaf)
 	}
-	copy(h[:], tree.Root())
-	return
+	return tree.Root()
 }
 
 // Calculates the number of leaves in the file when building a Merkle tree.

@@ -14,150 +14,118 @@ var (
 	ErrNicknameOverload = errors.New("a file with the proposed nickname already exists")
 )
 
-// A file is a single file that has been uploaded to the network.
+// A file is a single file that has been uploaded to the network. Files are
+// split into equal-length chunks, which are then erasure-coded into pieces.
+// Each piece is separately encrypted, using a key derived from the file's
+// master key. The pieces are uploaded to hosts in groups, such that one file
+// contract covers many pieces.
 type file struct {
-	Name     string
-	Checksum crypto.Hash // checksum of the decoded file.
+	// NOTE: these fields are defined first to ensure 64-bit alignment, which
+	// is required for atomic operations.
+	bytesUploaded  uint64
+	chunksUploaded uint64
 
-	// Erasure coding variables:
-	//		piecesRequired <= optimalRecoveryPieces <= totalPieces
-	ErasureScheme         string
-	PiecesRequired        int
-	OptimalRecoveryPieces int
-	TotalPieces           int
-	Pieces                []filePiece
-
-	// DEPRECATED - the new renter scheme has the renter pre-making contracts
-	// with hosts uploading new contracts through diffs.
-	UploadParams modules.FileUploadParams
-
-	// The file needs to access the renter's lock. This variable is not
-	// exported so that the persistence functions won't save the whole renter.
-	renter *Renter
+	name        string
+	size        uint64
+	contracts   map[modules.NetAddress]fileContract
+	masterKey   crypto.TwofishKey
+	erasureCode modules.ErasureCoder
+	pieceSize   uint64
+	mode        uint32 // actually an os.FileMode
 }
 
-// A filePiece contains information about an individual file piece that has
-// been uploaded to a host, including information about the host and the health
-// of the file piece.
-type filePiece struct {
-	// Implementation node: 'Transferred' is declared first to ensure that it
-	// is 64-byte aligned. This is necessary to ensure that atomic operations
-	// work correctly on ARM and x86-32.
-	Transferred uint64
+// A fileContract is a contract covering an arbitrary number of file pieces.
+// Chunk/Piece metadata is used to split the raw contract data appropriately.
+type fileContract struct {
+	ID     types.FileContractID
+	IP     modules.NetAddress
+	Pieces []pieceData
 
-	Active     bool                 // True if the host has the file and has been online somewhat recently.
-	Repairing  bool                 // True if the piece is currently being uploaded.
-	Contract   types.FileContract   // The contract being enforced.
-	ContractID types.FileContractID // The ID of the contract.
+	WindowStart types.BlockHeight
+}
 
-	HostIP     modules.NetAddress // Where to find the file piece.
-	StartIndex uint64
-	EndIndex   uint64
+// pieceData contains the metadata necessary to request a piece from a
+// fetcher.
+type pieceData struct {
+	Chunk  uint64 // which chunk the piece belongs to
+	Piece  uint64 // the index of the piece in the chunk
+	Offset uint64 // the offset of the piece in the file contract
+}
 
-	PieceSize uint64
+// deriveKey derives the key used to encrypt and decrypt a specific file piece.
+func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, chunkIndex, pieceIndex))
+}
 
-	PieceIndex    int // Indicates the erasure coding index of this piece.
-	EncryptionKey crypto.TwofishKey
-	Checksum      crypto.Hash
+// chunkSize returns the size of one chunk.
+func (f *file) chunkSize() uint64 {
+	return f.pieceSize * uint64(f.erasureCode.MinPieces())
+}
+
+// numChunks returns the number of chunks that f was split into.
+func (f *file) numChunks() uint64 {
+	n := f.size / f.chunkSize()
+	if f.size%f.chunkSize() != 0 {
+		n++
+	}
+	return n
 }
 
 // Available indicates whether the file is ready to be downloaded.
 func (f *file) Available() bool {
-	lockID := f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock(lockID)
-
-	// The loop uses an index instead of a range because range copies the piece
-	// to fresh data. Atomic operations are being concurrently performed on the
-	// piece, and the copy results in a race condition against the atomic
-	// operations. By removing the copying, the race condition is eliminated.
-	var active int
-	for i := range f.Pieces {
-		if f.Pieces[i].Active {
-			active++
-		}
-		if active >= f.PiecesRequired {
-			return true
-		}
-	}
-	return false
+	return atomic.LoadUint64(&f.chunksUploaded) >= f.numChunks()
 }
 
-// UploadProgress indicates how close the file is to being available.
+// UploadProgress indicates what percentage of the file (plus redundancy) has
+// been uploaded. Note that a file may be Available long before UploadProgress
+// reaches 100%.
 func (f *file) UploadProgress() float32 {
-	lockID := f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock(lockID)
-
-	// full replication means we just use the progress of most-uploaded piece.
-	//
-	// The loop uses an index instead of a range because range copies the piece
-	// to fresh data. Atomic operations are being concurrently performed on the
-	// piece, and the copy results in a race condition against the atomic
-	// operations. By removing the copying, the race condition is eliminated.
-	var max float32
-	for i := range f.Pieces {
-		progress := float32(atomic.LoadUint64(&f.Pieces[i].Transferred)) / float32(f.Pieces[i].PieceSize)
-		if progress > max {
-			max = progress
-		}
-	}
-	return 100 * max
+	totalBytes := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
+	return 100 * float32(atomic.LoadUint64(&f.bytesUploaded)) / float32(totalBytes)
 }
 
 // Nickname returns the nickname of the file.
 func (f *file) Nickname() string {
-	lockID := f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock(lockID)
-	return f.Name
+	return f.name
 }
 
 // Filesize returns the size of the file.
 func (f *file) Filesize() uint64 {
-	lockID := f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock(lockID)
-	// TODO: this will break when we switch to erasure coding.
-	for i := range f.Pieces {
-		if f.Pieces[i].Contract.FileSize != 0 {
-			return f.Pieces[i].Contract.FileSize
-		}
-	}
-	return 0
+	return f.size
 }
 
-// Repairing returns whether or not the file is actively being repaired.
-func (f *file) Repairing() bool {
-	lockID := f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock(lockID)
-
-	for i := range f.Pieces {
-		if f.Pieces[i].Repairing {
-			return true
+// Expiration returns the lowest height at which any of the file's contracts
+// will expire.
+func (f *file) Expiration() types.BlockHeight {
+	if len(f.contracts) == 0 {
+		return 0
+	}
+	lowest := ^types.BlockHeight(0)
+	for _, fc := range f.contracts {
+		if fc.WindowStart < lowest {
+			lowest = fc.WindowStart
 		}
 	}
-	return false
+	return lowest
 }
 
-// TimeRemaining returns the amount of time until the file's contracts expire.
-func (f *file) TimeRemaining() types.BlockHeight {
-	lockID := f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock(lockID)
-
-	largest := types.BlockHeight(0)
-	for i := range f.Pieces {
-		if f.Pieces[i].Contract.WindowStart < f.renter.blockHeight {
-			continue
-		}
-		current := f.Pieces[i].Contract.WindowStart - f.renter.blockHeight
-		if current > largest {
-			largest = current
-		}
+// newFile creates a new file object.
+func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64) *file {
+	key, _ := crypto.GenerateTwofishKey()
+	return &file{
+		name:        name,
+		size:        fileSize,
+		contracts:   make(map[modules.NetAddress]fileContract),
+		masterKey:   key,
+		erasureCode: code,
+		pieceSize:   pieceSize,
 	}
-	return largest
 }
 
 // DeleteFile removes a file entry from the renter.
 func (r *Renter) DeleteFile(nickname string) error {
-	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
 
 	_, exists := r.files[nickname]
 	if !exists {
@@ -199,7 +167,7 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 
 	// Do the renaming.
 	delete(r.files, currentName)
-	file.Name = newName
+	file.name = newName // make atomic?
 	r.files[newName] = file
 
 	r.save()

@@ -50,11 +50,11 @@ type (
 
 func (t test5) MarshalSia() []byte { return []byte(t.s) }
 
-func (t *test5) UnmarshalSia(b []byte) { t.s = string(b) }
+func (t *test5) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
 
 func (t *test6) MarshalSia() []byte { return []byte(t.s) }
 
-func (t *test6) UnmarshalSia(b []byte) { t.s = string(b) }
+func (t *test6) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
 
 var testStructs = []interface{}{
 	test0{false, 65537, 256, "foo"},
@@ -84,7 +84,7 @@ func TestEncode(t *testing.T) {
 	// use Marshal for convenience
 	for i := range testStructs {
 		b := Marshal(testStructs[i])
-		if bytes.Compare(b, testEncodings[i]) != 0 {
+		if !bytes.Equal(b, testEncodings[i]) {
 			t.Errorf("bad encoding of testStructs[%d]: \nexp:\t%v\ngot:\t%v", i, testEncodings[i], b)
 		}
 	}
@@ -207,7 +207,7 @@ func TestMarshalAll(t *testing.T) {
 	}
 
 	expected := MarshalAll(testStructs...)
-	if bytes.Compare(b, expected) != 0 {
+	if !bytes.Equal(b, expected) {
 		t.Errorf("expected %v, got %v", expected, b)
 	}
 }

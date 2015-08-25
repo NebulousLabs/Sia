@@ -87,7 +87,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 				return err
 			}
 			defer conn.Close()
-			err = encoding.WriteObject(conn, [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'})
+			err = encoding.WriteObject(conn, modules.RPCSettings)
 			if err != nil {
 				return err
 			}

@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -13,183 +14,292 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-var (
-	downloadAttempts = 5
-)
+// A fetcher fetches pieces from a host. This interface exists to facilitate
+// easy testing.
+type fetcher interface {
+	// pieces returns the set of pieces corresponding to a given chunk.
+	pieces(chunk uint64) []pieceData
 
-// A Download is a file download that has been queued by the renter. It
+	// fetch returns the data specified by piece metadata.
+	fetch(pieceData) ([]byte, error)
+}
+
+// A hostFetcher fetches pieces from a host. It implements the fetcher
+// interface.
+type hostFetcher struct {
+	conn      net.Conn
+	pieceMap  map[uint64][]pieceData
+	pieceSize uint64
+	masterKey crypto.TwofishKey
+}
+
+// pieces returns the pieces stored on this host that are part of a given
+// chunk.
+func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
+	return hf.pieceMap[chunk]
+}
+
+// fetch downloads the piece specified by p.
+func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
+	// request piece
+	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, hf.pieceSize})
+	if err != nil {
+		return nil, err
+	}
+
+	// download piece
+	data := make([]byte, hf.pieceSize)
+	_, err = io.ReadFull(hf.conn, data)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate decryption key
+	key := deriveKey(hf.masterKey, p.Chunk, p.Piece)
+
+	// decrypt and return
+	return key.DecryptBytes(data)
+}
+
+func (hf *hostFetcher) Close() error {
+	// ignore error; we'll need to close conn anyway
+	encoding.WriteObject(hf.conn, modules.DownloadRequest{0, 0})
+	return hf.conn.Close()
+}
+
+// newHostFetcher creates a new hostFetcher by connecting to a host.
+// TODO: We may not wind up requesting data from this, which means we will
+// connect and then disconnect without making any actual requests (but holding
+// the connection open the entire time). This is wasteful of host resources.
+// Consider only opening the connection after the first request has been made.
+func newHostFetcher(fc fileContract, pieceSize uint64, masterKey crypto.TwofishKey) (*hostFetcher, error) {
+	conn, err := net.DialTimeout("tcp", string(fc.IP), 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	// send RPC
+	err = encoding.WriteObject(conn, modules.RPCDownload)
+	if err != nil {
+		return nil, err
+	}
+
+	// send contract ID
+	err = encoding.WriteObject(conn, fc.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// make piece map
+	pieceMap := make(map[uint64][]pieceData)
+	for _, p := range fc.Pieces {
+		pieceMap[p.Chunk] = append(pieceMap[p.Chunk], p)
+	}
+	return &hostFetcher{
+		conn:      conn,
+		pieceMap:  pieceMap,
+		pieceSize: pieceSize + 28, // TODO: handle this better
+		masterKey: masterKey,
+	}, nil
+}
+
+// checkHosts checks that a set of hosts is sufficient to download a file.
+func checkHosts(hosts []fetcher, minPieces int, numChunks uint64) error {
+	for i := uint64(0); i < numChunks; i++ {
+		pieces := 0
+		for _, h := range hosts {
+			pieces += len(h.pieces(i))
+		}
+		if pieces < minPieces {
+			return errors.New("insufficient hosts to recover file")
+		}
+	}
+	return nil
+}
+
+// A download is a file download that has been queued by the renter. It
 // implements the modules.DownloadInfo interface.
-type Download struct {
-	// Implementation note: received is declared first to ensure that it is
-	// 64-bit aligned. This is necessary to ensure that atomic operations work
-	// correctly on ARM and x86-32.
+type download struct {
+	// NOTE: received is the first field to ensure 64-bit alignment, which is
+	// required for atomic operations.
 	received uint64
 
 	startTime   time.Time
-	complete    bool
-	filesize    uint64
-	destination string
 	nickname    string
+	destination string
 
-	pieces []filePiece
-	file   *os.File
+	erasureCode modules.ErasureCoder
+	chunkSize   uint64
+	fileSize    uint64
+	hosts       []fetcher
 }
 
-// StartTime returns when the download was initiated.
-func (d *Download) StartTime() time.Time {
+// StartTime is when the download was initiated.
+func (d *download) StartTime() time.Time {
 	return d.startTime
 }
 
-// Complete returns whether the file is ready to be used.
-func (d *Download) Complete() bool {
-	return d.complete
+// Filesize is the size of the file being downloaded.
+func (d *download) Filesize() uint64 {
+	return d.fileSize
 }
 
-// Filesize returns the size of the file.
-func (d *Download) Filesize() uint64 {
-	return d.filesize
-}
-
-// Received returns the number of bytes downloaded so far.
-func (d *Download) Received() uint64 {
+// Received is the number of bytes downloaded so far.
+func (d *download) Received() uint64 {
 	return atomic.LoadUint64(&d.received)
 }
 
-// Destination returns the file's location on disk.
-func (d *Download) Destination() string {
+// Destination is the filepath that the file was downloaded into.
+func (d *download) Destination() string {
 	return d.destination
 }
 
-// Nickname returns the identifier assigned to the file when it was uploaded.
-func (d *Download) Nickname() string {
+// Nickname is the identifier assigned to the file when it was uploaded.
+func (d *download) Nickname() string {
 	return d.nickname
 }
 
-// Write implements the io.Writer interface. Each write updates the Download's
-// received field. This allows download progress to be monitored in real-time.
-func (d *Download) Write(b []byte) (int, error) {
-	n, err := d.file.Write(b)
-	atomic.AddUint64(&d.received, uint64(n))
-	return n, err
+// downloadWorker fetches pieces from a host as directed by reqChan. It sends
+// the fetched pieces down the appropriate respChan.
+func downloadWorker(host fetcher, reqChan chan uint64, respChans []chan []byte) {
+	for chunkIndex := range reqChan {
+		for _, p := range host.pieces(chunkIndex) {
+			data, err := host.fetch(p)
+			if err != nil {
+				data = nil
+			}
+			respChans[p.Piece] <- data
+		}
+	}
 }
 
-// downloadPiece attempts to retrieve a file piece from a host.
-func (d *Download) downloadPiece(piece filePiece) error {
-	conn, err := net.DialTimeout("tcp", string(piece.HostIP), 10e9)
-	if err != nil {
-		return err
+// run performs the actual download. It spawns one worker per host, and
+// instructs them to sequentially download chunks. It then writes the
+// recovered chunks to w.
+func (d *download) run(w io.Writer) error {
+	// create request and response channels
+	reqChans := make([]chan uint64, len(d.hosts))
+	for i := range reqChans {
+		reqChans[i] = make(chan uint64)
 	}
-	defer conn.Close()
-	err = encoding.WriteObject(conn, [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'})
-	if err != nil {
-		return err
-	}
-
-	// Send the ID of the contract for the file piece we're requesting.
-	if err := encoding.WriteObject(conn, piece.ContractID); err != nil {
-		return err
+	respChans := make([]chan []byte, d.erasureCode.NumPieces())
+	for i := range respChans {
+		respChans[i] = make(chan []byte)
 	}
 
-	// Simultaneously download, decrypt, and calculate the Merkle root of the file.
-	tee := io.TeeReader(
-		// Use a LimitedReader to ensure we don't read indefinitely.
-		io.LimitReader(conn, int64(piece.Contract.FileSize)),
-		// Write the decrypted bytes to the file.
-		piece.EncryptionKey.NewWriter(d),
-	)
-	merkleRoot, err := crypto.ReaderMerkleRoot(tee)
-	if err != nil {
-		return err
+	// spawn download workers
+	for i, h := range d.hosts {
+		go downloadWorker(h, reqChans[i], respChans)
+		defer close(reqChans[i])
 	}
 
-	if merkleRoot != piece.Contract.FileMerkleRoot {
-		return errors.New("host provided a file that's invalid")
+	var received uint64
+	for i := uint64(0); received < d.fileSize; i++ {
+		// tell all workers to download chunk i
+		for _, ch := range reqChans {
+			ch <- i
+		}
+		// load pieces into chunk
+		// TODO: this deadlocks if any pieces are missing.
+		chunk := make([][]byte, d.erasureCode.NumPieces())
+		for j, ch := range respChans {
+			chunk[j] = <-ch
+		}
+
+		// Write pieces to w. We always write chunkSize bytes unless this is
+		// the last chunk; in that case, we write the remainder.
+		n := d.chunkSize
+		if n > d.fileSize-received {
+			n = d.fileSize - received
+		}
+		err := d.erasureCode.Recover(chunk, uint64(n), w)
+		if err != nil {
+			return err
+		}
+		received += n
+		atomic.AddUint64(&d.received, n)
 	}
 
 	return nil
 }
 
-// newDownload initializes a new Download object.
-func newDownload(file *file, destination string) (*Download, error) {
-	// Create the download destination file.
-	handle, err := os.Create(destination)
-	if err != nil {
-		return nil, err
-	}
+// newDownload initializes and returns a download object.
+func (f *file) newDownload(hosts []fetcher, destination string) *download {
+	return &download{
+		erasureCode: f.erasureCode,
+		chunkSize:   f.chunkSize(),
+		fileSize:    f.size,
+		hosts:       hosts,
 
-	// Filter out the inactive pieces.
-	var activePieces []filePiece
-	for _, piece := range file.Pieces {
-		if piece.Active {
-			activePieces = append(activePieces, piece)
-		}
-	}
-	if len(activePieces) == 0 {
-		return nil, errors.New("no active pieces")
-	}
-
-	return &Download{
-		startTime: time.Now(),
-		complete:  false,
-		// for now, all the pieces are equivalent
-		filesize:    file.Pieces[0].Contract.FileSize,
+		startTime:   time.Now(),
 		received:    0,
+		nickname:    f.name,
 		destination: destination,
-		nickname:    file.Name,
-
-		pieces: activePieces,
-		file:   handle,
-	}, nil
+	}
 }
 
 // Download downloads a file, identified by its nickname, to the destination
 // specified.
 func (r *Renter) Download(nickname, destination string) error {
-	lockID := r.mu.Lock()
 	// Lookup the file associated with the nickname.
+	lockID := r.mu.Lock()
 	file, exists := r.files[nickname]
+	r.mu.Unlock(lockID)
 	if !exists {
 		return errors.New("no file of that nickname")
 	}
 
-	// Create the download object and spawn the download process.
-	d, err := newDownload(file, destination)
+	// If no permissions are found, use a sane default.
+	perm := os.FileMode(file.mode)
+	if perm == 0 {
+		perm = 0666
+	}
+
+	// Create file on disk with the correct permissions.
+	oldMode := syscall.Umask(0000)
+	f, err := os.OpenFile(destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, perm)
+	if err != nil {
+		syscall.Umask(oldMode)
+		return err
+	}
+	defer f.Close()
+	syscall.Umask(oldMode)
+
+	// Initiate connections to each host.
+	var hosts []fetcher
+	for _, fc := range file.contracts {
+		// TODO: connect in parallel
+		hf, err := newHostFetcher(fc, file.pieceSize, file.masterKey)
+		if err != nil {
+			continue
+		}
+		defer hf.Close()
+		hosts = append(hosts, hf)
+	}
+
+	// Check that this host set is sufficient to download the file.
+	err = checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
 	if err != nil {
 		return err
 	}
 
+	// Create the download object.
+	d := file.newDownload(hosts, destination)
+
 	// Add the download to the download queue.
+	lockID = r.mu.Lock()
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)
 
-	// Download the file. We only need one piece, so iterate through the hosts
-	// until a download succeeds.
-	for i := 0; i < downloadAttempts; i++ {
-		for _, piece := range d.pieces {
-			downloadErr := d.downloadPiece(piece)
-			if downloadErr == nil {
-				// done
-				d.complete = true
-				d.file.Close()
-				return nil
-			}
-			// Reset seek, since the file may have been partially written. The
-			// next attempt will overwrite these bytes.
-			d.file.Seek(0, 0)
-			atomic.SwapUint64(&d.received, 0)
-		}
-
-		// This iteration failed, no hosts returned the piece. Try again
-		// after waiting a random amount of time.
-		r, _ := crypto.RandIntn(i * i * 256)
-		time.Sleep(time.Second * time.Duration(r))
+	// Perform download.
+	err = d.run(f)
+	if err != nil {
+		// File could not be downloaded; delete the copy on disk.
+		os.Remove(destination)
+		return err
 	}
 
-	// File could not be downloaded; delete the copy on disk.
-	d.file.Close()
-	os.Remove(destination)
-
-	return errors.New("could not download any file pieces")
+	return nil
 }
 
 // DownloadQueue returns the list of downloads in the queue.

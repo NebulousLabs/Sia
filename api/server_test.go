@@ -98,7 +98,7 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, hdb, w, filepath.Join(testdir, modules.RenterDir))
+	r, err := renter.New(cs, hdb, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}

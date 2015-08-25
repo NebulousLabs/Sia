@@ -106,7 +106,7 @@ func TestWritePrefix(t *testing.T) {
 	expected := append(EncUint64(3), "foo"...)
 	if err != nil {
 		t.Error(err)
-	} else if bytes.Compare(b.Bytes(), expected) != 0 {
+	} else if !bytes.Equal(b.Bytes(), expected) {
 		t.Errorf("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
 	}
 
@@ -126,7 +126,7 @@ func TestWriteObject(t *testing.T) {
 	expected := append(EncUint64(11), append(EncUint64(3), "foo"...)...)
 	if err != nil {
 		t.Error(err)
-	} else if bytes.Compare(b.Bytes(), expected) != 0 {
+	} else if !bytes.Equal(b.Bytes(), expected) {
 		t.Errorf("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
 	}
 
@@ -150,7 +150,7 @@ func TestReadWritePrefix(t *testing.T) {
 	rdata, err := ReadPrefix(b, 100)
 	if err != nil {
 		t.Error(err)
-	} else if bytes.Compare(rdata, data) != 0 {
+	} else if !bytes.Equal(rdata, data) {
 		t.Errorf("read/write mismatch: wrote %s, read %s", data, rdata)
 	}
 

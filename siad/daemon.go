@@ -62,7 +62,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
+	renter, err := renter.New(state, hostdb, wallet, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
 	if err != nil {
 		return err
 	}

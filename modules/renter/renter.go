@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"crypto/rand"
 	"errors"
 	"os"
 
@@ -12,7 +13,8 @@ import (
 var (
 	ErrNilCS     = errors.New("cannot create renter with nil consensus set")
 	ErrNilHostDB = errors.New("cannot create renter with nil hostdb")
-	ErrNilWallet = errors.New("cannot create renter wil nil wlalet")
+	ErrNilWallet = errors.New("cannot create renter with nil wallet")
+	ErrNilTpool  = errors.New("cannot create renter with nil transaction pool")
 )
 
 // A Renter is responsible for tracking all of the files that a user has
@@ -21,17 +23,20 @@ type Renter struct {
 	cs          modules.ConsensusSet
 	hostDB      modules.HostDB
 	wallet      modules.Wallet
+	tpool       modules.TransactionPool
 	blockHeight types.BlockHeight
 
 	files         map[string]*file
-	downloadQueue []*Download
+	contracts     map[types.FileContractID]types.FileContract
+	entropy       [32]byte // used to generate signing keys
+	downloadQueue []*download
 	saveDir       string
 
 	mu *sync.RWMutex
 }
 
 // New returns an empty renter.
-func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpool modules.TransactionPool, saveDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
 	}
@@ -41,19 +46,28 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, sav
 	if wallet == nil {
 		return nil, ErrNilWallet
 	}
+	if tpool == nil {
+		return nil, ErrNilTpool
+	}
 
 	r := &Renter{
 		cs:     cs,
 		hostDB: hdb,
 		wallet: wallet,
+		tpool:  tpool,
 
-		files:   make(map[string]*file),
-		saveDir: saveDir,
+		files:     make(map[string]*file),
+		contracts: make(map[types.FileContractID]types.FileContract),
+		saveDir:   saveDir,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
+	_, err := rand.Read(r.entropy[:])
+	if err != nil {
+		return nil, err
+	}
 
-	err := os.MkdirAll(saveDir, 0700)
+	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
 		return nil, err
 	}
@@ -62,15 +76,6 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, sav
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-
-	// TODO: I'm worried about balances here. Because of the way that the
-	// re-try algorithm works, it won't be a problem, but without that we would
-	// need to make sure that scanAllFiles() didn't get called until the entire
-	// balance had loaded, which would require loading the entire blockchain.
-	// This also won't be a problem once we're also saving the addresses.
-	//
-	// TODO: bring back this functionality when we have resumable uploads.
-	//r.scanAllFiles()
 
 	r.cs.ConsensusSetSubscribe(r)
 
@@ -90,6 +95,7 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	// Calculate the average cost of a file.
 	var totalPrice types.Currency
+	redundancy := 6 // reasonable estimate until we come up with an alternative
 	sampleSize := redundancy * 3 / 2
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {
@@ -110,3 +116,6 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	return
 }
+
+// enforce that Renter satisfies the modules.Renter interface
+var _ modules.Renter = (*Renter)(nil)

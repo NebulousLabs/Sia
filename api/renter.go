@@ -5,18 +5,20 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	duration   = 6000 // Duration that hosts will hold onto the file.
-	redundancy = 15   // Redundancy of files uploaded to the network.
+	duration     = 6000    // Duration that hosts will hold onto the file.
+	dataPieces   = 2       // Default data pieces per erasure-coded chunk
+	parityPieces = 10      // Default parity pieces per erasure-coded chunk
+	pieceSize    = 1 << 22 // Default size of one piece (4 MiB)
 )
 
 // DownloadInfo is a helper struct for the downloadqueue API call.
 type DownloadInfo struct {
 	StartTime   time.Time
-	Complete    bool
 	Filesize    uint64
 	Received    uint64
 	Destination string
@@ -29,7 +31,6 @@ type FileInfo struct {
 	UploadProgress float32
 	Nickname       string
 	Filesize       uint64
-	Repairing      bool
 	TimeRemaining  types.BlockHeight
 }
 
@@ -57,7 +58,6 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 	for _, dl := range downloads {
 		downloadSet = append(downloadSet, DownloadInfo{
 			StartTime:   dl.StartTime(),
-			Complete:    dl.Complete(),
 			Filesize:    dl.Filesize(),
 			Received:    dl.Received(),
 			Destination: dl.Destination(),
@@ -78,8 +78,7 @@ func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Reque
 			UploadProgress: file.UploadProgress(),
 			Nickname:       file.Nickname(),
 			Filesize:       file.Filesize(),
-			Repairing:      file.Repairing(),
-			TimeRemaining:  file.TimeRemaining(),
+			TimeRemaining:  file.Expiration() - types.BlockHeight(srv.blockchainHeight),
 		})
 	}
 
@@ -101,19 +100,22 @@ func (srv *Server) renterFilesDeleteHandler(w http.ResponseWriter, req *http.Req
 // renterFilesRenameHandler handles the API call to rename a file entry in the
 // renter.
 func (srv *Server) renterFilesRenameHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	writeError(w, "renaming temporarily disabled", http.StatusBadRequest)
 
-	writeSuccess(w)
+	/*
+		err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
+		if err != nil {
+			writeError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		writeSuccess(w)
+	*/
 }
 
-// renterFilesLoadHandler handles the API call to load a '.sia' that
-// contains filesharing information.
+// renterFilesLoadHandler handles the API call to load a '.sia' file.
 func (srv *Server) renterFilesLoadHandler(w http.ResponseWriter, req *http.Request) {
-	files, err := srv.renter.LoadSharedFile(req.FormValue("filename"))
+	files, err := srv.renter.LoadSharedFiles(req.FormValue("filename"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -123,7 +125,7 @@ func (srv *Server) renterFilesLoadHandler(w http.ResponseWriter, req *http.Reque
 }
 
 // renterFilesLoadAsciiHandler handles the API call to load a '.sia' file
-// in ascii form.
+// in ASCII form.
 func (srv *Server) renterFilesLoadAsciiHandler(w http.ResponseWriter, req *http.Request) {
 	files, err := srv.renter.LoadSharedFilesAscii(req.FormValue("file"))
 	if err != nil {
@@ -136,6 +138,7 @@ func (srv *Server) renterFilesLoadAsciiHandler(w http.ResponseWriter, req *http.
 
 // renterFilesShareHandler handles the API call to create a '.sia' file that
 // shares a file.
+// TODO: allow sharing of multiple files.
 func (srv *Server) renterFilesShareHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.ShareFiles([]string{req.FormValue("nickname")}, req.FormValue("filepath"))
 	if err != nil {
@@ -165,11 +168,13 @@ func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request)
 
 // renterFilesUploadHandler handles the API call to upload a file.
 func (srv *Server) renterFilesUploadHandler(w http.ResponseWriter, req *http.Request) {
+	rsc, _ := renter.NewRSCode(dataPieces, parityPieces)
 	err := srv.renter.Upload(modules.FileUploadParams{
-		Filename: req.FormValue("source"),
-		Duration: duration,
-		Nickname: req.FormValue("nickname"),
-		Pieces:   redundancy,
+		Filename:    req.FormValue("source"),
+		Duration:    duration,
+		Nickname:    req.FormValue("nickname"),
+		ErasureCode: rsc,
+		PieceSize:   pieceSize,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)

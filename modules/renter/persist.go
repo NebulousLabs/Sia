@@ -10,7 +10,11 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -21,106 +25,252 @@ const (
 var (
 	ErrNoNicknames    = errors.New("at least one nickname must be supplied")
 	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
+	ErrBadFile        = errors.New("not a .sia file")
+	ErrIncompatible   = errors.New("file is not compatible with current version")
 
-	shareMetadata = persist.Metadata{
-		Header:  "Sia Shared File",
-		Version: "0.1",
-	}
+	shareHeader  = [15]byte{'S', 'i', 'a', ' ', 'S', 'h', 'a', 'r', 'e', 'd', ' ', 'F', 'i', 'l', 'e'}
+	shareVersion = "0.4"
 
 	saveMetadata = persist.Metadata{
 		Header:  "Renter Persistence",
-		Version: "0.2",
+		Version: "0.4",
 	}
 )
 
+// save saves a file to w in shareable form. Files are stored in binary format
+// and gzipped to reduce size.
+func (f *file) save(w io.Writer) error {
+	// TODO: error checking
+	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	defer zip.Close()
+	enc := encoding.NewEncoder(zip)
+
+	// encode easy fields
+	enc.Encode(f.name)
+	enc.Encode(f.size)
+	enc.Encode(f.masterKey)
+	enc.Encode(f.pieceSize)
+	enc.Encode(f.mode)
+	enc.Encode(f.bytesUploaded)
+	enc.Encode(f.chunksUploaded)
+
+	// encode erasureCode
+	switch code := f.erasureCode.(type) {
+	case *rsCode:
+		enc.Encode("Reed-Solomon")
+		enc.Encode(uint64(code.dataPieces))
+		enc.Encode(uint64(code.numPieces - code.dataPieces))
+	default:
+		if build.DEBUG {
+			panic("unknown erasure code")
+		}
+		return errors.New("unknown erasure code")
+	}
+	// encode contracts
+	enc.Encode(uint64(len(f.contracts)))
+	for _, c := range f.contracts {
+		enc.Encode(c)
+	}
+	return nil
+}
+
+// load loads a file created by save.
+func (f *file) load(r io.Reader) error {
+	// TODO: error checking
+	zip, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer zip.Close()
+	dec := encoding.NewDecoder(zip)
+
+	// decode easy fields
+	dec.Decode(&f.name)
+	dec.Decode(&f.size)
+	dec.Decode(&f.masterKey)
+	dec.Decode(&f.pieceSize)
+	dec.Decode(&f.mode)
+	dec.Decode(&f.bytesUploaded)
+	dec.Decode(&f.chunksUploaded)
+
+	// decode erasure coder
+	var codeType string
+	dec.Decode(&codeType)
+	switch codeType {
+	case "Reed-Solomon":
+		var nData, nParity uint64
+		dec.Decode(&nData)
+		dec.Decode(&nParity)
+		rsc, err := NewRSCode(int(nData), int(nParity))
+		if err != nil {
+			return err
+		}
+		f.erasureCode = rsc
+	default:
+		return errors.New("unrecognized erasure code type: " + codeType)
+	}
+
+	// decode contracts
+	var nContracts uint64
+	dec.Decode(&nContracts)
+	f.contracts = make(map[modules.NetAddress]fileContract)
+	var contract fileContract
+	for i := uint64(0); i < nContracts; i++ {
+		dec.Decode(&contract)
+		f.contracts[contract.IP] = contract
+	}
+	return nil
+}
+
+// saveFile saves a file to the renter directory.
+func (r *Renter) saveFile(f *file) error {
+	handle, err := persist.NewSafeFile(filepath.Join(r.saveDir, f.name+ShareExtension))
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+
+	enc := encoding.NewEncoder(handle)
+
+	// Write header.
+	enc.Encode(shareHeader)
+	enc.Encode(shareVersion)
+
+	// Write length of 1.
+	err = enc.Encode(uint64(1))
+	if err != nil {
+		return err
+	}
+
+	// Write file.
+	err = f.save(handle)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // save stores the current renter data to disk.
 func (r *Renter) save() error {
-	var files []file
-	for _, file := range r.files {
-		files = append(files, *file)
+	data := struct {
+		Contracts map[string]types.FileContract
+		Entropy   [32]byte
+	}{make(map[string]types.FileContract), r.entropy}
+	// Convert renter's contract map to a JSON-friendly type.
+	for id, fc := range r.contracts {
+		b, _ := id.MarshalJSON()
+		data.Contracts[string(b)] = fc
 	}
-	return persist.SaveFile(saveMetadata, files, filepath.Join(r.saveDir, PersistFilename))
+	return persist.SaveFile(saveMetadata, data, filepath.Join(r.saveDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	var files []file
-	err := persist.LoadFile(saveMetadata, &files, filepath.Join(r.saveDir, PersistFilename))
+	// Load all files found in renter directory.
+	dir, err := os.Open(r.saveDir) // TODO: store in a subdir?
 	if err != nil {
 		return err
 	}
-	for i := range files {
-		files[i].renter = r
-		r.files[files[i].Name] = &files[i]
+	filenames, err := dir.Readdirnames(-1)
+	if err != nil {
+		return err
 	}
+	for _, path := range filenames {
+		// Skip non-sia files.
+		if filepath.Ext(path) != ShareExtension {
+			continue
+		}
+		file, err := os.Open(filepath.Join(r.saveDir, path))
+		if err != nil {
+			// maybe just skip?
+			return err
+		}
+		_, err = r.loadSharedFiles(file)
+		if err != nil {
+			// maybe just skip?
+			return err
+		}
+	}
+
+	// Load contracts and entropy.
+	data := struct {
+		Contracts map[string]types.FileContract
+		Entropy   [32]byte
+	}{}
+	err = persist.LoadFile(saveMetadata, &data, filepath.Join(r.saveDir, PersistFilename))
+	if err != nil {
+		return err
+	}
+	r.entropy = data.Entropy
+	var fcid types.FileContractID
+	for id, fc := range data.Contracts {
+		fcid.UnmarshalJSON([]byte(id))
+		r.contracts[fcid] = fc
+	}
+
 	return nil
 }
 
-// shareFiles writes the metadata of each file specified by nicknames to w.
-// This output can be shared with other daemons, giving them access to those
-// files.
+// shareFiles writes the specified files to w.
 func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
-	if len(nicknames) == 0 {
-		return ErrNoNicknames
+	enc := encoding.NewEncoder(w)
+
+	// Write header.
+	enc.Encode(shareHeader)
+	enc.Encode(shareVersion)
+
+	// Write number of files.
+	err := enc.Encode(uint64(len(nicknames)))
+	if err != nil {
+		return err
 	}
 
-	var files []file
-	for _, nickname := range nicknames {
-		file, exists := r.files[nickname]
+	// Write each file.
+	for _, name := range nicknames {
+		file, exists := r.files[name]
 		if !exists {
 			return ErrUnknownNickname
 		}
-		active := 0
-		for _, piece := range file.Pieces {
-			if piece.Active {
-				active++
-			}
+		err = file.save(w)
+		if err != nil {
+			return err
 		}
-		if active < 3 {
-			return errors.New("Cannot share an inactive file")
-		}
-		files = append(files, *file)
 	}
-
-	// pipe data through json -> gzip -> w
-	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
-	err := persist.Save(shareMetadata, files, zip)
-	if err != nil {
-		return err
-	}
-	zip.Close()
 
 	return nil
 }
 
-// ShareFiles saves a '.sia' file that can be shared with others, enabling them
-// to download the file you are sharing. It creates a Sia equivalent of a
-// '.torrent'.
+// ShareFile saves the specified files to sharedest.
 func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	// Suffix enforcement is not really necessary, but I want explicit
-	// enforcement of the suffix until people are used to seeing '.sia' files.
+	// TODO: consider just appending the proper extension.
 	if filepath.Ext(sharedest) != ShareExtension {
 		return ErrNonShareSuffix
 	}
 
-	file, err := os.Create(sharedest)
+	file, err := os.Open(sharedest)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	return r.shareFiles(nicknames, file)
+	err = r.shareFiles(nicknames, file)
+	if err != nil {
+		os.Remove(sharedest)
+		return err
+	}
+
+	return nil
 }
 
-// ShareFilesAscii returns an ascii string that can be shared with other
-// daemons, granting them access to the files.
+// ShareFilesAscii returns the specified files in ASCII format.
 func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	// pipe to a base64 encoder
 	buf := new(bytes.Buffer)
 	err := r.shareFiles(nicknames, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
@@ -130,43 +280,71 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	return buf.String(), nil
 }
 
-// loadSharedFile reads and decodes file metadata from reader and adds it to
-// the renter.
-func (r *Renter) loadSharedFile(reader io.Reader) ([]string, error) {
-	zip, err := gzip.NewReader(reader)
+// loadSharedFiles reads .sia data from reader and registers the contained
+// files in the renter. It returns the nicknames of the loaded files.
+func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
+	dec := encoding.NewDecoder(reader)
+
+	// read header
+	var header [15]byte
+	dec.Decode(&header)
+	if header != shareHeader {
+		return nil, ErrBadFile
+	}
+
+	// decode version
+	var version string
+	dec.Decode(&version)
+	if version != shareVersion {
+		return nil, ErrIncompatible
+	}
+
+	// Read number of files
+	var numFiles uint64
+	err := dec.Decode(&numFiles)
 	if err != nil {
 		return nil, err
 	}
 
-	var files []file
-	err = persist.Load(shareMetadata, &files, zip)
-	if err != nil {
-		return nil, err
-	}
-
-	var fileList []string
+	// Read each file.
+	files := make([]*file, numFiles)
 	for i := range files {
+		files[i] = new(file)
+		err := files[i].load(reader)
+		if err != nil {
+			return nil, err
+		}
+
+		// Make sure the file's name does not conflict with existing files.
 		dupCount := 0
-		origName := files[i].Name
+		origName := files[i].name
 		for {
-			_, exists := r.files[files[i].Name]
+			_, exists := r.files[files[i].name]
 			if !exists {
 				break
 			}
 			dupCount++
-			files[i].Name = origName + "_" + strconv.Itoa(dupCount)
+			files[i].name = origName + "_" + strconv.Itoa(dupCount)
 		}
-		files[i].renter = r
-		r.files[files[i].Name] = &files[i]
-		fileList = append(fileList, files[i].Name)
 	}
-	r.save()
 
-	return fileList, nil
+	// Add files to renter.
+	names := make([]string, numFiles)
+	for i, f := range files {
+		r.files[f.name] = f
+		names[i] = f.name
+	}
+	err = r.save()
+	if err != nil {
+		return nil, err
+	}
+
+	return names, nil
 }
 
-// LoadSharedFile loads a shared file into the renter.
-func (r *Renter) LoadSharedFile(filename string) ([]string, error) {
+// LoadSharedFiles loads a .sia file into the renter. It returns the nicknames
+// of the loaded files.
+func (r *Renter) LoadSharedFiles(filename string) ([]string, error) {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
@@ -174,12 +352,16 @@ func (r *Renter) LoadSharedFile(filename string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.loadSharedFile(file)
+	defer file.Close()
+	return r.loadSharedFiles(file)
 }
 
-// loadSharedFile takes an encoded set of files and adds them to the renter,
-// taking them form an ascii string.
+// LoadSharedFilesAscii loads an ASCII-encoded .sia file into the renter. It
+// returns the nicknames of the loaded files.
 func (r *Renter) LoadSharedFilesAscii(asciiSia string) ([]string, error) {
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
+
 	dec := base64.NewDecoder(base64.URLEncoding, bytes.NewBufferString(asciiSia))
-	return r.loadSharedFile(dec)
+	return r.loadSharedFiles(dec)
 }

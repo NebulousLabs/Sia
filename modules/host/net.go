@@ -4,14 +4,8 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
-)
-
-type rpcID [8]byte
-
-var (
-	idSettings = rpcID{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
-	idContract = rpcID{'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
-	idRetrieve = rpcID{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
@@ -25,20 +19,24 @@ func (h *Host) listen() {
 	}
 }
 
+// TODO: maintain compatibility
 func (h *Host) handleConn(conn net.Conn) {
 	defer conn.Close()
-	var id rpcID
-	if err := encoding.ReadObject(conn, &id, 8); err != nil {
+
+	var id types.Specifier
+	if err := encoding.ReadObject(conn, &id, 16); err != nil {
 		// log
 		return
 	}
 	switch id {
-	case idSettings:
+	case modules.RPCSettings:
 		h.rpcSettings(conn)
-	case idContract:
-		h.rpcContract(conn)
-	case idRetrieve:
-		h.rpcRetrieve(conn)
+	case modules.RPCUpload:
+		h.rpcUpload(conn)
+	case modules.RPCRevise:
+		h.rpcRevise(conn)
+	case modules.RPCDownload:
+		h.rpcDownload(conn)
 	default:
 		// log
 	}

@@ -832,7 +832,6 @@ Parameters: none
 Response:
 ```
 []struct{
-	Complete    bool
 	Filesize    uint64
 	Received    uint64
 	Destination string
@@ -840,11 +839,6 @@ Response:
 }
 ```
 Each file in the queue is represented by the above struct.
-
-`Complete` indicates whether the file is ready to be used. Note that `Received
-== Filesize` does not imply `Complete`, because the file may require
-additional processing (e.g. decryption) after all of the raw bytes have been
-downloaded.
 
 `Filesize` is the size of the file being download.
 
@@ -891,20 +885,24 @@ Parameters: none
 Response:
 ```
 []struct {
-	Available     bool
-	Nickname      string
-	Repairing     bool
-	TimeRemaining int
+	Available      bool
+	UploadProgress float32
+	Nickname       string
+	Filesize       uint64
+	TimeRemaining  types.BlockHeight (uint64)
 }
 ```
 Each uploaded file is represented by the above struct.
 
 `Available` indicates whether or not the file can be downloaded immediately.
 
+`UploadProgress` is the current upload percentage of the file, including
+redundancy. In general, files will be available for download before
+UploadProgress == 100.
+
 `Nickname` is the nickname given to the file when it was uploaded.
 
-`Repairing` indicates whether the file is currently being repaired. It is
-typically best not to shut down siad until files are no longer being repaired.
+`Filesize` is the size of the file in bytes.
 
 `TimeRemaining` indicates how many blocks the file will be available for.
 
