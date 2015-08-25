@@ -123,7 +123,7 @@ func renterdownloadqueuecmd() {
 	}
 	fmt.Println("Download Queue:")
 	for _, file := range queue {
-		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 2 3:04 PM"), 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
+		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
 	}
 }
 
