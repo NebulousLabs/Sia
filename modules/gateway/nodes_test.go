@@ -114,9 +114,11 @@ func TestShareNodes(t *testing.T) {
 
 	// g1 should have received the node
 	time.Sleep(100 * time.Millisecond)
+	id = g1.mu.Lock()
 	if g1.addNode(dummyNode) == nil {
 		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
 	}
+	g1.mu.Unlock(id)
 
 	// remove all nodes from both peers
 	id = g1.mu.Lock()

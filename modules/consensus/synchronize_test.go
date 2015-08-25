@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -40,8 +41,8 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// blockchains should now match
-	if cst1.cs.currentBlockID() != cst2.cs.currentBlockID() {
-		t.Fatal("Consensus Sets did not synchronize")
+	for cst1.cs.currentBlockID() != cst2.cs.currentBlockID() {
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst2.
@@ -66,8 +67,8 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// block heights should now match
-	if cst1.cs.Height() != cst2.cs.Height() {
-		t.Fatalf("Consensus Sets did not synchronize: %v %v", cst1.cs.Height(), cst2.cs.Height())
+	for cst1.cs.Height() != cst2.cs.Height() {
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
