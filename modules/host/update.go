@@ -3,7 +3,6 @@ package host
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -35,8 +34,7 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightForProof types.BlockHeight) {
 	defer h.threadedDeleteObligation(obligation)
 
-	fullpath := filepath.Join(h.saveDir, obligation.Path)
-	file, err := os.Open(fullpath)
+	file, err := os.Open(obligation.Path)
 	if err != nil {
 		fmt.Println(err)
 		return

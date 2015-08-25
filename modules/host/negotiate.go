@@ -19,14 +19,6 @@ var (
 	HostCapacityErr = errors.New("host is at capacity and cannot take more files")
 )
 
-// allocate creates a new file with a unique name on disk.
-func (h *Host) allocate() (*os.File, string, error) {
-	h.fileCounter++
-	path := strconv.Itoa(h.fileCounter)
-	file, err := os.Create(filepath.Join(h.saveDir, path))
-	return file, path, err
-}
-
 // deallocate deletes a file and restores its allocated space.
 func (h *Host) deallocate(path string) error {
 	fullpath := filepath.Join(h.saveDir, path)
