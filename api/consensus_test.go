@@ -27,7 +27,7 @@ func TestIntegrationConsensusGET(t *testing.T) {
 	if cg.CurrentBlock != st.server.currentBlock.ID() {
 		t.Error("wrong block returned in consensus GET call")
 	}
-	expectedTarget := types.Target{64}
+	expectedTarget := types.Target{128}
 	if cg.Target != expectedTarget {
 		t.Error("wrong target returned in consensus GET call")
 	}
