@@ -18,3 +18,15 @@ func RandIntn(n int) (int, error) {
 	r, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
 	return int(r.Int64()), err
 }
+
+// Perm returns, as a slice of n ints, a pseudo-random permutation of the
+// integers [0,n).
+func Perm(n int) []int {
+	m := make([]int, n)
+	for i := 0; i < n; i++ {
+		j, _ := RandIntn(i + 1)
+		m[i] = m[j]
+		m[j] = i
+	}
+	return m
+}

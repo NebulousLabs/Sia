@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -73,7 +74,9 @@ func startDaemon() error {
 
 	// Bootstrap to the network.
 	if !config.Siad.NoBootstrap {
-		for i := range modules.BootstrapPeers {
+		// connect to 3 random bootstrap nodes
+		perm := crypto.Perm(len(modules.BootstrapPeers))
+		for _, i := range perm[:3] {
 			go gateway.Connect(modules.BootstrapPeers[i])
 		}
 	}
