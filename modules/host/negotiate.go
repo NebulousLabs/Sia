@@ -21,13 +21,12 @@ var (
 
 // deallocate deletes a file and restores its allocated space.
 func (h *Host) deallocate(path string) error {
-	fullpath := filepath.Join(h.saveDir, path)
-	stat, err := os.Stat(fullpath)
+	stat, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 	h.spaceRemaining += stat.Size()
-	return os.Remove(fullpath)
+	return os.Remove(path)
 }
 
 // considerContract checks that the provided transaction matches the host's
