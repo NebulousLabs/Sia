@@ -192,6 +192,10 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	// submit to blockchain
 	err = hu.renter.tpool.AcceptTransactionSet(signedHostTxnSet)
+	if err == modules.ErrDuplicateTransactionSet {
+		// this can happen if the renter is uploading to itself
+		err = nil
+	}
 	if err != nil {
 		return err
 	}

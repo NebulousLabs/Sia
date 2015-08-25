@@ -222,6 +222,10 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return err
 	}
 	err = h.tpool.AcceptTransactionSet(signedTxnSet)
+	if err == modules.ErrDuplicateTransactionSet {
+		// this can happen if the host is uploading to itself
+		err = nil
+	}
 	if err != nil {
 		return err
 	}
