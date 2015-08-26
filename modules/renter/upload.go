@@ -7,16 +7,22 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	defaultDuration     = 6000    // Duration that hosts will hold onto the file
-	defaultDataPieces   = 2       // Data pieces per erasure-coded chunk
-	defaultParityPieces = 10      // Parity pieces per erasure-coded chunk
-	defaultPieceSize    = 1 << 22 // Size of one piece (4 MiB)
-	smallPieceSize      = 1 << 16 // Size for smaller files (64 KiB)
+	defaultDuration     = 6000 // Duration that hosts will hold onto the file
+	defaultDataPieces   = 2    // Data pieces per erasure-coded chunk
+	defaultParityPieces = 10   // Parity pieces per erasure-coded chunk
+
+	// piece sizes
+	// NOTE: The encryption overhead is subtracted so that encrypted piece
+	// will always be a multiple of 64 (i.e. crypto.SegmentSize). Without this
+	// property, revisions break the file's Merkle root.
+	defaultPieceSize = 1<<22 - crypto.TwofishOverhead // 4 MiB
+	smallPieceSize   = 1<<16 - crypto.TwofishOverhead // 64 KiB
 )
 
 type uploadPiece struct {

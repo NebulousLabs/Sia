@@ -13,6 +13,10 @@ import (
 	"golang.org/x/crypto/twofish"
 )
 
+const (
+	TwofishOverhead = 28 // number of bytes added by EncryptBytes
+)
+
 var (
 	ErrInsufficientLen = errors.New("supplied ciphertext is not long enough to contain a nonce")
 )
