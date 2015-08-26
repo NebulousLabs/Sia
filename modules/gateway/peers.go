@@ -3,7 +3,6 @@ package gateway
 import (
 	"errors"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -208,17 +207,10 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 
 	// call initRPCs
 	id = g.mu.RLock()
-	var wg sync.WaitGroup
-	wg.Add(len(g.initRPCs))
 	for name, fn := range g.initRPCs {
-		go func(name string, fn modules.RPCFunc) {
-			// errors here are non-fatal
-			g.RPC(addr, name, fn)
-			wg.Done()
-		}(name, fn)
+		go g.RPC(addr, name, fn)
 	}
 	g.mu.RUnlock(id)
-	wg.Wait()
 
 	return nil
 }

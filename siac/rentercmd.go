@@ -123,7 +123,7 @@ func renterdownloadqueuecmd() {
 	}
 	fmt.Println("Download Queue:")
 	for _, file := range queue {
-		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 2 3:04 PM"), 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
+		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
 	}
 }
 
@@ -174,7 +174,7 @@ func renterfilesloadcmd(filename string) {
 		fmt.Println("Could not load file:", err)
 		return
 	}
-	fmt.Printf("Loaded %d files:\n", len(info.FilesAdded))
+	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
 	for _, file := range info.FilesAdded {
 		fmt.Printf("\t%s\n", file)
 	}
@@ -187,7 +187,7 @@ func renterfilesloadasciicmd(data string) {
 		fmt.Println("Could not load file:", err)
 		return
 	}
-	fmt.Printf("Loaded %d files:\n", len(info.FilesAdded))
+	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
 	for _, file := range info.FilesAdded {
 		fmt.Printf("\t%s\n", file)
 	}

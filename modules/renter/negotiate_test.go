@@ -67,6 +67,12 @@ func TestReviseContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// get an address
+	ourAddr, err := rt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// generate keys
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
@@ -82,14 +88,58 @@ func TestReviseContract(t *testing.T) {
 		SignaturesRequired: 1,
 	}
 
+	// create file contract
+	payout := types.NewCurrency64(1e16)
+
+	fc := types.FileContract{
+		FileSize:       0,
+		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
+		WindowStart:    100,
+		WindowEnd:      1000,
+		Payout:         payout,
+		UnlockHash:     uc.UnlockHash(),
+		RevisionNumber: 0,
+	}
+	// outputs need account for tax
+	fc.ValidProofOutputs = []types.SiacoinOutput{
+		{Value: payout.Sub(fc.Tax()), UnlockHash: ourAddr.UnlockHash()},
+		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}}, // no collateral
+	}
+	fc.MissedProofOutputs = []types.SiacoinOutput{
+		// same as above
+		fc.ValidProofOutputs[0],
+		// goes to the void, not the renter
+		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
+	}
+
+	txnBuilder := rt.wallet.StartTransaction()
+	err = txnBuilder.FundSiacoins(fc.Payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnBuilder.AddFileContract(fc)
+	signedTxnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// submit contract
+	err = rt.tpool.AcceptTransactionSet(signedTxnSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// create revision
-	fcid := types.FileContractID{1}
+	fcid := signedTxnSet[len(signedTxnSet)-1].FileContractID(0)
 	rev := types.FileContractRevision{
-		ParentID:         fcid,
-		UnlockConditions: uc,
-		NewFileSize:      10,
-		NewWindowStart:   100,
-		NewWindowEnd:     1000,
+		ParentID:              fcid,
+		UnlockConditions:      uc,
+		NewFileSize:           10,
+		NewWindowStart:        100,
+		NewWindowEnd:          1000,
+		NewRevisionNumber:     1,
+		NewValidProofOutputs:  fc.ValidProofOutputs,
+		NewMissedProofOutputs: fc.MissedProofOutputs,
 	}
 
 	// create transaction containing the revision
@@ -110,6 +160,12 @@ func TestReviseContract(t *testing.T) {
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
 	err = signedTxn.StandaloneValid(rt.renter.blockHeight)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// submit revision
+	err = rt.tpool.AcceptTransactionSet([]types.Transaction{signedTxn})
 	if err != nil {
 		t.Fatal(err)
 	}

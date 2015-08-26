@@ -2,6 +2,8 @@ package renter
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -127,11 +129,13 @@ func (r *Renter) DeleteFile(nickname string) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
-	_, exists := r.files[nickname]
+	f, exists := r.files[nickname]
 	if !exists {
 		return ErrUnknownNickname
 	}
 	delete(r.files, nickname)
+
+	os.Remove(filepath.Join(r.saveDir, f.name+ShareExtension))
 
 	r.save()
 	return nil

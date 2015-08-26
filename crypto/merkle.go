@@ -51,12 +51,12 @@ func MerkleRoot(leaves [][]byte) (h Hash) {
 }
 
 // Calculates the number of leaves in the file when building a Merkle tree.
-func CalculateLeaves(fileSize uint64) (numSegments uint64) {
-	numSegments = fileSize / SegmentSize
-	if fileSize%SegmentSize != 0 {
+func CalculateLeaves(fileSize uint64) uint64 {
+	numSegments := fileSize / SegmentSize
+	if fileSize == 0 || fileSize%SegmentSize != 0 {
 		numSegments++
 	}
-	return
+	return numSegments
 }
 
 // ReaderMerkleRoot returns the merkle root of a reader.

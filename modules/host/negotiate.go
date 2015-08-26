@@ -19,23 +19,14 @@ var (
 	HostCapacityErr = errors.New("host is at capacity and cannot take more files")
 )
 
-// allocate creates a new file with a unique name on disk.
-func (h *Host) allocate() (*os.File, string, error) {
-	h.fileCounter++
-	path := strconv.Itoa(h.fileCounter)
-	file, err := os.Create(filepath.Join(h.saveDir, path))
-	return file, path, err
-}
-
 // deallocate deletes a file and restores its allocated space.
 func (h *Host) deallocate(path string) error {
-	fullpath := filepath.Join(h.saveDir, path)
-	stat, err := os.Stat(fullpath)
+	stat, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 	h.spaceRemaining += stat.Size()
-	return os.Remove(fullpath)
+	return os.Remove(path)
 }
 
 // considerContract checks that the provided transaction matches the host's
@@ -222,6 +213,10 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return err
 	}
 	err = h.tpool.AcceptTransactionSet(signedTxnSet)
+	if err == modules.ErrDuplicateTransactionSet {
+		// this can happen if the host is uploading to itself
+		err = nil
+	}
 	if err != nil {
 		return err
 	}
@@ -296,8 +291,12 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		tree.Push(buf)
 	}
 
-	// accept new revisions in a loop
-	emptyID := types.Transaction{}.ID()
+	// accept new revisions in a loop. The final good transaction will be
+	// submitted to the blockchain.
+	var finalTxn types.Transaction
+	defer func() {
+		h.tpool.AcceptTransactionSet([]types.Transaction{finalTxn})
+	}()
 	for {
 		// read proposed revision
 		var revTxn types.Transaction
@@ -305,7 +304,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			return err
 		}
 		// an empty transaction indicates completion
-		if revTxn.ID() == emptyID {
+		if revTxn.ID() == (types.Transaction{}).ID() {
 			break
 		}
 
@@ -383,6 +382,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 		h.save()
 		h.mu.Unlock(lockID)
+
+		finalTxn = revTxn
 	}
 
 	return nil

@@ -251,7 +251,7 @@ func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 		return ErrNonShareSuffix
 	}
 
-	file, err := os.Open(sharedest)
+	file, err := os.Create(sharedest)
 	if err != nil {
 		return err
 	}

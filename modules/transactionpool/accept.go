@@ -182,7 +182,11 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	// diff objects can be repeated, (no need to remove those). Just need to
 	// remove the conflicts from tp.transactionSets.
 	var superset []types.Transaction
+	supersetMap := make(map[TransactionSetID]struct{})
 	for _, conflict := range conflictMap {
+		supersetMap[conflict] = struct{}{}
+	}
+	for conflict := range supersetMap {
 		superset = append(superset, tp.transactionSets[conflict]...)
 	}
 	superset = append(superset, dedupSet...)

@@ -22,34 +22,22 @@ func TestTreeBuilder(t *testing.T) {
 
 // TestCalculateLeaves probes the CalulateLeaves function.
 func TestCalculateLeaves(t *testing.T) {
-	cl0 := CalculateLeaves(0)
-	cl63 := CalculateLeaves(63)
-	cl64 := CalculateLeaves(64)
-	cl65 := CalculateLeaves(65)
-	cl127 := CalculateLeaves(127)
-	cl128 := CalculateLeaves(128)
-	cl129 := CalculateLeaves(129)
+	tests := []struct {
+		size, expSegs uint64
+	}{
+		{0, 1},
+		{63, 1},
+		{64, 1},
+		{65, 2},
+		{127, 2},
+		{128, 2},
+		{129, 3},
+	}
 
-	if cl0 != 0 {
-		t.Error("miscalculation for cl0")
-	}
-	if cl63 != 1 {
-		t.Error("miscalculation for cl63")
-	}
-	if cl64 != 1 {
-		t.Error("miscalculation for cl64")
-	}
-	if cl65 != 2 {
-		t.Error("miscalculation for cl65")
-	}
-	if cl127 != 2 {
-		t.Error("miscalculation for cl127")
-	}
-	if cl128 != 2 {
-		t.Error("miscalculation for cl128")
-	}
-	if cl129 != 3 {
-		t.Error("miscalculation for cl129")
+	for i, test := range tests {
+		if segs := CalculateLeaves(test.size); segs != test.expSegs {
+			t.Errorf("miscalculation for test %v: expected %v, got %v", i, test.expSegs, segs)
+		}
 	}
 }
 

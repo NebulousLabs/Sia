@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -30,8 +31,8 @@ func startDaemon() error {
 	//
 	// TODO: This message can be removed once the api starts up in under 1/2
 	// second.
-	fmt.Println("siad is loading, may take a minute or two")
-	loadStart := time.Now().UnixNano()
+	fmt.Println("Loading...")
+	loadStart := time.Now()
 
 	// Create all of the modules.
 	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
@@ -73,7 +74,9 @@ func startDaemon() error {
 
 	// Bootstrap to the network.
 	if !config.Siad.NoBootstrap {
-		for i := range modules.BootstrapPeers {
+		// connect to 3 random bootstrap nodes
+		perm := crypto.Perm(len(modules.BootstrapPeers))
+		for _, i := range perm[:3] {
 			go gateway.Connect(modules.BootstrapPeers[i])
 		}
 	}
@@ -82,8 +85,8 @@ func startDaemon() error {
 	//
 	// TODO: This message can be removed once the api starts up in under 1/2
 	// second.
-	startupTime := time.Now().UnixNano() - loadStart
-	fmt.Println("siad has finished loading after", float64(startupTime)/1e9, "seconds")
+	startupTime := time.Since(loadStart)
+	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
 	// Start serving api requests.
 	err = srv.Serve()
