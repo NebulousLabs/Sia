@@ -73,11 +73,11 @@ pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
        ./modules/wallet ./modules/explorer ./persist                 \
        ./siag ./siae ./types
 test: clean fmt REBUILD
-	go test -short -tags='debug testing' -timeout=10s $(pkgs)
+	go test -short -tags='debug testing' -timeout=5s $(pkgs)
 test-v: clean fmt REBUILD
-	go test -race -v -short -tags='debug testing' -timeout=20s $(pkgs)
+	go test -race -v -short -tags='debug testing' -timeout=10s $(pkgs)
 test-long: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=360s $(pkgs)
+	go test -v -race -tags='testing debug' -timeout=150s $(pkgs)
 bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=120s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
@@ -90,14 +90,14 @@ cover: clean REBUILD
 cover-integration: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestIntegration -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestIntegration -tags='testing debug' -timeout=150s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
 cover-unit: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestUnit -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestUnit -tags='testing debug' -timeout=150s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
