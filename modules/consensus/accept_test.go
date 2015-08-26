@@ -12,9 +12,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
-func TestDoSBlockHandling(t *testing.T) {
-	cst, err := createConsensusSetTester("TestDoSBlockHandling")
+// TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly ignored.
+func TestIntegrationDoSBlockHandling(t *testing.T) {
+	cst, err := createConsensusSetTester("TestIntegrationDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,69 +52,59 @@ func TestDoSBlockHandling(t *testing.T) {
 	}
 }
 
-// testBlockKnownHandling submits known blocks to the consensus set.
-func (cst *consensusSetTester) testBlockKnownHandling() error {
+// TestBlockKnownHandling submits known blocks to the consensus set.
+func TestBlockKnownHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBlockKnownHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+
 	// Get a block destined to be stale.
 	block, _, target, err := cst.miner.BlockForWork()
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 	staleBlock, _ := cst.miner.SolveBlock(block, target)
 
 	// Add two new blocks to the consensus set to block the stale block.
 	block1, err := cst.miner.AddBlock()
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 	block2, err := cst.miner.AddBlock()
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 
 	// Submit the stale block.
 	err = cst.cs.acceptBlock(staleBlock)
 	if err != nil && err != modules.ErrNonExtendingBlock {
-		return err
+		t.Fatal(err)
 	}
 
 	// Submit block1 and block2 again, looking for a 'BlockKnown' error.
 	err = cst.cs.acceptBlock(block1)
 	if err != ErrBlockKnown {
-		return errors.New("expecting known block err: " + err.Error())
+		t.Fatal("expecting known block err: " + err.Error())
 	}
 	err = cst.cs.acceptBlock(block2)
 	if err != ErrBlockKnown {
-		return errors.New("expecting known block err: " + err.Error())
+		t.Fatal("expecting known block err: " + err.Error())
 	}
 	err = cst.cs.acceptBlock(staleBlock)
 	if err != ErrBlockKnown {
-		return errors.New("expecting known block err: " + err.Error())
+		t.Fatal("expecting known block err: " + err.Error())
 	}
 
 	// Try the genesis block edge case.
 	genesisBlock := cst.cs.db.getBlockMap(cst.cs.db.getPath(0)).Block
 	err = cst.cs.acceptBlock(genesisBlock)
 	if err != ErrBlockKnown {
-		return errors.New("expecting known block err: " + err.Error())
-	}
-	return nil
-}
-
-// TestBlockKnownHandling creates a new consensus set tester and uses it to
-// call testBlockKnownHandling.
-func TestBlockKnownHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	cst, err := createConsensusSetTester("TestBlockKnownHandling")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-	err = cst.testBlockKnownHandling()
-	if err != nil {
-		t.Error(err)
+		t.Fatal("expecting known block err: " + err.Error())
 	}
 }
 
@@ -1665,15 +1655,7 @@ func TestBuriedBadFork(t *testing.T) {
 	block, _ = cst.miner.SolveBlock(block, parent.ChildTarget) // okay because the target will not change
 	err = cst.cs.AcceptBlock(block)
 	if err == nil {
-		t.Fatal(err)
-	}
-	exists := cst.cs.db.inBlockMap(badBlock.ID())
-	if exists {
-		t.Error("bad block not cleared from memory")
-	}
-	exists = cst.cs.db.inBlockMap(block.ID())
-	if exists {
-		t.Error("block not cleared from memory")
+		t.Fatal("a bad block failed to cause an error")
 	}
 }
 
@@ -1724,10 +1706,6 @@ func TestBuriedBadTransaction(t *testing.T) {
 	err = cst.cs.AcceptBlock(block)
 	if err == nil {
 		t.Error("buried transaction didn't cause an error")
-	}
-	exists := cst.cs.db.inBlockMap(block.ID())
-	if exists {
-		t.Error("bad block made it into the block map")
 	}
 }
 

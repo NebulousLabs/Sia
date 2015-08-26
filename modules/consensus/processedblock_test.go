@@ -99,8 +99,8 @@ func TestIntegrationEarliestChildTimestamp(t *testing.T) {
 	}
 }
 
-// TestHeavierThan probes the heavierThan method of the processedBlock type.
-func TestHeavierThan(t *testing.T) {
+// TestUnitHeavierThan probes the heavierThan method of the processedBlock type.
+func TestUnitHeavierThan(t *testing.T) {
 	// Create a light node.
 	pbLight := new(processedBlock)
 	pbLight.Depth[0] = 64

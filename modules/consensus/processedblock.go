@@ -28,7 +28,7 @@ var SurpassThreshold = big.NewRat(20, 100)
 type processedBlock struct {
 	Block    types.Block
 	Parent   types.BlockID
-	Children []types.BlockID
+	Children []types.BlockID // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
 
 	Height      types.BlockHeight
 	Depth       types.Target
@@ -162,7 +162,7 @@ func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock
 // children. The new node is also returned. It necessairly modifies the database
 //
 // TODO: newChild has a fair amount of room for optimization.
-func (cs *ConsensusSet) newChild(pb *processedBlock, b types.Block) *processedBlock {
+func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block) (*processedBlock, error) {
 	// Create the child node.
 	childID := b.ID()
 	child := &processedBlock{
@@ -172,21 +172,14 @@ func (cs *ConsensusSet) newChild(pb *processedBlock, b types.Block) *processedBl
 		Height: pb.Height + 1,
 		Depth:  pb.childDepth(),
 	}
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		blockMap := tx.Bucket(BlockMap)
-		err := cs.setChildTarget(blockMap, child)
-		if err != nil {
-			return err
-		}
-		pb.Children = append(pb.Children, childID)
-		err = blockMap.Put(child.Block.ParentID[:], encoding.Marshal(*pb))
-		if err != nil {
-			return err
-		}
-		return blockMap.Put(childID[:], encoding.Marshal(*child))
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
+	blockMap := tx.Bucket(BlockMap)
+	err := cs.setChildTarget(blockMap, child)
+	if err != nil {
+		return nil, err
 	}
-	return child
+	err = blockMap.Put(childID[:], encoding.Marshal(*child))
+	if err != nil {
+		return nil, err
+	}
+	return child, nil
 }

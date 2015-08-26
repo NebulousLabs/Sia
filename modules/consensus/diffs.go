@@ -429,7 +429,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
-			cs.deleteNode(pb)
 			return err
 		}
 

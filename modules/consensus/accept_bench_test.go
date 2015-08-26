@@ -1,99 +1,78 @@
 package consensus
 
 import (
-	"errors"
-	"fmt"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// benchmarkEmptyBlocks is a benchmark that mines many blocks, and
-// measures how long it takes to add them to the consensusset
-func benchmarkAcceptEmptyBlocks(b *testing.B) error {
+// BenchmarkAcceptEmptyBlocks measures how quckly empty blocks are integrated
+// into the consensus set.
+//
+// David's Setup - 08-26-2015: 6.377 ms / op
+func BenchmarkAcceptEmptyBlocks(b *testing.B) {
+	cst, err := createConsensusSetTester("BenchmarkEmptyBlocks")
+	if err != nil {
+		b.Fatal("Error creating tester: " + err.Error())
+	}
+	defer cst.closeCst()
+
 	// Create an alternate testing consensus set, which does not
 	// have any subscribers
-	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkEmptyBlocksB")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkEmptyBlocks - 2")
+	cs, err := New(cst.gateway, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
-		return err
-	}
-	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
-	if err != nil {
-		return errors.New("Error creating consensus: " + err.Error())
+		b.Fatal(err)
 	}
 	defer cs.Close()
 
-	// The test dir will be reset each time the benchmark
-	// is done.
-	cst, err := createConsensusSetTester("BenchmarkEmptyBlocks")
-	if err != nil {
-		return errors.New("Error creating tester: " + err.Error())
-	}
-	defer cst.closeCst()
+	// Synchronisze the cst and the subscriberless consensus set.
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
 		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
 		if err != nil {
-			return err
+			b.Fatal(err)
 		}
 	}
 
 	b.ResetTimer()
+	b.StopTimer()
 	for j := 0; j < b.N; j++ {
 		// Submit a block to the consensus set tester - which has many
 		// subscribers. (untimed)
-		b.StopTimer()
-		block, err := cst.miner.FindBlock()
+		block, err := cst.miner.AddBlock()
 		if err != nil {
-			return err
+			b.Fatal(err)
 		}
-		err = cst.cs.AcceptBlock(block)
-		if err != nil {
-			errstr := fmt.Sprintf("Error accepting %d from mined: %s", j, err.Error())
-			return errors.New(errstr)
-		}
-		b.StartTimer()
 
 		// Submit a block to the consensus set which has no subscribers.
 		// (timed)
+		b.StartTimer()
 		err = cs.AcceptBlock(block)
 		if err != nil {
-			errstr := fmt.Sprintf("Error accepting %d for timing: %s", j, err.Error())
-			return errors.New(errstr)
+			b.Fatal("error accepting a block:", err)
 		}
-	}
-
-	return nil
-}
-
-// BenchmarkEmptyBlocks is a wrapper for benchmarkEmptyBlocks, which
-// handles error catching
-func BenchmarkAcceptEmptyBlocks(b *testing.B) {
-	b.ReportAllocs()
-	err := benchmarkAcceptEmptyBlocks(b)
-	if err != nil {
-		b.Fatal(err)
+		b.StopTimer()
 	}
 }
 
-func BenchmarkAcceptBigTxBlocks(b *testing.B) {
-	b.ReportAllocs()
-
-	numSigs := 7
-
-	cst, err := createConsensusSetTester("BenchmarkEmptyBlocksA")
+// BenchmarkAcceptSmallBlocks measures how quickly smaller blocks are
+// integrated into the consensus set.
+//
+// David's Setup - 08-26-2015: 10.047 ms / op
+func BenchmarkAcceptAcceptSmallBlocks(b *testing.B) {
+	cst, err := createConsensusSetTester("BenchmarkAcceptSmallBlocks")
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer cst.closeCst()
-
-	// Mine until the wallet has 100 utxos
-	for cst.cs.height() < (types.BlockHeight(numSigs) + types.MaturityDelay) {
+	// COMPAT v0.4.0
+	//
+	// Push the height of the consensus set tester beyond the fork height.
+	for i := 0; i < 10; i++ {
 		_, err := cst.miner.AddBlock()
 		if err != nil {
 			b.Fatal(err)
@@ -102,16 +81,14 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 
 	// Create an alternate testing consensus set, which does not
 	// have any subscribers
-	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkEmptyBlocksB")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
-	if err != nil {
-		b.Fatal(err)
-	}
-	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
+	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkAcceptSmallBlocks - 2")
+	cs, err := New(cst.gateway, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		b.Fatal("Error creating consensus: " + err.Error())
 	}
 	defer cs.Close()
+
+	// Synchronize the consensus set with the consensus set tester.
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
 		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
@@ -120,59 +97,51 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 		}
 	}
 
-	// construct a transaction using numSigs utxo's, and signed numSigs times
-	outputValues := make([]types.Currency, numSigs)
-	txValue := types.ZeroCurrency
-	for i := 1; i <= numSigs; i++ {
-		outputValues[i-1] = types.CalculateCoinbase(types.BlockHeight(i))
-		txValue = txValue.Add(outputValues[i-1])
-	}
-
 	b.ResetTimer()
 	b.StopTimer()
 	for j := 0; j < b.N; j++ {
+		// Create a transaction with a miner fee, a normal siacoin output, and
+		// a funded file contract.
 		txnBuilder := cst.wallet.StartTransaction()
-		err = txnBuilder.FundSiacoins(txValue)
+		err = txnBuilder.FundSiacoins(types.NewCurrency64(125e6))
 		if err != nil {
 			b.Fatal(err)
 		}
-
-		for i := 0; i < numSigs; i++ {
-			unlockConditions, err := cst.wallet.NextAddress()
-			if err != nil {
-				b.Fatal(err)
-			}
-			txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: outputValues[i], UnlockHash: unlockConditions.UnlockHash()})
+		// Add a small miner fee.
+		txnBuilder.AddMinerFee(types.NewCurrency64(5e6))
+		// Add a siacoin output.
+		txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: types.NewCurrency64(20e6)})
+		// Add a file contract.
+		fc := types.FileContract{
+			WindowStart: 1000,
+			WindowEnd:   10005,
+			Payout:      types.NewCurrency64(100e6),
+			ValidProofOutputs: []types.SiacoinOutput{{
+				Value: types.NewCurrency64(96100e3),
+			}},
+			MissedProofOutputs: []types.SiacoinOutput{{
+				Value: types.NewCurrency64(96100e3),
+			}},
 		}
-
+		txnBuilder.AddFileContract(fc)
 		txnSet, err := txnBuilder.Sign(true)
 		if err != nil {
 			b.Fatal(err)
 		}
 
-		outputVolume := types.ZeroCurrency
-		for _, out := range txnSet[0].SiacoinOutputs {
-			outputVolume = outputVolume.Add(out.Value)
-		}
-
-		blk := types.Block{
-			ParentID:  cst.cs.CurrentBlock().ID(),
-			Timestamp: types.CurrentTimestamp(),
-			MinerPayouts: []types.SiacoinOutput{
-				{Value: types.CalculateCoinbase(cst.cs.height())},
-			},
-			Transactions: txnSet,
-		}
-
-		target, _ := cst.cs.ChildTarget(cst.cs.CurrentBlock().ID())
-		block, _ := cst.miner.SolveBlock(blk, target)
-		// Submit it to the first consensus set for validity
-		err = cst.cs.AcceptBlock(block)
+		// Submit the transaction set and mine the block.
+		err = cst.tpool.AcceptTransactionSet(txnSet)
 		if err != nil {
 			b.Fatal(err)
 		}
+		block, err := cst.miner.AddBlock()
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// Submit the block to the consensus set without subscribers, timing
+		// how long it takes for the block to get accepted.
 		b.StartTimer()
-		// Time the consensus set without subscribers
 		err = cs.AcceptBlock(block)
 		if err != nil {
 			b.Fatal(err)
