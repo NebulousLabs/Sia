@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -256,14 +255,11 @@ func (r *Renter) Download(nickname, destination string) error {
 	}
 
 	// Create file on disk with the correct permissions.
-	oldMode := syscall.Umask(0000)
 	f, err := os.OpenFile(destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, perm)
 	if err != nil {
-		syscall.Umask(oldMode)
 		return err
 	}
 	defer f.Close()
-	syscall.Umask(oldMode)
 
 	// Initiate connections to each host.
 	var hosts []fetcher
