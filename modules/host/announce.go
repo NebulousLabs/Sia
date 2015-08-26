@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -53,14 +52,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 func (h *Host) Announce() error {
 	lockID := h.mu.RLock()
 	addr := h.myAddr
-	if h.UnlockHash == (types.UnlockHash{}) {
-		uc, err := h.wallet.NextAddress()
-		if err != nil {
-			return err
-		}
-		h.UnlockHash = uc.UnlockHash()
-		h.save()
-	}
 	h.mu.RUnlock(lockID)
 
 	if addr.Host() == "::1" {

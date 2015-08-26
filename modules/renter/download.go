@@ -98,7 +98,7 @@ func newHostFetcher(fc fileContract, pieceSize uint64, masterKey crypto.TwofishK
 	return &hostFetcher{
 		conn:      conn,
 		pieceMap:  pieceMap,
-		pieceSize: pieceSize + 28, // TODO: handle this better
+		pieceSize: pieceSize + crypto.TwofishOverhead,
 		masterKey: masterKey,
 	}, nil
 }
