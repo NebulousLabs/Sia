@@ -11,6 +11,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	defaultDuration     = 6000    // Duration that hosts will hold onto the file
+	defaultDataPieces   = 2       // Data pieces per erasure-coded chunk
+	defaultParityPieces = 10      // Parity pieces per erasure-coded chunk
+	defaultPieceSize    = 1 << 22 // Size of one piece (4 MiB)
+	smallPieceSize      = 1 << 16 // Size for smaller files (64 KiB)
+)
+
 type uploadPiece struct {
 	data       []byte
 	chunkIndex uint64
@@ -140,12 +148,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return err
 	}
 
-	// Check that we have enough money to finance the upload.
-	err = r.checkWalletBalance(up)
-	if err != nil {
-		return err
-	}
-
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
 	_, exists := r.files[up.Nickname]
@@ -166,6 +168,27 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// limit.
 	if fileInfo.Size() > 5*1024*1024*1024 {
 		return errors.New("cannot upload a file larger than 5 GB")
+	}
+
+	// Fill in any missing upload params with sensible defaults.
+	if up.Duration == 0 {
+		up.Duration = defaultDuration
+	}
+	if up.ErasureCode == nil {
+		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
+	}
+	if up.PieceSize == 0 {
+		if fileInfo.Size() > defaultPieceSize {
+			up.PieceSize = defaultPieceSize
+		} else {
+			up.PieceSize = smallPieceSize
+		}
+	}
+
+	// Check that we have enough money to finance the upload.
+	err = r.checkWalletBalance(up)
+	if err != nil {
+		return err
 	}
 
 	// Create file object.

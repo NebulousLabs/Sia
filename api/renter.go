@@ -5,15 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-const (
-	duration     = 6000    // Duration that hosts will hold onto the file.
-	dataPieces   = 2       // Default data pieces per erasure-coded chunk
-	parityPieces = 10      // Default parity pieces per erasure-coded chunk
-	pieceSize    = 1 << 22 // Default size of one piece (4 MiB)
 )
 
 // DownloadInfo is a helper struct for the downloadqueue API call.
@@ -168,13 +160,13 @@ func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request)
 
 // renterFilesUploadHandler handles the API call to upload a file.
 func (srv *Server) renterFilesUploadHandler(w http.ResponseWriter, req *http.Request) {
-	rsc, _ := renter.NewRSCode(dataPieces, parityPieces)
 	err := srv.renter.Upload(modules.FileUploadParams{
-		Filename:    req.FormValue("source"),
-		Duration:    duration,
-		Nickname:    req.FormValue("nickname"),
-		ErasureCode: rsc,
-		PieceSize:   pieceSize,
+		Filename: req.FormValue("source"),
+		Nickname: req.FormValue("nickname"),
+		// let the renter decide these values; eventually they will be configurable
+		Duration:    0,
+		ErasureCode: nil,
+		PieceSize:   0,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
