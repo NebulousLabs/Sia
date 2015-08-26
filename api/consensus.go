@@ -13,7 +13,7 @@ import (
 type ConsensusGET struct {
 	Height       types.BlockHeight `json:"height"`
 	CurrentBlock types.BlockID     `json:"currentblock"`
-	Target       types.Target      `json:target"`
+	Target       types.Target      `json:"target"`
 }
 
 // consensusHandlerGET handles a GET request to /consensus.
