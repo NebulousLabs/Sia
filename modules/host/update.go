@@ -11,20 +11,14 @@ import (
 
 // threadedDeleteObligation deletes a file obligation.
 func (h *Host) threadedDeleteObligation(obligation contractObligation) {
-	// Delete the obligation.
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
-
 	err := h.deallocate(obligation.Path)
 	if err != nil {
 		fmt.Println(err)
 	}
 	delete(h.obligationsByID, obligation.ID)
-
-	// Storage proof was successful, so increment profit tracking
-	h.profit = h.profit.Add(obligation.FileContract.Payout)
-
-	_ = h.save() // TODO: Some way to communicate that the save failed.
+	h.save()
 }
 
 // threadedCreateStorageProof creates a storage proof for a file contract
@@ -67,6 +61,11 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 		fmt.Println(err)
 		return
 	}
+
+	// Storage proof was successful, so increment profit tracking
+	lockID := h.mu.Lock()
+	h.profit = h.profit.Add(obligation.FileContract.Payout)
+	h.mu.Unlock(lockID)
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
