@@ -12,7 +12,7 @@ import (
 // BenchmarkAcceptEmptyBlocks measures how quckly empty blocks are integrated
 // into the consensus set.
 //
-// David's Setup - 08-26-2015: 6.375 ms / op
+// David's Setup - 08-26-2015: 6.377 ms / op
 func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 	cst, err := createConsensusSetTester("BenchmarkEmptyBlocks")
 	if err != nil {
@@ -62,7 +62,7 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 // BenchmarkAcceptSmallBlocks measures how quickly smaller blocks are
 // integrated into the consensus set.
 //
-// David's Setup - 08-26-2015: 10.087 ms / op
+// David's Setup - 08-26-2015: 10.047 ms / op
 func BenchmarkAcceptAcceptSmallBlocks(b *testing.B) {
 	cst, err := createConsensusSetTester("BenchmarkAcceptSmallBlocks")
 	if err != nil {

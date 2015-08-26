@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	// "fmt"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -26,7 +27,7 @@ var (
 )
 
 // validHeader does some early, low computation verification on the block.
-func (cs *ConsensusSet) validHeader(b types.Block) error {
+func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	// See if the block is known already.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
@@ -34,40 +35,32 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 		return ErrDoSBlock
 	}
 
-	// Do read-only verification operations inside of a single read-only boltdb
-	// tx.
+	// Check if the block is already known.
+	blockMap := tx.Bucket(BlockMap)
+	if blockMap.Get(id[:]) != nil {
+		return ErrBlockKnown
+	}
+
+	// Check for the parent.
+	parentBytes := blockMap.Get(b.ParentID[:])
+	if parentBytes == nil {
+		return ErrOrphan
+	}
 	var parent processedBlock
-	err := cs.db.View(func(tx *bolt.Tx) error {
-		// Check if the block is already known.
-		blockMap := tx.Bucket(BlockMap)
-		if blockMap.Get(id[:]) != nil {
-			return ErrBlockKnown
-		}
-
-		// Check for the parent.
-		parentBytes := blockMap.Get(b.ParentID[:])
-		if parentBytes == nil {
-			return ErrOrphan
-		}
-		err := encoding.Unmarshal(parentBytes, &parent)
-		if err != nil {
-			return err
-		}
-
-		// Check that the target of the new block is sufficient.
-		if !b.CheckTarget(parent.ChildTarget) {
-			return ErrMissedTarget
-		}
-
-		// Check that the timestamp is not too far in the past to be
-		// acceptable.
-		if earliestChildTimestamp(blockMap, &parent) > b.Timestamp {
-			return ErrEarlyTimestamp
-		}
-		return nil
-	})
+	err := encoding.Unmarshal(parentBytes, &parent)
 	if err != nil {
 		return err
+	}
+
+	// Check that the target of the new block is sufficient.
+	if !b.CheckTarget(parent.ChildTarget) {
+		return ErrMissedTarget
+	}
+
+	// Check that the timestamp is not too far in the past to be
+	// acceptable.
+	if earliestChildTimestamp(blockMap, &parent) > b.Timestamp {
+		return ErrEarlyTimestamp
 	}
 
 	// Check that the block is below the size limit.
@@ -101,7 +94,6 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 		}()
 		return ErrFutureTimestamp
 	}
-
 	return nil
 }
 
@@ -132,7 +124,12 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	newNode := cs.newChild(parentNode, b)
+	var newNode *processedBlock
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		var err2 error
+		newNode, err2 = cs.newChild(tx, parentNode, b)
+		return err2
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -152,10 +149,18 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		return err
 	}
 
-	// Check that the header is valid. The header is checked first because it
-	// is not computationally expensive to verify, but it is computationally
-	// expensive to create.
-	err = cs.validHeader(b)
+	// Start verification inside of a bolt View tx.
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		// Check that the header is valid. The header is checked first because it
+		// is not computationally expensive to verify, but it is computationally
+		// expensive to create.
+		err = cs.validHeader(tx, b)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		cs.db.stopConsistencyGuard()
 		return err
@@ -186,6 +191,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
+	// fmt.Printf("%v, %v, %v\n", cs.height(), time.Now(), cs.siafundPool)
 	cs.db.stopConsistencyGuard()
 	return nil
 }

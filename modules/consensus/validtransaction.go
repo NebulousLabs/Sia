@@ -275,7 +275,6 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	if err != nil {
 		return modules.ConsensusChange{}, err
 	}
-	defer cs.db.stopConsistencyGuard()
 
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
@@ -287,10 +286,12 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	for _, txn := range txns {
 		err = cs.validTransaction(txn)
 		if err != nil {
+			cs.db.stopConsistencyGuard()
 			return modules.ConsensusChange{}, err
 		}
 		err = cs.applyTransaction(diffHolder, txn)
 		if err != nil {
+			cs.db.stopConsistencyGuard()
 			return modules.ConsensusChange{}, err
 		}
 	}
@@ -301,5 +302,6 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		DelayedSiacoinOutputDiffs: diffHolder.DelayedSiacoinOutputDiffs,
 		SiafundPoolDiffs:          diffHolder.SiafundPoolDiffs,
 	}
+	cs.db.stopConsistencyGuard()
 	return cc, nil
 }
