@@ -153,6 +153,11 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 // rpcUpload is an RPC that negotiates a file contract. Under the new scheme,
 // file contracts should not initially hold any data.
 func (h *Host) rpcUpload(conn net.Conn) error {
+	// Check that the host has grabbed an address from the wallet.
+	if h.UnlockHash == (types.UnlockHash{}) {
+		return errors.New("host has not yet been properly initialized - call 'announce' to finish initialization")
+	}
+
 	// perform key exchange
 	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
 		return err

@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -54,11 +55,26 @@ func (h *Host) Announce() error {
 	addr := h.myAddr
 	h.mu.RUnlock(lockID)
 
+	// Generate an unlock hash, if necessary
+	if h.UnlockHash == (types.UnlockHash{}) {
+		uc, err := h.wallet.NextAddress()
+		if err != nil {
+			return err
+		}
+		h.UnlockHash = uc.UnlockHash()
+		err = h.save()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Check that the host's ip address is both known and reachable.
 	if addr.Host() == "::1" {
 		return errors.New("can't announce without knowing external IP")
 	} else if !ping(addr) {
 		return errors.New("host address not reachable; ensure you have forwarded port " + addr.Port())
 	}
+
 	return h.announce(addr)
 }
 

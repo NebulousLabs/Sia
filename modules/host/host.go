@@ -124,16 +124,6 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		return nil, err
 	}
 
-	// Generate an unlock hash, if necessary
-	if h.UnlockHash == (types.UnlockHash{}) {
-		uc, err := h.wallet.NextAddress()
-		if err != nil {
-			return nil, err
-		}
-		h.UnlockHash = uc.UnlockHash()
-		h.save()
-	}
-
 	// Create listener and set address.
 	h.listener, err = net.Listen("tcp", addr)
 	if err != nil {
