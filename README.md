@@ -1,4 +1,4 @@
-Sia 0.3.3.3
+Sia 0.4.0
 ===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -19,11 +19,10 @@ retrieving data, Sia is poised to be a highly competitive cloud storage
 platform. More information about the technology can be found on our website and
 in the 'doc' folder of the repo.
 
-Sia is currently in beta, and will be launching the currency on June 7th, 2015.
-Even though the currency is launching, the storage platform itself will remain
-in beta. Sia is ready for use with small sums of money and non-critical files,
-but until the network has a more proven track record we advise against relying
-on Sia as a sole means of storing important data.
+Sia is currently in beta. The currency was launched on June 7th, 2015, but the
+storage platform itself remains in beta. Sia is ready for use with small sums
+of money and non-critical files, but until the network has a more proven track
+record, we advise against using it as a sole means of storing important data.
 
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon," that runs the Sia protocol, and siac is a client that is
@@ -72,6 +71,13 @@ Troubleshooting
   In future versions, we will add support for UPnP, which may allow you to
   skip this step if your router supports it.
 
+- I'm 100% sure my ports are open, but Sia won't let me announce as a host.
+
+  siad tries to verify your connectivity by pinging your external IPv4 address.
+  This method is sufficient for most people, but for unusual setups it may
+  report false negatives. To override this check, you can "force" the
+  announcement by running `siac host announce --force`. Don't use this lightly!
+
 - I mined a block, but I didn't receive any money.
 
   There is a 144-block confirmation delay before you will receive siacoins from
@@ -85,20 +91,48 @@ Troubleshooting
 
 If your issue is not addressed above, you can get in touch with us personally:
 
+  slack: http://slackin.siacoin.com (ping taek or nemo)
+
   email:
   
   david@nebulouslabs.com
   
   luke@nebulouslabs.com
-  
-  IRC: #siatalk on freenode (ping Taek)
 
 Version Information
 -------------------
 
-- If you intend to host files, you **must** forward your host port, and you
-  should do so before making your host announcement. The default host port is
-  9982.
+- v0.4.0 introduces wallet seeds, which can be used to regenerate your wallet
+  using only a passphrase. To create a wallet, run `siac wallet init`. Be sure
+  to write down the passphrase somewhere safe! You will also need it to unlock
+  the wallet each time you start siad.
+
+  As a result, compatibility with the old wallet.dat files has been broken. To
+  transfer funds from v0.3.3.3 to v0.4.0, you must send them from the v0.3.3.3
+  client to a v0.4.0 address. Note that you can run both clients at once (from
+  different folders).
+
+- v0.4.0 uses erasure-coding to enable durability, availability, and efficiency
+  when uploading and downloading files. However, the new upload and download
+  algorithms have not yet been perfected. Specifically, you may observe slower-
+  than-expected download speeds. These algorithms will be a top  priority in
+  future releases. After all, they are crucial to the Sia platform!
+
+- The format of the block database has changed, which means you will need to
+  redownload the entire blockchain. This may take anywhere from 10 minutes to
+  6 hours. Check http://explore.siacoin.com to see the current block height.
+
+- Ports are now automatically forwarded using UPnP. If your router supports
+  UPnP, you no longer need to manually set up port forwarding. This should
+  improve the general health of the network. Note that for now, there is no
+  way to disable UPnP, but you can always turn it off in your router settings.
+
+- Much compatibility with the v0.3.3.3 host and renter has been broken. The
+  .sia format has changed, the network protocol is different, etc. The bottom
+  line is, if you were hosting on v0.3.3.3, you should continue to do so until
+  your contracts expire. If you were renting, you should download those files
+  with the v0.3.3.3 client and reupload them on v0.4.0. We apologize for the
+  inconvenience. Fortunately, storage is cheap and the network is small.
 
 Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
@@ -106,6 +140,14 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+August 2015:
+
+v0.4.0: Second stable currency release.
+- Wallets are encrypted and generated from seed phrases
+- Files are erasure-coded and transferred in parallel
+- The blockchain is now fully on-disk
+- Added UPnP support
 
 June 2015:
 
