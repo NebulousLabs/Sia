@@ -28,7 +28,7 @@ var SurpassThreshold = big.NewRat(20, 100)
 type processedBlock struct {
 	Block    types.Block
 	Parent   types.BlockID
-	Children []types.BlockID
+	Children []types.BlockID // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
 
 	Height      types.BlockHeight
 	Depth       types.Target
@@ -174,11 +174,6 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 	}
 	blockMap := tx.Bucket(BlockMap)
 	err := cs.setChildTarget(blockMap, child)
-	if err != nil {
-		return nil, err
-	}
-	pb.Children = append(pb.Children, childID)
-	err = blockMap.Put(child.Block.ParentID[:], encoding.Marshal(*pb))
 	if err != nil {
 		return nil, err
 	}

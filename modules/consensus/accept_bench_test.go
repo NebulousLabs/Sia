@@ -29,7 +29,7 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 	}
 	defer cs.Close()
 
-	// Synchronisze the cst and the subscirberless consensus set.
+	// Synchronisze the cst and the subscriberless consensus set.
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
 		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
