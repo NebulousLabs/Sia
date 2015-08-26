@@ -155,7 +155,8 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 func (h *Host) rpcUpload(conn net.Conn) error {
 	// Check that the host has grabbed an address from the wallet.
 	if h.UnlockHash == (types.UnlockHash{}) {
-		return errors.New("host has not yet been properly initialized - call 'announce' to finish initialization")
+		println("host turned down a contract because it has not been properly announced - please announce the host")
+		return errors.New("cannot negotiate contract without unlock hash")
 	}
 
 	// perform key exchange
