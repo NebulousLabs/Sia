@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	// "fmt"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -191,7 +190,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
-	// fmt.Printf("%v, %v, %v\n", cs.height(), time.Now(), cs.siafundPool)
 	cs.db.stopConsistencyGuard()
 	return nil
 }

@@ -1655,15 +1655,7 @@ func TestBuriedBadFork(t *testing.T) {
 	block, _ = cst.miner.SolveBlock(block, parent.ChildTarget) // okay because the target will not change
 	err = cst.cs.AcceptBlock(block)
 	if err == nil {
-		t.Fatal(err)
-	}
-	exists := cst.cs.db.inBlockMap(badBlock.ID())
-	if exists {
-		t.Error("bad block not cleared from memory")
-	}
-	exists = cst.cs.db.inBlockMap(block.ID())
-	if exists {
-		t.Error("block not cleared from memory")
+		t.Fatal("a bad block failed to cause an error")
 	}
 }
 
@@ -1714,10 +1706,6 @@ func TestBuriedBadTransaction(t *testing.T) {
 	err = cst.cs.AcceptBlock(block)
 	if err == nil {
 		t.Error("buried transaction didn't cause an error")
-	}
-	exists := cst.cs.db.inBlockMap(block.ID())
-	if exists {
-		t.Error("bad block made it into the block map")
 	}
 }
 

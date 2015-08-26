@@ -8,49 +8,11 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
-	errDeleteCurrentPath = errors.New("cannot call 'deleteNode' on a block node in the current path")
-	errExternalRevert    = errors.New("cannot revert to node outside of current path")
+	errExternalRevert = errors.New("cannot revert to node outside of current path")
 )
-
-// deleteNode recursively deletes its children from the set of known blocks.
-// The node being deleted should not be a part of the current path.
-func (cs *ConsensusSet) deleteNode(pb *processedBlock) {
-	// Sanity check - the node being deleted should not be in the current path.
-	if build.DEBUG {
-		if types.BlockHeight(cs.db.pathHeight()) > pb.Height &&
-			cs.db.getPath(pb.Height) == pb.Block.ID() {
-			panic(errDeleteCurrentPath)
-		}
-	}
-
-	// Recusively call 'deleteNode' on of the input node's children.
-	for i := range pb.Children {
-		child := cs.db.getBlockMap(pb.Children[i])
-		cs.deleteNode(child)
-	}
-
-	// Remove the node from the block map, and from its parents list of
-	// children.
-	cs.db.rmBlockMap(pb.Block.ID())
-	parent := cs.db.getBlockMap(pb.Parent)
-	for i := range parent.Children {
-		if parent.Children[i] == pb.Block.ID() {
-			// If 'i' is not the last element, remove it from the array by
-			// copying the remaining array over it.
-			if i < len(parent.Children)-1 {
-				copy(parent.Children[i:], parent.Children[i+1:])
-			}
-			// Trim the last element.
-			parent.Children = parent.Children[:len(parent.Children)-1]
-			break
-		}
-	}
-	cs.db.updateBlockMap(parent)
-}
 
 // backtrackToCurrentPath traces backwards from 'pb' until it reaches a node in
 // the ConsensusSet's current path (the "common parent"). It returns the
