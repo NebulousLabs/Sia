@@ -39,35 +39,35 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+	cs, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
 	if err != nil {
 		return err
 	}
-	tpool, err := transactionpool.New(state, gateway)
+	tpool, err := transactionpool.New(cs, gateway)
 	if err != nil {
 		return err
 	}
-	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
+	wallet, err := wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
 	if err != nil {
 		return err
 	}
-	miner, err := miner.New(state, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
+	miner, err := miner.New(cs, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
 	if err != nil {
 		return err
 	}
-	hostdb, err := hostdb.New(state, gateway)
+	hostdb, err := hostdb.New(cs, gateway)
 	if err != nil {
 		return err
 	}
-	host, err := host.New(state, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
+	host, err := host.New(cs, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
 	if err != nil {
 		return err
 	}
-	renter, err := renter.New(state, hostdb, wallet, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
+	renter, err := renter.New(cs, hostdb, wallet, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet, nil)
+	srv, err := api.NewServer(config.Siad.APIaddr, cs, gateway, host, hostdb, miner, renter, tpool, wallet, nil)
 	if err != nil {
 		return err
 	}
