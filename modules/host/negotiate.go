@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -240,6 +241,7 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
 		Path:         filepath.Join(h.saveDir, strconv.Itoa(h.fileCounter)),
+		mu:           new(sync.Mutex),
 	}
 	proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)

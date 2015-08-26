@@ -30,7 +30,7 @@ type contractObligation struct {
 
 	// each obligation needs a mutex to prevent simultaneous revisions to the
 	// same obligation
-	mu sync.Mutex
+	mu *sync.Mutex
 }
 
 // A Host contains all the fields necessary for storing files for clients and
