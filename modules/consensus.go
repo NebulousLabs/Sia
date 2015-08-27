@@ -16,7 +16,8 @@ const (
 )
 
 var (
-	ErrNonExtendingBlock = errors.New("block does not extend the longest fork.")
+	ErrBlockKnown        = errors.New("block already present in database")
+	ErrNonExtendingBlock = errors.New("block does not extend the longest fork")
 )
 
 type (

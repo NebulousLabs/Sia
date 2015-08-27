@@ -14,7 +14,6 @@ import (
 
 var (
 	ErrBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
-	ErrBlockKnown             = errors.New("block exists in block map")
 	ErrDoSBlock               = errors.New("block is known to be invalid")
 	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
 	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
@@ -37,7 +36,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	// Check if the block is already known.
 	blockMap := tx.Bucket(BlockMap)
 	if blockMap.Get(id[:]) != nil {
-		return ErrBlockKnown
+		return modules.ErrBlockKnown
 	}
 
 	// Check for the parent.

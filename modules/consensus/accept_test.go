@@ -88,22 +88,22 @@ func TestBlockKnownHandling(t *testing.T) {
 
 	// Submit block1 and block2 again, looking for a 'BlockKnown' error.
 	err = cst.cs.acceptBlock(block1)
-	if err != ErrBlockKnown {
+	if err != modules.ErrBlockKnown {
 		t.Fatal("expecting known block err: " + err.Error())
 	}
 	err = cst.cs.acceptBlock(block2)
-	if err != ErrBlockKnown {
+	if err != modules.ErrBlockKnown {
 		t.Fatal("expecting known block err: " + err.Error())
 	}
 	err = cst.cs.acceptBlock(staleBlock)
-	if err != ErrBlockKnown {
+	if err != modules.ErrBlockKnown {
 		t.Fatal("expecting known block err: " + err.Error())
 	}
 
 	// Try the genesis block edge case.
 	genesisBlock := cst.cs.db.getBlockMap(cst.cs.db.getPath(0)).Block
 	err = cst.cs.acceptBlock(genesisBlock)
-	if err != ErrBlockKnown {
+	if err != modules.ErrBlockKnown {
 		t.Fatal("expecting known block err: " + err.Error())
 	}
 }

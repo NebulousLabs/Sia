@@ -76,7 +76,6 @@ func TestSynchronize(t *testing.T) {
 	lockID := cst2.cs.mu.Lock()
 	cst2.cs.db.pushPath(cst2.cs.db.getPath(0))
 	cst2.cs.mu.Unlock(lockID)
-	// ErrBlockKnown will be converted to nil
 	if cst1.cs.db.pathHeight() == cst2.cs.db.pathHeight() {
 		t.Fatal("cst1 did not reject bad block")
 	}

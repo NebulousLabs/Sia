@@ -50,6 +50,10 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	}
 	// call fn
 	err = fn(conn)
+	// don't log benign errors
+	if err == modules.ErrDuplicateTransactionSet || err == modules.ErrBlockKnown {
+		err = nil
+	}
 	if err != nil {
 		g.log.Printf("WARN: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
 	}
