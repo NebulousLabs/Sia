@@ -580,7 +580,7 @@ func TestValidTransaction(t *testing.T) {
 // TestTryTransactionSet probes the TryTransactionSet method of the consensus set.
 func TestTryTransactionSet(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestValidTransaction")
 	if err != nil {

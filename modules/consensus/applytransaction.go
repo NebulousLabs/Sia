@@ -5,6 +5,7 @@ import (
 
 	"github.com/boltdb/bolt"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -27,8 +28,8 @@ func (cs *ConsensusSet) applySiacoinInputs(scoBucket *bolt.Bucket, pb *processed
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		scoBytes := scoBucket.Get(sci.ParentID[:])
-		if scoBytes == nil {
-			panic("nil sco bytes")
+		if build.DEBUG && scoBytes == nil {
+			panic(ErrMisuseApplySiacoinInput)
 		}
 		var sco types.SiacoinOutput
 		err := encoding.Unmarshal(scoBytes, &sco)

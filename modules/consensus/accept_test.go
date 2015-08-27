@@ -478,9 +478,6 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
 // TestSpendSiacoinsBlock creates a consensus set tester and uses it to call
 // testSpendSiacoinsBlock.
 func TestSpendSiacoinsBlock(t *testing.T) {
-	if testing.Short() {
-		// t.SkipNow()
-	}
 	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
 	if err != nil {
 		t.Fatal(err)

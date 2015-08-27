@@ -115,7 +115,7 @@ func (fc FileContract) Tax() Currency {
 	CurrentHeightLock.Lock()
 	height := CurrentHeight
 	CurrentHeightLock.Unlock()
-	if (height < 20e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
+	if (height < 21e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
 		return fc.Payout.MulFloat(0.039).RoundDown(SiafundCount)
 	}
 	return fc.Payout.MulTax().RoundDown(SiafundCount)

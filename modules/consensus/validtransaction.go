@@ -26,7 +26,11 @@ var (
 	ErrUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
 	ErrWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 
-	// dont judge me
+	// Boltdb will only roll back a tx if an error is returned. In the case of
+	// TryTransactionSet, we want to roll back the tx even if there is no
+	// error. So errSuccess is returned. An alternate method would be to
+	// manually manage the tx instead of using 'Update', but that has safety
+	// concerns and is more difficult to implement correctly.
 	errSuccess = errors.New("please")
 )
 
@@ -205,7 +209,7 @@ func (cs *ConsensusSet) validTxStorageProofs(tx *bolt.Tx, t types.Transaction) e
 		// Fixing the padding situation resulted in a hardfork. The below code
 		// will stop the hardfork from triggering before block 20,000.
 		types.CurrentHeightLock.Lock()
-		if (build.Release == "standard" && types.CurrentHeight < 20e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
+		if (build.Release == "standard" && types.CurrentHeight < 21e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
 		types.CurrentHeightLock.Unlock()
@@ -247,7 +251,7 @@ func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 		// Fixing the padding situation resulted in a hardfork. The below code
 		// will stop the hardfork from triggering before block 20,000.
 		types.CurrentHeightLock.Lock()
-		if (build.Release == "standard" && types.CurrentHeight < 20e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
+		if (build.Release == "standard" && types.CurrentHeight < 21e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
 		types.CurrentHeightLock.Unlock()
