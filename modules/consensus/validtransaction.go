@@ -25,13 +25,6 @@ var (
 	ErrUnfinishedFileContract     = errors.New("file contract window has not yet openend")
 	ErrUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
 	ErrWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
-
-	// Boltdb will only roll back a tx if an error is returned. In the case of
-	// TryTransactionSet, we want to roll back the tx even if there is no
-	// error. So errSuccess is returned. An alternate method would be to
-	// manually manage the tx instead of using 'Update', but that has safety
-	// concerns and is more difficult to implement correctly.
-	errSuccess = errors.New("please")
 )
 
 // validTxSiacoins checks that the siacoin inputs and outputs are valid in the
@@ -508,6 +501,12 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 
 	// Grab the old siafund pool so it can be reverted after TryTransactionSet.
 	sfpOld := cs.siafundPool
+	// Boltdb will only roll back a tx if an error is returned. In the case of
+	// TryTransactionSet, we want to roll back the tx even if there is no
+	// error. So errSuccess is returned. An alternate method would be to
+	// manually manage the tx instead of using 'Update', but that has safety
+	// concerns and is more difficult to implement correctly.
+	errSuccess := errors.New("success")
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		for _, txn := range txns {
 			err := cs.validTxTransaction(tx, txn)
