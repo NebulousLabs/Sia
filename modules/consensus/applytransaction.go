@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -26,13 +27,22 @@ var (
 func (cs *ConsensusSet) applySiacoinInputs(scoBucket *bolt.Bucket, pb *processedBlock, t types.Transaction) error {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
+		scoBytes := scoBucket.Get(sci.ParentID[:])
+		if build.DEBUG && scoBytes == nil {
+			panic(ErrMisuseApplySiacoinInput)
+		}
+		var sco types.SiacoinOutput
+		err := encoding.Unmarshal(scoBytes, &sco)
+		if err != nil {
+			return err
+		}
 		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffRevert,
 			ID:            sci.ParentID,
-			SiacoinOutput: cs.db.getSiacoinOutputs(sci.ParentID),
+			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+		err = cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -87,14 +97,15 @@ func (cs *ConsensusSet) applyFileContracts(tx *bolt.Tx, pb *processedBlock, t ty
 	return nil
 }
 
-// applyFileContractRevisions iterates through all of the file contract
+// applyTxFileContractRevisions iterates through all of the file contract
 // revisions in a transaction and applies them to the state, updating the diffs
 // in the processed block.
-func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.Transaction) {
+func (cs *ConsensusSet) applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, fcr := range t.FileContractRevisions {
-		// Sanity check - termination should affect an existing contract.
-		// Check done inside database wrapper
-		fc := cs.db.getFileContracts(fcr.ParentID)
+		fc, err := getFileContract(tx, fcr.ParentID)
+		if err != nil {
+			return err
+		}
 
 		// Add the diff to delete the old file contract.
 		fcd := modules.FileContractDiff{
@@ -103,7 +114,10 @@ func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.T
 			FileContract: fc,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
+		err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 
 		// Add the diff to add the revised file contract.
 		newFC := types.FileContract{
@@ -123,30 +137,27 @@ func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.T
 			FileContract: newFC,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
+		err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-// applyStorageProofs iterates through all of the storage proofs in a
+// applyTxStorageProofs iterates through all of the storage proofs in a
 // transaction and applies them to the state, updating the diffs in the processed
 // block.
-func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
-		// Sanity check - the file contract of the storage proof should exist.
-		// Check done inside database wrapper
-		fc := cs.db.getFileContracts(sp.ParentID)
+		fc, err := getFileContract(tx, sp.ParentID)
+		if err != nil {
+			return err
+		}
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
-			// Sanity check - output should not already exist.
 			spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
-			if build.DEBUG {
-				exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
-				if exists {
-					panic(ErrDuplicateValidProofOutput)
-				}
-			}
-
 			dscod := modules.DelayedSiacoinOutputDiff{
 				Direction:      modules.DiffApply,
 				ID:             spoid,
@@ -154,9 +165,7 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 				MaturityHeight: pb.Height + types.MaturityDelay,
 			}
 			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			err := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-			})
+			err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 			if err != nil {
 				return err
 			}
@@ -168,25 +177,23 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 			FileContract: fc,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
+		err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// applySiafundInputs takes all of the siafund inputs in a transaction and
+// applyTxSiafundInputs takes all of the siafund inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, sfi := range t.SiafundInputs {
-		// Sanity check - the input should exist within the blockchain.
-		if build.DEBUG {
-			exists := cs.db.inSiafundOutputs(sfi.ParentID)
-			if !exists {
-				panic(ErrMisuseApplySiafundInput)
-			}
-		}
-
 		// Calculate the volume of siacoins to put in the claim output.
-		sfo := cs.db.getSiafundOutputs(sfi.ParentID)
+		sfo, err := getSiafundOutput(tx, sfi.ParentID)
+		if err != nil {
+			return err
+		}
 		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
@@ -202,9 +209,7 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		})
+		err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -214,68 +219,69 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffRevert,
 			ID:            sfi.ParentID,
-			SiafundOutput: cs.db.getSiafundOutputs(sfi.ParentID),
+			SiafundOutput: sfo,
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+		err = cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// applySiafundOutputs takes all of the siafund outputs in a transaction and
-// applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transaction) {
+func (cs *ConsensusSet) applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for i, sfo := range t.SiafundOutputs {
-		// Sanity check - the output should not exist within the blockchain.
 		sfoid := t.SiafundOutputID(i)
-		if build.DEBUG {
-			exists := cs.db.inSiafundOutputs(sfoid)
-			if exists {
-				panic(ErrMisuseApplySiafundOutput)
-			}
-		}
-
-		// Set the claim start.
 		sfo.ClaimStart = cs.siafundPool
-
-		// Create and apply the diff.
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfoid,
 			SiafundOutput: sfo,
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+		err := cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // applyTransaction applies the contents of a transaction to the ConsensusSet.
 // This produces a set of diffs, which are stored in the blockNode containing
 // the transaction. No verification is done by this function.
-func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applyTransaction(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		scoBucket := tx.Bucket(SiacoinOutputs)
-		err := cs.applySiacoinInputs(scoBucket, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applySiacoinOutputs(scoBucket, pb, t)
-		if err != nil {
-			return err
-		}
-		return cs.applyFileContracts(tx, pb, t)
-	})
+	scoBucket := tx.Bucket(SiacoinOutputs)
+	err := cs.applySiacoinInputs(scoBucket, pb, t)
 	if err != nil {
 		return err
 	}
-	cs.applyFileContractRevisions(pb, t)
-	err = cs.applyStorageProofs(pb, t)
+	err = cs.applySiacoinOutputs(scoBucket, pb, t)
 	if err != nil {
 		return err
 	}
-	cs.applySiafundInputs(pb, t)
-	cs.applySiafundOutputs(pb, t)
+	err = cs.applyFileContracts(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyFileContractRevisions(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyStorageProofs(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applySiafundInputs(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applySiafundOutputs(tx, pb, t)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -110,6 +110,7 @@ func (db *setDB) startConsistencyGuard() error {
 		cg := tx.Bucket(ConsistencyGuard)
 		gs := cg.Get(GuardStart)
 		if !bytes.Equal(gs, cg.Get(GuardEnd)) {
+			println("Database is inconsistent - please reset your database by redownloading it or loading a consistent backup. This can happen if you close Sia unexpectedly.")
 			return errDBInconsistent
 		}
 		i := encoding.DecUint64(gs)
@@ -171,8 +172,8 @@ func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
 	}
 	k := encoding.Marshal(key)
 	item := b.Get(k)
-	if build.DEBUG && item == nil {
-		panic(errNilItem)
+	if item == nil {
+		return nil, errNilItem
 	}
 	return item, nil
 }
@@ -208,8 +209,8 @@ func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error
 		}
 		item = b.Get(k)
 		// Sanity check to make sure the item requested exists
-		if build.DEBUG && item == nil {
-			panic(errNilItem)
+		if item == nil {
+			return errNilItem
 		}
 		return nil
 	})
@@ -394,6 +395,19 @@ func (db *setDB) addSiafundOutputs(id types.SiafundOutputID, output types.Siafun
 	})
 }
 
+func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
+	sfoBytes, err := getItem(tx, SiafundOutputs, id)
+	if err != nil {
+		return types.SiafundOutput{}, err
+	}
+	var sfo types.SiafundOutput
+	err = encoding.Unmarshal(sfoBytes, &sfo)
+	if err != nil {
+		return types.SiafundOutput{}, err
+	}
+	return sfo, nil
+}
+
 // getSiafundOutputs is a wrapper around getItem which decodes the
 // result into a siafundOutput
 func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput {
@@ -527,7 +541,7 @@ func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOu
 // getSiacoinOutputs retrieves a saicoin output by ID
 func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput {
 	scoBytes, err := db.getItem(SiacoinOutputs, id)
-	if build.DEBUG && err != nil {
+	if err != nil {
 		panic(err)
 	}
 	var sco types.SiacoinOutput

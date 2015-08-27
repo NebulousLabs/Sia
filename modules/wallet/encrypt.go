@@ -119,13 +119,6 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 	if err != nil {
 		return err
 	}
-
-	// Subscribe to the consensus set if this is the first unlock for the
-	// wallet object.
-	if !w.subscribed {
-		w.tpool.TransactionPoolSubscribe(w)
-		w.subscribed = true
-	}
 	w.unlocked = true
 	return nil
 }
@@ -198,8 +191,25 @@ func (w *Wallet) Lock() error {
 // Unlock will decrypt the wallet seed and load all of the addresses into
 // memory.
 func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
 	w.log.Println("INFO: Unlocking wallet.")
-	return w.unlock(masterKey)
+
+	// Initialize all of the keys in the wallet under a lock. While holding the
+	// lock, also grab the subscriber status.
+	lockID := w.mu.Lock()
+	subscribed := w.subscribed
+	err := w.unlock(masterKey)
+	w.mu.Unlock(lockID)
+	if err != nil {
+		return err
+	}
+
+	// Subscribe to the consensus set if this is the first unlock for the
+	// wallet object.
+	if !subscribed {
+		w.tpool.TransactionPoolSubscribe(w)
+		lockID = w.mu.Lock()
+		w.subscribed = true
+		w.mu.Unlock(lockID)
+	}
+	return nil
 }

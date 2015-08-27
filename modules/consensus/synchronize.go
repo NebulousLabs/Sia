@@ -15,11 +15,39 @@ const (
 	MaxSynchronizeAttempts = 8
 )
 
+// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
+// BlockIDs and then doubling in step size until the genesis block is reached.
+// The genesis block is always included. This array of BlockIDs is used to
+// establish a shared commonality between peers during synchronization.
+func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
+	knownBlocks := make([]types.BlockID, 0, 32)
+	step := types.BlockHeight(1)
+	for height := s.height(); ; height -= step {
+		// after 12, start doubling
+		knownBlocks = append(knownBlocks, s.db.getPath(height))
+		if len(knownBlocks) >= 12 {
+			step *= 2
+		}
+
+		// this check has to come before height -= step;
+		// otherwise we might underflow
+		if height <= step {
+			break
+		}
+	}
+	// always include the genesis block
+	knownBlocks = append(knownBlocks, s.db.getPath(0))
+
+	copy(blockIDs[:], knownBlocks)
+	return
+}
+
 // receiveBlocks is the calling end of the SendBlocks RPC.
 func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
 	lockID := s.mu.RLock()
 	if !s.db.open {
+		s.mu.RUnlock(lockID)
 		return errors.New("database not open")
 	}
 	history := s.blockHistory()
@@ -45,6 +73,7 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			// verification.
 			lockID := s.mu.Lock()
 			if !s.db.open {
+				s.mu.Unlock(lockID)
 				return errors.New("database not open")
 			}
 			acceptErr := s.acceptBlock(block)
@@ -68,34 +97,6 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
-// BlockIDs and then doubling in step size until the genesis block is reached.
-// The genesis block is always included. This array of BlockIDs is used to
-// establish a shared commonality between peers during synchronization.
-func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
-	knownBlocks := make([]types.BlockID, 0, 32)
-	step := types.BlockHeight(1)
-	for height := s.height(); ; height -= step {
-		knownBlocks = append(knownBlocks, s.db.getPath(height))
-
-		// after 12, start doubling
-		if len(knownBlocks) >= 12 {
-			step *= 2
-		}
-
-		// this check has to come before height -= step;
-		// otherwise we might underflow
-		if height <= step {
-			break
-		}
-	}
-	// always include the genesis block
-	knownBlocks = append(knownBlocks, s.db.getPath(0))
-
-	copy(blockIDs[:], knownBlocks)
-	return
-}
-
 // sendBlocks is the receiving end of the SendBlocks RPC. It returns a
 // sequential set of blocks based on the 32 input block IDs. The most recent
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
@@ -114,6 +115,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
 	if !s.db.open {
+		s.mu.RUnlock(lockID)
 		return errors.New("database not open")
 	}
 	for _, id := range knownBlocks {
@@ -148,6 +150,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		var blocks []types.Block
 		lockID = s.mu.RLock()
 		if !s.db.open {
+			s.mu.RUnlock(lockID)
 			return errors.New("database not open")
 		}
 

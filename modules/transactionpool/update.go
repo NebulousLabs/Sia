@@ -17,7 +17,6 @@ func (tp *TransactionPool) purge() {
 // to the consensus set.
 func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := tp.mu.Lock()
-	defer tp.mu.Unlock(lockID)
 
 	// TODO: Right now, transactions that were reverted to not get saved and
 	// retried, because some transactions such as storage proofs might be
@@ -47,14 +46,26 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Add all of the unconfirmed transaction sets back to the transaction
 	// pool. The ones that are invalid will throw an error and will not be
 	// re-added.
+	//
+	// Accepting a transaction set requires locking the consensus set (to check
+	// validity). But, ProcessConsensusChange is only called when the consensus
+	// set is already locked, causing a deadlock problem. Therefore,
+	// transactions are readded to the pool in a goroutine, so that this
+	// function can finish and consensus can unlock. The tpool lock is held
+	// however until the goroutine completes.
+	//
+	// Which means that no other modules can require a tpool lock when
+	// processing consensus changes. Overall, the locking is pretty fragile and
+	// more rules need to be put in place.
 	for _, set := range unconfirmedSets {
-		_ = tp.acceptTransactionSet(set) // Error is not checked.
+		tp.acceptTransactionSet(set) // Error is not checked.
 	}
 
 	// Inform subscribers that an update has executed.
 	tp.consensusChangeIndex++
 	tp.updateSubscribersConsensus(cc)
 	tp.updateSubscribersTransactions()
+	tp.mu.Unlock(lockID)
 }
 
 // PurgeTransactionPool deletes all transactions from the transaction pool.

@@ -146,6 +146,17 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 	}
 }
 
+func (cs *ConsensusSet) commitTxSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) error {
+	sfoBucket := tx.Bucket(SiafundOutputs)
+	if build.DEBUG && (sfoBucket.Get(sfod.ID[:]) == nil) != (sfod.Direction == dir) {
+		panic(errRepeatInsert)
+	}
+	if sfod.Direction == dir {
+		return sfoBucket.Put(sfod.ID[:], encoding.Marshal(sfod.SiafundOutput))
+	}
+	return sfoBucket.Delete(sfod.ID[:])
+}
+
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
 func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
@@ -416,7 +427,13 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range pb.Block.Transactions {
-		err := cs.validTransaction(txn)
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			err := cs.validTxTransaction(tx, txn)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		if err != nil {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
@@ -425,15 +442,21 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 				return cs.applyMaturedSiacoinOutputs(tx, pb)
 			})
 			if updateErr != nil {
-				return err
+				return errors.New(updateErr.Error() + " and " + err.Error())
 			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			return err
 		}
 
-		err = cs.applyTransaction(pb, txn)
-		if err != nil {
+		updateErr := cs.db.Update(func(tx *bolt.Tx) error {
+			err = cs.applyTransaction(tx, pb, txn)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if updateErr != nil {
 			return err
 		}
 	}
