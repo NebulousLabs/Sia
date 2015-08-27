@@ -146,6 +146,17 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 	}
 }
 
+func (cs *ConsensusSet) commitTxSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) error {
+	sfoBucket := tx.Bucket(SiafundOutputs)
+	if build.DEBUG && (sfoBucket.Get(sfod.ID[:]) == nil) != (sfod.Direction == dir) {
+		panic(errRepeatInsert)
+	}
+	if sfod.Direction == dir {
+		return sfoBucket.Put(sfod.ID[:], encoding.Marshal(sfod.SiafundOutput))
+	}
+	return sfoBucket.Delete(sfod.ID[:])
+}
+
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
 func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an

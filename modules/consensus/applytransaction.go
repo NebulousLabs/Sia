@@ -320,23 +320,30 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 	return nil
 }
 
+func (cs *ConsensusSet) applyTxSiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+	for i, sfo := range t.SiafundOutputs {
+		sfoid := t.SiafundOutputID(i)
+		sfo.ClaimStart = cs.siafundPool
+		sfod := modules.SiafundOutputDiff{
+			Direction:     modules.DiffApply,
+			ID:            sfoid,
+			SiafundOutput: sfo,
+		}
+		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
+		err := cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // applySiafundOutputs takes all of the siafund outputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
 func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
-		// Sanity check - the output should not exist within the blockchain.
 		sfoid := t.SiafundOutputID(i)
-		if build.DEBUG {
-			exists := cs.db.inSiafundOutputs(sfoid)
-			if exists {
-				panic(ErrMisuseApplySiafundOutput)
-			}
-		}
-
-		// Set the claim start.
 		sfo.ClaimStart = cs.siafundPool
-
-		// Create and apply the diff.
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfoid,
@@ -380,7 +387,18 @@ func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction
 	if err != nil {
 		return err
 	}
+
 	cs.applySiafundInputs(pb, t)
-	cs.applySiafundOutputs(pb, t)
+
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		err := cs.applyTxSiafundOutputs(tx, pb, t)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
