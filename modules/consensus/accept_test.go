@@ -709,7 +709,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 // testFileContractsBlocks.
 func TestFileContractsBlocks(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestFileContractsBlocks")
 	if err != nil {

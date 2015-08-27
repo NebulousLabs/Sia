@@ -427,7 +427,13 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range pb.Block.Transactions {
-		err := cs.validTransaction(txn)
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			err := cs.validTxTransaction(tx, txn)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		if err != nil {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
@@ -436,7 +442,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 				return cs.applyMaturedSiacoinOutputs(tx, pb)
 			})
 			if updateErr != nil {
-				return err
+				return errors.New(updateErr.Error() + " and " + err.Error())
 			}
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}

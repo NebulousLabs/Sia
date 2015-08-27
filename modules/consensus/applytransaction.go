@@ -247,22 +247,6 @@ func (cs *ConsensusSet) applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t t
 	return nil
 }
 
-// applySiafundOutputs takes all of the siafund outputs in a transaction and
-// applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transaction) {
-	for i, sfo := range t.SiafundOutputs {
-		sfoid := t.SiafundOutputID(i)
-		sfo.ClaimStart = cs.siafundPool
-		sfod := modules.SiafundOutputDiff{
-			Direction:     modules.DiffApply,
-			ID:            sfoid,
-			SiafundOutput: sfo,
-		}
-		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-	}
-}
-
 // applyTransaction applies the contents of a transaction to the ConsensusSet.
 // This produces a set of diffs, which are stored in the blockNode containing
 // the transaction. No verification is done by this function.

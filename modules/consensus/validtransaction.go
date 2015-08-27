@@ -501,6 +501,9 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	// consensus set get reverted.
 	diffHolder := new(processedBlock)
 	diffHolder.Height = cs.height()
+
+	// Grab the old siafund pool so it can be reverted after TryTransactionSet.
+	sfpOld := cs.siafundPool
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		for _, txn := range txns {
 			err := cs.validTxTransaction(tx, txn)
@@ -514,6 +517,8 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		}
 		return errSuccess
 	})
+	// Revert the siafund pool before checking the error.
+	cs.siafundPool = sfpOld
 	if err != errSuccess {
 		return modules.ConsensusChange{}, err
 	}
