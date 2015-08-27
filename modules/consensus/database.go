@@ -110,6 +110,7 @@ func (db *setDB) startConsistencyGuard() error {
 		cg := tx.Bucket(ConsistencyGuard)
 		gs := cg.Get(GuardStart)
 		if !bytes.Equal(gs, cg.Get(GuardEnd)) {
+			println("Database is inconsistent - please reset your database by redownloading it or loading a consistent backup. This can happen if you close Sia unexpectedly.")
 			return errDBInconsistent
 		}
 		i := encoding.DecUint64(gs)
