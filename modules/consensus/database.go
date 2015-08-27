@@ -395,6 +395,19 @@ func (db *setDB) addSiafundOutputs(id types.SiafundOutputID, output types.Siafun
 	})
 }
 
+func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) types.SiafundOutput {
+	sfoBytes, err := getItem(tx, SiafundOutputs, id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var sfo types.SiafundOutput
+	err = encoding.Unmarshal(sfoBytes, &sfo)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sfo
+}
+
 // getSiafundOutputs is a wrapper around getItem which decodes the
 // result into a siafundOutput
 func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput {

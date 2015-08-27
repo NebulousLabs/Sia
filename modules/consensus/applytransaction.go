@@ -5,7 +5,6 @@ import (
 
 	"github.com/boltdb/bolt"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -271,20 +270,12 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 	return nil
 }
 
-// applySiafundInputs takes all of the siafund inputs in a transaction and
+// applyTxSiafundInputs takes all of the siafund inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applyTxSiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, sfi := range t.SiafundInputs {
-		// Sanity check - the input should exist within the blockchain.
-		if build.DEBUG {
-			exists := cs.db.inSiafundOutputs(sfi.ParentID)
-			if !exists {
-				panic(ErrMisuseApplySiafundInput)
-			}
-		}
-
 		// Calculate the volume of siacoins to put in the claim output.
-		sfo := cs.db.getSiafundOutputs(sfi.ParentID)
+		sfo := getSiafundOutput(tx, sfi.ParentID)
 		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
@@ -300,9 +291,7 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		})
+		err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -315,7 +304,58 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 			SiafundOutput: cs.db.getSiafundOutputs(sfi.ParentID),
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+		err = cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applySiafundInputs takes all of the siafund inputs in a transaction and
+// applies them to the state, updating the diffs in the processed block.
+func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transaction) error {
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		for _, sfi := range t.SiafundInputs {
+			// Calculate the volume of siacoins to put in the claim output.
+			sfo := getSiafundOutput(tx, sfi.ParentID)
+			claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+
+			// Add the claim output to the delayed set of outputs.
+			sco := types.SiacoinOutput{
+				Value:      claimPortion,
+				UnlockHash: sfi.ClaimUnlockHash,
+			}
+			scoid := sfi.ParentID.SiaClaimOutputID()
+			dscod := modules.DelayedSiacoinOutputDiff{
+				Direction:      modules.DiffApply,
+				ID:             scoid,
+				SiacoinOutput:  sco,
+				MaturityHeight: pb.Height + types.MaturityDelay,
+			}
+			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+			err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+
+			// Create the siafund output diff and remove the output from the
+			// consensus set.
+			sfod := modules.SiafundOutputDiff{
+				Direction:     modules.DiffRevert,
+				ID:            sfi.ParentID,
+				SiafundOutput: cs.db.getSiafundOutputs(sfi.ParentID),
+			}
+			pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
+			err = cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -382,16 +422,11 @@ func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction
 		if err != nil {
 			return err
 		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	cs.applySiafundInputs(pb, t)
-
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		err := cs.applyTxSiafundOutputs(tx, pb, t)
+		err = cs.applyTxSiafundInputs(tx, pb, t)
+		if err != nil {
+			return err
+		}
+		err = cs.applyTxSiafundOutputs(tx, pb, t)
 		if err != nil {
 			return err
 		}
