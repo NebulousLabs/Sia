@@ -20,6 +20,7 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
 	lockID := s.mu.RLock()
 	if !s.db.open {
+		s.mu.RUnlock(lockID)
 		return errors.New("database not open")
 	}
 	history := s.blockHistory()
@@ -45,6 +46,7 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			// verification.
 			lockID := s.mu.Lock()
 			if !s.db.open {
+				s.mu.Unlock(lockID)
 				return errors.New("database not open")
 			}
 			acceptErr := s.acceptBlock(block)
@@ -114,6 +116,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
 	if !s.db.open {
+		s.mu.RUnlock(lockID)
 		return errors.New("database not open")
 	}
 	for _, id := range knownBlocks {
@@ -148,6 +151,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		var blocks []types.Block
 		lockID = s.mu.RLock()
 		if !s.db.open {
+			s.mu.RUnlock(lockID)
 			return errors.New("database not open")
 		}
 
