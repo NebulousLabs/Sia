@@ -479,7 +479,7 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
 // testSpendSiacoinsBlock.
 func TestSpendSiacoinsBlock(t *testing.T) {
 	if testing.Short() {
-		t.SkipNow()
+		// t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
 	if err != nil {

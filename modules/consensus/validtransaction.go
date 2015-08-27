@@ -501,23 +501,21 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	// consensus set get reverted.
 	diffHolder := new(processedBlock)
 	diffHolder.Height = cs.height()
-	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
-	for _, txn := range txns {
-		err := cs.validTransaction(txn)
-		if err != nil {
-			return modules.ConsensusChange{}, err
-		}
-		err = cs.db.Update(func(tx *bolt.Tx) error {
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		for _, txn := range txns {
+			err := cs.validTxTransaction(tx, txn)
+			if err != nil {
+				return err
+			}
 			err = cs.applyTransaction(tx, diffHolder, txn)
 			if err != nil {
 				return err
 			}
-			return nil
-		})
-		if err != nil {
-			return modules.ConsensusChange{}, err
 		}
-
+		return errSuccess
+	})
+	if err != errSuccess {
+		return modules.ConsensusChange{}, err
 	}
 	cc := modules.ConsensusChange{
 		SiacoinOutputDiffs:        diffHolder.SiacoinOutputDiffs,

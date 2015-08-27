@@ -172,8 +172,8 @@ func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
 	}
 	k := encoding.Marshal(key)
 	item := b.Get(k)
-	if build.DEBUG && item == nil {
-		panic(errNilItem)
+	if item == nil {
+		return nil, errNilItem
 	}
 	return item, nil
 }
@@ -209,8 +209,8 @@ func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error
 		}
 		item = b.Get(k)
 		// Sanity check to make sure the item requested exists
-		if build.DEBUG && item == nil {
-			panic(errNilItem)
+		if item == nil {
+			return errNilItem
 		}
 		return nil
 	})
@@ -541,7 +541,7 @@ func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOu
 // getSiacoinOutputs retrieves a saicoin output by ID
 func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput {
 	scoBytes, err := db.getItem(SiacoinOutputs, id)
-	if build.DEBUG && err != nil {
+	if err != nil {
 		panic(err)
 	}
 	var sco types.SiacoinOutput
