@@ -645,6 +645,9 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 		return err
 	}
 	_, err = cst.miner.AddBlock()
+	lockID3 := cst.cs.mu.Lock()
+	cst.cs.mu.Unlock(lockID3)
+
 	if err != nil {
 		return err
 	}
@@ -706,7 +709,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 // testFileContractsBlocks.
 func TestFileContractsBlocks(t *testing.T) {
 	if testing.Short() {
-		t.SkipNow()
+		// t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestFileContractsBlocks")
 	if err != nil {
