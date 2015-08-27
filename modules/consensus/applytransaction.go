@@ -87,14 +87,15 @@ func (cs *ConsensusSet) applyFileContracts(tx *bolt.Tx, pb *processedBlock, t ty
 	return nil
 }
 
-// applyFileContractRevisions iterates through all of the file contract
+// applyTxFileContractRevisions iterates through all of the file contract
 // revisions in a transaction and applies them to the state, updating the diffs
 // in the processed block.
-func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.Transaction) {
+func (cs *ConsensusSet) applyTxFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, fcr := range t.FileContractRevisions {
-		// Sanity check - termination should affect an existing contract.
-		// Check done inside database wrapper
-		fc := cs.db.getFileContracts(fcr.ParentID)
+		fc, err := getFileContract(tx, fcr.ParentID)
+		if err != nil {
+			return err
+		}
 
 		// Add the diff to delete the old file contract.
 		fcd := modules.FileContractDiff{
@@ -103,7 +104,10 @@ func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.T
 			FileContract: fc,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
+		err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 
 		// Add the diff to add the revised file contract.
 		newFC := types.FileContract{
@@ -123,30 +127,77 @@ func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.T
 			FileContract: newFC,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
+		err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-// applyStorageProofs iterates through all of the storage proofs in a
+// applyFileContractRevisions iterates through all of the file contract
+// revisions in a transaction and applies them to the state, updating the diffs
+// in the processed block.
+func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.Transaction) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		for _, fcr := range t.FileContractRevisions {
+			fc, err := getFileContract(tx, fcr.ParentID)
+			if err != nil {
+				return err
+			}
+
+			// Add the diff to delete the old file contract.
+			fcd := modules.FileContractDiff{
+				Direction:    modules.DiffRevert,
+				ID:           fcr.ParentID,
+				FileContract: fc,
+			}
+			pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+			err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+
+			// Add the diff to add the revised file contract.
+			newFC := types.FileContract{
+				FileSize:           fcr.NewFileSize,
+				FileMerkleRoot:     fcr.NewFileMerkleRoot,
+				WindowStart:        fcr.NewWindowStart,
+				WindowEnd:          fcr.NewWindowEnd,
+				Payout:             fc.Payout,
+				ValidProofOutputs:  fcr.NewValidProofOutputs,
+				MissedProofOutputs: fcr.NewMissedProofOutputs,
+				UnlockHash:         fcr.NewUnlockHash,
+				RevisionNumber:     fcr.NewRevisionNumber,
+			}
+			fcd = modules.FileContractDiff{
+				Direction:    modules.DiffApply,
+				ID:           fcr.ParentID,
+				FileContract: newFC,
+			}
+			pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+			err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// applyTxStorageProofs iterates through all of the storage proofs in a
 // transaction and applies them to the state, updating the diffs in the processed
 // block.
-func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applyTxStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
-		// Sanity check - the file contract of the storage proof should exist.
-		// Check done inside database wrapper
-		fc := cs.db.getFileContracts(sp.ParentID)
+		fc, err := getFileContract(tx, sp.ParentID)
+		if err != nil {
+			return err
+		}
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
-			// Sanity check - output should not already exist.
 			spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
-			if build.DEBUG {
-				exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
-				if exists {
-					panic(ErrDuplicateValidProofOutput)
-				}
-			}
-
 			dscod := modules.DelayedSiacoinOutputDiff{
 				Direction:      modules.DiffApply,
 				ID:             spoid,
@@ -154,9 +205,7 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 				MaturityHeight: pb.Height + types.MaturityDelay,
 			}
 			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			err := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-			})
+			err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 			if err != nil {
 				return err
 			}
@@ -168,7 +217,56 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 			FileContract: fc,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		cs.commitFileContractDiff(fcd, modules.DiffApply)
+		err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applyStorageProofs iterates through all of the storage proofs in a
+// transaction and applies them to the state, updating the diffs in the processed
+// block.
+func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transaction) error {
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		for _, sp := range t.StorageProofs {
+			fc, err := getFileContract(tx, sp.ParentID)
+			if err != nil {
+				return err
+			}
+
+			// Add all of the outputs in the ValidProofOutputs of the contract.
+			for i, vpo := range fc.ValidProofOutputs {
+				spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
+				dscod := modules.DelayedSiacoinOutputDiff{
+					Direction:      modules.DiffApply,
+					ID:             spoid,
+					SiacoinOutput:  vpo,
+					MaturityHeight: pb.Height + types.MaturityDelay,
+				}
+				pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+				err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+				if err != nil {
+					return err
+				}
+			}
+
+			fcd := modules.FileContractDiff{
+				Direction:    modules.DiffRevert,
+				ID:           sp.ParentID,
+				FileContract: fc,
+			}
+			pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+			err = cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -265,13 +363,20 @@ func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction
 		if err != nil {
 			return err
 		}
-		return cs.applyFileContracts(tx, pb, t)
+		err = cs.applyFileContracts(tx, pb, t)
+		if err != nil {
+			return err
+		}
+		err = cs.applyTxFileContractRevisions(tx, pb, t)
+		if err != nil {
+			return err
+		}
+		err = cs.applyTxStorageProofs(tx, pb, t)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
-	if err != nil {
-		return err
-	}
-	cs.applyFileContractRevisions(pb, t)
-	err = cs.applyStorageProofs(pb, t)
 	if err != nil {
 		return err
 	}

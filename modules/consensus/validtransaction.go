@@ -271,9 +271,6 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
-	lockID := cs.mu.Lock()
-	defer cs.mu.Unlock(lockID)
-
 	// Enable the inconsistency detector.
 	err := cs.db.startConsistencyGuard()
 	if err != nil {
