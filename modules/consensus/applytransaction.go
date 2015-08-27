@@ -275,7 +275,10 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 func (cs *ConsensusSet) applyTxSiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for _, sfi := range t.SiafundInputs {
 		// Calculate the volume of siacoins to put in the claim output.
-		sfo := getSiafundOutput(tx, sfi.ParentID)
+		sfo, err := getSiafundOutput(tx, sfi.ParentID)
+		if err != nil {
+			return err
+		}
 		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
@@ -291,7 +294,7 @@ func (cs *ConsensusSet) applyTxSiafundInputs(tx *bolt.Tx, pb *processedBlock, t 
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -318,7 +321,10 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		for _, sfi := range t.SiafundInputs {
 			// Calculate the volume of siacoins to put in the claim output.
-			sfo := getSiafundOutput(tx, sfi.ParentID)
+			sfo, err := getSiafundOutput(tx, sfi.ParentID)
+			if err != nil {
+				return err
+			}
 			claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 			// Add the claim output to the delayed set of outputs.
@@ -334,7 +340,7 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 				MaturityHeight: pb.Height + types.MaturityDelay,
 			}
 			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 			if err != nil {
 				return err
 			}
