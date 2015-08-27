@@ -6,15 +6,20 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 type testHost struct {
 	data      []byte
 	pieceMap  map[uint64][]pieceData // key is chunkIndex
 	pieceSize uint64
-	nFetch    int
+	nAttempt  int // total number of download attempts
+	nFetch    int // number of successfull download attempts
 
-	delay time.Duration // used to simulate real-world conditions
+	// used to simulate real-world conditions
+	delay    time.Duration // download will take this long
+	failRate int           // download will randomly fail with probability 1/failRate
 }
 
 func (h *testHost) pieces(chunkIndex uint64) []pieceData {
@@ -22,7 +27,12 @@ func (h *testHost) pieces(chunkIndex uint64) []pieceData {
 }
 
 func (h *testHost) fetch(p pieceData) ([]byte, error) {
+	h.nAttempt++
 	time.Sleep(h.delay)
+	// randomly fail
+	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
+		return nil, io.EOF
+	}
 	h.nFetch++
 	return h.data[p.Offset : p.Offset+h.pieceSize], nil
 }
@@ -46,12 +56,16 @@ func TestErasureDownload(t *testing.T) {
 	for i := range hosts {
 		hosts[i] = &testHost{
 			pieceMap:  make(map[uint64][]pieceData),
-			delay:     time.Millisecond,
 			pieceSize: pieceSize,
+
+			delay:    time.Millisecond,
+			failRate: 5, // 20% failure rate
 		}
 	}
 	// make one host really slow
-	hosts[0].(*testHost).delay = 10 * time.Millisecond
+	hosts[0].(*testHost).delay = 100 * time.Millisecond
+	// make one host always fail
+	hosts[1].(*testHost).failRate = 1
 
 	// upload data to hosts
 	r := bytes.NewReader(data) // makes chunking easier
@@ -100,8 +114,9 @@ func TestErasureDownload(t *testing.T) {
 	/*
 		totFetch := 0
 		for i, h := range hosts {
-			t.Logf("Host #: %d  \tFetched: %v", i, h.(*testHost).nFetch)
-			totFetch += h.(*testHost).nFetch
+			h := h.(*testHost)
+			t.Logf("Host %2d:  Fetched: %v/%v", i, h.nFetch, h.nAttempt)
+			totFetch += h.nAttempt
 
 		}
 		t.Log("Optimal fetches:", i*uint64(rsc.MinPieces()))
