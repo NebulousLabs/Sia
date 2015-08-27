@@ -32,6 +32,9 @@ type MiningPool struct {
 	// List of headers whose miner has already been paid (prevent double submits)
 	spentHeaders map[types.BlockHeader]struct{}
 
+	// The target of the current block being mined
+	target types.Target // TODO: update target on every new block
+
 	// A list of blocks that have been submitted to the network. netPayout is
 	// the total amount of money sent to miners, while profit is the amount of
 	// money earned

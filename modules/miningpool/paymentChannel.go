@@ -1,7 +1,6 @@
 package miningpool
 
 import (
-	"errors"
 	"net"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -190,12 +189,7 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 // `addr` by creating a new transaction that sends `amount + oldAmount` to
 // `addr` and returning it. This new transaction is meant to then be sent to
 // the miner off-chain
-func (mp *MiningPool) sendPayment(amount types.Currency, addr types.UnlockHash) (types.Transaction, error) {
-	pc, exists := mp.channels[addr]
-	if !exists {
-		return types.Transaction{}, errors.New("No payment channel exists with given output addr")
-	}
-
+func (mp *MiningPool) sendPayment(amount types.Currency, pc paymentChannel) (types.Transaction, error) {
 	// TODO: Increment amount by how much the pool has already sent
 
 	// TODO: Make sure amount is less than channel size
@@ -211,7 +205,7 @@ func (mp *MiningPool) sendPayment(amount types.Currency, addr types.UnlockHash) 
 			},
 			{
 				Value:      amount,
-				UnlockHash: addr,
+				UnlockHash: pc.payTo,
 			},
 		},
 		TransactionSignatures: []types.TransactionSignature{

@@ -186,7 +186,7 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target, error) {
 		return types.BlockHeader{}, types.Target{}, err
 	}
 
-	// TODO: Set the target to be easier
+	// Set the target to easier based on the pool's specifications
 	target = target.MulDifficulty(big.NewRat(int64(m.targetMultiple), 1))
 
 	// Change the payouts of the block manager's block
