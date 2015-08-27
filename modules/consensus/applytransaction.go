@@ -397,41 +397,35 @@ func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transact
 // applyTransaction applies the contents of a transaction to the ConsensusSet.
 // This produces a set of diffs, which are stored in the blockNode containing
 // the transaction. No verification is done by this function.
-func (cs *ConsensusSet) applyTransaction(pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applyTransaction(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		scoBucket := tx.Bucket(SiacoinOutputs)
-		err := cs.applySiacoinInputs(scoBucket, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applySiacoinOutputs(scoBucket, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applyFileContracts(tx, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applyTxFileContractRevisions(tx, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applyTxStorageProofs(tx, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applyTxSiafundInputs(tx, pb, t)
-		if err != nil {
-			return err
-		}
-		err = cs.applyTxSiafundOutputs(tx, pb, t)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	scoBucket := tx.Bucket(SiacoinOutputs)
+	err := cs.applySiacoinInputs(scoBucket, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applySiacoinOutputs(scoBucket, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyFileContracts(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyTxFileContractRevisions(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyTxStorageProofs(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyTxSiafundInputs(tx, pb, t)
+	if err != nil {
+		return err
+	}
+	err = cs.applyTxSiafundOutputs(tx, pb, t)
 	if err != nil {
 		return err
 	}

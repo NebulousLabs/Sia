@@ -290,7 +290,9 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 			cs.db.stopConsistencyGuard()
 			return modules.ConsensusChange{}, err
 		}
-		err = cs.applyTransaction(diffHolder, txn)
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			return cs.applyTransaction(tx, diffHolder, txn)
+		})
 		if err != nil {
 			cs.db.stopConsistencyGuard()
 			return modules.ConsensusChange{}, err

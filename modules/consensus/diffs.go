@@ -443,8 +443,14 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			return err
 		}
 
-		err = cs.applyTransaction(pb, txn)
-		if err != nil {
+		updateErr := cs.db.Update(func(tx *bolt.Tx) error {
+			err = cs.applyTransaction(tx, pb, txn)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if updateErr != nil {
 			return err
 		}
 	}
