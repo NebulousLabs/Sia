@@ -92,7 +92,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			so.outputs = append(so.outputs, sco)
 		}
 	}
-	sort.Sort(so)
+	sort.Sort(sort.Reverse(so))
 
 	// Create and fund a parent transaction that will add the correct amount of
 	// siacoins to the transaction.
