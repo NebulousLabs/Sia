@@ -66,8 +66,10 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		wg.Add(len(pieces))
 		for j, data := range pieces {
 			go func(j int, data []byte) {
-				hosts[j%len(hosts)].addPiece(uploadPiece{data, i, uint64(j)})
-				atomic.AddUint64(&f.bytesUploaded, uint64(len(data)))
+				err := hosts[j%len(hosts)].addPiece(uploadPiece{data, i, uint64(j)})
+				if err == nil {
+					atomic.AddUint64(&f.bytesUploaded, uint64(len(data)))
+				}
 				wg.Done()
 			}(j, data)
 		}

@@ -15,11 +15,11 @@ type testHost struct {
 	pieceMap  map[uint64][]pieceData // key is chunkIndex
 	pieceSize uint64
 	nAttempt  int // total number of download attempts
-	nFetch    int // number of successfull download attempts
+	nFetch    int // number of successful download attempts
 
 	// used to simulate real-world conditions
-	delay    time.Duration // download will take this long
-	failRate int           // download will randomly fail with probability 1/failRate
+	delay    time.Duration // transfers will take this long
+	failRate int           // transfers will randomly fail with probability 1/failRate
 }
 
 func (h *testHost) pieces(chunkIndex uint64) []pieceData {
