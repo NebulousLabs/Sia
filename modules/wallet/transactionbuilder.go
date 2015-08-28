@@ -80,7 +80,19 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		so.ids = append(so.ids, scoid)
 		so.outputs = append(so.outputs, sco)
 	}
-	sort.Sort(so)
+	// Add all of the unconfirmed outputs as well.
+	for _, upt := range tb.wallet.unconfirmedProcessedTransactions {
+		for i, sco := range upt.Transaction.SiacoinOutputs {
+			// Determine if the output belongs to the wallet.
+			_, exists := tb.wallet.keys[sco.UnlockHash]
+			if !exists {
+				continue
+			}
+			so.ids = append(so.ids, upt.Transaction.SiacoinOutputID(i))
+			so.outputs = append(so.outputs, sco)
+		}
+	}
+	sort.Sort(sort.Reverse(so))
 
 	// Create and fund a parent transaction that will add the correct amount of
 	// siacoins to the transaction.
@@ -165,6 +177,9 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			return err
 		}
 	}
+	// Mark the parent output as spent. Must be done after the transaction is
+	// finished because otherwise the txid and output id will change.
+	tb.wallet.spentOutputs[types.OutputID(parentTxn.SiacoinOutputID(0))] = tb.wallet.consensusSetHeight
 
 	// Add the exact output.
 	newInput := types.SiacoinInput{
