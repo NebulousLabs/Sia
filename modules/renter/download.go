@@ -158,51 +158,43 @@ func (d *download) Nickname() string {
 	return d.nickname
 }
 
-// downloadWorker fetches pieces from a host as directed by reqChan. It sends
-// the fetched pieces down the appropriate respChan.
-func downloadWorker(host fetcher, reqChan chan uint64, respChans []chan []byte) {
-	for chunkIndex := range reqChan {
-		for _, p := range host.pieces(chunkIndex) {
-			data, err := host.fetch(p)
-			if err != nil {
-				data = nil
+// getPiece locates and downloads a specific piece.
+func (d *download) getPiece(chunkIndex, pieceIndex uint64) []byte {
+	for _, h := range d.hosts {
+		for _, p := range h.pieces(chunkIndex) {
+			if p.Piece == pieceIndex {
+				data, err := h.fetch(p)
+				if err != nil {
+					break // try next host
+				}
+				return data
 			}
-			respChans[p.Piece] <- data
 		}
 	}
+	return nil
 }
 
 // run performs the actual download. It spawns one worker per host, and
 // instructs them to sequentially download chunks. It then writes the
 // recovered chunks to w.
 func (d *download) run(w io.Writer) error {
-	// create request and response channels
-	reqChans := make([]chan uint64, len(d.hosts))
-	for i := range reqChans {
-		reqChans[i] = make(chan uint64)
-	}
-	respChans := make([]chan []byte, d.erasureCode.NumPieces())
-	for i := range respChans {
-		respChans[i] = make(chan []byte)
-	}
-
-	// spawn download workers
-	for i, h := range d.hosts {
-		go downloadWorker(h, reqChans[i], respChans)
-		defer close(reqChans[i])
-	}
-
 	var received uint64
 	for i := uint64(0); received < d.fileSize; i++ {
-		// tell all workers to download chunk i
-		for _, ch := range reqChans {
-			ch <- i
-		}
 		// load pieces into chunk
-		// TODO: this deadlocks if any pieces are missing.
 		chunk := make([][]byte, d.erasureCode.NumPieces())
-		for j, ch := range respChans {
-			chunk[j] = <-ch
+		left := d.erasureCode.MinPieces()
+		// pick hosts at random
+		for _, j := range crypto.Perm(len(chunk)) {
+			chunk[j] = d.getPiece(i, uint64(j))
+			if chunk[j] != nil {
+				left--
+			}
+			if left == 0 {
+				break
+			}
+		}
+		if left != 0 {
+			return errors.New("couldn't fetch enough pieces to recover data")
 		}
 
 		// Write pieces to w. We always write chunkSize bytes unless this is
