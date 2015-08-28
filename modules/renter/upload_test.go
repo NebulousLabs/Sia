@@ -5,17 +5,25 @@ import (
 	"crypto/rand"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 func (h *testHost) addPiece(p uploadPiece) error {
+	// simulate I/O delay
+	time.Sleep(h.delay)
+
+	// randomly fail
+	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
+		return crypto.ErrNilInput
+	}
+
 	h.pieceMap[p.chunkIndex] = append(h.pieceMap[p.chunkIndex], pieceData{
 		p.chunkIndex,
 		p.pieceIndex,
 		uint64(len(h.data)),
 	})
 	h.data = append(h.data, p.data...)
-	// simulate I/O delay
-	time.Sleep(h.delay)
 	return nil
 }
 
@@ -35,18 +43,22 @@ func TestErasureUpload(t *testing.T) {
 	}
 
 	// create hosts
+	const pieceSize = 10
 	hosts := make([]uploader, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
-			pieceMap: make(map[uint64][]pieceData),
-			delay:    time.Duration(i) * time.Millisecond,
+			pieceMap:  make(map[uint64][]pieceData),
+			pieceSize: pieceSize,
+			delay:     time.Duration(i) * time.Millisecond,
+			failRate:  5, // 20% failure rate
 		}
 	}
 	// make one host really slow
 	hosts[0].(*testHost).delay = 100 * time.Millisecond
+	// make one host always fail
+	hosts[1].(*testHost).failRate = 1
 
 	// upload data to hosts
-	const pieceSize = 10
 	f := newFile("foo", rsc, pieceSize, dataSize)
 	err = f.upload(bytes.NewReader(data), hosts)
 	if err != nil {
@@ -55,8 +67,8 @@ func TestErasureUpload(t *testing.T) {
 
 	// download data
 	buf := new(bytes.Buffer)
-	chunk := make([][]byte, rsc.NumPieces())
 	for i := uint64(0); i < f.numChunks(); i++ {
+		chunk := make([][]byte, rsc.NumPieces())
 		for _, h := range hosts {
 			host := h.(*testHost)
 			for _, p := range host.pieceMap[i] {
