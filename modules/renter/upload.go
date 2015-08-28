@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -42,41 +43,11 @@ type uploader interface {
 	fileContract() fileContract
 }
 
-// uploadWorker uploads pieces to a host as directed by reqChan. When there
-// are no more pieces to upload, it sends the final version of the
-// fileContract down respChan.
-func (f *file) uploadWorker(host uploader, reqChan chan uploadPiece, respChan chan fileContract) {
-	for req := range reqChan {
-		err := host.addPiece(req)
-		if err != nil {
-			// TODO: how should this be handled?
-			break
-		}
-		atomic.AddUint64(&f.bytesUploaded, uint64(len(req.data)))
-	}
-	// reqChan was closed; send final fileContract
-	respChan <- host.fileContract()
-}
-
 // upload reads chunks from r and uploads them to hosts. It spawns a worker
 // for each host, and instructs them to upload pieces of each chunk.
 func (f *file) upload(r io.Reader, hosts []uploader) error {
-	// All requests are sent down the same channel. Since all workers are
-	// waiting on this channel, pieces will be uploaded by the first idle
-	// worker. This means faster uploaders will get more pieces than slow
-	// uploaders.
-	reqChan := make(chan uploadPiece)
-
-	// Once all requests have been sent, upload will read the resulting
-	// fileContracts from respChan and store them in f.
-	respChan := make(chan fileContract)
-
-	// spawn workers
-	for _, h := range hosts {
-		go f.uploadWorker(h, reqChan, respChan)
-	}
-
 	// encode and upload each chunk
+	var wg sync.WaitGroup
 	for i := uint64(0); ; i++ {
 		// read next chunk
 		chunk := make([]byte, f.chunkSize())
@@ -91,17 +62,24 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		if err != nil {
 			return err
 		}
-		// send upload requests to workers
+		// upload pieces, split evenly among hosts
+		wg.Add(len(pieces))
 		for j, data := range pieces {
-			reqChan <- uploadPiece{data, i, uint64(j)}
+			go func(j int, data []byte) {
+				err := hosts[j%len(hosts)].addPiece(uploadPiece{data, i, uint64(j)})
+				if err == nil {
+					atomic.AddUint64(&f.bytesUploaded, uint64(len(data)))
+				}
+				wg.Done()
+			}(j, data)
 		}
+		wg.Wait()
 		atomic.AddUint64(&f.chunksUploaded, 1)
 	}
 
-	// signal workers to send their contracts
-	close(reqChan)
-	for range hosts {
-		contract := <-respChan
+	// gather final contracts
+	for _, h := range hosts {
+		contract := h.fileContract()
 		f.contracts[contract.IP] = contract
 	}
 
