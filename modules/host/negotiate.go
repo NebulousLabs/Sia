@@ -381,6 +381,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		h.spaceRemaining -= int64(len(piece))
 		obligation.FileContract.RevisionNumber = rev.NewRevisionNumber
 		obligation.FileContract.FileSize = rev.NewFileSize
+		obligation.FileContract.FileMerkleRoot = rev.NewFileMerkleRoot
 		h.obligationsByID[obligation.ID] = obligation
 		heightObligations := h.obligationsByHeight[obligation.FileContract.WindowStart+StorageProofReorgDepth]
 		for i := range heightObligations {

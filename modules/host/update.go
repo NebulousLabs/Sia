@@ -25,7 +25,7 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 // obligation and submits it to the blockchain.
 //
 // TODO: The printlns here should be logging messages.
-func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightForProof types.BlockHeight) {
+func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 	defer h.threadedDeleteObligation(obligation)
 
 	file, err := os.Open(obligation.Path)
@@ -81,7 +81,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _ = range cc.AppliedBlocks {
 		h.blockHeight++
 		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
-			go h.threadedCreateStorageProof(obligation, h.blockHeight)
+			go h.threadedCreateStorageProof(obligation)
 		}
 		// TODO: If something happens while the storage proofs are being
 		// created, those files will never get cleared from the host.
