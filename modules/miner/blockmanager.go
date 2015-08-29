@@ -64,6 +64,9 @@ func (m *Miner) prepareNewBlock() {
 		delete(m.blockMem, m.headerMem[m.memProgress])
 		delete(m.arbDataMem, m.headerMem[m.memProgress])
 		m.memProgress++
+		if m.memProgress == headerForWorkMemory {
+			m.memProgress = 0
+		}
 	}
 }
 
