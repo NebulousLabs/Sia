@@ -130,5 +130,26 @@ func (w *Wallet) initPersist() error {
 
 // CreateBackup creates a backup file at the desired filepath.
 func (w *Wallet) CreateBackup(backupFilepath string) error {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
 	return persist.SaveFile(settingsMetadata, w.persist, backupFilepath)
 }
+
+/*
+// LoadBackup loads a backup file from the provided filepath. The backup file
+// primary seed is loaded as an auxiliary seed.
+func (w *Wallet) LoadBackup(masterKey, backupMasterKey crypto.TwofishKey, backupFilepath string) error {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+
+	// Load all of the seed files, check for duplicates, re-encrypt them (but
+	// keep the UID), and add them to the WalletPersist object)
+	var backupPersist WalletPersist
+	err := persist.LoadFile(settingsMetadata, &backupPersist, backupFilepath)
+	if err != nil {
+		return err
+	}
+	backupSeeds := append(backupPersist.AuxiliarySeedFiles, backupPersist.PrimarySeedFile)
+	TODO: more
+}
+*/

@@ -38,6 +38,14 @@ type SiagKeyPair struct {
 	UnlockConditions types.UnlockConditions
 }
 
+// SavedKey033x is the persist structure that was used to save and load private
+// keys in versions v0.3.3.x for siad.
+type SavedKey033x struct {
+	SecretKey        crypto.SecretKey
+	UnlockConditions types.UnlockConditions
+	Visible          bool
+}
+
 // initUnseededKeys loads all of the unseeded keys into the wallet after the
 // wallet gets unlocked.
 func (w *Wallet) initUnseededKeys(masterKey crypto.TwofishKey) error {
@@ -68,9 +76,50 @@ func (w *Wallet) initUnseededKeys(masterKey crypto.TwofishKey) error {
 	return nil
 }
 
+// loadSpendableKey loads a spendable key into the wallet's persist structure.
+func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) error {
+	// Duplication is detected by looking at the set of unlock conditions. If
+	// the wallet is locked, correct deduplication is uncertain.
+	if !w.unlocked {
+		return modules.ErrLockedWallet
+	}
+
+	// Check for duplicates. No error is returned in the event of a duplicate.
+	_, exists := w.keys[sk.UnlockConditions.UnlockHash()]
+	if exists {
+		return nil
+	}
+
+	// TODO: Check that they key is actually spendable.
+
+	// Create a UID and encryption verification.
+	var skf SpendableKeyFile
+	_, err := rand.Read(skf.UID[:])
+	if err != nil {
+		return err
+	}
+	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
+	plaintextVerification := make([]byte, encryptionVerificationLen)
+	skf.EncryptionVerification, err = encryptionKey.EncryptBytes(plaintextVerification)
+	if err != nil {
+		return err
+	}
+
+	// Encrypt and save the key.
+	skf.SpendableKey, err = encryptionKey.EncryptBytes(encoding.Marshal(sk))
+	if err != nil {
+		return err
+	}
+	w.persist.UnseededKeys = append(w.persist.UnseededKeys, skf)
+	return nil
+}
+
 // loadSiagKeys loads a set of siag keyfiles into the wallet, so that the
 // wallet may spend the siafunds.
 func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) error {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+
 	// Load the keyfiles from disk.
 	if len(keyfiles) < 1 {
 		return ErrNoKeyfile
@@ -104,30 +153,16 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	// Drop all unneeded keys.
 	skps = skps[0:skps[0].UnlockConditions.SignaturesRequired]
 
-	// Merge the keys into a single spendableKey.
+	// Merge the keys into a single spendableKey and save it to the wallet.
 	var sk spendableKey
 	sk.UnlockConditions = skps[0].UnlockConditions
 	for _, skp := range skps {
 		sk.SecretKeys = append(sk.SecretKeys, skp.SecretKey)
 	}
-
-	// Create the encrypted spendable key file that gets saved to disk.
-	var skf SpendableKeyFile
-	_, err := rand.Read(skf.UID[:])
+	err := w.loadSpendableKey(masterKey, sk)
 	if err != nil {
 		return err
 	}
-	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
-	plaintextVerification := make([]byte, encryptionVerificationLen)
-	skf.EncryptionVerification, err = encryptionKey.EncryptBytes(plaintextVerification)
-	if err != nil {
-		return err
-	}
-	skf.SpendableKey, err = encryptionKey.EncryptBytes(encoding.Marshal(sk))
-	if err != nil {
-		return err
-	}
-	w.persist.UnseededKeys = append(w.persist.UnseededKeys, skf)
 	return w.saveSettings()
 }
 
@@ -135,5 +170,37 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) error {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
+	err := w.checkMasterKey(masterKey)
+	if err != nil {
+		return err
+	}
 	return w.loadSiagKeys(masterKey, keyfiles)
+}
+
+// Load033xWallet loads a v0.3.3.x wallet as an unseeded key, such that the
+// funds become spendable to the current wallet.
+func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath string) error {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	err := w.checkMasterKey(masterKey)
+	if err != nil {
+		return err
+	}
+
+	var savedKeys []SavedKey033x
+	err = encoding.ReadFile(filepath, &savedKeys)
+	if err != nil {
+		return err
+	}
+	for _, savedKey := range savedKeys {
+		spendKey := spendableKey{
+			UnlockConditions: savedKey.UnlockConditions,
+			SecretKeys:       []crypto.SecretKey{savedKey.SecretKey},
+		}
+		err = w.loadSpendableKey(masterKey, spendKey)
+		if err != nil {
+			return err
+		}
+	}
+	return w.saveSettings()
 }

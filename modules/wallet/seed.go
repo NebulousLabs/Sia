@@ -122,11 +122,21 @@ func (w *Wallet) integrateSeed(seed modules.Seed) {
 
 // recoverSeed integrates a recovery seed into the wallet.
 func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
+	// Because the recovery seed does not have a UID, duplication must be
+	// prevented by comparing with the list of decrypted seeds. This can only
+	// occur while the wallet is unlocked.
+	if !w.unlocked {
+		return modules.ErrLockedWallet
+	}
+
 	// Check that the seed is not already known.
 	for _, wSeed := range w.seeds {
 		if seed == wSeed {
 			return errKnownSeed
 		}
+	}
+	if seed == w.primarySeed {
+		return errKnownSeed
 	}
 	seedFile, err := w.encryptAndSaveSeedFile(masterKey, seed)
 	if err != nil {
@@ -249,9 +259,6 @@ func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 func (w *Wallet) RecoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	if !w.unlocked {
-		return modules.ErrLockedWallet
-	}
 	err := w.checkMasterKey(masterKey)
 	if err != nil {
 		return err
