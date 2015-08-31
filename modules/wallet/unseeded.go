@@ -116,7 +116,9 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 		return err
 	}
 	w.persist.UnseededKeys = append(w.persist.UnseededKeys, skf)
-	w.keys[sk.UnlockConditions.UnlockHash()] = sk
+	// w.keys[sk.UnlockConditions.UnlockHash()] = sk -> aids with duplicate
+	// detection, but causes db inconsistency. Rescanning is probably the
+	// solution.
 	return nil
 }
 
