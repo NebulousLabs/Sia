@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -26,6 +28,9 @@ var (
 	ErrNoKeyfile        = errors.New("no keyfile has been presented")
 	ErrUnknownHeader    = errors.New("file contains the wrong header")
 	ErrUnknownVersion   = errors.New("file has an unknown version number")
+
+	errAllDuplicates = errors.New("old wallet has no new seeds")
+	errDuplicateSpendableKey = errors.New("key has already been loaded into the wallet")
 )
 
 // A SiagKeyPair is the struct representation of the bytes that get saved to
@@ -84,13 +89,13 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 		return modules.ErrLockedWallet
 	}
 
-	// Check for duplicates. No error is returned in the event of a duplicate.
+	// Check for duplicates.
 	_, exists := w.keys[sk.UnlockConditions.UnlockHash()]
 	if exists {
-		return nil
+		return errDuplicateSpendableKey
 	}
 
-	// TODO: Check that they key is actually spendable.
+	// TODO: Check that the key is actually spendable.
 
 	// Create a UID and encryption verification.
 	var skf SpendableKeyFile
@@ -111,6 +116,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 		return err
 	}
 	w.persist.UnseededKeys = append(w.persist.UnseededKeys, skf)
+	w.keys[sk.UnlockConditions.UnlockHash()] = sk
 	return nil
 }
 
@@ -163,7 +169,11 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if err != nil {
 		return err
 	}
-	return w.saveSettings()
+	err = w.saveSettings()
+	if err != nil {
+		return err
+	}
+	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+settingsFileSuffix))
 }
 
 // LoadSiagKeys loads a set of siag-generated keys into the wallet.
@@ -179,7 +189,7 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 
 // Load033xWallet loads a v0.3.3.x wallet as an unseeded key, such that the
 // funds become spendable to the current wallet.
-func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath string) error {
+func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string) error {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	err := w.checkMasterKey(masterKey)
@@ -188,19 +198,30 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath string) er
 	}
 
 	var savedKeys []SavedKey033x
-	err = encoding.ReadFile(filepath, &savedKeys)
+	err = encoding.ReadFile(filepath033x, &savedKeys)
 	if err != nil {
 		return err
 	}
+	var seedsLoaded int
 	for _, savedKey := range savedKeys {
 		spendKey := spendableKey{
 			UnlockConditions: savedKey.UnlockConditions,
 			SecretKeys:       []crypto.SecretKey{savedKey.SecretKey},
 		}
 		err = w.loadSpendableKey(masterKey, spendKey)
-		if err != nil {
+		if err != nil && err != errDuplicateSpendableKey {
 			return err
 		}
+		if err == nil {
+			seedsLoaded++
+		}
 	}
-	return w.saveSettings()
+	err = w.saveSettings()
+	if err != nil {
+		return err
+	}
+	if seedsLoaded != 0 {
+		return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+settingsFileSuffix))
+	}
+	return errAllDuplicates
 }

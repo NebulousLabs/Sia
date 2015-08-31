@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	logFile      = modules.WalletDir + ".log"
-	settingsFile = modules.WalletDir + ".json"
+	logFile            = modules.WalletDir + ".log"
+	settingsFileSuffix = ".json"
+	settingsFile       = modules.WalletDir + settingsFileSuffix
 
 	encryptionVerificationLen = 32
 )
@@ -128,11 +129,16 @@ func (w *Wallet) initPersist() error {
 	return nil
 }
 
+// createBackup creates a backup file at the desired filepath.
+func (w *Wallet) createBackup(backupFilepath string) error {
+	return persist.SaveFile(settingsMetadata, w.persist, backupFilepath)
+}
+
 // CreateBackup creates a backup file at the desired filepath.
 func (w *Wallet) CreateBackup(backupFilepath string) error {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	return persist.SaveFile(settingsMetadata, w.persist, backupFilepath)
+	return w.createBackup(backupFilepath)
 }
 
 /*
