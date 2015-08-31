@@ -230,7 +230,7 @@ func walletload033xcmd(filepath string) {
 		fmt.Println("Reading password failed")
 		return
 	}
-	qs := fmt.Sprintf("filepath=%s&encryptionpassword=%s", password, filepath)
+	qs := fmt.Sprintf("filepath=%s&encryptionpassword=%s", filepath, password)
 	err = post("/wallet/load/033x", qs)
 	if err != nil {
 		fmt.Println("loading error:", err)
