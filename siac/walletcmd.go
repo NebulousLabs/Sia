@@ -246,7 +246,7 @@ func walletunlockcmd() {
 
 // walletinitcmd encrypts the wallet with the given password
 func walletinitcmd() {
-	var er api.WalletEncryptPOST
+	var er api.WalletInitPOST
 	qs := fmt.Sprintf("dictionary=%s", "english")
 	if initPassword {
 		password, err := speakeasy.Ask("Wallet password: ")
