@@ -173,6 +173,11 @@ type (
 		// View returns the incomplete transaction along with all of its
 		// parents.
 		View() (txn types.Transaction, parents []types.Transaction)
+
+		// Drop indicates that a transaction is no longer useful, will not be
+		// broadcast, and that all of the outputs can be reclaimed. 'Drop'
+		// should only be used before signatures are added.
+		Drop()
 	}
 
 	// Wallet stores and manages siacoins and siafunds. The wallet file is

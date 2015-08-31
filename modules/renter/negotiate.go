@@ -143,31 +143,37 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	// send txn
 	if err := encoding.WriteObject(conn, txnSet); err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 
 	// read back acceptance
 	var response string
 	if err := encoding.ReadObject(conn, &response, 128); err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 	if response != modules.AcceptResponse {
+		txnBuilder.Drop()
 		return errors.New("host rejected proposed contract: " + response)
 	}
 
 	// read back txn with host collateral.
 	var hostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 
 	// check that txn is okay. For now, no collateral will be added, so the
 	// transaction sets should be identical.
 	if len(hostTxnSet) != len(txnSet) {
+		txnBuilder.Drop()
 		return errors.New("host sent bad collateral transaction")
 	}
 	for i := range hostTxnSet {
 		if hostTxnSet[i].ID() != txnSet[i].ID() {
+			txnBuilder.Drop()
 			return errors.New("host sent bad collateral transaction")
 		}
 	}
@@ -178,15 +184,18 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	// with whatever fields were added by the host.
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 
 	// read signed txn from host
 	var signedHostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 
@@ -197,6 +206,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		err = nil
 	}
 	if err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 
