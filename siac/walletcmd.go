@@ -336,3 +336,73 @@ func walletunlockcmd() {
 	}
 	fmt.Println("Wallet unlocked")
 }
+
+// walletinitcmd encrypts the wallet with the given password
+func walletinitcmd() {
+	var er api.WalletInitPOST
+	qs := fmt.Sprintf("dictionary=%s", "english")
+	if initPassword {
+		password, err := speakeasy.Ask("Wallet password: ")
+		if err != nil {
+			fmt.Println("Reading password failed")
+			return
+		}
+		qs += fmt.Sprintf("&encryptionpassword=%s", password)
+	}
+	err := postResp("/wallet/encrypt", qs, &er)
+	if err != nil {
+		fmt.Println("Error when encrypting wallet:", err)
+		return
+	}
+	fmt.Printf("Seed is:\n %s\n\n", er.PrimarySeed)
+	if initPassword {
+		fmt.Printf("Wallet encrypted with given password\n")
+	} else {
+		fmt.Printf("Wallet encrypted with password: %s\n", er.PrimarySeed)
+	}
+}
+
+// walletlockcmd locks the wallet
+func walletlockcmd() {
+	err := post("/wallet/lock", "")
+	if err != nil {
+		fmt.Println("Could not lock wallet:", err)
+	}
+}
+
+// walletaddseedcmd adds a seed to the wallet's list of seeds
+func walletaddseedcmd() {
+	password, err := speakeasy.Ask("Wallet password: ")
+	if err != nil {
+		fmt.Println("Reading password failed")
+		return
+	}
+	seed, err := speakeasy.Ask("New Seed: ")
+	if err != nil {
+		fmt.Println("Reading seed failed")
+		return
+	}
+	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
+	err = post("/wallet/seeds", qs)
+	if err != nil {
+		fmt.Println("Could not add seed:", err)
+		return
+	}
+	fmt.Println("Added Key")
+}
+
+// walletseedcmd returns the current seed {
+func walletseedscmd() {
+	var seedInfo api.WalletSeedsGET
+	err := getAPI("/wallet/seeds", &seedInfo)
+	if err != nil {
+		fmt.Println("Error retrieving the current seed:", err)
+		return
+	}
+	fmt.Printf("Primary Seed: %s\n"+
+		"Addresses Remaining %d\n"+
+		"All Seeds:\n", seedInfo.PrimarySeed, seedInfo.AddressesRemaining)
+	for _, seed := range seedInfo.AllSeeds {
+		fmt.Println(seed)
+	}
+}

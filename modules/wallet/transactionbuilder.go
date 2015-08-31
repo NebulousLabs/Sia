@@ -384,6 +384,28 @@ func (tb *transactionBuilder) AddTransactionSignature(sig types.TransactionSigna
 	return uint64(len(tb.transaction.TransactionSignatures) - 1)
 }
 
+// Drop discards all of the outputs in a transaction, returning them to the
+// pool so that other transactions may use them. 'Drop' should only be called
+// if a transaction is both unsigned and will not be used any further.
+func (tb *transactionBuilder) Drop() {
+	lockID := tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock(lockID)
+
+	// Iterate through all parents and the transaction itself and restore all
+	// outputs to the list of available outputs.
+	txns := append(tb.parents, tb.transaction)
+	for _, txn := range txns {
+		for _, sci := range txn.SiacoinInputs {
+			delete(tb.wallet.spentOutputs, types.OutputID(sci.ParentID))
+		}
+	}
+
+	tb.parents = nil
+	tb.transaction = types.Transaction{}
+	tb.siacoinInputs = nil
+	tb.siafundInputs = nil
+}
+
 // Sign will sign any inputs added by 'FundSiacoins' or 'FundSiafunds' and
 // return a transaction set that contains all parents prepended to the
 // transaction. If more fields need to be added, a new transaction builder will

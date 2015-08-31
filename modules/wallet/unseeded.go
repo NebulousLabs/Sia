@@ -29,7 +29,7 @@ var (
 	ErrUnknownHeader    = errors.New("file contains the wrong header")
 	ErrUnknownVersion   = errors.New("file has an unknown version number")
 
-	errAllDuplicates = errors.New("old wallet has no new seeds")
+	errAllDuplicates         = errors.New("old wallet has no new seeds")
 	errDuplicateSpendableKey = errors.New("key has already been loaded into the wallet")
 )
 
@@ -123,9 +123,6 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 // loadSiagKeys loads a set of siag keyfiles into the wallet, so that the
 // wallet may spend the siafunds.
 func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) error {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
 	// Load the keyfiles from disk.
 	if len(keyfiles) < 1 {
 		return ErrNoKeyfile
