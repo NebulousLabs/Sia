@@ -103,8 +103,8 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
 		handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // POST
 		handleHTTPRequest(mux, "/wallet/encrypt", srv.walletEncryptHandler)            // POST
+		handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
 		handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // POST
-		handleHTTPRequest(mux, "/wallet/recover/033x", srv.walletRecover033xHandler)   // POST
 		handleHTTPRequest(mux, "/wallet/seeds", srv.walletSeedsHandler)                // GET, POST
 		handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)          // POST
 		handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)          // POST
