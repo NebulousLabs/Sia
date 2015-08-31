@@ -33,8 +33,16 @@ type (
 		Address types.UnlockHash `json:"address"`
 	}
 
+	// WalletInitPOST contains the primary seed that gets generated during a
+	// POST call to /wallet/init.
+	WalletInitPOST struct {
+		PrimarySeed string `json:"primaryseed"`
+	}
+
 	// WalletEncryptPOST contains the primary seed that gets generated during a
 	// POST call to /wallet/encrypt.
+	//
+	// COMPATv0.4.0
 	WalletEncryptPOST struct {
 		PrimarySeed string `json:"primaryseed"`
 	}
@@ -178,15 +186,15 @@ func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request)
 	writeError(w, "unrecognized method when calling /wallet/backup", http.StatusBadRequest)
 }
 
-// walletEncryptHandlerPOST handles a POST call to /wallet/encrypt.
-func (srv *Server) walletEncryptHandlerPOST(w http.ResponseWriter, req *http.Request) {
+// walletInitHandlerPOST handles a POST call to /wallet/init.
+func (srv *Server) walletInitHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	var encryptionKey crypto.TwofishKey
 	if req.FormValue("encryptionpassword") != "" {
 		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
 	seed, err := srv.wallet.Encrypt(encryptionKey)
 	if err != nil {
-		writeError(w, "error when calling /wallet/encrypt: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error when calling /wallet/init: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -196,18 +204,29 @@ func (srv *Server) walletEncryptHandlerPOST(w http.ResponseWriter, req *http.Req
 	}
 	seedStr, err := modules.SeedToString(seed, dictID)
 	if err != nil {
-		writeError(w, "error when calling /wallet/encrypt: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error when calling /wallet/init: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, WalletEncryptPOST{
+	writeJSON(w, WalletInitPOST{
 		PrimarySeed: seedStr,
 	})
 }
 
-// walletEncryptHandler handles API calls to /wallet/encrypt.
+// walletInitHandler handles API calls to /wallet/init.
+func (srv *Server) walletInitHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "POST" {
+		srv.walletInitHandlerPOST(w, req)
+		return
+	}
+	writeError(w, "unrecognized method when calling /wallet/init", http.StatusBadRequest)
+}
+
+// walletEncryptHandler is a legacy alias for walletInitHandler.
+//
+// COMPATv0.4.0
 func (srv *Server) walletEncryptHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
-		srv.walletEncryptHandlerPOST(w, req)
+		srv.walletInitHandlerPOST(w, req)
 		return
 	}
 	writeError(w, "unrecognized method when calling /wallet/encrypt", http.StatusBadRequest)

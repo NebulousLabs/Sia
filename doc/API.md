@@ -48,7 +48,7 @@ Queries:
 * /wallet                      [GET]
 * /wallet/address              [GET]
 * /wallet/backup               [POST]
-* /wallet/encrypt              [POST]
+* /wallet/init                 [POST]
 * /wallet/lock                 [POST]
 * /wallet/seeds                [GET]
 * /wallet/seeds                [POST]
@@ -60,10 +60,10 @@ Queries:
 * /wallet/unlock               [POST]
 
 The first time that the wallet is ever created, the wallet will be unencrypted
-and locked. The wallet must be encrypted using a call to /wallet/encrypt. After
-encrypting the wallet, the wallet must be unlocked. From that point forward
-(including restarting siad), the wallet will be encrypted, and only the call to
-/wallet/unlock will be needed.
+and locked. The wallet must be initialized and encrypted using a call to 
+/wallet/init. After encrypting the wallet, the wallet must be unlocked. From 
+that point forward (including restarting siad), the wallet will be encrypted,
+and only the call to /wallet/unlock will be needed.
 
 #### /wallet [GET]
 
@@ -150,12 +150,12 @@ filepath string
 
 Response: standard
 
-#### /wallet/encrypt [POST]
+#### /wallet/init [POST]
 
-Function: Encrypt the wallet. After the wallet has been encrypted once, it does
-not need to be encrypted again, and future calls to /wallet/encrypt will return
-an error. The encryption password is provided by the api call. If the password
-is blank, then the password will be set to the same as the seed.
+Function: Initialize the wallet. After the wallet has been initialized once, it
+does not need to be initialized again, and future calls to /wallet/init will
+return an error. The encryption password is provided by the api call. If the
+password is blank, then the password will be set to the same as the seed.
 
 Parameters:
 ```
