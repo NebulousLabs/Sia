@@ -247,6 +247,15 @@ type (
 		// filepath. The backup will have all seeds and keys.
 		CreateBackup(string) error
 
+		// LoadBackup will load a backup of the wallet from the provided
+		// address. The backup wallet will be added as an auxiliary seed, not
+		// as a primary seed.
+		// LoadBackup(masterKey, backupMasterKey crypto.TwofishKey, string) error
+
+		// Load033xWallet will load a version 0.3.3.x wallet from disk and add all of
+		// the keys in the wallet as unseeded keys.
+		Load033xWallet(crypto.TwofishKey, string) error
+
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
 		// refund transacitons.

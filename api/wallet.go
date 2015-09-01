@@ -232,14 +232,41 @@ func (srv *Server) walletEncryptHandler(w http.ResponseWriter, req *http.Request
 	writeError(w, "unrecognized method when calling /wallet/encrypt", http.StatusBadRequest)
 }
 
+// walletLoad033xHandlerPOST handles a POST call to /wallet/load/033x.
+func (srv *Server) walletLoad033xHandlerPOST(w http.ResponseWriter, req *http.Request) {
+	filepath := req.FormValue("filepath")
+	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+	for _, key := range potentialKeys {
+		err := srv.wallet.Load033xWallet(key, filepath)
+		if err == nil {
+			writeSuccess(w)
+			return
+		}
+		if err != nil && err != modules.ErrBadEncryptionKey {
+			writeError(w, "error when calling /wallet/load/033x: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	writeError(w, modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
+}
+
+// walletLoad033xHandler handles API calls to /wallet/load/033x.
+func (srv *Server) walletLoad033xHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "POST" {
+		srv.walletLoad033xHandlerPOST(w, req)
+		return
+	}
+	writeError(w, "unrecognized method when calling /wallet/load/033x", http.StatusBadRequest)
+}
+
 // walletLockHandlerPOST handles a POST request to /wallet/lock.
 func (srv *Server) walletLockHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	err := srv.wallet.Lock()
-	if err == nil {
-		writeSuccess(w)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeError(w, err.Error(), http.StatusBadRequest)
+	writeSuccess(w)
 }
 
 // walletLockHanlder handles API calls to /wallet/lock.

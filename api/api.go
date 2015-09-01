@@ -102,16 +102,17 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/wallet", srv.walletHandler)                           // GET
 		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
 		handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // POST
-		handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
 		handleHTTPRequest(mux, "/wallet/encrypt", srv.walletEncryptHandler)            // POST - COMPATv0.4.0
-		handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // PUT
+		handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
+		handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
+		handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // POST
 		handleHTTPRequest(mux, "/wallet/seeds", srv.walletSeedsHandler)                // GET, POST
 		handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)          // POST
 		handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)          // POST
 		handleHTTPRequest(mux, "/wallet/transaction/", srv.walletTransactionHandler)   // $(id) GET
 		handleHTTPRequest(mux, "/wallet/transactions", srv.walletTransactionsHandler)  // GET
 		handleHTTPRequest(mux, "/wallet/transactions/", srv.walletTransactionsHandler) // $(addr) GET
-		handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // PUT
+		handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // POST
 	}
 
 	// BlockExplorer API Calls - Unfinished

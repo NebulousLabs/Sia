@@ -50,6 +50,7 @@ Queries:
 * /wallet/backup               [POST]
 * /wallet/init                 [POST]
 * /wallet/lock                 [POST]
+* /wallet/recover/033x         [POST]
 * /wallet/seeds                [GET]
 * /wallet/seeds                [POST]
 * /wallet/siacoins             [POST]
@@ -186,6 +187,25 @@ become unavailable. Queries concerning transaction history and balance are
 still available.
 
 Parameters: none
+
+Response: Standard.
+
+#### /wallet/recover/033x [POST]
+
+Function: Load a v0.3.3.x wallet into the current wallet, harvesting all of the
+secret keys. All spendable addresses in the loaded wallet will become spendable
+from the current wallet.
+
+Parameters:
+```
+filepath           string
+encryptionpassword string
+```
+'filepath' is the filepath of the v0.3.3.x wallet that is being loaded into the
+current wallet.
+
+'encryptionpassword' is the encryption key of the wallet. An error will be
+returned if the wrong key is provided.
 
 Response: Standard.
 
