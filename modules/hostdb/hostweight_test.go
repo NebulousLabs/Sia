@@ -40,7 +40,8 @@ func TestHostWeightWithOnePricedZero(t *testing.T) {
 	weight1 := calculateWeightFromUInt64Price(5)
 	weight2 := calculateWeightFromUInt64Price(0)
 	if weight1.Cmp(weight2) >= 0 {
-		t.Error("Zero-priced host should have higher weight than non-zero host.")
+		t.Error("Zero-priced host should have higher weight than nonzero-priced " +
+			"host.")
 	}
 }
 
