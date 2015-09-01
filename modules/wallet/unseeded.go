@@ -219,8 +219,8 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	if err != nil {
 		return err
 	}
-	if seedsLoaded != 0 {
-		return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+settingsFileSuffix))
+	if seedsLoaded == 0 {
+		return errAllDuplicates
 	}
-	return errAllDuplicates
+	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+settingsFileSuffix))
 }
