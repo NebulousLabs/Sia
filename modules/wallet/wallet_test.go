@@ -168,3 +168,26 @@ func TestNilInputs(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestAllAddresses checks that AllAddresses returns all of the wallet's
+// addresses in sorted order.
+func TestAllAddresses(t *testing.T) {
+	wt, err := createBlankWalletTester("TestAllAddresses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	wt.wallet.keys[types.UnlockHash{1}] = spendableKey{}
+	wt.wallet.keys[types.UnlockHash{5}] = spendableKey{}
+	wt.wallet.keys[types.UnlockHash{0}] = spendableKey{}
+	wt.wallet.keys[types.UnlockHash{2}] = spendableKey{}
+	wt.wallet.keys[types.UnlockHash{4}] = spendableKey{}
+	wt.wallet.keys[types.UnlockHash{3}] = spendableKey{}
+	addrs := wt.wallet.AllAddresses()
+	for i := range addrs {
+		if addrs[i][0] != byte(i) {
+			t.Error("address sorting failed:", i, addrs[i][0])
+		}
+	}
+}

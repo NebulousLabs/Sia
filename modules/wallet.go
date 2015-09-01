@@ -184,11 +184,6 @@ type (
 	// encrypted using a user-specified password. Common addresses are all
 	// dervied from a single address seed.
 	Wallet interface {
-		// Encrypted returns whether or not the wallet has been encrypted yet.
-		// After being encrypted for the first time, the wallet can only be
-		// unlocked using the encryption password.
-		Encrypted() bool
-
 		// Encrypt will encrypt the wallet using the input key. Upon
 		// encryption, a primary seed will be created for the wallet (no seed
 		// exists prior to this point). If the key is blank, then the hash of
@@ -200,9 +195,10 @@ type (
 		// a different directory or deleted.
 		Encrypt(masterKey crypto.TwofishKey) (Seed, error)
 
-		// Unlocked returns true if the wallet is currently unlocked, false
-		// otherwise.
-		Unlocked() bool
+		// Encrypted returns whether or not the wallet has been encrypted yet.
+		// After being encrypted for the first time, the wallet can only be
+		// unlocked using the encryption password.
+		Encrypted() bool
 
 		// Lock deletes all keys in memory and prevents the wallet from being
 		// used to spend coins or extract keys until 'Unlock' is called.
@@ -216,6 +212,15 @@ type (
 		// All items in the wallet are encrypted using different keys which are
 		// derived from the master key.
 		Unlock(masterKey crypto.TwofishKey) error
+
+		// Unlocked returns true if the wallet is currently unlocked, false
+		// otherwise.
+		Unlocked() bool
+
+		// AllAddresses returns all addresses that the wallet is able to spend
+		// from, including unseeded addresses. Addresses are returned sorted in
+		// byte-order.
+		AllAddresses() []types.UnlockHash
 
 		// AllSeeds returns all of the seeds that are being tracked by the
 		// wallet, including the primary seed. Only the primary seed is used to

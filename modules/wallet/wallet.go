@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"log"
+	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -132,4 +133,20 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 	return w, nil
+}
+
+// AllAddresses returns all addresses that the wallet is able to spend from,
+// including unseeded addresses. Addresses are returned sorted in byte-order.
+func (w *Wallet) AllAddresses() []types.UnlockHash {
+	lockID := w.mu.RLock()
+	defer w.mu.RUnlock(lockID)
+
+	i := 0
+	addrs := types.UnlockHashSlice(make([]types.UnlockHash, len(w.keys)))
+	for addr := range w.keys {
+		addrs[i] = addr
+		i++
+	}
+	sort.Sort(addrs)
+	return addrs
 }
