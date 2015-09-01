@@ -142,10 +142,9 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 	defer w.mu.RUnlock(lockID)
 
 	i := 0
-	addrs := types.UnlockHashSlice(make([]types.UnlockHash, len(w.keys)))
+	addrs := make(types.UnlockHashSlice, 0, len(w.keys))
 	for addr := range w.keys {
-		addrs[i] = addr
-		i++
+		addrs = append(addrs, addr)
 	}
 	sort.Sort(addrs)
 	return addrs
