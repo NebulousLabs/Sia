@@ -47,12 +47,13 @@ Queries:
 
 * /wallet                      [GET]
 * /wallet/address              [GET]
+* /wallet/addresses            [GET]
 * /wallet/backup               [POST]
 * /wallet/init                 [POST]
+* /wallet/load/033x            [POST]
+* /wallet/load/seed            [POST]
 * /wallet/lock                 [POST]
-* /wallet/recover/033x         [POST]
 * /wallet/seeds                [GET]
-* /wallet/seeds                [POST]
 * /wallet/siacoins             [POST]
 * /wallet/siafunds             [POST]
 * /wallet/transaction/$(id)    [GET]
@@ -136,6 +137,28 @@ struct {
 ```
 'address' is a Sia address that can receive siacoins or siafunds.
 
+#### /wallet/addresses [GET]
+
+Function: Fetch the list of addresses from the wallet.
+
+Parameters: none
+
+Response:
+```
+struct {
+	addresses []WalletAddress
+}
+```
+'addresses' is an array of wallet addresses. Wallet addresses take the
+following form:
+```
+struct {
+	address types.UnlockHash (string)
+}
+```
+A struct is used to allow future fields such as a list of transactions or a set
+of balances to be provided without breaking JSON compatibility.
+
 #### /wallet/backup [POST]
 
 Function: Create a backup of the wallet settings file. Though this can easily
@@ -179,18 +202,7 @@ struct {
 'primaryseed' is the dictionary encoded seed that is used to generate addresses
 that the wallet is able to spend.
 
-#### /wallet/lock [POST]
-
-Function: Locks the wallet, wiping all secret keys. After being locked, the
-keys are encrypted. Queries for the seed, to send siafunds, and related queries
-become unavailable. Queries concerning transaction history and balance are
-still available.
-
-Parameters: none
-
-Response: Standard.
-
-#### /wallet/recover/033x [POST]
+#### /wallet/load/033x [POST]
 
 Function: Load a v0.3.3.x wallet into the current wallet, harvesting all of the
 secret keys. All spendable addresses in the loaded wallet will become spendable
@@ -206,6 +218,42 @@ current wallet.
 
 'encryptionpassword' is the encryption key of the wallet. An error will be
 returned if the wrong key is provided.
+
+Response: Standard.
+
+#### /wallet/load/seed [POST]
+
+Function: Give the wallet a seed to track when looking for incoming
+transactions. The wallet will be able to spend outputs related to addresses
+created by the seed. The seed is added as an auxiliary seed, and does not
+replace the primary seed. Only the primary seed will be used for generating new
+addresses.
+
+Parameters:
+```
+encryptionpassword string
+dictionary         string
+seed               string
+```
+'encryptionpassword' is the key that is used to encrypt the new seed when it is
+saved to disk.
+
+'dictionary' is the name of the dictionary that should be used when encoding
+the seed. 'english' is the most common choice when picking a dictionary.
+
+'seed' is the dictionary-encoded phrase that corresponds to the seed being
+added to the wallet.
+
+Response: standard
+
+#### /wallet/lock [POST]
+
+Function: Locks the wallet, wiping all secret keys. After being locked, the
+keys are encrypted. Queries for the seed, to send siafunds, and related queries
+become unavailable. Queries concerning transaction history and balance are
+still available.
+
+Parameters: none
 
 Response: Standard.
 
@@ -251,31 +299,6 @@ contains a small checksum of the seed, to help catch simple mistakes when
 copying. The library
 [entropy-mnemonics](https://github.com/NebulousLabs/entropy-mnemonics) is used
 when encoding.
-
-#### /wallet/seeds [POST]
-
-Function: Give the wallet a seed to track when looking for incoming
-transactions. The wallet will be able to spend outputs related to addresses
-created by the seed. The seed is added as an auxiliary seed, and does not
-replace the primary seed. Only the primary seed will be used for generating new
-addresses.
-
-Parameters:
-```
-encryptionpassword string
-dictionary         string
-seed               string
-```
-'encryptionpassword' is the key that is used to encrypt the new seed when it is
-saved to disk.
-
-'dictionary' is the name of the dictionary that should be used when encoding
-the seed. 'english' is the most common choice when picking a dictionary.
-
-'seed' is the dictionary-encoded phrase that corresponds to the seed being
-added to the wallet.
-
-Response: standard
 
 #### /wallet/siacoins [POST]
 

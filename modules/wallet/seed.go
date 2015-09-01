@@ -166,18 +166,24 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey, seed modules.Seed) erro
 	w.primarySeed = seed
 	w.persist.PrimarySeedFile = seedFile
 	w.persist.PrimarySeedProgress = 0
+	// The wallet preloads keys to prevent confusion for people using the same
+	// seed/wallet file in multiple places.
+	for i := uint64(0); i < modules.WalletSeedPreloadDepth; i++ {
+		spendableKey := generateSpendableKey(seed, i)
+		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
+	}
 	return w.saveSettings()
 }
 
-// initPrimarySeed loads the primary seed into the wallet, creating a new one
-// if the primary seed does not exist. The primary seed is used to generate new
-// addresses.
+// initPrimarySeed loads the primary seed into the wallet.
 func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
 	seed, err := decryptSeedFile(masterKey, w.persist.PrimarySeedFile)
 	if err != nil {
 		return err
 	}
-	for i := uint64(0); i < w.persist.PrimarySeedProgress; i++ {
+	// The wallet preloads keys to prevent confusion when using the same wallet
+	// in multiple places.
+	for i := uint64(0); i < w.persist.PrimarySeedProgress+modules.WalletSeedPreloadDepth; i++ {
 		spendableKey := generateSpendableKey(seed, i)
 		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	}
@@ -186,8 +192,7 @@ func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
 	return nil
 }
 
-// initAuxiliarySeeds scans the wallet folder for wallet seeds. Auxiliary seeds
-// are not used to generate new addresses.
+// initAuxiliarySeeds scans the wallet folder for wallet seeds.
 func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 	for _, seedFile := range w.persist.AuxiliarySeedFiles {
 		seed, err := decryptSeedFile(masterKey, seedFile)
@@ -211,8 +216,9 @@ func (w *Wallet) nextPrimarySeedAddress() (types.UnlockConditions, error) {
 	}
 
 	// Integrate the next key into the wallet, and return the unlock
-	// conditions.
-	spendableKey := generateSpendableKey(w.primarySeed, w.persist.PrimarySeedProgress)
+	// conditions. Because the wallet preloads keys, the progress used is
+	// 'PrimarySeedProgress+modules.WalletSeedPreloadDepth'.
+	spendableKey := generateSpendableKey(w.primarySeed, w.persist.PrimarySeedProgress+modules.WalletSeedPreloadDepth)
 	w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	w.persist.PrimarySeedProgress++
 	err := w.saveSettings()
@@ -254,8 +260,6 @@ func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 // reclaiming any funds that were lost due to a deleted file or lost encryption
 // key. An error will be returned if the seed has already been integrated with
 // the wallet.
-//
-// NOTE: The recovery implementation is incomplete.
 func (w *Wallet) RecoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
