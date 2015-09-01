@@ -109,7 +109,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			settings.IPAddress = hostEntry.HostSettings.IPAddress
 			hostEntry.HostSettings = settings
 			hostEntry.reliability = MaxReliability
-			hostEntry.weight = hdb.hostWeight(*hostEntry)
+			hostEntry.weight = calculateHostWeight(*hostEntry)
 
 			// If the host is not already in the database and 'MaxActiveHosts' has not
 			// been reached, add the host to the database.
