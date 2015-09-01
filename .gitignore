@@ -1,6 +1,11 @@
+# vim
 *.swp
+
+# build artifacts
 cover
 release
+
+# pdflatex
 doc/whitepaper.aux
 doc/whitepaper.log
 doc/whitepaper.pdf
