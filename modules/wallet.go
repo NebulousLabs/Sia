@@ -15,7 +15,8 @@ const (
 
 	SeedChecksumSize = 6
 
-	PublicKeysPerSeed = 2500
+	PublicKeysPerSeed      = 2500
+	WalletSeedPreloadDepth = 25
 )
 
 var (
