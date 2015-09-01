@@ -183,7 +183,7 @@ func walletaddseedcmd() {
 		return
 	}
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
-	err = post("/wallet/seeds", qs)
+	err = post("/wallet/load/seed", qs)
 	if err != nil {
 		fmt.Println("Could not add seed:", err)
 		return

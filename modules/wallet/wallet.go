@@ -141,7 +141,6 @@ func (w *Wallet) AllAddresses() []types.UnlockHash {
 	lockID := w.mu.RLock()
 	defer w.mu.RUnlock(lockID)
 
-	i := 0
 	addrs := make(types.UnlockHashSlice, 0, len(w.keys))
 	for addr := range w.keys {
 		addrs = append(addrs, addr)
