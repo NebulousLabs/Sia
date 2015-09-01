@@ -33,6 +33,12 @@ type (
 		Address types.UnlockHash `json:"address"`
 	}
 
+	// WalletAddressesGET contains the list of wallet addresses returned by a
+	// GET call to /wallet/addresses.
+	WalletAddressesGET struct {
+		Addresses []modules.WalletAddress `json:"addresses"`
+	}
+
 	// WalletInitPOST contains the primary seed that gets generated during a
 	// POST call to /wallet/init.
 	WalletInitPOST struct {
@@ -146,11 +152,11 @@ func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request) {
 	writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
 }
 
-// walletAddressHandlerGET handles a GET request to /wallet/seed.
+// walletAddressHandlerGET handles a GET request to /wallet/address.
 func (srv *Server) walletAddressHandlerGET(w http.ResponseWriter, req *http.Request) {
 	unlockConditions, err := srv.wallet.NextAddress()
 	if err != nil {
-		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error after call to /wallet/addresses: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, WalletAddressGET{
@@ -165,6 +171,30 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 		return
 	}
 	writeError(w, "unrecognized method when calling /wallet/address", http.StatusBadRequest)
+}
+
+// walletAddressesHandlerGET handles a GET request to /wallet/addresses.
+func (srv *Server) walletAddressesHandlerGET(w http.ResponseWriter, req *http.Request) {
+	// Get the addresses and assemble the WalletAddress field.
+	addrs := srv.wallet.AllAddresses()
+	waddrs := make([]modules.WalletAddress, len(addrs))
+	for i := range addrs {
+		waddrs[i].Address = addrs[i]
+	}
+
+	// Print the result to the caller.
+	writeJSON(w, WalletAddressesGET{
+		Addresses: waddrs,
+	})
+}
+
+// walletAddressHandler handles API calls to /wallet/addresses.
+func (srv *Server) walletAddressesHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "" || req.Method == "GET" {
+		srv.walletAddressesHandlerGET(w, req)
+		return
+	}
+	writeError(w, "unrecognized method when calling /wallet/addresses", http.StatusBadRequest)
 }
 
 // walletBackupHandlerPOST handles a POST call to /wallet/backup
@@ -259,6 +289,41 @@ func (srv *Server) walletLoad033xHandler(w http.ResponseWriter, req *http.Reques
 	writeError(w, "unrecognized method when calling /wallet/load/033x", http.StatusBadRequest)
 }
 
+// walletLoadSeedHandlerPOST handles a POST request to /wallet/load/seed.
+func (srv *Server) walletLoadSeedHandlerPOST(w http.ResponseWriter, req *http.Request) {
+	// Get the seed using the ditionary + phrase
+	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
+	if err != nil {
+		writeError(w, "error when calling /wallet/load/seed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+	for _, key := range potentialKeys {
+		err := srv.wallet.RecoverSeed(key, seed)
+		if err == nil {
+			writeSuccess(w)
+			return
+		}
+		if err != nil && err != modules.ErrBadEncryptionKey {
+			writeError(w, "error when calling /wallet/load/seed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	writeError(w, "error when calling /wallet/load/seed: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
+}
+
+// walletLoadSeedHandler handles API calls to /wallet/load/seed.
+func (srv *Server) walletLoadSeedHandler(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case "POST":
+		srv.walletLoadSeedHandlerPOST(w, req)
+	default:
+		writeError(w, "unrecognized method when calling /wallet/load/seed", http.StatusBadRequest)
+	}
+}
+
 // walletLockHandlerPOST handles a POST request to /wallet/lock.
 func (srv *Server) walletLockHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	err := srv.wallet.Lock()
@@ -319,40 +384,13 @@ func (srv *Server) walletSeedsHandlerGET(w http.ResponseWriter, req *http.Reques
 	})
 }
 
-// walletSeedsHandlerPOST handles a POST request to /wallet/seeds.
-func (srv *Server) walletSeedsHandlerPOST(w http.ResponseWriter, req *http.Request) {
-	// Get the seed using the ditionary + phrase
-	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
-	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
-	if err != nil {
-		writeError(w, "error when calling /wallet/seeds: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
-	for _, key := range potentialKeys {
-		err := srv.wallet.RecoverSeed(key, seed)
-		if err == nil {
-			writeSuccess(w)
-			return
-		}
-		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, "error when calling /wallet/seeds: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	writeError(w, "error when calling /wallet/seeds: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
-}
-
 // walletSeedHandler handles API calls to /wallet/seed.
 func (srv *Server) walletSeedsHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET", "":
 		srv.walletSeedsHandlerGET(w, req)
-	case "POST":
-		srv.walletSeedsHandlerPOST(w, req)
 	default:
-		writeError(w, "unrecognized method when calling /wallet/seed", http.StatusBadRequest)
+		writeError(w, "unrecognized method when calling /wallet/seeds", http.StatusBadRequest)
 	}
 }
 
