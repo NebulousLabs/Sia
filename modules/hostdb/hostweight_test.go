@@ -3,16 +3,12 @@ package hostdb
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 func calculateWeightFromUInt64Price(price uint64) (weight types.Currency) {
-	entry := hostEntry{
-		HostSettings: modules.HostSettings{
-			Price: types.NewCurrency64(price),
-		},
-	}
+	var entry hostEntry
+	entry.Price = types.NewCurrency64(price)
 	return calculateHostWeight(entry)
 }
 
@@ -40,8 +36,7 @@ func TestHostWeightWithOnePricedZero(t *testing.T) {
 	weight1 := calculateWeightFromUInt64Price(5)
 	weight2 := calculateWeightFromUInt64Price(0)
 	if weight1.Cmp(weight2) >= 0 {
-		t.Error("Zero-priced host should have higher weight than nonzero-priced " +
-			"host.")
+		t.Error("Zero-priced host should have higher weight than nonzero-priced host.")
 	}
 }
 

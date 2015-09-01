@@ -16,9 +16,9 @@ var (
 // calculateHostWeight returns the weight of a host according to the settings of
 // the host database entry. Currently, only the price is considered.
 func calculateHostWeight(entry hostEntry) (weight types.Currency) {
-	// If the price is <= 0, just return the base weight.
+	// If the price is 0, just return the base weight to avoid divide by zero.
 	price := entry.Price
-	if price.Cmp(types.NewCurrency64(0)) <= 0 {
+	if price.IsZero() {
 		return baseWeight
 	}
 
