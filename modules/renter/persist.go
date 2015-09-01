@@ -334,6 +334,10 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 		r.files[f.name] = f
 		names[i] = f.name
 	}
+	// Save the files, and their renter metadata.
+	for _, f := range files {
+		r.saveFile(f)
+	}
 	err = r.save()
 	if err != nil {
 		return nil, err
