@@ -62,6 +62,15 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 
 // renterFilesListHandler handles the API call to list all of the files.
 func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Request) {
+	// helper fn to display number of blocks before a file expires
+	blocksLeft := func(height types.BlockHeight) types.BlockHeight {
+		curHeight := types.BlockHeight(srv.blockchainHeight)
+		if height < curHeight {
+			return 0
+		}
+		return height - curHeight
+	}
+
 	files := srv.renter.FileList()
 	fileSet := make([]FileInfo, 0, len(files))
 	for _, file := range files {
@@ -70,7 +79,7 @@ func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Reque
 			UploadProgress: file.UploadProgress(),
 			Nickname:       file.Nickname(),
 			Filesize:       file.Filesize(),
-			TimeRemaining:  file.Expiration() - types.BlockHeight(srv.blockchainHeight),
+			TimeRemaining:  blocksLeft(file.Expiration()),
 		})
 	}
 
