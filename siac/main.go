@@ -179,8 +179,11 @@ func main() {
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd, walletLoad033xCmd, walletLoadseedCmd, walletLoadsiagCmd, walletLockCmd, walletSeedsCmd, walletSendCmd, walletStatusCmd, walletUnlockCmd)
+	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd,
+		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd,
+		walletStatusCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
+	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
 
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterDownloadQueueCmd, renterFilesDeleteCmd, renterFilesDownloadCmd,

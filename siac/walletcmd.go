@@ -83,25 +83,33 @@ The seed string, which is also the encryption password, will be returned.`,
 		Run: wrap(walletinitcmd),
 	}
 
+	walletLoadCmd = &cobra.Command{
+		Use:   "load",
+		Short: "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
+		Long:  "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
+		Run:   walletloadcmd,
+	}
+
 	walletLoad033xCmd = &cobra.Command{
-		Use:   "load033x [filepath]",
+		Use:   "033x [filepath]",
 		Short: "Load a v0.3.3.x wallet",
 		Long:  "Load a v0.3.3.x wallet into the current wallet",
 		Run:   wrap(walletload033xcmd),
 	}
 
-	walletLoadseedCmd = &cobra.Command{
-		Use:   `loadseed`,
+	walletLoadSeedCmd = &cobra.Command{
+		Use:   `seed`,
 		Short: "Add a seed to the wallet",
 		Long:  "Uses the given password to create a new wallet with that as the primary seed",
 		Run:   wrap(walletloadseedcmd),
 	}
 
-	walletLoadsiagCmd = &cobra.Command{
-		Use:   `loadsiag [filepaths]`,
+	walletLoadSiagCmd = &cobra.Command{
+		Use:   `siag [filepaths]`,
 		Short: "Load a siag keyset into the wallet",
-		Long:  "Load a set of siag keys into the wallet - typically used for siafunds. Example: 'siac wallet loadsiag key1.siakey,key2.siakey'",
-		Run:   wrap(walletloadsiagcmd),
+		Long: `Load a set of siag keys into the wallet - typically used for siafunds.
+Example: 'siac wallet load siag key1.siakey,key2.siakey'`,
+		Run: wrap(walletloadsiagcmd),
 	}
 
 	walletLockCmd = &cobra.Command{
@@ -201,6 +209,9 @@ func walletinitcmd() {
 		fmt.Printf("Wallet encrypted with password: %s\n", er.PrimarySeed)
 	}
 }
+
+// walletloadcmd is a no-op; it only has subcommands.
+func walletloadcmd(cmd *cobra.Command, args []string) { cmd.Usage() }
 
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
 func walletload033xcmd(filepath string) {
