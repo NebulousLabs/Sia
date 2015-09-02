@@ -29,8 +29,13 @@ func apiGet(call string) (*http.Response, error) {
 	if host, port, _ := net.SplitHostPort(addr); host == "" {
 		addr = net.JoinHostPort("localhost", port)
 	}
-
-	resp, err := http.Get("http://" + addr + call)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "http://"+addr+call, nil)
+	if err != nil {
+		return nil, errors.New("no response from daemon")
+	}
+	req.Header.Add("User-Agent", "Sia-Agent")
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
@@ -78,11 +83,14 @@ func apiPost(call, vals string) (*http.Response, error) {
 		addr = net.JoinHostPort("localhost", port)
 	}
 
-	data, err := url.ParseQuery(vals)
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "http://"+addr+call, strings.NewReader(vals))
 	if err != nil {
-		return nil, errors.New("bad query string")
+		return nil, errors.New("no response from daemon")
 	}
-	resp, err := http.PostForm("http://"+addr+call, data)
+	req.Header.Add("User-Agent", "Sia-Agent")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
