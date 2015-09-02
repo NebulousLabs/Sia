@@ -57,7 +57,7 @@ func TestSignedUpdate(t *testing.T) {
 	}
 
 	// apply (bad signature)
-	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + "/daemon/updates/apply?version=current")
+	resp, err := HttpGET("http://localhost" + st.server.apiServer.Addr + "/daemon/updates/apply?version=current")
 	if err != nil {
 		t.Fatal("GET failed:", err)
 	}

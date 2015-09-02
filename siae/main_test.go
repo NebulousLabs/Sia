@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
 )
 
@@ -34,7 +35,7 @@ func TestMain(t *testing.T) {
 	// daemon.
 	<-started
 	time.Sleep(250 * time.Millisecond)
-	resp, err := http.Get("http://localhost:45350/daemon/stop")
+	resp, err := api.HttpGET("http://localhost:45350/daemon/stop")
 	if err != nil {
 		t.Fatal(err)
 	}

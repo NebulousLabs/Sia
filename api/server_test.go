@@ -162,7 +162,7 @@ func (st *serverTester) coinAddress() string {
 
 // getAPI makes an API call and decodes the response.
 func (st *serverTester) getAPI(call string, obj interface{}) error {
-	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + call)
+	resp, err := HttpGET("http://localhost" + st.server.apiServer.Addr + call)
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func (st *serverTester) getAPI(call string, obj interface{}) error {
 
 // postAPI makes an API call and decodes the response.
 func (st *serverTester) postAPI(call string, values url.Values, obj interface{}) error {
-	resp, err := http.PostForm("http://localhost"+st.server.apiServer.Addr+call, values)
+	resp, err := HttpPOST("http://localhost"+st.server.apiServer.Addr+call, values.Encode())
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (st *serverTester) postAPI(call string, values url.Values, obj interface{})
 
 // stdGetAPI makes an API call and discards the response.
 func (st *serverTester) stdGetAPI(call string) error {
-	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + call)
+	resp, err := HttpGET("http://localhost" + st.server.apiServer.Addr + call)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (st *serverTester) stdGetAPI(call string) error {
 
 // stdPostAPI makes an API call and discards the response.
 func (st *serverTester) stdPostAPI(call string, values url.Values) error {
-	resp, err := http.PostForm("http://localhost"+st.server.apiServer.Addr+call, values)
+	resp, err := HttpPOST("http://localhost"+st.server.apiServer.Addr+call, values.Encode())
 	if err != nil {
 		return err
 	}
