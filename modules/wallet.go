@@ -187,10 +187,9 @@ type (
 		Drop()
 	}
 
-	// Wallet stores and manages siacoins and siafunds. The wallet file is
-	// encrypted using a user-specified password. Common addresses are all
-	// dervied from a single address seed.
-	Wallet interface {
+	// EncryptionManager can encrypt, lock, unlock, and indicate the current
+	// status of the EncryptionManager.
+	EncryptionManager interface {
 		// Encrypt will encrypt the wallet using the input key. Upon
 		// encryption, a primary seed will be created for the wallet (no seed
 		// exists prior to this point). If the key is blank, then the hash of
@@ -223,7 +222,12 @@ type (
 		// Unlocked returns true if the wallet is currently unlocked, false
 		// otherwise.
 		Unlocked() bool
+	}
 
+	// KeyManager manages wallet keys, including the use of seeds, creating and
+	// loading backups, and providing a layer of compatibility for older wallet
+	// files.
+	KeyManager interface {
 		// AllAddresses returns all addresses that the wallet is able to spend
 		// from, including unseeded addresses. Addresses are returned sorted in
 		// byte-order.
@@ -244,17 +248,6 @@ type (
 		// primary seed.
 		NextAddress() (types.UnlockConditions, error)
 
-		// LoadSiagKeys will take a set of filepaths that point to a siag key
-		// and will have the siag keys loaded into the wallet so that they will
-		// become spendable.
-		LoadSiagKeys(crypto.TwofishKey, []string) error
-
-		// RecoverSeed will recreate a wallet file using the recovery phrase.
-		// RecoverSeed only needs to be called if the original seed file or
-		// encryption password was lost. The master key is used encrypt the
-		// recovery seed before saving it to disk.
-		RecoverSeed(crypto.TwofishKey, Seed) error
-
 		// CreateBackup will create a backup of the wallet at the provided
 		// filepath. The backup will have all seeds and keys.
 		CreateBackup(string) error
@@ -267,6 +260,25 @@ type (
 		// Load033xWallet will load a version 0.3.3.x wallet from disk and add all of
 		// the keys in the wallet as unseeded keys.
 		Load033xWallet(crypto.TwofishKey, string) error
+
+		// LoadSeed will recreate a wallet file using the recovery phrase.
+		// LoadSeed only needs to be called if the original seed file or
+		// encryption password was lost. The master key is used encrypt the
+		// recovery seed before saving it to disk.
+		LoadSeed(crypto.TwofishKey, Seed) error
+
+		// LoadSiagKeys will take a set of filepaths that point to a siag key
+		// and will have the siag keys loaded into the wallet so that they will
+		// become spendable.
+		LoadSiagKeys(crypto.TwofishKey, []string) error
+	}
+
+	// Wallet stores and manages siacoins and siafunds. The wallet file is
+	// encrypted using a user-specified password. Common addresses are all
+	// dervied from a single address seed.
+	Wallet interface {
+		EncryptionManager
+		KeyManager
 
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed

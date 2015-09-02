@@ -301,7 +301,7 @@ func (srv *Server) walletLoadSeedHandlerPOST(w http.ResponseWriter, req *http.Re
 
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
-		err := srv.wallet.RecoverSeed(key, seed)
+		err := srv.wallet.LoadSeed(key, seed)
 		if err == nil {
 			writeSuccess(w)
 			return
