@@ -30,9 +30,6 @@ func apiGet(call string) (*http.Response, error) {
 	}
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+addr+call, nil)
-	if err != nil {
-		return nil, errors.New("no response from daemon")
-	}
 	req.Header.Add("User-Agent", "Sia-Agent")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -84,9 +81,6 @@ func apiPost(call, vals string) (*http.Response, error) {
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", "http://"+addr+call, strings.NewReader(vals))
-	if err != nil {
-		return nil, errors.New("no response from daemon")
-	}
 	req.Header.Add("User-Agent", "Sia-Agent")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
