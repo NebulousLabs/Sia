@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -584,7 +586,15 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 
 	// Check that the siafund pool was increased.
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(31200e3)) != 0 {
+	var siafundPool types.Currency
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	if siafundPool.Cmp(types.NewCurrency64(31200e3)) != 0 {
 		return errors.New("siafund pool was not increased correctly")
 	}
 
@@ -810,7 +820,15 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 
 	// Put a file contract into the blockchain that will add values to siafund
 	// outputs.
-	oldSiafundPool := cst.cs.siafundPool
+	var siafundPool types.Currency
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	oldSiafundPool := siafundPool
 	payout := types.NewCurrency64(400e6)
 	fc := types.FileContract{
 		WindowStart: cst.cs.height() + 2,
@@ -840,7 +858,14 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	if err != nil {
 		return err
 	}
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(15600e3).Add(oldSiafundPool)) != 0 {
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	if siafundPool.Cmp(types.NewCurrency64(15600e3).Add(oldSiafundPool)) != 0 {
 		return errors.New("siafund pool did not update correctly")
 	}
 
@@ -884,8 +909,15 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 
 	// Find the siafund output and check that it has the expected number of
 	// siafunds.
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
 	found := false
-	expectedBalance := cst.cs.siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
+	expectedBalance := siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
 	cst.cs.db.forEachDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
 		if output.UnlockHash == claimDest {
 			found = true
@@ -1759,7 +1791,15 @@ func TestTaxHardfork(t *testing.T) {
 	}
 
 	// Check that the siafund pool was increased.
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(15590e3)) != 0 {
+	var siafundPool types.Currency
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	if siafundPool.Cmp(types.NewCurrency64(15590e3)) != 0 {
 		t.Fatal("siafund pool was not increased correctly")
 	}
 

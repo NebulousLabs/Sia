@@ -1,5 +1,8 @@
 package consensus
 
+// applytransaction.go handles applying a transaction to the consensus set.
+// There is an assumption that the transaction has already been verified.
+
 import (
 	"errors"
 
@@ -24,8 +27,9 @@ var (
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiacoinInputs(scoBucket *bolt.Bucket, pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
+	scoBucket := tx.Bucket(SiacoinOutputs)
 	for _, sci := range t.SiacoinInputs {
 		scoBytes := scoBucket.Get(sci.ParentID[:])
 		if build.DEBUG && scoBytes == nil {
@@ -52,8 +56,9 @@ func (cs *ConsensusSet) applySiacoinInputs(scoBucket *bolt.Bucket, pb *processed
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func (cs *ConsensusSet) applySiacoinOutputs(scoBucket *bolt.Bucket, pb *processedBlock, t types.Transaction) error {
+func (cs *ConsensusSet) applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
+	scoBucket := tx.Bucket(SiacoinOutputs)
 	for i, sco := range t.SiacoinOutputs {
 		scoid := t.SiacoinOutputID(i)
 		scod := modules.SiacoinOutputDiff{
@@ -86,10 +91,11 @@ func (cs *ConsensusSet) applyFileContracts(tx *bolt.Tx, pb *processedBlock, t ty
 
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
+		sfp := getSiafundPool(tx)
 		sfpd := modules.SiafundPoolDiff{
 			Direction: modules.DiffApply,
-			Previous:  cs.siafundPool,
-			Adjusted:  cs.siafundPool.Add(fc.Tax()),
+			Previous:  sfp,
+			Adjusted:  sfp.Add(fc.Tax()),
 		}
 		pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
 		cs.commitTxSiafundPoolDiff(tx, sfpd, modules.DiffApply)
@@ -194,7 +200,7 @@ func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t ty
 		if err != nil {
 			return err
 		}
-		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+		claimPortion := getSiafundPool(tx).Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{
@@ -230,10 +236,11 @@ func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t ty
 	return nil
 }
 
+// applySiafundOutput applies a siafund output to the consensus set.
 func (cs *ConsensusSet) applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for i, sfo := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(i)
-		sfo.ClaimStart = cs.siafundPool
+		sfo.ClaimStart = getSiafundPool(tx)
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfoid,
@@ -254,12 +261,11 @@ func (cs *ConsensusSet) applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t t
 func (cs *ConsensusSet) applyTransaction(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
-	scoBucket := tx.Bucket(SiacoinOutputs)
-	err := cs.applySiacoinInputs(scoBucket, pb, t)
+	err := cs.applySiacoinInputs(tx, pb, t)
 	if err != nil {
 		return err
 	}
-	err = cs.applySiacoinOutputs(scoBucket, pb, t)
+	err = cs.applySiacoinOutputs(tx, pb, t)
 	if err != nil {
 		return err
 	}
