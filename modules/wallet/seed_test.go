@@ -81,13 +81,13 @@ func TestPrimarySeed(t *testing.T) {
 	}
 }
 
-// TestRecoverSeed checks that a seed can be successfully recovered from a
-// wallet, and then remain available on subsequent loads of the wallet.
-func TestRecoverSeed(t *testing.T) {
+// TestLoadSeed checks that a seed can be successfully recovered from a wallet,
+// and then remain available on subsequent loads of the wallet.
+func TestLoadSeed(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	wt, err := createWalletTester("TestRecoverSeed")
+	wt, err := createWalletTester("TestLoadSeed")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestRecoverSeed(t *testing.T) {
 		t.Error("AllSeeds returned the wrong seed")
 	}
 
-	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestRecoverSeed - 0"), modules.WalletDir)
+	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestLoadSeed - 0"), modules.WalletDir)
 	w, err := New(wt.cs, wt.tpool, dir)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestRecoverSeed(t *testing.T) {
 	if siacoinBal.Cmp(types.NewCurrency64(0)) != 0 {
 		t.Error("fresh wallet should not have a balance")
 	}
-	err = w.RecoverSeed(crypto.TwofishKey(crypto.HashObject(newSeed)), seed)
+	err = w.LoadSeed(crypto.TwofishKey(crypto.HashObject(newSeed)), seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestRecoverSeed(t *testing.T) {
 	}
 	siacoinBal2, _, _ := w2.ConfirmedBalance()
 	if siacoinBal2.Cmp(types.NewCurrency64(0)) <= 0 {
-		t.Error("wallet failed to recover a seed with money in it")
+		t.Error("wallet failed to load a seed with money in it")
 	}
 	allSeeds, err = w2.AllSeeds()
 	if err != nil {

@@ -75,13 +75,6 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 		Run:   wrap(walletaddressescmd),
 	}
 
-	walletAddseedCmd = &cobra.Command{
-		Use:   `addseed`,
-		Short: "Add a seed to the wallet",
-		Long:  "Uses the given password to create a new wallet with that as the primary seed",
-		Run:   wrap(walletaddseedcmd),
-	}
-
 	walletInitCmd = &cobra.Command{
 		Use:   "init",
 		Short: "Initialize and encrypt a new wallet",
@@ -90,11 +83,33 @@ The seed string, which is also the encryption password, will be returned.`,
 		Run: wrap(walletinitcmd),
 	}
 
+	walletLoadCmd = &cobra.Command{
+		Use:   "load",
+		Short: "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
+		Long:  "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
+		Run:   walletloadcmd,
+	}
+
 	walletLoad033xCmd = &cobra.Command{
-		Use:   "load033x [filepath]",
+		Use:   "033x [filepath]",
 		Short: "Load a v0.3.3.x wallet",
 		Long:  "Load a v0.3.3.x wallet into the current wallet",
 		Run:   wrap(walletload033xcmd),
+	}
+
+	walletLoadSeedCmd = &cobra.Command{
+		Use:   `seed`,
+		Short: "Add a seed to the wallet",
+		Long:  "Uses the given password to create a new wallet with that as the primary seed",
+		Run:   wrap(walletloadseedcmd),
+	}
+
+	walletLoadSiagCmd = &cobra.Command{
+		Use:   `siag [filepaths]`,
+		Short: "Load a siag keyset into the wallet",
+		Long: `Load a set of siag keys into the wallet - typically used for siafunds.
+Example: 'siac wallet load siag key1.siakey,key2.siakey'`,
+		Run: wrap(walletloadsiagcmd),
 	}
 
 	walletLockCmd = &cobra.Command{
@@ -170,27 +185,6 @@ func walletaddressescmd() {
 	}
 }
 
-// walletaddseedcmd adds a seed to the wallet's list of seeds
-func walletaddseedcmd() {
-	password, err := speakeasy.Ask("Wallet password: ")
-	if err != nil {
-		fmt.Println("Reading password failed")
-		return
-	}
-	seed, err := speakeasy.Ask("New Seed: ")
-	if err != nil {
-		fmt.Println("Reading seed failed")
-		return
-	}
-	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
-	err = post("/wallet/load/seed", qs)
-	if err != nil {
-		fmt.Println("Could not add seed:", err)
-		return
-	}
-	fmt.Println("Added Key")
-}
-
 // walletinitcmd encrypts the wallet with the given password
 func walletinitcmd() {
 	var er api.WalletEncryptPOST
@@ -216,6 +210,9 @@ func walletinitcmd() {
 	}
 }
 
+// walletloadcmd is a no-op; it only has subcommands.
+func walletloadcmd(cmd *cobra.Command, args []string) { cmd.Usage() }
+
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
 func walletload033xcmd(filepath string) {
 	password, err := speakeasy.Ask("Wallet password: ")
@@ -225,6 +222,43 @@ func walletload033xcmd(filepath string) {
 	}
 	qs := fmt.Sprintf("filepath=%s&encryptionpassword=%s", filepath, password)
 	err = post("/wallet/load/033x", qs)
+	if err != nil {
+		fmt.Println("loading error:", err)
+		return
+	}
+	fmt.Println("Wallet loading successful.")
+}
+
+// walletloadseedcmd adds a seed to the wallet's list of seeds
+func walletloadseedcmd() {
+	password, err := speakeasy.Ask("Wallet password: ")
+	if err != nil {
+		fmt.Println("Reading password failed")
+		return
+	}
+	seed, err := speakeasy.Ask("New Seed: ")
+	if err != nil {
+		fmt.Println("Reading seed failed")
+		return
+	}
+	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
+	err = post("/wallet/load/seed", qs)
+	if err != nil {
+		fmt.Println("Could not add seed:", err)
+		return
+	}
+	fmt.Println("Added Key")
+}
+
+// walletloadsiagcmd loads a siag key set into the wallet.
+func walletloadsiagcmd(keyfiles string) {
+	password, err := speakeasy.Ask("Wallet password: ")
+	if err != nil {
+		fmt.Println("Reading password failed")
+		return
+	}
+	qs := fmt.Sprintf("keyfiles=%s&encryptionpassword=%s", keyfiles, password)
+	err = post("/wallet/load/siag", qs)
 	if err != nil {
 		fmt.Println("loading error:", err)
 		return
