@@ -240,19 +240,6 @@ func (r *Renter) Download(nickname, destination string) error {
 		return errors.New("no file of that nickname")
 	}
 
-	// If no permissions are found, use a sane default.
-	perm := os.FileMode(file.mode)
-	if perm == 0 {
-		perm = 0666
-	}
-
-	// Create file on disk with the correct permissions.
-	f, err := os.OpenFile(destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, perm)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
 	// Initiate connections to each host.
 	var hosts []fetcher
 	for _, fc := range file.contracts {
@@ -266,10 +253,22 @@ func (r *Renter) Download(nickname, destination string) error {
 	}
 
 	// Check that this host set is sufficient to download the file.
-	err = checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
+	err := checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
 	if err != nil {
 		return err
 	}
+
+	// Create file on disk with the correct permissions.
+	perm := os.FileMode(file.mode)
+	if perm == 0 {
+		// sane default
+		perm = 0666
+	}
+	f, err := os.OpenFile(destination, os.O_CREATE|os.O_RDWR|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
 	// Create the download object.
 	d := file.newDownload(hosts, destination)
