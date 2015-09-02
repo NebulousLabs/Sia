@@ -1,31 +1,32 @@
 Developer Environment
 =====================
 
-Sia is written in golang. To build and test Sia, you are going to need a
-working go environment, including having both $GOROOT/bin and $GOPATH/bin in
-your $PATH. For most Linux distributions, go will be in the package manager,
-though it may be an old version that is incompatible with Sia. Once you have a
-working go environment, you are set to build the project. If you plan on cross
-compiling Sia, you may need to install go from source. You can find information
-on that [here](http://golang.org/doc/install/source).
+Sia is written in Go. To build and test Sia, you are going to need a working go
+environment, including having both $GOROOT/bin and $GOPATH/bin in your $PATH.
+For most Linux distributions, Go will be in the package manager, though it may
+be an old version that is incompatible with Sia. Once you have a working Go
+environment, you are set to build the project. If you plan on cross compiling
+Sia, you may need to install Go from source. You can find information on that
+[here](http://golang.org/doc/install/source).
 
 Sia has has a development build, an automated testing build, and a release
 build. The release build is the only one that can synchronize to the full
-network. To get the release build, it is usually sufficient to run
-`go get -u github.com/NebulousLabs/Sia/...`. This will pull all of the
-necessary repositories off of github and place them in the correct folders
-within the gopath.
+network. To get the release build, it is usually sufficient to run `go get -u
+github.com/NebulousLabs/Sia/...`. This will download Sia and its dependencies
+and install binaries in $GOPATH/bin.
 
-If you would like to build the project manually, you will need to clone the Sia
-repository into the folder `$GOPATH/src/github.com/NebulousLabs/`. It will not
-be sufficient to clone Sia from the gopath. It also seems that more recent
-versions of go do not like sym links. After cloning, you will need to run 
-`make dependencies`.
+After downloading, you can find the Sia source code in
+$GOPATH/src/github.com/NebulousLabs/Sia. To build the release binary, run
+`make release-std` from this directory. To build the release binary with a
+(slow) race detector and an array of debugging asserts, run `make release`. To
+build the developer binary (which has a different gensis block, faster block
+times, and a few other tweaks), just run `make`.
 
-To build the release binary, run `make release-std`. To build the release
-binary with a (slow) race detector and an array of debugging asserts, run `make
-release`. To build the developer binary (which has a different gensis block,
-faster block times, and a few other tweaks), just run `make`.
+If you intend to contribute to Sia, you should start by forking the project on
+GitHub, and then adding your fork as a "remote" in the Sia git repository via
+`git remote add [fork name] [fork url]`. Now you can develop by pulling changes
+from `origin`, pushing your modifications to `[fork name]`, and then making a
+pull request on GitHub.
 
 If you see an error like the one below, it means that you either forgot to run
 `make dependencies`, or you cloned the project into a path that the go tool
@@ -35,7 +36,7 @@ involved).
 ```
 consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" in any of:
     /usr/lib/go/src/github.com/NebulousLabs/Sia/crypto (from $GOROOT)
-    /home/david/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
+    /home/user/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
 ```
 
 Developer Conventions
