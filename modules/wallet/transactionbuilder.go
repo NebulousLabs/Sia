@@ -29,6 +29,9 @@ type walletSpender interface {
 	// block.
 	setSpendHeight(types.OutputID, types.BlockHeight)
 
+	// removeOutput removes a given output from the wallet.
+	removeOutput(types.OutputID)
+
 	// key returns the key associated with the given hash.
 	key(types.UnlockHash) spendableKey
 
@@ -70,6 +73,10 @@ func (w *spendableWallet) spendHeight(oid types.OutputID) types.BlockHeight {
 
 func (w *spendableWallet) setSpendHeight(oid types.OutputID, height types.BlockHeight) {
 	w.wallet.spentOutputs[oid] = height
+}
+
+func (w *spendableWallet) removeOutput(oid types.OutputID) {
+	delete(w.wallet.spentOutputs, oid)
 }
 
 func (w *spendableWallet) unconfirmedProcessedTransactions() []modules.ProcessedTransaction {
@@ -471,15 +478,15 @@ func (tb *transactionBuilder) AddTransactionSignature(sig types.TransactionSigna
 // pool so that other transactions may use them. 'Drop' should only be called
 // if a transaction is both unsigned and will not be used any further.
 func (tb *transactionBuilder) Drop() {
-	lockID := tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock(lockID)
+	tb.wallet.acquireLock()
+	defer tb.wallet.releaseLock()
 
 	// Iterate through all parents and the transaction itself and restore all
 	// outputs to the list of available outputs.
 	txns := append(tb.parents, tb.transaction)
 	for _, txn := range txns {
 		for _, sci := range txn.SiacoinInputs {
-			delete(tb.wallet.spentOutputs, types.OutputID(sci.ParentID))
+			tb.wallet.removeOutput(types.OutputID(sci.ParentID))
 		}
 	}
 
