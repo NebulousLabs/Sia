@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -97,8 +99,17 @@ func (cs *ConsensusSet) checkSiacoins() error {
 	cs.db.forEachDelayedSiacoinOutputs(func(v types.SiacoinOutputID, dso types.SiacoinOutput) {
 		totalSiacoins = totalSiacoins.Add(dso.Value)
 	})
+	var siafundPool types.Currency
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		var err error
+		siafundPool, err = getSiafundPool(tx)
+		return err
+	})
+	if err != nil {
+		return err
+	}
 	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		sfoSiacoins := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+		sfoSiacoins := siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 		totalSiacoins = totalSiacoins.Add(sfoSiacoins)
 	})
 	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
@@ -207,7 +218,16 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	}
 
 	// Add the siafund pool
-	tree.PushObject(cs.siafundPool)
+	var siafundPool types.Currency
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		var err error
+		siafundPool, err = getSiafundPool(tx)
+		return err
+	})
+	if err != nil {
+		panic(err)
+	}
+	tree.PushObject(siafundPool)
 
 	return tree.Root()
 }

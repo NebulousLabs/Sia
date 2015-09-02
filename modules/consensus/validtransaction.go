@@ -499,8 +499,6 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	diffHolder := new(processedBlock)
 	diffHolder.Height = cs.height()
 
-	// Grab the old siafund pool so it can be reverted after TryTransactionSet.
-	sfpOld := cs.siafundPool
 	// Boltdb will only roll back a tx if an error is returned. In the case of
 	// TryTransactionSet, we want to roll back the tx even if there is no
 	// error. So errSuccess is returned. An alternate method would be to
@@ -520,8 +518,6 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		}
 		return errSuccess
 	})
-	// Revert the siafund pool before checking the error.
-	cs.siafundPool = sfpOld
 	if err != errSuccess {
 		return modules.ConsensusChange{}, err
 	}

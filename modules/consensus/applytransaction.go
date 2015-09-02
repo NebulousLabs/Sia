@@ -1,5 +1,8 @@
 package consensus
 
+// applytransaction.go handles applying a transaction to the consensus set.
+// There is an assumption that the transaction has already been verified.
+
 import (
 	"errors"
 
@@ -86,10 +89,14 @@ func (cs *ConsensusSet) applyFileContracts(tx *bolt.Tx, pb *processedBlock, t ty
 
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
+		sfp, err := getSiafundPool(tx)
+		if err != nil {
+			return err
+		}
 		sfpd := modules.SiafundPoolDiff{
 			Direction: modules.DiffApply,
-			Previous:  cs.siafundPool,
-			Adjusted:  cs.siafundPool.Add(fc.Tax()),
+			Previous:  sfp,
+			Adjusted:  sfp.Add(fc.Tax()),
 		}
 		pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
 		cs.commitTxSiafundPoolDiff(tx, sfpd, modules.DiffApply)
@@ -194,7 +201,11 @@ func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t ty
 		if err != nil {
 			return err
 		}
-		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+		sfp, err := getSiafundPool(tx)
+		if err != nil {
+			return err
+		}
+		claimPortion := sfp.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{
@@ -233,14 +244,18 @@ func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t ty
 func (cs *ConsensusSet) applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for i, sfo := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(i)
-		sfo.ClaimStart = cs.siafundPool
+		sfp, err := getSiafundPool(tx)
+		if err != nil {
+			return err
+		}
+		sfo.ClaimStart = sfp
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfoid,
 			SiafundOutput: sfo,
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		err := cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+		err = cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
 		if err != nil {
 			return err
 		}

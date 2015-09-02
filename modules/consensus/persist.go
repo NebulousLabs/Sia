@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -18,15 +21,21 @@ func (cs *ConsensusSet) initSetDB() error {
 		return err
 	}
 
-	// Initilize the saved siafund pool on disk
-	cs.db.setSiafundPool(cs.siafundPool)
-
 	// add genesis block
 	err = cs.db.addBlockMap(&cs.blockRoot)
 	if err != nil {
 		return err
 	}
 	err = cs.db.pushPath(cs.blockRoot.Block.ID())
+	if err != nil {
+		return err
+	}
+
+	// Set the siafund pool to 0.
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		sfpBucket := tx.Bucket(SiafundPool)
+		return sfpBucket.Put(SiafundPool, encoding.Marshal(types.NewCurrency64(0)))
+	})
 	if err != nil {
 		return err
 	}
@@ -89,9 +98,6 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	pb := cs.db.getBlockMap(bid)
 
 	cs.blockRoot.ConsensusSetHash = pb.ConsensusSetHash
-
-	// Restore the saved siafund pool
-	cs.siafundPool = cs.db.getSiafundPool()
 
 	return nil
 }

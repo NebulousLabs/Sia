@@ -29,32 +29,18 @@ type ConsensusSet struct {
 	gateway modules.Gateway
 
 	// The block root contains the genesis block.
+	//
+	// TODO: Remove the block root from memory as a structure.
 	blockRoot processedBlock
 
-	// The set database stores the consensus set on disk. The variables it
-	// contains are siacoinOutputs, fileContracts, and siafundOutputs. They
-	// keep track of the unspent outputs and active contracts present in the
-	// current path. If an output is spent or a contract expires, it is removed
-	// from the consensus set.
+	// The db is a database holding the current consensus set.
 	//
-	// It also holds delayedSiacoinOutputs, which are siacoin outputs that have
-	// been created in a block, but are not allowed to be spent until a certain
-	// height. When that height is reached, they are moved to the
-	// siacoinOutputs map.
+	// TODO: The db should be renamed 'database'.
 	//
-	// The database also holds the file contract expirations.
-	// FileContractExpirations is not actually a part of the consensus set, but
-	// it is needed to get decent order notation on the file contract lookups.
-	// It is a map of heights to maps of file contract ids. The other table is
-	// needed because of file contract revisions - you need to have random
-	// access lookups to file contracts for when revisions are submitted to the
-	// blockchain.
+	// TODO: The db should be updated such that only consensus information is
+	// in the database, this means no block map, and no blocks that aren't a
+	// part of the current path.
 	db *setDB
-
-	// The siafundPool tracks the total number of siacoins that have been taxed
-	// from file contracts. Unless a reorg occurs, the siafundPool should never
-	// decrease.
-	siafundPool types.Currency
 
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
@@ -65,9 +51,7 @@ type ConsensusSet struct {
 	// known to the expensive part of block validation.
 	dosBlocks map[types.BlockID]struct{}
 
-	// The entire consensus set is protected by a single mutex. While this
-	// inhibits parallel lookups to parallel data, it reduces overall
-	// complexity.
+	// TODO: add a persistDir
 	mu *sync.RWMutex
 }
 
