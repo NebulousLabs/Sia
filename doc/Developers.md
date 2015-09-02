@@ -3,30 +3,40 @@ Developer Environment
 
 Sia is written in golang. To build and test Sia, you are going to need a
 working go environment, including having both $GOROOT/bin and $GOPATH/bin in
-your $PATH. For most Linux distributions, go will be in the package manager.
-Then it should be sufficient to run `make dependencies && make`. For more
-information, check the [go documentation](http://golang.org/doc/install).
+your $PATH. For most Linux distributions, go will be in the package manager,
+though it may be an old version that is incompatible with Sia. Once you have a
+working go environment, you are set to build the project. If you plan on cross
+compiling Sia, you may need to install go from source. You can find information
+on that [here](http://golang.org/doc/install/source).
 
-If you plan on cross compiling Sia, you may need to install go from source. You
-can find information on that [here](http://golang.org/doc/install/source).
+Sia has has a development build, an automated testing build, and a release
+build. The release build is the only one that can synchronize to the full
+network. To get the release build, it is usually sufficient to run
+`go get -u github.com/NebulousLabs/Sia/...`. This will pull all of the
+necessary repositories off of github and place them in the correct folders
+within the gopath.
 
-When you clone the Sia repository, make sure that you call `git clone` from the
-folder `$GOPATH/src/github.com/NebulousLabs/`. It will not be sufficient to clone
-Sia from the gopath. Alternatively, you should be able to call `go get -u
-github.com/NebulousLabs/Sia/...`.
+If you would like to build the project manually, you will need to clone the Sia
+repository into the folder `$GOPATH/src/github.com/NebulousLabs/`. It will not
+be sufficient to close Sia from the gopath. It also seems that more recent
+versions of go do not like sym links. After cloning, you will need to run 
+`make dependencies`.
 
-Golang does not like sym links, a problem which seems to have appeared
-recently. If you are using a sym link, you can expect to see an error similar
-to the one below:
+To build the release binary, run `make release-std`. To build the release
+binary with a (slow) race detector and an array of debugging asserts, run `make
+release`. To build the developer binary (which has a different gensis block,
+faster block times, and a few other tweaks), just run `make`.
 
+If you see an error like the one below, it means that you either forgot to run
+`make dependencies`, or you cloned the project into a path that the go tool
+does not recognize (usually the wrong path, or sym links were somehow
+involved).
 
 ```
 consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" in any of:
     /usr/lib/go/src/github.com/NebulousLabs/Sia/crypto (from $GOROOT)
     /home/david/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
 ```
-
-A discussion on this problem can be found [here](http://groups.google.com/forum/#!topic/golang-nuts/f5ZYztyHK5I).
 
 Developer Conventions
 =====================
@@ -66,6 +76,25 @@ than what you would expect to remember from an 'Intro to Data Structures' class
 should have an explanation about what the concept it is and why it was picked
 over other potential choices.
 
+Code that exists purely to be compatibile with previous versions of the
+software should be tagged with a 'COMPATvX.X.X' comment. Examples below.
+
+```go
+// Find and sort the outputs.
+outputs := getOutputs()
+// TODO: actually sort the outputs.
+```
+
+```go
+// Disallow unknown agents.
+//
+// COMPATv0.4.0: allow a blank agent to preserve compatibility with
+// 'siac' v0.4.0, which did not set an agent.
+if agent != "SiaAgent" && agent != "" {
+	return errors.New("unrecognized agent!")
+}
+```
+
 Naming
 ------
 
@@ -79,8 +108,8 @@ and so 'cs' is appropriate for the rest of the function.
 Data structures should never have shortened names. 'FileContract.mr' is
 confusing to anyone who has not used the data structure extensively. The code
 should be accessible to people who are unfamiliar with the codebase. One
-exception is for the variable called 'mu', which is short for 'mutex'. 'mu' is
-an acceptable variable name within a data structure.
+exception is for the variable called 'mu', which is short for 'mutex'. This
+exception is made because 'mu' appears in many datastructures.
 
 When calling functions with obscure parameters, named variables should be used
 to indicate what the parameters do. For example, 'm := NewMiner(1)' is
@@ -122,24 +151,21 @@ forkBlockchain(node)
 Mutexes
 -------
 
-Any exported function will lock the data structures it interacts with such that
-the function can safely be called concurrently without the caller needing to
-know anything about the threading. In particular, the function should have a
-'Lock(); defer Unlock()' right at the top, or should otherwise have a comment
-explaining why the mutex usage in the function breaks convention. Functions
-that do not need to deal with mutexes at all do not need to mention mutexes in
-the docstring.
+All exported functions from a package and/or object need to be thread safe.
+Usually, this means that the first lines of the function contain a `Lock();
+defer Unlock()`. Simple locking schemes should be preferred over performant
+locking schemes. As will everything else, anything unusual or convention
+breaking should have a comment.
 
-Any non-exported functions will not lock the data structures they interact
-with. The responsibility for locking comes from the exported functions. This
-means that developers can safely assume the usage of non exported functions
-will not cause deadlock within the program. This convention is strictly
-enforced.
+Non-exported functions should not do any locking, unless they have a special
+prefix to the name (explained below). The responsibility for thread-safety
+comes from the exported funcitons which call the non-exported functions.
+Maintaining this convention minimizes developer overhead when working with
+complex objects.
 
 Functions prefixed 'threaded' (example 'threadedMine') are meant to be called
-in their own goroutine ('go threadedMine()') and will manage their own mutexes.
-These functions typically loop forever, either listening on a channel or
-performing some regular task, and should not be called with a mutex locked.
+in their own goroutine ('go threadedMine()') and will manage their own
+thread-safety.
 
 Error Handling
 --------------
@@ -171,7 +197,7 @@ transactions. Where possible, these explicit assumptions should be validated.
 Example:
 
 ```go
-if consensus.DEBUG {
+if build.DEBUG {
 	_, exists := tp.usedOutputs[input.OutputID]
 	if exists {
 		panic("incorrect use of addTransaction")
@@ -189,41 +215,24 @@ to go unnoticed.
 
 Sanity checks and panics are purely to check for developer mistakes. A user
 should not be able to trigger a panic, and no set of network communications or
-real-world conditions should be able to trigger a panic. In an ideal world, no
-panic would ever be thrown by production code.
+real-world conditions should be able to trigger a panic.
 
 Testing
 -------
 
-The test suite code needs to have the same level of quality as the rest of the
-codebase.
+The test suite code should be the same quality as the rest of the codebase.
+When writing new code in a pull request, the pull request should include test
+coverage for the code.
 
-Some parts of the codebase are still being designed and changed rapidly. These
-portions only need to test the basic major functionality of the code, but
-should not be expected to work well in production. These parts of the codebase
-are not polished because it is expected that they will be changed dramatically
-in the near future.
+Most modules have a tester object, which can be created by calling
+`createModuleTester`. Module testers typically have a consensus set, a miner, a
+wallet, and a few other relevant modules that can be used to build
+transactions, mine blocks, etc.
 
-The remaining parts of the codebase are expected to be polished, and this
-includes a comprehensive test suite. Except for intentionally unreachable code
-(usually in the form of sanity checks), test coverage needs to be 100%. Tests
-should be organized, well commented, and easy to both read and understand. 100%
-should be seen as a minimum bar. It is not sufficient to merely see that code
-has run without producing a runtime error, there needs to be checks that the
-code has produced the expected results. Often, 100% test coverage can be
-reached by testing 1 function which calls numerous other functions, but these
-functions can silently output unexpected/incorrect results. Where possible,
-each function should be tested individually.
+In general, testing that uses exclusively exported functions the achieve full
+coverage is preferred. These types of tests seem to find more bugs and trigger
+more asserts.
 
-Encoding objects is an important part of Sia. Any objects that get declared in
-polished code need to have a test which checks that they can be marshalled and
-unmarshalled without error.
-
-Compatibility
--------------
-
-Upgrades must preserve compatibility with previous versions. While Sia is still
-in beta, compatibility must be preserved until 90% no longer need the
-compatibilty adjustments.
-
-Compatibility code should be marked with a COMPAT tag. Example: // COMPATv0.3.3.3
+Any testing provided by a third party which is both maintainable and resonably
+quick will be accepted. There is little downside to more testing, even when the
+testing is largely redudnant.
