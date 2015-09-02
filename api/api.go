@@ -14,12 +14,33 @@ const (
 	apiTimeout = 5 * time.Second
 )
 
+// HttpGET is a utility function for making http get requests to sia with a whitelisted user-agent
+func HttpGET(url string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("User-Agent", "Sia-Agent")
+	return new(http.Client).Do(req)
+}
+
+// HttpPOST is a utility function for making post requests to sia with a whitelisted user-agent
+func HttpPOST(url string, data string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("User-Agent", "Sia-Agent")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	return new(http.Client).Do(req)
+}
+
 // handleHTTPRequest is a wrapper function that handles all incoming calls to
 // the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
 		// prevent access from sources other than siac and Sia-UI
-		if !strings.Contains(req.UserAgent(), "Sia-Agent") && !strings.Contains(req.UserAgent(), "Sia-Miner") && req.UserAgent() != "" && req.UserAgent() != "Go 1.1 package http" && !strings.Contains(req.UserAgent(), "Electron") && !strings.Contains(req.UserAgent(), "AtomShell") {
+		if !strings.Contains(req.UserAgent(), "Sia-Agent") && !strings.Contains(req.UserAgent(), "Sia-Miner") && req.UserAgent() != "" && !strings.Contains(req.UserAgent(), "Electron") && !strings.Contains(req.UserAgent(), "AtomShell") {
 			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusInternalServerError)
 			return
 		}
