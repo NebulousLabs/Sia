@@ -588,8 +588,8 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	// Check that the siafund pool was increased.
 	var siafundPool types.Currency
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)
@@ -822,8 +822,8 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	// outputs.
 	var siafundPool types.Currency
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)
@@ -859,8 +859,8 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 		return err
 	}
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)
@@ -910,8 +910,8 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	// Find the siafund output and check that it has the expected number of
 	// siafunds.
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)
@@ -1793,8 +1793,8 @@ func TestTaxHardfork(t *testing.T) {
 	// Check that the siafund pool was increased.
 	var siafundPool types.Currency
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)

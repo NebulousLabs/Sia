@@ -871,19 +871,20 @@ func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(types.F
 }
 
 // getSiafundPool returns the current value of the siafund pool.
-func getSiafundPool(tx *bolt.Tx) (types.Currency, error) {
+func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
 	bucket := tx.Bucket(SiafundPool)
 	poolBytes := bucket.Get(SiafundPool)
-	var pool types.Currency
+	// An error should only be returned if the object stored in the siafund
+	// pool bucket is either unavailable or otherwise malformed. As this is a
+	// developer error, a panic is appropriate.
 	err := encoding.Unmarshal(poolBytes, &pool)
-	if err != nil {
-		return types.Currency{}, err
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
-	return pool, nil
+	return pool
 }
 
 // setSiafundPool updates the saved siafund pool on disk
 func setSiafundPool(tx *bolt.Tx, c types.Currency) error {
-	bucket := tx.Bucket(SiafundPool)
-	return bucket.Put(SiafundPool, encoding.Marshal(c))
+	return tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
 }

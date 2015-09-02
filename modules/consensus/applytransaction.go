@@ -89,10 +89,7 @@ func (cs *ConsensusSet) applyFileContracts(tx *bolt.Tx, pb *processedBlock, t ty
 
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
-		sfp, err := getSiafundPool(tx)
-		if err != nil {
-			return err
-		}
+		sfp := getSiafundPool(tx)
 		sfpd := modules.SiafundPoolDiff{
 			Direction: modules.DiffApply,
 			Previous:  sfp,
@@ -201,11 +198,7 @@ func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t ty
 		if err != nil {
 			return err
 		}
-		sfp, err := getSiafundPool(tx)
-		if err != nil {
-			return err
-		}
-		claimPortion := sfp.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+		claimPortion := getSiafundPool(tx).Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{
@@ -241,21 +234,18 @@ func (cs *ConsensusSet) applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t ty
 	return nil
 }
 
+// applySiafundOutput applies a siafund output to the consensus set.
 func (cs *ConsensusSet) applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	for i, sfo := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(i)
-		sfp, err := getSiafundPool(tx)
-		if err != nil {
-			return err
-		}
-		sfo.ClaimStart = sfp
+		sfo.ClaimStart = getSiafundPool(tx)
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfoid,
 			SiafundOutput: sfo,
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		err = cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+		err := cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
 		if err != nil {
 			return err
 		}

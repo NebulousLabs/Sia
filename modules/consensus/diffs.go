@@ -210,11 +210,7 @@ func (cs *ConsensusSet) commitTxSiafundPoolDiff(tx *bolt.Tx, sfpd modules.Siafun
 	if dir == modules.DiffApply {
 		// Sanity check - sfpd.Previous should equal the current siafund pool.
 		if build.DEBUG {
-			sfp, err := getSiafundPool(tx)
-			if err != nil {
-				return err
-			}
-			if sfp.Cmp(sfpd.Previous) != 0 {
+			if getSiafundPool(tx).Cmp(sfpd.Previous) != 0 {
 				panic(errApplySiafundPoolDiffMismatch)
 			}
 		}
@@ -222,11 +218,7 @@ func (cs *ConsensusSet) commitTxSiafundPoolDiff(tx *bolt.Tx, sfpd modules.Siafun
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
 		if build.DEBUG {
-			sfp, err := getSiafundPool(tx)
-			if err != nil {
-				return err
-			}
-			if sfp.Cmp(sfpd.Adjusted) != 0 {
+			if getSiafundPool(tx).Cmp(sfpd.Adjusted) != 0 {
 				panic(errRevertSiafundPoolDiffMismatch)
 			}
 		}

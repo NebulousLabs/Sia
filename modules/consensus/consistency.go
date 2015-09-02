@@ -101,9 +101,8 @@ func (cs *ConsensusSet) checkSiacoins() error {
 	})
 	var siafundPool types.Currency
 	err := cs.db.Update(func(tx *bolt.Tx) error {
-		var err error
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		return err
@@ -220,9 +219,8 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	// Add the siafund pool
 	var siafundPool types.Currency
 	err := cs.db.Update(func(tx *bolt.Tx) error {
-		var err error
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)

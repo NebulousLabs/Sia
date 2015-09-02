@@ -609,8 +609,8 @@ func TestCommitNodeDiffs(t *testing.T) {
 	}
 	var siafundPool types.Currency
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool, err = getSiafundPool(tx)
-		return err
+		siafundPool = getSiafundPool(tx)
+		return nil
 	})
 	if err != nil {
 		panic(err)
