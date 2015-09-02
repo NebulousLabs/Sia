@@ -18,7 +18,7 @@ within the gopath.
 
 If you would like to build the project manually, you will need to clone the Sia
 repository into the folder `$GOPATH/src/github.com/NebulousLabs/`. It will not
-be sufficient to close Sia from the gopath. It also seems that more recent
+be sufficient to clone Sia from the gopath. It also seems that more recent
 versions of go do not like sym links. After cloning, you will need to run 
 `make dependencies`.
 
@@ -164,7 +164,7 @@ Maintaining this convention minimizes developer overhead when working with
 complex objects.
 
 Functions prefixed 'threaded' (example 'threadedMine') are meant to be called
-in their own goroutine ('go threadedMine()') and will manage their own
+in their own goroutine (`go threadedMine()`) and will manage their own
 thread-safety.
 
 Error Handling
@@ -225,11 +225,11 @@ When writing new code in a pull request, the pull request should include test
 coverage for the code.
 
 Most modules have a tester object, which can be created by calling
-`createModuleTester`. Module testers typically have a consensus set, a miner, a
+`createXXXTester`. Module testers typically have a consensus set, a miner, a
 wallet, and a few other relevant modules that can be used to build
 transactions, mine blocks, etc.
 
-In general, testing that uses exclusively exported functions the achieve full
+In general, testing that uses exclusively exported functions to achieve full
 coverage is preferred. These types of tests seem to find more bugs and trigger
 more asserts.
 
