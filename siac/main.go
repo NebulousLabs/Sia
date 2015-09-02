@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -29,8 +28,10 @@ func apiGet(call string) (*http.Response, error) {
 	if host, port, _ := net.SplitHostPort(addr); host == "" {
 		addr = net.JoinHostPort("localhost", port)
 	}
-
-	resp, err := http.Get("http://" + addr + call)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", "http://"+addr+call, nil)
+	req.Header.Add("User-Agent", "Sia-Agent")
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
@@ -78,11 +79,11 @@ func apiPost(call, vals string) (*http.Response, error) {
 		addr = net.JoinHostPort("localhost", port)
 	}
 
-	data, err := url.ParseQuery(vals)
-	if err != nil {
-		return nil, errors.New("bad query string")
-	}
-	resp, err := http.PostForm("http://"+addr+call, data)
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", "http://"+addr+call, strings.NewReader(vals))
+	req.Header.Add("User-Agent", "Sia-Agent")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
