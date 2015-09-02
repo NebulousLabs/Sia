@@ -29,7 +29,7 @@ func apiGet(call string) (*http.Response, error) {
 		addr = net.JoinHostPort("localhost", port)
 	}
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+addr+call, nil)
+	req, _ := http.NewRequest("GET", "http://"+addr+call, nil)
 	req.Header.Add("User-Agent", "Sia-Agent")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -80,7 +80,7 @@ func apiPost(call, vals string) (*http.Response, error) {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", "http://"+addr+call, strings.NewReader(vals))
+	req, _ := http.NewRequest("POST", "http://"+addr+call, strings.NewReader(vals))
 	req.Header.Add("User-Agent", "Sia-Agent")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
