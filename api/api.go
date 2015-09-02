@@ -107,6 +107,7 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
 		handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
 		handleHTTPRequest(mux, "/wallet/load/seed", srv.walletLoadSeedHandler)         // POST
+		handleHTTPRequest(mux, "/wallet/load/siag", srv.walletLoadSiagHandler)         // POST
 		handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // POST
 		handleHTTPRequest(mux, "/wallet/seeds", srv.walletSeedsHandler)                // GET
 		handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)          // POST

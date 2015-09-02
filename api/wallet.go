@@ -324,6 +324,35 @@ func (srv *Server) walletLoadSeedHandler(w http.ResponseWriter, req *http.Reques
 	}
 }
 
+// walletLoadSiagHandlerPOST handles a POST request to /wallet/load/seed.
+func (srv *Server) walletLoadSiagHandlerPOST(w http.ResponseWriter, req *http.Request) {
+	// Fetch the list of keyfiles from the post body.
+	keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
+	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+	for _, key := range potentialKeys {
+		err := srv.wallet.LoadSiagKeys(key, keyfiles)
+		if err == nil {
+			writeSuccess(w)
+			return
+		}
+		if err != nil && err != modules.ErrBadEncryptionKey {
+			writeError(w, "error when calling /wallet/load/siag: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	writeError(w, "error when calling /wallet/load/siag: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
+}
+
+// walletLoadSiagHandler handles API calls to /wallet/load/seed.
+func (srv *Server) walletLoadSiagHandler(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case "POST":
+		srv.walletLoadSiagHandlerPOST(w, req)
+	default:
+		writeError(w, "unrecognized method when calling /wallet/load/siag", http.StatusBadRequest)
+	}
+}
+
 // walletLockHandlerPOST handles a POST request to /wallet/lock.
 func (srv *Server) walletLockHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	err := srv.wallet.Lock()
