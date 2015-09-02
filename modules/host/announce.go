@@ -51,10 +51,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
-	lockID := h.mu.RLock()
-	addr := h.myAddr
-	h.mu.RUnlock(lockID)
-
 	// Generate an unlock hash, if necessary
 	if h.UnlockHash == (types.UnlockHash{}) {
 		uc, err := h.wallet.NextAddress()
@@ -67,6 +63,12 @@ func (h *Host) Announce() error {
 			return err
 		}
 	}
+
+	// Get the external IP again; it may have changed.
+	h.learnHostname()
+	lockID := h.mu.RLock()
+	addr := h.myAddr
+	h.mu.RUnlock(lockID)
 
 	// Check that the host's ip address is both known and reachable.
 	if addr.Host() == "::1" {
