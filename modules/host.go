@@ -47,9 +47,9 @@ type Host interface {
 	// host cannot reach itself or if the external ip address is unknown.
 	Announce() error
 
-	// ForceAnnounce announces the host on the blockchain, regardless of
-	// connectivity.
-	ForceAnnounce() error
+	// ForceAnnounce announces the specified address on the blockchain,
+	// regardless of connectivity.
+	ForceAnnounce(NetAddress) error
 
 	// SetConfig sets the hosting parameters of the host.
 	SetSettings(HostSettings)

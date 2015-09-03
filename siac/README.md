@@ -88,8 +88,8 @@ siacoins to.
 a unit, for example MS, S, mS, ps, etc. If no unit is given hastings
 is assumed. `dest` must be a valid siacoin address.
 
-* `siac wallet lock` locks a wallet. After calling, the wallet must be unlocked using the
-encryption password in order to use it further
+* `siac wallet lock` locks a wallet. After calling, the wallet must be unlocked
+using the encryption password in order to use it further
 
 * `siac wallet seeds` returns the list of secret seeds in use by the
 wallet. These can be used to regenerate the wallet
@@ -116,11 +116,10 @@ You can call this many times to configure you host before
 announcing. Alternatively, you can manually adjust these parameters
 inside the `host/config.json` file.
 
-* `siac host announce [-f]` makes an host announcement. If the `-f` flag
-is passed, it will force the announcement. Otherwise, you cannot
-annonuce multiple times. Announcing a second time after changing
-settings is not necessary, as the announcement only contains enough
-information to reach your host.
+* `siac host announce` makes an host announcement. You may optionally
+supply a specific address to be announced; this allows you to announce a domain
+name. Announcing a second time after changing settings is not necessary, as the
+announcement only contains enough information to reach your host.
 
 * `siac host status` outputs some of your hosting settings.
 

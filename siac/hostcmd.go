@@ -37,8 +37,11 @@ Available settings:
 		Use:   "announce",
 		Short: "Announce yourself as a host",
 		Long: `Announce yourself as a host on the network.
-The --force flag can be used to override connectivity checks.`,
-		Run: wrap(hostannouncecmd)}
+You may also supply a specific address to be announced, e.g.:
+	siac host announce my-host-domain.com:9001
+Doing so will override the standard connectivity checks.`,
+		Run: hostannouncecmd,
+	}
 
 	hostStatusCmd = &cobra.Command{
 		Use:   "status",
@@ -67,12 +70,17 @@ func hostconfigcmd(param, value string) {
 	fmt.Println("Host settings updated.")
 }
 
-func hostannouncecmd() {
-	args := ""
-	if force {
-		args = "force=true"
+func hostannouncecmd(cmd *cobra.Command, args []string) {
+	var err error
+	switch len(args) {
+	case 0:
+		err = post("/host/announce", "")
+	case 1:
+		err = post("/host/announce", "address="+args[0])
+	default:
+		cmd.Usage()
+		return
 	}
-	err := post("/host/announce", args)
 	if err != nil {
 		fmt.Println("Could not announce host:", err)
 		return

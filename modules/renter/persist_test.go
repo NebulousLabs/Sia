@@ -126,11 +126,19 @@ func TestRenterSaveLoad(t *testing.T) {
 	defer rt.Close()
 
 	// Create and save some files
-	f1 := newTestingFile()
+	var f1, f2, f3 *file
+	f1 = newTestingFile()
+	f2 = newTestingFile()
+	f3 = newTestingFile()
+	// names must not conflict
+	for f2.name == f1.name || f2.name == f3.name {
+		f2 = newTestingFile()
+	}
+	for f3.name == f1.name || f3.name == f2.name {
+		f3 = newTestingFile()
+	}
 	rt.renter.saveFile(f1)
-	f2 := newTestingFile()
 	rt.renter.saveFile(f2)
-	f3 := newTestingFile()
 	rt.renter.saveFile(f3)
 
 	// load should now load the files into memory.
