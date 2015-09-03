@@ -48,13 +48,7 @@ release-std: REBUILD
 xc: dependencies test test-long REBUILD
 	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=0.4.0   \
 	     -br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
-	     -main-dirs-exclude=siae,siag -tasks-=deb,deb-dev,deb-source,go-test     \
-	     -n=Sia
-xc-siag: dependencies test test-long REBUILD
-	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=1.0.1    \
-	     -br=release -include=LICENSE                                             \
-	     -main-dirs-exclude=siac,siad,siae -tasks-=deb,deb-dev,deb-source,go-test \
-	     -n=Sia_Address_Generator
+	     -main-dirs-exclude=siae -tasks-=deb,deb-dev,deb-source,go-test -n=Sia
 
 # clean removes all directories that get automatically created during
 # development.
@@ -71,7 +65,7 @@ pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
        ./modules/gateway ./modules/host ./modules/hostdb		     \
        ./modules/miner ./modules/renter ./modules/transactionpool    \
        ./modules/wallet ./modules/explorer ./persist                 \
-       ./siag ./siae ./types
+       ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=10s $(pkgs)
 test-v: clean fmt REBUILD
@@ -108,4 +102,4 @@ whitepaper:
 	@pdflatex -output-directory=doc whitepaper.tex > /dev/null
 	pdflatex -output-directory=doc whitepaper.tex
 
-.PHONY: all dependencies fmt REBUILD install release xc clean test test-long cover whitepaper
+.PHONY: all dependencies fmt REBUILD install release release-std xc clean test test-v test-long cover cover-integration cover-unit whitepaper
