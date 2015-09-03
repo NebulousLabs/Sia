@@ -671,7 +671,12 @@ Queries:
 Function: The host will announce itself to the network as a source of storage.
 Generally only needs to be called once.
 
-Parameters: none
+Parameters:
+```
+address string
+```
+`address` is an optional parameter that specifies the address to be announced.
+Supplying this parameters will also override standard connectivity checks.
 
 Response: standard
 

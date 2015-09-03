@@ -76,7 +76,8 @@ Troubleshooting
   siad tries to verify your connectivity by pinging your external IPv4 address.
   This method is sufficient for most people, but for unusual setups it may
   report false negatives. To override this check, you can "force" the
-  announcement by running `siac host announce --force`. Don't use this lightly!
+  announcement by running `siac host announce [ip:port]`. You can determine
+  your external IP by running `siac gateway` or using a 3rd-party service.
 
 - I mined a block, but I didn't receive any money.
 

@@ -27,6 +27,19 @@ func ping(addr modules.NetAddress) bool {
 
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
+	// Generate an unlock hash, if necessary.
+	if h.UnlockHash == (types.UnlockHash{}) {
+		uc, err := h.wallet.NextAddress()
+		if err != nil {
+			return err
+		}
+		h.UnlockHash = uc.UnlockHash()
+		err = h.save()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Create a transaction with a host announcement.
 	txnBuilder := h.wallet.StartTransaction()
 	announcement := encoding.Marshal(modules.HostAnnouncement{
@@ -51,19 +64,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
-	// Generate an unlock hash, if necessary
-	if h.UnlockHash == (types.UnlockHash{}) {
-		uc, err := h.wallet.NextAddress()
-		if err != nil {
-			return err
-		}
-		h.UnlockHash = uc.UnlockHash()
-		err = h.save()
-		if err != nil {
-			return err
-		}
-	}
-
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
 	lockID := h.mu.RLock()
@@ -80,11 +80,8 @@ func (h *Host) Announce() error {
 	return h.announce(addr)
 }
 
-// ForceAnnounce skips the check for knowing your external IP and for checking
-// your port.
-func (h *Host) ForceAnnounce() error {
-	lockID := h.mu.RLock()
-	addr := h.myAddr
-	h.mu.RUnlock(lockID)
+// ForceAnnounce announces using the provided address, and without performing
+// any connectivity checks.
+func (h *Host) ForceAnnounce(addr modules.NetAddress) error {
 	return h.announce(addr)
 }
