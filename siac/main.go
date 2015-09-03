@@ -18,7 +18,6 @@ import (
 
 var (
 	addr         string
-	force        bool
 	initPassword bool
 )
 
@@ -196,7 +195,6 @@ func main() {
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
-	root.PersistentFlags().BoolVarP(&force, "force", "f", false, "force certain commands")
 
 	// run
 	root.Execute()
