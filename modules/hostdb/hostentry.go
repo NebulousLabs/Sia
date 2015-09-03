@@ -1,6 +1,8 @@
 package hostdb
 
 import (
+	"net"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -16,6 +18,13 @@ type hostEntry struct {
 // set of all hosts, and if it is online and responding to requests it will be
 // put into the list of active hosts.
 func (hdb *HostDB) insertHost(host modules.HostSettings) {
+	// Blacklist localhost.
+	if host.IPAddress.Host() == "localhost" {
+		return
+	} else if ip := net.ParseIP(string(host.IPAddress)); ip != nil && ip.IsLoopback() {
+		return
+	}
+
 	// Add the host to allHosts.
 	entry := &hostEntry{
 		HostSettings: host,
