@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // coinUnits converts a siacoin amount to base units.
@@ -150,6 +151,13 @@ Run 'wallet send --help' to see a list of available units.`,
 		Short: "View wallet status",
 		Long:  "View wallet status, including the current balance and number of addresses.",
 		Run:   wrap(walletstatuscmd),
+	}
+
+	walletTransactionsCmd = &cobra.Command{
+		Use:   "transactions",
+		Short: "View transactions",
+		Long:  "View transactions related to addresses spendable by the wallet, providing a net flow of siacoins and siafunds for each transaction",
+		Run:   wrap(wallettransactionscmd),
 	}
 
 	walletUnlockCmd = &cobra.Command{
@@ -371,6 +379,66 @@ Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v SC
 `, encStatus, lockStatus, sc, usc, status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+}
+
+// wallettransactionscmd lists all of the transactions related to the wallet,
+// providing a net flow of siacoins and siafunds for each.
+func wallettransactionscmd() {
+	wtg := new(api.WalletTransactionsGET)
+	err := getAPI("/wallet/transactions?startheight=0&endheight=10000000", wtg)
+	if err != nil {
+		fmt.Println("Could not fetch transaction history:", err)
+		return
+	}
+
+	fmt.Println("    [height]                                                   [transaction id]    [net siacoins]   [net siafunds]")
+	txns := append(wtg.ConfirmedTransactions, wtg.UnconfirmedTransactions...)
+	for _, txn := range txns {
+		// Determine the number of outgoing siacoins and siafunds.
+		var outgoingSiacoins types.Currency
+		var outgoingSiafunds types.Currency
+		for _, input := range txn.Inputs {
+			if input.FundType == types.SpecifierSiacoinInput && input.WalletAddress {
+				outgoingSiacoins = outgoingSiacoins.Add(input.Value)
+			}
+			if input.FundType == types.SpecifierSiafundInput && input.WalletAddress {
+				outgoingSiafunds = outgoingSiafunds.Add(input.Value)
+			}
+		}
+
+		// Determine the number of incoming siacoins and siafunds.
+		var incomingSiacoins types.Currency
+		var incomingSiafunds types.Currency
+		for _, output := range txn.Outputs {
+			if output.FundType == types.SpecifierMinerPayout {
+				incomingSiacoins = incomingSiacoins.Add(output.Value)
+			}
+			if output.FundType == types.SpecifierSiacoinOutput && output.WalletAddress {
+				incomingSiacoins = incomingSiacoins.Add(output.Value)
+			}
+			if output.FundType == types.SpecifierSiafundOutput && output.WalletAddress {
+				incomingSiafunds = incomingSiafunds.Add(output.Value)
+			}
+		}
+
+		// Convert the siacoins to a float.
+		incomingSiacoinsFloat, _ := new(big.Rat).SetFrac(incomingSiacoins.Big(), types.SiacoinPrecision.Big()).Float64()
+		outgoingSiacoinsFloat, _ := new(big.Rat).SetFrac(outgoingSiacoins.Big(), types.SiacoinPrecision.Big()).Float64()
+
+		// Print the results.
+		if txn.ConfirmationHeight < 1e9 {
+			fmt.Printf("%12v", txn.ConfirmationHeight)
+		} else {
+			fmt.Printf(" unconfirmed")
+		}
+		fmt.Printf("%67v%15.2f SC", txn.TransactionID, incomingSiacoinsFloat-outgoingSiacoinsFloat)
+		// For siafunds, need to avoid having a negative types.Currency.
+		if incomingSiafunds.Cmp(outgoingSiafunds) >= 0 {
+			fmt.Printf("%14v SF\n", incomingSiafunds.Sub(outgoingSiafunds))
+		} else {
+			fmt.Printf("-%14v SF\n", outgoingSiafunds.Sub(incomingSiafunds))
+		}
+	}
 }
 
 // walletunlockcmd unlocks a saved wallet
