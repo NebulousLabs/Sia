@@ -329,7 +329,8 @@ Parameters:
 amount      int
 destination string
 ```
-'amount' is the number of siacoins being sent.
+'amount' is the number of hastings being sent. A hasting is the smallest unit
+in Sia. There are 10^24 hastings in a siacoin.
 
 'destination' is the address that is receiving the coins.
 
