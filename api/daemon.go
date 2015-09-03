@@ -142,9 +142,8 @@ func applyUpdate(version string) error {
 	}
 
 	// Configure the update.
-	opts := new(update.Options)
+	var opts update.Options
 	opts.SetPublicKeyPEM([]byte(developerKey))
-
 	// Perform updates as indicated by the manifest.
 	for _, file := range manifest[1:] {
 		// set update path
