@@ -391,7 +391,7 @@ func wallettransactionscmd() {
 		return
 	}
 
-	fmt.Println("[height]\t[transaction id]\t\t\t\t\t\t\t[net siacoin transfer]\t[net siafund transfer]")
+	fmt.Println("    [height]                                                   [transaction id]    [net siacoins]   [net siafunds]")
 	txns := append(wtg.ConfirmedTransactions, wtg.UnconfirmedTransactions...)
 	for _, txn := range txns {
 		// Determine the number of outgoing siacoins and siafunds.
@@ -426,12 +426,17 @@ func wallettransactionscmd() {
 		outgoingSiacoinsFloat, _ := new(big.Rat).SetFrac(outgoingSiacoins.Big(), types.SiacoinPrecision.Big()).Float64()
 
 		// Print the results.
-		fmt.Printf("%v\t\t%v\t %.2f SC\t\t", txn.ConfirmationHeight, txn.TransactionID, incomingSiacoinsFloat-outgoingSiacoinsFloat)
+		if txn.ConfirmationHeight < 1e9 {
+			fmt.Printf("%12v", txn.ConfirmationHeight)
+		} else {
+			fmt.Printf(" unconfirmed")
+		}
+		fmt.Printf("%67v%15.2f SC", txn.TransactionID, incomingSiacoinsFloat-outgoingSiacoinsFloat)
 		// For siafunds, need to avoid having a negative types.Currency.
 		if incomingSiafunds.Cmp(outgoingSiafunds) >= 0 {
-			fmt.Printf("%v SF\n", incomingSiafunds.Sub(outgoingSiafunds))
+			fmt.Printf("%14v SF\n", incomingSiafunds.Sub(outgoingSiafunds))
 		} else {
-			fmt.Printf("-%v SF\n", outgoingSiafunds.Sub(incomingSiafunds))
+			fmt.Printf("-%14v SF\n", outgoingSiafunds.Sub(incomingSiafunds))
 		}
 	}
 }
