@@ -14,7 +14,7 @@ func TestAnnouncement(t *testing.T) {
 	ht := CreateHostTester("TestAnnouncement", t)
 
 	// Place the announcement.
-	err := ht.host.ForceAnnounce()
+	err := ht.host.ForceAnnounce("foo")
 	if err != nil {
 		t.Fatal(err)
 	}
