@@ -252,6 +252,7 @@ func (g *Gateway) makeOutboundConnections() {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				id = g.mu.Lock()
 				g.removeNode(addr)
+				g.save()
 				g.mu.Unlock(id)
 			}
 		}
