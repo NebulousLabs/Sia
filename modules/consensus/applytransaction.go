@@ -9,7 +9,6 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -29,16 +28,10 @@ var (
 // applies them to the state, updating the diffs in the processed block.
 func (cs *ConsensusSet) applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
-	scoBucket := tx.Bucket(SiacoinOutputs)
 	for _, sci := range t.SiacoinInputs {
-		scoBytes := scoBucket.Get(sci.ParentID[:])
-		if build.DEBUG && scoBytes == nil {
-			panic(ErrMisuseApplySiacoinInput)
-		}
-		var sco types.SiacoinOutput
-		err := encoding.Unmarshal(scoBytes, &sco)
-		if err != nil {
-			return err
+		sco, err := getSiacoinOutput(tx, sci.ParentID)
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
 		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffRevert,
@@ -46,7 +39,7 @@ func (cs *ConsensusSet) applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t ty
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err = cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+		err = cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -58,7 +51,6 @@ func (cs *ConsensusSet) applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t ty
 // applies them to the state, updating the diffs in the processed block.
 func (cs *ConsensusSet) applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
-	scoBucket := tx.Bucket(SiacoinOutputs)
 	for i, sco := range t.SiacoinOutputs {
 		scoid := t.SiacoinOutputID(i)
 		scod := modules.SiacoinOutputDiff{
@@ -67,7 +59,7 @@ func (cs *ConsensusSet) applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t t
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+		err := cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
 		if err != nil {
 			return err
 		}

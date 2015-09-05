@@ -110,7 +110,6 @@ func (db *setDB) startConsistencyGuard() error {
 		cg := tx.Bucket(ConsistencyGuard)
 		gs := cg.Get(GuardStart)
 		if !bytes.Equal(gs, cg.Get(GuardEnd)) {
-			println("Database is inconsistent - please reset your database by redownloading it or loading a consistent backup. This can happen if you close Sia unexpectedly.")
 			return errDBInconsistent
 		}
 		i := encoding.DecUint64(gs)
@@ -132,6 +131,41 @@ func (db *setDB) stopConsistencyGuard() {
 	if err != nil && build.DEBUG {
 		panic(err)
 	}
+}
+
+// getSiacoinOutput fetches a siacoin output from the database. An error is
+// returned if the siacoin output does not exist.
+func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
+	scoBytes := tx.Bucket(SiacoinOutputs).Get(id[:])
+	if scoBytes == nil {
+		return types.SiacoinOutput{}, errNilItem
+	}
+	var sco types.SiacoinOutput
+	err := encoding.Unmarshal(scoBytes, &sco)
+	if err != nil {
+		return types.SiacoinOutput{}, err
+	}
+	return sco, nil
+}
+
+// addSiacoinOutput adds a siacoin output to the database. An error is returned
+// if the siacoin output is already in the database.
+func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	siacoinOutputs := tx.Bucket(SiacoinOutputs)
+	if siacoinOutputs.Get(id[:]) != nil {
+		return errRepeatInsert
+	}
+	return siacoinOutputs.Put(id[:], encoding.Marshal(sco))
+}
+
+// removeSiacoinOutput removes a siacoin output from the database. An error is
+// returned if the siacoin output is not in the database prior to removal.
+func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
+	scoBytes := tx.Bucket(SiacoinOutputs).Get(id[:])
+	if scoBytes == nil {
+		return errNilItem
+	}
+	return removeItem(tx, SiacoinOutputs, id)
 }
 
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
@@ -523,14 +557,6 @@ func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.Fi
 	})
 }
 
-func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	siacoinOutputs := tx.Bucket(SiacoinOutputs)
-	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
-		panic(errRepeatInsert)
-	}
-	return siacoinOutputs.Put(id[:], encoding.Marshal(sco))
-}
-
 // addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
 func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 	return db.Update(func(tx *bolt.Tx) error {
@@ -565,10 +591,6 @@ func isSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) bool {
 // in the siacoin outputs bucket
 func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
 	return db.inBucket(SiacoinOutputs, id)
-}
-
-func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
-	return removeItem(tx, SiacoinOutputs, id)
 }
 
 // rmSiacoinOutputs removes a siacoin output form the siacoin outputs map

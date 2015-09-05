@@ -31,7 +31,7 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txnSet, err := txnBuilder.Sign(true) // true indicates that the whole transaction should be signed.
+	txnSet, err := txnBuilder.Sign(true) // true sets the 'wholeTransaction' flag
 	if err != nil {
 		t.Fatal(err)
 	}

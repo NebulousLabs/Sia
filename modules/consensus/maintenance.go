@@ -49,7 +49,6 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlo
 		return nil
 	}
 
-	scoBucket := tx.Bucket(SiacoinOutputs)
 	err := forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG && isSiacoinOutput(tx, id) {
@@ -64,7 +63,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlo
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
+		err := cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
 		if err != nil {
 			return err
 		}

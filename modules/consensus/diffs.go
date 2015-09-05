@@ -37,18 +37,6 @@ var (
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
-// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
-// a database transaction.
-func (cs *ConsensusSet) commitBucketSiacoinOutputDiff(scoBucket *bolt.Bucket, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
-	if build.DEBUG && (scoBucket.Get(scod.ID[:]) == nil) != (scod.Direction == dir) {
-		panic(errRepeatInsert)
-	}
-	if scod.Direction == dir {
-		return scoBucket.Put(scod.ID[:], encoding.Marshal(scod.SiacoinOutput))
-	}
-	return scoBucket.Delete(scod.ID[:])
-}
-
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
@@ -406,6 +394,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		err = cs.db.Update(func(tx *bolt.Tx) error {
 			err := cs.validTxTransaction(tx, txn)
 			if err != nil {
+				println(err.Error())
 				return err
 			}
 			return nil
