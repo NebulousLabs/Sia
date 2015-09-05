@@ -236,26 +236,25 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 // peerManager tries to keep the Gateway well-connected. As long as the
 // Gateway is not well-connected, it tries to connect to random nodes.
 func (g *Gateway) peerManager() {
-	sleepTime := 5 * time.Second
 	for {
-		time.Sleep(sleepTime)
-
+		// If we are well-connected, sleep in increments of five minutes until
+		// we are no longer well-connected.
 		id := g.mu.RLock()
 		numPeers := len(g.peers)
 		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
-		if err != nil {
-			// can't do much until we have nodes
+		if numPeers >= wellConnectedThreshold {
+			time.Sleep(5 * time.Minute)
 			continue
 		}
 
-		if numPeers >= wellConnectedThreshold {
-			sleepTime = time.Minute
-		} else {
-			sleepTime = 5 * time.Second
+		// Try to connect to a random node. Instead of blocking on Connect, we
+		// spawn a goroutine and sleep for five seconds. This allows us to
+		// continue making connections if the node is unresponsive.
+		if err == nil {
+			go g.Connect(addr)
 		}
-
-		go g.Connect(addr)
+		time.Sleep(5 * time.Second)
 	}
 }
 
