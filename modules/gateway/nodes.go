@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -110,4 +111,51 @@ func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 		return errors.New("can't send address without knowing external IP")
 	}
 	return encoding.WriteObject(conn, g.Address())
+}
+
+// nodeManager tries to keep the Gateway's node list healthy. As long as the
+// Gateway has fewer than minNodeListSize nodes, it asks a random peer for
+// more nodes. It also continually pings nodes in order to establish their
+// connectivity. Unresponsive nodes are aggressively removed.
+func (g *Gateway) nodeManager() {
+	for {
+		time.Sleep(5 * time.Second)
+
+		id := g.mu.RLock()
+		numNodes := len(g.nodes)
+		peer, err := g.randomPeer()
+		g.mu.RUnlock(id)
+		if err != nil {
+			// can't do much until we have peers
+			continue
+		}
+
+		if numNodes < minNodeListLen {
+			g.RPC(peer, "ShareNodes", g.requestNodes)
+		}
+
+		// find an untested node to check
+		id = g.mu.RLock()
+		node, err := g.randomNode()
+		g.mu.RUnlock(id)
+		if err != nil {
+			continue
+		}
+
+		// try to connect
+		conn, err := net.DialTimeout("tcp", string(node), dialTimeout)
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			id = g.mu.Lock()
+			g.removeNode(node)
+			g.save()
+			g.mu.Unlock(id)
+		} else if err != nil {
+			continue
+		}
+		// if connection succeeds, supply an unacceptable version to ensure
+		// they won't try to add us as a peer
+		encoding.WriteObject(conn, "0.0.0")
+		conn.Close()
+
+	}
 }

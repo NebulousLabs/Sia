@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	dialTimeout = 10 * time.Second
+	dialTimeout = 2 * time.Minute
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
@@ -233,38 +233,29 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	return nil
 }
 
-// makeOutboundConnections tries to keep the Gateway well-connected. As long
-// as the Gateway is not well-connected, it tries to add random nodes as
-// peers. It sleeps when the Gateway becomes well-connected, or it has tried
-// more than 100 nodes.
-func (g *Gateway) makeOutboundConnections() {
+// peerManager tries to keep the Gateway well-connected. As long as the
+// Gateway is not well-connected, it tries to connect to random nodes.
+func (g *Gateway) peerManager() {
+	sleepTime := 5 * time.Second
 	for {
-		for i := 0; i < 100; i++ {
-			id := g.mu.RLock()
-			numPeers := len(g.peers)
-			addr, err := g.randomNode()
-			g.mu.RUnlock(id)
-			if err != nil || numPeers >= wellConnectedThreshold {
-				break
-			}
-			err = g.Connect(addr)
-			// aggressively remove unresponsive nodes
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				id = g.mu.Lock()
-				g.removeNode(addr)
-				g.save()
-				g.mu.Unlock(id)
-			}
-		}
-		// request more nodes if necessary
+		time.Sleep(sleepTime)
+
 		id := g.mu.RLock()
-		numNodes := len(g.nodes)
-		addr, err := g.randomPeer()
+		numPeers := len(g.peers)
+		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
-		if build.Release != "testing" && err == nil && numNodes < minNodeListLen {
-			g.RPC(addr, "ShareNodes", g.requestNodes)
+		if err != nil {
+			// can't do much until we have nodes
+			continue
 		}
-		time.Sleep(5 * time.Second)
+
+		if numPeers >= wellConnectedThreshold {
+			sleepTime = time.Minute
+		} else {
+			sleepTime = 5 * time.Second
+		}
+
+		g.Connect(addr)
 	}
 }
 
