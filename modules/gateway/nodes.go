@@ -144,18 +144,16 @@ func (g *Gateway) nodeManager() {
 
 		// try to connect
 		conn, err := net.DialTimeout("tcp", string(node), dialTimeout)
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		if err != nil {
 			id = g.mu.Lock()
 			g.removeNode(node)
 			g.save()
 			g.mu.Unlock(id)
-		} else if err != nil {
 			continue
 		}
 		// if connection succeeds, supply an unacceptable version to ensure
 		// they won't try to add us as a peer
 		encoding.WriteObject(conn, "0.0.0")
 		conn.Close()
-
 	}
 }
