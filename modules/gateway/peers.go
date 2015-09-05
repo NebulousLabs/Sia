@@ -255,7 +255,7 @@ func (g *Gateway) peerManager() {
 			sleepTime = 5 * time.Second
 		}
 
-		g.Connect(addr)
+		go g.Connect(addr)
 	}
 }
 
