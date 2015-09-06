@@ -10,11 +10,12 @@ import (
 // A NetAddress contains the information needed to contact a peer.
 type NetAddress string
 
-// Host returns the NetAddress' IP.
-//
-// TODO: Unchecked error resulted in bugs in production code!
+// Host removes the port from a NetAddress, returning just the host.
 func (na NetAddress) Host() string {
-	host, _, _ := net.SplitHostPort(string(na))
+	host, _, err := net.SplitHostPort(string(na))
+	if err != nil {
+		return string(na)
+	}
 	return host
 }
 
@@ -24,19 +25,6 @@ func (na NetAddress) Host() string {
 func (na NetAddress) Port() string {
 	_, port, _ := net.SplitHostPort(string(na))
 	return port
-}
-
-// RemovePort removes the port from a NetAddress. Due to error checking, the
-// behavior is different from 'Host()' for IPAddresses that don't have a port.
-// This function should probably be merged with Host(), but I wasn't sure if
-// portions of the gateway relied on getting 'nil' if no port was present in
-// the NetAddress.
-func (na NetAddress) RemovePort() string {
-	host, _, err := net.SplitHostPort(string(na))
-	if err != nil {
-		return string(na)
-	}
-	return host
 }
 
 // IsLocal returns true for ip addresses that are on the same machine.

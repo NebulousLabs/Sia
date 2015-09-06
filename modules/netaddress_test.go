@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-// TestRemovePort tests the RemovePort method of the NetAddress type.
-func TestRemovePort(t *testing.T) {
+// TestHost tests the Host method of the NetAddress type.
+func TestHost(t *testing.T) {
 	testSet := []struct {
 		query           NetAddress
 		desiredResponse string
@@ -25,8 +25,8 @@ func TestRemovePort(t *testing.T) {
 		{"::1", "::1"},
 	}
 	for _, test := range testSet {
-		if test.query.RemovePort() != test.desiredResponse {
-			t.Error("test failed:", test, test.query.RemovePort())
+		if test.query.Host() != test.desiredResponse {
+			t.Error("test failed:", test, test.query.Host())
 		}
 	}
 }
