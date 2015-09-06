@@ -47,6 +47,19 @@ func (na NetAddress) Port() string {
 	return port
 }
 
+// RemovePort removes the port from a NetAddress. Due to error checking, the
+// behavior is different from 'Host()' for IPAddresses that don't have a port.
+// This function should probably be merged with Host(), but I wasn't sure if
+// portions of the gateway relied on getting 'nil' if no port was present in
+// the NetAddress.
+func (na NetAddress) RemovePort() string {
+	host, _, err := net.SplitHostPort(string(na))
+	if err != nil {
+		return string(na)
+	}
+	return host
+}
+
 // A Gateway facilitates the interactions between the local node and remote
 // nodes (peers). It relays incoming blocks and transactions to local modules,
 // and broadcasts outgoing blocks and transactions to peers. In a broad sense,
