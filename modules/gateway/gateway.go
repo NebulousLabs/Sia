@@ -110,9 +110,10 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Automatically forward the RPC port, if possible.
 	go g.forwardPort(port)
 
-	// Spawn the connector loop. This will continually attempt to add nodes as
-	// peers to ensure we stay well-connected.
-	go g.makeOutboundConnections()
+	// Spawn the peer and node managers. These will attempt to keep the peer
+	// and node lists healthy.
+	go g.threadedPeerManager()
+	go g.threadedNodeManager()
 
 	// Spawn the primary listener.
 	go g.listen()

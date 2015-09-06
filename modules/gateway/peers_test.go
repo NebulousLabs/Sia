@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"net"
-	"strconv"
 	"testing"
 	"time"
 
@@ -197,46 +196,30 @@ func TestDisconnect(t *testing.T) {
 	}
 }
 
-func TestMakeOutboundConnections(t *testing.T) {
+func TestPeerManager(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	g1 := newTestingGateway("TestMakeOutboundConnections1", t)
+	g1 := newTestingGateway("TestPeerManager1", t)
 	defer g1.Close()
 
-	// first add 8 dummy peers
-	id := g1.mu.Lock()
-	for i := 0; i < 8; i++ {
-		peerAddr := modules.NetAddress("foo" + strconv.Itoa(i))
-		g1.peers[peerAddr] = &peer{addr: peerAddr, sess: nil}
-	}
-	g1.mu.Unlock(id)
-
-	// makeOutboundConnections should now sleep for 5 seconds
-	time.Sleep(1 * time.Second)
-
-	// remove a peer while makeOutboundConnections is asleep, and add a new
-	// connectable address to the node list
-	id = g1.mu.Lock()
-	delete(g1.peers, "foo1")
-	g1.mu.Unlock(id)
-
-	g2 := newTestingGateway("TestMakeOutboundConnections2", t)
+	// create a valid node to connect to
+	g2 := newTestingGateway("TestPeerManager2", t)
 	defer g2.Close()
-	id = g1.mu.Lock()
-	g1.nodes[g2.Address()] = struct{}{} // manual insertion to bypass addNode
+
+	// g1's node list should only contain g2
+	id := g1.mu.Lock()
+	g1.nodes = map[modules.NetAddress]struct{}{}
+	g1.nodes[g2.Address()] = struct{}{}
 	g1.mu.Unlock(id)
 
-	// when makeOutboundConnections wakes up, it should connect to g2.
-	time.Sleep(5 * time.Second)
+	// when peerManager wakes up, it should connect to g2.
+	time.Sleep(6 * time.Second)
 
 	id = g1.mu.RLock()
 	defer g1.mu.RUnlock(id)
-	if len(g1.peers) != 8 {
-		t.Fatal("gateway did not reach 8 peers:", g1.peers)
-	}
-	if g1.peers[g2.Address()] == nil {
-		t.Fatal("gateway did not connect to g2")
+	if len(g1.peers) != 1 || g1.peers[g2.Address()] == nil {
+		t.Fatal("gateway did not connect to g2:", g1.peers)
 	}
 }

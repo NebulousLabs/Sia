@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	dialTimeout = 10 * time.Second
+	dialTimeout = 2 * time.Minute
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
@@ -233,35 +233,26 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	return nil
 }
 
-// makeOutboundConnections tries to keep the Gateway well-connected. As long
-// as the Gateway is not well-connected, it tries to add random nodes as
-// peers. It sleeps when the Gateway becomes well-connected, or it has tried
-// more than 100 nodes.
-func (g *Gateway) makeOutboundConnections() {
+// threadedPeerManager tries to keep the Gateway well-connected. As long as
+// the Gateway is not well-connected, it tries to connect to random nodes.
+func (g *Gateway) threadedPeerManager() {
 	for {
-		for i := 0; i < 100; i++ {
-			id := g.mu.RLock()
-			numPeers := len(g.peers)
-			addr, err := g.randomNode()
-			g.mu.RUnlock(id)
-			if err != nil || numPeers >= wellConnectedThreshold {
-				break
-			}
-			err = g.Connect(addr)
-			// aggressively remove unresponsive nodes
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				id = g.mu.Lock()
-				g.removeNode(addr)
-				g.mu.Unlock(id)
-			}
-		}
-		// request more nodes if necessary
+		// If we are well-connected, sleep in increments of five minutes until
+		// we are no longer well-connected.
 		id := g.mu.RLock()
-		numNodes := len(g.nodes)
-		addr, err := g.randomPeer()
+		numPeers := len(g.peers)
+		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
-		if build.Release != "testing" && err == nil && numNodes < minNodeListLen {
-			g.RPC(addr, "ShareNodes", g.requestNodes)
+		if numPeers >= wellConnectedThreshold {
+			time.Sleep(5 * time.Minute)
+			continue
+		}
+
+		// Try to connect to a random node. Instead of blocking on Connect, we
+		// spawn a goroutine and sleep for five seconds. This allows us to
+		// continue making connections if the node is unresponsive.
+		if err == nil {
+			go g.Connect(addr)
 		}
 		time.Sleep(5 * time.Second)
 	}
