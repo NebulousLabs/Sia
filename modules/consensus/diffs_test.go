@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+/*
 // TestSiacoinOutputDiff applies and reverts a siacoin output diff, then
 // triggers an inconsistency panic.
 func TestCommitSiacoinOutputDiff(t *testing.T) {
@@ -79,6 +80,7 @@ func TestCommitSiacoinOutputDiff(t *testing.T) {
 	// that already exists)
 	cst.cs.commitSiacoinOutputDiff(scod, modules.DiffRevert)
 }
+*/
 
 // TestCommitFileContracttDiff applies and reverts a file contract diff, then
 // triggers an inconsistency panic.

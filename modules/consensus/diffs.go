@@ -37,24 +37,6 @@ var (
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
-// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding an output twice, or deleting an
-	// output that does not exist.
-	if build.DEBUG {
-		exists := cs.db.inSiacoinOutputs(scod.ID)
-		if exists == (scod.Direction == dir) {
-			panic(errBadCommitSiacoinOutputDiff)
-		}
-	}
-
-	if scod.Direction == dir {
-		cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
-	} else {
-		cs.db.rmSiacoinOutputs(scod.ID)
-	}
-}
-
 // commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
 // a database transaction.
 func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
@@ -255,7 +237,12 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *process
 func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
 		for _, scod := range pb.SiacoinOutputDiffs {
-			cs.commitSiacoinOutputDiff(scod, dir)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.commitTxSiacoinOutputDiff(tx, scod, dir)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		for _, fcd := range pb.FileContractDiffs {
 			cs.commitFileContractDiff(fcd, dir)
@@ -276,7 +263,12 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 		}
 	} else {
 		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-			cs.commitSiacoinOutputDiff(pb.SiacoinOutputDiffs[i], dir)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.commitTxSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
 			cs.commitFileContractDiff(pb.FileContractDiffs[i], dir)
