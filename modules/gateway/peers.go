@@ -233,9 +233,9 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	return nil
 }
 
-// peerManager tries to keep the Gateway well-connected. As long as the
-// Gateway is not well-connected, it tries to connect to random nodes.
-func (g *Gateway) peerManager() {
+// threadedPeerManager tries to keep the Gateway well-connected. As long as
+// the Gateway is not well-connected, it tries to connect to random nodes.
+func (g *Gateway) threadedPeerManager() {
 	for {
 		// If we are well-connected, sleep in increments of five minutes until
 		// we are no longer well-connected.

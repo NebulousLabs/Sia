@@ -113,11 +113,11 @@ func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 	return encoding.WriteObject(conn, g.Address())
 }
 
-// nodeManager tries to keep the Gateway's node list healthy. As long as the
-// Gateway has fewer than minNodeListSize nodes, it asks a random peer for
-// more nodes. It also continually pings nodes in order to establish their
+// threadedNodeManager tries to keep the Gateway's node list healthy. As long
+// as the Gateway has fewer than minNodeListSize nodes, it asks a random peer
+// for more nodes. It also continually pings nodes in order to establish their
 // connectivity. Unresponsive nodes are aggressively removed.
-func (g *Gateway) nodeManager() {
+func (g *Gateway) threadedNodeManager() {
 	for {
 		time.Sleep(5 * time.Second)
 

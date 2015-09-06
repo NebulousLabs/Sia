@@ -112,8 +112,8 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.
-	go g.peerManager()
-	go g.nodeManager()
+	go g.threadedPeerManager()
+	go g.threadedNodeManager()
 
 	// Spawn the primary listener.
 	go g.listen()
