@@ -23,6 +23,10 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 		return
 	} else if ip := net.ParseIP(string(host.IPAddress)); ip != nil && ip.IsLoopback() {
 		return
+	} else if host.IPAddress.Host() == "::1" {
+		// `if ip := net.ParseIP(string(host.IPAddress)); ip != nil &&
+		// ip.IsLoopback()` will not catch "::1".
+		return
 	}
 
 	// Add the host to allHosts.
