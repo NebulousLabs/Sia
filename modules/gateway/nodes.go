@@ -155,5 +155,8 @@ func (g *Gateway) nodeManager() {
 		// they won't try to add us as a peer
 		encoding.WriteObject(conn, "0.0.0")
 		conn.Close()
+		// sleep for an extra 10 minutes after success; we don't want to spam
+		// connectable nodes
+		time.Sleep(10 * time.Minute)
 	}
 }
