@@ -3,7 +3,7 @@ package renter
 import (
 	"crypto/rand"
 	"errors"
-	"os"
+	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -30,13 +30,14 @@ type Renter struct {
 	contracts     map[types.FileContractID]types.FileContract
 	entropy       [32]byte // used to generate signing keys
 	downloadQueue []*download
-	saveDir       string
 
-	mu *sync.RWMutex
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
 // New returns an empty renter.
-func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpool modules.TransactionPool, saveDir string) (*Renter, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
 	}
@@ -58,22 +59,16 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 
 		files:     make(map[string]*file),
 		contracts: make(map[types.FileContractID]types.FileContract),
-		saveDir:   saveDir,
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 	_, err := rand.Read(r.entropy[:])
 	if err != nil {
 		return nil, err
 	}
-
-	err = os.MkdirAll(saveDir, 0700)
+	err = r.initPersist()
 	if err != nil {
-		return nil, err
-	}
-
-	err = r.load()
-	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 

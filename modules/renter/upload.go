@@ -183,12 +183,12 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	totalsize := up.PieceSize * uint64(up.ErasureCode.NumPieces()) * f.numChunks()
 	var hosts []uploader
 	for _, host := range r.hostDB.RandomHosts(up.ErasureCode.NumPieces() * 3 / 2) {
-		host, err := r.newHostUploader(host, totalsize, up.Duration, f.masterKey)
+		hostUploader, err := r.newHostUploader(host, totalsize, up.Duration, f.masterKey)
 		if err != nil {
 			continue
 		}
-		defer host.Close()
-		hosts = append(hosts, host)
+		defer hostUploader.Close()
+		hosts = append(hosts, hostUploader)
 	}
 	if len(hosts) < up.ErasureCode.MinPieces() {
 		return errors.New("not enough hosts to support upload")

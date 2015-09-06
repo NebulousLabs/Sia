@@ -158,7 +158,7 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 
 	// Corrupt a renter file and try to reload it.
-	err = ioutil.WriteFile(filepath.Join(rt.renter.saveDir, "corrupt"+ShareExtension), []byte{1, 2, 3}, 0660)
+	err = ioutil.WriteFile(filepath.Join(rt.renter.persistDir, "corrupt"+ShareExtension), []byte{1, 2, 3}, 0660)
 	if err != nil {
 		t.Fatal(err)
 	}

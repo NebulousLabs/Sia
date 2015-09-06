@@ -135,7 +135,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 	delete(r.files, nickname)
 
-	os.Remove(filepath.Join(r.saveDir, f.name+ShareExtension))
+	os.Remove(filepath.Join(r.persistDir, f.name+ShareExtension))
 
 	r.save()
 	return nil

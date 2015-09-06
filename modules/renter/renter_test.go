@@ -128,27 +128,27 @@ func TestNilInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = New(rt.cs, rt.hostdb, rt.wallet, rt.tpool, rt.renter.saveDir+"1")
+	_, err = New(rt.cs, rt.hostdb, rt.wallet, rt.tpool, rt.renter.persistDir+"1")
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = New(nil, nil, nil, nil, rt.renter.saveDir+"2")
+	_, err = New(nil, nil, nil, nil, rt.renter.persistDir+"2")
 	if err == nil {
 		t.Error("no error returned for nil inputs")
 	}
-	_, err = New(nil, rt.hostdb, rt.wallet, rt.tpool, rt.renter.saveDir+"3")
+	_, err = New(nil, rt.hostdb, rt.wallet, rt.tpool, rt.renter.persistDir+"3")
 	if err != ErrNilCS {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, nil, rt.wallet, rt.tpool, rt.renter.saveDir+"5")
+	_, err = New(rt.cs, nil, rt.wallet, rt.tpool, rt.renter.persistDir+"5")
 	if err != ErrNilHostDB {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, rt.hostdb, nil, rt.tpool, rt.renter.saveDir+"6")
+	_, err = New(rt.cs, rt.hostdb, nil, rt.tpool, rt.renter.persistDir+"6")
 	if err != ErrNilWallet {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, rt.hostdb, rt.wallet, nil, rt.renter.saveDir+"6")
+	_, err = New(rt.cs, rt.hostdb, rt.wallet, nil, rt.renter.persistDir+"6")
 	if err != ErrNilTpool {
 		t.Error(err)
 	}
