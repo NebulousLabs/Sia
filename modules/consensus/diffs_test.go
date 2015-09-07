@@ -82,6 +82,7 @@ func TestCommitSiacoinOutputDiff(t *testing.T) {
 }
 */
 
+/*
 // TestCommitFileContracttDiff applies and reverts a file contract diff, then
 // triggers an inconsistency panic.
 func TestCommitFileContractDiff(t *testing.T) {
@@ -154,6 +155,7 @@ func TestCommitFileContractDiff(t *testing.T) {
 	cst.cs.commitFileContractDiff(fcd, modules.DiffRevert) // revert the application.
 	cst.cs.commitFileContractDiff(fcd, modules.DiffRevert) // revert the application again, in error.
 }
+*/
 
 // TestSiafundOutputDiff applies and reverts a siafund output diff, then
 // triggers an inconsistency panic.

@@ -62,7 +62,12 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 		FileContract: fc,
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	cs.commitFileContractDiff(fcd, modules.DiffApply)
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		return cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

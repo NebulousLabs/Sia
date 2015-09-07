@@ -37,8 +37,7 @@ var (
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
-// commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff from within
-// a database transaction.
+// commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
 	if scod.Direction == dir {
 		return addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
@@ -49,73 +48,12 @@ func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.Siac
 // commitTxFileContractDiff applies or reverts a FileContractDiff.
 func (cs *ConsensusSet) commitTxFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) error {
 	if fcd.Direction == dir {
-		addFileContract(tx, fcd.ID, fcd.FileContract)
-
-		bucketID := append(prefix_fcex, encoding.Marshal(fcd.FileContract.WindowEnd)...)
-		fcesByHeight := tx.Bucket(FileContractExpirations)
-		err := fcesByHeight.Put(encoding.Marshal(fcd.FileContract.WindowEnd), bucketID)
-		if err != nil {
-			return err
-		}
-		fceSet, err := tx.CreateBucketIfNotExists(bucketID)
-		if err != nil {
-			return err
-		}
-		return fceSet.Put(fcd.ID[:], []byte{})
+		return addFileContract(tx, fcd.ID, fcd.FileContract)
 	}
-	err := removeFileContract(tx, fcd.ID)
-	if err != nil {
-		return err
-	}
-	return removeFCExpiration(tx, fcd.FileContract.WindowEnd, fcd.ID)
+	return removeFileContract(tx, fcd.ID)
 }
 
-// commitFileContractDiff applies or reverts a FileContractDiff.
-func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding a contract twice, or deleting a
-	// contract that does not exist.
-	if build.DEBUG {
-		exists := cs.db.inFileContracts(fcd.ID)
-		if exists == (fcd.Direction == dir) {
-			panic(errBadCommitFileContractDiff)
-		}
-	}
-
-	if fcd.Direction == dir {
-		cs.db.addFileContracts(fcd.ID, fcd.FileContract)
-
-		// Put a file contract into the file contract expirations map.
-		exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
-		if !exists {
-			cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
-		}
-
-		// Sanity check - file contract expiration pointer should not already
-		// exist.
-		if build.DEBUG {
-			exists := cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
-			if exists {
-				panic(errExistingFileContractExpiration)
-			}
-		}
-		cs.db.addFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
-	} else {
-		cs.db.rmFileContracts(fcd.ID)
-
-		if build.DEBUG {
-			exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
-			if !exists {
-				panic(errBadExpirationPointer)
-			}
-			exists = cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
-			if !exists {
-				panic(errBadExpirationPointer)
-			}
-		}
-		cs.db.rmFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
-	}
-}
-
+// commitTxSiafundOutputDiff applies or reverts a Siafund output diff.
 func (cs *ConsensusSet) commitTxSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) error {
 	sfoBucket := tx.Bucket(SiafundOutputs)
 	if build.DEBUG && (sfoBucket.Get(sfod.ID[:]) == nil) != (sfod.Direction == dir) {
@@ -243,13 +181,16 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 					return err
 				}
 			}
+			for _, fcd := range pb.FileContractDiffs {
+				err := cs.commitTxFileContractDiff(tx, fcd, dir)
+				if err != nil {
+					return err
+				}
+			}
 			return nil
 		})
 		if err != nil {
 			return err
-		}
-		for _, fcd := range pb.FileContractDiffs {
-			cs.commitFileContractDiff(fcd, dir)
 		}
 		for _, sfod := range pb.SiafundOutputDiffs {
 			cs.commitSiafundOutputDiff(sfod, dir)
@@ -277,13 +218,16 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 					return err
 				}
 			}
+			for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
+				err := cs.commitTxFileContractDiff(tx, pb.FileContractDiffs[i], dir)
+				if err != nil {
+					return err
+				}
+			}
 			return nil
 		})
 		if err != nil {
 			return err
-		}
-		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
-			cs.commitFileContractDiff(pb.FileContractDiffs[i], dir)
 		}
 		for i := len(pb.SiafundOutputDiffs) - 1; i >= 0; i-- {
 			cs.commitSiafundOutputDiff(pb.SiafundOutputDiffs[i], dir)

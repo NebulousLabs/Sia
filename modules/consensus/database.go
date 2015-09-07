@@ -35,10 +35,10 @@ var (
 	BlockMap                = []byte("BlockMap")
 	SiacoinOutputs          = []byte("SiacoinOutputs")
 	FileContracts           = []byte("FileContracts")
-	FileContractExpirations = []byte("FileContractExpirations")
+	FileContractExpirations = []byte("FileContractExpirations") // TODO: Unneeded data structure
 	SiafundOutputs          = []byte("SiafundOutputs")
 	SiafundPool             = []byte("SiafundPool")
-	DSCOBuckets             = []byte("DSCOBuckets")
+	DSCOBuckets             = []byte("DSCOBuckets") // TODO: Unneeded data structure
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -161,11 +161,72 @@ func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOu
 // removeSiacoinOutput removes a siacoin output from the database. An error is
 // returned if the siacoin output is not in the database prior to removal.
 func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
-	scoBytes := tx.Bucket(SiacoinOutputs).Get(id[:])
+	scoBucket := tx.Bucket(SiacoinOutputs)
+	scoBytes := scoBucket.Get(id[:])
 	if scoBytes == nil {
 		return errNilItem
 	}
-	return removeItem(tx, SiacoinOutputs, id)
+	return scoBucket.Delete(id[:])
+}
+
+// addFileContract adds a file contract to the database. An error is returned
+// if the file contract is already in the database.
+func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) error {
+	// Add the file contract to the database.
+	fcBucket := tx.Bucket(FileContracts)
+	if fcBucket.Get(id[:]) != nil {
+		return errRepeatInsert
+	}
+	err := fcBucket.Put(id[:], encoding.Marshal(fc))
+	if err != nil {
+		return err
+	}
+
+	// Add an entry for when the file contract expires.
+	expirationBucketID := append(prefix_fcex, encoding.Marshal(fc.WindowEnd)...)
+	expirationBucket, err := tx.CreateBucketIfNotExists(expirationBucketID)
+	if err != nil {
+		return err
+	}
+	return expirationBucket.Put(id[:], []byte{})
+}
+
+// removeFileContract removes a file contract from the database.
+func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
+	// Delete the file contract entry.
+	fcBucket := tx.Bucket(FileContracts)
+	fcBytes := fcBucket.Get(id[:])
+	if fcBytes == nil {
+		return errNilItem
+	}
+	err := fcBucket.Delete(id[:])
+	if err != nil {
+		return err
+	}
+
+	// Delete the entry for the file contract's expiration. The portion of
+	// 'fcBytes' used to determine the expiration bucket id is the
+	// byte-representation of the file contract window end, which always
+	// appears at bytes 48-56.
+	expirationBucketID := append(prefix_fcex, fcBytes[48:56]...)
+	expirationBucket := tx.Bucket(expirationBucketID)
+	expirationBytes := expirationBucket.Get(id[:])
+	if expirationBytes == nil {
+		return errNilItem
+	}
+	return expirationBucket.Delete(id[:])
+}
+
+func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
+	return forEach(tx, bucketID, func(kb, bv []byte) error {
+		var id types.FileContractID
+		err := encoding.Unmarshal(kb, &id)
+		if err != nil {
+			return err
+		}
+		return fn(id)
+	})
 }
 
 // getSiafundPool returns the current value of the siafund pool.
@@ -504,10 +565,6 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 	})
 }
 
-func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) error {
-	return insertItem(tx, FileContracts, id, fc)
-}
-
 // addFileContracts is a wrapper around addItem for adding a file
 // contract to the consensusset
 func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract) error {
@@ -546,10 +603,6 @@ func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 // a file contract is in the consensus set
 func (db *setDB) inFileContracts(id types.FileContractID) bool {
 	return db.inBucket(FileContracts, id)
-}
-
-func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
-	return removeItem(tx, FileContracts, id)
 }
 
 // rmFileContracts removes a file contract from the consensus set
@@ -873,27 +926,10 @@ func (db *setDB) rmFCExpirations(h types.BlockHeight) {
 	}
 }
 
-func removeFCExpiration(tx *bolt.Tx, bh types.BlockHeight, id types.FileContractID) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
-	return removeItem(tx, bucketID, id)
-}
-
 // rmFCExpirationsHeight removes an individual file contract from a given height
 func (db *setDB) rmFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
 	return db.rmItem(bucketID, id)
-}
-
-func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
-	return forEach(tx, bucketID, func(kb, bv []byte) error {
-		var id types.FileContractID
-		err := encoding.Unmarshal(kb, &id)
-		if err != nil {
-			return err
-		}
-		return fn(id)
-	})
 }
 
 // forEachFCExpirationsHeight applies a function to every file
