@@ -100,6 +100,7 @@ func TestIsValid(t *testing.T) {
 		{"", false},
 		{"garbage:6146:616", false},
 		{"[::1]", false},
+		// {"google.com:notAPort", false}, TODO: Failed test case.
 	}
 	for _, test := range testSet {
 		if test.query.IsValid() != test.desiredResponse {
