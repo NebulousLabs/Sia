@@ -52,7 +52,9 @@ func (na NetAddress) IsLocal() bool {
 // or hostname.
 func (na NetAddress) IsValid() bool {
 	host := na.Host()
-	// Check if the host is a valid ip address.
+	// Check if the host is a valid ip address. Host will have been returned as
+	// the empty string (which is not a valid ip address) if there is anything
+	// structurally incorrect with the NetAddress.
 	if net.ParseIP(host) != nil {
 		return true
 	}
