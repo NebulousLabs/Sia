@@ -168,6 +168,25 @@ func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
 	return removeItem(tx, SiacoinOutputs, id)
 }
 
+// getSiafundPool returns the current value of the siafund pool.
+func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
+	bucket := tx.Bucket(SiafundPool)
+	poolBytes := bucket.Get(SiafundPool)
+	// An error should only be returned if the object stored in the siafund
+	// pool bucket is either unavailable or otherwise malformed. As this is a
+	// developer error, a panic is appropriate.
+	err := encoding.Unmarshal(poolBytes, &pool)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return pool
+}
+
+// setSiafundPool updates the saved siafund pool on disk
+func setSiafundPool(tx *bolt.Tx, c types.Currency) error {
+	return tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
+}
+
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
 // the bucket does not exist or if the item is already in the bucket.
 func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
@@ -890,23 +909,4 @@ func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(types.F
 		fn(key)
 		return nil
 	})
-}
-
-// getSiafundPool returns the current value of the siafund pool.
-func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
-	bucket := tx.Bucket(SiafundPool)
-	poolBytes := bucket.Get(SiafundPool)
-	// An error should only be returned if the object stored in the siafund
-	// pool bucket is either unavailable or otherwise malformed. As this is a
-	// developer error, a panic is appropriate.
-	err := encoding.Unmarshal(poolBytes, &pool)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return pool
-}
-
-// setSiafundPool updates the saved siafund pool on disk
-func setSiafundPool(tx *bolt.Tx, c types.Currency) error {
-	return tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
 }
