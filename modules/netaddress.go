@@ -10,20 +10,25 @@ import (
 // A NetAddress contains the information needed to contact a peer.
 type NetAddress string
 
-// Host removes the port from a NetAddress, returning just the host.
+// Host removes the port from a NetAddress, returning just the host. If the
+// address is invalid, the empty string is returned.
 func (na NetAddress) Host() string {
 	host, _, err := net.SplitHostPort(string(na))
+	// 'host' is not always the empty string if an error is returned.
 	if err != nil {
-		return string(na)
+		return ""
 	}
 	return host
 }
 
-// Port returns the NetAddress' port number.
-//
-// TODO: Unchecked error.
+// Port returns the NetAddress object's port number. The empty string is
+// returned if the NetAddress is invalid.
 func (na NetAddress) Port() string {
-	_, port, _ := net.SplitHostPort(string(na))
+	_, port, err := net.SplitHostPort(string(na))
+	// 'port' will not always be the empty string if an error is returned.
+	if err != nil {
+		return ""
+	}
 	return port
 }
 
@@ -33,7 +38,7 @@ func (na NetAddress) IsLocal() bool {
 		return false
 	}
 
-	host := na.RemovePort()
+	host := na.Host()
 	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
 		return true
 	}
@@ -46,7 +51,7 @@ func (na NetAddress) IsLocal() bool {
 // IsValid uses a regex to check whether the net address is a valid ip address
 // or hostname.
 func (na NetAddress) IsValid() bool {
-	host := na.RemovePort()
+	host := na.Host()
 	// Check if the host is a valid ip address.
 	if net.ParseIP(host) != nil {
 		return true

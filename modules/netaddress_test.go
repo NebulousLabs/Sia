@@ -10,19 +10,19 @@ func TestHost(t *testing.T) {
 		query           NetAddress
 		desiredResponse string
 	}{
-		{"localhost", "localhost"},
+		{"localhost", ""},
 		{"localhost:1234", "localhost"},
-		{"127.0.0.1", "127.0.0.1"},
+		{"127.0.0.1", ""},
 		{"127.0.0.1:6723", "127.0.0.1"},
-		{"bbc.com", "bbc.com"},
+		{"bbc.com", ""},
 		{"bbc.com:6434", "bbc.com"},
-		{"bitcoin.ninja", "bitcoin.ninja"},
+		{"bitcoin.ninja", ""},
 		{"bitcoin.ninja:6752", "bitcoin.ninja"},
-		{"garbage:64:77", "garbage:64:77"},
-		{"::1:5856", "::1:5856"},
+		{"garbage:64:77", ""},
+		{"::1:5856", ""},
 		{"[::1]:5856", "::1"},
-		{"[::1]", "[::1]"},
-		{"::1", "::1"},
+		{"[::1]", ""},
+		{"::1", ""},
 	}
 	for _, test := range testSet {
 		if test.query.Host() != test.desiredResponse {
@@ -41,11 +41,11 @@ func TestIsLocal(t *testing.T) {
 		// for these networks is currently undefined.
 
 		// Localhost tests.
-		{"localhost", true},
+		{"localhost", false},
 		{"localhost:1234", true},
-		{"127.0.0.1", true},
+		{"127.0.0.1", false},
 		{"127.0.0.1:6723", true},
-		{"::1", true},
+		{"::1", false},
 		{"[::1]:7124", true},
 
 		// Public name tests.
@@ -53,9 +53,10 @@ func TestIsLocal(t *testing.T) {
 		{"hn.com:8811", false},
 		{"12.34.45.64", false},
 		{"12.34.45.64:7777", false},
-		{"::1:4646", false}, // TODO: I'm not sure if this is actually localhost. The trailing values are part of the IPAddress, not part of the port.
+		{"::1:4646", false},
 
 		// Garbage name tests.
+		{"", false},
 		{"garbage", false},
 		{"garbage:6432", false},
 		{"garbage:6146:616", false},
@@ -79,23 +80,24 @@ func TestIsValid(t *testing.T) {
 		// for these networks is currently undefined.
 
 		// Localhost tests.
-		{"localhost", true},
+		{"localhost", false},
 		{"localhost:1234", true},
-		{"127.0.0.1", true},
+		{"127.0.0.1", false},
 		{"127.0.0.1:6723", true},
-		{"::1", true},
+		{"::1", false},
 		{"[::1]:7124", true},
 
 		// Public name tests.
-		{"hn.com", true},
+		{"hn.com", false},
 		{"hn.com:8811", true},
-		{"12.34.45.64", true},
+		{"12.34.45.64", false},
 		{"12.34.45.64:7777", true},
-		{"::1:4646", true},
-		{"plain", true},
+		{"::1:4646", false},
+		{"plain", false},
 		{"plain:6432", true},
 
 		// Garbage name tests.
+		{"", false},
 		{"garbage:6146:616", false},
 		{"[::1]", false},
 	}
