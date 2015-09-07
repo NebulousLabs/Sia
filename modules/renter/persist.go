@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -124,7 +125,7 @@ func (f *file) load(r io.Reader) error {
 
 // saveFile saves a file to the renter directory.
 func (r *Renter) saveFile(f *file) error {
-	handle, err := persist.NewSafeFile(filepath.Join(r.saveDir, f.name+ShareExtension))
+	handle, err := persist.NewSafeFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
 		return err
 	}
@@ -162,13 +163,13 @@ func (r *Renter) save() error {
 		b, _ := id.MarshalJSON()
 		data.Contracts[string(b)] = fc
 	}
-	return persist.SaveFile(saveMetadata, data, filepath.Join(r.saveDir, PersistFilename))
+	return persist.SaveFile(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
 	// Load all files found in renter directory.
-	dir, err := os.Open(r.saveDir) // TODO: store in a subdir?
+	dir, err := os.Open(r.persistDir) // TODO: store in a subdir?
 	if err != nil {
 		return err
 	}
@@ -181,7 +182,7 @@ func (r *Renter) load() error {
 		if filepath.Ext(path) != ShareExtension {
 			continue
 		}
-		file, err := os.Open(filepath.Join(r.saveDir, path))
+		file, err := os.Open(filepath.Join(r.persistDir, path))
 		if err != nil {
 			// maybe just skip?
 			return err
@@ -198,7 +199,7 @@ func (r *Renter) load() error {
 		Contracts map[string]types.FileContract
 		Entropy   [32]byte
 	}{}
-	err = persist.LoadFile(saveMetadata, &data, filepath.Join(r.saveDir, PersistFilename))
+	err = persist.LoadFile(saveMetadata, &data, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
 		return err
 	}
@@ -344,6 +345,31 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 	}
 
 	return names, nil
+}
+
+// initPersist handles all of the persistence initialization, such as creating
+// the persistance directory and starting the logger.
+func (r *Renter) initPersist() error {
+	// Create the perist directory if it does not yet exist.
+	err := os.MkdirAll(r.persistDir, 0700)
+	if err != nil {
+		return err
+	}
+
+	// Initialize the logger.
+	logFile, err := os.OpenFile(filepath.Join(r.persistDir, "renter.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+	if err != nil {
+		return err
+	}
+	r.log = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
+	r.log.Println("STARTUP: Renter has started logging")
+
+	// Load the prior persistance structures.
+	err = r.load()
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // LoadSharedFiles loads a .sia file into the renter. It returns the nicknames
