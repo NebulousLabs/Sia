@@ -46,7 +46,7 @@ func newHDBTester(name string) (*hdbTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := New(cs, g)
+	hdb, err := New(cs, g, filepath.Join(testdir, modules.HostDBDir))
 	if err != nil {
 		return nil, err
 	}
@@ -117,15 +117,15 @@ func TestNilInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = New(nil, nil)
+	_, err = New(nil, nil, "")
 	if err == nil {
 		t.Error("Should get an error when using nil inputs")
 	}
-	_, err = New(nil, hdbt.gateway)
+	_, err = New(nil, hdbt.gateway, "")
 	if err != errNilConsensusSet {
 		t.Error("expecting ErrNilConsensusSet:", err)
 	}
-	_, err = New(hdbt.cs, nil)
+	_, err = New(hdbt.cs, nil, "")
 	if err != errNilGateway {
 		t.Error("expecting ErrNilGateway:", err)
 	}

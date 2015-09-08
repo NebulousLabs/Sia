@@ -8,6 +8,7 @@ package hostdb
 
 import (
 	"errors"
+	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -52,24 +53,24 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
-	mu *sync.RWMutex
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error) {
+func New(cs *consensus.ConsensusSet, g modules.Gateway, persistDir string) (*HostDB, error) {
 	// Check for nil dependencies.
 	if cs == nil {
-		err = errNilConsensusSet
-		return
+		return nil, errNilConsensusSet
 	}
 	if g == nil {
-		err = errNilGateway
-		return
+		return nil, errNilGateway
 	}
 
 	// Build an empty hostdb.
-	hdb = &HostDB{
+	hdb := &HostDB{
 		consensusSet: cs,
 		gateway:      g,
 
@@ -79,7 +80,12 @@ func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error)
 
 		scanPool: make(chan *hostEntry, scanPoolSize),
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
+	}
+	err := hdb.initPersist()
+	if err != nil {
+		return nil, err
 	}
 
 	// Begin listening to consensus and looking for hosts.
@@ -88,5 +94,5 @@ func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error)
 	}
 	go hdb.threadedScan()
 	cs.ConsensusSetSubscribe(hdb)
-	return
+	return hdb, nil
 }

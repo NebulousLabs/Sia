@@ -68,7 +68,7 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hdb, err := hostdb.New(cs, g)
+	hdb, err := hostdb.New(cs, g, filepath.Join(testdir, modules.HostDBDir))
 	if err != nil {
 		t.Fatal(err)
 	}
