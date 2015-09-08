@@ -123,11 +123,11 @@ func TestNilInputs(t *testing.T) {
 		t.Error("Should get an error when using nil inputs")
 	}
 	_, err = New(nil, hdbt.gateway)
-	if err != ErrNilConsensusSet {
+	if err != errNilConsensusSet {
 		t.Error("expecting ErrNilConsensusSet:", err)
 	}
 	_, err = New(hdbt.cs, nil)
-	if err != ErrNilGateway {
+	if err != errNilGateway {
 		t.Error("expecting ErrNilGateway:", err)
 	}
 }
