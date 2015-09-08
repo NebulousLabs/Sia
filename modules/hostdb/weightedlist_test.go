@@ -30,7 +30,6 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 	// Check that the length of activeHosts and the count of hostTree are
 	// consistent.
 	if len(hdbt.hostdb.activeHosts) != numEntries {
-		hdbt.t.Error("activeHosts should equal ", numEntries, "equals", len(hdbt.hostdb.activeHosts))
 		return errors.New("unexpected number of active hosts")
 	}
 
@@ -51,9 +50,8 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 
 		// See if each host was selected enough times.
 		errorBound := 64 // Pretty large, but will still detect if something is seriously wrong.
-		for i, count := range selectionMap {
+		for _, count := range selectionMap {
 			if count < expected-errorBound || count > expected+errorBound {
-				hdbt.t.Error(i, count)
 				return errors.New("error bound was breached")
 			}
 		}
@@ -90,7 +88,10 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 // verifies that the tree stays consistent through the adjustments.
 func TestWeightedList(t *testing.T) {
 	// Create a hostdb and 3 equal entries to insert.
-	hdbt := newHDBTester("TestWeightedList", t)
+	hdbt, err := newHDBTester("TestWeightedList")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
@@ -101,7 +102,7 @@ func TestWeightedList(t *testing.T) {
 		}
 		hdbt.hostdb.insertNode(&entry)
 	}
-	err := hdbt.uniformTreeVerification(firstInsertions)
+	err = hdbt.uniformTreeVerification(firstInsertions)
 	if err != nil {
 		t.Error(err)
 	}
@@ -155,8 +156,10 @@ func TestVariedWeights(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	hdbt := newHDBTester("TestVariedWeights", t)
+	hdbt, err := newHDBTester("TestVariedWeights")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
 	// per weight added to the tree, the total number of selections necessary
@@ -208,7 +211,10 @@ func TestVariedWeights(t *testing.T) {
 
 // TestRepeatInsert inserts 2 hosts with the same address.
 func TestRepeatInsert(t *testing.T) {
-	hdbt := newHDBTester("TestRepeatInsert", t)
+	hdbt, err := newHDBTester("TestRepeatInsert")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	entry1 := hostEntry{
 		HostSettings: modules.HostSettings{IPAddress: fakeAddr(0)},
@@ -229,7 +235,10 @@ func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt := newHDBTester("TestRandomHosts", t)
+	hdbt, err := newHDBTester("TestRandomHosts")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Insert 3 hosts to be selected.
 	entry1 := hostEntry{

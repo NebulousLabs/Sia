@@ -46,7 +46,10 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt := newHDBTester("TestFindHostAnnouncements", t)
+	hdbt, err := newHDBTester("TestFindHostAnnouncements")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Put a host announcement into the blockchain.
 	announcement := encoding.Marshal(modules.HostAnnouncement{
