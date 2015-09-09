@@ -515,7 +515,12 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	if exists {
 		t.Fatal("unexpected delayed output map at pb.Height")
 	}
-	cst.cs.commitDiffSet(pb, modules.DiffRevert) // revert the current block node
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitDiffSet(tx, pb, modules.DiffRevert) // revert the current block node
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if !exists {
 		t.Error("delayed output map was not created when reverting diffs")
@@ -540,9 +545,19 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	// Check that a map is not created on revert when the height is
 	// sufficiently low.
 	parent := cst.cs.db.getBlockMap(pb.Parent)
-	cst.cs.commitDiffSet(parent, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitDiffSet(tx, parent, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	grandparent := cst.cs.db.getBlockMap(parent.Parent)
-	cst.cs.commitDiffSet(grandparent, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitDiffSet(tx, grandparent, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inDelayedSiacoinOutputs(grandparent.Height)
 	if exists {
 		t.Error("delayed output map was created when bringing the height too low")
@@ -589,7 +604,12 @@ func TestCommitNodeDiffs(t *testing.T) {
 		t.Fatal(err)
 	}
 	pb := cst.cs.currentProcessedBlock()
-	cst.cs.commitDiffSet(pb, modules.DiffRevert) // pull the block node out of the consensus set.
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// For diffs that can be destroyed in the same block they are created,
 	// create diffs that do just that. This has in the past caused issues upon
@@ -704,7 +724,12 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	}
 	pb := cst.cs.currentProcessedBlock()
 
-	cst.cs.commitDiffSet(pb, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitDiffSet(tx, pb, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Check that maps are deleted at pb.Height when applying changes.
 	exists := cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
@@ -776,7 +801,12 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		t.Fatal(err)
 	}
 	pb := cst.cs.currentProcessedBlock()
-	cst.cs.commitDiffSet(pb, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitDiffSet(tx, pb, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	defer func() {
 		r := recover()

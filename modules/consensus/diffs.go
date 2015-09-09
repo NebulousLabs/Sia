@@ -226,15 +226,15 @@ func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir module
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
-func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDirection) {
+func updateCurrentPath(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		err := cs.db.pushPath(pb.Block.ID())
+		err := pushPath(tx, pb.Block.ID())
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
 	} else {
-		err := cs.db.popPath()
+		err := popPath(tx)
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
@@ -242,23 +242,21 @@ func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDi
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) error {
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		commitDiffSetSanity(tx, pb, dir)
-		err := createUpcomingDelayedOutputMaps(tx, pb, dir)
-		if err != nil {
-			return err
-		}
-		err = commitNodeDiffs(tx, pb, dir)
-		if err != nil {
-			return err
-		}
-		return deleteObsoleteDelayedOutputMaps(tx, pb, dir)
-	})
+func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+	commitDiffSetSanity(tx, pb, dir)
+	err := createUpcomingDelayedOutputMaps(tx, pb, dir)
 	if err != nil {
 		return err
 	}
-	cs.updateCurrentPath(pb, dir)
+	err = commitNodeDiffs(tx, pb, dir)
+	if err != nil {
+		return err
+	}
+	err = deleteObsoleteDelayedOutputMaps(tx, pb, dir)
+	if err != nil {
+		return err
+	}
+	updateCurrentPath(tx, pb, dir)
 	return nil
 }
 
@@ -268,14 +266,14 @@ func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirect
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
 func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
-	// Sanity check - the block being applied should have the current block as
-	// a parent.
-	if build.DEBUG && pb.Parent != cs.currentBlockID() {
-		panic(errInvalidSuccessor)
-	}
-
 	// Update the state to point to the new block.
 	err := cs.db.Update(func(tx *bolt.Tx) error {
+		// Sanity check - the block being applied should have the current block as
+		// a parent.
+		if build.DEBUG && pb.Parent != currentBlockID(tx) {
+			panic(errInvalidSuccessor)
+		}
+
 		bid := pb.Block.ID()
 		err := tx.Bucket(BlockPath).Put(encoding.EncUint64(uint64(pb.Height)), bid[:])
 		if err != nil {
@@ -297,26 +295,29 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range pb.Block.Transactions {
+		var validationErr error
 		err = cs.db.Update(func(tx *bolt.Tx) error {
-			err := cs.validTxTransaction(tx, txn)
-			if err != nil {
-				return err
+			validationErr = cs.validTxTransaction(tx, txn)
+			if validationErr != nil {
+				// Awkward: need to apply the matured outputs otherwise the diff
+				// structure malforms due to the way the delayedOutput maps are
+				// created and destroyed.
+				err2 := cs.applyMaturedSiacoinOutputs(tx, pb)
+				if err2 != nil {
+					validationErr = errors.New(validationErr.Error() + " and " + err2.Error())
+					return nil
+				}
+				err2 = commitDiffSet(tx, pb, modules.DiffRevert)
+				if err2 != nil {
+					validationErr = errors.New(validationErr.Error() + " and " + err2.Error())
+					return nil
+				}
+				cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			}
 			return nil
 		})
-		if err != nil {
-			// Awkward: need to apply the matured outputs otherwise the diff
-			// structure malforms due to the way the delayedOutput maps are
-			// created and destroyed.
-			updateErr := cs.db.Update(func(tx *bolt.Tx) error {
-				return cs.applyMaturedSiacoinOutputs(tx, pb)
-			})
-			if updateErr != nil {
-				return errors.New(updateErr.Error() + " and " + err.Error())
-			}
-			cs.commitDiffSet(pb, modules.DiffRevert)
-			cs.dosBlocks[pb.Block.ID()] = struct{}{}
-			return err
+		if validationErr != nil {
+			return validationErr
 		}
 
 		updateErr := cs.db.Update(func(tx *bolt.Tx) error {

@@ -52,7 +52,9 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 	// Rewind blocks until we reach 'pb'.
 	for cs.currentBlockID() != pb.Block.ID() {
 		node := cs.currentProcessedBlock()
-		err := cs.commitDiffSet(node, modules.DiffRevert)
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			return commitDiffSet(tx, node, modules.DiffRevert)
+		})
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
@@ -70,7 +72,9 @@ func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*pro
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.DiffsGenerated {
-			err := cs.commitDiffSet(node, modules.DiffApply)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return commitDiffSet(tx, node, modules.DiffApply)
+			})
 			if build.DEBUG && err != nil {
 				panic(err)
 			}

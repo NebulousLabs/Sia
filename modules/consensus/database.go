@@ -144,6 +144,22 @@ func currentBlockID(tx *bolt.Tx) types.BlockID {
 	return getPath(tx, blockHeight(tx))
 }
 
+// pushPath adds a block to the BlockPath at current height + 1.
+func pushPath(tx *bolt.Tx, bid types.BlockID) error {
+	b := tx.Bucket(BlockPath)
+	key := encoding.EncUint64(uint64(b.Stats().KeyN))
+	value := encoding.Marshal(bid)
+	return b.Put(key, value)
+}
+
+// popPath removes a block from the "end" of the chain, i.e. the block
+// with the largest height.
+func popPath(tx *bolt.Tx) error {
+	b := tx.Bucket(BlockPath)
+	key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
+	return b.Delete(key)
+}
+
 // getSiacoinOutput fetches a siacoin output from the database. An error is
 // returned if the siacoin output does not exist.
 func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
@@ -394,14 +410,6 @@ func forEach(tx *bolt.Tx, bucket []byte, fn func(k, v []byte) error) error {
 		panic(errNilBucket)
 	}
 	return b.ForEach(fn)
-}
-
-// pushPath adds a block to the BlockPath at current height + 1.
-func pushPath(tx *bolt.Tx, bid types.BlockID) error {
-	b := tx.Bucket(BlockPath)
-	key := encoding.EncUint64(uint64(b.Stats().KeyN))
-	value := encoding.Marshal(bid)
-	return b.Put(key, value)
 }
 
 // getItem is a generic function to insert an item into the set database
