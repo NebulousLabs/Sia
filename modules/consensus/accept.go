@@ -123,7 +123,9 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	}()
 
 	var newNode *processedBlock
+	var currentNode *processedBlock
 	err = cs.db.Update(func(tx *bolt.Tx) error {
+		currentNode = currentProcessedBlock(tx)
 		var err2 error
 		newNode, err2 = cs.newChild(tx, parentNode, b)
 		return err2
@@ -131,7 +133,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	if err != nil {
 		return nil, nil, err
 	}
-	if newNode.heavierThan(cs.currentProcessedBlock()) {
+	if newNode.heavierThan(currentNode) {
 		return cs.forkBlockchain(newNode)
 	}
 	return nil, nil, modules.ErrNonExtendingBlock

@@ -144,6 +144,11 @@ func currentBlockID(tx *bolt.Tx) types.BlockID {
 	return getPath(tx, blockHeight(tx))
 }
 
+// currentProcessedBlock returns the most recent block in the consensus set.
+func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
+	return getBlockMap(tx, currentBlockID(tx))
+}
+
 // pushPath adds a block to the BlockPath at current height + 1.
 func pushPath(tx *bolt.Tx, bid types.BlockID) error {
 	b := tx.Bucket(BlockPath)
