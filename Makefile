@@ -62,16 +62,17 @@ clean:
 # command. 'test' runs short tests that should last no more than a few seconds,
 # 'test-long' runs more thorough tests which should not last more than a few
 # minutes.
+run = Test
 pkgs = ./api ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/hostdb	   \
        ./modules/miner ./modules/renter ./modules/transactionpool              \
        ./modules/wallet  ./persist ./siac ./siae ./types
 test: clean fmt REBUILD
-	go test -short -tags='debug testing' -timeout=10s $(pkgs)
+	go test -short -tags='debug testing' -timeout=10s $(pkgs) -run $(run)
 test-v: clean fmt REBUILD
-	go test -race -v -short -tags='debug testing' -timeout=35s $(pkgs)
+	go test -race -v -short -tags='debug testing' -timeout=35s $(pkgs) -run $(run)
 test-long: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=300s $(pkgs)
+	go test -v -race -tags='testing debug' -timeout=300s $(pkgs) -run $(run)
 bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=300s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
