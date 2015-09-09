@@ -128,7 +128,7 @@ func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirect
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
 		return createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 	} else if pb.Height > types.MaturityDelay {
@@ -207,27 +207,22 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
-func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
+func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if pb.Height > types.MaturityDelay {
-			// Sanity check - the map being deleted should be empty.
-			if build.DEBUG {
-				if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
-					panic(errDeletingNonEmptyDelayedMap)
-				}
+			err := removeDSCOBucket(tx, pb.Height)
+			if err != nil {
+				return err
 			}
-			cs.db.rmDelayedSiacoinOutputs(pb.Height)
 		}
 	} else {
-		// Sanity check - the map being deleted should be empty
-		if build.DEBUG {
-			if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay) != 0 {
-				panic(errDeletingNonEmptyDelayedMap)
-			}
+		err := removeDSCOBucket(tx, pb.Height+types.MaturityDelay)
+		if err != nil {
+			return err
 		}
-		cs.db.rmDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	}
+	return nil
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
@@ -250,16 +245,19 @@ func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDi
 func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) error {
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		commitDiffSetSanity(tx, pb, dir)
-		err := cs.createUpcomingDelayedOutputMaps(tx, pb, dir)
+		err := createUpcomingDelayedOutputMaps(tx, pb, dir)
 		if err != nil {
 			return err
 		}
-		return commitNodeDiffs(tx, pb, dir)
+		err = commitNodeDiffs(tx, pb, dir)
+		if err != nil {
+			return err
+		}
+		return deleteObsoleteDelayedOutputMaps(tx, pb, dir)
 	})
 	if err != nil {
 		return err
 	}
-	cs.deleteObsoleteDelayedOutputMaps(pb, dir)
 	cs.updateCurrentPath(pb, dir)
 	return nil
 }

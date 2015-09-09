@@ -527,7 +527,7 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 		t.Fatal("delayed output map exists when it shouldn't")
 	}
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -649,7 +649,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -713,7 +713,7 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	}
 	// Prepare for and then apply the obsolete maps.
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -724,7 +724,12 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffApply)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if exists {
 		t.Error("delayed output map was not deleted on apply")
@@ -737,7 +742,7 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 		t.Fatal("expected a delayed output map at pb.Height+maturity delay")
 	}
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
+		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -748,7 +753,12 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	if exists {
 		t.Error("delayed siacoin output map was not deleted upon revert")
@@ -782,7 +792,7 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 
 		// Trigger a panic by deleting a map with outputs in it during revert.
 		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+			return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -793,11 +803,21 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
+		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffRevert)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	// Trigger a panic by deleting a map with outputs in it during apply.
-	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffApply)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 /*

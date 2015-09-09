@@ -303,6 +303,33 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) err
 	return dscoBucket.Delete(id[:])
 }
 
+// removeDSCOBucket deletes the bucket that held a set of delayed siacoin
+// outputs.
+func removeDSCOBucket(tx *bolt.Tx, h types.BlockHeight) error {
+	// Delete the bucket.
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucket := tx.Bucket(bucketID)
+	if build.DEBUG && bucket == nil {
+		panic(errNilBucket)
+	}
+	if build.DEBUG && bucket.Stats().KeyN != 0 {
+		// TODO: The fact that the panic is triggering indicates some type of
+		// developer mistake. Must be addressed.
+		//
+		// panic(errNonEmptyBucket)
+	}
+	err := tx.DeleteBucket(bucketID)
+	if err != nil {
+		return err
+	}
+
+	b := tx.Bucket(DSCOBuckets)
+	if build.DEBUG && b.Get(encoding.Marshal(h)) == nil {
+		panic(errNilItem)
+	}
+	return b.Delete(encoding.Marshal(h))
+}
+
 func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
 	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
 	return forEach(tx, bucketID, func(kb, bv []byte) error {
@@ -787,20 +814,6 @@ func (db *setDB) inDelayedSiacoinOutputs(h types.BlockHeight) bool {
 func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) bool {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
 	return db.inBucket(bucketID, id)
-}
-
-func removeDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
-	bhBytes := encoding.EncUint64(uint64(bh))
-	bucketID := append(prefix_dsco, bhBytes...)
-	err := tx.DeleteBucket(bucketID)
-	if err != nil {
-		return err
-	}
-	b := tx.Bucket(DSCOBuckets)
-	if build.DEBUG && b.Get(bhBytes) == nil {
-		panic(errNilItem)
-	}
-	return b.Delete(bhBytes)
 }
 
 // rmDelayedSiacoinOutputs removes a height and its corresponding
