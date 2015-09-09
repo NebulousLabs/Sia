@@ -177,6 +177,7 @@ func main() {
 		walletStatusCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
+	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterDownloadQueueCmd, renterFilesDeleteCmd, renterFilesDownloadCmd,
