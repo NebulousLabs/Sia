@@ -40,33 +40,24 @@ func (rt *renterTester) Close() error {
 // newRenterTester creates a ready-to-use renter tester with money in the
 // wallet.
 func newRenterTester(name string) (*renterTester, error) {
+	// Create the modules.
 	testdir := build.TempDir("renter", name)
-
-	// Create the gateway.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the consensus set.
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the hostdb.
-	hdb, err := hostdb.New(cs, g)
+	hdb, err := hostdb.New(cs, g, filepath.Join(testdir, modules.HostDBDir))
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the tpool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the wallet.
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		return nil, err
@@ -83,14 +74,10 @@ func newRenterTester(name string) (*renterTester, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the renter.
 	r, err := New(cs, hdb, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the miner.
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err

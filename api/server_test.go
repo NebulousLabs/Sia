@@ -90,7 +90,7 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := hostdb.New(cs, g)
+	hdb, err := hostdb.New(cs, g, filepath.Join(testdir, modules.HostDBDir))
 	if err != nil {
 		return nil, err
 	}

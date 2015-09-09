@@ -8,17 +8,13 @@ package hostdb
 
 import (
 	"errors"
+	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 )
 
 const (
-	// Hosts will not be removed if there are fewer than this many hosts.
-	// Eventually, this number should be in the low thousands.
-	MinHostThreshold = 5
-
 	// scanPoolSize sets the buffer size of the channel that holds hosts which
 	// need to be scanned. A thread pool pulls from the scan pool to query
 	// hosts that are due for an update.
@@ -26,16 +22,17 @@ const (
 )
 
 var (
-	ErrNilGateway      = errors.New("gateway cannot be nil")
-	ErrNilConsensusSet = errors.New("consensus set cannot be nil")
+	errNilGateway      = errors.New("gateway cannot be nil")
+	errNilConsensusSet = errors.New("consensus set cannot be nil")
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
-	consensusSet *consensus.ConsensusSet
-	gateway      modules.Gateway
+	consensusSet    modules.ConsensusSet
+	gateway         modules.Gateway
+	consensusHeight int
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -43,9 +40,8 @@ type HostDB struct {
 	// corresponding node, as the hostTree is unsorted. A host is active if
 	// it is currently responding to queries about price and other
 	// settings.
-	hostTree        *hostNode
-	activeHosts     map[modules.NetAddress]*hostNode
-	consensusHeight int
+	hostTree    *hostNode
+	activeHosts map[modules.NetAddress]*hostNode
 
 	// allHosts is a simple list of all known hosts by their network address,
 	// including hosts that are currently offline.
@@ -56,24 +52,24 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
-	mu *sync.RWMutex
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
-// New returns a host database that will still crawling the hosts it finds on
-// the blockchain.
-func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error) {
+// New creates and starts up a hostdb. The hostdb that gets returned will not
+// have finished scanning the network or blockchain.
+func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*HostDB, error) {
 	// Check for nil dependencies.
 	if cs == nil {
-		err = ErrNilConsensusSet
-		return
+		return nil, errNilConsensusSet
 	}
 	if g == nil {
-		err = ErrNilGateway
-		return
+		return nil, errNilGateway
 	}
 
 	// Build an empty hostdb.
-	hdb = &HostDB{
+	hdb := &HostDB{
 		consensusSet: cs,
 		gateway:      g,
 
@@ -83,7 +79,12 @@ func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error)
 
 		scanPool: make(chan *hostEntry, scanPoolSize),
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
+	}
+	err := hdb.initPersist()
+	if err != nil {
+		return nil, err
 	}
 
 	// Begin listening to consensus and looking for hosts.
@@ -92,5 +93,5 @@ func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error)
 	}
 	go hdb.threadedScan()
 	cs.ConsensusSetSubscribe(hdb)
-	return
+	return hdb, nil
 }

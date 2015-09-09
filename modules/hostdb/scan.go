@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	DefaultScanSleep = 2*time.Hour + 18*time.Minute
-	MaxScanSleep     = 6 * time.Hour
+	DefaultScanSleep = 1*time.Hour + 37*time.Minute
+	MaxScanSleep     = 4 * time.Hour
 	MinScanSleep     = 1 * time.Hour
 
 	MaxActiveHosts              = 500
@@ -34,8 +34,8 @@ const (
 )
 
 var (
-	MaxReliability     = types.NewCurrency64(50) // Given the scanning defaults, about 1 week of survival.
-	DefaultReliability = types.NewCurrency64(20) // Given the scanning defaults, about 3 days of survival.
+	MaxReliability     = types.NewCurrency64(225) // Given the scanning defaults, about 3 weeks of survival.
+	DefaultReliability = types.NewCurrency64(75)  // Given the scanning defaults, about 1 week of survival.
 	UnreachablePenalty = types.NewCurrency64(1)
 )
 
@@ -127,6 +127,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
 	for {
+		// Log the current number of hosts.
+		hdb.log.Printf("INFO: Starting a host scan. Active Hosts: %v. All hosts: %v.", len(hdb.activeHosts), len(hdb.allHosts))
+
 		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.

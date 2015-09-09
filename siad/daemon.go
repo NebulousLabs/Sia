@@ -55,7 +55,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	hostdb, err := hostdb.New(cs, gateway)
+	hostdb, err := hostdb.New(cs, gateway, filepath.Join(config.Siad.SiaDir, modules.HostDBDir))
 	if err != nil {
 		return err
 	}

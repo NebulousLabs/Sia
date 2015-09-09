@@ -21,7 +21,7 @@ import (
 )
 
 type hdbTester struct {
-	cs      *consensus.ConsensusSet
+	cs      modules.ConsensusSet
 	gateway modules.Gateway
 	host    modules.Host
 	miner   modules.Miner
@@ -31,56 +31,53 @@ type hdbTester struct {
 	walletMasterKey crypto.TwofishKey
 
 	hostdb *HostDB
-
-	t *testing.T
 }
 
 // newHDBTester returns a ready-to-use hdb tester, with all modules
 // initialized.
-func newHDBTester(name string, t *testing.T) *hdbTester {
-	testdir := build.TempDir("hostdb", name)
-
+func newHDBTester(name string) (*hdbTester, error) {
 	// Create the modules.
+	testdir := build.TempDir("hostdb", name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	hdb, err := New(cs, g)
+	hdb, err := New(cs, g, filepath.Join(testdir, modules.HostDBDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	var masterKey crypto.TwofishKey
 	_, err = rand.Read(masterKey[:])
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	_, err = w.Encrypt(masterKey)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	err = w.Unlock(masterKey)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	h, err := host.New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	// Assemble all objects into an hdbTester.
@@ -95,8 +92,6 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		walletMasterKey: masterKey,
 
 		hostdb: hdb,
-
-		t: t,
 	}
 
 	// Mine blocks until there is money in the wallet.
@@ -104,11 +99,11 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		b, _ := hdbt.miner.FindBlock()
 		err = hdbt.cs.AcceptBlock(b)
 		if err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 	}
 
-	return hdbt
+	return hdbt, err
 }
 
 // TestNilInputs tries supplying the hostdb with nil inputs and checks for
@@ -117,17 +112,21 @@ func TestNilInputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt := newHDBTester("TestNilInputs", t)
-	_, err := New(nil, nil)
+	hdbt, err := newHDBTester("TestNilInputs")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = New(nil, nil, "")
 	if err == nil {
 		t.Error("Should get an error when using nil inputs")
 	}
-	_, err = New(nil, hdbt.gateway)
-	if err != ErrNilConsensusSet {
+	_, err = New(nil, hdbt.gateway, "")
+	if err != errNilConsensusSet {
 		t.Error("expecting ErrNilConsensusSet:", err)
 	}
-	_, err = New(hdbt.cs, nil)
-	if err != ErrNilGateway {
+	_, err = New(hdbt.cs, nil, "")
+	if err != errNilGateway {
 		t.Error("expecting ErrNilGateway:", err)
 	}
 }

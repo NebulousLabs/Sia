@@ -4,6 +4,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	HostDBDir = "hostdb"
+)
+
 var (
 	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
 )
