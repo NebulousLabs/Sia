@@ -133,6 +133,17 @@ func (db *setDB) stopConsistencyGuard() {
 	}
 }
 
+// blockHeight returns the height of the blockchain.
+func blockHeight(tx *bolt.Tx) types.BlockHeight {
+	blockPath := tx.Bucket(BlockPath)
+	return types.BlockHeight(blockPath.Stats().KeyN - 1)
+}
+
+// currentBlockID returns the id of the most recent block in the consensus set.
+func currentBlockID(tx *bolt.Tx) types.BlockID {
+	return getPath(tx, blockHeight(tx))
+}
+
 // getSiacoinOutput fetches a siacoin output from the database. An error is
 // returned if the siacoin output does not exist.
 func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
@@ -505,6 +516,8 @@ func (db *setDB) addBlockMap(pb *processedBlock) error {
 }
 
 // getBlockMap returns a processed block with the input id.
+//
+// TODO: This function is not safe.
 func getBlockMap(tx *bolt.Tx, id types.BlockID) *processedBlock {
 	pbBytes, err := getItem(tx, BlockMap, id)
 	if build.DEBUG && err != nil {

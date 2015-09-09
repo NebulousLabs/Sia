@@ -470,7 +470,10 @@ func TestCommitDiffSetSanity(t *testing.T) {
 
 		// Trigger a panic about diffs not being generated.
 		pb.DiffsGenerated = false
-		cst.cs.commitDiffSetSanity(pb, modules.DiffRevert)
+		_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			commitDiffSetSanity(tx, pb, modules.DiffRevert)
+			return nil
+		})
 	}()
 	defer func() {
 		r := recover()
@@ -480,12 +483,19 @@ func TestCommitDiffSetSanity(t *testing.T) {
 
 		// trigger a panic about applying the wrong block.
 		pb.Block.ParentID[0]++
-		cst.cs.commitDiffSetSanity(pb, modules.DiffApply)
+		_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			commitDiffSetSanity(tx, pb, modules.DiffApply)
+			return nil
+		})
 	}()
 
 	// Trigger a panic about incorrectly reverting a diff set.
-	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{}) // change the block id by adding a miner payout
-	cst.cs.commitDiffSetSanity(pb, modules.DiffRevert)
+	// Change block id by adding a miner payout.
+	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{})
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitDiffSetSanity(tx, pb, modules.DiffRevert)
+		return nil
+	})
 }
 
 // TestCreateUpcomingDelayedOutputMaps probes the createUpcomingDelayedMaps

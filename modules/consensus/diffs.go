@@ -103,7 +103,7 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 
 // commitDiffSetSanity performs a series of sanity checks before commiting a
 // diff set.
-func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.DiffDirection) {
+func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// Sanity checks.
 	if build.DEBUG {
 		// Diffs should have already been generated for this node.
@@ -114,12 +114,12 @@ func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.Diff
 		// Current node must be the input node's parent if applying, and
 		// current node must be the input node if reverting.
 		if dir == modules.DiffApply {
-			parent := cs.db.getBlockMap(pb.Parent)
-			if parent.Block.ID() != cs.currentBlockID() {
+			parent := getBlockMap(tx, pb.Parent)
+			if parent.Block.ID() != currentBlockID(tx) {
 				panic(errWrongAppliedDiffSet)
 			}
 		} else {
-			if pb.Block.ID() != cs.currentBlockID() {
+			if pb.Block.ID() != currentBlockID(tx) {
 				panic(errWrongRevertDiffSet)
 			}
 		}
@@ -248,8 +248,8 @@ func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDi
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
 func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) error {
-	cs.commitDiffSetSanity(pb, dir)
 	err := cs.db.Update(func(tx *bolt.Tx) error {
+		commitDiffSetSanity(tx, pb, dir)
 		err := cs.createUpcomingDelayedOutputMaps(tx, pb, dir)
 		if err != nil {
 			return err
