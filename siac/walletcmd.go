@@ -128,22 +128,29 @@ Example: 'siac wallet load siag key1.siakey,key2.siakey'`,
 	}
 
 	walletSendCmd = &cobra.Command{
-		Use:   "send [amount] [dest]",
-		Short: "Send coins to another wallet",
-		Long: `Send coins to another wallet. 'dest' must be a 76-byte hexadecimal address.
+		Use:   "send",
+		Short: "Send either siacoins or siafunds to an address",
+		Long:  "Send either siacoins or siafunds to an address",
+		Run:   walletsendcmd,
+	}
+
+	walletSendSiacoinsCmd = &cobra.Command{
+		Use:   "siacoins [amount] [dest]",
+		Short: "Send siacoins to an address",
+		Long: `Send siacoins to an address. 'dest' must be a 76-byte hexadecimal address.
 'amount' can be specified in units, e.g. 1.23KS. Run 'wallet --help' for a list of units.
 If no unit is supplied, hastings will be assumed.
 
 A miner fee of 10 SC is levied on all transactions.`,
-		Run: wrap(walletsendcmd),
+		Run: wrap(walletsendsiacoinscmd),
 	}
 
-	walletSiafundsSendCmd = &cobra.Command{
-		Use:   "send [amount] [dest] [keyfiles]",
+	walletSendSiafundsCmd = &cobra.Command{
+		Use:   "siafunds [amount] [dest] [keyfiles]",
 		Short: "Send siafunds",
-		Long: `Send siafunds to an address, and transfer their siacoins to the wallet.
+		Long: `Send siafunds to an address, and transfer the claim siacoins to your wallet.
 Run 'wallet send --help' to see a list of available units.`,
-		Run: walletsiafundssendcmd, // see function docstring
+		Run: wrap(walletsendsiafundscmd),
 	}
 
 	walletStatusCmd = &cobra.Command{
@@ -298,8 +305,11 @@ func walletseedscmd() {
 	}
 }
 
-// walletsendcmd sends siacoins to a destination address.
-func walletsendcmd(amount, dest string) {
+// walletsendcmd is a noop, it has only subcommands.
+func walletsendcmd(cmd *cobra.Command, args []string) { cmd.Usage() }
+
+// walletsendsiacoinscmd sends siacoins to a destination address.
+func walletsendsiacoinscmd(amount, dest string) {
 	adjAmount, err := coinUnits(amount)
 	if err != nil {
 		fmt.Println("Could not parse amount:", err)
@@ -313,39 +323,14 @@ func walletsendcmd(amount, dest string) {
 	fmt.Printf("Sent %s hastings to %s\n", adjAmount, dest)
 }
 
-// special because list of keyfiles is variadic
-func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
-	/*
-			if len(args) < 3 {
-				cmd.Usage()
-				return
-			}
-			amount, dest, keyfiles := args[0], args[1], args[2:]
-			for i := range keyfiles {
-				keyfiles[i] = abs(keyfiles[i])
-			}
-			qs := fmt.Sprintf("amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
-
-			err := post("/wallet/siafunds/send", qs)
-			if err != nil {
-				fmt.Println("Could not send siafunds:", err)
-				return
-			}
-			fmt.Printf("Sent %s siafunds to %s\n", amount, dest)
-		}
-
-		func walletsiafundstrackcmd(keyfile string) {
-			err := post("/wallet/siafunds/watchsiagaddress", "keyfile="+abs(keyfile))
-			if err != nil {
-				fmt.Println("Could not track siafunds:", err)
-				return
-			}
-			fmt.Printf(`Added %s to tracked siafunds.
-
-		You must restart siad to update your siafund balance.
-		Do not delete the original keyfile.
-		`, keyfile)
-	*/
+// walletsendsiafundscmd sends siafunds to a destination address.
+func walletsendsiafundscmd(amount, dest string) {
+	err := post("/wallet/siafunds", fmt.Sprintf("amount=%s&destination=%s", amount, dest))
+	if err != nil {
+		fmt.Println("Could not send:", err)
+		return
+	}
+	fmt.Printf("Sent %s siafunds to %s\n", amount, dest)
 }
 
 // walletstatuscmd retrieves and displays information about the wallet
