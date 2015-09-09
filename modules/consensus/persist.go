@@ -45,7 +45,7 @@ func (cs *ConsensusSet) initSetDB() error {
 	// opened/initilized and the consensus set hash being calculated
 	err = cs.db.Update(func(tx *bolt.Tx) error {
 		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
-			err := cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+			err := commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 			if err != nil {
 				return err
 			}

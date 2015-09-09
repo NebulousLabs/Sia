@@ -340,7 +340,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 		MaturityHeight: maturityHeight,
 	}
 	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		return commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	})
 }
 

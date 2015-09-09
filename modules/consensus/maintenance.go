@@ -31,7 +31,7 @@ func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		err := commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlo
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.commitTxSiacoinOutputDiff(tx, scod, modules.DiffApply)
+		err := commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlo
 			MaturityHeight: pb.Height,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		return commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	})
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBloc
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		err = commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBloc
 		FileContract: fc,
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	return cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+	return commitFileContractDiff(tx, fcd, modules.DiffApply)
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have

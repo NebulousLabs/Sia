@@ -37,24 +37,24 @@ var (
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
-// commitTxSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (cs *ConsensusSet) commitTxSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
+// commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
+func commitSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
 	if scod.Direction == dir {
 		return addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
 	}
 	return removeSiacoinOutput(tx, scod.ID)
 }
 
-// commitTxFileContractDiff applies or reverts a FileContractDiff.
-func (cs *ConsensusSet) commitTxFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) error {
+// commitFileContractDiff applies or reverts a FileContractDiff.
+func commitFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) error {
 	if fcd.Direction == dir {
 		return addFileContract(tx, fcd.ID, fcd.FileContract)
 	}
 	return removeFileContract(tx, fcd.ID)
 }
 
-// commitTxSiafundOutputDiff applies or reverts a Siafund output diff.
-func (cs *ConsensusSet) commitTxSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) error {
+// commitSiafundOutputDiff applies or reverts a Siafund output diff.
+func commitSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) error {
 	if sfod.Direction == dir {
 		return addSiafundOutput(tx, sfod.ID, sfod.SiafundOutput)
 	}
@@ -62,15 +62,15 @@ func (cs *ConsensusSet) commitTxSiafundOutputDiff(tx *bolt.Tx, sfod modules.Siaf
 }
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
-func (cs *ConsensusSet) commitTxDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) error {
+func commitDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) error {
 	if dscod.Direction == dir {
 		return addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
 	}
 	return removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
 }
 
-// commitTxSiafundPoolDiff applies or reverts a SiafundPoolDiff.
-func (cs *ConsensusSet) commitTxSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) error {
+// commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
+func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) error {
 	// Sanity check - siafund pool should only ever increase.
 	if build.DEBUG {
 		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
@@ -142,62 +142,62 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		if dir == modules.DiffApply {
 			for _, scod := range pb.SiacoinOutputDiffs {
-				err := cs.commitTxSiacoinOutputDiff(tx, scod, dir)
+				err := commitSiacoinOutputDiff(tx, scod, dir)
 				if err != nil {
 					return err
 				}
 			}
 			for _, fcd := range pb.FileContractDiffs {
-				err := cs.commitTxFileContractDiff(tx, fcd, dir)
+				err := commitFileContractDiff(tx, fcd, dir)
 				if err != nil {
 					return err
 				}
 			}
 			for _, sfod := range pb.SiafundOutputDiffs {
-				err := cs.commitTxSiafundOutputDiff(tx, sfod, dir)
+				err := commitSiafundOutputDiff(tx, sfod, dir)
 				if err != nil {
 					return err
 				}
 			}
 			for _, dscod := range pb.DelayedSiacoinOutputDiffs {
-				err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, dir)
+				err := commitDelayedSiacoinOutputDiff(tx, dscod, dir)
 				if err != nil {
 					return err
 				}
 			}
 			for _, sfpd := range pb.SiafundPoolDiffs {
-				err := cs.commitTxSiafundPoolDiff(tx, sfpd, dir)
+				err := commitSiafundPoolDiff(tx, sfpd, dir)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
 			for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-				err := cs.commitTxSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
+				err := commitSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
 				if err != nil {
 					return err
 				}
 			}
 			for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
-				err := cs.commitTxFileContractDiff(tx, pb.FileContractDiffs[i], dir)
+				err := commitFileContractDiff(tx, pb.FileContractDiffs[i], dir)
 				if err != nil {
 					return err
 				}
 			}
 			for i := len(pb.SiafundOutputDiffs) - 1; i >= 0; i-- {
-				err := cs.commitTxSiafundOutputDiff(tx, pb.SiafundOutputDiffs[i], dir)
+				err := commitSiafundOutputDiff(tx, pb.SiafundOutputDiffs[i], dir)
 				if err != nil {
 					return err
 				}
 			}
 			for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-				err := cs.commitTxDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
+				err := commitDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
 				if err != nil {
 					return err
 				}
 			}
 			for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
-				err := cs.commitTxSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
+				err := commitSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
 				if err != nil {
 					return err
 				}
@@ -326,7 +326,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		}
 
 		updateErr := cs.db.Update(func(tx *bolt.Tx) error {
-			err = cs.applyTransaction(tx, pb, txn)
+			err = applyTransaction(tx, pb, txn)
 			if err != nil {
 				return err
 			}

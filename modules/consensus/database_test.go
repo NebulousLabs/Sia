@@ -47,7 +47,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			return commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		})
 		if err != nil {
 			return err
@@ -63,7 +63,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
 	err := cs.db.Update(func(tx *bolt.Tx) error {
-		return cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+		return commitFileContractDiff(tx, fcd, modules.DiffApply)
 	})
 	if err != nil {
 		return err
