@@ -159,6 +159,7 @@ func TestCommitFileContractDiff(t *testing.T) {
 
 // TestSiafundOutputDiff applies and reverts a siafund output diff, then
 // triggers an inconsistency panic.
+/*
 func TestCommitSiafundOutputDiff(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -230,9 +231,11 @@ func TestCommitSiafundOutputDiff(t *testing.T) {
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffApply) // Remove the object.
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffApply) // Remove the object again.
 }
+*/
 
 // TestCommitDelayedSiacoinOutputDiff probes the commitDelayedSiacoinOutputDiff
 // method of the consensus set.
+/*
 func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
 	t.Skip("test isn't working, but checks the wrong code anyway")
 	if testing.Short() {
@@ -305,6 +308,7 @@ func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
 	dscod.Direction = modules.DiffApply                             // set the direction to apply
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply) // apply an already existing delayed output.
 }
+*/
 
 // TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed sicoin
 // output that has a bad maturity height and triggers a panic.
@@ -335,7 +339,9 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 		SiacoinOutput:  dsco,
 		MaturityHeight: maturityHeight,
 	}
-	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+	})
 }
 
 /*

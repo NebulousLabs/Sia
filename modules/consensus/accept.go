@@ -156,7 +156,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		if err != nil {
 			return err
 		}
-
 		return nil
 	})
 	if err != nil {

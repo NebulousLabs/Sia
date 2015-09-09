@@ -152,8 +152,9 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 // if the siacoin output is already in the database.
 func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 	siacoinOutputs := tx.Bucket(SiacoinOutputs)
-	if siacoinOutputs.Get(id[:]) != nil {
-		return errRepeatInsert
+	// Sanity check - should not be adding an item that exists.
+	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
+		panic("repeat siacoin output")
 	}
 	return siacoinOutputs.Put(id[:], encoding.Marshal(sco))
 }
@@ -162,9 +163,12 @@ func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOu
 // returned if the siacoin output is not in the database prior to removal.
 func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
 	scoBucket := tx.Bucket(SiacoinOutputs)
-	scoBytes := scoBucket.Get(id[:])
-	if scoBytes == nil {
-		return errNilItem
+	// Sanity check - should not be removing an item that is not in the db.
+	if build.DEBUG {
+		scoBytes := scoBucket.Get(id[:])
+		if scoBytes == nil {
+			panic("nil siacoin output")
+		}
 	}
 	return scoBucket.Delete(id[:])
 }
@@ -174,8 +178,9 @@ func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
 func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) error {
 	// Add the file contract to the database.
 	fcBucket := tx.Bucket(FileContracts)
-	if fcBucket.Get(id[:]) != nil {
-		return errRepeatInsert
+	// Sanity check - should not be adding a file contract already in the db.
+	if build.DEBUG && fcBucket.Get(id[:]) != nil {
+		panic("repeat file contract")
 	}
 	err := fcBucket.Put(id[:], encoding.Marshal(fc))
 	if err != nil {
@@ -196,8 +201,9 @@ func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
 	// Delete the file contract entry.
 	fcBucket := tx.Bucket(FileContracts)
 	fcBytes := fcBucket.Get(id[:])
-	if fcBytes == nil {
-		return errNilItem
+	// Sanity check - should not be removing a file contract not in the db.
+	if build.DEBUG && fcBytes == nil {
+		panic("nil file contract")
 	}
 	err := fcBucket.Delete(id[:])
 	if err != nil {
@@ -217,16 +223,28 @@ func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
 	return expirationBucket.Delete(id[:])
 }
 
-func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
-	return forEach(tx, bucketID, func(kb, bv []byte) error {
-		var id types.FileContractID
-		err := encoding.Unmarshal(kb, &id)
-		if err != nil {
-			return err
+// addSiafundOutput adds a siafund output to the database. An error is returned
+// if the siafund output is already in the database.
+func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sco types.SiafundOutput) error {
+	siafundOutputs := tx.Bucket(SiafundOutputs)
+	// Sanity check - should not be adding an item already in the db.
+	if build.DEBUG && siafundOutputs.Get(id[:]) != nil {
+		panic("repeat siafund output")
+	}
+	return siafundOutputs.Put(id[:], encoding.Marshal(sco))
+}
+
+// removeSiafundOutput removes a siafund output from the database. An error is
+// returned if the siafund output is not in the database prior to removal.
+func removeSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) error {
+	scoBucket := tx.Bucket(SiafundOutputs)
+	if build.DEBUG {
+		scoBytes := scoBucket.Get(id[:])
+		if scoBytes == nil {
+			panic("nil siafund output")
 		}
-		return fn(id)
-	})
+	}
+	return scoBucket.Delete(id[:])
 }
 
 // getSiafundPool returns the current value of the siafund pool.
@@ -246,6 +264,44 @@ func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
 // setSiafundPool updates the saved siafund pool on disk
 func setSiafundPool(tx *bolt.Tx, c types.Currency) error {
 	return tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
+}
+
+// addDSCO adds a delayed siacoin output to the consnesus set.
+func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	// Sanity check - output should not already be in the full set of outputs.
+	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
+		panic("dsco already in output set")
+	}
+	dscoBucketID := append(prefix_dsco, encoding.EncUint64(uint64(bh))...)
+	dscoBucket := tx.Bucket(dscoBucketID)
+	// Sanity check - should not be adding an item already in the db.
+	if build.DEBUG && dscoBucket.Get(id[:]) != nil {
+		panic(errRepeatInsert)
+	}
+	return dscoBucket.Put(id[:], encoding.Marshal(sco))
+}
+
+// removeDSCO removes a delayed siacoin output from the consensus set.
+func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	// Sanity check - should not remove an item not in the db.
+	dscoBucket := tx.Bucket(bucketID)
+	if build.DEBUG && dscoBucket.Get(id[:]) == nil {
+		panic("nil dsco")
+	}
+	return dscoBucket.Delete(id[:])
+}
+
+func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
+	return forEach(tx, bucketID, func(kb, bv []byte) error {
+		var id types.FileContractID
+		err := encoding.Unmarshal(kb, &id)
+		if err != nil {
+			return err
+		}
+		return fn(id)
+	})
 }
 
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
@@ -502,13 +558,6 @@ func (db *setDB) updateBlockMap(pb *processedBlock) {
 	}
 }
 
-// addSiafundOutputs is a wrapper around addItem for adding a siafundOutput.
-func (db *setDB) addSiafundOutputs(id types.SiafundOutputID, output types.SiafundOutput) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, SiafundOutputs, id, output)
-	})
-}
-
 func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
 	sfoBytes, err := getItem(tx, SiafundOutputs, id)
 	if err != nil {
@@ -701,20 +750,6 @@ func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
 	return err
 }
 
-func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	// Sanity check - output should not already be in the siacoin outputs set.
-	if build.DEBUG && isSiacoinOutput(tx, id) {
-		panic(errOutputAlreadyMature)
-	}
-	dscoBucketID := append(prefix_dsco, encoding.EncUint64(uint64(bh))...)
-	dscoBucket := tx.Bucket(dscoBucketID)
-	if build.DEBUG && dscoBucket.Get(id[:]) != nil {
-		panic(errRepeatInsert)
-	}
-	emsco := encoding.Marshal(sco)
-	return dscoBucket.Put(id[:], emsco)
-}
-
 // getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
 func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinOutputID) types.SiacoinOutput {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
@@ -776,11 +811,6 @@ func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-}
-
-func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
-	return removeItem(tx, bucketID, id)
 }
 
 // lenDelayedSiacoinOutputs returns the number of unique heights in the delayed siacoin outputs map

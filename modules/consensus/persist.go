@@ -43,8 +43,17 @@ func (cs *ConsensusSet) initSetDB() error {
 	// Update the siafundoutput diffs map for the genesis block on
 	// disk. This needs to happen between the database being
 	// opened/initilized and the consensus set hash being calculated
-	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
+			err := cs.commitTxSiafundOutputDiff(tx, sfod, modules.DiffApply)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// Prevent the miner payout for the genesis block from being spent

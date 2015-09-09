@@ -348,7 +348,12 @@ func TestInconsistentCheck(t *testing.T) {
 	})
 	sfo.Value = sfo.Value.Add(types.NewCurrency64(1))
 	cst.cs.db.rmSiafundOutputs(sfod)
-	cst.cs.db.addSiafundOutputs(sfod, sfo)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return addSiafundOutput(tx, sfod, sfo)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Mine and submit a block, triggering the inconsistency check.
 	defer func() {
