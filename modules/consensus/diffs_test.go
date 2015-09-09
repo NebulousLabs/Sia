@@ -644,7 +644,12 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.cs.commitNodeDiffs(pb, modules.DiffApply)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitNodeDiffs(tx, pb, modules.DiffApply)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists := cst.cs.db.inSiacoinOutputs(scoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
@@ -657,7 +662,12 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	cst.cs.commitNodeDiffs(pb, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitNodeDiffs(tx, pb, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exists = cst.cs.db.inSiacoinOutputs(scoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
@@ -698,7 +708,12 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.cs.commitNodeDiffs(pb, modules.DiffApply)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitNodeDiffs(tx, pb, modules.DiffApply)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
 	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if exists {
@@ -717,7 +732,12 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.cs.commitNodeDiffs(pb, modules.DiffRevert)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return commitNodeDiffs(tx, pb, modules.DiffRevert)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
 	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	if exists {
@@ -757,7 +777,12 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst.cs.commitNodeDiffs(pb, modules.DiffApply)
+		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			return commitNodeDiffs(tx, pb, modules.DiffApply)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
 	}()
 

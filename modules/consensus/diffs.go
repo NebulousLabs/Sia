@@ -138,75 +138,69 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *process
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) error {
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		if dir == modules.DiffApply {
-			for _, scod := range pb.SiacoinOutputDiffs {
-				err := commitSiacoinOutputDiff(tx, scod, dir)
-				if err != nil {
-					return err
-				}
-			}
-			for _, fcd := range pb.FileContractDiffs {
-				err := commitFileContractDiff(tx, fcd, dir)
-				if err != nil {
-					return err
-				}
-			}
-			for _, sfod := range pb.SiafundOutputDiffs {
-				err := commitSiafundOutputDiff(tx, sfod, dir)
-				if err != nil {
-					return err
-				}
-			}
-			for _, dscod := range pb.DelayedSiacoinOutputDiffs {
-				err := commitDelayedSiacoinOutputDiff(tx, dscod, dir)
-				if err != nil {
-					return err
-				}
-			}
-			for _, sfpd := range pb.SiafundPoolDiffs {
-				err := commitSiafundPoolDiff(tx, sfpd, dir)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-				err := commitSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
-				if err != nil {
-					return err
-				}
-			}
-			for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
-				err := commitFileContractDiff(tx, pb.FileContractDiffs[i], dir)
-				if err != nil {
-					return err
-				}
-			}
-			for i := len(pb.SiafundOutputDiffs) - 1; i >= 0; i-- {
-				err := commitSiafundOutputDiff(tx, pb.SiafundOutputDiffs[i], dir)
-				if err != nil {
-					return err
-				}
-			}
-			for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-				err := commitDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
-				if err != nil {
-					return err
-				}
-			}
-			for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
-				err := commitSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
-				if err != nil {
-					return err
-				}
+func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+	if dir == modules.DiffApply {
+		for _, scod := range pb.SiacoinOutputDiffs {
+			err := commitSiacoinOutputDiff(tx, scod, dir)
+			if err != nil {
+				return err
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		return err
+		for _, fcd := range pb.FileContractDiffs {
+			err := commitFileContractDiff(tx, fcd, dir)
+			if err != nil {
+				return err
+			}
+		}
+		for _, sfod := range pb.SiafundOutputDiffs {
+			err := commitSiafundOutputDiff(tx, sfod, dir)
+			if err != nil {
+				return err
+			}
+		}
+		for _, dscod := range pb.DelayedSiacoinOutputDiffs {
+			err := commitDelayedSiacoinOutputDiff(tx, dscod, dir)
+			if err != nil {
+				return err
+			}
+		}
+		for _, sfpd := range pb.SiafundPoolDiffs {
+			err := commitSiafundPoolDiff(tx, sfpd, dir)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
+			err := commitSiacoinOutputDiff(tx, pb.SiacoinOutputDiffs[i], dir)
+			if err != nil {
+				return err
+			}
+		}
+		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
+			err := commitFileContractDiff(tx, pb.FileContractDiffs[i], dir)
+			if err != nil {
+				return err
+			}
+		}
+		for i := len(pb.SiafundOutputDiffs) - 1; i >= 0; i-- {
+			err := commitSiafundOutputDiff(tx, pb.SiafundOutputDiffs[i], dir)
+			if err != nil {
+				return err
+			}
+		}
+		for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			err := commitDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
+			if err != nil {
+				return err
+			}
+		}
+		for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
+			err := commitSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -256,15 +250,17 @@ func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDi
 func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) error {
 	cs.commitDiffSetSanity(pb, dir)
 	err := cs.db.Update(func(tx *bolt.Tx) error {
-		return cs.createUpcomingDelayedOutputMaps(tx, pb, dir)
+		err := cs.createUpcomingDelayedOutputMaps(tx, pb, dir)
+		if err != nil {
+			return err
+		}
+		return commitNodeDiffs(tx, pb, dir)
 	})
 	if err != nil {
 		return err
 	}
-	cs.commitNodeDiffs(pb, dir)
 	cs.deleteObsoleteDelayedOutputMaps(pb, dir)
 	cs.updateCurrentPath(pb, dir)
-
 	return nil
 }
 
