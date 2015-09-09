@@ -11,7 +11,6 @@ import (
 	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 )
 
@@ -31,7 +30,7 @@ var (
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
-	consensusSet    *consensus.ConsensusSet
+	consensusSet    modules.ConsensusSet
 	gateway         modules.Gateway
 	consensusHeight int
 
@@ -60,7 +59,7 @@ type HostDB struct {
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New(cs *consensus.ConsensusSet, g modules.Gateway, persistDir string) (*HostDB, error) {
+func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*HostDB, error) {
 	// Check for nil dependencies.
 	if cs == nil {
 		return nil, errNilConsensusSet

@@ -21,7 +21,7 @@ import (
 )
 
 type hdbTester struct {
-	cs      *consensus.ConsensusSet
+	cs      modules.ConsensusSet
 	gateway modules.Gateway
 	host    modules.Host
 	miner   modules.Miner
