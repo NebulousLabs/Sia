@@ -180,8 +180,8 @@ func (hdb *HostDB) RandomHosts(count int) (hosts []modules.HostSettings) {
 	}
 
 	// Add back all of the entries that got removed.
-	for _, entry := range removedEntries {
-		hdb.insertNode(entry)
+	for i := range removedEntries {
+		hdb.insertNode(removedEntries[i])
 	}
 	return hosts
 }
