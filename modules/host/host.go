@@ -186,11 +186,13 @@ func (h *Host) Info() modules.HostInfo {
 	}
 
 	// Calculate estimated competition (reported in per GB per month). Price
-	// calculated by taking the average of 8 ranomly selected weighted hosts.
+	// calculated by taking the average of hosts 8-15.
 	var averagePrice types.Currency
-	// TODO: 8 is the sample size - to be made a constant.
-	hosts := h.hostdb.RandomHosts(8)
-	for _, host := range hosts {
+	hosts := h.hostdb.RandomHosts(15)
+	for i, host := range hosts {
+		if i < 8 {
+			continue
+		}
 		averagePrice = averagePrice.Add(host.Price)
 	}
 	if len(hosts) == 0 {

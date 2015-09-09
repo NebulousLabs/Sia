@@ -18,7 +18,7 @@ func TestHostWeightDistinctPrices(t *testing.T) {
 	// expensive host.
 	weight1 := calculateWeightFromUInt64Price(3)
 	weight2 := calculateWeightFromUInt64Price(6)
-	expectedWeight := weight1.Div(types.NewCurrency64(8))
+	expectedWeight := weight1.Div(types.NewCurrency64(32))
 	if weight2.Cmp(expectedWeight) != 0 {
 		t.Error("Weight of expensive host is not the correct value.")
 	}

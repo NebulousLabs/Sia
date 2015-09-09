@@ -182,8 +182,9 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Select and connect to hosts.
 	totalsize := up.PieceSize * uint64(up.ErasureCode.NumPieces()) * f.numChunks()
 	var hosts []uploader
-	for _, host := range r.hostDB.RandomHosts(up.ErasureCode.NumPieces() * 3 / 2) {
-		hostUploader, err := r.newHostUploader(host, totalsize, up.Duration, f.masterKey)
+	randHosts := r.hostDB.RandomHosts(up.ErasureCode.NumPieces())
+	for i := range randHosts {
+		hostUploader, err := r.newHostUploader(randHosts[i], totalsize, up.Duration, f.masterKey)
 		if err != nil {
 			continue
 		}

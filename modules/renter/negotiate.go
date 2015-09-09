@@ -53,7 +53,7 @@ func (hu *hostUploader) Close() error {
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
 func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight) error {
-	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
 	if err != nil {
 		return err
 	}
@@ -65,8 +65,8 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	hu.renter.mu.RUnlock(lockID)
 
 	renterCost := hu.settings.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
-	renterCost = renterCost.MulFloat(1.5) // extra buffer to guarantee we won't run out of money during revision
-	payout := renterCost                  // no collateral
+	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
+	payout := renterCost                   // no collateral
 
 	// get an address from the wallet
 	ourAddr, err := hu.renter.wallet.NextAddress()
@@ -381,7 +381,7 @@ func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64,
 	}
 
 	// initiate the revision loop
-	hu.conn, err = net.DialTimeout("tcp", string(hu.settings.IPAddress), 5*time.Second)
+	hu.conn, err = net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
 	if err != nil {
 		return nil, err
 	}

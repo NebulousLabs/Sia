@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -30,6 +31,6 @@ func hostdbhostscmd() {
 	}
 	fmt.Println("Active hosts:")
 	for _, host := range info.Hosts {
-		fmt.Printf("\t%v\n", host.IPAddress)
+		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.IPAddress, host.Price.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
 	}
 }
