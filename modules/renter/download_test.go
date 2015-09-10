@@ -39,6 +39,10 @@ func (h *testHost) fetch(p pieceData) ([]byte, error) {
 
 // TestErasureDownload tests parallel downloading of erasure-coded data.
 func TestErasureDownload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// generate data
 	const dataSize = 777
 	data := make([]byte, dataSize)

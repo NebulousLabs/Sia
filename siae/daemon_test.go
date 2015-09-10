@@ -11,6 +11,10 @@ import (
 
 // TestStartDaemon probes the startDaemon function.
 func TestStartDaemon(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	testDir := build.TempDir("siad", "TestStartDaemon")
 	config.Siad.NoBootstrap = false
 	config.Siad.APIaddr = "localhost:45370"

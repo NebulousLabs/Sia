@@ -117,6 +117,9 @@ func TestListen(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// create bootstrap peer
 	bootstrap := newTestingGateway("TestConnect1", t)
 	defer bootstrap.Close()

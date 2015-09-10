@@ -11,6 +11,9 @@ import (
 // TestAnnouncement has a host announce itself to the blockchain and then
 // checks that the announcement makes it correctly.
 func TestAnnouncement(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	ht := CreateHostTester("TestAnnouncement", t)
 
 	// Place the announcement.

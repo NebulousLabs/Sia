@@ -21,6 +21,10 @@ func genHashNum(x byte) crypto.Hash {
 // Add a couple blocks to the database, then perform lookups to see if
 // they were added and crossed referenced correctly
 func (et *explorerTester) testAddBlock(t *testing.T) error {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// This block will *NOT* be valid, but should contain
 	// addresses that can cross reference each other.
 	b1 := types.Block{

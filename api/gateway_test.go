@@ -43,6 +43,9 @@ func TestGatewayStatus(t *testing.T) {
 }
 
 func TestGatewayPeerAdd(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st, err := createServerTester("TestGatewayPeerAdd")
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +64,9 @@ func TestGatewayPeerAdd(t *testing.T) {
 }
 
 func TestGatewayPeerRemove(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st, err := createServerTester("TestGatewayPeerRemove")
 	if err != nil {
 		t.Fatal(err)

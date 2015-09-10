@@ -3,8 +3,20 @@ package consensus
 import (
 	"testing"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/modules"
 )
+
+// dbBacktrackToCurrentPath is a convenience function to call
+// backtrackToCurrentPath without a bolt.Tx.
+func (cs *ConsensusSet) dbBacktrackToCurrentPath(pb *processedBlock) (pbs []*processedBlock) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		pbs = backtrackToCurrentPath(tx, pb)
+		return nil
+	})
+	return pbs
+}
 
 // TestBacktrackToCurrentPath probes the backtrackToCurrentPath method of the
 // consensus set.
@@ -19,7 +31,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	pb := cst.cs.currentProcessedBlock()
 
 	// Backtrack from the current node to the blockchain.
-	nodes := cst.cs.backtrackToCurrentPath(pb)
+	nodes := cst.cs.dbBacktrackToCurrentPath(pb)
 	if len(nodes) != 1 {
 		t.Fatal("backtracking to the current node gave incorrect result")
 	}
@@ -39,7 +51,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	pb = cst.cs.db.getBlockMap(child1.ID())
-	nodes = cst.cs.backtrackToCurrentPath(pb)
+	nodes = cst.cs.dbBacktrackToCurrentPath(pb)
 	if len(nodes) != 2 {
 		t.Error("backtracking grabbed wrong number of nodes")
 	}

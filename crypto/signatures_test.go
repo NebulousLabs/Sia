@@ -54,16 +54,14 @@ func TestSignatureEncoding(t *testing.T) {
 // TestSigning creates a bunch of keypairs and signs random data with each of
 // them.
 func TestSigning(t *testing.T) {
-	var iterations int
 	if testing.Short() {
-		iterations = 5
-	} else {
-		iterations = 200
+		t.SkipNow()
 	}
 
 	// Try a bunch of signatures because at one point there was a library that
 	// worked around 98% of the time. Tests would usually pass, but 200
 	// iterations would normally cause a failure.
+	iterations := 200
 	for i := 0; i < iterations; i++ {
 		// Generate the keys.
 		sk, pk, err := GenerateSignatureKeys()

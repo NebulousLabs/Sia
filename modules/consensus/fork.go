@@ -18,22 +18,15 @@ var (
 // the ConsensusSet's current path (the "common parent"). It returns the
 // (inclusive) set of nodes between the common parent and 'pb', starting from
 // the former.
-func (cs *ConsensusSet) backtrackToCurrentPath(pb *processedBlock) []*processedBlock {
+func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	path := []*processedBlock{pb}
-	csHeight := cs.height()
-	err := cs.db.View(func(tx *bolt.Tx) error {
-		for {
-			// Stop at the common parent.
-			if pb.Height <= csHeight && getPath(tx, pb.Height) == pb.Block.ID() {
-				break
-			}
-			pb = getBlockMap(tx, pb.Parent)
-			path = append([]*processedBlock{pb}, path...) // prepend
+	for {
+		// Stop at the common parent.
+		if pb.Height <= blockHeight(tx) && getPath(tx, pb.Height) == pb.Block.ID() {
+			break
 		}
-		return nil
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
+		pb = getBlockMap(tx, pb.Parent)
+		path = append([]*processedBlock{pb}, path...) // prepend
 	}
 	return path
 }
@@ -67,7 +60,11 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 // set's current path and 'pb'.
 func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
-	newPath := cs.backtrackToCurrentPath(pb)
+	var newPath []*processedBlock
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		newPath = backtrackToCurrentPath(tx, pb)
+		return nil
+	})
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
@@ -107,7 +104,11 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	oldHead := cs.currentProcessedBlock()
 
 	// revert to the common parent
-	commonParent := cs.backtrackToCurrentPath(newNode)[0]
+	var commonParent *processedBlock
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		commonParent = backtrackToCurrentPath(tx, newNode)[0]
+		return nil
+	})
 	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode

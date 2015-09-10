@@ -31,6 +31,10 @@ func (h *testHost) fileContract() fileContract { return fileContract{} }
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.
 func TestErasureUpload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// generate data
 	const dataSize = 777
 	data := make([]byte, dataSize)
