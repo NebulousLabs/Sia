@@ -62,6 +62,14 @@ func hostconfigcmd(param, value string) {
 		p.Mul(p, big.NewRat(1e24/1e9, 4320))
 		value = new(big.Int).Div(p.Num(), p.Denom()).String()
 	}
+	// parse sizes of form 10GB, 10TB, 1TiB etc
+	if param == "totalstorage" || param == "minfilesize" || param == "maxfilesize" {
+		var err error // must be pre-declared because value is
+		value, err = parseSize(value)
+		if err != nil {
+			fmt.Println("could not parse " + param)
+		}
+	}
 	err := post("/host/configure", param+"="+value)
 	if err != nil {
 		fmt.Println("Could not update host settings:", err)
