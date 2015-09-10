@@ -113,6 +113,8 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	}
 
 	// restore old path
+	//
+	// TODO: Won't be needed.
 	cs.revertToNode(commonParent)
 	_, errReapply := cs.applyUntilNode(oldHead)
 	if build.DEBUG {

@@ -294,9 +294,9 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
-	for _, txn := range pb.Block.Transactions {
-		var validationErr error
-		err = cs.db.Update(func(tx *bolt.Tx) error {
+	var validationErr error
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		for _, txn := range pb.Block.Transactions {
 			validationErr = cs.validTxTransaction(tx, txn)
 			if validationErr != nil {
 				// Awkward: need to apply the matured outputs otherwise the diff
@@ -313,23 +313,17 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 					return nil
 				}
 				cs.dosBlocks[pb.Block.ID()] = struct{}{}
+				return nil
 			}
-			return nil
-		})
-		if validationErr != nil {
-			return validationErr
-		}
-
-		updateErr := cs.db.Update(func(tx *bolt.Tx) error {
-			err = applyTransaction(tx, pb, txn)
-			if err != nil {
-				return err
+			validationErr = applyTransaction(tx, pb, txn)
+			if validationErr != nil {
+				return nil
 			}
-			return nil
-		})
-		if updateErr != nil {
-			return err
 		}
+		return nil
+	})
+	if validationErr != nil {
+		return validationErr
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
