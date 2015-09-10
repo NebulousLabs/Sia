@@ -1563,7 +1563,7 @@ func TestComplexForking(t *testing.T) {
 	// Give each type of major block to cst1.
 	err = cst1.complexBlockSet()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	// Give all the blocks in cst1 to cst3 - as a holding place.
@@ -1599,7 +1599,7 @@ func TestComplexForking(t *testing.T) {
 	}
 	err = cst2.complexBlockSet()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 	var cst2Blocks []types.Block
 	pb = cst2.cs.currentProcessedBlock()

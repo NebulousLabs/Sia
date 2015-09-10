@@ -11,31 +11,41 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// diffs.go contains all of the functions related to diffs in the consensus
-// set. Each block changes the consensus set in a deterministic way, these
-// changes are recorded as diffs for easy rewinding and reapplying. The diffs
-// are created, applied, reverted, and queried in this file.
-
 var (
-	errApplySiafundPoolDiffMismatch      = errors.New("committing a siafund pool diff with an invalid 'previous' field")
-	errBadCommitSiacoinOutputDiff        = errors.New("rogue siacoin output diff in commitSiacoinOutputDiff")
-	errBadCommitFileContractDiff         = errors.New("rogue file contract diff in commitFileContractDiff")
-	errBadCommitSiafundOutputDiff        = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
-	errBadCommitDelayedSiacoinOutputDiff = errors.New("rogue delayed siacoin output diff in commitSiacoinOutputDiff")
-	errBadExpirationPointer              = errors.New("deleting a file contract that has a file pointer to a nonexistant map")
-	errBadMaturityHeight                 = errors.New("delayed siacoin output diff was submitted with illegal maturity height")
-	errCreatingExistingUpcomingMap       = errors.New("creating an existing upcoming map")
-	errDeletingNonEmptyDelayedMap        = errors.New("deleting a delayed siacoin output map that is not empty")
-	errDiffsNotGenerated                 = errors.New("applying diff set before generating errors")
-	errExistingFileContractExpiration    = errors.New("creating a pointer to a file contract expiration that already exists")
-	errInvalidSuccessor                  = errors.New("generating diffs for a block that's an invalid successsor to the current block")
-	errNegativePoolAdjustment            = errors.New("committing a siafund pool diff with a negative adjustment")
-	errNonApplySiafundPoolDiff           = errors.New("commiting a siafund pool diff that doesn't have the 'apply' direction")
-	errRegenerateDiffs                   = errors.New("cannot call generateAndApplyDiffs on a node for which diffs were already generated")
-	errRevertSiafundPoolDiffMismatch     = errors.New("committing a siafund pool diff with an invalid 'adjusted' field")
-	errWrongAppliedDiffSet               = errors.New("applying a diff set that isn't the current block")
-	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
+	errApplySiafundPoolDiffMismatch  = errors.New("committing a siafund pool diff with an invalid 'previous' field")
+	errDiffsNotGenerated             = errors.New("applying diff set before generating errors")
+	errInvalidSuccessor              = errors.New("generating diffs for a block that's an invalid successsor to the current block")
+	errNegativePoolAdjustment        = errors.New("committing a siafund pool diff with a negative adjustment")
+	errNonApplySiafundPoolDiff       = errors.New("commiting a siafund pool diff that doesn't have the 'apply' direction")
+	errRevertSiafundPoolDiffMismatch = errors.New("committing a siafund pool diff with an invalid 'adjusted' field")
+	errWrongAppliedDiffSet           = errors.New("applying a diff set that isn't the current block")
+	errWrongRevertDiffSet            = errors.New("reverting a diff set that isn't the current block")
 )
+
+// commitDiffSetSanity performs a series of sanity checks before commiting a
+// diff set.
+func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
+	// Sanity checks.
+	if build.DEBUG {
+		// Diffs should have already been generated for this node.
+		if !pb.DiffsGenerated {
+			panic(errDiffsNotGenerated)
+		}
+
+		// Current node must be the input node's parent if applying, and
+		// current node must be the input node if reverting.
+		if dir == modules.DiffApply {
+			parent := getBlockMap(tx, pb.Parent)
+			if parent.Block.ID() != currentBlockID(tx) {
+				panic(errWrongAppliedDiffSet)
+			}
+		} else {
+			if pb.Block.ID() != currentBlockID(tx) {
+				panic(errWrongRevertDiffSet)
+			}
+		}
+	}
+}
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func commitSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) error {
@@ -99,31 +109,6 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 		setSiafundPool(tx, sfpd.Previous)
 	}
 	return nil
-}
-
-// commitDiffSetSanity performs a series of sanity checks before commiting a
-// diff set.
-func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
-	// Sanity checks.
-	if build.DEBUG {
-		// Diffs should have already been generated for this node.
-		if !pb.DiffsGenerated {
-			panic(errDiffsNotGenerated)
-		}
-
-		// Current node must be the input node's parent if applying, and
-		// current node must be the input node if reverting.
-		if dir == modules.DiffApply {
-			parent := getBlockMap(tx, pb.Parent)
-			if parent.Block.ID() != currentBlockID(tx) {
-				panic(errWrongAppliedDiffSet)
-			}
-		} else {
-			if pb.Block.ID() != currentBlockID(tx) {
-				panic(errWrongRevertDiffSet)
-			}
-		}
-	}
 }
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
@@ -265,78 +250,44 @@ func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) e
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
-	// Update the state to point to the new block.
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		// Sanity check - the block being applied should have the current block as
-		// a parent.
-		if build.DEBUG && pb.Parent != currentBlockID(tx) {
-			panic(errInvalidSuccessor)
-		}
+func (cs *ConsensusSet) generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
+	// Sanity check - the block being applied should have the current block as
+	// a parent.
+	if build.DEBUG && pb.Parent != currentBlockID(tx) {
+		panic(errInvalidSuccessor)
+	}
 
-		bid := pb.Block.ID()
-		err := tx.Bucket(BlockPath).Put(encoding.EncUint64(uint64(pb.Height)), bid[:])
-		if err != nil {
-			return err
-		}
-		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
-		return nil
-	})
+	bid := pb.Block.ID()
+	err := tx.Bucket(BlockPath).Put(encoding.EncUint64(uint64(pb.Height)), bid[:])
 	if err != nil {
-		panic(err)
+		return err
 	}
-	var validationErr error
-	err = cs.db.Update(func(tx *bolt.Tx) error {
+	createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 
-		// diffsGenerated is set to true as soon as we start changing the set of
-		// diffs in the block node. If at any point the block is found to be
-		// invalid, the diffs can be safely reversed.
-		pb.DiffsGenerated = true
+	// diffsGenerated is set to true as soon as we start changing the set of
+	// diffs in the block node. If at any point the block is found to be
+	// invalid, the diffs can be safely reversed.
+	pb.DiffsGenerated = true
 
-		// Validate and apply each transaction in the block. They cannot be
-		// validated all at once because some transactions may not be valid until
-		// previous transactions have been applied.
-		for _, txn := range pb.Block.Transactions {
-			validationErr = cs.validTxTransaction(tx, txn)
-			if validationErr != nil {
-				// Awkward: need to apply the matured outputs otherwise the diff
-				// structure malforms due to the way the delayedOutput maps are
-				// created and destroyed.
-				err2 := applyMaturedSiacoinOutputs(tx, pb)
-				if err2 != nil {
-					validationErr = errors.New(validationErr.Error() + " and " + err2.Error())
-					return nil
-				}
-				err2 = commitDiffSet(tx, pb, modules.DiffRevert)
-				if err2 != nil {
-					validationErr = errors.New(validationErr.Error() + " and " + err2.Error())
-					return nil
-				}
-				cs.dosBlocks[pb.Block.ID()] = struct{}{}
-				return nil
-			}
-			validationErr = applyTransaction(tx, pb, txn)
-			if validationErr != nil {
-				return nil
-			}
-		}
-		return nil
-	})
-	if validationErr != nil {
-		return validationErr
-	}
-
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		// After all of the transactions have been applied, 'maintenance' is
-		// applied on the block. This includes adding any outputs that have reached
-		// maturity, applying any contracts with missed storage proofs, and adding
-		// the miner payouts to the list of delayed outputs.
-		err := applyMaintenance(tx, pb)
+	// Validate and apply each transaction in the block. They cannot be
+	// validated all at once because some transactions may not be valid until
+	// previous transactions have been applied.
+	for _, txn := range pb.Block.Transactions {
+		err = cs.validTxTransaction(tx, txn)
 		if err != nil {
 			return err
 		}
-		return nil
-	})
+		err = applyTransaction(tx, pb, txn)
+		if err != nil {
+			return err
+		}
+	}
+
+	// After all of the transactions have been applied, 'maintenance' is
+	// applied on the block. This includes adding any outputs that have reached
+	// maturity, applying any contracts with missed storage proofs, and adding
+	// the miner payouts to the list of delayed outputs.
+	err = applyMaintenance(tx, pb)
 	if err != nil {
 		return err
 	}
@@ -345,10 +296,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		pb.ConsensusSetHash = cs.consensusSetHash()
 	}
 
-	// Replace the unprocessed block in the block map with a processed one
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		id := pb.Block.ID()
-		blockMap := tx.Bucket(BlockMap)
-		return blockMap.Put(id[:], encoding.Marshal(*pb))
-	})
+	id := pb.Block.ID()
+	blockMap := tx.Bucket(BlockMap)
+	return blockMap.Put(id[:], encoding.Marshal(*pb))
 }
