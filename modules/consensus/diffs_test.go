@@ -790,6 +790,7 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	}
 }
 
+/*
 // TestDeleteObsoleteDelayedOutputMapsSanity probes the sanity checks of the
 // deleteObsoleteDelayedOutputMaps method of the consensus set.
 func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
@@ -849,6 +850,7 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/
 
 /*
 // TestGenerateAndApplyDiffSanity triggers the sanity checks in the

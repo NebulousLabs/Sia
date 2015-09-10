@@ -15,8 +15,32 @@ var (
 	errSiafundMiscount = errors.New("consensus set has the wrong number of siafunds")
 )
 
+// consensusChecksum grabs a checksum of the consensus set by pushing all of
+// the elements in sorted order into a merkle tree and taking the root. All
+// consensus sets with the same current block should have identical consensus
+// checksums.
 func consensusChecksum(tx *bolt.Tx) crypto.Hash {
-	return crypto.Hash{}
+	// Create a checksum tree.
+	tree := crypto.NewTree()
+
+	// Push every element of the block path.
+	blockPath := tx.Bucket(BlockPath)
+	blockPath.ForEach(func(k, v []byte) error {
+		tree.Push(k)
+		tree.Push(v)
+		return nil
+	})
+
+	// TODO: Push more elements.
+
+	return tree.Root()
+}
+
+// checkConsistency runs a series of checks to make sure that the consensus set
+// is consistent with some rules that should always be true.
+func checkConsistency(tx *bolt.Tx) error {
+	// TODO: implement more consistency checks.
+	return nil
 }
 
 /// BARRIER ///

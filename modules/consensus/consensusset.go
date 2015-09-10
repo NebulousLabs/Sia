@@ -29,17 +29,9 @@ type ConsensusSet struct {
 	gateway modules.Gateway
 
 	// The block root contains the genesis block.
-	//
-	// TODO: Remove the block root from memory as a structure.
 	blockRoot processedBlock
 
 	// The db is a database holding the current consensus set.
-	//
-	// TODO: The db should be renamed 'database'.
-	//
-	// TODO: The db should be updated such that only consensus information is
-	// in the database, this means no block map, and no blocks that aren't a
-	// part of the current path.
 	db *setDB
 
 	// Modules subscribed to the consensus set will receive an ordered list of

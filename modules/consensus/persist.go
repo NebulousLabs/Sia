@@ -131,15 +131,17 @@ func (cs *ConsensusSet) loadDiffs() {
 	}
 
 	// Do a consistency check after loading the database.
-	if height > 1 && build.DEBUG {
-		err := cs.db.startConsistencyGuard()
-		if err != nil {
-			panic(err)
+	/*
+		if height > 1 && build.DEBUG {
+			err := cs.db.startConsistencyGuard()
+			if err != nil {
+				panic(err)
+			}
+			err = cs.checkConsistency()
+			if err != nil {
+				panic(err)
+			}
+			cs.db.stopConsistencyGuard()
 		}
-		err = cs.checkConsistency()
-		if err != nil {
-			panic(err)
-		}
-		cs.db.stopConsistencyGuard()
-	}
+	*/
 }

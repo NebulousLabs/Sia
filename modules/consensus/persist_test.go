@@ -24,7 +24,7 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldHash := cst.cs.consensusSetHash()
+	oldHash := cst.cs.dbConsensusChecksum()
 	cst.cs.Close()
 
 	// Reassigning this will lose subscribers and such, but we
@@ -34,7 +34,7 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newHash := cst.cs.consensusSetHash()
+	newHash := cst.cs.dbConsensusChecksum()
 	if oldHash != newHash {
 		t.Fatal("consensus set hash changed after load")
 	}

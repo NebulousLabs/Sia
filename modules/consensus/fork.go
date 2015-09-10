@@ -72,17 +72,19 @@ func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*pro
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.DiffsGenerated {
-			err := cs.db.Update(func(tx *bolt.Tx) error {
+			err = cs.db.Update(func(tx *bolt.Tx) error {
 				return commitDiffSet(tx, node, modules.DiffApply)
 			})
 			if build.DEBUG && err != nil {
 				panic(err)
 			}
 		} else {
-			err := cs.db.Update(func(tx *bolt.Tx) error {
+			err = cs.db.Update(func(tx *bolt.Tx) error {
 				return generateAndApplyDiff(tx, node)
 			})
 			if err != nil {
+				// Mark the block as invalid.
+				cs.dosBlocks[node.Block.ID()] = struct{}{}
 				break
 			}
 		}

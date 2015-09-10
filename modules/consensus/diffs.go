@@ -264,11 +264,6 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	}
 	createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 
-	// diffsGenerated is set to true as soon as we start changing the set of
-	// diffs in the block node. If at any point the block is found to be
-	// invalid, the diffs can be safely reversed.
-	pb.DiffsGenerated = true
-
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
@@ -292,11 +287,23 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 		return err
 	}
 
+	// Sanity check preparation - set the consensus hash at this height so that
+	// during reverting a check can be performed to assure consistency when
+	// adding and removing blocks.
 	if build.DEBUG {
 		pb.ConsensusSetHash = consensusChecksum(tx)
 	}
 
-	id := pb.Block.ID()
+	// DiffsGenerated are only set to true after the block has been fully
+	// validated and integrated. This is required to prevent later blocks from
+	// being accepted on top of an invalid block - if the consensus set ever
+	// forks over an invalid block, 'DiffsGenerated' will be set to 'false',
+	// requiring validation to occur again. when 'DiffsGenerated' is set to
+	// true, validation is skipped, therefore the flag should only be set to
+	// true on fully validated blocks.
+	pb.DiffsGenerated = true
+
+	// Add the fully processed block to the block map.
 	blockMap := tx.Bucket(BlockMap)
-	return blockMap.Put(id[:], encoding.Marshal(*pb))
+	return blockMap.Put(bid[:], encoding.Marshal(*pb))
 }

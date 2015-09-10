@@ -31,6 +31,9 @@ var (
 	GuardStart       = []byte("GuardStart")
 	GuardEnd         = []byte("GuardEnd")
 
+	// BlockPath is a database bucket containing a mapping from the height of a
+	// block to the id of the block at that height. BlockPath only includes
+	// blocks in the current path.
 	BlockPath               = []byte("BlockPath")
 	BlockMap                = []byte("BlockMap")
 	SiacoinOutputs          = []byte("SiacoinOutputs")

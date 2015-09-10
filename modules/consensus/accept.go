@@ -185,7 +185,9 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic("appliedNodes and revertedNodes are mismatched!")
 		}
 		// Check that the general setup makes sense.
-		err = cs.checkConsistency()
+		err = cs.db.View(func(tx *bolt.Tx) error {
+			return checkConsistency(tx)
+		})
 		if err != nil {
 			panic(err)
 		}
