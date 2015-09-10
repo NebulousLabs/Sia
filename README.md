@@ -1,4 +1,4 @@
-Sia 0.4.0
+Sia 0.4.2
 ===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -143,6 +143,14 @@ Version History
 ---------------
 
 August 2015:
+
+v0.4.2: Stable currency patch.
+- Uploading and Hosting Bugfixes
+- Consensus Bugfixes
+
+v0.4.1: Stable currency patch.
+- Minor Bugfixes
+- Improvements to Build Process
 
 v0.4.0: Second stable currency release.
 - Wallets are encrypted and generated from seed phrases
