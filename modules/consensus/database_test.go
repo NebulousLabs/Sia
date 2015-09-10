@@ -12,6 +12,48 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// dbBlockHeight is a convenience function allowing blockHeight to be called
+// without a bolt.Tx.
+func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		bh = blockHeight(tx)
+		return nil
+	})
+	return bh
+}
+
+// dbCurrentBlockID is a convenience function allowing currentBlockID to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		id = currentBlockID(tx)
+		return nil
+	})
+	return id
+}
+
+// dbCurrentProcessedBlock is a convenience function allowing
+// currentProcessedBlock to be called without a bolt.Tx.
+func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		pb = currentProcessedBlock(tx)
+		return nil
+	})
+	return pb
+}
+
+// dbGetPath is a convenience function allowing getPath to be called without a
+// bolt.Tx.
+func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		id = getPath(tx, bh)
+		return nil
+	})
+	return id
+}
+
+/// BREAK ///
+
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
 func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) error {

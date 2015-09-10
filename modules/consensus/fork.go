@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/boltdb/bolt"
 
@@ -41,18 +42,25 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 			panic(errExternalRevert)
 		}
 	}
-
 	// Rewind blocks until we reach 'pb'.
 	for cs.currentBlockID() != pb.Block.ID() {
+		fmt.Println(cs.currentBlockID())
+		fmt.Println(pb.Block.ID())
 		_ = cs.db.Update(func(tx *bolt.Tx) error {
 			node := currentProcessedBlock(tx)
+			fmt.Println(blockHeight(tx))
 			err := commitDiffSet(tx, node, modules.DiffRevert)
 			if build.DEBUG && err != nil {
 				panic(err)
 			}
 			revertedNodes = append(revertedNodes, node)
+			println("post")
+			fmt.Println(blockHeight(tx))
+			// fmt.Println(currentBlockID(tx))
+			fmt.Println(pb.Block.ID())
 			return nil
 		})
+		fmt.Println(cs.height())
 	}
 	return revertedNodes
 }

@@ -25,24 +25,26 @@ var (
 // commitDiffSetSanity performs a series of sanity checks before commiting a
 // diff set.
 func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
-	// Sanity checks.
-	if build.DEBUG {
-		// Diffs should have already been generated for this node.
-		if !pb.DiffsGenerated {
-			panic(errDiffsNotGenerated)
-		}
+	// This function is purely sanity checks.
+	if !build.DEBUG {
+		return
+	}
 
-		// Current node must be the input node's parent if applying, and
-		// current node must be the input node if reverting.
-		if dir == modules.DiffApply {
-			parent := getBlockMap(tx, pb.Parent)
-			if parent.Block.ID() != currentBlockID(tx) {
-				panic(errWrongAppliedDiffSet)
-			}
-		} else {
-			if pb.Block.ID() != currentBlockID(tx) {
-				panic(errWrongRevertDiffSet)
-			}
+	// Diffs should have already been generated for this node.
+	if !pb.DiffsGenerated {
+		panic(errDiffsNotGenerated)
+	}
+
+	// Current node must be the input node's parent if applying, and
+	// current node must be the input node if reverting.
+	if dir == modules.DiffApply {
+		parent := getBlockMap(tx, pb.Parent)
+		if parent.Block.ID() != currentBlockID(tx) {
+			panic(errWrongAppliedDiffSet)
+		}
+	} else {
+		if pb.Block.ID() != currentBlockID(tx) {
+			panic(errWrongRevertDiffSet)
 		}
 	}
 }
@@ -214,21 +216,19 @@ func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir module
 func updateCurrentPath(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		err := pushPath(tx, pb.Block.ID())
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
+		pushPath(tx, pb.Block.ID())
 	} else {
-		err := popPath(tx)
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
+		popPath(tx)
 	}
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
 func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
-	commitDiffSetSanity(tx, pb, dir)
+	// Sanity checks - there are a few so they were moved to another function.
+	if build.DEBUG {
+		commitDiffSetSanity(tx, pb, dir)
+	}
+
 	err := createUpcomingDelayedOutputMaps(tx, pb, dir)
 	if err != nil {
 		return err

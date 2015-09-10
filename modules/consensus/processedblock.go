@@ -27,7 +27,7 @@ var SurpassThreshold = big.NewRat(20, 100)
 // exported, so that a block node can be marshalled
 type processedBlock struct {
 	Block    types.Block
-	Parent   types.BlockID
+	Parent   types.BlockID   // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
 	Children []types.BlockID // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
 
 	Height      types.BlockHeight

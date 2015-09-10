@@ -31,6 +31,14 @@ var (
 	GuardStart       = []byte("GuardStart")
 	GuardEnd         = []byte("GuardEnd")
 
+	// Generally we would just look at BlockPath.Stats(), but there is an error
+	// in boltdb that prevents the bucket stats from updating until a tx is
+	// committed. Wasn't a problem until we started doing the entire block as
+	// one tx.
+	//
+	// DEPRECATED.
+	BlockHeight = []byte("BlockHeight")
+
 	// BlockPath is a database bucket containing a mapping from the height of a
 	// block to the id of the block at that height. BlockPath only includes
 	// blocks in the current path.
@@ -70,6 +78,7 @@ func openDB(filename string) (*setDB, error) {
 		SiafundOutputs,
 		SiafundPool,
 		DSCOBuckets,
+		BlockHeight,
 	}
 
 	// Initialize the database.
@@ -138,8 +147,16 @@ func (db *setDB) stopConsistencyGuard() {
 
 // blockHeight returns the height of the blockchain.
 func blockHeight(tx *bolt.Tx) types.BlockHeight {
-	blockPath := tx.Bucket(BlockPath)
-	return types.BlockHeight(blockPath.Stats().KeyN - 1)
+	var height int
+	bh := tx.Bucket(BlockHeight)
+	err = encoding.Unmarshal(bh.Get(BlockHeight), &height)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	if height < 0 {
+		panic(height)
+	}
+	return types.BlockHeight(height)
 }
 
 // currentBlockID returns the id of the most recent block in the consensus set.
@@ -153,19 +170,52 @@ func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
 }
 
 // pushPath adds a block to the BlockPath at current height + 1.
-func pushPath(tx *bolt.Tx, bid types.BlockID) error {
-	b := tx.Bucket(BlockPath)
-	key := encoding.EncUint64(uint64(b.Stats().KeyN))
-	value := encoding.Marshal(bid)
-	return b.Put(key, value)
+func pushPath(tx *bolt.Tx, bid types.BlockID) {
+	bp := tx.Bucket(BlockPath)
+	bh := tx.Bucket(BlockHeight)
+	heightBytes := bh.Get(BlockHeight)
+
+	// Add the block to the block path.
+	err := bp.Put(heightBytes, bid[:])
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	// Update the block height.
+	var oldHeight int
+	err = encoding.Unmarshal(heightBytes, &oldHeight)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = bh.Put(BlockHeight, encoding.Marshal(oldHeight+1))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 }
 
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
-func popPath(tx *bolt.Tx) error {
-	b := tx.Bucket(BlockPath)
-	key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
-	return b.Delete(key)
+func popPath(tx *bolt.Tx) {
+	bp := tx.Bucket(BlockPath)
+	bh := tx.Bucket(BlockHeight)
+	heightBytes := bh.Get(BlockHeight)
+
+	// Remove the block from the path.
+	err := bp.Delete(heightBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	// Update the block height.
+	var oldHeight int
+	err = encoding.Unmarshal(heightBytes, &oldHeight)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = bh.Put(BlockHeight, encoding.Marshal(oldHeight-1))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 }
 
 // getSiacoinOutput fetches a siacoin output from the database. An error is
@@ -336,12 +386,10 @@ func removeDSCOBucket(tx *bolt.Tx, h types.BlockHeight) error {
 	if build.DEBUG && bucket == nil {
 		panic(errNilBucket)
 	}
-	if build.DEBUG && bucket.Stats().KeyN != 0 {
-		// TODO: The fact that the panic is triggering indicates some type of
-		// developer mistake. Must be addressed.
-		//
-		// panic(errNonEmptyBucket)
-	}
+
+	// TODO: Check that the bucket is empty. Using Stats() does not work at the
+	// moment, as there is an error in the boltdb code.
+
 	err := tx.DeleteBucket(bucketID)
 	if err != nil {
 		return err

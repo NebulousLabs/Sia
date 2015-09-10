@@ -21,6 +21,17 @@ func (cs *ConsensusSet) initSetDB() error {
 		return err
 	}
 
+	// Set the block height to -1, adding the genesis block will bump it to 0.
+	//
+	// DEPRECATED
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		blockHeight := tx.Bucket(BlockHeight)
+		return blockHeight.Put(BlockHeight, encoding.Marshal(-1))
+	})
+	if err != nil {
+		return err
+	}
+
 	// add genesis block
 	err = cs.db.addBlockMap(&cs.blockRoot)
 	if err != nil {

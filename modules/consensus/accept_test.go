@@ -375,7 +375,9 @@ func TestInconsistentCheck(t *testing.T) {
 // automatically added by the miner) and adds it to the consnesus set.
 func (cst *consensusSetTester) testSimpleBlock() error {
 	// Get the starting hash of the consenesus set.
-	initialCSSum := cst.cs.dbConsensusChecksum()
+	initialChecksum := cst.cs.dbConsensusChecksum()
+	initialHeight := cst.cs.dbBlockHeight()
+	initialBlockID := cst.cs.dbCurrentBlockID()
 
 	// Mine and submit a block
 	block, err := cst.miner.AddBlock()
@@ -383,37 +385,50 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 		return err
 	}
 
-	// Get the ending hash of the consensus set.
-	resultingCSSum := cst.cs.dbConsensusChecksum()
-	if initialCSSum == resultingCSSum {
-		return errors.New("state hash is unchanged after mining a block")
+	// Check that the consensus info functions changed as expected.
+	resultingChecksum := cst.cs.dbConsensusChecksum()
+	if initialChecksum == resultingChecksum {
+		return errors.New("checksum is unchanged after mining a block")
 	}
-
-	// Check that the current path has updated as expected.
-	newNode := cst.cs.currentProcessedBlock()
-	if cst.cs.CurrentBlock().ID() != block.ID() {
+	resultingHeight := cst.cs.dbBlockHeight()
+	if resultingHeight != initialHeight+1 {
+		return errors.New("height of consensus set did not increase as expected")
+	}
+	currentPB := cst.cs.dbCurrentProcessedBlock()
+	if currentPB.Block.ParentID != initialBlockID {
+		return errors.New("new processed block does not have correct information")
+	}
+	if currentPB.Block.ID() != block.ID() {
 		return errors.New("the state's current block is not reporting as the recently mined block.")
 	}
-	// Check that the current path has updated correctly.
-	if block.ID() != cst.cs.db.getPath(newNode.Height) {
-		return errors.New("the state's current path didn't update correctly after accepting a new block")
+	if currentPB.Height != initialHeight+1 {
+		return errors.New("the processed block is not reporting the correct height")
+	}
+	if block.ID() != cst.cs.dbGetPath(currentPB.Height) {
+		return errors.New("current path does not point to the correct block")
+	}
+	if currentPB.Parent != currentPB.Block.ParentID {
+		return errors.New("processed block is reporting the wrong parent")
 	}
 
 	// Revert the block that was just added to the consensus set and check for
 	// parity with the original state of consensus.
-	parent := cst.cs.db.getBlockMap(newNode.Parent)
+	parent := cst.cs.db.getBlockMap(currentPB.Parent)
+	println("Record your feelings")
+	fmt.Println(block.ID())
+	fmt.Println(block.ParentID)
 	_, _, err = cst.cs.forkBlockchain(parent)
 	if err != nil {
 		return err
 	}
-	if cst.cs.dbConsensusChecksum() != initialCSSum {
+	if cst.cs.dbConsensusChecksum() != initialChecksum {
 		return errors.New("adding and reverting a block changed the consensus set")
 	}
 	// Re-add the block and check for parity with the first time it was added.
 	// This test is useful because a different codepath is followed if the
 	// diffs have already been generated.
-	_, _, err = cst.cs.forkBlockchain(newNode)
-	if cst.cs.dbConsensusChecksum() != resultingCSSum {
+	_, _, err = cst.cs.forkBlockchain(currentPB)
+	if cst.cs.dbConsensusChecksum() != resultingChecksum {
 		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
 	}
 	return nil
