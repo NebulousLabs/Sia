@@ -144,11 +144,11 @@ Version History
 
 August 2015:
 
-v0.4.2: Stable currency patch.
+v0.4.2 (patch)
 - Uploading and Hosting Bugfixes
 - Consensus Bugfixes
 
-v0.4.1: Stable currency patch.
+v0.4.1 (patch)
 - Minor Bugfixes
 - Improvements to Build Process
 
@@ -160,21 +160,21 @@ v0.4.0: Second stable currency release.
 
 June 2015:
 
-v0.3.3.3: Third stable currency patch.
+v0.3.3.3 (patch)
 - Host announcements can be "forced"
 - Wallets can be merged
 - Unresponsive addresses are pruned from the node list
 
-v0.3.3.2: Second stable currency patch.
+v0.3.3.2 (patch)
 - Siafunds can be loaded and sent
 - Added block explorer
 - Patched two critical security vulnerabilities
 
-v0.3.3.1: Hotfixed stable currency release.
+v0.3.3.1 (hotfix)
 - Mining API sends headers instead of entire blocks
 - Slashed default hosting price
 
-v0.3.3: Stable currency release.
+v0.3.3: First stable currency release.
 - Set release target
 - Added progress bars to uploads
 - Rigorous testing of consensus code
