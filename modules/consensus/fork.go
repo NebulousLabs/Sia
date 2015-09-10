@@ -34,25 +34,21 @@ func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 // revertToNode will revert blocks from the ConsensusSet's current path until
 // 'pb' is the current block. Blocks are returned in the order that they were
 // reverted.  'pb' is not reverted.
-func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*processedBlock) {
+func revertToNode(tx *bolt.Tx, pb *processedBlock) (revertedNodes []*processedBlock) {
 	// Sanity check - make sure that pb is in the current path.
-	if build.DEBUG {
-		if cs.height() < pb.Height || cs.db.getPath(pb.Height) != pb.Block.ID() {
-			panic(errExternalRevert)
-		}
+	if build.DEBUG && (blockHeight(tx) < pb.Height || getPath(tx, pb.Height) != pb.Block.ID()) {
+		panic(errExternalRevert)
 	}
+
 	// Rewind blocks until we reach 'pb'.
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		for currentBlockID(tx) != pb.Block.ID() {
-			node := currentProcessedBlock(tx)
-			err := commitDiffSet(tx, node, modules.DiffRevert)
-			if build.DEBUG && err != nil {
-				panic(err)
-			}
-			revertedNodes = append(revertedNodes, node)
+	for currentBlockID(tx) != pb.Block.ID() {
+		node := currentProcessedBlock(tx)
+		err := commitDiffSet(tx, node, modules.DiffRevert)
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
-		return nil
-	})
+		revertedNodes = append(revertedNodes, node)
+	}
 	return revertedNodes
 }
 
@@ -107,9 +103,9 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	var commonParent *processedBlock
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
 		commonParent = backtrackToCurrentPath(tx, newNode)[0]
+		revertedNodes = revertToNode(tx, commonParent)
 		return nil
 	})
-	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode
 	appliedNodes, err = cs.applyUntilNode(newNode)
@@ -120,7 +116,10 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	// restore old path
 	//
 	// TODO: Won't be needed.
-	cs.revertToNode(commonParent)
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		revertToNode(tx, commonParent)
+		return nil
+	})
 	_, errReapply := cs.applyUntilNode(oldHead)
 	if build.DEBUG {
 		if errReapply != nil {

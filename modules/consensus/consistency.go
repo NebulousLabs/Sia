@@ -276,7 +276,10 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	// calculated.
 	currentNode := cs.currentProcessedBlock()
 	parent := cs.db.getBlockMap(currentNode.Parent)
-	cs.revertToNode(parent)
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		revertToNode(tx, parent)
+		return nil
+	})
 	if cs.consensusSetHash() != parent.ConsensusSetHash {
 		return errors.New("rewinding a block resulted in unexpected consensus set hash")
 	}
