@@ -31,10 +31,10 @@ func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	return path
 }
 
-// revertToNode will revert blocks from the ConsensusSet's current path until
+// revertToBlock will revert blocks from the ConsensusSet's current path until
 // 'pb' is the current block. Blocks are returned in the order that they were
 // reverted.  'pb' is not reverted.
-func revertToNode(tx *bolt.Tx, pb *processedBlock) (revertedNodes []*processedBlock) {
+func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedNodes []*processedBlock) {
 	// Sanity check - make sure that pb is in the current path.
 	if build.DEBUG && (blockHeight(tx) < pb.Height || getPath(tx, pb.Height) != pb.Block.ID()) {
 		panic(errExternalRevert)
@@ -103,7 +103,7 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	var commonParent *processedBlock
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
 		commonParent = backtrackToCurrentPath(tx, newNode)[0]
-		revertedNodes = revertToNode(tx, commonParent)
+		revertedNodes = revertToBlock(tx, commonParent)
 		return nil
 	})
 
@@ -117,7 +117,7 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 	//
 	// TODO: Won't be needed.
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		revertToNode(tx, commonParent)
+		revertToBlock(tx, commonParent)
 		return nil
 	})
 	_, errReapply := cs.applyUntilNode(oldHead)

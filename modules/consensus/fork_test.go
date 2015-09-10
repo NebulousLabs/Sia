@@ -18,11 +18,11 @@ func (cs *ConsensusSet) dbBacktrackToCurrentPath(pb *processedBlock) (pbs []*pro
 	return pbs
 }
 
-// dbRevertToNode is a convenience function to call revertToNode without a
+// dbRevertToNode is a convenience function to call revertToBlock without a
 // bolt.Tx.
 func (cs *ConsensusSet) dbRevertToNode(pb *processedBlock) (pbs []*processedBlock) {
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		pbs = revertToNode(tx, pb)
+		pbs = revertToBlock(tx, pb)
 		return nil
 	})
 	return pbs
@@ -74,7 +74,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	}
 }
 
-// TestRevertToNode probes the revertToNode method of the consensus set.
+// TestRevertToNode probes the revertToBlock method of the consensus set.
 func TestRevertToNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

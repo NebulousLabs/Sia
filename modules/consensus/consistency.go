@@ -277,7 +277,7 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	currentNode := cs.currentProcessedBlock()
 	parent := cs.db.getBlockMap(currentNode.Parent)
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		revertToNode(tx, parent)
+		revertToBlock(tx, parent)
 		return nil
 	})
 	if cs.consensusSetHash() != parent.ConsensusSetHash {
