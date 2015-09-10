@@ -44,16 +44,17 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 
 	// Rewind blocks until we reach 'pb'.
 	for cs.currentBlockID() != pb.Block.ID() {
-		node := cs.currentProcessedBlock()
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return commitDiffSet(tx, node, modules.DiffRevert)
+		_ = cs.db.Update(func(tx *bolt.Tx) error {
+			node := currentProcessedBlock(tx)
+			err := commitDiffSet(tx, node, modules.DiffRevert)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
+			revertedNodes = append(revertedNodes, node)
+			return nil
 		})
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
-		revertedNodes = append(revertedNodes, node)
 	}
-	return
+	return revertedNodes
 }
 
 // applyUntilNode will successively apply the blocks between the consensus
