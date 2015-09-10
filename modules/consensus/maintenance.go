@@ -81,7 +81,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
 	if err != nil {
 		return err
 	}
-	return removeDSCOBucket(tx, pb.Height)
+	return deleteDSCOBucket(tx, pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file

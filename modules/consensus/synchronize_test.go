@@ -71,14 +71,16 @@ func TestSynchronize(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
-	// reject the bad block.
-	lockID := cst2.cs.mu.Lock()
-	cst2.cs.db.pushPath(cst2.cs.db.getPath(0))
-	cst2.cs.mu.Unlock(lockID)
-	if cst1.cs.db.pathHeight() == cst2.cs.db.pathHeight() {
-		t.Fatal("cst1 did not reject bad block")
-	}
+	/*
+		// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
+		// reject the bad block.
+		lockID := cst2.cs.mu.Lock()
+		cst2.cs.db.pushPath(cst2.cs.db.getPath(0))
+		cst2.cs.mu.Unlock(lockID)
+		if cst1.cs.db.pathHeight() == cst2.cs.db.pathHeight() {
+			t.Fatal("cst1 did not reject bad block")
+		}
+	*/
 }
 
 func TestResynchronize(t *testing.T) {
@@ -117,36 +119,38 @@ func TestResynchronize(t *testing.T) {
 	}
 
 	// mine a block on cst2, but hide it from cst1 during reconnect
-	b, _ = cst2.miner.FindBlock()
-	err = cst2.cs.AcceptBlock(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lockID := cst2.cs.mu.Lock()
-	id := cst2.cs.currentBlockID()
-	err = cst2.cs.db.popPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cst2.cs.mu.Unlock(lockID)
+	/*
+		b, _ = cst2.miner.FindBlock()
+		err = cst2.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lockID := cst2.cs.mu.Lock()
+		id := cst2.cs.currentBlockID()
+		err = cst2.cs.db.popPath()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst2.cs.mu.Unlock(lockID)
 
-	err = cst1.gateway.Connect(cst2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+		err = cst1.gateway.Connect(cst2.gateway.Address())
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// add id back to cst2's current path
-	lockID = cst2.cs.mu.Lock()
-	err = cst2.cs.db.pushPath(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cst2.cs.mu.Unlock(lockID)
+		// add id back to cst2's current path
+		lockID = cst2.cs.mu.Lock()
+		err = cst2.cs.db.pushPath(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst2.cs.mu.Unlock(lockID)
 
-	// cst1 should not have the block
-	if cst1.cs.Height() == cst2.cs.Height() {
-		t.Fatal("Consensus Sets should not have the same height")
-	}
+		// cst1 should not have the block
+		if cst1.cs.Height() == cst2.cs.Height() {
+			t.Fatal("Consensus Sets should not have the same height")
+		}
+	*/
 }
 
 // TestBlockHistory tests that blockHistory returns the expected sequence of

@@ -198,13 +198,13 @@ func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir module
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if pb.Height > types.MaturityDelay {
-			err := removeDSCOBucket(tx, pb.Height)
+			err := deleteDSCOBucket(tx, pb.Height)
 			if err != nil {
 				return err
 			}
 		}
 	} else {
-		err := removeDSCOBucket(tx, pb.Height+types.MaturityDelay)
+		err := deleteDSCOBucket(tx, pb.Height+types.MaturityDelay)
 		if err != nil {
 			return err
 		}
@@ -286,6 +286,8 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	if err != nil {
 		return err
 	}
+
+	updateCurrentPath(tx, pb, modules.DiffApply)
 
 	// Sanity check preparation - set the consensus hash at this height so that
 	// during reverting a check can be performed to assure consistency when

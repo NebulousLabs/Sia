@@ -149,7 +149,7 @@ func (db *setDB) stopConsistencyGuard() {
 func blockHeight(tx *bolt.Tx) types.BlockHeight {
 	var height int
 	bh := tx.Bucket(BlockHeight)
-	err = encoding.Unmarshal(bh.Get(BlockHeight), &height)
+	err := encoding.Unmarshal(bh.Get(BlockHeight), &height)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -169,25 +169,35 @@ func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
 	return getBlockMap(tx, currentBlockID(tx))
 }
 
+// getPath returns the block id at 'height' in the block path.
+func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID) {
+	idBytes := tx.Bucket(BlockPath).Get(encoding.Marshal(height))
+	err := encoding.Unmarshal(idBytes, &id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // pushPath adds a block to the BlockPath at current height + 1.
 func pushPath(tx *bolt.Tx, bid types.BlockID) {
-	bp := tx.Bucket(BlockPath)
+	// Fetch and update the block height.
 	bh := tx.Bucket(BlockHeight)
 	heightBytes := bh.Get(BlockHeight)
+	var oldHeight types.BlockHeight
+	err := encoding.Unmarshal(heightBytes, &oldHeight)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	newHeightBytes := encoding.Marshal(oldHeight + 1)
+	err = bh.Put(BlockHeight, newHeightBytes)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 
 	// Add the block to the block path.
-	err := bp.Put(heightBytes, bid[:])
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-
-	// Update the block height.
-	var oldHeight int
-	err = encoding.Unmarshal(heightBytes, &oldHeight)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = bh.Put(BlockHeight, encoding.Marshal(oldHeight+1))
+	bp := tx.Bucket(BlockPath)
+	err = bp.Put(newHeightBytes, bid[:])
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -196,24 +206,25 @@ func pushPath(tx *bolt.Tx, bid types.BlockID) {
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func popPath(tx *bolt.Tx) {
-	bp := tx.Bucket(BlockPath)
+	// Fetch and update the block height.
 	bh := tx.Bucket(BlockHeight)
-	heightBytes := bh.Get(BlockHeight)
+	oldHeightBytes := bh.Get(BlockHeight)
+	var oldHeight types.BlockHeight
+	err := encoding.Unmarshal(oldHeightBytes, &oldHeight)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	newHeightBytes := encoding.Marshal(oldHeight - 1)
+	err = bh.Put(BlockHeight, newHeightBytes)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 
-	// Remove the block from the path.
-	err := bp.Delete(heightBytes)
+	// Remove the block from the path - make sure to remove the block at
+	// oldHeight.
+	bp := tx.Bucket(BlockPath)
+	err = bp.Delete(oldHeightBytes)
 	if err != nil {
-		panic(err)
-	}
-
-	// Update the block height.
-	var oldHeight int
-	err = encoding.Unmarshal(heightBytes, &oldHeight)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = bh.Put(BlockHeight, encoding.Marshal(oldHeight-1))
-	if build.DEBUG && err != nil {
 		panic(err)
 	}
 }
@@ -377,9 +388,22 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) err
 	return dscoBucket.Delete(id[:])
 }
 
-// removeDSCOBucket deletes the bucket that held a set of delayed siacoin
+// createDSCOBucket creates a bucket for the delayed siacoin outputs at the
+// input height.
+func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	dscoBuckets := tx.Bucket(DSCOBuckets)
+	err := dscoBuckets.Put(encoding.Marshal(bh), encoding.Marshal(bucketID))
+	if err != nil {
+		panic(err)
+	}
+	_, err = tx.CreateBucket(bucketID)
+	return err
+}
+
+// deleteDSCOBucket deletes the bucket that held a set of delayed siacoin
 // outputs.
-func removeDSCOBucket(tx *bolt.Tx, h types.BlockHeight) error {
+func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) error {
 	// Delete the bucket.
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
 	bucket := tx.Bucket(bucketID)
@@ -542,29 +566,6 @@ func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
 	}
 }
 
-// pushPath inserts a block into the database at the "end" of the chain, i.e.
-// the current height + 1.
-//
-// DEPRECATED
-func (db *setDB) pushPath(bid types.BlockID) error {
-	value := encoding.Marshal(bid)
-	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BlockPath)
-		key := encoding.EncUint64(uint64(b.Stats().KeyN))
-		return b.Put(key, value)
-	})
-}
-
-// popPath removes a block from the "end" of the chain, i.e. the block
-// with the largest height.
-func (db *setDB) popPath() error {
-	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BlockPath)
-		key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
-		return b.Delete(key)
-	})
-}
-
 // getPath retreives the block id of a block at a given hegiht from the path
 //
 // DEPRECATED
@@ -578,19 +579,6 @@ func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 		panic(err)
 	}
 	return
-}
-
-// getPath returns the block id at 'height' in the block path.
-func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID) {
-	idBytes, err := getItem(tx, BlockPath, height)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = encoding.Unmarshal(idBytes, &id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return id
 }
 
 // pathHeight returns the size of the current path
@@ -841,19 +829,6 @@ func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.
 	})
 }
 
-// createDSCOBucket creates a bucket for the delayed siacoin outputs at the
-// input height.
-func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
-	dscoBuckets := tx.Bucket(DSCOBuckets)
-	err := dscoBuckets.Put(encoding.Marshal(bh), encoding.Marshal(bucketID))
-	if err != nil {
-		panic(err)
-	}
-	_, err = tx.CreateBucket(bucketID)
-	return err
-}
-
 // getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
 func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinOutputID) types.SiacoinOutput {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
@@ -878,29 +853,6 @@ func (db *setDB) inDelayedSiacoinOutputs(h types.BlockHeight) bool {
 func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) bool {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
 	return db.inBucket(bucketID, id)
-}
-
-// rmDelayedSiacoinOutputs removes a height and its corresponding
-// bucket from the set of delayed siacoin outputs. The map must be empty
-func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketID)
-		if b == nil {
-			return errNilBucket
-		}
-		if b.Stats().KeyN != 0 {
-			return errNonEmptyBucket
-		}
-		return tx.DeleteBucket(bucketID)
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = db.rmItem(DSCOBuckets, h)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
 }
 
 // lenDelayedSiacoinOutputs returns the number of unique heights in the delayed siacoin outputs map
@@ -1022,28 +974,6 @@ func (db *setDB) inFCExpirations(h types.BlockHeight) bool {
 func (db *setDB) inFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) bool {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
 	return db.inBucket(bucketID, id)
-}
-
-// rmFCExpirations removes a file contract set for a given height
-func (db *setDB) rmFCExpirations(h types.BlockHeight) {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketID)
-		if b == nil {
-			return errNilBucket
-		}
-		if b.Stats().KeyN != 0 {
-			return errNonEmptyBucket
-		}
-		return tx.DeleteBucket(bucketID)
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = db.rmItem(FileContractExpirations, h)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
 }
 
 // rmFCExpirationsHeight removes an individual file contract from a given height

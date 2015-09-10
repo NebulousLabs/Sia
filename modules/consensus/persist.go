@@ -26,7 +26,8 @@ func (cs *ConsensusSet) initSetDB() error {
 	// DEPRECATED
 	err = cs.db.Update(func(tx *bolt.Tx) error {
 		blockHeight := tx.Bucket(BlockHeight)
-		return blockHeight.Put(BlockHeight, encoding.Marshal(-1))
+		underflow := types.BlockHeight(0)
+		return blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
 	})
 	if err != nil {
 		return err
@@ -37,10 +38,10 @@ func (cs *ConsensusSet) initSetDB() error {
 	if err != nil {
 		return err
 	}
-	err = cs.db.pushPath(cs.blockRoot.Block.ID())
-	if err != nil {
-		return err
-	}
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		pushPath(tx, cs.blockRoot.Block.ID())
+		return nil
+	})
 
 	// Set the siafund pool to 0.
 	err = cs.db.Update(func(tx *bolt.Tx) error {

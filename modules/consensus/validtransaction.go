@@ -77,7 +77,7 @@ func storageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error)
 	// Get the trigger block id.
 	blockPath := tx.Bucket(BlockPath)
 	triggerHeight := fc.WindowStart - 1
-	if triggerHeight > types.BlockHeight(blockPath.Stats().KeyN) {
+	if triggerHeight > blockHeight(tx) {
 		return 0, ErrUnfinishedFileContract
 	}
 	var triggerID types.BlockID

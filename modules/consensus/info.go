@@ -28,9 +28,12 @@ func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
 }
 
 // height returns the current height of the state.
-func (s *ConsensusSet) height() types.BlockHeight {
-	// Off by one as the genesis block doesn't count.
-	return s.db.pathHeight() - 1
+func (cs *ConsensusSet) height() (bh types.BlockHeight) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		bh = blockHeight(tx)
+		return nil
+	})
+	return bh
 }
 
 // CurrentBlock returns the highest block on the tallest fork.
@@ -131,7 +134,7 @@ func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index ui
 		// Get the trigger block id.
 		blockPath := tx.Bucket(BlockPath)
 		triggerHeight := fc.WindowStart - 1
-		if triggerHeight > types.BlockHeight(blockPath.Stats().KeyN) {
+		if triggerHeight > blockHeight(tx) {
 			return ErrUnfinishedFileContract
 		}
 		var triggerID types.BlockID
