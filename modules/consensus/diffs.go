@@ -285,24 +285,24 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	if err != nil {
 		panic(err)
 	}
-
-	// diffsGenerated is set to true as soon as we start changing the set of
-	// diffs in the block node. If at any point the block is found to be
-	// invalid, the diffs can be safely reversed.
-	pb.DiffsGenerated = true
-
-	// Validate and apply each transaction in the block. They cannot be
-	// validated all at once because some transactions may not be valid until
-	// previous transactions have been applied.
 	var validationErr error
 	err = cs.db.Update(func(tx *bolt.Tx) error {
+
+		// diffsGenerated is set to true as soon as we start changing the set of
+		// diffs in the block node. If at any point the block is found to be
+		// invalid, the diffs can be safely reversed.
+		pb.DiffsGenerated = true
+
+		// Validate and apply each transaction in the block. They cannot be
+		// validated all at once because some transactions may not be valid until
+		// previous transactions have been applied.
 		for _, txn := range pb.Block.Transactions {
 			validationErr = cs.validTxTransaction(tx, txn)
 			if validationErr != nil {
 				// Awkward: need to apply the matured outputs otherwise the diff
 				// structure malforms due to the way the delayedOutput maps are
 				// created and destroyed.
-				err2 := cs.applyMaturedSiacoinOutputs(tx, pb)
+				err2 := applyMaturedSiacoinOutputs(tx, pb)
 				if err2 != nil {
 					validationErr = errors.New(validationErr.Error() + " and " + err2.Error())
 					return nil
@@ -326,11 +326,17 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		return validationErr
 	}
 
-	// After all of the transactions have been applied, 'maintenance' is
-	// applied on the block. This includes adding any outputs that have reached
-	// maturity, applying any contracts with missed storage proofs, and adding
-	// the miner payouts to the list of delayed outputs.
-	err = cs.applyMaintenance(pb)
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		// After all of the transactions have been applied, 'maintenance' is
+		// applied on the block. This includes adding any outputs that have reached
+		// maturity, applying any contracts with missed storage proofs, and adding
+		// the miner payouts to the list of delayed outputs.
+		err := applyMaintenance(tx, pb)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}

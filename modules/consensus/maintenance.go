@@ -20,7 +20,7 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
+func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
 	for i := range pb.Block.MinerPayouts {
 		// Create and apply the delayed miner payout.
 		mpid := pb.Block.MinerPayoutID(uint64(i))
@@ -42,7 +42,7 @@ func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
+func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
 	if !(pb.Height > types.MaturityDelay) {
@@ -86,7 +86,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlo
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) error {
+func applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) error {
 	// Sanity checks.
 	fc, err := getFileContract(tx, fcid)
 	if err != nil {
@@ -137,7 +137,7 @@ func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBloc
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func (cs *ConsensusSet) applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) error {
+func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) error {
 	// Get the bucket pointing to all of the expiring file contracts.
 	fceBucketID := append(prefix_fcex, encoding.Marshal(pb.Height)...)
 	fceBucket := tx.Bucket(fceBucketID)
@@ -147,7 +147,7 @@ func (cs *ConsensusSet) applyFileContractMaintenance(tx *bolt.Tx, pb *processedB
 	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
 		var id types.FileContractID
 		copy(id[:], keyBytes)
-		return cs.applyTxMissedStorageProof(tx, pb, id)
+		return applyTxMissedStorageProof(tx, pb, id)
 	})
 	if err != nil {
 		return err
@@ -159,16 +159,14 @@ func (cs *ConsensusSet) applyFileContractMaintenance(tx *bolt.Tx, pb *processedB
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
-func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		err := cs.applyMinerPayouts(tx, pb)
-		if err != nil {
-			return err
-		}
-		err = cs.applyMaturedSiacoinOutputs(tx, pb)
-		if err != nil {
-			return err
-		}
-		return cs.applyFileContractMaintenance(tx, pb)
-	})
+func applyMaintenance(tx *bolt.Tx, pb *processedBlock) error {
+	err := applyMinerPayouts(tx, pb)
+	if err != nil {
+		return err
+	}
+	err = applyMaturedSiacoinOutputs(tx, pb)
+	if err != nil {
+		return err
+	}
+	return applyFileContractMaintenance(tx, pb)
 }

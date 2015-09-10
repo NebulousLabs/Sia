@@ -30,7 +30,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 
 	// Apply the single miner payout.
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.applyMinerPayouts(tx, pb)
+		return applyMinerPayouts(tx, pb)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	mpid1 := pb2.Block.MinerPayoutID(0)
 	mpid2 := pb2.Block.MinerPayoutID(1)
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.applyMinerPayouts(tx, pb2)
+		return applyMinerPayouts(tx, pb2)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -103,14 +103,14 @@ func TestApplyMinerPayouts(t *testing.T) {
 		cst.cs.db.rmDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid0)
 		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
 		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			return cst.cs.applyMinerPayouts(tx, pb)
+			return applyMinerPayouts(tx, pb)
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.applyMinerPayouts(tx, pb)
+		return applyMinerPayouts(tx, pb)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +146,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 	}
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height, types.SiacoinOutputID{}, types.SiacoinOutput{})
 	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.applyMaturedSiacoinOutputs(tx, pb)
+		return applyMaturedSiacoinOutputs(tx, pb)
 	})
 }
 
@@ -266,7 +266,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
 	cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return cst.cs.applyFileContractMaintenance(tx, pb)
+		return applyFileContractMaintenance(tx, pb)
 	})
 	if err != nil {
 		t.Fatal(err)
