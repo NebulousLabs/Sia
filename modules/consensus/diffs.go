@@ -250,7 +250,7 @@ func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) e
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func (cs *ConsensusSet) generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
+func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
 	if build.DEBUG && pb.Parent != currentBlockID(tx) {
@@ -273,7 +273,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) er
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range pb.Block.Transactions {
-		err = cs.validTxTransaction(tx, txn)
+		err = validTxTransaction(tx, txn)
 		if err != nil {
 			return err
 		}
@@ -293,7 +293,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) er
 	}
 
 	if build.DEBUG {
-		pb.ConsensusSetHash = cs.consensusSetHash()
+		pb.ConsensusSetHash = consensusChecksum(tx)
 	}
 
 	id := pb.Block.ID()

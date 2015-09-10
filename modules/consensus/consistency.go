@@ -15,6 +15,12 @@ var (
 	errSiafundMiscount = errors.New("consensus set has the wrong number of siafunds")
 )
 
+func consensusChecksum(tx *bolt.Tx) crypto.Hash {
+	return crypto.Hash{}
+}
+
+/// BARRIER ///
+
 // checkCurrentPath looks at the blocks in the current path and verifies that
 // they are all ordered correctly and in the block map.
 func (cs *ConsensusSet) checkCurrentPath() error {

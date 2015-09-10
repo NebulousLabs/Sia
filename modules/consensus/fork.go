@@ -79,7 +79,9 @@ func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*pro
 				panic(err)
 			}
 		} else {
-			err = cs.generateAndApplyDiff(node)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return generateAndApplyDiff(tx, node)
+			})
 			if err != nil {
 				break
 			}

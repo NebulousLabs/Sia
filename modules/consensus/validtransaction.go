@@ -29,7 +29,7 @@ var (
 
 // validTxSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func (cs *ConsensusSet) validTxSiacoins(tx *bolt.Tx, t types.Transaction) error {
+func validTxSiacoins(tx *bolt.Tx, t types.Transaction) error {
 	scoBucket := tx.Bucket(SiacoinOutputs)
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
@@ -91,7 +91,7 @@ func (cs *ConsensusSet) validSiacoins(t types.Transaction) error {
 
 // txStorageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
-func (cs *ConsensusSet) txStorageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error) {
+func txStorageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error) {
 	// Check that the parent file contract exists.
 	fcBucket := tx.Bucket(FileContracts)
 	fcBytes := fcBucket.Get(fcid[:])
@@ -179,10 +179,10 @@ func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index ui
 
 // validTxStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (cs *ConsensusSet) validTxStorageProofs(tx *bolt.Tx, t types.Transaction) error {
+func validTxStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
 		// Check that the storage proof itself is valid.
-		segmentIndex, err := cs.txStorageProofSegment(tx, sp.ParentID)
+		segmentIndex, err := txStorageProofSegment(tx, sp.ParentID)
 		if err != nil {
 			return err
 		}
@@ -266,7 +266,7 @@ func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 
 // validTxFileContractRevision checks that each file contract revision is valid
 // in the context of the current consensus set.
-func (cs *ConsensusSet) validTxFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
+func validTxFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 	for _, fcr := range t.FileContractRevisions {
 		fc, err := getFileContract(tx, fcr.ParentID)
 		if err != nil {
@@ -276,7 +276,7 @@ func (cs *ConsensusSet) validTxFileContractRevisions(tx *bolt.Tx, t types.Transa
 		// Check that the height is less than fc.WindowStart - revisions are
 		// not allowed to be submitted once the storage proof window has
 		// opened.  This reduces complexity for unconfirmed transactions.
-		if cs.height() > fc.WindowStart {
+		if blockHeight(tx) > fc.WindowStart {
 			return ErrLateRevision
 		}
 
@@ -361,7 +361,7 @@ func (cs *ConsensusSet) validFileContractRevisions(t types.Transaction) (err err
 
 // validTxSiafunds checks that the siafund portions of the transaction are valid
 // in the context of the consensus set.
-func (cs *ConsensusSet) validTxSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
+func validTxSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
 	// Compare the number of input siafunds to the output siafunds.
 	var siafundInputSum types.Currency
 	var siafundOutputSum types.Currency
@@ -426,29 +426,29 @@ func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
 
 // validTxTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
-func (cs *ConsensusSet) validTxTransaction(tx *bolt.Tx, t types.Transaction) error {
+func validTxTransaction(tx *bolt.Tx, t types.Transaction) error {
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
-	err := t.StandaloneValid(cs.height())
+	err := t.StandaloneValid(blockHeight(tx))
 	if err != nil {
 		return err
 	}
 
 	// Check that each portion of the transaction is legal given the current
 	// consensus set.
-	err = cs.validTxSiacoins(tx, t)
+	err = validTxSiacoins(tx, t)
 	if err != nil {
 		return err
 	}
-	err = cs.validTxStorageProofs(tx, t)
+	err = validTxStorageProofs(tx, t)
 	if err != nil {
 		return err
 	}
-	err = cs.validTxFileContractRevisions(tx, t)
+	err = validTxFileContractRevisions(tx, t)
 	if err != nil {
 		return err
 	}
-	err = cs.validTxSiafunds(tx, t)
+	err = validTxSiafunds(tx, t)
 	if err != nil {
 		return err
 	}
@@ -507,7 +507,7 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	errSuccess := errors.New("success")
 	err := cs.db.Update(func(tx *bolt.Tx) error {
 		for _, txn := range txns {
-			err := cs.validTxTransaction(tx, txn)
+			err := validTxTransaction(tx, txn)
 			if err != nil {
 				return err
 			}
