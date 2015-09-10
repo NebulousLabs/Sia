@@ -273,7 +273,7 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range pb.Block.Transactions {
-		err = validTxTransaction(tx, txn)
+		err = validTransaction(tx, txn)
 		if err != nil {
 			return err
 		}

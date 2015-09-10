@@ -1,6 +1,13 @@
 package consensus
 
 import (
+	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
+)
+
+/*
+import (
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
@@ -576,6 +583,7 @@ func TestValidTransaction(t *testing.T) {
 		t.Error("transaction is valid")
 	}
 }
+*/
 
 // TestTryTransactionSet probes the TryTransactionSet method of the consensus set.
 func TestTryTransactionSet(t *testing.T) {
