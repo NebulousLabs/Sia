@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -23,6 +25,10 @@ func myExternalIP() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		return "", errors.New(string(errResp))
+	}
 	buf := make([]byte, 64)
 	n, err := resp.Body.Read(buf)
 	if err != nil && err != io.EOF {
@@ -51,7 +57,7 @@ func (g *Gateway) learnHostname() {
 		host, err = myExternalIP()
 	}
 	if err != nil {
-		g.log.Println("WARN: failed to discover external IP")
+		g.log.Println("WARN: failed to discover external IP:", err)
 		return
 	}
 
