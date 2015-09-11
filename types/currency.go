@@ -11,10 +11,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 type (
@@ -186,11 +188,15 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 // the bytes of the big.Int correspond to the absolute value of the integer,
 // there is no way to marshal a negative Currency.
 func (c Currency) MarshalSia() []byte {
-	return c.i.Bytes()
+	return encoding.AddPrefix(c.i.Bytes())
 }
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
-func (c *Currency) UnmarshalSia(b []byte) error {
+func (c *Currency) UnmarshalSia(r io.Reader) error {
+	b, err := encoding.ReadPrefix(r, 256)
+	if err != nil {
+		return err
+	}
 	c.i.SetBytes(b)
 	return nil
 }

@@ -48,13 +48,26 @@ type (
 	}
 )
 
-func (t test5) MarshalSia() []byte { return []byte(t.s) }
+func (t test5) MarshalSia() []byte {
+	return AddPrefix([]byte(t.s))
+}
 
-func (t *test5) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
+func (t *test5) UnmarshalSia(r io.Reader) error {
+	b, err := ReadPrefix(r, 256)
+	t.s = string(b)
+	return err
+}
 
-func (t *test6) MarshalSia() []byte { return []byte(t.s) }
+// reuse above methods, but with a pointer receiver
+func (t *test6) MarshalSia() []byte {
+	return AddPrefix([]byte(t.s))
+}
 
-func (t *test6) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
+func (t *test6) UnmarshalSia(r io.Reader) error {
+	b, err := ReadPrefix(r, 256)
+	t.s = string(b)
+	return err
+}
 
 var testStructs = []interface{}{
 	test0{false, 65537, 256, "foo"},

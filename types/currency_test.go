@@ -168,7 +168,7 @@ func TestCurrencyMarshalSia(t *testing.T) {
 	c := NewCurrency64(1656)
 	cMar := c.MarshalSia()
 	var cUmar Currency
-	cUmar.UnmarshalSia(cMar)
+	cUmar.UnmarshalSia(bytes.NewReader(cMar))
 	if c.Cmp(cUmar) != 0 {
 		t.Error("marshal and unmarshal mismatch for currency type")
 	}
