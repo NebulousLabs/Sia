@@ -1,4 +1,4 @@
-Sia 0.4.0
+Sia 0.4.2
 ===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -144,6 +144,15 @@ Version History
 
 August 2015:
 
+v0.4.2 (patch)
+- HostDB is now smarter
+- Tweaked renter contract creation
+
+v0.4.1 (patch)
+- Added support for loading v0.3.3.x wallets
+- Better pruning of dead nodes
+- Improve database consistency
+
 v0.4.0: Second stable currency release.
 - Wallets are encrypted and generated from seed phrases
 - Files are erasure-coded and transferred in parallel
@@ -152,21 +161,21 @@ v0.4.0: Second stable currency release.
 
 June 2015:
 
-v0.3.3.3: Third stable currency patch.
+v0.3.3.3 (patch)
 - Host announcements can be "forced"
 - Wallets can be merged
 - Unresponsive addresses are pruned from the node list
 
-v0.3.3.2: Second stable currency patch.
+v0.3.3.2 (patch)
 - Siafunds can be loaded and sent
 - Added block explorer
 - Patched two critical security vulnerabilities
 
-v0.3.3.1: Hotfixed stable currency release.
+v0.3.3.1 (hotfix)
 - Mining API sends headers instead of entire blocks
 - Slashed default hosting price
 
-v0.3.3: Stable currency release.
+v0.3.3: First stable currency release.
 - Set release target
 - Added progress bars to uploads
 - Rigorous testing of consensus code
