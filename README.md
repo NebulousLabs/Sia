@@ -145,12 +145,13 @@ Version History
 August 2015:
 
 v0.4.2 (patch)
-- Uploading and Hosting Bugfixes
-- Consensus Bugfixes
+- HostDB is now smarter
+- Tweaked renter contract creation
 
 v0.4.1 (patch)
-- Minor Bugfixes
-- Improvements to Build Process
+- Added support for loading v0.3.3.x wallets
+- Better pruning of dead nodes
+- Improve database consistency
 
 v0.4.0: Second stable currency release.
 - Wallets are encrypted and generated from seed phrases
