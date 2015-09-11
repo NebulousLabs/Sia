@@ -134,7 +134,14 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		return nil, nil, err
 	}
 	if newNode.heavierThan(currentNode) {
-		return cs.forkBlockchain(newNode)
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			revertedNodes, appliedNodes, err = cs.forkBlockchain(tx, newNode)
+			return err
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return revertedNodes, appliedNodes, nil
 	}
 	return nil, nil, modules.ErrNonExtendingBlock
 }

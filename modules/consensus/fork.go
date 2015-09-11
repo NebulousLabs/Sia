@@ -77,14 +77,10 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 // will be returned if any of the blocks applied in the transition are found to
 // be invalid. forkBlockchain is atomic; the ConsensusSet is only updated if
 // the function returns nil.
-func (cs *ConsensusSet) forkBlockchain(newBlock *processedBlock) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
-	var commonParent *processedBlock
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		commonParent = backtrackToCurrentPath(tx, newBlock)[0]
-		revertedBlocks = revertToBlock(tx, commonParent)
-		appliedBlocks, err = cs.applyUntilBlock(tx, newBlock)
-		return err
-	})
+func (cs *ConsensusSet) forkBlockchain(tx *bolt.Tx, newBlock *processedBlock) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
+	commonParent := backtrackToCurrentPath(tx, newBlock)[0]
+	revertedBlocks = revertToBlock(tx, commonParent)
+	appliedBlocks, err = cs.applyUntilBlock(tx, newBlock)
 	if err != nil {
 		return nil, nil, err
 	}

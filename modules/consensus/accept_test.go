@@ -414,7 +414,10 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	// Revert the block that was just added to the consensus set and check for
 	// parity with the original state of consensus.
 	parent := cst.cs.db.getBlockMap(currentPB.Parent)
-	_, _, err = cst.cs.forkBlockchain(parent)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		_, _, err := cst.cs.forkBlockchain(tx, parent)
+		return err
+	})
 	if err != nil {
 		return err
 	}
@@ -424,7 +427,10 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	// Re-add the block and check for parity with the first time it was added.
 	// This test is useful because a different codepath is followed if the
 	// diffs have already been generated.
-	_, _, err = cst.cs.forkBlockchain(currentPB)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		_, _, err := cst.cs.forkBlockchain(tx, currentPB)
+		return err
+	})
 	if cst.cs.dbConsensusChecksum() != resultingChecksum {
 		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
 	}
