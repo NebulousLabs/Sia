@@ -63,9 +63,9 @@ clean:
 # 'test-long' runs more thorough tests which should not last more than a few
 # minutes.
 pkgs = ./api ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
-       ./modules/explorer ./modules/gateway ./modules/host ./modules/hostdb \
-       ./modules/miner ./modules/renter ./modules/transactionpool \
-       ./modules/wallet ./persist ./siae ./types
+       ./modules/explorer ./modules/gateway ./modules/host ./modules/hostdb	   \
+       ./modules/miner ./modules/renter ./modules/transactionpool              \
+       ./modules/wallet  ./persist ./siac ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=10s $(pkgs)
 test-v: clean fmt REBUILD
