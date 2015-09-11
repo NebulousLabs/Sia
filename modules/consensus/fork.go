@@ -49,36 +49,26 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processed
 
 // applyUntilBlock will successively apply the blocks between the consensus
 // set's current path and 'pb'.
-func (cs *ConsensusSet) applyUntilBlock(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
+func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
-	var newPath []*processedBlock
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		newPath = backtrackToCurrentPath(tx, pb)
-		return nil
-	})
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		for _, node := range newPath[1:] {
-			// If the diffs for this node have already been generated, apply diffs
-			// directly instead of generating them. This is much faster.
-			if node.DiffsGenerated {
-				err := commitDiffSet(tx, node, modules.DiffApply)
-				if err != nil {
-					panic(err)
-				}
-			} else {
-				err := generateAndApplyDiff(tx, node)
-				if err != nil {
-					// Mark the block as invalid.
-					cs.dosBlocks[node.Block.ID()] = struct{}{}
-					return err
-				}
+	newPath := backtrackToCurrentPath(tx, pb)
+	for _, node := range newPath[1:] {
+		// If the diffs for this node have already been generated, apply diffs
+		// directly instead of generating them. This is much faster.
+		if node.DiffsGenerated {
+			err := commitDiffSet(tx, node, modules.DiffApply)
+			if err != nil {
+				panic(err)
 			}
-			appliedBlocks = append(appliedBlocks, node)
+		} else {
+			err := generateAndApplyDiff(tx, node)
+			if err != nil {
+				// Mark the block as invalid.
+				cs.dosBlocks[node.Block.ID()] = struct{}{}
+				return nil, err
+			}
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		appliedBlocks = append(appliedBlocks, node)
 	}
 	return appliedBlocks, nil
 }
@@ -88,34 +78,15 @@ func (cs *ConsensusSet) applyUntilBlock(pb *processedBlock) (appliedBlocks []*pr
 // be invalid. forkBlockchain is atomic; the ConsensusSet is only updated if
 // the function returns nil.
 func (cs *ConsensusSet) forkBlockchain(newBlock *processedBlock) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
-	oldHead := cs.currentProcessedBlock()
-
-	// revert to the common parent
 	var commonParent *processedBlock
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+	err = cs.db.Update(func(tx *bolt.Tx) error {
 		commonParent = backtrackToCurrentPath(tx, newBlock)[0]
 		revertedBlocks = revertToBlock(tx, commonParent)
-		return nil
+		appliedBlocks, err = cs.applyUntilBlock(tx, newBlock)
+		return err
 	})
-
-	// fast-forward to newBlock
-	appliedBlocks, err = cs.applyUntilBlock(newBlock)
-	if err == nil {
-		return revertedBlocks, appliedBlocks, nil
+	if err != nil {
+		return nil, nil, err
 	}
-
-	// restore old path
-	//
-	// TODO: Won't be needed.
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		revertToBlock(tx, commonParent)
-		return nil
-	})
-	_, errReapply := cs.applyUntilBlock(oldHead)
-	if build.DEBUG {
-		if errReapply != nil {
-			panic("couldn't reapply previously applied diffs")
-		}
-	}
-	return nil, nil, err
+	return revertedBlocks, appliedBlocks, nil
 }

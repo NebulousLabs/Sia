@@ -290,7 +290,7 @@ func (cs *ConsensusSet) checkRewindApply() error {
 		return errors.New("rewinding a block resulted in unexpected consensus set hash")
 	}
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		cs.applyUntilBlock(currentNode)
+		cs.applyUntilBlock(tx, currentNode)
 		return nil
 	})
 	if cs.consensusSetHash() != currentNode.ConsensusSetHash {
