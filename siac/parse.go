@@ -16,14 +16,14 @@ func parseSize(strSize string) (string, error) {
 		suffix     string
 		multiplier int64
 	}{
-		{"kb", 1000},
-		{"mb", 1000000},
-		{"gb", 1000000000},
-		{"tb", 1000000000000},
-		{"kib", 1024},
-		{"mib", 1048576},
-		{"gib", 1073741824},
-		{"tib", 1099511627776},
+		{"kb", 1e3},
+		{"mb", 1e6},
+		{"gb", 1e9},
+		{"tb", 1e12},
+		{"kib", 1 << 10},
+		{"mib", 1 << 20},
+		{"gib", 1 << 30},
+		{"tib", 1 << 40},
 		{"b", 1}, // must be after others else it'll match on them all
 		{"", 1},  // no suffix is still a valid suffix
 	}
