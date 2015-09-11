@@ -56,10 +56,10 @@ func (cs *ConsensusSet) applyUntilBlock(pb *processedBlock) (appliedBlocks []*pr
 		newPath = backtrackToCurrentPath(tx, pb)
 		return nil
 	})
-	for _, node := range newPath[1:] {
-		// If the diffs for this node have already been generated, apply diffs
-		// directly instead of generating them. This is much faster.
-		err = cs.db.Update(func(tx *bolt.Tx) error {
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		for _, node := range newPath[1:] {
+			// If the diffs for this node have already been generated, apply diffs
+			// directly instead of generating them. This is much faster.
 			if node.DiffsGenerated {
 				err := commitDiffSet(tx, node, modules.DiffApply)
 				if err != nil {
@@ -73,12 +73,12 @@ func (cs *ConsensusSet) applyUntilBlock(pb *processedBlock) (appliedBlocks []*pr
 					return err
 				}
 			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
+			appliedBlocks = append(appliedBlocks, node)
 		}
-		appliedBlocks = append(appliedBlocks, node)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return appliedBlocks, nil
 }

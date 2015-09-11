@@ -199,10 +199,10 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 			Value:      claimPortion,
 			UnlockHash: sfi.ClaimUnlockHash,
 		}
-		scoid := sfi.ParentID.SiaClaimOutputID()
+		sfoid := sfi.ParentID.SiaClaimOutputID()
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
-			ID:             scoid,
+			ID:             sfoid,
 			SiacoinOutput:  sco,
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}

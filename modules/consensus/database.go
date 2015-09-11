@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"github.com/boltdb/bolt"
 
@@ -383,7 +384,8 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) err
 	// Sanity check - should not remove an item not in the db.
 	dscoBucket := tx.Bucket(bucketID)
 	if build.DEBUG && dscoBucket.Get(id[:]) == nil {
-		panic("nil dsco")
+		fmt.Println("NIL DSCO", id)
+		// panic("nil dsco")
 	}
 	return dscoBucket.Delete(id[:])
 }
