@@ -40,9 +40,14 @@ func ReadObject(r io.Reader, obj interface{}, maxLen uint64) error {
 	return Unmarshal(data, obj)
 }
 
+// AddPrefix prepends b with an 8-byte length prefix.
+func AddPrefix(b []byte) []byte {
+	return append(EncUint64(uint64(len(b))), b...)
+}
+
 // WritePrefix writes a length-prefixed byte slice to w.
 func WritePrefix(w io.Writer, data []byte) error {
-	n, err := w.Write(append(EncUint64(uint64(len(data))), data...))
+	n, err := w.Write(AddPrefix(data))
 	if n != len(data)+8 {
 		return io.ErrShortWrite
 	}
