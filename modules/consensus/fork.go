@@ -35,7 +35,7 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processed
 		panic(errExternalRevert)
 	}
 
-	// Rewind blocks until we reach 'pb'.
+	// Rewind blocks until 'pb' is the current block.
 	for currentBlockID(tx) != pb.Block.ID() {
 		node := currentProcessedBlock(tx)
 		err := commitDiffSet(tx, node, modules.DiffRevert)

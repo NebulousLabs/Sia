@@ -100,7 +100,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*processedBlock, err error) {
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
 	parentNode := cs.db.getBlockMap(b.ParentID)
 	// COMPATv0.4.0
 	//
@@ -110,9 +110,6 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	//
 	// This is so that the Tax() logic correctly handles the hardfork that
 	// changes the tax from a float64 to a big.Rat during computation.
-	//
-	// TODO: Upon removing this compatibility code, optimize everything up to
-	// forkBlockchain into a single bolt tx, among other speedups.
 	types.CurrentHeightLock.Lock()
 	types.CurrentHeight = parentNode.Height
 	types.CurrentHeightLock.Unlock()
@@ -122,28 +119,32 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	var newNode *processedBlock
-	var currentNode *processedBlock
+	var nonExtending bool
 	err = cs.db.Update(func(tx *bolt.Tx) error {
-		currentNode = currentProcessedBlock(tx)
-		var err2 error
-		newNode, err2 = cs.newChild(tx, parentNode, b)
-		return err2
+		currentNode := currentProcessedBlock(tx)
+		newNode, err := cs.newChild(tx, parentNode, b)
+		if err != nil {
+			return err
+		}
+
+		// modules.ErrNonExtendingBlock should be returned if the block does
+		// not extend the current blockchain, however the changes from newChild
+		// should be comitted (which means 'nil' must be returned). A flag is
+		// set to indicate that modules.ErrNonExtending should be returned.
+		nonExtending = !newNode.heavierThan(currentNode)
+		if nonExtending {
+			return nil
+		}
+		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
+		return err
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	if newNode.heavierThan(currentNode) {
-		err = cs.db.Update(func(tx *bolt.Tx) error {
-			revertedNodes, appliedNodes, err = cs.forkBlockchain(tx, newNode)
-			return err
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		return revertedNodes, appliedNodes, nil
+	if nonExtending {
+		return nil, nil, modules.ErrNonExtendingBlock
 	}
-	return nil, nil, modules.ErrNonExtendingBlock
+	return revertedBlocks, appliedBlocks, nil
 }
 
 // acceptBlock is the internal consensus function for adding
@@ -176,20 +177,20 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
+	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
 		cs.db.stopConsistencyGuard()
 		return err
 	}
-	if len(appliedNodes) > 0 {
-		cs.updateSubscribers(revertedNodes, appliedNodes)
+	if len(appliedBlocks) > 0 {
+		cs.updateSubscribers(revertedBlocks, appliedBlocks)
 	}
 
 	// Sanity checks.
 	if build.DEBUG {
-		// If appliedNodes is 0, revertedNodes will also be 0.
-		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
-			panic("appliedNodes and revertedNodes are mismatched!")
+		// If appliedBlocks is 0, revertedBlocks will also be 0.
+		if len(appliedBlocks) == 0 && len(revertedBlocks) != 0 {
+			panic("appliedBlocks and revertedBlocks are mismatched!")
 		}
 		// Check that the general setup makes sense.
 		err = cs.db.View(func(tx *bolt.Tx) error {
