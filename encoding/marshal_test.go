@@ -237,3 +237,34 @@ func TestReadWriteFile(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 }
+
+func BenchmarkEncode(b *testing.B) {
+	buf := new(bytes.Buffer)
+	enc := NewEncoder(buf)
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		for i := range testStructs {
+			err := enc.Encode(testStructs[i])
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+	b.SetBytes(int64(buf.Len()))
+}
+
+func BenchmarkDecode(b *testing.B) {
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
+	var numBytes int64
+	for i := 0; i < b.N; i++ {
+		numBytes = 0
+		for i := range testEncodings {
+			err := Unmarshal(testEncodings[i], emptyStructs[i])
+			if err != nil {
+				b.Fatal(err)
+			}
+			numBytes += int64(len(testEncodings[i]))
+		}
+	}
+	b.SetBytes(numBytes)
+}
