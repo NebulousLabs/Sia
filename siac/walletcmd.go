@@ -115,7 +115,7 @@ A miner fee of 10 SC is levied on all transactions.`,
 	}
 
 	walletSendSiafundsCmd = &cobra.Command{
-		Use:   "siafunds [amount] [dest] [keyfiles]",
+		Use:   "siafunds [amount] [dest]",
 		Short: "Send siafunds",
 		Long: `Send siafunds to an address, and transfer the claim siacoins to your wallet.
 Run 'wallet send --help' to see a list of available units.`,
