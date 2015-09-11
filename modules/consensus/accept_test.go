@@ -1660,9 +1660,7 @@ func TestComplexForking(t *testing.T) {
 	}
 	for _, block := range cst3Blocks {
 		// Some blocks will return errors.
-		err = cst1.cs.AcceptBlock(block)
-		if err == nil {
-		}
+		_ = cst1.cs.AcceptBlock(block)
 	}
 	if cst1.cs.currentBlockID() != cst3.cs.currentBlockID() {
 		t.Error("cst1 and cst3 do not share the same path")

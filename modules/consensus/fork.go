@@ -6,12 +6,11 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
-	errExternalRevert = errors.New("cannot revert to node outside of current path")
+	errExternalRevert = errors.New("cannot revert to block outside of current path")
 )
 
 // backtrackToCurrentPath traces backwards from 'pb' until it reaches a node in
@@ -20,11 +19,7 @@ var (
 // the former.
 func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	path := []*processedBlock{pb}
-	for {
-		// Stop at the common parent.
-		if pb.Height <= blockHeight(tx) && getPath(tx, pb.Height) == pb.Block.ID() {
-			break
-		}
+	for pb.Height > blockHeight(tx) || getPath(tx, pb.Height) != pb.Block.ID() {
 		pb = getBlockMap(tx, pb.Parent)
 		path = append([]*processedBlock{pb}, path...) // prepend
 	}
@@ -34,7 +29,7 @@ func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 // revertToBlock will revert blocks from the ConsensusSet's current path until
 // 'pb' is the current block. Blocks are returned in the order that they were
 // reverted.  'pb' is not reverted.
-func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedNodes []*processedBlock) {
+func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processedBlock) {
 	// Sanity check - make sure that pb is in the current path.
 	if build.DEBUG && (blockHeight(tx) < pb.Height || getPath(tx, pb.Height) != pb.Block.ID()) {
 		panic(errExternalRevert)
@@ -47,14 +42,14 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedNodes []*processedB
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
-		revertedNodes = append(revertedNodes, node)
+		revertedBlocks = append(revertedBlocks, node)
 	}
-	return revertedNodes
+	return revertedBlocks
 }
 
-// applyUntilNode will successively apply the blocks between the consensus
+// applyUntilBlock will successively apply the blocks between the consensus
 // set's current path and 'pb'.
-func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
+func (cs *ConsensusSet) applyUntilBlock(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
 	var newPath []*processedBlock
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
@@ -64,53 +59,49 @@ func (cs *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*pro
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
-		if node.DiffsGenerated {
-			err = cs.db.Update(func(tx *bolt.Tx) error {
-				return commitDiffSet(tx, node, modules.DiffApply)
-			})
-			if build.DEBUG && err != nil {
-				panic(err)
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			if node.DiffsGenerated {
+				err := commitDiffSet(tx, node, modules.DiffApply)
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				err := generateAndApplyDiff(tx, node)
+				if err != nil {
+					// Mark the block as invalid.
+					cs.dosBlocks[node.Block.ID()] = struct{}{}
+					return err
+				}
 			}
-		} else {
-			err = cs.db.Update(func(tx *bolt.Tx) error {
-				return generateAndApplyDiff(tx, node)
-			})
-			if err != nil {
-				// Mark the block as invalid.
-				cs.dosBlocks[node.Block.ID()] = struct{}{}
-				break
-			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
 		appliedBlocks = append(appliedBlocks, node)
 	}
-	return appliedBlocks, err
+	return appliedBlocks, nil
 }
 
-// forkBlockchain will move the consensus set onto the 'newNode' fork. An error
+// forkBlockchain will move the consensus set onto the 'newBlock' fork. An error
 // will be returned if any of the blocks applied in the transition are found to
 // be invalid. forkBlockchain is atomic; the ConsensusSet is only updated if
 // the function returns nil.
-func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, appliedNodes []*processedBlock, err error) {
-	// In debug mode, record the old state hash before attempting the fork.
-	// This variable is otherwise unused.
-	var oldHash crypto.Hash
-	if build.DEBUG {
-		oldHash = cs.consensusSetHash()
-	}
+func (cs *ConsensusSet) forkBlockchain(newBlock *processedBlock) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
 	oldHead := cs.currentProcessedBlock()
 
 	// revert to the common parent
 	var commonParent *processedBlock
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		commonParent = backtrackToCurrentPath(tx, newNode)[0]
-		revertedNodes = revertToBlock(tx, commonParent)
+		commonParent = backtrackToCurrentPath(tx, newBlock)[0]
+		revertedBlocks = revertToBlock(tx, commonParent)
 		return nil
 	})
 
-	// fast-forward to newNode
-	appliedNodes, err = cs.applyUntilNode(newNode)
+	// fast-forward to newBlock
+	appliedBlocks, err = cs.applyUntilBlock(newBlock)
 	if err == nil {
-		return revertedNodes, appliedNodes, nil
+		return revertedBlocks, appliedBlocks, nil
 	}
 
 	// restore old path
@@ -120,12 +111,10 @@ func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, 
 		revertToBlock(tx, commonParent)
 		return nil
 	})
-	_, errReapply := cs.applyUntilNode(oldHead)
+	_, errReapply := cs.applyUntilBlock(oldHead)
 	if build.DEBUG {
 		if errReapply != nil {
 			panic("couldn't reapply previously applied diffs")
-		} else if cs.consensusSetHash() != oldHash {
-			panic("state hash changed after an unsuccessful fork attempt")
 		}
 	}
 	return nil, nil, err

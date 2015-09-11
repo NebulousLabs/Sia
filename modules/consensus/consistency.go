@@ -36,6 +36,12 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 	return tree.Root()
 }
 
+// checkDSCOs scans the sets of delayed siacoin outputs and checks for
+// consistency.
+func checkDSCOs(tx *bolt.Tx) error {
+	return nil
+}
+
 // checkConsistency runs a series of checks to make sure that the consensus set
 // is consistent with some rules that should always be true.
 func checkConsistency(tx *bolt.Tx) error {
@@ -283,7 +289,10 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	if cs.consensusSetHash() != parent.ConsensusSetHash {
 		return errors.New("rewinding a block resulted in unexpected consensus set hash")
 	}
-	cs.applyUntilNode(currentNode)
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		cs.applyUntilBlock(currentNode)
+		return nil
+	})
 	if cs.consensusSetHash() != currentNode.ConsensusSetHash {
 		return errors.New("reapplying a block resulted in unexpected consensus set hash")
 	}
