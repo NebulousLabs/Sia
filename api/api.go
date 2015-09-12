@@ -39,7 +39,7 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 // the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
-		permittedClients := []string{"Sia-Agent", "Sia-Miner", "Sia-Explorer", "Electron", "AtomShell"}
+		permittedClients := []string{"Sia-Agent", "Sia-Miner", "Electron", "AtomShell"}
 		for _, pc := range permittedClients {
 			if strings.Contains(req.UserAgent(), pc) {
 				handler(w, req)
@@ -47,7 +47,6 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 			}
 		}
 		writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusInternalServerError)
-		return
 	})
 }
 
