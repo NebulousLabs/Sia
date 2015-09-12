@@ -48,7 +48,7 @@ func AddPrefix(b []byte) []byte {
 // WritePrefix writes a length-prefixed byte slice to w.
 func WritePrefix(w io.Writer, data []byte) error {
 	n, err := w.Write(AddPrefix(data))
-	if n != len(data)+8 {
+	if n != len(data)+8 && err == nil {
 		return io.ErrShortWrite
 	}
 	return err

@@ -12,21 +12,6 @@ import (
 	"reflect"
 )
 
-// A SiaMarshaler can encode itself as a byte slice.
-type SiaMarshaler interface {
-	MarshalSia() []byte
-}
-
-// A SiaUnmarshaler can decode itself from a reader.
-type SiaUnmarshaler interface {
-	UnmarshalSia(io.Reader) error
-}
-
-// An Encoder writes objects to an output stream.
-type Encoder struct {
-	w io.Writer
-}
-
 const (
 	maxDecodeLen = 10 * 1024 * 1024 // 10 MB
 	maxSliceLen  = 4 * 1024 * 1024  // 4 MB
@@ -35,6 +20,21 @@ const (
 var (
 	errBadPointer = errors.New("cannot decode into invalid pointer")
 )
+
+// A SiaMarshaler can encode and write itself to a stream.
+type SiaMarshaler interface {
+	MarshalSia(io.Writer) error
+}
+
+// A SiaUnmarshaler can read and decode itself from a stream.
+type SiaUnmarshaler interface {
+	UnmarshalSia(io.Reader) error
+}
+
+// An Encoder writes objects to an output stream.
+type Encoder struct {
+	w io.Writer
+}
 
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
@@ -45,7 +45,7 @@ func (e *Encoder) Encode(v interface{}) error {
 // write catches instances where short writes do not return an error.
 func (e *Encoder) write(p []byte) error {
 	n, err := e.w.Write(p)
-	if n != len(p) {
+	if n != len(p) && err == nil {
 		return io.ErrShortWrite
 	}
 	return err
@@ -56,7 +56,7 @@ func (e *Encoder) write(p []byte) error {
 func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
-		return e.write(m.MarshalSia())
+		return m.MarshalSia(e.w)
 	}
 
 	switch val.Kind() {

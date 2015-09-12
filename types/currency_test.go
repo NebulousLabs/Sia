@@ -166,9 +166,13 @@ func TestCurrencyMarshalJSON(t *testing.T) {
 // the currency type.
 func TestCurrencyMarshalSia(t *testing.T) {
 	c := NewCurrency64(1656)
-	cMar := c.MarshalSia()
+	buf := new(bytes.Buffer)
+	err := c.MarshalSia(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var cUmar Currency
-	cUmar.UnmarshalSia(bytes.NewReader(cMar))
+	cUmar.UnmarshalSia(buf)
 	if c.Cmp(cUmar) != 0 {
 		t.Error("marshal and unmarshal mismatch for currency type")
 	}

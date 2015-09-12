@@ -183,12 +183,12 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalSia implements the encoding.SiaMarshaler interface. It returns the
-// byte-slice representation of the Currency's internal big.Int.  Note that as
-// the bytes of the big.Int correspond to the absolute value of the integer,
-// there is no way to marshal a negative Currency.
-func (c Currency) MarshalSia() []byte {
-	return encoding.AddPrefix(c.i.Bytes())
+// MarshalSia implements the encoding.SiaMarshaler interface. It writes the
+// byte-slice representation of the Currency's internal big.Int to w. Note
+// that as the bytes of the big.Int correspond to the absolute value of the
+// integer, there is no way to marshal a negative Currency.
+func (c Currency) MarshalSia(w io.Writer) error {
+	return encoding.WritePrefix(w, c.i.Bytes())
 }
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
