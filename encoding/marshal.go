@@ -95,6 +95,9 @@ func (e *Encoder) encode(val reflect.Value) error {
 		if err := e.write(EncUint64(uint64(val.Len()))); err != nil {
 			return err
 		}
+		if val.Len() == 0 {
+			return nil
+		}
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays
@@ -282,6 +285,8 @@ func (d *Decoder) decode(val reflect.Value) {
 		// them allocate a massive slice
 		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > maxSliceLen {
 			panic("slice is too large")
+		} else if sliceLen == 0 {
+			return
 		}
 		val.Set(reflect.MakeSlice(val.Type(), int(sliceLen), int(sliceLen)))
 		fallthrough
