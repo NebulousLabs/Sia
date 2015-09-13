@@ -6,6 +6,14 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
+func BenchmarkEncodeBlock(b *testing.B) {
+	var block Block
+	b.SetBytes(int64(len(encoding.Marshal(block))))
+	for i := 0; i < b.N; i++ {
+		encoding.Marshal(block)
+	}
+}
+
 // BenchmarkDecodeEmptyBlock benchmarks decoding an empty block.
 //
 // i7-4770, 08-20-2015: 38 MB/s
