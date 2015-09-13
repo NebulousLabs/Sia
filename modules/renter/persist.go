@@ -47,20 +47,40 @@ func (f *file) save(w io.Writer) error {
 	enc := encoding.NewEncoder(zip)
 
 	// encode easy fields
-	enc.Encode(f.name)
-	enc.Encode(f.size)
-	enc.Encode(f.masterKey)
-	enc.Encode(f.pieceSize)
-	enc.Encode(f.mode)
-	enc.Encode(f.bytesUploaded)
-	enc.Encode(f.chunksUploaded)
+	if err := enc.Encode(f.name); err != nil {
+		return err
+	}
+	if err := enc.Encode(f.size); err != nil {
+		return err
+	}
+	if err := enc.Encode(f.masterKey); err != nil {
+		return err
+	}
+	if err := enc.Encode(f.pieceSize); err != nil {
+		return err
+	}
+	if err := enc.Encode(f.mode); err != nil {
+		return err
+	}
+	if err := enc.Encode(f.bytesUploaded); err != nil {
+		return err
+	}
+	if err := enc.Encode(f.chunksUploaded); err != nil {
+		return err
+	}
 
 	// encode erasureCode
 	switch code := f.erasureCode.(type) {
 	case *rsCode:
-		enc.Encode("Reed-Solomon")
-		enc.Encode(uint64(code.dataPieces))
-		enc.Encode(uint64(code.numPieces - code.dataPieces))
+		if err := enc.Encode("Reed-Solomon"); err != nil {
+			return err
+		}
+		if err := enc.Encode(uint64(code.dataPieces)); err != nil {
+			return err
+		}
+		if err := enc.Encode(uint64(code.numPieces - code.dataPieces)); err != nil {
+			return err
+		}
 	default:
 		if build.DEBUG {
 			panic("unknown erasure code")
@@ -68,9 +88,13 @@ func (f *file) save(w io.Writer) error {
 		return errors.New("unknown erasure code")
 	}
 	// encode contracts
-	enc.Encode(uint64(len(f.contracts)))
+	if err := enc.Encode(uint64(len(f.contracts))); err != nil {
+		return err
+	}
 	for _, c := range f.contracts {
-		enc.Encode(c)
+		if err := enc.Encode(c); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -86,22 +110,42 @@ func (f *file) load(r io.Reader) error {
 	dec := encoding.NewDecoder(zip)
 
 	// decode easy fields
-	dec.Decode(&f.name)
-	dec.Decode(&f.size)
-	dec.Decode(&f.masterKey)
-	dec.Decode(&f.pieceSize)
-	dec.Decode(&f.mode)
-	dec.Decode(&f.bytesUploaded)
-	dec.Decode(&f.chunksUploaded)
+	if err := dec.Decode(&f.name); err != nil {
+		return err
+	}
+	if err := dec.Decode(&f.size); err != nil {
+		return err
+	}
+	if err := dec.Decode(&f.masterKey); err != nil {
+		return err
+	}
+	if err := dec.Decode(&f.pieceSize); err != nil {
+		return err
+	}
+	if err := dec.Decode(&f.mode); err != nil {
+		return err
+	}
+	if err := dec.Decode(&f.bytesUploaded); err != nil {
+		return err
+	}
+	if err := dec.Decode(&f.chunksUploaded); err != nil {
+		return err
+	}
 
 	// decode erasure coder
 	var codeType string
-	dec.Decode(&codeType)
+	if err := dec.Decode(&codeType); err != nil {
+		return err
+	}
 	switch codeType {
 	case "Reed-Solomon":
 		var nData, nParity uint64
-		dec.Decode(&nData)
-		dec.Decode(&nParity)
+		if err := dec.Decode(&nData); err != nil {
+			return err
+		}
+		if err := dec.Decode(&nParity); err != nil {
+			return err
+		}
 		rsc, err := NewRSCode(int(nData), int(nParity))
 		if err != nil {
 			return err
@@ -113,11 +157,15 @@ func (f *file) load(r io.Reader) error {
 
 	// decode contracts
 	var nContracts uint64
-	dec.Decode(&nContracts)
+	if err := dec.Decode(&nContracts); err != nil {
+		return err
+	}
 	f.contracts = make(map[modules.NetAddress]fileContract)
 	var contract fileContract
 	for i := uint64(0); i < nContracts; i++ {
-		dec.Decode(&contract)
+		if err := dec.Decode(&contract); err != nil {
+			return err
+		}
 		f.contracts[contract.IP] = contract
 	}
 	return nil
@@ -130,26 +178,23 @@ func (r *Renter) saveFile(f *file) error {
 		return err
 	}
 	defer handle.Close()
-
 	enc := encoding.NewEncoder(handle)
 
 	// Write header.
-	enc.Encode(shareHeader)
-	enc.Encode(shareVersion)
+	if err := enc.Encode(shareHeader); err != nil {
+		return err
+	}
+	if err := enc.Encode(shareVersion); err != nil {
+		return err
+	}
 
 	// Write length of 1.
-	err = enc.Encode(uint64(1))
-	if err != nil {
+	if err := enc.Encode(uint64(1)); err != nil {
 		return err
 	}
 
 	// Write file.
-	err = f.save(handle)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return f.save(handle)
 }
 
 // save stores the current renter data to disk.
@@ -218,12 +263,15 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 	enc := encoding.NewEncoder(w)
 
 	// Write header.
-	enc.Encode(shareHeader)
-	enc.Encode(shareVersion)
+	if err := enc.Encode(shareHeader); err != nil {
+		return err
+	}
+	if err := enc.Encode(shareVersion); err != nil {
+		return err
+	}
 
 	// Write number of files.
-	err := enc.Encode(uint64(len(nicknames)))
-	if err != nil {
+	if err := enc.Encode(uint64(len(nicknames))); err != nil {
 		return err
 	}
 
@@ -233,7 +281,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if !exists {
 			return ErrUnknownNickname
 		}
-		err = file.save(w)
+		err := file.save(w)
 		if err != nil {
 			return err
 		}
