@@ -47,38 +47,28 @@ func (f *file) save(w io.Writer) error {
 	enc := encoding.NewEncoder(zip)
 
 	// encode easy fields
-	if err := enc.Encode(f.name); err != nil {
-		return err
-	}
-	if err := enc.Encode(f.size); err != nil {
-		return err
-	}
-	if err := enc.Encode(f.masterKey); err != nil {
-		return err
-	}
-	if err := enc.Encode(f.pieceSize); err != nil {
-		return err
-	}
-	if err := enc.Encode(f.mode); err != nil {
-		return err
-	}
-	if err := enc.Encode(f.bytesUploaded); err != nil {
-		return err
-	}
-	if err := enc.Encode(f.chunksUploaded); err != nil {
+	err := enc.EncodeAll(
+		f.name,
+		f.size,
+		f.masterKey,
+		f.pieceSize,
+		f.mode,
+		f.bytesUploaded,
+		f.chunksUploaded,
+	)
+	if err != nil {
 		return err
 	}
 
 	// encode erasureCode
 	switch code := f.erasureCode.(type) {
 	case *rsCode:
-		if err := enc.Encode("Reed-Solomon"); err != nil {
-			return err
-		}
-		if err := enc.Encode(uint64(code.dataPieces)); err != nil {
-			return err
-		}
-		if err := enc.Encode(uint64(code.numPieces - code.dataPieces)); err != nil {
+		err = enc.EncodeAll(
+			"Reed-Solomon",
+			uint64(code.dataPieces),
+			uint64(code.numPieces-code.dataPieces),
+		)
+		if err != nil {
 			return err
 		}
 	default:
@@ -110,25 +100,16 @@ func (f *file) load(r io.Reader) error {
 	dec := encoding.NewDecoder(zip)
 
 	// decode easy fields
-	if err := dec.Decode(&f.name); err != nil {
-		return err
-	}
-	if err := dec.Decode(&f.size); err != nil {
-		return err
-	}
-	if err := dec.Decode(&f.masterKey); err != nil {
-		return err
-	}
-	if err := dec.Decode(&f.pieceSize); err != nil {
-		return err
-	}
-	if err := dec.Decode(&f.mode); err != nil {
-		return err
-	}
-	if err := dec.Decode(&f.bytesUploaded); err != nil {
-		return err
-	}
-	if err := dec.Decode(&f.chunksUploaded); err != nil {
+	err = dec.DecodeAll(
+		&f.name,
+		&f.size,
+		&f.masterKey,
+		&f.pieceSize,
+		&f.mode,
+		&f.bytesUploaded,
+		&f.chunksUploaded,
+	)
+	if err != nil {
 		return err
 	}
 
@@ -140,10 +121,11 @@ func (f *file) load(r io.Reader) error {
 	switch codeType {
 	case "Reed-Solomon":
 		var nData, nParity uint64
-		if err := dec.Decode(&nData); err != nil {
-			return err
-		}
-		if err := dec.Decode(&nParity); err != nil {
+		err = dec.DecodeAll(
+			&nData,
+			&nParity,
+		)
+		if err != nil {
 			return err
 		}
 		rsc, err := NewRSCode(int(nData), int(nParity))
@@ -178,18 +160,14 @@ func (r *Renter) saveFile(f *file) error {
 		return err
 	}
 	defer handle.Close()
-	enc := encoding.NewEncoder(handle)
 
-	// Write header.
-	if err := enc.Encode(shareHeader); err != nil {
-		return err
-	}
-	if err := enc.Encode(shareVersion); err != nil {
-		return err
-	}
-
-	// Write length of 1.
-	if err := enc.Encode(uint64(1)); err != nil {
+	// Write header with length of 1.
+	err = encoding.NewEncoder(handle).EncodeAll(
+		shareHeader,
+		shareVersion,
+		uint64(1),
+	)
+	if err != nil {
 		return err
 	}
 
@@ -260,18 +238,13 @@ func (r *Renter) load() error {
 
 // shareFiles writes the specified files to w.
 func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
-	enc := encoding.NewEncoder(w)
-
 	// Write header.
-	if err := enc.Encode(shareHeader); err != nil {
-		return err
-	}
-	if err := enc.Encode(shareVersion); err != nil {
-		return err
-	}
-
-	// Write number of files.
-	if err := enc.Encode(uint64(len(nicknames))); err != nil {
+	err := encoding.NewEncoder(w).EncodeAll(
+		shareHeader,
+		shareVersion,
+		uint64(len(nicknames)),
+	)
+	if err != nil {
 		return err
 	}
 
@@ -332,27 +305,21 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 // loadSharedFiles reads .sia data from reader and registers the contained
 // files in the renter. It returns the nicknames of the loaded files.
 func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
-	dec := encoding.NewDecoder(reader)
-
 	// read header
 	var header [15]byte
-	dec.Decode(&header)
-	if header != shareHeader {
-		return nil, ErrBadFile
-	}
-
-	// decode version
 	var version string
-	dec.Decode(&version)
-	if version != shareVersion {
-		return nil, ErrIncompatible
-	}
-
-	// Read number of files
 	var numFiles uint64
-	err := dec.Decode(&numFiles)
+	err := encoding.NewDecoder(reader).DecodeAll(
+		&header,
+		&version,
+		&numFiles,
+	)
 	if err != nil {
 		return nil, err
+	} else if header != shareHeader {
+		return nil, ErrBadFile
+	} else if version != shareVersion {
+		return nil, ErrIncompatible
 	}
 
 	// Read each file.

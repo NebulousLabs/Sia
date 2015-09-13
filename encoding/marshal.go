@@ -42,6 +42,16 @@ func (e *Encoder) Encode(v interface{}) error {
 	return e.encode(reflect.ValueOf(v))
 }
 
+// EncodeAll encodes a variable number of arguments.
+func (e *Encoder) EncodeAll(vs ...interface{}) error {
+	for i := range vs {
+		if err := e.Encode(vs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // write catches instances where short writes do not return an error.
 func (e *Encoder) write(p []byte) error {
 	n, err := e.w.Write(p)
@@ -193,6 +203,16 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 
 	d.decode(pval.Elem())
 	return
+}
+
+// DecodeAll decodes a variable number of arguments.
+func (d *Decoder) DecodeAll(vs ...interface{}) error {
+	for i := range vs {
+		if err := d.Decode(vs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // readN reads n bytes and panics if the read fails.
