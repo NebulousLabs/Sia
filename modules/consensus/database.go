@@ -230,6 +230,14 @@ func popPath(tx *bolt.Tx) {
 	}
 }
 
+// isSiacoinOutput returns true if there is a siacoin output of that id in the
+// database.
+func isSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) bool {
+	bucket := tx.Bucket(SiacoinOutputs)
+	sco := bucket.Get(id[:])
+	return sco != nil
+}
+
 // getSiacoinOutput fetches a siacoin output from the database. An error is
 // returned if the siacoin output does not exist.
 func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutput, error) {
@@ -268,6 +276,20 @@ func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
 		}
 	}
 	return scoBucket.Delete(id[:])
+}
+
+// getFileContract fetches a file contract from the database, returning an
+// error if it is not there.
+func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContract, err error) {
+	fcBytes := tx.Bucket(FileContracts).Get(id[:])
+	if fcBytes == nil {
+		return types.FileContract{}, errNilItem
+	}
+	err = encoding.Unmarshal(fcBytes, &fc)
+	if err != nil {
+		return types.FileContract{}, err
+	}
+	return fc, nil
 }
 
 // addFileContract adds a file contract to the database. An error is returned
@@ -426,18 +448,6 @@ func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) error {
 		panic(errNilItem)
 	}
 	return b.Delete(encoding.Marshal(h))
-}
-
-func forEachFCExpiration(tx *bolt.Tx, bh types.BlockHeight, fn func(types.FileContractID) error) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(bh)...)
-	return forEach(tx, bucketID, func(kb, bv []byte) error {
-		var id types.FileContractID
-		err := encoding.Unmarshal(kb, &id)
-		if err != nil {
-			return err
-		}
-		return fn(id)
-	})
 }
 
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
@@ -716,18 +726,6 @@ func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract
 	})
 }
 
-func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContract, err error) {
-	fcBytes, err := getItem(tx, FileContracts, id)
-	if err != nil {
-		return types.FileContract{}, err
-	}
-	err = encoding.Unmarshal(fcBytes, &fc)
-	if err != nil {
-		return types.FileContract{}, err
-	}
-	return fc, nil
-}
-
 // getFileContracts is a wrapper around getItem for retrieving a file contract
 func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 	fcBytes, err := db.getItem(FileContracts, id)
@@ -740,17 +738,6 @@ func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 		panic(err)
 	}
 	return fc
-}
-
-// inFileContracts is a wrapper around inBucket which returns true if
-// a file contract is in the consensus set
-func (db *setDB) inFileContracts(id types.FileContractID) bool {
-	return db.inBucket(FileContracts, id)
-}
-
-// rmFileContracts removes a file contract from the consensus set
-func (db *setDB) rmFileContracts(id types.FileContractID) error {
-	return db.rmItem(FileContracts, id)
 }
 
 // forEachFileContracts applies a function to each (file contract id, filecontract)
@@ -791,15 +778,6 @@ func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput
 		panic(err)
 	}
 	return sco
-}
-
-func isSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) bool {
-	bucket := tx.Bucket(SiacoinOutputs)
-	if bucket == nil {
-		panic(errNilBucket)
-	}
-	item := bucket.Get(encoding.Marshal(id))
-	return item != nil
 }
 
 // inSiacoinOutputs returns a bool showing if a soacoin output ID is
@@ -941,60 +919,4 @@ func (db *setDB) forEachDelayedSiacoinOutputs(fn func(k types.SiacoinOutputID, v
 	if err != nil {
 		panic(err)
 	}
-}
-
-// addFCExpirations creates a new file contract expirations map for the given height
-func (db *setDB) addFCExpirations(h types.BlockHeight) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	err := db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, FileContractExpirations, h, bucketID)
-	})
-	if err != nil {
-		return err
-	}
-	return db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket(bucketID)
-		return err
-	})
-}
-
-// addFCExpirationsHeight adds a file contract ID to the set at a particular height
-func (db *setDB) addFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, bucketID, id, struct{}{})
-	})
-}
-
-// inFCExpirations returns a bool showing the presence of a file contract map at a given height
-func (db *setDB) inFCExpirations(h types.BlockHeight) bool {
-	return db.inBucket(FileContractExpirations, h)
-}
-
-// inFCExpirationsHeight returns a bool showing the presence a file
-// contract in the map for a given height
-func (db *setDB) inFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) bool {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	return db.inBucket(bucketID, id)
-}
-
-// rmFCExpirationsHeight removes an individual file contract from a given height
-func (db *setDB) rmFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	return db.rmItem(bucketID, id)
-}
-
-// forEachFCExpirationsHeight applies a function to every file
-// contract ID that expires at a given height
-func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(types.FileContractID)) {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	db.forEachItem(bucketID, func(kb, vb []byte) error {
-		var key types.FileContractID
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		fn(key)
-		return nil
-	})
 }

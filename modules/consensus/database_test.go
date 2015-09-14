@@ -151,3 +151,37 @@ func (db *setDB) lenFCExpirationsHeight(h types.BlockHeight) uint64 {
 func (db *setDB) lenSiafundOutputs() uint64 {
 	return db.lenBucket(SiafundOutputs)
 }
+
+// addFCExpirations creates a new file contract expirations map for the given height
+func (db *setDB) addFCExpirations(h types.BlockHeight) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	err := db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, FileContractExpirations, h, bucketID)
+	})
+	if err != nil {
+		return err
+	}
+	return db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket(bucketID)
+		return err
+	})
+}
+
+// addFCExpirationsHeight adds a file contract ID to the set at a particular height
+func (db *setDB) addFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, bucketID, id, struct{}{})
+	})
+}
+
+// inFileContracts is a wrapper around inBucket which returns true if
+// a file contract is in the consensus set
+func (db *setDB) inFileContracts(id types.FileContractID) bool {
+	return db.inBucket(FileContracts, id)
+}
+
+// rmFileContracts removes a file contract from the consensus set
+func (db *setDB) rmFileContracts(id types.FileContractID) error {
+	return db.rmItem(FileContracts, id)
+}

@@ -103,11 +103,8 @@ func applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileC
 	for i, mpo := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
 		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
-		if build.DEBUG {
-			exists := isSiacoinOutput(tx, spoid)
-			if exists {
-				panic(errPayoutsAlreadyPaid)
-			}
+		if build.DEBUG && isSiacoinOutput(tx, spoid) {
+			panic(errPayoutsAlreadyPaid)
 		}
 
 		dscod := modules.DelayedSiacoinOutputDiff{

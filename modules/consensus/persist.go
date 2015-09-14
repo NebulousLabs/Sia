@@ -22,8 +22,6 @@ func (cs *ConsensusSet) initSetDB() error {
 	}
 
 	// Set the block height to -1, adding the genesis block will bump it to 0.
-	//
-	// DEPRECATED
 	err = cs.db.Update(func(tx *bolt.Tx) error {
 		blockHeight := tx.Bucket(BlockHeight)
 		underflow := types.BlockHeight(0)
