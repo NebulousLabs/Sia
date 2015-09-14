@@ -66,8 +66,9 @@ Marshal(foo{"bar", 3}) == append(Marshal("bar"), Marshal(3)...)
 ```
 
 Finally, if a type implements the SiaMarshaler interface, its MarshalSia
-method will be used to encode the type. The resulting byte slice will be
-length-prefixed like any other variable-length type. During decoding, the type
-is decoded as a byte slice, and then passed to UnmarshalSia. The most
-prevalent example of this is the `Currency` type, which is encoded as a
-variable-length big-endian unsigned integer.
+method will be used to encode the type. Similarly, if a type implements the
+SiaUnmarshal interface, its UnmarshalSia method will be used to decode the
+type. Note that unless a type implements both interfaces, it must conform to
+the spec above. Otherwise, it may encode and decode itself however desired.
+This may be an attractive option where speed is critical, since it allows for
+more compact representations, and bypasses the use of reflection.
