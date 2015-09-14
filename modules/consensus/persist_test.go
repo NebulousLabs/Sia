@@ -39,27 +39,3 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal("consensus set hash changed after load")
 	}
 }
-
-// TestConsistencyGuard verifies that the database cannot be modified after it
-// has been corrupted
-func TestConsistencyGuard(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestConsistencyGuard")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Improperly trigger the guard, simulating a situation where the guard is
-	// added at the beginning of editing but not removed at the end of editing.
-	err = cst.cs.db.startConsistencyGuard()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = cst.miner.AddBlock()
-	if err != errDBInconsistent {
-		t.Fatal(err)
-	}
-}

@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -24,13 +23,9 @@ var (
 	prefix_fcex = []byte("fcex_")
 
 	meta = persist.Metadata{
-		Version: "0.4.0",
+		Version: "0.4.3",
 		Header:  "Consensus Set Database",
 	}
-
-	ConsistencyGuard = []byte("ConsistencyGuard")
-	GuardStart       = []byte("GuardStart")
-	GuardEnd         = []byte("GuardEnd")
 
 	// Generally we would just look at BlockPath.Stats(), but there is an error
 	// in boltdb that prevents the bucket stats from updating until a tx is
@@ -91,59 +86,9 @@ func openDB(filename string) (*setDB, error) {
 				return err
 			}
 		}
-
-		// Initilize the consistency guards.
-		cg, err := tx.CreateBucketIfNotExists(ConsistencyGuard)
-		if err != nil {
-			return err
-		}
-		gs := cg.Get(GuardStart)
-		ge := cg.Get(GuardEnd)
-		// Database is consistent if both are nil, or if both are equal.
-		// Database is inconsistent otherwise.
-		if (gs != nil && ge != nil && bytes.Equal(gs, ge)) || gs == nil && ge == nil {
-			cg.Put(GuardStart, encoding.EncUint64(1))
-			cg.Put(GuardEnd, encoding.EncUint64(1))
-			return nil
-		}
-		return errDBInconsistent
+		return nil
 	})
 	return &setDB{db, true}, err
-}
-
-// startConsistencyGuard activates a consistency guard on the database. This is
-// necessary because the consensus set makes one atomic database change, but
-// does so using several boltdb transactions. The 'guard' is actually two
-// values, a 'GuardStart' and a 'GuardEnd'. 'GuardStart' is incremented when
-// consensus changes begin, and 'GuardEnd' is incremented when consensus
-// changes finish. If 'GuardStart' is not equal to 'GuardEnd' when
-// startConsistencyGuard is called, the database is likely corrupt.
-func (db *setDB) startConsistencyGuard() error {
-	return db.Update(func(tx *bolt.Tx) error {
-		cg := tx.Bucket(ConsistencyGuard)
-		gs := cg.Get(GuardStart)
-		if !bytes.Equal(gs, cg.Get(GuardEnd)) {
-			return errDBInconsistent
-		}
-		i := encoding.DecUint64(gs)
-		return cg.Put(GuardStart, encoding.EncUint64(i+1))
-	})
-}
-
-// stopConsistencyGuard is the complement function to startConsistencyGuard.
-// startConsistencyGuard should be called any time that consensus changes are
-// starting, and stopConsistencyGuard should be called when the consensus
-// changes are finished. The guards are necessary because one set of changes
-// may occur over multiple boltdb transactions.
-func (db *setDB) stopConsistencyGuard() {
-	err := db.Update(func(tx *bolt.Tx) error {
-		cg := tx.Bucket(ConsistencyGuard)
-		i := encoding.DecUint64(cg.Get(GuardEnd))
-		return cg.Put(GuardEnd, encoding.EncUint64(i+1))
-	})
-	if err != nil && build.DEBUG {
-		panic(err)
-	}
 }
 
 // blockHeight returns the height of the blockchain.

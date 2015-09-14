@@ -3,7 +3,6 @@ package consensus
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/boltdb/bolt"
 
@@ -16,13 +15,8 @@ import (
 // initDatabase is run when the database. This has become the true
 // init function for consensus set
 func (cs *ConsensusSet) initSetDB() error {
-	err := cs.db.startConsistencyGuard()
-	if err != nil {
-		return err
-	}
-
 	// Set the block height to -1, adding the genesis block will bump it to 0.
-	err = cs.db.Update(func(tx *bolt.Tx) error {
+	err := cs.db.Update(func(tx *bolt.Tx) error {
 		blockHeight := tx.Bucket(BlockHeight)
 		underflow := types.BlockHeight(0)
 		return blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
@@ -76,7 +70,6 @@ func (cs *ConsensusSet) initSetDB() error {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
 		cs.db.updateBlockMap(&cs.blockRoot)
 	}
-	cs.db.stopConsistencyGuard()
 	return nil
 }
 
@@ -123,6 +116,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 // loadDiffs is a transitional function to load the processed blocks
 // from disk and move the diffs into memory
+//
+// TODO: remanage this func
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
 
@@ -134,24 +129,15 @@ func (cs *ConsensusSet) loadDiffs() {
 		lockID := cs.mu.Lock()
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
-
-		// Yield the processor so that other goroutines have a chance to grab
-		// the lock before it is immeditately grabbed again in the tight loop.
-		runtime.Gosched()
 	}
 
 	// Do a consistency check after loading the database.
 	/*
 		if height > 1 && build.DEBUG {
-			err := cs.db.startConsistencyGuard()
-			if err != nil {
-				panic(err)
-			}
 			err = cs.checkConsistency()
 			if err != nil {
 				panic(err)
 			}
-			cs.db.stopConsistencyGuard()
 		}
 	*/
 }

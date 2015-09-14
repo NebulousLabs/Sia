@@ -152,24 +152,18 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 // transactions. Trusted blocks, like those on disk, should already
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
-	err := cs.db.startConsistencyGuard()
-	if err != nil {
-		return err
-	}
-
 	// Start verification inside of a bolt View tx.
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Check that the header is valid. The header is checked first because it
 		// is not computationally expensive to verify, but it is computationally
 		// expensive to create.
-		err = cs.validHeader(tx, b)
+		err := cs.validHeader(tx, b)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		cs.db.stopConsistencyGuard()
 		return err
 	}
 
@@ -179,7 +173,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// the longest fork.
 	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
-		cs.db.stopConsistencyGuard()
 		return err
 	}
 	if len(appliedBlocks) > 0 {
@@ -200,7 +193,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
-	cs.db.stopConsistencyGuard()
 	return nil
 }
 
