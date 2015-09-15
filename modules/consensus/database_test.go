@@ -189,3 +189,10 @@ func (db *setDB) inFileContracts(id types.FileContractID) bool {
 func (db *setDB) rmFileContracts(id types.FileContractID) error {
 	return db.rmItem(FileContracts, id)
 }
+
+// addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
+func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, SiacoinOutputs, id, sco)
+	})
+}

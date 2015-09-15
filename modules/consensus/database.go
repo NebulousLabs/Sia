@@ -144,6 +144,15 @@ func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
 	return &pb, nil
 }
 
+// addBlockMap adds a processed block to the block map.
+func addBlockMap(tx *bolt.Tx, pb *processedBlock) {
+	id := pb.Block.ID()
+	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(pb))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
 // getPath returns the block id at 'height' in the block path.
 func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID) {
 	idBytes := tx.Bucket(BlockPath).Get(encoding.Marshal(height))
@@ -732,13 +741,6 @@ func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.Fi
 		}
 		fn(key, value)
 		return nil
-	})
-}
-
-// addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
-func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, SiacoinOutputs, id, sco)
 	})
 }
 

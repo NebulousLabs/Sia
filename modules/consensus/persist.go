@@ -12,50 +12,47 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	DatabaseFilename = "consensus.db"
+)
+
 // initDatabase is run when the database. This has become the true
 // init function for consensus set
-func (cs *ConsensusSet) initSetDB() error {
-	// Set the block height to -1, adding the genesis block will bump it to 0.
+func (cs *ConsensusSet) initDB() error {
 	err := cs.db.Update(func(tx *bolt.Tx) error {
+		// Set the block height to -1, so the genesis block is at height 0.
 		blockHeight := tx.Bucket(BlockHeight)
 		underflow := types.BlockHeight(0)
-		return blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
-	})
-	if err != nil {
-		return err
-	}
+		err := blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
+		if err != nil {
+			return err
+		}
 
-	// add genesis block
-	err = cs.db.addBlockMap(&cs.blockRoot)
-	if err != nil {
-		return err
-	}
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		// Add the genesis block.
+		addBlockMap(tx, &cs.blockRoot)
 		pushPath(tx, cs.blockRoot.Block.ID())
-		return nil
-	})
 
-	// Set the siafund pool to 0.
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		// Set the siafund pool to 0.
 		setSiafundPool(tx, types.NewCurrency64(0))
-		return nil
-	})
 
-	// Update the siafundoutput diffs map for the genesis block on
-	// disk. This needs to happen between the database being
-	// opened/initilized and the consensus set hash being calculated
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		// Update the siafundoutput diffs map for the genesis block on
+		// disk. This needs to happen between the database being
+		// opened/initilized and the consensus set hash being calculated
 		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
 			commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 		}
+
+		// Add the miner payout from the genesis block - unspendable, as the
+		// unlock hash is blank.
+		addSiacoinOutput(tx, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
+			Value:      types.CalculateCoinbase(0),
+			UnlockHash: types.UnlockHash{},
+		})
 		return nil
 	})
-
-	// Prevent the miner payout for the genesis block from being spent
-	cs.db.addSiacoinOutputs(cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
-		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.UnlockHash{},
-	})
+	if err != nil {
+		return err
+	}
 
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
@@ -67,7 +64,7 @@ func (cs *ConsensusSet) initSetDB() error {
 // load pulls all the blocks that have been saved to disk into memory, using
 // them to fill out the ConsensusSet.
 func (cs *ConsensusSet) load() error {
-	db, err := openDB(filepath.Join(cs.persistDir, "set.db"))
+	db, err := openDB(filepath.Join(cs.persistDir, DatabaseFilename))
 	if err != nil {
 		return err
 	}
@@ -77,7 +74,7 @@ func (cs *ConsensusSet) load() error {
 	// genesis block should be added.
 	height := cs.db.pathHeight()
 	if height == 0 {
-		return cs.initSetDB()
+		return cs.initDB()
 	}
 
 	// Check that the db's genesis block matches our genesis block.
@@ -86,7 +83,7 @@ func (cs *ConsensusSet) load() error {
 	if bid != cs.blockRoot.Block.ID() {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		cs.db.Close()
-		err = os.Rename(filepath.Join(cs.persistDir, "set.db"), filepath.Join(cs.persistDir, "set.db.bck"))
+		err = os.Rename(filepath.Join(cs.persistDir, DatabaseFilename), filepath.Join(cs.persistDir, DatabaseFilename+".bck"))
 		if err != nil {
 			return err
 		}
