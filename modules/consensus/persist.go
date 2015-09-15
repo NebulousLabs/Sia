@@ -61,9 +61,9 @@ func (cs *ConsensusSet) initDB() error {
 	return nil
 }
 
-// load pulls all the blocks that have been saved to disk into memory, using
+// loadDB pulls all the blocks that have been saved to disk into memory, using
 // them to fill out the ConsensusSet.
-func (cs *ConsensusSet) load() error {
+func (cs *ConsensusSet) loadDB() error {
 	db, err := openDB(filepath.Join(cs.persistDir, DatabaseFilename))
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (cs *ConsensusSet) load() error {
 		}
 		// Try to load again. Since the old database has been moved, the second
 		// call will not follow this branch path again.
-		return cs.load()
+		return cs.loadDB()
 	}
 
 	// The state cannot be easily reverted to a point where the
@@ -127,8 +127,9 @@ func (cs *ConsensusSet) initPersist() error {
 		return err
 	}
 
-	// Try to load an existing database from disk.
-	err = cs.load()
+	// Try to load an existing database from disk - a new one will be created
+	// if one does not exist.
+	err = cs.loadDB()
 	if err != nil {
 		return err
 	}
