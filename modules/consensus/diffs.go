@@ -89,7 +89,7 @@ func commitDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOut
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
-func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) error {
+func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
 	// Sanity check - siafund pool should only ever increase.
 	if build.DEBUG {
 		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
@@ -113,7 +113,6 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 		}
 		setSiafundPool(tx, sfpd.Previous)
 	}
-	return nil
 }
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
@@ -127,7 +126,7 @@ func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir module
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		for _, scod := range pb.SiacoinOutputDiffs {
 			commitSiacoinOutputDiff(tx, scod, dir)
@@ -142,10 +141,7 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 			commitDelayedSiacoinOutputDiff(tx, dscod, dir)
 		}
 		for _, sfpd := range pb.SiafundPoolDiffs {
-			err := commitSiafundPoolDiff(tx, sfpd, dir)
-			if err != nil {
-				return err
-			}
+			commitSiafundPoolDiff(tx, sfpd, dir)
 		}
 	} else {
 		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
@@ -161,13 +157,9 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 			commitDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
 		}
 		for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
-			err := commitSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
-			if err != nil {
-				return err
-			}
+			commitSiafundPoolDiff(tx, pb.SiafundPoolDiffs[i], dir)
 		}
 	}
-	return nil
 }
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
@@ -194,7 +186,7 @@ func updateCurrentPath(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirectio
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// COMPATv0.4.0
 	//
 	// When validating/accepting a block, the types height needs to be set to
@@ -213,13 +205,9 @@ func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) e
 	}
 
 	createUpcomingDelayedOutputMaps(tx, pb, dir)
-	err := commitNodeDiffs(tx, pb, dir)
-	if err != nil {
-		return err
-	}
+	commitNodeDiffs(tx, pb, dir)
 	deleteObsoleteDelayedOutputMaps(tx, pb, dir)
 	updateCurrentPath(tx, pb, dir)
-	return nil
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the

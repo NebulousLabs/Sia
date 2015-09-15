@@ -42,10 +42,7 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processed
 	// Rewind blocks until 'pb' is the current block.
 	for currentBlockID(tx) != pb.Block.ID() {
 		node := currentProcessedBlock(tx)
-		err := commitDiffSet(tx, node, modules.DiffRevert)
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
+		commitDiffSet(tx, node, modules.DiffRevert)
 		revertedBlocks = append(revertedBlocks, node)
 	}
 	return revertedBlocks
@@ -60,10 +57,7 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.DiffsGenerated {
-			err := commitDiffSet(tx, node, modules.DiffApply)
-			if err != nil {
-				panic(err)
-			}
+			commitDiffSet(tx, node, modules.DiffApply)
 		} else {
 			err := generateAndApplyDiff(tx, node)
 			if err != nil {

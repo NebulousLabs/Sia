@@ -455,12 +455,10 @@ func TestCommitNodeDiffs(t *testing.T) {
 		t.Fatal(err)
 	}
 	pb := cst.cs.currentProcessedBlock()
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// For diffs that can be destroyed in the same block they are created,
 	// create diffs that do just that. This has in the past caused issues upon
@@ -523,12 +521,10 @@ func TestCommitNodeDiffs(t *testing.T) {
 		createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
 		return nil
 	})
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitNodeDiffs(tx, pb, modules.DiffApply)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitNodeDiffs(tx, pb, modules.DiffApply)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	exists := cst.cs.db.inSiacoinOutputs(scoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
@@ -541,12 +537,10 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitNodeDiffs(tx, pb, modules.DiffRevert)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitNodeDiffs(tx, pb, modules.DiffRevert)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	exists = cst.cs.db.inSiacoinOutputs(scoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
