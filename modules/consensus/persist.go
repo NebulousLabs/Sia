@@ -66,8 +66,8 @@ func (cs *ConsensusSet) initSetDB() error {
 
 // load pulls all the blocks that have been saved to disk into memory, using
 // them to fill out the ConsensusSet.
-func (cs *ConsensusSet) load(saveDir string) error {
-	db, err := openDB(filepath.Join(saveDir, "set.db"))
+func (cs *ConsensusSet) load() error {
+	db, err := openDB(filepath.Join(cs.persistDir, "set.db"))
 	if err != nil {
 		return err
 	}
@@ -86,13 +86,13 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	if bid != cs.blockRoot.Block.ID() {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		cs.db.Close()
-		err = os.Rename(filepath.Join(saveDir, "set.db"), filepath.Join(saveDir, "set.db.bck"))
+		err = os.Rename(filepath.Join(cs.persistDir, "set.db"), filepath.Join(cs.persistDir, "set.db.bck"))
 		if err != nil {
 			return err
 		}
-		// Now that chain.db no longer exists, recursing will create a new
-		// empty db and add the genesis block to it.
-		return cs.load(saveDir)
+		// Try to load again. Since the old database has been moved, the second
+		// call will not follow this branch path again.
+		return cs.load()
 	}
 
 	// The state cannot be easily reverted to a point where the
@@ -107,8 +107,6 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 // loadDiffs is a transitional function to load the processed blocks
 // from disk and move the diffs into memory
-//
-// TODO: remanage this func
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
 
@@ -121,14 +119,28 @@ func (cs *ConsensusSet) loadDiffs() {
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}
+}
 
-	// Do a consistency check after loading the database.
-	/*
-		if height > 1 && build.DEBUG {
-			err = cs.checkConsistency()
-			if err != nil {
-				panic(err)
-			}
-		}
-	*/
+// initPersist initializes the persistence structures of the consensus set, in
+// particular loading the database and preparing to manage subscribers.
+func (cs *ConsensusSet) initPersist() error {
+	// Create the consensus directory.
+	err := os.MkdirAll(cs.persistDir, 0700)
+	if err != nil {
+		return err
+	}
+
+	// Try to load an existing database from disk.
+	err = cs.load()
+	if err != nil {
+		return err
+	}
+
+	// Send the genesis block to subscribers.
+	cs.updateSubscribers(nil, []*processedBlock{&cs.blockRoot})
+
+	// Send any blocks that were loaded from disk to subscribers.
+	cs.loadDiffs()
+
+	return nil
 }

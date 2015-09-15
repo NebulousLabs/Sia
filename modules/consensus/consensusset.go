@@ -8,7 +8,6 @@ package consensus
 
 import (
 	"errors"
-	"os"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -43,14 +42,15 @@ type ConsensusSet struct {
 	// known to the expensive part of block validation.
 	dosBlocks map[types.BlockID]struct{}
 
-	// TODO: add a persistDir
-	mu *sync.RWMutex
+	persistDir string
+	mu         *sync.RWMutex
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If
-// there is an existing block database present in saveDir, it will be loaded.
-// Otherwise, a new database will be created.
-func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
+// there is an existing block database present in the persist directory, it
+// will be loaded.
+func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
+	// Check for nil dependencies.
 	if gateway == nil {
 		return nil, ErrNilGateway
 	}
@@ -77,10 +77,11 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	// Allocate the Siafund addresses by putting them all in a big transaction inside the genesis block
+	// Create the diffs for the genesis siafund outputs.
 	for i, siafundOutput := range genesisBlock.Transactions[0].SiafundOutputs {
 		sfid := genesisBlock.Transactions[0].SiafundOutputID(i)
 		sfod := modules.SiafundOutputDiff{
@@ -91,23 +92,11 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.blockRoot.SiafundOutputDiffs = append(cs.blockRoot.SiafundOutputDiffs, sfod)
 	}
 
-	// Create the consensus directory.
-	err := os.MkdirAll(saveDir, 0700)
+	// Initialize the consensus persistence structures.
+	err := cs.initPersist()
 	if err != nil {
 		return nil, err
 	}
-
-	// Try to load an existing database from disk.
-	err = cs.load(saveDir)
-	if err != nil {
-		return nil, err
-	}
-
-	// Send the genesis block to subscribers.
-	cs.updateSubscribers(nil, []*processedBlock{&cs.blockRoot})
-
-	// Send any blocks that were loaded from disk to subscribers.
-	cs.loadDiffs()
 
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
