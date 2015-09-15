@@ -251,7 +251,7 @@ func TestReadWriteFile(t *testing.T) {
 	}
 }
 
-// i5-4670K, 09-15-2015: 33 MB/s
+// i5-4670K, 9a90f86: 33 MB/s
 func BenchmarkEncode(b *testing.B) {
 	buf := new(bytes.Buffer)
 	enc := NewEncoder(buf)
@@ -267,7 +267,7 @@ func BenchmarkEncode(b *testing.B) {
 	b.SetBytes(int64(buf.Len()))
 }
 
-// i5-4670K, 09-15-2015: 26 MB/s
+// i5-4670K, 9a90f86: 26 MB/s
 func BenchmarkDecode(b *testing.B) {
 	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
 	var numBytes int64
