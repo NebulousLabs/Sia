@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	maxDecodeLen = 10 * 1024 * 1024 // 10 MB
-	maxSliceLen  = 4 * 1024 * 1024  // 4 MB
+	maxDecodeLen = 10 * 1024 * 1024 // 10 MiB
+	maxSliceLen  = 4 * 1024 * 1024  // 4 MiB
 )
 
 var (
