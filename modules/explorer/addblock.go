@@ -218,6 +218,7 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 
 	// Append each input to the list of modifications
 	for _, input := range txn.SiacoinInputs {
+		tx.addAddress(input.UnlockConditions.UnlockHash(), txid)
 		tx.addSiacoinInput(input.ParentID, txid)
 	}
 
