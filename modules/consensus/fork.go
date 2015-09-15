@@ -20,7 +20,11 @@ var (
 func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	path := []*processedBlock{pb}
 	for pb.Height > blockHeight(tx) || getPath(tx, pb.Height) != pb.Block.ID() {
-		pb = getBlockMap(tx, pb.Block.ParentID)
+		var err error
+		pb, err = getBlockMap(tx, pb.Block.ParentID)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 		path = append([]*processedBlock{pb}, path...) // prepend
 	}
 	return path

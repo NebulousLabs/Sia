@@ -120,7 +120,28 @@ func currentBlockID(tx *bolt.Tx) types.BlockID {
 
 // currentProcessedBlock returns the most recent block in the consensus set.
 func currentProcessedBlock(tx *bolt.Tx) *processedBlock {
-	return getBlockMap(tx, currentBlockID(tx))
+	pb, err := getBlockMap(tx, currentBlockID(tx))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return pb
+}
+
+// getBlockMap returns a processed block with the input id.
+func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
+	// Look up the encoded block.
+	pbBytes := tx.Bucket(BlockMap).Get(id[:])
+	if pbBytes == nil {
+		return nil, errNilItem
+	}
+
+	// Decode the block - should never fail.
+	var pb processedBlock
+	err := encoding.Unmarshal(pbBytes, &pb)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return &pb, nil
 }
 
 // getPath returns the block id at 'height' in the block path.
@@ -416,6 +437,11 @@ func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) {
 	}
 }
 
+// BREAK //
+// BREAK //
+// BREAK //
+// BREAK //
+
 // insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
 // the bucket does not exist or if the item is already in the bucket.
 func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
@@ -570,22 +596,6 @@ func (db *setDB) addBlockMap(pb *processedBlock) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		return insertItem(tx, BlockMap, pb.Block.ID(), *pb)
 	})
-}
-
-// getBlockMap returns a processed block with the input id.
-//
-// TODO: This function is not safe.
-func getBlockMap(tx *bolt.Tx, id types.BlockID) *processedBlock {
-	pbBytes, err := getItem(tx, BlockMap, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var pb processedBlock
-	err = encoding.Unmarshal(pbBytes, &pb)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return &pb
 }
 
 // getBlockMap queries the set database to return a processedBlock

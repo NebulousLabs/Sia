@@ -410,7 +410,10 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 
 	// Revert the block that was just added to the consensus set and check for
 	// parity with the original state of consensus.
-	parent := cst.cs.dbGetBlockMap(currentPB.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(currentPB.Block.ParentID)
+	if err != nil {
+		return err
+	}
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
 		_, _, err := cst.cs.forkBlockchain(tx, parent)
 		return err
