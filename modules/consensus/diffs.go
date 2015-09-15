@@ -38,7 +38,7 @@ func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirect
 	// Current node must be the input node's parent if applying, and
 	// current node must be the input node if reverting.
 	if dir == modules.DiffApply {
-		parent := getBlockMap(tx, pb.Parent)
+		parent := getBlockMap(tx, pb.Block.ParentID)
 		if parent.Block.ID() != currentBlockID(tx) {
 			panic(errWrongAppliedDiffSet)
 		}
@@ -239,7 +239,7 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
-	if build.DEBUG && pb.Parent != currentBlockID(tx) {
+	if build.DEBUG && pb.Block.ParentID != currentBlockID(tx) {
 		panic(errInvalidSuccessor)
 	}
 

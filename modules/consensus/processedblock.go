@@ -26,10 +26,7 @@ var SurpassThreshold = big.NewRat(20, 100)
 // other blockNodes replaced with block ID's, and all the fields
 // exported, so that a block node can be marshalled
 type processedBlock struct {
-	Block    types.Block
-	Parent   types.BlockID   // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
-	Children []types.BlockID // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
-
+	Block       types.Block
 	Height      types.BlockHeight
 	Depth       types.Target
 	ChildTarget types.Target
@@ -54,7 +51,7 @@ func earliestChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Tim
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	windowTimes[0] = pb.Block.Timestamp
-	parent := pb.Parent
+	parent := pb.Block.ParentID
 	for i := uint64(1); i < types.MedianTimestampWindow; i++ {
 		// If the genesis block is 'parent', use the genesis block timestamp
 		// for all remaining times.
@@ -167,8 +164,6 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 	childID := b.ID()
 	child := &processedBlock{
 		Block:  b,
-		Parent: b.ParentID,
-
 		Height: pb.Height + 1,
 		Depth:  pb.childDepth(),
 	}

@@ -445,60 +445,6 @@ func TestCommitSiafundPoolDiff(t *testing.T) {
 }
 */
 
-// TestCommitDiffSetSanity triggers all of the panics in the
-// commitDiffSetSanity method of the consensus set.
-func TestCommitDiffSetSanity(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestCommitDiffSetSanity")
-	if err != nil {
-		t.Fatal(err)
-	}
-	pb := cst.cs.currentProcessedBlock()
-
-	defer func() {
-		r := recover()
-		if r != errDiffsNotGenerated {
-			t.Error("expected errDiffsNotGenerated, got", r)
-		}
-	}()
-	defer func() {
-		r := recover()
-		if r != errWrongAppliedDiffSet {
-			t.Error("expected errWrongAppliedDiffSet, got", r)
-		}
-
-		// Trigger a panic about diffs not being generated.
-		pb.DiffsGenerated = false
-		_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			commitDiffSetSanity(tx, pb, modules.DiffRevert)
-			return nil
-		})
-	}()
-	defer func() {
-		r := recover()
-		if r != errWrongRevertDiffSet {
-			t.Error("expected errWrongRevertDiffSet, got", r)
-		}
-
-		// trigger a panic about applying the wrong block.
-		pb.Block.ParentID[0]++
-		_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			commitDiffSetSanity(tx, pb, modules.DiffApply)
-			return nil
-		})
-	}()
-
-	// Trigger a panic about incorrectly reverting a diff set.
-	// Change block id by adding a miner payout.
-	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{})
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		commitDiffSetSanity(tx, pb, modules.DiffRevert)
-		return nil
-	})
-}
-
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
 func TestCommitNodeDiffs(t *testing.T) {
 	if testing.Short() {

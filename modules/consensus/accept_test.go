@@ -407,9 +407,6 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	if block.ID() != cst.cs.dbGetPath(currentPB.Height) {
 		return errors.New("current path does not point to the correct block")
 	}
-	if currentPB.Parent != currentPB.Block.ParentID {
-		return errors.New("processed block is reporting the wrong parent")
-	}
 
 	// Revert the block that was just added to the consensus set and check for
 	// parity with the original state of consensus.
@@ -1601,7 +1598,7 @@ func TestComplexForking(t *testing.T) {
 	pb := cst1.cs.currentProcessedBlock()
 	for pb.Block.ID() != cst1.cs.blockRoot.Block.ID() {
 		cst1Blocks = append([]types.Block{pb.Block}, cst1Blocks...) // prepend
-		pb = cst1.cs.db.getBlockMap(pb.Parent)
+		pb = cst1.cs.db.getBlockMap(pb.Block.ParentID)
 	}
 
 	for _, block := range cst1Blocks {
@@ -1633,7 +1630,7 @@ func TestComplexForking(t *testing.T) {
 	pb = cst2.cs.currentProcessedBlock()
 	for pb.Block.ID() != cst2.cs.blockRoot.Block.ID() {
 		cst2Blocks = append([]types.Block{pb.Block}, cst2Blocks...) // prepend
-		pb = cst2.cs.db.getBlockMap(pb.Parent)
+		pb = cst2.cs.db.getBlockMap(pb.Block.ParentID)
 	}
 	for _, block := range cst2Blocks {
 		// Some blocks will return errors.
@@ -1660,7 +1657,7 @@ func TestComplexForking(t *testing.T) {
 	pb = cst3.cs.currentProcessedBlock()
 	for pb.Block.ID() != cst3.cs.blockRoot.Block.ID() {
 		cst3Blocks = append([]types.Block{pb.Block}, cst3Blocks...) // prepend
-		pb = cst3.cs.db.getBlockMap(pb.Parent)
+		pb = cst3.cs.db.getBlockMap(pb.Block.ParentID)
 	}
 	for _, block := range cst3Blocks {
 		// Some blocks will return errors.
@@ -1694,14 +1691,14 @@ func TestBuriedBadFork(t *testing.T) {
 	// Create a bad block that builds on a parent, so that it is part of not
 	// the longest fork.
 	badBlock := types.Block{
-		ParentID:     pb.Parent,
+		ParentID:     pb.Block.ParentID,
 		Timestamp:    types.CurrentTimestamp(),
 		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(pb.Height)}},
 		Transactions: []types.Transaction{{
 			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
 		}},
 	}
-	parent := cst.cs.db.getBlockMap(pb.Parent)
+	parent := cst.cs.db.getBlockMap(pb.Block.ParentID)
 	badBlock, _ = cst.miner.SolveBlock(badBlock, parent.ChildTarget)
 	err = cst.cs.AcceptBlock(badBlock)
 	if err != modules.ErrNonExtendingBlock {

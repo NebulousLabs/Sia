@@ -75,12 +75,12 @@ func (cs *ConsensusSet) checkCurrentPath() error {
 			return errors.New("node height mismatches its location in the blockchain")
 		}
 		// Current node's parent needs the right id.
-		parent := cs.db.getBlockMap(currentNode.Parent)
+		parent := cs.db.getBlockMap(currentNode.Block.ParentID)
 		if currentNode.Block.ParentID != parent.Block.ID() {
 			return errors.New("node parent id mismatches actual parent id")
 		}
 
-		currentNode = cs.db.getBlockMap(currentNode.Parent)
+		currentNode = cs.db.getBlockMap(currentNode.Block.ParentID)
 	}
 	return nil
 }
@@ -268,7 +268,7 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	// block and check that the new consensus set has is the same as originally
 	// calculated.
 	currentNode := cs.currentProcessedBlock()
-	parent := cs.db.getBlockMap(currentNode.Parent)
+	parent := cs.db.getBlockMap(currentNode.Block.ParentID)
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
 		revertToBlock(tx, parent)
 		return nil
