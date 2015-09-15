@@ -20,7 +20,7 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
+func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) {
 	for i := range pb.Block.MinerPayouts {
 		// Create and apply the delayed miner payout.
 		mpid := pb.Block.MinerPayoutID(uint64(i))
@@ -33,20 +33,19 @@ func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
+func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
 	if !(pb.Height > types.MaturityDelay) {
-		return nil
+		return
 	}
 
-	err := forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	_ = forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG && isSiacoinOutput(tx, id) {
 			panic(errOutputAlreadyMature)
@@ -73,10 +72,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
 		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return deleteDSCOBucket(tx, pb.Height)
+	deleteDSCOBucket(tx, pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
@@ -150,13 +146,7 @@ func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) error {
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
 func applyMaintenance(tx *bolt.Tx, pb *processedBlock) error {
-	err := applyMinerPayouts(tx, pb)
-	if err != nil {
-		return err
-	}
-	err = applyMaturedSiacoinOutputs(tx, pb)
-	if err != nil {
-		return err
-	}
+	applyMinerPayouts(tx, pb)
+	applyMaturedSiacoinOutputs(tx, pb)
 	return applyFileContractMaintenance(tx, pb)
 }

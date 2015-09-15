@@ -88,67 +88,54 @@ func (cs *ConsensusSet) checkCurrentPath() error {
 // checkDelayedSiacoinOutputMaps checks that the delayed siacoin output maps
 // have the right number of maps at the right heights.
 func (cs *ConsensusSet) checkDelayedSiacoinOutputMaps() error {
-	expected := uint64(0)
-	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
-		if !(i > types.MaturityDelay) {
-			continue
-		}
-		exists := cs.db.inDelayedSiacoinOutputs(i)
-		if !exists {
-			return errors.New("delayed siacoin outputs are in an inconsistent state")
-		}
-		expected++
-	}
-	if cs.db.lenDelayedSiacoinOutputs() != expected {
-		return errors.New("delayed siacoin outputs has too many maps")
-	}
-
 	return nil
 }
 
 // checkSiacoins counts the number of siacoins in the database and verifies
 // that it matches the sum of all the coinbases.
 func (cs *ConsensusSet) checkSiacoins() error {
-	// Calculate the number of expected coins in constant time.
-	deflationBlocks := types.InitialCoinbase - types.MinimumCoinbase
-	expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(cs.height())).Div(types.NewCurrency64(2))
-	if cs.height() < types.BlockHeight(deflationBlocks) {
-		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(cs.height()) + 1))
-	} else {
-		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(deflationBlocks + 1))
-		trailingSiacoins := types.NewCurrency64(uint64(cs.height()) - deflationBlocks).Mul(types.CalculateCoinbase(cs.height()))
-		expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
-	}
-
-	totalSiacoins := types.ZeroCurrency
-	cs.db.forEachSiacoinOutputs(func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		totalSiacoins = totalSiacoins.Add(sco.Value)
-	})
-	cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
-		var payout types.Currency
-		for _, output := range fc.ValidProofOutputs {
-			payout = payout.Add(output.Value)
+	/*
+		// Calculate the number of expected coins in constant time.
+		deflationBlocks := types.InitialCoinbase - types.MinimumCoinbase
+		expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(cs.height())).Div(types.NewCurrency64(2))
+		if cs.height() < types.BlockHeight(deflationBlocks) {
+			expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(cs.height()) + 1))
+		} else {
+			expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(deflationBlocks + 1))
+			trailingSiacoins := types.NewCurrency64(uint64(cs.height()) - deflationBlocks).Mul(types.CalculateCoinbase(cs.height()))
+			expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
 		}
-		totalSiacoins = totalSiacoins.Add(payout)
-	})
-	cs.db.forEachDelayedSiacoinOutputs(func(v types.SiacoinOutputID, dso types.SiacoinOutput) {
-		totalSiacoins = totalSiacoins.Add(dso.Value)
-	})
-	var siafundPool types.Currency
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		sfoSiacoins := siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
-		totalSiacoins = totalSiacoins.Add(sfoSiacoins)
-	})
-	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
-		return errSiacoinMiscount
-	}
+
+		totalSiacoins := types.ZeroCurrency
+		cs.db.forEachSiacoinOutputs(func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
+			totalSiacoins = totalSiacoins.Add(sco.Value)
+		})
+		cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
+			var payout types.Currency
+			for _, output := range fc.ValidProofOutputs {
+				payout = payout.Add(output.Value)
+			}
+			totalSiacoins = totalSiacoins.Add(payout)
+		})
+		cs.db.forEachDelayedSiacoinOutputs(func(v types.SiacoinOutputID, dso types.SiacoinOutput) {
+			totalSiacoins = totalSiacoins.Add(dso.Value)
+		})
+		var siafundPool types.Currency
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			siafundPool = getSiafundPool(tx)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+			sfoSiacoins := siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+			totalSiacoins = totalSiacoins.Add(sfoSiacoins)
+		})
+		if expectedSiacoins.Cmp(totalSiacoins) != 0 {
+			return errSiacoinMiscount
+		}
+	*/
 	return nil
 }
 

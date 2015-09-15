@@ -29,12 +29,10 @@ func TestApplyMinerPayouts(t *testing.T) {
 	mpid0 := pb.Block.MinerPayoutID(0)
 
 	// Apply the single miner payout.
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return applyMinerPayouts(tx, pb)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		applyMinerPayouts(tx, pb)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	exists := cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid0)
 	if !exists {
 		t.Error("miner payout was not created in the delayed outputs set")
@@ -70,12 +68,10 @@ func TestApplyMinerPayouts(t *testing.T) {
 	}
 	mpid1 := pb2.Block.MinerPayoutID(0)
 	mpid2 := pb2.Block.MinerPayoutID(1)
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return applyMinerPayouts(tx, pb2)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		applyMinerPayouts(tx, pb2)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid1)
 	if !exists {
 		t.Error("delayed siacoin output was not created")
@@ -102,19 +98,15 @@ func TestApplyMinerPayouts(t *testing.T) {
 		}
 		cst.cs.db.rmDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid0)
 		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
-		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			return applyMinerPayouts(tx, pb)
+		_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			applyMinerPayouts(tx, pb)
+			return nil
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
 	}()
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return applyMinerPayouts(tx, pb)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		applyMinerPayouts(tx, pb)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 // TestApplyMaturedSiacoinOutputs probes the applyMaturedSiacoinOutputs method
@@ -138,15 +130,14 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		}
 	}()
 	cst.cs.db.addSiacoinOutputs(types.SiacoinOutputID{}, types.SiacoinOutput{})
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return createDSCOBucket(tx, pb.Height)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		createDSCOBucket(tx, pb.Height)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height, types.SiacoinOutputID{}, types.SiacoinOutput{})
 	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return applyMaturedSiacoinOutputs(tx, pb)
+		applyMaturedSiacoinOutputs(tx, pb)
+		return nil
 	})
 }
 

@@ -53,36 +53,36 @@ func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirect
 func commitSiacoinOutputDiff(tx *bolt.Tx, scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	if scod.Direction == dir {
 		addSiacoinOutput(tx, scod.ID, scod.SiacoinOutput)
-		return
+	} else {
+		removeSiacoinOutput(tx, scod.ID)
 	}
-	removeSiacoinOutput(tx, scod.ID)
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
 func commitFileContractDiff(tx *bolt.Tx, fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	if fcd.Direction == dir {
 		addFileContract(tx, fcd.ID, fcd.FileContract)
-		return
+	} else {
+		removeFileContract(tx, fcd.ID)
 	}
-	removeFileContract(tx, fcd.ID)
 }
 
 // commitSiafundOutputDiff applies or reverts a Siafund output diff.
 func commitSiafundOutputDiff(tx *bolt.Tx, sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	if sfod.Direction == dir {
 		addSiafundOutput(tx, sfod.ID, sfod.SiafundOutput)
-		return
+	} else {
+		removeSiafundOutput(tx, sfod.ID)
 	}
-	removeSiafundOutput(tx, sfod.ID)
 }
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
 func commitDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
 	if dscod.Direction == dir {
 		addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
-		return
+	} else {
+		removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
 	}
-	removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
@@ -99,18 +99,14 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 
 	if dir == modules.DiffApply {
 		// Sanity check - sfpd.Previous should equal the current siafund pool.
-		if build.DEBUG {
-			if getSiafundPool(tx).Cmp(sfpd.Previous) != 0 {
-				panic(errApplySiafundPoolDiffMismatch)
-			}
+		if build.DEBUG && getSiafundPool(tx).Cmp(sfpd.Previous) != 0 {
+			panic(errApplySiafundPoolDiffMismatch)
 		}
 		setSiafundPool(tx, sfpd.Adjusted)
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
-		if build.DEBUG {
-			if getSiafundPool(tx).Cmp(sfpd.Adjusted) != 0 {
-				panic(errRevertSiafundPoolDiffMismatch)
-			}
+		if build.DEBUG && getSiafundPool(tx).Cmp(sfpd.Adjusted) != 0 {
+			panic(errRevertSiafundPoolDiffMismatch)
 		}
 		setSiafundPool(tx, sfpd.Previous)
 	}
@@ -119,13 +115,12 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
-		return createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 	} else if pb.Height > types.MaturityDelay {
-		return createDSCOBucket(tx, pb.Height)
+		createDSCOBucket(tx, pb.Height)
 	}
-	return nil
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
@@ -174,22 +169,15 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
-func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
+func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if pb.Height > types.MaturityDelay {
-			err := deleteDSCOBucket(tx, pb.Height)
-			if err != nil {
-				return err
-			}
+			deleteDSCOBucket(tx, pb.Height)
 		}
 	} else {
-		err := deleteDSCOBucket(tx, pb.Height+types.MaturityDelay)
-		if err != nil {
-			return err
-		}
+		deleteDSCOBucket(tx, pb.Height+types.MaturityDelay)
 	}
-	return nil
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
@@ -221,18 +209,12 @@ func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) e
 		commitDiffSetSanity(tx, pb, dir)
 	}
 
-	err := createUpcomingDelayedOutputMaps(tx, pb, dir)
+	createUpcomingDelayedOutputMaps(tx, pb, dir)
+	err := commitNodeDiffs(tx, pb, dir)
 	if err != nil {
 		return err
 	}
-	err = commitNodeDiffs(tx, pb, dir)
-	if err != nil {
-		return err
-	}
-	err = deleteObsoleteDelayedOutputMaps(tx, pb, dir)
-	if err != nil {
-		return err
-	}
+	deleteObsoleteDelayedOutputMaps(tx, pb, dir)
 	updateCurrentPath(tx, pb, dir)
 	return nil
 }

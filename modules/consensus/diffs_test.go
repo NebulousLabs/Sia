@@ -499,102 +499,6 @@ func TestCommitDiffSetSanity(t *testing.T) {
 	})
 }
 
-// TestCreateUpcomingDelayedOutputMaps probes the createUpcomingDelayedMaps
-// method of the consensus set.
-func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestCreateUpcomingDelayedOutputMaps")
-	if err != nil {
-		t.Fatal(err)
-	}
-	pb := cst.cs.currentProcessedBlock()
-
-	// Check that a map gets created upon revert.
-	exists := cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
-	if exists {
-		t.Fatal("unexpected delayed output map at pb.Height")
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitDiffSet(tx, pb, modules.DiffRevert) // revert the current block node
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
-	if !exists {
-		t.Error("delayed output map was not created when reverting diffs")
-	}
-
-	// Check that a map gets created on apply.
-	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
-	if exists {
-		t.Fatal("delayed output map exists when it shouldn't")
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
-	if !exists {
-		t.Error("delayed output map was not created")
-	}
-
-	// Check that a map is not created on revert when the height is
-	// sufficiently low.
-	parent := cst.cs.db.getBlockMap(pb.Parent)
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitDiffSet(tx, parent, modules.DiffRevert)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	grandparent := cst.cs.db.getBlockMap(parent.Parent)
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitDiffSet(tx, grandparent, modules.DiffRevert)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	exists = cst.cs.db.inDelayedSiacoinOutputs(grandparent.Height)
-	if exists {
-		t.Error("delayed output map was created when bringing the height too low")
-	}
-
-	/*
-		defer func() {
-			r := recover()
-			if r == nil {
-				t.Error("expecting an error to be thrown after corrupting the database")
-			}
-		}()
-		defer func() {
-			r := recover()
-			if r == nil {
-				t.Error("expecting an error to be thrown after corrupting the database")
-			}
-
-			// Trigger a panic by creating a map that's already there during a revert.
-			err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-				return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}()
-		// Trigger a panic by creating a map that's already there during an apply.
-		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-			return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
-}
-
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
 func TestCommitNodeDiffs(t *testing.T) {
 	if testing.Short() {
@@ -669,12 +573,10 @@ func TestCommitNodeDiffs(t *testing.T) {
 	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod1)
 	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
 		return commitNodeDiffs(tx, pb, modules.DiffApply)
 	})
@@ -710,84 +612,6 @@ func TestCommitNodeDiffs(t *testing.T) {
 	exists = cst.cs.db.inSiafundOutputs(sfoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
-	}
-}
-
-// TestDeleteObsoleteDelayedOutputMaps probes the
-// deleteObsoleteDelayedOutputMaps method of the consensus set.
-func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestDeleteObsoleteDelayedOutputMaps")
-	if err != nil {
-		t.Fatal(err)
-	}
-	pb := cst.cs.currentProcessedBlock()
-
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitDiffSet(tx, pb, modules.DiffRevert)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Check that maps are deleted at pb.Height when applying changes.
-	exists := cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
-	if !exists {
-		t.Fatal("expected a delayed output map at pb.Height")
-	}
-	// Prepare for and then apply the obsolete maps.
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitNodeDiffs(tx, pb, modules.DiffApply)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffApply)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
-	if exists {
-		t.Error("delayed output map was not deleted on apply")
-	}
-
-	// Check that maps are deleted at pb.Height+types.MaturityDelay when
-	// reverting changes.
-	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
-	if !exists {
-		t.Fatal("expected a delayed output map at pb.Height+maturity delay")
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return commitNodeDiffs(tx, pb, modules.DiffRevert)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return deleteObsoleteDelayedOutputMaps(tx, pb, modules.DiffRevert)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
-	if exists {
-		t.Error("delayed siacoin output map was not deleted upon revert")
 	}
 }
 
