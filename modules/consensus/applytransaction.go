@@ -39,10 +39,7 @@ func applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err = commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 	}
 	return nil
 }
@@ -59,10 +56,7 @@ func applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) e
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 	}
 	return nil
 }
@@ -112,10 +106,7 @@ func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transac
 			FileContract: fc,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		err = commitFileContractDiff(tx, fcd, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitFileContractDiff(tx, fcd, modules.DiffApply)
 
 		// Add the diff to add the revised file contract.
 		newFC := types.FileContract{
@@ -135,10 +126,7 @@ func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transac
 			FileContract: newFC,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		err = commitFileContractDiff(tx, fcd, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitFileContractDiff(tx, fcd, modules.DiffApply)
 	}
 	return nil
 }
@@ -146,11 +134,11 @@ func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transac
 // applyTxStorageProofs iterates through all of the storage proofs in a
 // transaction and applies them to the state, updating the diffs in the processed
 // block.
-func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for _, sp := range t.StorageProofs {
 		fc, err := getFileContract(tx, sp.ParentID)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
@@ -163,10 +151,7 @@ func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 				MaturityHeight: pb.Height + types.MaturityDelay,
 			}
 			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			err := commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
+			commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		}
 
 		fcd := modules.FileContractDiff{
@@ -175,22 +160,18 @@ func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 			FileContract: fc,
 		}
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-		err = commitFileContractDiff(tx, fcd, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitFileContractDiff(tx, fcd, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyTxSiafundInputs takes all of the siafund inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Calculate the volume of siacoins to put in the claim output.
 		sfo, err := getSiafundOutput(tx, sfi.ParentID)
 		if err != nil {
-			return err
+			panic(err)
 		}
 		claimPortion := getSiafundPool(tx).Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
@@ -207,10 +188,7 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err = commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 
 		// Create the siafund output diff and remove the output from the
 		// consensus set.
@@ -220,12 +198,8 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 			SiafundOutput: sfo,
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		err = commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 	}
-	return nil
 }
 
 // applySiafundOutput applies a siafund output to the consensus set.
@@ -239,10 +213,7 @@ func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) e
 			SiafundOutput: sfo,
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
-		err := commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 	}
 	return nil
 }
@@ -269,14 +240,8 @@ func applyTransaction(tx *bolt.Tx, pb *processedBlock, t types.Transaction) erro
 	if err != nil {
 		return err
 	}
-	err = applyStorageProofs(tx, pb, t)
-	if err != nil {
-		return err
-	}
-	err = applySiafundInputs(tx, pb, t)
-	if err != nil {
-		return err
-	}
+	applyStorageProofs(tx, pb, t)
+	applySiafundInputs(tx, pb, t)
 	err = applySiafundOutputs(tx, pb, t)
 	if err != nil {
 		return err

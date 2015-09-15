@@ -36,29 +36,20 @@ func (cs *ConsensusSet) initSetDB() error {
 	})
 
 	// Set the siafund pool to 0.
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		sfpBucket := tx.Bucket(SiafundPool)
-		return sfpBucket.Put(SiafundPool, encoding.Marshal(types.NewCurrency64(0)))
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		setSiafundPool(tx, types.NewCurrency64(0))
+		return nil
 	})
-	if err != nil {
-		return err
-	}
 
 	// Update the siafundoutput diffs map for the genesis block on
 	// disk. This needs to happen between the database being
 	// opened/initilized and the consensus set hash being calculated
-	err = cs.db.Update(func(tx *bolt.Tx) error {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
 		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
-			err := commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
-			if err != nil {
-				return err
-			}
+			commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
 
 	// Prevent the miner payout for the genesis block from being spent
 	cs.db.addSiacoinOutputs(cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{

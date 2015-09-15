@@ -31,10 +31,7 @@ func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 	return nil
 }
@@ -63,10 +60,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
 			SiacoinOutput: sco,
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 
 		// Remove the delayed siacoin output from the consensus set.
 		dscod := modules.DelayedSiacoinOutputDiff{
@@ -76,7 +70,8 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
 			MaturityHeight: pb.Height,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		return commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		return nil
 	})
 	if err != nil {
 		return err
@@ -114,10 +109,7 @@ func applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileC
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err = commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 
 	// Remove the file contract from the consensus set and record the diff in
@@ -128,7 +120,8 @@ func applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileC
 		FileContract: fc,
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	return commitFileContractDiff(tx, fcd, modules.DiffApply)
+	commitFileContractDiff(tx, fcd, modules.DiffApply)
+	return nil
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have

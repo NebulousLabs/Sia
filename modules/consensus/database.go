@@ -1,5 +1,15 @@
 package consensus
 
+// database.go contains initialization functions for the database, and helper
+// functions for accessing the database. All database access functions take a
+// bolt.Tx as input because consensus manipulations should always be made as a
+// single atomic transaction. Any function for changing the database will not
+// return errors, but instead will panic as a sanity check. No item should ever
+// be inserted into the database that is already in the database, and no item
+// should ever be removed from the database that is not currently in the
+// database. Attempting such with the debug flags enabled indicate developer
+// error and will cause a panic.
+
 import (
 	"errors"
 	"fmt"
@@ -200,27 +210,30 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 
 // addSiacoinOutput adds a siacoin output to the database. An error is returned
 // if the siacoin output is already in the database.
-func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	siacoinOutputs := tx.Bucket(SiacoinOutputs)
 	// Sanity check - should not be adding an item that exists.
 	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
 		panic("repeat siacoin output")
 	}
-	return siacoinOutputs.Put(id[:], encoding.Marshal(sco))
+	err := siacoinOutputs.Put(id[:], encoding.Marshal(sco))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // removeSiacoinOutput removes a siacoin output from the database. An error is
 // returned if the siacoin output is not in the database prior to removal.
-func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
+func removeSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) {
 	scoBucket := tx.Bucket(SiacoinOutputs)
 	// Sanity check - should not be removing an item that is not in the db.
-	if build.DEBUG {
-		scoBytes := scoBucket.Get(id[:])
-		if scoBytes == nil {
-			panic("nil siacoin output")
-		}
+	if build.DEBUG && scoBucket.Get(id[:]) == nil {
+		panic("nil siacoin output")
 	}
-	return scoBucket.Delete(id[:])
+	err := scoBucket.Delete(id[:])
+	if err != nil {
+		panic(err)
+	}
 }
 
 // getFileContract fetches a file contract from the database, returning an
@@ -239,7 +252,7 @@ func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContrac
 
 // addFileContract adds a file contract to the database. An error is returned
 // if the file contract is already in the database.
-func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) error {
+func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) {
 	// Add the file contract to the database.
 	fcBucket := tx.Bucket(FileContracts)
 	// Sanity check - should not be adding a file contract already in the db.
@@ -248,20 +261,23 @@ func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract
 	}
 	err := fcBucket.Put(id[:], encoding.Marshal(fc))
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// Add an entry for when the file contract expires.
 	expirationBucketID := append(prefix_fcex, encoding.Marshal(fc.WindowEnd)...)
 	expirationBucket, err := tx.CreateBucketIfNotExists(expirationBucketID)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	return expirationBucket.Put(id[:], []byte{})
+	err = expirationBucket.Put(id[:], []byte{})
+	if err != nil {
+		panic(err)
+	}
 }
 
 // removeFileContract removes a file contract from the database.
-func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
+func removeFileContract(tx *bolt.Tx, id types.FileContractID) {
 	// Delete the file contract entry.
 	fcBucket := tx.Bucket(FileContracts)
 	fcBytes := fcBucket.Get(id[:])
@@ -271,7 +287,7 @@ func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
 	}
 	err := fcBucket.Delete(id[:])
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// Delete the entry for the file contract's expiration. The portion of
@@ -282,36 +298,43 @@ func removeFileContract(tx *bolt.Tx, id types.FileContractID) error {
 	expirationBucket := tx.Bucket(expirationBucketID)
 	expirationBytes := expirationBucket.Get(id[:])
 	if expirationBytes == nil {
-		return errNilItem
+		panic(errNilItem)
 	}
-	return expirationBucket.Delete(id[:])
+	err = expirationBucket.Delete(id[:])
+	if err != nil {
+		panic(err)
+	}
 }
 
 // addSiafundOutput adds a siafund output to the database. An error is returned
 // if the siafund output is already in the database.
-func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sco types.SiafundOutput) error {
+func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sco types.SiafundOutput) {
 	siafundOutputs := tx.Bucket(SiafundOutputs)
 	// Sanity check - should not be adding an item already in the db.
 	if build.DEBUG && siafundOutputs.Get(id[:]) != nil {
 		panic("repeat siafund output")
 	}
-	return siafundOutputs.Put(id[:], encoding.Marshal(sco))
+	err := siafundOutputs.Put(id[:], encoding.Marshal(sco))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // removeSiafundOutput removes a siafund output from the database. An error is
 // returned if the siafund output is not in the database prior to removal.
-func removeSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) error {
-	scoBucket := tx.Bucket(SiafundOutputs)
-	if build.DEBUG {
-		scoBytes := scoBucket.Get(id[:])
-		if scoBytes == nil {
-			panic("nil siafund output")
-		}
+func removeSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) {
+	sfoBucket := tx.Bucket(SiafundOutputs)
+	if build.DEBUG && sfoBucket.Get(id[:]) == nil {
+		panic("nil siafund output")
 	}
-	return scoBucket.Delete(id[:])
+	err := sfoBucket.Delete(id[:])
+	if err != nil {
+		panic(err)
+	}
 }
 
-// getSiafundPool returns the current value of the siafund pool.
+// getSiafundPool returns the current value of the siafund pool. No error is
+// returned as the siafund pool should always be available.
 func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
 	bucket := tx.Bucket(SiafundPool)
 	poolBytes := bucket.Get(SiafundPool)
@@ -326,12 +349,15 @@ func getSiafundPool(tx *bolt.Tx) (pool types.Currency) {
 }
 
 // setSiafundPool updates the saved siafund pool on disk
-func setSiafundPool(tx *bolt.Tx, c types.Currency) error {
-	return tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
+func setSiafundPool(tx *bolt.Tx, c types.Currency) {
+	err := tx.Bucket(SiafundPool).Put(SiafundPool, encoding.Marshal(c))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // addDSCO adds a delayed siacoin output to the consnesus set.
-func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	// Sanity check - output should not already be in the full set of outputs.
 	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
 		panic("dsco already in output set")
@@ -342,11 +368,14 @@ func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco ty
 	if build.DEBUG && dscoBucket.Get(id[:]) != nil {
 		panic(errRepeatInsert)
 	}
-	return dscoBucket.Put(id[:], encoding.Marshal(sco))
+	err := dscoBucket.Put(id[:], encoding.Marshal(sco))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // removeDSCO removes a delayed siacoin output from the consensus set.
-func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) error {
+func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
 	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
 	// Sanity check - should not remove an item not in the db.
 	dscoBucket := tx.Bucket(bucketID)
@@ -354,7 +383,10 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) err
 		fmt.Println("NIL DSCO", id)
 		// panic("nil dsco")
 	}
-	return dscoBucket.Delete(id[:])
+	err := dscoBucket.Delete(id[:])
+	if err != nil {
+		panic(err)
+	}
 }
 
 // createDSCOBucket creates a bucket for the delayed siacoin outputs at the

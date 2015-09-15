@@ -52,6 +52,16 @@ func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID) {
 	return id
 }
 
+// dbGetBlockMap is a convenience function allowing getBlockMap to be called
+// without a bolt.Tx.
+func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock) {
+	_ = cs.db.Update(func(tx *bolt.Tx) error {
+		pb = getBlockMap(tx, id)
+		return nil
+	})
+	return pb
+}
+
 /// BREAK ///
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
@@ -88,12 +98,10 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.db.Update(func(tx *bolt.Tx) error {
-			return commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		_ = cs.db.Update(func(tx *bolt.Tx) error {
+			commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			return nil
 		})
-		if err != nil {
-			return err
-		}
 	}
 
 	// Remove the file contract from the consensus set and record the diff in
@@ -104,14 +112,10 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 		FileContract: fc,
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		return commitFileContractDiff(tx, fcd, modules.DiffApply)
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		commitFileContractDiff(tx, fcd, modules.DiffApply)
+		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
