@@ -250,3 +250,24 @@ func TestBlockMinerPayoutID(t *testing.T) {
 		knownIDs[id] = struct{}{}
 	}
 }
+
+// TestBlockEncodes probes the MarshalSia and UnmarshalSia methods of the
+// Block type.
+func TestBlockEncoding(t *testing.T) {
+	b := Block{
+		MinerPayouts: []SiacoinOutput{
+			{Value: CalculateCoinbase(0)},
+			{Value: CalculateCoinbase(0)},
+		},
+	}
+	var decB Block
+	err := encoding.Unmarshal(encoding.Marshal(b), &decB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decB.MinerPayouts) != len(b.MinerPayouts) ||
+		decB.MinerPayouts[0].Value.Cmp(b.MinerPayouts[0].Value) != 0 ||
+		decB.MinerPayouts[1].Value.Cmp(b.MinerPayouts[1].Value) != 0 {
+		t.Fatal("block changed after encode/decode:", b, decB)
+	}
+}

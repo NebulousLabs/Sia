@@ -48,13 +48,26 @@ type (
 	}
 )
 
-func (t test5) MarshalSia() []byte { return []byte(t.s) }
+func (t test5) MarshalSia(w io.Writer) error {
+	return WritePrefix(w, []byte(t.s))
+}
 
-func (t *test5) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
+func (t *test5) UnmarshalSia(r io.Reader) error {
+	b, err := ReadPrefix(r, 256)
+	t.s = string(b)
+	return err
+}
 
-func (t *test6) MarshalSia() []byte { return []byte(t.s) }
+// same as above methods, but with a pointer receiver
+func (t *test6) MarshalSia(w io.Writer) error {
+	return WritePrefix(w, []byte(t.s))
+}
 
-func (t *test6) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
+func (t *test6) UnmarshalSia(r io.Reader) error {
+	b, err := ReadPrefix(r, 256)
+	t.s = string(b)
+	return err
+}
 
 var testStructs = []interface{}{
 	test0{false, 65537, 256, "foo"},
@@ -94,7 +107,7 @@ func TestEncode(t *testing.T) {
 	for i := range testStructs {
 		err := enc.Encode(testStructs[i])
 		if err != io.ErrShortWrite {
-			t.Error("expected ErrShortWrite, got", err)
+			t.Errorf("testStructs[%d]: expected ErrShortWrite, got %v", i, err)
 		}
 	}
 	// special case, not covered by testStructs
@@ -236,4 +249,37 @@ func TestReadWriteFile(t *testing.T) {
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
+}
+
+// i5-4670K, 9a90f86: 33 MB/s
+func BenchmarkEncode(b *testing.B) {
+	buf := new(bytes.Buffer)
+	enc := NewEncoder(buf)
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		for i := range testStructs {
+			err := enc.Encode(testStructs[i])
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+	b.SetBytes(int64(buf.Len()))
+}
+
+// i5-4670K, 9a90f86: 26 MB/s
+func BenchmarkDecode(b *testing.B) {
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
+	var numBytes int64
+	for i := 0; i < b.N; i++ {
+		numBytes = 0
+		for i := range testEncodings {
+			err := Unmarshal(testEncodings[i], emptyStructs[i])
+			if err != nil {
+				b.Fatal(err)
+			}
+			numBytes += int64(len(testEncodings[i]))
+		}
+	}
+	b.SetBytes(numBytes)
 }

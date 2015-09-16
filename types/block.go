@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 type (
@@ -132,6 +134,24 @@ func (b Block) MinerPayoutID(i uint64) SiacoinOutputID {
 		b.ID(),
 		i,
 	))
+}
+
+// MarshalSia implements the encoding.SiaMarshaler interface.
+func (b Block) MarshalSia(w io.Writer) error {
+	w.Write(b.ParentID[:])
+	w.Write(b.Nonce[:])
+	w.Write(encoding.EncUint64(uint64(b.Timestamp)))
+	return encoding.NewEncoder(w).EncodeAll(b.MinerPayouts, b.Transactions)
+}
+
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (b *Block) UnmarshalSia(r io.Reader) error {
+	io.ReadFull(r, b.ParentID[:])
+	io.ReadFull(r, b.Nonce[:])
+	tsBytes := make([]byte, 8)
+	io.ReadFull(r, tsBytes)
+	b.Timestamp = Timestamp(encoding.DecUint64(tsBytes))
+	return encoding.NewDecoder(r).DecodeAll(&b.MinerPayouts, &b.Transactions)
 }
 
 // MarshalJSON marshales a block id as a hex string.

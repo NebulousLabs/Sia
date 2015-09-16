@@ -47,20 +47,30 @@ func (f *file) save(w io.Writer) error {
 	enc := encoding.NewEncoder(zip)
 
 	// encode easy fields
-	enc.Encode(f.name)
-	enc.Encode(f.size)
-	enc.Encode(f.masterKey)
-	enc.Encode(f.pieceSize)
-	enc.Encode(f.mode)
-	enc.Encode(f.bytesUploaded)
-	enc.Encode(f.chunksUploaded)
+	err := enc.EncodeAll(
+		f.name,
+		f.size,
+		f.masterKey,
+		f.pieceSize,
+		f.mode,
+		f.bytesUploaded,
+		f.chunksUploaded,
+	)
+	if err != nil {
+		return err
+	}
 
 	// encode erasureCode
 	switch code := f.erasureCode.(type) {
 	case *rsCode:
-		enc.Encode("Reed-Solomon")
-		enc.Encode(uint64(code.dataPieces))
-		enc.Encode(uint64(code.numPieces - code.dataPieces))
+		err = enc.EncodeAll(
+			"Reed-Solomon",
+			uint64(code.dataPieces),
+			uint64(code.numPieces-code.dataPieces),
+		)
+		if err != nil {
+			return err
+		}
 	default:
 		if build.DEBUG {
 			panic("unknown erasure code")
@@ -68,9 +78,13 @@ func (f *file) save(w io.Writer) error {
 		return errors.New("unknown erasure code")
 	}
 	// encode contracts
-	enc.Encode(uint64(len(f.contracts)))
+	if err := enc.Encode(uint64(len(f.contracts))); err != nil {
+		return err
+	}
 	for _, c := range f.contracts {
-		enc.Encode(c)
+		if err := enc.Encode(c); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -86,22 +100,34 @@ func (f *file) load(r io.Reader) error {
 	dec := encoding.NewDecoder(zip)
 
 	// decode easy fields
-	dec.Decode(&f.name)
-	dec.Decode(&f.size)
-	dec.Decode(&f.masterKey)
-	dec.Decode(&f.pieceSize)
-	dec.Decode(&f.mode)
-	dec.Decode(&f.bytesUploaded)
-	dec.Decode(&f.chunksUploaded)
+	err = dec.DecodeAll(
+		&f.name,
+		&f.size,
+		&f.masterKey,
+		&f.pieceSize,
+		&f.mode,
+		&f.bytesUploaded,
+		&f.chunksUploaded,
+	)
+	if err != nil {
+		return err
+	}
 
 	// decode erasure coder
 	var codeType string
-	dec.Decode(&codeType)
+	if err := dec.Decode(&codeType); err != nil {
+		return err
+	}
 	switch codeType {
 	case "Reed-Solomon":
 		var nData, nParity uint64
-		dec.Decode(&nData)
-		dec.Decode(&nParity)
+		err = dec.DecodeAll(
+			&nData,
+			&nParity,
+		)
+		if err != nil {
+			return err
+		}
 		rsc, err := NewRSCode(int(nData), int(nParity))
 		if err != nil {
 			return err
@@ -113,11 +139,15 @@ func (f *file) load(r io.Reader) error {
 
 	// decode contracts
 	var nContracts uint64
-	dec.Decode(&nContracts)
+	if err := dec.Decode(&nContracts); err != nil {
+		return err
+	}
 	f.contracts = make(map[modules.NetAddress]fileContract)
 	var contract fileContract
 	for i := uint64(0); i < nContracts; i++ {
-		dec.Decode(&contract)
+		if err := dec.Decode(&contract); err != nil {
+			return err
+		}
 		f.contracts[contract.IP] = contract
 	}
 	return nil
@@ -131,25 +161,18 @@ func (r *Renter) saveFile(f *file) error {
 	}
 	defer handle.Close()
 
-	enc := encoding.NewEncoder(handle)
-
-	// Write header.
-	enc.Encode(shareHeader)
-	enc.Encode(shareVersion)
-
-	// Write length of 1.
-	err = enc.Encode(uint64(1))
+	// Write header with length of 1.
+	err = encoding.NewEncoder(handle).EncodeAll(
+		shareHeader,
+		shareVersion,
+		uint64(1),
+	)
 	if err != nil {
 		return err
 	}
 
 	// Write file.
-	err = f.save(handle)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return f.save(handle)
 }
 
 // save stores the current renter data to disk.
@@ -215,14 +238,12 @@ func (r *Renter) load() error {
 
 // shareFiles writes the specified files to w.
 func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
-	enc := encoding.NewEncoder(w)
-
 	// Write header.
-	enc.Encode(shareHeader)
-	enc.Encode(shareVersion)
-
-	// Write number of files.
-	err := enc.Encode(uint64(len(nicknames)))
+	err := encoding.NewEncoder(w).EncodeAll(
+		shareHeader,
+		shareVersion,
+		uint64(len(nicknames)),
+	)
 	if err != nil {
 		return err
 	}
@@ -233,7 +254,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if !exists {
 			return ErrUnknownNickname
 		}
-		err = file.save(w)
+		err := file.save(w)
 		if err != nil {
 			return err
 		}
@@ -284,27 +305,21 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 // loadSharedFiles reads .sia data from reader and registers the contained
 // files in the renter. It returns the nicknames of the loaded files.
 func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
-	dec := encoding.NewDecoder(reader)
-
 	// read header
 	var header [15]byte
-	dec.Decode(&header)
-	if header != shareHeader {
-		return nil, ErrBadFile
-	}
-
-	// decode version
 	var version string
-	dec.Decode(&version)
-	if version != shareVersion {
-		return nil, ErrIncompatible
-	}
-
-	// Read number of files
 	var numFiles uint64
-	err := dec.Decode(&numFiles)
+	err := encoding.NewDecoder(reader).DecodeAll(
+		&header,
+		&version,
+		&numFiles,
+	)
 	if err != nil {
 		return nil, err
+	} else if header != shareHeader {
+		return nil, ErrBadFile
+	} else if version != shareVersion {
+		return nil, ErrIncompatible
 	}
 
 	// Read each file.

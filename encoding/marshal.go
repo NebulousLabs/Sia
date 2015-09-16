@@ -12,14 +12,23 @@ import (
 	"reflect"
 )
 
-// A SiaMarshaler can encode itself as a byte slice.
+const (
+	maxDecodeLen = 10 * 1024 * 1024 // 10 MiB
+	maxSliceLen  = 4 * 1024 * 1024  // 4 MiB
+)
+
+var (
+	errBadPointer = errors.New("cannot decode into invalid pointer")
+)
+
+// A SiaMarshaler can encode and write itself to a stream.
 type SiaMarshaler interface {
-	MarshalSia() []byte
+	MarshalSia(io.Writer) error
 }
 
-// A SiaUnmarshaler can decode itself from a byte slice.
+// A SiaUnmarshaler can read and decode itself from a stream.
 type SiaUnmarshaler interface {
-	UnmarshalSia([]byte) error
+	UnmarshalSia(io.Reader) error
 }
 
 // An Encoder writes objects to an output stream.
@@ -27,25 +36,26 @@ type Encoder struct {
 	w io.Writer
 }
 
-const (
-	maxDecodeLen = 10 * 1024 * 1024 // 10 MB
-	maxSliceLen  = 4 * 1024 * 1024  // 4 MB
-)
-
-var (
-	errBadPointer = errors.New("cannot decode into invalid pointer")
-)
-
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
 func (e *Encoder) Encode(v interface{}) error {
 	return e.encode(reflect.ValueOf(v))
 }
 
+// EncodeAll encodes a variable number of arguments.
+func (e *Encoder) EncodeAll(vs ...interface{}) error {
+	for i := range vs {
+		if err := e.Encode(vs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // write catches instances where short writes do not return an error.
 func (e *Encoder) write(p []byte) error {
 	n, err := e.w.Write(p)
-	if n != len(p) {
+	if n != len(p) && err == nil {
 		return io.ErrShortWrite
 	}
 	return err
@@ -56,7 +66,7 @@ func (e *Encoder) write(p []byte) error {
 func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
-		return WritePrefix(e.w, m.MarshalSia())
+		return m.MarshalSia(e.w)
 	}
 
 	switch val.Kind() {
@@ -84,6 +94,9 @@ func (e *Encoder) encode(val reflect.Value) error {
 		// slices are variable length, so prepend the length and then fallthrough to array logic
 		if err := e.write(EncUint64(uint64(val.Len()))); err != nil {
 			return err
+		}
+		if val.Len() == 0 {
+			return nil
 		}
 		fallthrough
 	case reflect.Array:
@@ -195,6 +208,16 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 	return
 }
 
+// DecodeAll decodes a variable number of arguments.
+func (d *Decoder) DecodeAll(vs ...interface{}) error {
+	for i := range vs {
+		if err := d.Decode(vs[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // readN reads n bytes and panics if the read fails.
 func (d *Decoder) readN(n int) []byte {
 	b := make([]byte, n)
@@ -221,7 +244,7 @@ func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			err := u.UnmarshalSia(d.readPrefix())
+			err := u.UnmarshalSia(d)
 			if err != nil {
 				panic(err)
 			}
@@ -262,6 +285,8 @@ func (d *Decoder) decode(val reflect.Value) {
 		// them allocate a massive slice
 		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > maxSliceLen {
 			panic("slice is too large")
+		} else if sliceLen == 0 {
+			return
 		}
 		val.Set(reflect.MakeSlice(val.Type(), int(sliceLen), int(sliceLen)))
 		fallthrough
