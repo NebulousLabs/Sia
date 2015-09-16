@@ -18,6 +18,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -72,7 +73,20 @@ func openDB(filename string) (*setDB, error) {
 	if err != nil {
 		return nil, err
 	}
+	return &setDB{db, true}, nil
+}
 
+// dbInitialized returns true if the database appears to be initialized, false
+// if not.
+func dbInitialized(tx *bolt.Tx) bool {
+	// If the SiafundPool bucket exists, the database has almost certainly been
+	// initialized correctly.
+	return tx.Bucket(SiafundPool) != nil
+}
+
+// initDatabase is run when the database. This has become the true
+// init function for consensus set
+func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	// Enumerate the database buckets.
 	buckets := [][]byte{
 		BlockPath,
@@ -85,18 +99,51 @@ func openDB(filename string) (*setDB, error) {
 		BlockHeight,
 	}
 
-	// Initialize the database.
-	err = db.Update(func(tx *bolt.Tx) error {
-		// Create the database buckets.
-		for _, bucket := range buckets {
-			_, err := tx.CreateBucketIfNotExists(bucket)
-			if err != nil {
-				return err
-			}
+	// Create the database buckets.
+	for _, bucket := range buckets {
+		_, err := tx.CreateBucketIfNotExists(bucket)
+		if err != nil {
+			return err
 		}
-		return nil
+	}
+
+	// Set the block height to -1, so the genesis block is at height 0.
+	blockHeight := tx.Bucket(BlockHeight)
+	underflow := types.BlockHeight(0)
+	err := blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
+	if err != nil {
+		return err
+	}
+
+	// Add the genesis block.
+	addBlockMap(tx, &cs.blockRoot)
+	pushPath(tx, cs.blockRoot.Block.ID())
+
+	// Set the siafund pool to 0.
+	setSiafundPool(tx, types.NewCurrency64(0))
+
+	// Update the siafundoutput diffs map for the genesis block on
+	// disk. This needs to happen between the database being
+	// opened/initilized and the consensus set hash being calculated
+	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
+		commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
+	}
+
+	// Add the miner payout from the genesis block - unspendable, as the
+	// unlock hash is blank.
+	addSiacoinOutput(tx, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
+		Value:      types.CalculateCoinbase(0),
+		UnlockHash: types.UnlockHash{},
 	})
-	return &setDB{db, true}, err
+
+	// Get the genesis consensus set hash.
+	if build.DEBUG {
+		cs.blockRoot.ConsensusSetHash = consensusChecksum(tx)
+	}
+
+	// Add the genesis block to the block map.
+	addBlockMap(tx, &cs.blockRoot)
+	return nil
 }
 
 // blockHeight returns the height of the blockchain.
