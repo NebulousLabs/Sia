@@ -104,20 +104,6 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Printf("INFO: %v wants to connect", addr)
 
-	// don't connect to an IP address more than once
-	if build.Release != "testing" {
-		id := g.mu.RLock()
-		for p := range g.peers {
-			if p.Host() == addr.Host() {
-				g.mu.RUnlock(id)
-				conn.Close()
-				g.log.Printf("INFO: rejected connection from %v: already connected", addr)
-				return
-			}
-		}
-		g.mu.RUnlock(id)
-	}
-
 	// read version
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
@@ -126,7 +112,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// decide whether to accept
+	// check that version is acceptable
 	// NOTE: this version must be bumped whenever the gateway or consensus
 	// breaks compatibility.
 	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
@@ -143,19 +129,23 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// If we are already fully connected, kick out an old inbound peer to make
-	// room for the new one. Among other things, this ensures that bootstrap
-	// nodes will always be connectible. Worst case, you'll connect, receive a
-	// node list, and immediately get booted. But once you have the node list
-	// you should be able to connect to less full peers.
+	// If we are already fully connected, kick out an old peer to make room
+	// for the new one. Importantly, prioritize kicking a peer with the same
+	// IP as the connecting peer. This protects against Sybil attacks.
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
-		oldPeer, err := g.randomInboundPeer()
-		if err == nil {
-			g.peers[oldPeer].sess.Close()
-			delete(g.peers, oldPeer)
-			g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
+		// first choose a random peer
+		kick, _ := g.randomPeer()
+		// try to pick a better one
+		for peer := range g.peers {
+			if peer.Host() == addr.Host() {
+				kick = peer
+				break
+			}
 		}
+		g.peers[kick].sess.Close()
+		delete(g.peers, kick)
+		g.log.Printf("INFO: disconnected from %v to make room for %v", kick, addr)
 	}
 	// add the peer
 	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
