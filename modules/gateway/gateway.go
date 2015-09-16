@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 )
@@ -83,10 +84,18 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		log:        logger,
 	}
 
-	// Load the old peer list. If it doesn't exist, no problem, but if it does,
+	// Load the old node list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
+	}
+
+	// Add the bootstrap peers to the node list.
+	if build.Release != "testing" {
+		for _, addr := range modules.BootstrapPeers {
+			g.addNode(addr)
+		}
+		g.save()
 	}
 
 	// Create listener and set address.
