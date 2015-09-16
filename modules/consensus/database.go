@@ -147,7 +147,7 @@ func getBlockMap(tx *bolt.Tx, id types.BlockID) (*processedBlock, error) {
 // addBlockMap adds a processed block to the block map.
 func addBlockMap(tx *bolt.Tx, pb *processedBlock) {
 	id := pb.Block.ID()
-	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(pb))
+	err := tx.Bucket(BlockMap).Put(id[:], encoding.Marshal(*pb))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -633,18 +633,6 @@ func (db *setDB) inBlockMap(id types.BlockID) bool {
 // rmBlockMap removes a processedBlock from the blockMap bucket
 func (db *setDB) rmBlockMap(id types.BlockID) error {
 	return db.rmItem(BlockMap, id)
-}
-
-// updateBlockMap is a wrapper function for modification of
-func (db *setDB) updateBlockMap(pb *processedBlock) {
-	err := db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(BlockMap)
-		id := pb.Block.ID()
-		return bucket.Put(id[:], encoding.Marshal(*pb))
-	})
-	if err != nil {
-		panic(err)
-	}
 }
 
 func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {

@@ -18,46 +18,43 @@ const (
 
 // initDatabase is run when the database. This has become the true
 // init function for consensus set
-func (cs *ConsensusSet) initDB() error {
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		// Set the block height to -1, so the genesis block is at height 0.
-		blockHeight := tx.Bucket(BlockHeight)
-		underflow := types.BlockHeight(0)
-		err := blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
-		if err != nil {
-			return err
-		}
-
-		// Add the genesis block.
-		addBlockMap(tx, &cs.blockRoot)
-		pushPath(tx, cs.blockRoot.Block.ID())
-
-		// Set the siafund pool to 0.
-		setSiafundPool(tx, types.NewCurrency64(0))
-
-		// Update the siafundoutput diffs map for the genesis block on
-		// disk. This needs to happen between the database being
-		// opened/initilized and the consensus set hash being calculated
-		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
-			commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
-		}
-
-		// Add the miner payout from the genesis block - unspendable, as the
-		// unlock hash is blank.
-		addSiacoinOutput(tx, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
-			Value:      types.CalculateCoinbase(0),
-			UnlockHash: types.UnlockHash{},
-		})
-		return nil
-	})
+func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
+	// Set the block height to -1, so the genesis block is at height 0.
+	blockHeight := tx.Bucket(BlockHeight)
+	underflow := types.BlockHeight(0)
+	err := blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
 	if err != nil {
 		return err
 	}
 
-	if build.DEBUG {
-		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
-		cs.db.updateBlockMap(&cs.blockRoot)
+	// Add the genesis block.
+	addBlockMap(tx, &cs.blockRoot)
+	pushPath(tx, cs.blockRoot.Block.ID())
+
+	// Set the siafund pool to 0.
+	setSiafundPool(tx, types.NewCurrency64(0))
+
+	// Update the siafundoutput diffs map for the genesis block on
+	// disk. This needs to happen between the database being
+	// opened/initilized and the consensus set hash being calculated
+	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
+		commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 	}
+
+	// Add the miner payout from the genesis block - unspendable, as the
+	// unlock hash is blank.
+	addSiacoinOutput(tx, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
+		Value:      types.CalculateCoinbase(0),
+		UnlockHash: types.UnlockHash{},
+	})
+
+	// Get the genesis consensus set hash.
+	if build.DEBUG {
+		cs.blockRoot.ConsensusSetHash = consensusChecksum(tx)
+	}
+
+	// Add the genesis block to the block map.
+	addBlockMap(tx, &cs.blockRoot)
 	return nil
 }
 
@@ -74,12 +71,18 @@ func (cs *ConsensusSet) loadDB() error {
 	// genesis block should be added.
 	height := cs.db.pathHeight()
 	if height == 0 {
-		return cs.initDB()
+		err := cs.db.Update(func(tx *bolt.Tx) error {
+			return cs.initDB(tx)
+		})
+		if err != nil {
+			return err
+		}
 	}
 
-	// Check that the db's genesis block matches our genesis block.
+	// Check that the genesis block of the database matches the genesis block
+	// generated during startup. If not, print a warning and create a new
+	// database.
 	bid := cs.db.getPath(0)
-	// If this happens, print a warning and start a new db.
 	if bid != cs.blockRoot.Block.ID() {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		cs.db.Close()
@@ -107,8 +110,8 @@ func (cs *ConsensusSet) loadDB() error {
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
 
-	// Load all blocks from disk, skipping the genesis block.
-	for i := types.BlockHeight(1); i < height; i++ {
+	// Load all blocks from disk.
+	for i := types.BlockHeight(0); i < height; i++ {
 		bid := cs.db.getPath(i)
 		pb := cs.db.getBlockMap(bid)
 
@@ -133,9 +136,6 @@ func (cs *ConsensusSet) initPersist() error {
 	if err != nil {
 		return err
 	}
-
-	// Send the genesis block to subscribers.
-	cs.updateSubscribers(nil, []*processedBlock{&cs.blockRoot})
 
 	// Send any blocks that were loaded from disk to subscribers.
 	cs.loadDiffs()
