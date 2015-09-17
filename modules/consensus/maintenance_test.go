@@ -256,8 +256,9 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
-	cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return applyFileContractMaintenance(tx, pb)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		applyFileContractMaintenance(tx, pb)
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -26,7 +26,7 @@ var (
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		sco, err := getSiacoinOutput(tx, sci.ParentID)
@@ -41,12 +41,11 @@ func applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
 		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 	}
-	return nil
 }
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the processed block.
-func applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
 		scoid := t.SiacoinOutputID(i)
@@ -58,13 +57,12 @@ func applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) e
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
 		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyFileContracts iterates through all of the file contracts in a
 // transaction and applies them to the state, updating the diffs in the proccesed
 // block.
-func applyFileContracts(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applyFileContracts(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for i, fc := range t.FileContracts {
 		fcid := t.FileContractID(i)
 		fcd := modules.FileContractDiff{
@@ -86,17 +84,16 @@ func applyFileContracts(tx *bolt.Tx, pb *processedBlock, t types.Transaction) er
 		pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
 		commitSiafundPoolDiff(tx, sfpd, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyTxFileContractRevisions iterates through all of the file contract
 // revisions in a transaction and applies them to the state, updating the diffs
 // in the processed block.
-func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for _, fcr := range t.FileContractRevisions {
 		fc, err := getFileContract(tx, fcr.ParentID)
-		if err != nil {
-			return err
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
 
 		// Add the diff to delete the old file contract.
@@ -128,7 +125,6 @@ func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transac
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
 		commitFileContractDiff(tx, fcd, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyTxStorageProofs iterates through all of the storage proofs in a
@@ -203,7 +199,7 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 }
 
 // applySiafundOutput applies a siafund output to the consensus set.
-func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
+func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(i)
 		sfo.ClaimStart = getSiafundPool(tx)
@@ -215,36 +211,17 @@ func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) e
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
 		commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyTransaction applies the contents of a transaction to the ConsensusSet.
 // This produces a set of diffs, which are stored in the blockNode containing
 // the transaction. No verification is done by this function.
-func applyTransaction(tx *bolt.Tx, pb *processedBlock, t types.Transaction) error {
-	// Apply each component of the transaction. Miner fees are handled
-	// elsewhere.
-	err := applySiacoinInputs(tx, pb, t)
-	if err != nil {
-		return err
-	}
-	err = applySiacoinOutputs(tx, pb, t)
-	if err != nil {
-		return err
-	}
-	err = applyFileContracts(tx, pb, t)
-	if err != nil {
-		return err
-	}
-	err = applyFileContractRevisions(tx, pb, t)
-	if err != nil {
-		return err
-	}
+func applyTransaction(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
+	applySiacoinInputs(tx, pb, t)
+	applySiacoinOutputs(tx, pb, t)
+	applyFileContracts(tx, pb, t)
+	applyFileContractRevisions(tx, pb, t)
 	applyStorageProofs(tx, pb, t)
 	applySiafundInputs(tx, pb, t)
-	err = applySiafundOutputs(tx, pb, t)
-	if err != nil {
-		return err
-	}
-	return nil
+	applySiafundOutputs(tx, pb, t)
 }

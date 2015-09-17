@@ -234,37 +234,27 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 		panic(errInvalidSuccessor)
 	}
 
-	bid := pb.Block.ID()
-	err := tx.Bucket(BlockPath).Put(encoding.EncUint64(uint64(pb.Height)), bid[:])
-	if err != nil {
-		return err
-	}
+	// Create the bucket to hold all of the delayed siacoin outputs created by
+	// transactions this block. Needs to happen before any transactions are
+	// applied.
 	createDSCOBucket(tx, pb.Height+types.MaturityDelay)
 
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range pb.Block.Transactions {
-		err = validTransaction(tx, txn)
+		err := validTransaction(tx, txn)
 		if err != nil {
 			return err
 		}
-		err = applyTransaction(tx, pb, txn)
-		if err != nil {
-			return err
-		}
+		applyTransaction(tx, pb, txn)
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	err = applyMaintenance(tx, pb)
-	if err != nil {
-		return err
-	}
-
-	updateCurrentPath(tx, pb, modules.DiffApply)
+	applyMaintenance(tx, pb)
 
 	// Sanity check preparation - set the consensus hash at this height so that
 	// during reverting a check can be performed to assure consistency when
@@ -282,7 +272,9 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	// true on fully validated blocks.
 	pb.DiffsGenerated = true
 
-	// Add the fully processed block to the block map.
+	// Add the block to the current path and block map.
+	bid := pb.Block.ID()
 	blockMap := tx.Bucket(BlockMap)
+	updateCurrentPath(tx, pb, modules.DiffApply)
 	return blockMap.Put(bid[:], encoding.Marshal(*pb))
 }

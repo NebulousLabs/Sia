@@ -22,7 +22,6 @@ var (
 // delayed siacoin outputs.
 func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) {
 	for i := range pb.Block.MinerPayouts {
-		// Create and apply the delayed miner payout.
 		mpid := pb.Block.MinerPayoutID(uint64(i))
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
@@ -77,11 +76,11 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) error {
+func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) {
 	// Sanity checks.
 	fc, err := getFileContract(tx, fcid)
-	if err != nil {
-		return err
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 	if build.DEBUG {
 		// Check that the file contract in question expires at pb.Height.
@@ -117,36 +116,34 @@ func applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileC
 	}
 	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
 	commitFileContractDiff(tx, fcd, modules.DiffApply)
-	return nil
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) error {
+func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) {
 	// Get the bucket pointing to all of the expiring file contracts.
 	fceBucketID := append(prefix_fcex, encoding.Marshal(pb.Height)...)
 	fceBucket := tx.Bucket(fceBucketID)
+	// Finish if there are no expiring file contracts.
 	if fceBucket == nil {
-		return nil
+		return
 	}
-	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
+
+	_ = fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
 		var id types.FileContractID
 		copy(id[:], keyBytes)
-		return applyTxMissedStorageProof(tx, pb, id)
+		applyMissedStorageProof(tx, pb, id)
+		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
-	// return tx.DeleteBucket(fceBucketID)
+	// tx.DeleteBucket(fceBucketID)
 }
 
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
-func applyMaintenance(tx *bolt.Tx, pb *processedBlock) error {
+func applyMaintenance(tx *bolt.Tx, pb *processedBlock) {
 	applyMinerPayouts(tx, pb)
 	applyMaturedSiacoinOutputs(tx, pb)
-	return applyFileContractMaintenance(tx, pb)
+	applyFileContractMaintenance(tx, pb)
 }

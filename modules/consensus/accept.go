@@ -173,6 +173,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// the longest fork.
 	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
+		// TODO: Add the incoming block to the list of DoS blocks.
 		return err
 	}
 	if len(appliedBlocks) > 0 {

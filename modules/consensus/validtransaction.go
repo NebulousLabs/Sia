@@ -273,10 +273,7 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 			if err != nil {
 				return err
 			}
-			err = applyTransaction(tx, diffHolder, txn)
-			if err != nil {
-				return err
-			}
+			applyTransaction(tx, diffHolder, txn)
 		}
 		return errSuccess
 	})
