@@ -147,10 +147,6 @@ type (
 		// This is a thread-safe way of managing updates.
 		ConsensusSetSubscribe(ConsensusSetSubscriber)
 
-		// CurrentBlock returns the most recent block on the heaviest fork known to
-		// the consensus set.
-		CurrentBlock() types.Block
-
 		// EarliestChildTimestamp returns the earliest timestamp that is acceptable
 		// on the current longest fork according to the consensus set. This is a
 		// required piece of information for the miner, who could otherwise be at

@@ -59,29 +59,31 @@ func (cs *ConsensusSet) checkCurrentPath() error {
 		return nil
 	}
 
-	currentNode := cs.currentProcessedBlock()
-	for i := cs.height(); i != 0; i-- {
-		// The block should be in the block map.
-		exists := cs.db.inBlockMap(currentNode.Block.ID())
-		if !exists {
-			return errors.New("current path block not found in block map")
-		}
-		// Current node should match the id in the current path.
-		if currentNode.Block.ID() != cs.db.getPath(i) {
-			return errors.New("current path points to an incorrect block")
-		}
-		// Height of node needs to be listed correctly.
-		if currentNode.Height != i {
-			return errors.New("node height mismatches its location in the blockchain")
-		}
-		// Current node's parent needs the right id.
-		parent := cs.db.getBlockMap(currentNode.Block.ParentID)
-		if currentNode.Block.ParentID != parent.Block.ID() {
-			return errors.New("node parent id mismatches actual parent id")
-		}
+	/*
+		currentNode := cs.currentProcessedBlock()
+		for i := cs.height(); i != 0; i-- {
+			// The block should be in the block map.
+			exists := cs.db.inBlockMap(currentNode.Block.ID())
+			if !exists {
+				return errors.New("current path block not found in block map")
+			}
+			// Current node should match the id in the current path.
+			if currentNode.Block.ID() != cs.db.getPath(i) {
+				return errors.New("current path points to an incorrect block")
+			}
+			// Height of node needs to be listed correctly.
+			if currentNode.Height != i {
+				return errors.New("node height mismatches its location in the blockchain")
+			}
+			// Current node's parent needs the right id.
+			parent := cs.db.getBlockMap(currentNode.Block.ParentID)
+			if currentNode.Block.ParentID != parent.Block.ID() {
+				return errors.New("node parent id mismatches actual parent id")
+			}
 
-		currentNode = cs.db.getBlockMap(currentNode.Block.ParentID)
-	}
+			currentNode = cs.db.getBlockMap(currentNode.Block.ParentID)
+		}
+	*/
 	return nil
 }
 
@@ -267,22 +269,24 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	// same as it was before the current block was added, then reapply the
 	// block and check that the new consensus set has is the same as originally
 	// calculated.
-	currentNode := cs.currentProcessedBlock()
-	parent := cs.db.getBlockMap(currentNode.Block.ParentID)
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		revertToBlock(tx, parent)
-		return nil
-	})
-	if cs.consensusSetHash() != parent.ConsensusSetHash {
-		return errors.New("rewinding a block resulted in unexpected consensus set hash")
-	}
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		cs.applyUntilBlock(tx, currentNode)
-		return nil
-	})
-	if cs.consensusSetHash() != currentNode.ConsensusSetHash {
-		return errors.New("reapplying a block resulted in unexpected consensus set hash")
-	}
+	/*
+		currentNode := cs.currentProcessedBlock()
+		parent := cs.db.getBlockMap(currentNode.Block.ParentID)
+		_ = cs.db.Update(func(tx *bolt.Tx) error {
+			revertToBlock(tx, parent)
+			return nil
+		})
+		if cs.consensusSetHash() != parent.ConsensusSetHash {
+			return errors.New("rewinding a block resulted in unexpected consensus set hash")
+		}
+		_ = cs.db.Update(func(tx *bolt.Tx) error {
+			cs.applyUntilBlock(tx, currentNode)
+			return nil
+		})
+		if cs.consensusSetHash() != currentNode.ConsensusSetHash {
+			return errors.New("reapplying a block resulted in unexpected consensus set hash")
+		}
+	*/
 	return nil
 }
 

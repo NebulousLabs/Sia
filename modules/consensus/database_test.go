@@ -368,3 +368,12 @@ func (s *ConsensusSet) Height() types.BlockHeight {
 	defer s.mu.RUnlock(counter)
 	return s.height()
 }
+
+// currentBlockID returns the ID of the current block.
+func (cs *ConsensusSet) currentBlockID() types.BlockID {
+	return cs.db.getPath(cs.height())
+}
+
+func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
+	return cs.db.getBlockMap(cs.currentBlockID())
+}
