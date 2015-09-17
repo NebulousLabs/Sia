@@ -162,7 +162,11 @@ func blockHeight(tx *bolt.Tx) types.BlockHeight {
 
 // currentBlockID returns the id of the most recent block in the consensus set.
 func currentBlockID(tx *bolt.Tx) types.BlockID {
-	return getPath(tx, blockHeight(tx))
+	id, err := getPath(tx, blockHeight(tx))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // currentProcessedBlock returns the most recent block in the consensus set.
@@ -201,13 +205,17 @@ func addBlockMap(tx *bolt.Tx, pb *processedBlock) {
 }
 
 // getPath returns the block id at 'height' in the block path.
-func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID) {
+func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID, err error) {
 	idBytes := tx.Bucket(BlockPath).Get(encoding.Marshal(height))
-	err := encoding.Unmarshal(idBytes, &id)
+	if idBytes == nil {
+		return types.BlockID{}, errNilItem
+	}
+
+	err = encoding.Unmarshal(idBytes, &id)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return id
+	return id, nil
 }
 
 // pushPath adds a block to the BlockPath at current height + 1.

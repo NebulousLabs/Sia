@@ -7,6 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -34,7 +35,10 @@ func (cs *ConsensusSet) loadDB() error {
 
 		// Check that the genesis block is correct - typically only incorrect
 		// in the event of developer binaries vs. release binaires.
-		genesisID := getPath(tx, 0)
+		genesisID, err := getPath(tx, 0)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 		if genesisID != cs.blockRoot.Block.ID() {
 			return errors.New("Blockchain has wrong genesis block, exiting.")
 		}
@@ -48,13 +52,16 @@ func (cs *ConsensusSet) loadDB() error {
 
 	// Send all of the existing blocks to subscribers - temporary while
 	// subscribers don't have any persistence for block progress.
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	return cs.db.View(func(tx *bolt.Tx) error {
 		for i := types.BlockHeight(0); i <= height; i++ {
 			// Fetch the processed block at height 'i'.
-			id := getPath(tx, i)
+			id, err := getPath(tx, i)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
 			pb, err := getBlockMap(tx, id)
-			if err != nil {
-				return err
+			if build.DEBUG && err != nil {
+				panic(err)
 			}
 
 			// Send the block to subscribers.
@@ -62,10 +69,6 @@ func (cs *ConsensusSet) loadDB() error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // initPersist initializes the persistence structures of the consensus set, in
@@ -83,6 +86,5 @@ func (cs *ConsensusSet) initPersist() error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

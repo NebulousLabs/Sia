@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -175,25 +177,29 @@ func TestBlockHistory(t *testing.T) {
 		}
 	}
 
-	history := cst.cs.blockHistory()
+	var history [32]types.BlockID
+	_ = cst.cs.db.View(func(tx *bolt.Tx) error {
+		history = cst.cs.blockHistory(tx)
+		return nil
+	})
 
 	// validate history
 	lockID := cst.cs.mu.Lock()
-	// first 12 IDs are linear
-	for i := types.BlockHeight(0); i < 12; i++ {
+	// first 10 IDs are linear
+	for i := types.BlockHeight(0); i < 10; i++ {
 		if history[i] != cst.cs.db.getPath(cst.cs.height()-i) {
 			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.height()-i), history[i])
 		}
 	}
 	// next 4 IDs are exponential
-	heights := []types.BlockHeight{14, 18, 26, 42}
+	heights := []types.BlockHeight{11, 15, 23, 39}
 	for i, height := range heights {
-		if history[12+i] != cst.cs.db.getPath(cst.cs.height()-height+1) {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.height()-height), history[12+i])
+		if history[10+i] != cst.cs.db.getPath(cst.cs.height()-height) {
+			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.height()-height), history[10+i])
 		}
 	}
 	// finally, the genesis ID
-	if history[16] != cst.cs.db.getPath(0) {
+	if history[31] != cst.cs.db.getPath(0) {
 		t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(0), history[16])
 	}
 
@@ -201,7 +207,7 @@ func TestBlockHistory(t *testing.T) {
 
 	// remaining IDs should be empty
 	var emptyID types.BlockID
-	for i, id := range history[17:] {
+	for i, id := range history[14:31] {
 		if id != emptyID {
 			t.Errorf("Expected empty ID at index %v, got %v", i+17, id)
 		}

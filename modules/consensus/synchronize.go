@@ -4,6 +4,9 @@ import (
 	"errors"
 	"runtime"
 
+	"github.com/boltdb/bolt"
+
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -15,31 +18,46 @@ const (
 	MaxSynchronizeAttempts = 8
 )
 
-// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
-// BlockIDs and then doubling in step size until the genesis block is reached.
-// The genesis block is always included. This array of BlockIDs is used to
-// establish a shared commonality between peers during synchronization.
-func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
-	knownBlocks := make([]types.BlockID, 0, 32)
+// blockHistory returns up to 32 block ids, starting with recent blocks and
+// then proving exponentially increasingly less recent blocks. The genesis
+// block is always included as the last block. This block history can be used
+// to find a common parent that is reasonably recent, usually the most recent
+// common parent is found, but always a common parent within a factor of 2 is
+// found.
+func (s *ConsensusSet) blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
+	height := blockHeight(tx)
 	step := types.BlockHeight(1)
-	for height := s.height(); ; height -= step {
-		// after 12, start doubling
-		knownBlocks = append(knownBlocks, s.db.getPath(height))
-		if len(knownBlocks) >= 12 {
+	// The final step is to include the genesis block, which is why `step <
+	// height` is used as opposed to `step <= height`.
+	for i := 0; i < 31; i++ {
+		// Include the next block.
+		blockID, err := getPath(tx, height)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		blockIDs[i] = blockID
+
+		// Determine the height of the next block to include and then increase
+		// the step size. The height must be decreased first to prevent
+		// underflow.
+		//
+		// `i >= 9` means that the first 10 blocks will be included, and then
+		// skipping will start.
+		if i >= 9 {
 			step *= 2
 		}
-
-		// this check has to come before height -= step;
-		// otherwise we might underflow
-		if height <= step {
+		if height < step {
 			break
 		}
+		height -= step
 	}
-	// always include the genesis block
-	knownBlocks = append(knownBlocks, s.db.getPath(0))
-
-	copy(blockIDs[:], knownBlocks)
-	return
+	// Include the genesis block as the last element
+	blockID, err := getPath(tx, 0)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	blockIDs[31] = blockID
+	return blockIDs
 }
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
@@ -50,7 +68,11 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 		s.mu.RUnlock(lockID)
 		return errors.New("database not open")
 	}
-	history := s.blockHistory()
+	var history [32]types.BlockID
+	_ = s.db.View(func(tx *bolt.Tx) error {
+		history = s.blockHistory(tx)
+		return nil
+	})
 	s.mu.RUnlock(lockID)
 	if err := encoding.WriteObject(conn, history); err != nil {
 		return err

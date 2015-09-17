@@ -44,12 +44,12 @@ func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
 
 // dbGetPath is a convenience function allowing getPath to be called without a
 // bolt.Tx.
-func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID) {
+func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err error) {
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		id = getPath(tx, bh)
+		id, err = getPath(tx, bh)
 		return nil
 	})
-	return id
+	return id, err
 }
 
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called

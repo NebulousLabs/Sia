@@ -404,7 +404,11 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	if currentPB.Height != initialHeight+1 {
 		return errors.New("the processed block is not reporting the correct height")
 	}
-	if block.ID() != cst.cs.dbGetPath(currentPB.Height) {
+	pathID, err := cst.cs.dbGetPath(currentPB.Height)
+	if err != nil {
+		return err
+	}
+	if pathID != block.ID() {
 		return errors.New("current path does not point to the correct block")
 	}
 

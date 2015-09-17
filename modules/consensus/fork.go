@@ -19,13 +19,26 @@ var (
 // the former.
 func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	path := []*processedBlock{pb}
-	for pb.Height > blockHeight(tx) || getPath(tx, pb.Height) != pb.Block.ID() {
-		var err error
+	for {
+		// Error is not checked in production code - an error can only indicate
+		// that pb.Height > blockHeight(tx).
+		currentPathID, err := getPath(tx, pb.Height)
+		if currentPathID == pb.Block.ID() {
+			break
+		}
+		// Sanity check - an error should only indicate that pb.Height >
+		// blockHeight(tx).
+		if build.DEBUG && err != nil && pb.Height <= blockHeight(tx) {
+			panic(err)
+		}
+
+		// Prepend the next block to the list of blocks leading from the
+		// current path to the input block.
 		pb, err = getBlockMap(tx, pb.Block.ParentID)
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
-		path = append([]*processedBlock{pb}, path...) // prepend
+		path = append([]*processedBlock{pb}, path...)
 	}
 	return path
 }
@@ -35,7 +48,8 @@ func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 // reverted.  'pb' is not reverted.
 func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processedBlock) {
 	// Sanity check - make sure that pb is in the current path.
-	if build.DEBUG && (blockHeight(tx) < pb.Height || getPath(tx, pb.Height) != pb.Block.ID()) {
+	currentPathID, err := getPath(tx, pb.Height)
+	if build.DEBUG && (err != nil || currentPathID != pb.Block.ID()) {
 		panic(errExternalRevert)
 	}
 
