@@ -7,7 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/types"
+	// "github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -143,13 +143,15 @@ func (cs *ConsensusSet) checkSiacoins() error {
 
 // checkSiafunds counts the siafund outputs and checks that there are 10,000.
 func (cs *ConsensusSet) checkSiafunds() error {
-	totalSiafunds := types.ZeroCurrency
-	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		totalSiafunds = totalSiafunds.Add(sfo.Value)
-	})
-	if totalSiafunds.Cmp(types.SiafundCount) != 0 {
-		return errSiafundMiscount
-	}
+	/*
+		totalSiafunds := types.ZeroCurrency
+		cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+			totalSiafunds = totalSiafunds.Add(sfo.Value)
+		})
+		if totalSiafunds.Cmp(types.SiafundCount) != 0 {
+			return errSiafundMiscount
+		}
+	*/
 	return nil
 }
 

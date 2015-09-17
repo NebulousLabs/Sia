@@ -6,15 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// height returns the current height of the state.
-func (cs *ConsensusSet) height() (bh types.BlockHeight) {
-	_ = cs.db.View(func(tx *bolt.Tx) error {
-		bh = blockHeight(tx)
-		return nil
-	})
-	return bh
-}
-
 // ChildTarget returns the target for the child of a block.
 func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exists bool) {
 	_ = cs.db.View(func(tx *bolt.Tx) error {

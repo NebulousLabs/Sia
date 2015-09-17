@@ -172,19 +172,27 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		// Get the set of blocks to send.
 		var blocks []types.Block
 		lockID = cs.mu.RLock()
-		{
-			height := cs.height()
-			// TODO: unit test for off-by-one errors here
+		cs.db.View(func(tx *bolt.Tx) error {
+			height := blockHeight(tx)
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node := cs.db.getBlockMap(cs.db.getPath(i))
-				blocks = append(blocks, node.Block)
+				id, err := getPath(tx, i)
+				if build.DEBUG && err != nil {
+					panic(err)
+				}
+				pb, err := getBlockMap(tx, id)
+				if build.DEBUG && err != nil {
+					panic(err)
+				}
+				blocks = append(blocks, pb.Block)
 			}
-
-			// TODO: Check for off-by-one here too.
 			moreAvailable = start+MaxCatchUpBlocks < height
 			start += MaxCatchUpBlocks
-		}
+			return nil
+		})
 		cs.mu.RUnlock(lockID)
+		if err != nil {
+			return err
+		}
 
 		// Send a set of blocks to the caller + a flag indicating whether more
 		// are available.

@@ -386,6 +386,21 @@ func removeFileContract(tx *bolt.Tx, id types.FileContractID) {
 	}
 }
 
+// getSiafundOutput fetches a siafund output from the database. An error is
+// returned if the siafund output does not exist.
+func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
+	sfoBytes := tx.Bucket(SiafundOutputs).Get(id[:])
+	if sfoBytes == nil {
+		return types.SiafundOutput{}, errNilItem
+	}
+	var sfo types.SiafundOutput
+	err := encoding.Unmarshal(sfoBytes, &sfo)
+	if err != nil {
+		return types.SiafundOutput{}, err
+	}
+	return sfo, nil
+}
+
 // addSiafundOutput adds a siafund output to the database. An error is returned
 // if the siafund output is already in the database.
 func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sco types.SiafundOutput) {
@@ -522,95 +537,6 @@ func forEachDSCO(tx *bolt.Tx, bh types.BlockHeight, fn func(id types.SiacoinOutp
 // BREAK //
 // BREAK //
 
-// getItem returns an item from a bucket. In debug mode, a panic is thrown if
-// the bucket does not exist or if the item does not exist.
-func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	k := encoding.Marshal(key)
-	item := b.Get(k)
-	if item == nil {
-		return nil, errNilItem
-	}
-	return item, nil
-}
-
-// getItem is a generic function to insert an item into the set database
-//
-// DEPRECATED
-func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error) {
-	k := encoding.Marshal(key)
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		// Sanity check to make sure the bucket exists.
-		if build.DEBUG && b == nil {
-			panic(errNilBucket)
-		}
-		item = b.Get(k)
-		// Sanity check to make sure the item requested exists
-		if item == nil {
-			return errNilItem
-		}
-		return nil
-	})
-	return item, err
-}
-
-// rmItem removes an item from a bucket
-func (db *setDB) rmItem(bucket []byte, key interface{}) error {
-	k := encoding.Marshal(key)
-	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucket)
-		if build.DEBUG {
-			// Sanity check to make sure the bucket exists.
-			if b == nil {
-				panic(errNilBucket)
-			}
-			// Sanity check to make sure you are deleting an item that exists
-			item := b.Get(k)
-			if item == nil {
-				panic(errNilItem)
-			}
-		}
-		return b.Delete(k)
-	})
-}
-
-// inBucket checks if an item with the given key is in the bucket
-func (db *setDB) inBucket(bucket []byte, key interface{}) bool {
-	exists, err := db.Exists(bucket, encoding.Marshal(key))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return exists
-}
-
-// lenBucket is a simple wrapper for bucketSize that panics on error
-func (db *setDB) lenBucket(bucket []byte) uint64 {
-	s, err := db.BucketSize(bucket)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return s
-}
-
-// forEachItem runs a given function on every element in a given
-// bucket name, and will panic on any error
-func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucket)
-		if build.DEBUG && b == nil {
-			panic(errNilBucket)
-		}
-		return b.ForEach(fn)
-	})
-	if err != nil {
-		panic(err)
-	}
-}
-
 // getPath retreives the block id of a block at a given hegiht from the path
 //
 // DEPRECATED
@@ -643,57 +569,32 @@ func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	return &pb
 }
 
-// inBlockMap checks for the existance of a block with a given ID in
-// the consensus set
-func (db *setDB) inBlockMap(id types.BlockID) bool {
-	return db.inBucket(BlockMap, id)
-}
-
-// rmBlockMap removes a processedBlock from the blockMap bucket
-func (db *setDB) rmBlockMap(id types.BlockID) error {
-	return db.rmItem(BlockMap, id)
-}
-
-func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutput, error) {
-	sfoBytes, err := getItem(tx, SiafundOutputs, id)
-	if err != nil {
-		return types.SiafundOutput{}, err
-	}
-	var sfo types.SiafundOutput
-	err = encoding.Unmarshal(sfoBytes, &sfo)
-	if err != nil {
-		return types.SiafundOutput{}, err
-	}
-	return sfo, nil
-}
-
-func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
-	db.forEachItem(SiafundOutputs, func(kb, vb []byte) error {
-		var key types.SiafundOutputID
-		var value types.SiafundOutput
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(vb, &value)
-		if err != nil {
-			return err
-		}
-		fn(key, value)
+// height returns the current height of the state.
+func (cs *ConsensusSet) height() (bh types.BlockHeight) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		bh = blockHeight(tx)
 		return nil
 	})
+	return bh
 }
 
-// getFileContracts is a wrapper around getItem for retrieving a file contract
-func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
-	fcBytes, err := db.getItem(FileContracts, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var fc types.FileContract
-	err = encoding.Unmarshal(fcBytes, &fc)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return fc
+// getItem is a generic function to insert an item into the set database
+//
+// DEPRECATED
+func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error) {
+	k := encoding.Marshal(key)
+	err = db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		// Sanity check to make sure the bucket exists.
+		if build.DEBUG && b == nil {
+			panic(errNilBucket)
+		}
+		item = b.Get(k)
+		// Sanity check to make sure the item requested exists
+		if item == nil {
+			return errNilItem
+		}
+		return nil
+	})
+	return item, err
 }

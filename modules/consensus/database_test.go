@@ -377,3 +377,98 @@ func (cs *ConsensusSet) currentBlockID() types.BlockID {
 func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
 	return cs.db.getBlockMap(cs.currentBlockID())
 }
+
+// rmItem removes an item from a bucket
+func (db *setDB) rmItem(bucket []byte, key interface{}) error {
+	k := encoding.Marshal(key)
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucket)
+		if build.DEBUG {
+			// Sanity check to make sure the bucket exists.
+			if b == nil {
+				panic(errNilBucket)
+			}
+			// Sanity check to make sure you are deleting an item that exists
+			item := b.Get(k)
+			if item == nil {
+				panic(errNilItem)
+			}
+		}
+		return b.Delete(k)
+	})
+}
+
+// inBucket checks if an item with the given key is in the bucket
+func (db *setDB) inBucket(bucket []byte, key interface{}) bool {
+	exists, err := db.Exists(bucket, encoding.Marshal(key))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return exists
+}
+
+// lenBucket is a simple wrapper for bucketSize that panics on error
+func (db *setDB) lenBucket(bucket []byte) uint64 {
+	s, err := db.BucketSize(bucket)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// forEachItem runs a given function on every element in a given
+// bucket name, and will panic on any error
+func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucket)
+		if build.DEBUG && b == nil {
+			panic(errNilBucket)
+		}
+		return b.ForEach(fn)
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// inBlockMap checks for the existance of a block with a given ID in
+// the consensus set
+func (db *setDB) inBlockMap(id types.BlockID) bool {
+	return db.inBucket(BlockMap, id)
+}
+
+// rmBlockMap removes a processedBlock from the blockMap bucket
+func (db *setDB) rmBlockMap(id types.BlockID) error {
+	return db.rmItem(BlockMap, id)
+}
+
+func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
+	db.forEachItem(SiafundOutputs, func(kb, vb []byte) error {
+		var key types.SiafundOutputID
+		var value types.SiafundOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		fn(key, value)
+		return nil
+	})
+}
+
+// getFileContracts is a wrapper around getItem for retrieving a file contract
+func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
+	fcBytes, err := db.getItem(FileContracts, id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var fc types.FileContract
+	err = encoding.Unmarshal(fcBytes, &fc)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return fc
+}
