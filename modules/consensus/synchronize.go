@@ -94,8 +94,9 @@ func (cs *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			cs.mu.Unlock(lockID)
 
 			// ErrNonExtendingBlock must be ignored until headers-first block
-			// sharing is implemented.
-			if acceptErr == modules.ErrNonExtendingBlock {
+			// sharing is implemented, block already in database should also be
+			// ignored.
+			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == modules.ErrBlockKnown {
 				acceptErr = nil
 			}
 			if acceptErr != nil {
@@ -111,7 +112,7 @@ func (cs *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
-func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
+func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
@@ -123,23 +124,39 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	// Find the most recent block from knownBlocks in the current path.
 	found := false
 	var start types.BlockHeight
-	lockID := s.mu.RLock()
-	for _, id := range knownBlocks {
-		if s.db.inBlockMap(id) {
-			pb := s.db.getBlockMap(id)
-			if pb.Height <= s.height() && id == s.db.getPath(pb.Height) {
-				found = true
-				start = pb.Height + 1 // start at child
+	var csHeight types.BlockHeight
+	lockID := cs.mu.RLock()
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		csHeight = blockHeight(tx)
+		for _, id := range knownBlocks {
+			pb, err := getBlockMap(tx, id)
+			if err != nil {
+				continue
+			}
+			pathID, err := getPath(tx, pb.Height)
+			if err != nil {
+				continue
+			}
+			if pathID != pb.Block.ID() {
+				continue
+			}
+			if pb.Height == blockHeight(tx) {
 				break
 			}
+			found = true
+			// Start from the child of the common block.
+			start = pb.Height + 1
 		}
+		return nil
+	})
+	cs.mu.RUnlock(lockID)
+	if err != nil {
+		return err
 	}
 
 	// If no matching blocks are found, or if the caller has all known blocks,
 	// don't send any blocks.
-	h := s.height()
-	s.mu.RUnlock(lockID)
-	if !found || start > h {
+	if !found {
 		// Send 0 blocks.
 		err = encoding.WriteObject(conn, []types.Block{})
 		if err != nil {
@@ -154,12 +171,12 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	for moreAvailable {
 		// Get the set of blocks to send.
 		var blocks []types.Block
-		lockID = s.mu.RLock()
+		lockID = cs.mu.RLock()
 		{
-			height := s.height()
+			height := cs.height()
 			// TODO: unit test for off-by-one errors here
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node := s.db.getBlockMap(s.db.getPath(i))
+				node := cs.db.getBlockMap(cs.db.getPath(i))
 				blocks = append(blocks, node.Block)
 			}
 
@@ -167,7 +184,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			moreAvailable = start+MaxCatchUpBlocks < height
 			start += MaxCatchUpBlocks
 		}
-		s.mu.RUnlock(lockID)
+		cs.mu.RUnlock(lockID)
 
 		// Send a set of blocks to the caller + a flag indicating whether more
 		// are available.

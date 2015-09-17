@@ -70,7 +70,7 @@ func TestSynchronize(t *testing.T) {
 
 	// block heights should now match
 	for cst1.cs.Height() != cst2.cs.Height() {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 	}
 
 	/*
