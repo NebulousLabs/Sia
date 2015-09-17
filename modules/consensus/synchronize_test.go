@@ -179,7 +179,7 @@ func TestBlockHistory(t *testing.T) {
 
 	var history [32]types.BlockID
 	_ = cst.cs.db.View(func(tx *bolt.Tx) error {
-		history = cst.cs.blockHistory(tx)
+		history = blockHistory(tx)
 		return nil
 	})
 

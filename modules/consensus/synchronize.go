@@ -1,9 +1,6 @@
 package consensus
 
 import (
-	"errors"
-	"runtime"
-
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -24,7 +21,7 @@ const (
 // to find a common parent that is reasonably recent, usually the most recent
 // common parent is found, but always a common parent within a factor of 2 is
 // found.
-func (s *ConsensusSet) blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
+func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 	height := blockHeight(tx)
 	step := types.BlockHeight(1)
 	// The final step is to include the genesis block, which is why `step <
@@ -61,26 +58,27 @@ func (s *ConsensusSet) blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 }
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
-func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
-	// get blockIDs to send
-	lockID := s.mu.RLock()
-	if !s.db.open {
-		s.mu.RUnlock(lockID)
-		return errors.New("database not open")
-	}
+func (cs *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
+	// Get blockIDs to send.
 	var history [32]types.BlockID
-	_ = s.db.View(func(tx *bolt.Tx) error {
-		history = s.blockHistory(tx)
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		history = blockHistory(tx)
 		return nil
 	})
-	s.mu.RUnlock(lockID)
+	if err != nil {
+		return err
+	}
+
+	// Send the block ids.
 	if err := encoding.WriteObject(conn, history); err != nil {
 		return err
 	}
 
-	// loop until no more blocks are available
+	// Read blocks off of the wire and add them to the consensus set until
+	// there are no more blocks available.
 	moreAvailable := true
 	for moreAvailable {
+		// Read a slice of blocks from the wire.
 		var newBlocks []types.Block
 		if err := encoding.ReadObject(conn, &newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit); err != nil {
 			return err
@@ -89,17 +87,12 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			return err
 		}
 
-		// integrate received blocks.
+		// Integrate the blocks into the consensus set.
 		for _, block := range newBlocks {
-			// Blocks received during synchronize aren't trusted; activate full
-			// verification.
-			lockID := s.mu.Lock()
-			if !s.db.open {
-				s.mu.Unlock(lockID)
-				return errors.New("database not open")
-			}
-			acceptErr := s.acceptBlock(block)
-			s.mu.Unlock(lockID)
+			lockID := cs.mu.Lock()
+			acceptErr := cs.acceptBlock(block)
+			cs.mu.Unlock(lockID)
+
 			// ErrNonExtendingBlock must be ignored until headers-first block
 			// sharing is implemented.
 			if acceptErr == modules.ErrNonExtendingBlock {
@@ -108,14 +101,8 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			if acceptErr != nil {
 				return acceptErr
 			}
-
-			// Yield the processor to give other processes time to grab a lock.
-			// The Lock/Unlock cycle in this loop is very tight, and has been
-			// known to prevent interrupts from getting lock access quickly.
-			runtime.Gosched()
 		}
 	}
-
 	return nil
 }
 
@@ -125,7 +112,8 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
-	// Read known blocks.
+	// Read a list of blocks known to the requester and find the most recent
+	// block from the current path.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
 	if err != nil {
@@ -136,10 +124,6 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	found := false
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
-	if !s.db.open {
-		s.mu.RUnlock(lockID)
-		return errors.New("database not open")
-	}
 	for _, id := range knownBlocks {
 		if s.db.inBlockMap(id) {
 			pb := s.db.getBlockMap(id)
@@ -171,11 +155,6 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		// Get the set of blocks to send.
 		var blocks []types.Block
 		lockID = s.mu.RLock()
-		if !s.db.open {
-			s.mu.RUnlock(lockID)
-			return errors.New("database not open")
-		}
-
 		{
 			height := s.height()
 			// TODO: unit test for off-by-one errors here

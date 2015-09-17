@@ -62,9 +62,6 @@ var (
 // consensus set
 type setDB struct {
 	*persist.BoltDatabase
-	// The open flag is used to prevent reading from the database
-	// after closing sia when the loading loop is still running
-	open bool // DEPRECATED
 }
 
 // openDB loads the set database and populates it with the necessary buckets
@@ -73,7 +70,7 @@ func openDB(filename string) (*setDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &setDB{db, true}, nil
+	return &setDB{BoltDatabase: db}, nil
 }
 
 // dbInitialized returns true if the database appears to be initialized, false

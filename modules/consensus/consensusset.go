@@ -110,6 +110,5 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 func (cs *ConsensusSet) Close() error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
-	cs.db.open = false
 	return cs.db.Close()
 }
