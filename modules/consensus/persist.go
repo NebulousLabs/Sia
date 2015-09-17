@@ -25,7 +25,8 @@ func (cs *ConsensusSet) loadDB() error {
 	cs.db = db
 
 	// Walk through initialization for Sia.
-	return cs.db.Update(func(tx *bolt.Tx) error {
+	var height types.BlockHeight
+	err = cs.db.Update(func(tx *bolt.Tx) error {
 		// Check if the database has been initialized.
 		if !dbInitialized(tx) {
 			return cs.initDB(tx)
@@ -37,24 +38,34 @@ func (cs *ConsensusSet) loadDB() error {
 		if genesisID != cs.blockRoot.Block.ID() {
 			return errors.New("Blockchain has wrong genesis block, exiting.")
 		}
+
+		height = blockHeight(tx)
 		return nil
 	})
-}
-
-// loadDiffs is a transitional function to load the processed blocks
-// from disk and move the diffs into memory
-func (cs *ConsensusSet) loadDiffs() {
-	height := cs.db.pathHeight()
-
-	// Load all blocks from disk.
-	for i := types.BlockHeight(0); i < height; i++ {
-		bid := cs.db.getPath(i)
-		pb := cs.db.getBlockMap(bid)
-
-		lockID := cs.mu.Lock()
-		cs.updateSubscribers(nil, []*processedBlock{pb})
-		cs.mu.Unlock(lockID)
+	if err != nil {
+		return err
 	}
+
+	// Send all of the existing blocks to subscribers - temporary while
+	// subscribers don't have any persistence for block progress.
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		for i := types.BlockHeight(0); i <= height; i++ {
+			// Fetch the processed block at height 'i'.
+			id := getPath(tx, i)
+			pb, err := getBlockMap(tx, id)
+			if err != nil {
+				return err
+			}
+
+			// Send the block to subscribers.
+			cs.updateSubscribers(nil, []*processedBlock{pb})
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // initPersist initializes the persistence structures of the consensus set, in
@@ -72,9 +83,6 @@ func (cs *ConsensusSet) initPersist() error {
 	if err != nil {
 		return err
 	}
-
-	// Send any blocks that were loaded from disk to subscribers.
-	cs.loadDiffs()
 
 	return nil
 }
