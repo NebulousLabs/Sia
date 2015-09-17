@@ -230,10 +230,15 @@ func (g *Gateway) threadedPeerManager() {
 		// If we are well-connected, sleep in increments of five minutes until
 		// we are no longer well-connected.
 		id := g.mu.RLock()
-		numPeers := len(g.peers)
+		numOutboundPeers := 0
+		for _, p := range g.peers {
+			if !p.inbound {
+				numOutboundPeers++
+			}
+		}
 		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
-		if numPeers >= wellConnectedThreshold {
+		if numOutboundPeers >= wellConnectedThreshold {
 			time.Sleep(5 * time.Minute)
 			continue
 		}
