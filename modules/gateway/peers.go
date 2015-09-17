@@ -134,12 +134,15 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	// IP as the connecting peer. This protects against Sybil attacks.
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
-		// first choose a random peer
-		kick, _ := g.randomPeer()
-		// try to pick a better one
-		for peer := range g.peers {
-			if peer.Host() == addr.Host() {
-				kick = peer
+		// first choose a random peer, preferably inbound
+		kick, err := g.randomInboundPeer()
+		if err != nil {
+			kick, _ = g.randomPeer()
+		}
+		// if another peer shares this IP, choose that one instead
+		for p := range g.peers {
+			if p.Host() == addr.Host() {
+				kick = p
 				break
 			}
 		}
