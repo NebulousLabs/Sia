@@ -493,39 +493,29 @@ func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) {
 	}
 }
 
-// BREAK //
-// BREAK //
-// BREAK //
-// BREAK //
-
-// insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
-// the bucket does not exist or if the item is already in the bucket.
-func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	k := encoding.Marshal(key)
-	v := encoding.Marshal(value)
-	if build.DEBUG && b.Get(k) != nil {
-		panic(errRepeatInsert)
-	}
-	return b.Put(k, v)
+// forEachDSCO iterates through each delayed siacoin output that matures at a
+// given height, and performs a given function on each.
+func forEachDSCO(tx *bolt.Tx, bh types.BlockHeight, fn func(id types.SiacoinOutputID, sco types.SiacoinOutput) error) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	return tx.Bucket(bucketID).ForEach(func(kb, vb []byte) error {
+		var key types.SiacoinOutputID
+		var value types.SiacoinOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		return fn(key, value)
+	})
 }
 
-// removeItem deletes an item from a bucket. In debug mode, a panic is thrown
-// if the bucket does not exist or if the item is not in the bucket.
-func removeItem(tx *bolt.Tx, bucket []byte, key interface{}) error {
-	k := encoding.Marshal(key)
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	if build.DEBUG && b.Get(k) == nil {
-		panic(errNilItem)
-	}
-	return b.Delete(k)
-}
+// BREAK //
+// BREAK //
+// BREAK //
+// BREAK //
 
 // getItem returns an item from a bucket. In debug mode, a panic is thrown if
 // the bucket does not exist or if the item does not exist.
@@ -540,16 +530,6 @@ func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
 		return nil, errNilItem
 	}
 	return item, nil
-}
-
-// forEach iterates through a bucket, calling the supplied closure on each
-// element.
-func forEach(tx *bolt.Tx, bucket []byte, fn func(k, v []byte) error) error {
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	return b.ForEach(fn)
 }
 
 // getItem is a generic function to insert an item into the set database
@@ -641,19 +621,6 @@ func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	return
 }
 
-// pathHeight returns the size of the current path
-func (db *setDB) pathHeight() types.BlockHeight {
-	return types.BlockHeight(db.lenBucket(BlockPath))
-}
-
-// addBlockMap adds a processedBlock to the block map
-// This will eventually take a processed block as an argument
-func (db *setDB) addBlockMap(pb *processedBlock) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, BlockMap, pb.Block.ID(), *pb)
-	})
-}
-
 // getBlockMap queries the set database to return a processedBlock
 // with the given ID
 //
@@ -695,32 +662,6 @@ func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutpu
 	return sfo, nil
 }
 
-// getSiafundOutputs is a wrapper around getItem which decodes the
-// result into a siafundOutput
-func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput {
-	sfoBytes, err := db.getItem(SiafundOutputs, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var sfo types.SiafundOutput
-	err = encoding.Unmarshal(sfoBytes, &sfo)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sfo
-}
-
-// inSiafundOutputs is a wrapper around inBucket which returns a true
-// if an output with the given id is in the database
-func (db *setDB) inSiafundOutputs(id types.SiafundOutputID) bool {
-	return db.inBucket(SiafundOutputs, id)
-}
-
-// rmSiafundOutputs removes a siafund output from the database
-func (db *setDB) rmSiafundOutputs(id types.SiafundOutputID) error {
-	return db.rmItem(SiafundOutputs, id)
-}
-
 func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
 	db.forEachItem(SiafundOutputs, func(kb, vb []byte) error {
 		var key types.SiafundOutputID
@@ -738,14 +679,6 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 	})
 }
 
-// addFileContracts is a wrapper around addItem for adding a file
-// contract to the consensusset
-func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, FileContracts, id, fc)
-	})
-}
-
 // getFileContracts is a wrapper around getItem for retrieving a file contract
 func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 	fcBytes, err := db.getItem(FileContracts, id)
@@ -758,129 +691,4 @@ func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 		panic(err)
 	}
 	return fc
-}
-
-// forEachFileContracts applies a function to each (file contract id, filecontract)
-// pair in the consensus set
-func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.FileContract)) {
-	db.forEachItem(FileContracts, func(kb, vb []byte) error {
-		var key types.FileContractID
-		var value types.FileContract
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(vb, &value)
-		if err != nil {
-			return err
-		}
-		fn(key, value)
-		return nil
-	})
-}
-
-// getSiacoinOutputs retrieves a saicoin output by ID
-func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput {
-	scoBytes, err := db.getItem(SiacoinOutputs, id)
-	if err != nil {
-		panic(err)
-	}
-	var sco types.SiacoinOutput
-	err = encoding.Unmarshal(scoBytes, &sco)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sco
-}
-
-// inSiacoinOutputs returns a bool showing if a soacoin output ID is
-// in the siacoin outputs bucket
-func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
-	return db.inBucket(SiacoinOutputs, id)
-}
-
-// rmSiacoinOutputs removes a siacoin output form the siacoin outputs map
-func (db *setDB) rmSiacoinOutputs(id types.SiacoinOutputID) error {
-	return db.rmItem(SiacoinOutputs, id)
-}
-
-// forEachSiacoinOutputs applies a function to every siacoin output and ID
-func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
-	db.forEachItem(SiacoinOutputs, func(kb, vb []byte) error {
-		var key types.SiacoinOutputID
-		var value types.SiacoinOutput
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(vb, &value)
-		if err != nil {
-			return err
-		}
-		fn(key, value)
-		return nil
-	})
-}
-
-// getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
-func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinOutputID) types.SiacoinOutput {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	scoBytes, err := db.getItem(bucketID, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var sco types.SiacoinOutput
-	err = encoding.Unmarshal(scoBytes, &sco)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sco
-}
-
-// inDelayedSiacoinOutputsHeight returns a boolean showing if a siacoin output exists at a given height
-func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) bool {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	return db.inBucket(bucketID, id)
-}
-
-// lenDelayedSiacoinOutputsHeight returns the number of outputs stored at one height
-func (db *setDB) lenDelayedSiacoinOutputsHeight(h types.BlockHeight) uint64 {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	return db.lenBucket(bucketID)
-}
-
-func forEachDSCO(tx *bolt.Tx, bh types.BlockHeight, fn func(id types.SiacoinOutputID, sco types.SiacoinOutput) error) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
-	return forEach(tx, bucketID, func(kb, vb []byte) error {
-		var key types.SiacoinOutputID
-		var value types.SiacoinOutput
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(vb, &value)
-		if err != nil {
-			return err
-		}
-		return fn(key, value)
-	})
-}
-
-// forEachDelayedSiacoinOutputsHeight applies a function to every siacoin output at a given height
-func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	db.forEachItem(bucketID, func(kb, vb []byte) error {
-		var key types.SiacoinOutputID
-		var value types.SiacoinOutput
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(vb, &value)
-		if err != nil {
-			return err
-		}
-		fn(key, value)
-		return nil
-	})
 }
