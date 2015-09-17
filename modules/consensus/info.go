@@ -1,12 +1,8 @@
 package consensus
 
 import (
-	"math/big"
-
 	"github.com/boltdb/bolt"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -92,13 +88,6 @@ func (s *ConsensusSet) GenesisBlock() types.Block {
 	return s.db.getBlockMap(s.db.getPath(0)).Block
 }
 
-// Height returns the height of the current blockchain (the longest fork).
-func (s *ConsensusSet) Height() types.BlockHeight {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.height()
-}
-
 // InCurrentPath returns true if the block presented is in the current path,
 // false otherwise.
 func (s *ConsensusSet) InCurrentPath(bid types.BlockID) bool {
@@ -113,107 +102,15 @@ func (s *ConsensusSet) InCurrentPath(bid types.BlockID) bool {
 	return s.db.getPath(node.Height) == bid
 }
 
-// storageProofSegment returns the index of the segment that needs to be proven
-// exists in a file contract.
-func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
-	err = cs.db.View(func(tx *bolt.Tx) error {
-		// Check that the parent file contract exists.
-		fcBucket := tx.Bucket(FileContracts)
-		fcBytes := fcBucket.Get(fcid[:])
-		if fcBytes == nil {
-			return ErrUnrecognizedFileContractID
-		}
-
-		// Decode the file contract.
-		var fc types.FileContract
-		err := encoding.Unmarshal(fcBytes, &fc)
-		if build.DEBUG && err != nil {
-			panic(err)
-		}
-
-		// Get the trigger block id.
-		blockPath := tx.Bucket(BlockPath)
-		triggerHeight := fc.WindowStart - 1
-		if triggerHeight > blockHeight(tx) {
-			return ErrUnfinishedFileContract
-		}
-		var triggerID types.BlockID
-		copy(triggerID[:], blockPath.Get(encoding.EncUint64(uint64(triggerHeight))))
-
-		// Get the index by appending the file contract ID to the trigger block and
-		// taking the hash, then converting the hash to a numerical value and
-		// modding it against the number of segments in the file. The result is a
-		// random number in range [0, numSegments]. The probability is very
-		// slightly weighted towards the beginning of the file, but because the
-		// size difference between the number of segments and the random number
-		// being modded, the difference is too small to make any practical
-		// difference.
-		seed := crypto.HashAll(triggerID, fcid)
-		numSegments := int64(crypto.CalculateLeaves(fc.FileSize))
-		seedInt := new(big.Int).SetBytes(seed[:])
-		index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
-		return nil
-	})
-	if err != nil {
-		return 0, err
-	}
-	return index, nil
-}
-
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
 func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	lockID := cs.mu.RLock()
 	defer cs.mu.RUnlock(lockID)
-	return cs.storageProofSegment(fcid)
-}
 
-// validStorageProofs checks that the storage proofs are valid in the context
-// of the consensus set.
-func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
-	for _, sp := range t.StorageProofs {
-		// Check that the storage proof itself is valid.
-		segmentIndex, err := cs.storageProofSegment(sp.ParentID)
-		if err != nil {
-			return err
-		}
-
-		fc := cs.db.getFileContracts(sp.ParentID) // previous function verifies the file contract exists
-		leaves := crypto.CalculateLeaves(fc.FileSize)
-		segmentLen := uint64(crypto.SegmentSize)
-		if segmentIndex == leaves-1 {
-			segmentLen = fc.FileSize % crypto.SegmentSize
-		}
-
-		// COMPATv0.4.0
-		//
-		// Fixing the padding situation resulted in a hardfork. The below code
-		// will stop the hardfork from triggering before block 20,000.
-		types.CurrentHeightLock.Lock()
-		if (build.Release == "standard" && types.CurrentHeight < 21e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
-			segmentLen = uint64(crypto.SegmentSize)
-		}
-		types.CurrentHeightLock.Unlock()
-
-		verified := crypto.VerifySegment(
-			sp.Segment[:segmentLen],
-			sp.HashSet,
-			leaves,
-			segmentIndex,
-			fc.FileMerkleRoot,
-		)
-		if !verified {
-			return ErrInvalidStorageProof
-		}
-	}
-
-	return nil
-}
-
-// ValidStorageProofs checks that the storage proofs are valid in the context
-// of the consensus set.
-func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
-	id := cs.mu.RLock()
-	defer cs.mu.RUnlock(id)
-	return cs.validStorageProofs(t)
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		index, err = storageProofSegment(tx, fcid)
+		return nil
+	})
+	return index, err
 }

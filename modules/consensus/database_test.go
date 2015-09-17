@@ -361,3 +361,10 @@ func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput
 	}
 	return sfo
 }
+
+// Height returns the height of the current blockchain (the longest fork).
+func (s *ConsensusSet) Height() types.BlockHeight {
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
+	return s.height()
+}
