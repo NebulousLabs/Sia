@@ -3,6 +3,8 @@ package consensus
 import (
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -17,61 +19,67 @@ type changeEntry struct {
 
 // computeConsensusChange computes the consensus change from the change entry
 // at index 'i' in the change log. If i is out of bounds, an error is returned.
-func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChange, err error) {
+func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, i int) (cc modules.ConsensusChange, err error) {
 	if i < 0 || i >= len(cs.changeLog) {
 		err = errors.New("bounds error when querying changelog")
 		return
 	}
 
 	for _, revertedBlockID := range cs.changeLog[i].revertedBlocks {
-		revertedNode := cs.db.getBlockMap(revertedBlockID)
+		revertedBlock, err := getBlockMap(tx, revertedBlockID)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 
 		// Because the direction is 'revert', the order of the diffs needs to
 		// be flipped and the direction of the diffs also needs to be flipped.
-		cc.RevertedBlocks = append(cc.RevertedBlocks, revertedNode.Block)
-		for i := len(revertedNode.SiacoinOutputDiffs) - 1; i >= 0; i-- {
-			scod := revertedNode.SiacoinOutputDiffs[i]
+		cc.RevertedBlocks = append(cc.RevertedBlocks, revertedBlock.Block)
+		for i := len(revertedBlock.SiacoinOutputDiffs) - 1; i >= 0; i-- {
+			scod := revertedBlock.SiacoinOutputDiffs[i]
 			scod.Direction = !scod.Direction
 			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
 		}
-		for i := len(revertedNode.FileContractDiffs) - 1; i >= 0; i-- {
-			fcd := revertedNode.FileContractDiffs[i]
+		for i := len(revertedBlock.FileContractDiffs) - 1; i >= 0; i-- {
+			fcd := revertedBlock.FileContractDiffs[i]
 			fcd.Direction = !fcd.Direction
 			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
 		}
-		for i := len(revertedNode.SiafundOutputDiffs) - 1; i >= 0; i-- {
-			sfod := revertedNode.SiafundOutputDiffs[i]
+		for i := len(revertedBlock.SiafundOutputDiffs) - 1; i >= 0; i-- {
+			sfod := revertedBlock.SiafundOutputDiffs[i]
 			sfod.Direction = !sfod.Direction
 			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
 		}
-		for i := len(revertedNode.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			dscod := revertedNode.DelayedSiacoinOutputDiffs[i]
+		for i := len(revertedBlock.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			dscod := revertedBlock.DelayedSiacoinOutputDiffs[i]
 			dscod.Direction = !dscod.Direction
 			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
 		}
-		for i := len(revertedNode.SiafundPoolDiffs) - 1; i >= 0; i-- {
-			sfpd := revertedNode.SiafundPoolDiffs[i]
+		for i := len(revertedBlock.SiafundPoolDiffs) - 1; i >= 0; i-- {
+			sfpd := revertedBlock.SiafundPoolDiffs[i]
 			sfpd.Direction = modules.DiffRevert
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
 	for _, appliedBlockID := range cs.changeLog[i].appliedBlocks {
-		appliedNode := cs.db.getBlockMap(appliedBlockID)
+		appliedBlock, err := getBlockMap(tx, appliedBlockID)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 
-		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedNode.Block)
-		for _, scod := range appliedNode.SiacoinOutputDiffs {
+		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedBlock.Block)
+		for _, scod := range appliedBlock.SiacoinOutputDiffs {
 			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
 		}
-		for _, fcd := range appliedNode.FileContractDiffs {
+		for _, fcd := range appliedBlock.FileContractDiffs {
 			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
 		}
-		for _, sfod := range appliedNode.SiafundOutputDiffs {
+		for _, sfod := range appliedBlock.SiafundOutputDiffs {
 			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
 		}
-		for _, dscod := range appliedNode.DelayedSiacoinOutputDiffs {
+		for _, dscod := range appliedBlock.DelayedSiacoinOutputDiffs {
 			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
 		}
-		for _, sfpd := range appliedNode.SiafundPoolDiffs {
+		for _, sfpd := range appliedBlock.SiafundPoolDiffs {
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
@@ -80,19 +88,24 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 
 // updateSubscribers will inform all subscribers of the new update to the
 // consensus set.
-func (cs *ConsensusSet) updateSubscribers(revertedNodes []*processedBlock, appliedNodes []*processedBlock) {
+func (cs *ConsensusSet) updateSubscribers(revertedBlocks []*processedBlock, appliedBlocks []*processedBlock) {
 	// Log the changes in the change log.
 	var ce changeEntry
-	for _, rn := range revertedNodes {
+	for _, rn := range revertedBlocks {
 		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
 	}
-	for _, an := range appliedNodes {
+	for _, an := range appliedBlocks {
 		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
 	}
 	cs.changeLog = append(cs.changeLog, ce)
 
 	// Notify each update channel that a new update is ready.
-	cc, err := cs.computeConsensusChange(len(cs.changeLog) - 1)
+	var cc modules.ConsensusChange
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		var err error
+		cc, err = cs.computeConsensusChange(tx, len(cs.changeLog)-1)
+		return err
+	})
 	if err != nil && build.DEBUG {
 		panic(err)
 	}
@@ -105,10 +118,17 @@ func (cs *ConsensusSet) updateSubscribers(revertedNodes []*processedBlock, appli
 // returning an error if the input is out of bounds. For example,
 // ConsensusChange(5) will return the 6th consensus change that was issued to
 // subscribers. ConsensusChanges can be assumed to be consecutive.
-func (cs *ConsensusSet) ConsensusChange(i int) (modules.ConsensusChange, error) {
+func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err error) {
 	id := cs.mu.RLock()
 	defer cs.mu.RUnlock(id)
-	return cs.computeConsensusChange(i)
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		cc, err = cs.computeConsensusChange(tx, i)
+		return err
+	})
+	if err != nil {
+		return modules.ConsensusChange{}, err
+	}
+	return cc, nil
 }
 
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
@@ -116,12 +136,18 @@ func (cs *ConsensusSet) ConsensusChange(i int) (modules.ConsensusChange, error) 
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
 	id := cs.mu.Lock()
 	cs.subscribers = append(cs.subscribers, subscriber)
-	for i := range cs.changeLog {
-		cc, err := cs.computeConsensusChange(i)
-		if err != nil && build.DEBUG {
-			panic(err)
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		for i := range cs.changeLog {
+			cc, err := cs.computeConsensusChange(tx, i)
+			if err != nil && build.DEBUG {
+				panic(err)
+			}
+			subscriber.ProcessConsensusChange(cc)
 		}
-		subscriber.ProcessConsensusChange(cc)
+		return nil
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 	cs.mu.Unlock(id)
 }
