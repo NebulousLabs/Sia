@@ -14,7 +14,10 @@ import (
 )
 
 const (
+	// the gateway will abort a connection attempt after this long
 	dialTimeout = 2 * time.Minute
+	// the gateway will sleep this long between incoming connections
+	acceptInterval = 3 * time.Second
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
@@ -96,6 +99,12 @@ func (g *Gateway) listen() {
 		}
 
 		go g.acceptConn(conn)
+
+		// Sleep after each accept. This limits the rate at which the Gateway
+		// will accept new connections. The intent here is to prevent new
+		// incoming connections from kicking out old ones before they have a
+		// chance to request additional nodes.
+		time.Sleep(acceptInterval)
 	}
 }
 
@@ -134,7 +143,10 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	// IP as the connecting peer. This protects against Sybil attacks.
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
-		// first choose a random peer, preferably inbound
+		// first choose a random peer, preferably inbound. If have only
+		// outbound peers, we'll wind up kicking an outbound peer; but
+		// subsequent inbound connections will kick each other instead of
+		// continuing to replace outbound peers.
 		kick, err := g.randomInboundPeer()
 		if err != nil {
 			kick, _ = g.randomPeer()
@@ -242,7 +254,11 @@ func (g *Gateway) threadedPeerManager() {
 		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
 		if numOutboundPeers >= wellConnectedThreshold {
-			time.Sleep(5 * time.Minute)
+			select {
+			case <-time.After(5 * time.Minute):
+			case <-g.closeChan:
+				return
+			}
 			continue
 		}
 
@@ -252,7 +268,11 @@ func (g *Gateway) threadedPeerManager() {
 		if err == nil {
 			go g.Connect(addr)
 		}
-		time.Sleep(5 * time.Second)
+		select {
+		case <-time.After(5 * time.Second):
+		case <-g.closeChan:
+			return
+		}
 	}
 }
 

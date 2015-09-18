@@ -33,6 +33,9 @@ type Gateway struct {
 	// network.
 	nodes map[modules.NetAddress]struct{}
 
+	// closeChan is used to shut down the Gateway's goroutines.
+	closeChan chan struct{}
+
 	persistDir string
 
 	log *log.Logger
@@ -54,6 +57,8 @@ func (g *Gateway) Close() error {
 		return err
 	}
 	g.mu.RUnlock(id)
+	// send close signal
+	close(g.closeChan)
 	// clear the port mapping (no effect if UPnP not supported)
 	g.clearPort(g.myAddr.Port())
 	// shut down the listener
@@ -79,6 +84,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		initRPCs:   make(map[string]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]*peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
+		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 2),
 		log:        logger,
