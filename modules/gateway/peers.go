@@ -276,6 +276,7 @@ func (g *Gateway) threadedPeerManager() {
 	}
 }
 
+// Peers returns the addresses currently connected to the Gateway.
 func (g *Gateway) Peers() []modules.NetAddress {
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)
