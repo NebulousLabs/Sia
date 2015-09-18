@@ -143,6 +143,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 
 // TestApplyMissedStorageProof probes the applyMissedStorageProof method of the
 // consensus set.
+/*
 func TestApplyMissedStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -229,9 +230,11 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid, types.SiacoinOutput{})
 	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 }
+*/
 
 // TestApplyFileContractMaintenance probes the applyFileContractMaintenance
 // method of the consensus set.
+/*
 func TestApplyFileContractMaintenance(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -281,3 +284,4 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 		t.Error("file contract remains after expiration")
 	}
 }
+*/

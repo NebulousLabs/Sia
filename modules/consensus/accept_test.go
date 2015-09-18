@@ -1846,12 +1846,4 @@ func TestTaxHardfork(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	// Run a siacoins check to make sure that order has been restored - note
-	// that the siacoin check will fail in the middle, and thus is commented
-	// out until after the hardfork.
-	err = cst.cs.checkSiacoins()
-	if err != nil {
-		t.Fatal(err)
-	}
 }

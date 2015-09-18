@@ -30,8 +30,8 @@ var (
 	errDBInconsistent = errors.New("database guard indicates inconsistency within database")
 	errNonEmptyBucket = errors.New("cannot remove a map with objects still in it")
 
-	prefix_dsco = []byte("dsco_")
-	prefix_fcex = []byte("fcex_")
+	prefixDSCO = []byte("dsco_")
+	prefixFCEX = []byte("fcex_")
 
 	meta = persist.Metadata{
 		Version: "0.4.3",
@@ -49,13 +49,12 @@ var (
 	// BlockPath is a database bucket containing a mapping from the height of a
 	// block to the id of the block at that height. BlockPath only includes
 	// blocks in the current path.
-	BlockPath               = []byte("BlockPath")
-	BlockMap                = []byte("BlockMap")
-	SiacoinOutputs          = []byte("SiacoinOutputs")
-	FileContracts           = []byte("FileContracts")
-	FileContractExpirations = []byte("FileContractExpirations") // TODO: Unneeded data structure
-	SiafundOutputs          = []byte("SiafundOutputs")
-	SiafundPool             = []byte("SiafundPool")
+	BlockPath      = []byte("BlockPath")
+	BlockMap       = []byte("BlockMap")
+	SiacoinOutputs = []byte("SiacoinOutputs")
+	FileContracts  = []byte("FileContracts")
+	SiafundOutputs = []byte("SiafundOutputs")
+	SiafundPool    = []byte("SiafundPool")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -90,7 +89,6 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 		BlockMap,
 		SiacoinOutputs,
 		FileContracts,
-		FileContractExpirations,
 		SiafundOutputs,
 		SiafundPool,
 		BlockHeight,
@@ -135,7 +133,7 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 
 	// Get the genesis consensus set hash.
 	if build.DEBUG {
-		cs.blockRoot.ConsensusSetHash = consensusChecksum(tx)
+		cs.blockRoot.ConsensusChecksum = consensusChecksum(tx)
 	}
 
 	// Add the genesis block to the block map.
@@ -345,7 +343,7 @@ func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract
 	}
 
 	// Add an entry for when the file contract expires.
-	expirationBucketID := append(prefix_fcex, encoding.Marshal(fc.WindowEnd)...)
+	expirationBucketID := append(prefixFCEX, encoding.Marshal(fc.WindowEnd)...)
 	expirationBucket, err := tx.CreateBucketIfNotExists(expirationBucketID)
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -374,7 +372,7 @@ func removeFileContract(tx *bolt.Tx, id types.FileContractID) {
 	// 'fcBytes' used to determine the expiration bucket id is the
 	// byte-representation of the file contract window end, which always
 	// appears at bytes 48-56.
-	expirationBucketID := append(prefix_fcex, fcBytes[48:56]...)
+	expirationBucketID := append(prefixFCEX, fcBytes[48:56]...)
 	expirationBucket := tx.Bucket(expirationBucketID)
 	expirationBytes := expirationBucket.Get(id[:])
 	if expirationBytes == nil {
@@ -457,7 +455,7 @@ func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco ty
 	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
 		panic("dsco already in output set")
 	}
-	dscoBucketID := append(prefix_dsco, encoding.EncUint64(uint64(bh))...)
+	dscoBucketID := append(prefixDSCO, encoding.EncUint64(uint64(bh))...)
 	dscoBucket := tx.Bucket(dscoBucketID)
 	// Sanity check - should not be adding an item already in the db.
 	if build.DEBUG && dscoBucket.Get(id[:]) != nil {
@@ -471,7 +469,7 @@ func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco ty
 
 // removeDSCO removes a delayed siacoin output from the consensus set.
 func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	// Sanity check - should not remove an item not in the db.
 	dscoBucket := tx.Bucket(bucketID)
 	if build.DEBUG && dscoBucket.Get(id[:]) == nil {
@@ -487,7 +485,7 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
 // createDSCOBucket creates a bucket for the delayed siacoin outputs at the
 // input height.
 func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	_, err := tx.CreateBucket(bucketID)
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -498,7 +496,7 @@ func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
 // outputs.
 func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) {
 	// Delete the bucket.
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	bucket := tx.Bucket(bucketID)
 	if build.DEBUG && bucket == nil {
 		panic(errNilBucket)
@@ -516,7 +514,7 @@ func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) {
 // forEachDSCO iterates through each delayed siacoin output that matures at a
 // given height, and performs a given function on each.
 func forEachDSCO(tx *bolt.Tx, bh types.BlockHeight, fn func(id types.SiacoinOutputID, sco types.SiacoinOutput) error) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	return tx.Bucket(bucketID).ForEach(func(kb, vb []byte) error {
 		var key types.SiacoinOutputID
 		var value types.SiacoinOutput

@@ -7,6 +7,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -120,7 +121,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 
 // addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
 func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	err := db.Update(func(tx *bolt.Tx) error {
 		return insertItem(tx, bucketID, id, sco)
 	})
@@ -131,7 +132,7 @@ func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.Si
 
 // rmDelayedSiacoinOutputsHeight removes a siacoin output with a given ID at the given height
 func (db *setDB) rmDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	return db.rmItem(bucketID, id)
 }
 
@@ -147,36 +148,13 @@ func (db *setDB) lenFileContracts() uint64 {
 
 // lenFCExpirationsHeight returns the number of file contracts which expire at a given height
 func (db *setDB) lenFCExpirationsHeight(h types.BlockHeight) uint64 {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	bucketID := append(prefixFCEX, encoding.Marshal(h)...)
 	return db.lenBucket(bucketID)
 }
 
 // lenSiafundOutputs returns the size of the SiafundOutputs bucket
 func (db *setDB) lenSiafundOutputs() uint64 {
 	return db.lenBucket(SiafundOutputs)
-}
-
-// addFCExpirations creates a new file contract expirations map for the given height
-func (db *setDB) addFCExpirations(h types.BlockHeight) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	err := db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, FileContractExpirations, h, bucketID)
-	})
-	if err != nil {
-		return err
-	}
-	return db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket(bucketID)
-		return err
-	})
-}
-
-// addFCExpirationsHeight adds a file contract ID to the set at a particular height
-func (db *setDB) addFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
-	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, bucketID, id, struct{}{})
-	})
 }
 
 // inFileContracts is a wrapper around inBucket which returns true if
@@ -235,7 +213,7 @@ func (db *setDB) pathHeight() types.BlockHeight {
 
 // forEachDelayedSiacoinOutputsHeight applies a function to every siacoin output at a given height
 func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	db.forEachItem(bucketID, func(kb, vb []byte) error {
 		var key types.SiacoinOutputID
 		var value types.SiacoinOutput
@@ -254,19 +232,19 @@ func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func
 
 // lenDelayedSiacoinOutputsHeight returns the number of outputs stored at one height
 func (db *setDB) lenDelayedSiacoinOutputsHeight(h types.BlockHeight) uint64 {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	return db.lenBucket(bucketID)
 }
 
 // inDelayedSiacoinOutputsHeight returns a boolean showing if a siacoin output exists at a given height
 func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) bool {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	return db.inBucket(bucketID, id)
 }
 
 // getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
 func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinOutputID) types.SiacoinOutput {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
 	scoBytes, err := db.getItem(bucketID, id)
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -474,8 +452,6 @@ func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 }
 
 // getPath retreives the block id of a block at a given hegiht from the path
-//
-// DEPRECATED
 func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	idBytes, err := db.getItem(BlockPath, h)
 	if err != nil {
@@ -490,8 +466,6 @@ func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 
 // getBlockMap queries the set database to return a processedBlock
 // with the given ID
-//
-// DEPRECATED
 func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	bnBytes, err := db.getItem(BlockMap, id)
 	if build.DEBUG && err != nil {
@@ -506,8 +480,6 @@ func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 }
 
 // getItem is a generic function to insert an item into the set database
-//
-// DEPRECATED
 func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error) {
 	k := encoding.Marshal(key)
 	err = db.View(func(tx *bolt.Tx) error {
@@ -533,4 +505,8 @@ func (cs *ConsensusSet) height() (bh types.BlockHeight) {
 		return nil
 	})
 	return bh
+}
+
+func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
+	return crypto.Hash{}
 }

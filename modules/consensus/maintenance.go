@@ -123,20 +123,26 @@ func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileCon
 // for the file contract.
 func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) {
 	// Get the bucket pointing to all of the expiring file contracts.
-	fceBucketID := append(prefix_fcex, encoding.Marshal(pb.Height)...)
+	fceBucketID := append(prefixFCEX, encoding.Marshal(pb.Height)...)
 	fceBucket := tx.Bucket(fceBucketID)
 	// Finish if there are no expiring file contracts.
 	if fceBucket == nil {
 		return
 	}
 
-	_ = fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
+	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
 		var id types.FileContractID
 		copy(id[:], keyBytes)
 		applyMissedStorageProof(tx, pb, id)
 		return nil
 	})
-	// tx.DeleteBucket(fceBucketID)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = tx.DeleteBucket(fceBucketID)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 }
 
 // applyMaintenance applies block-level alterations to the consensus set.

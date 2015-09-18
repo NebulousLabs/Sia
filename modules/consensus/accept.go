@@ -172,11 +172,20 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		if len(appliedBlocks) == 0 && len(revertedBlocks) != 0 {
 			panic("appliedBlocks and revertedBlocks are mismatched!")
 		}
-		// Check that the general setup makes sense.
-		err = cs.db.View(func(tx *bolt.Tx) error {
-			return checkConsistency(tx)
+
+		// When doing a consistency check, the database should not actually
+		// change at all. To prevent changes, an error must be returned.
+		// errSuccess will trigger a rollback while indicating that there were
+		// no actual problems.
+		errSuccess := errors.New("success")
+		err = cs.db.Update(func(tx *bolt.Tx) error {
+			err := cs.checkConsistency(tx)
+			if err != nil {
+				return err
+			}
+			return errSuccess
 		})
-		if err != nil {
+		if err != errSuccess {
 			panic(err)
 		}
 	}

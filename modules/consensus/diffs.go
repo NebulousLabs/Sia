@@ -256,13 +256,6 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	// the miner payouts to the list of delayed outputs.
 	applyMaintenance(tx, pb)
 
-	// Sanity check preparation - set the consensus hash at this height so that
-	// during reverting a check can be performed to assure consistency when
-	// adding and removing blocks.
-	if build.DEBUG {
-		pb.ConsensusSetHash = consensusChecksum(tx)
-	}
-
 	// DiffsGenerated are only set to true after the block has been fully
 	// validated and integrated. This is required to prevent later blocks from
 	// being accepted on top of an invalid block - if the consensus set ever
@@ -276,5 +269,14 @@ func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
 	bid := pb.Block.ID()
 	blockMap := tx.Bucket(BlockMap)
 	updateCurrentPath(tx, pb, modules.DiffApply)
+
+	// Sanity check preparation - set the consensus hash at this height so that
+	// during reverting a check can be performed to assure consistency when
+	// adding and removing blocks. Must happen after the block is added to the
+	// path.
+	if build.DEBUG {
+		pb.ConsensusChecksum = consensusChecksum(tx)
+	}
+
 	return blockMap.Put(bid[:], encoding.Marshal(*pb))
 }

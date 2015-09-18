@@ -38,7 +38,7 @@ type processedBlock struct {
 	DelayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
 	SiafundPoolDiffs          []modules.SiafundPoolDiff
 
-	ConsensusSetHash crypto.Hash
+	ConsensusChecksum crypto.Hash
 }
 
 // earliestChildTimestamp returns the earliest timestamp that a child node
