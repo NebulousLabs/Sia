@@ -121,12 +121,10 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 		// COMPATv0.4.0
 		//
 		// Fixing the padding situation resulted in a hardfork. The below code
-		// will stop the hardfork from triggering before block 20,000.
-		types.CurrentHeightLock.Lock()
-		if (build.Release == "standard" && types.CurrentHeight < 21e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
+		// will stop the hardfork from triggering before block 21,000.
+		if (build.Release == "standard" && blockHeight(tx) < 21e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
-		types.CurrentHeightLock.Unlock()
 
 		verified := crypto.VerifySegment(
 			sp.Segment[:segmentLen],

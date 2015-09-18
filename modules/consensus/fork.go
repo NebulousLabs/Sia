@@ -13,9 +13,9 @@ var (
 	errExternalRevert = errors.New("cannot revert to block outside of current path")
 )
 
-// backtrackToCurrentPath traces backwards from 'pb' until it reaches a node in
-// the ConsensusSet's current path (the "common parent"). It returns the
-// (inclusive) set of nodes between the common parent and 'pb', starting from
+// backtrackToCurrentPath traces backwards from 'pb' until it reaches a block
+// in the ConsensusSet's current path (the "common parent"). It returns the
+// (inclusive) set of blocks between the common parent and 'pb', starting from
 // the former.
 func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 	path := []*processedBlock{pb}
@@ -55,9 +55,9 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processed
 
 	// Rewind blocks until 'pb' is the current block.
 	for currentBlockID(tx) != pb.Block.ID() {
-		node := currentProcessedBlock(tx)
-		commitDiffSet(tx, node, modules.DiffRevert)
-		revertedBlocks = append(revertedBlocks, node)
+		block := currentProcessedBlock(tx)
+		commitDiffSet(tx, block, modules.DiffRevert)
+		revertedBlocks = append(revertedBlocks, block)
 	}
 	return revertedBlocks
 }
@@ -65,30 +65,30 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processed
 // applyUntilBlock will successively apply the blocks between the consensus
 // set's current path and 'pb'.
 func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
-	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
+	// Backtrack to the common parent of 'bn' and current path and then apply the new blocks.
 	newPath := backtrackToCurrentPath(tx, pb)
-	for _, node := range newPath[1:] {
-		// If the diffs for this node have already been generated, apply diffs
+	for _, block := range newPath[1:] {
+		// If the diffs for this block have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
-		if node.DiffsGenerated {
-			commitDiffSet(tx, node, modules.DiffApply)
+		if block.DiffsGenerated {
+			commitDiffSet(tx, block, modules.DiffApply)
 		} else {
-			err := generateAndApplyDiff(tx, node)
+			err := generateAndApplyDiff(tx, block)
 			if err != nil {
 				// Mark the block as invalid.
-				cs.dosBlocks[node.Block.ID()] = struct{}{}
+				cs.dosBlocks[block.Block.ID()] = struct{}{}
 				return nil, err
 			}
 		}
-		appliedBlocks = append(appliedBlocks, node)
+		appliedBlocks = append(appliedBlocks, block)
 	}
 	return appliedBlocks, nil
 }
 
-// forkBlockchain will move the consensus set onto the 'newBlock' fork. An error
-// will be returned if any of the blocks applied in the transition are found to
-// be invalid. forkBlockchain is atomic; the ConsensusSet is only updated if
-// the function returns nil.
+// forkBlockchain will move the consensus set onto the 'newBlock' fork. An
+// error will be returned if any of the blocks applied in the transition are
+// found to be invalid. forkBlockchain is atomic; the ConsensusSet is only
+// updated if the function returns nil.
 func (cs *ConsensusSet) forkBlockchain(tx *bolt.Tx, newBlock *processedBlock) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
 	commonParent := backtrackToCurrentPath(tx, newBlock)[0]
 	revertedBlocks = revertToBlock(tx, commonParent)
@@ -98,5 +98,3 @@ func (cs *ConsensusSet) forkBlockchain(tx *bolt.Tx, newBlock *processedBlock) (r
 	}
 	return revertedBlocks, appliedBlocks, nil
 }
-
-// TODO: rename 'node' to 'pb'

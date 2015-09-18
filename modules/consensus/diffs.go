@@ -187,18 +187,6 @@ func updateCurrentPath(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirectio
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
 func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
-	// COMPATv0.4.0
-	//
-	// When validating/accepting a block, the types height needs to be set to
-	// the height of the block that's being analyzed. After analysis is
-	// finished, the height needs to be set to the height of the current block.
-	//
-	// This is so that the Tax() logic correctly handles the hardfork that
-	// changes the tax from a float64 to a big.Rat during computation.
-	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = pb.Height
-	types.CurrentHeightLock.Unlock()
-
 	// Sanity checks - there are a few so they were moved to another function.
 	if build.DEBUG {
 		commitDiffSetSanity(tx, pb, dir)
@@ -216,18 +204,6 @@ func commitDiffSet(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
 func generateAndApplyDiff(tx *bolt.Tx, pb *processedBlock) error {
-	// COMPATv0.4.0
-	//
-	// When validating/accepting a block, the types height needs to be set to
-	// the height of the block that's being analyzed. After analysis is
-	// finished, the height needs to be set to the height of the current block.
-	//
-	// This is so that the Tax() logic correctly handles the hardfork that
-	// changes the tax from a float64 to a big.Rat during computation.
-	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = pb.Height
-	types.CurrentHeightLock.Unlock()
-
 	// Sanity check - the block being applied should have the current block as
 	// a parent.
 	if build.DEBUG && pb.Block.ParentID != currentBlockID(tx) {
