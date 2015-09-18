@@ -110,33 +110,30 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 		return err
 	}
 
-	// Add the genesis block.
-	addBlockMap(tx, &cs.blockRoot)
-	pushPath(tx, cs.blockRoot.Block.ID())
-
 	// Set the siafund pool to 0.
 	setSiafundPool(tx, types.NewCurrency64(0))
 
-	// Update the siafundoutput diffs map for the genesis block on
-	// disk. This needs to happen between the database being
-	// opened/initilized and the consensus set hash being calculated
+	// Update the siafund output diffs map for the genesis block on disk. This
+	// needs to happen between the database being opened/initilized and the
+	// consensus set hash being calculated
 	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
 		commitSiafundOutputDiff(tx, sfod, modules.DiffApply)
 	}
 
-	// Add the miner payout from the genesis block - unspendable, as the
-	// unlock hash is blank.
-	addSiacoinOutput(tx, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
+	// Add the miner payout from the genesis block to the delayed siacoin
+	// outputs - unspendable, as the unlock hash is blank.
+	createDSCOBucket(tx, types.MaturityDelay)
+	addDSCO(tx, types.MaturityDelay, cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
 		Value:      types.CalculateCoinbase(0),
 		UnlockHash: types.UnlockHash{},
 	})
 
-	// Get the genesis consensus set hash.
+	// Add the genesis block to the block strucutres - checksum must be taken
+	// after pushing the genesis block into the path.
+	pushPath(tx, cs.blockRoot.Block.ID())
 	if build.DEBUG {
 		cs.blockRoot.ConsensusChecksum = consensusChecksum(tx)
 	}
-
-	// Add the genesis block to the block map.
 	addBlockMap(tx, &cs.blockRoot)
 	return nil
 }
@@ -494,9 +491,9 @@ func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
 
 // deleteDSCOBucket deletes the bucket that held a set of delayed siacoin
 // outputs.
-func deleteDSCOBucket(tx *bolt.Tx, h types.BlockHeight) {
+func deleteDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
 	// Delete the bucket.
-	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
+	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
 	bucket := tx.Bucket(bucketID)
 	if build.DEBUG && bucket == nil {
 		panic(errNilBucket)

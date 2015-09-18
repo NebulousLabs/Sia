@@ -34,7 +34,7 @@ REBUILD:
 	@touch build/*.go
 
 # install builds and installs developer binaries.
-install: fmt REBUILD
+install: REBUILD
 	go install -race -tags='dev debug profile' ./...
 
 # release builds and installs release binaries.
@@ -67,9 +67,9 @@ pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/con
        ./modules/explorer ./modules/gateway ./modules/host ./modules/hostdb \
        ./modules/miner ./modules/renter ./modules/transactionpool \
        ./modules/wallet ./persist ./siac ./siae ./types
-test: clean fmt REBUILD
+test: REBUILD
 	go test -short -tags='debug testing' -timeout=10s $(pkgs) -run $(run)
-test-v: clean fmt REBUILD
+test-v: REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=35s $(pkgs) -run $(run)
 test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=300s $(pkgs) -run $(run)

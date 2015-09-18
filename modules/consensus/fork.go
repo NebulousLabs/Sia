@@ -98,3 +98,5 @@ func (cs *ConsensusSet) forkBlockchain(tx *bolt.Tx, newBlock *processedBlock) (r
 	}
 	return revertedBlocks, appliedBlocks, nil
 }
+
+// TODO: rename 'node' to 'pb'

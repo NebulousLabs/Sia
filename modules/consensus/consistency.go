@@ -8,6 +8,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -44,8 +46,8 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 	}
 
 	// Iterate through all the buckets looking for buckets prefixed with
-	// prefixDSCO, and add all of the delayed siacoin outputs. Buckets are
-	// presented in byte-sorted order by name.
+	// prefixDSCO or prefixFCEX. Buckets are presented in byte-sorted order by
+	// name.
 	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 		// If the bucket is not a delayed siacoin output bucket or a file
 		// contract expiration bucket, skip.
@@ -73,9 +75,110 @@ func checkSiacoinCount(tx *bolt.Tx) error {
 	return nil
 }
 
+// checkSiafundCount checks that the number of siafunds countable within the
+// consensus set equal the expected number of siafunds for the block height.
+func checkSiafundCount(tx *bolt.Tx) error {
+	var total types.Currency
+	err := tx.Bucket(SiafundOutputs).ForEach(func(_, siafundOutputBytes []byte) error {
+		var sfo types.SiafundOutput
+		err := encoding.Unmarshal(siafundOutputBytes, &sfo)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		total = total.Add(sfo.Value)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if total.Cmp(types.SiafundCount) != 0 {
+		return errors.New("wrong number if siafunds in the consensus set")
+	}
+	return nil
+}
+
 // checkDSCOs scans the sets of delayed siacoin outputs and checks for
 // consistency.
 func checkDSCOs(tx *bolt.Tx) error {
+	// Create a map to track which delayed siacoin output maps exist, and
+	// another map to track which ids have appeared in the dsco set.
+	dscoTracker := make(map[types.BlockHeight]struct{})
+	idMap := make(map[types.SiacoinOutputID]struct{})
+
+	// Iterate through all the buckets looking for the delayed siacoin output
+	// buckets, and check that they are for the correct heights.
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// If the bucket is not a delayed siacoin output bucket or a file
+		// contract expiration bucket, skip.
+		if !strings.HasPrefix(string(name), string(prefixDSCO)) {
+			return nil
+		}
+
+		// Add the bucket to the dscoTracker.
+		var height types.BlockHeight
+		err := encoding.Unmarshal(name[len(prefixDSCO):], &height)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		_, exists := dscoTracker[height]
+		if exists {
+			return errors.New("repeat dsco map")
+		}
+		dscoTracker[height] = struct{}{}
+
+		var total types.Currency
+		err = b.ForEach(func(idBytes, delayedOutput []byte) error {
+			// Check that the output id has not appeared in another dsco.
+			var id types.SiacoinOutputID
+			copy(id[:], idBytes)
+			_, exists := idMap[id]
+			if exists {
+				return errors.New("repeat delayed siacoin output")
+			}
+			idMap[id] = struct{}{}
+
+			// Sum the funds in the bucket.
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(delayedOutput, &sco)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
+			total = total.Add(sco.Value)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// Check that the minimum value has been achieved - the coinbase from
+		// an earlier block is guaranteed to be in the bucket.
+		minimumValue := types.CalculateCoinbase(height - types.MaturityDelay)
+		if total.Cmp(minimumValue) < 0 {
+			return errors.New("total number of coins in the delayed output bucket is incorrect")
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Check that all of the correct heights are represented.
+	currentHeight := blockHeight(tx)
+	expectedBuckets := 0
+	for i := currentHeight + 1; i <= currentHeight+types.MaturityDelay; i++ {
+		if i < types.MaturityDelay {
+			continue
+		}
+		_, exists := dscoTracker[i]
+		if !exists {
+			return errors.New("missing a dsco bucket")
+		}
+		expectedBuckets++
+	}
+	if len(dscoTracker) != expectedBuckets {
+		return errors.New("too many dsco buckets")
+	}
+
 	return nil
 }
 
@@ -103,6 +206,9 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) error {
 	if consensusChecksum(tx) != current.ConsensusChecksum {
 		return errors.New("consensus checksum mismatch after re-applying")
 	}
+
+	// TODO: Check that the parent relationship is correct.
+
 	return nil
 }
 
@@ -113,11 +219,11 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) error {
 	if err != nil {
 		return err
 	}
-	err = checkDSCOs(tx)
+	err = checkSiafundCount(tx)
 	if err != nil {
 		return err
 	}
-	// err = checkSiafundCount(tx)
+	err = checkDSCOs(tx)
 	if err != nil {
 		return err
 	}

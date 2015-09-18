@@ -120,7 +120,7 @@ func commitSiafundPoolDiff(tx *bolt.Tx, sfpd modules.SiafundPoolDiff, dir module
 func createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		createDSCOBucket(tx, pb.Height+types.MaturityDelay)
-	} else if pb.Height > types.MaturityDelay {
+	} else if pb.Height >= types.MaturityDelay {
 		createDSCOBucket(tx, pb.Height)
 	}
 }
@@ -167,7 +167,7 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
-		if pb.Height > types.MaturityDelay {
+		if pb.Height >= types.MaturityDelay {
 			deleteDSCOBucket(tx, pb.Height)
 		}
 	} else {
