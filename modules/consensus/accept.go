@@ -101,28 +101,14 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
 func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
-	parentNode := cs.db.getBlockMap(b.ParentID)
-	// COMPATv0.4.0
-	//
-	// When validating/accepting a block, the types height needs to be set to
-	// the height of the block that's being analyzed. After analysis is
-	// finished, the height needs to be set to the height of the current block.
-	//
-	// This is so that the Tax() logic correctly handles the hardfork that
-	// changes the tax from a float64 to a big.Rat during computation.
-	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = parentNode.Height
-	types.CurrentHeightLock.Unlock()
-	defer func() {
-		types.CurrentHeightLock.Lock()
-		types.CurrentHeight = cs.height()
-		types.CurrentHeightLock.Unlock()
-	}()
-
 	var nonExtending bool
 	err = cs.db.Update(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, b.ParentID)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
 		currentNode := currentProcessedBlock(tx)
-		newNode, err := cs.newChild(tx, parentNode, b)
+		newNode, err := cs.newChild(tx, pb, b)
 		if err != nil {
 			return err
 		}
