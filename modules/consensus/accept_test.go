@@ -1639,8 +1639,10 @@ func TestComplexForking(t *testing.T) {
 		cst2Blocks = append([]types.Block{pb.Block}, cst2Blocks...) // prepend
 		pb = cst2.cs.db.getBlockMap(pb.Block.ParentID)
 	}
-	for _, block := range cst2Blocks {
+	fmt.Println(cst1.cs.dbBlockHeight())
+	for i, block := range cst2Blocks {
 		// Some blocks will return errors.
+		fmt.Println(i, cst1.cs.dbBlockHeight())
 		_ = cst1.cs.AcceptBlock(block)
 	}
 	if cst1.cs.currentBlockID() != cst2.cs.currentBlockID() {

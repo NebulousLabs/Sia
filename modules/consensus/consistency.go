@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/boltdb/bolt"
@@ -72,6 +73,107 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 // checkSiacoinCount checks that the number of siacoins countable within the
 // consensus set equal the expected number of siacoins for the block height.
 func checkSiacoinCount(tx *bolt.Tx) error {
+	// Count how many coins should exist
+	deflationBlocks := types.BlockHeight(types.InitialCoinbase - types.MinimumCoinbase)
+	expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(blockHeight(tx))).Div(types.NewCurrency64(2))
+	if blockHeight(tx) < deflationBlocks {
+		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(blockHeight(tx) + 1)))
+	} else {
+		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(deflationBlocks + 1)))
+		trailingSiacoins := types.NewCurrency64(uint64(blockHeight(tx) - deflationBlocks)).Mul(types.CalculateCoinbase(blockHeight(tx)))
+		expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
+	}
+
+	// Add up all the delayed siacoin outputs.
+	totalSiacoins := types.NewCurrency64(0)
+	// Iterate through all the buckets looking for the delayed siacoin output
+	// buckets, and check that they are for the correct heights.
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// Check if the bucket is a delayed siacoin output bucket.
+		if !strings.HasPrefix(string(name), string(prefixDSCO)) {
+			return nil
+		}
+
+		// Sum up the delayed outputs in this bucket.
+		err := b.ForEach(func(_, delayedOutput []byte) error {
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(delayedOutput, &sco)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
+			totalSiacoins = totalSiacoins.Add(sco.Value)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add all of the siacoin outputs.
+	err = tx.Bucket(SiacoinOutputs).ForEach(func(_, scoBytes []byte) error {
+		var sco types.SiacoinOutput
+		err := encoding.Unmarshal(scoBytes, &sco)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		totalSiacoins = totalSiacoins.Add(sco.Value)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add all of the payouts from file contracts.
+	err = tx.Bucket(FileContracts).ForEach(func(_, fcBytes []byte) error {
+		var fc types.FileContract
+		err := encoding.Unmarshal(fcBytes, &fc)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		fcCoins := fc.Payout.Sub(fc.Tax())
+		totalSiacoins = totalSiacoins.Add(fcCoins)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Add all of the siafund claims.
+	err = tx.Bucket(SiafundOutputs).ForEach(func(_, sfoBytes []byte) error {
+		var sfo types.SiafundOutput
+		err := encoding.Unmarshal(sfoBytes, &sfo)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+
+		coinsPerFund := getSiafundPool(tx).Sub(sfo.ClaimStart)
+		claimCoins := coinsPerFund.Mul(sfo.Value).Div(types.SiafundCount)
+		totalSiacoins = totalSiacoins.Add(claimCoins)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if totalSiacoins.Cmp(expectedSiacoins) != 0 {
+		fmt.Println("Wrong number of siacoins... diagnostics:")
+		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
+			fmt.Println(totalSiacoins)
+			fmt.Println(expectedSiacoins)
+			fmt.Println("expected is bigger")
+			fmt.Println(expectedSiacoins.Sub(totalSiacoins))
+		} else {
+			fmt.Println(totalSiacoins)
+			fmt.Println(expectedSiacoins)
+			fmt.Println("total is bigger")
+			fmt.Println(totalSiacoins.Sub(expectedSiacoins))
+		}
+		return errors.New("wrong number of siacoins in the consensus set")
+	}
 	return nil
 }
 
@@ -192,6 +294,9 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) error {
 	if err != nil {
 		return err
 	}
+	if current.Height != parent.Height+1 {
+		return errors.New("parent structure of a block is incorrect")
+	}
 	_, _, err = cs.forkBlockchain(tx, parent)
 	if err != nil {
 		return err
@@ -206,8 +311,6 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) error {
 	if consensusChecksum(tx) != current.ConsensusChecksum {
 		return errors.New("consensus checksum mismatch after re-applying")
 	}
-
-	// TODO: Check that the parent relationship is correct.
 
 	return nil
 }
@@ -233,3 +336,5 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) error {
 	}
 	return nil
 }
+
+// TODO: Check that every file contract has an expiration too.
