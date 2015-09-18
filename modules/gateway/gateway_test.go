@@ -42,7 +42,7 @@ func TestPeers(t *testing.T) {
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRPC2", t)
-	defer g1.Close()
+	defer g2.Close()
 	err := g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("failed to connect:", err)

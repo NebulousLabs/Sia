@@ -119,7 +119,11 @@ func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 // connectivity. Unresponsive nodes are aggressively removed.
 func (g *Gateway) threadedNodeManager() {
 	for {
-		time.Sleep(5 * time.Second)
+		select {
+		case <-time.After(5 * time.Second):
+		case <-g.closeChan:
+			return
+		}
 
 		id := g.mu.RLock()
 		numNodes := len(g.nodes)
@@ -157,6 +161,10 @@ func (g *Gateway) threadedNodeManager() {
 		conn.Close()
 		// sleep for an extra 10 minutes after success; we don't want to spam
 		// connectable nodes
-		time.Sleep(10 * time.Minute)
+		select {
+		case <-time.After(10 * time.Minute):
+		case <-g.closeChan:
+			return
+		}
 	}
 }

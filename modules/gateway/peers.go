@@ -14,7 +14,10 @@ import (
 )
 
 const (
+	// the gateway will abort a connection attempt after this long
 	dialTimeout = 2 * time.Minute
+	// the gateway will sleep this long between incoming connections
+	acceptInterval = 3 * time.Second
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
@@ -96,6 +99,12 @@ func (g *Gateway) listen() {
 		}
 
 		go g.acceptConn(conn)
+
+		// Sleep after each accept. This limits the rate at which the Gateway
+		// will accept new connections. The intent here is to prevent new
+		// incoming connections from kicking out old ones before they have a
+		// chance to request additional nodes.
+		time.Sleep(acceptInterval)
 	}
 }
 
@@ -103,20 +112,6 @@ func (g *Gateway) listen() {
 func (g *Gateway) acceptConn(conn net.Conn) {
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Printf("INFO: %v wants to connect", addr)
-
-	// don't connect to an IP address more than once
-	if build.Release != "testing" {
-		id := g.mu.RLock()
-		for p := range g.peers {
-			if p.Host() == addr.Host() {
-				g.mu.RUnlock(id)
-				conn.Close()
-				g.log.Printf("INFO: rejected connection from %v: already connected", addr)
-				return
-			}
-		}
-		g.mu.RUnlock(id)
-	}
 
 	// read version
 	var remoteVersion string
@@ -126,7 +121,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// decide whether to accept
+	// check that version is acceptable
 	// NOTE: this version must be bumped whenever the gateway or consensus
 	// breaks compatibility.
 	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
@@ -143,19 +138,29 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// If we are already fully connected, kick out an old inbound peer to make
-	// room for the new one. Among other things, this ensures that bootstrap
-	// nodes will always be connectible. Worst case, you'll connect, receive a
-	// node list, and immediately get booted. But once you have the node list
-	// you should be able to connect to less full peers.
+	// If we are already fully connected, kick out an old peer to make room
+	// for the new one. Importantly, prioritize kicking a peer with the same
+	// IP as the connecting peer. This protects against Sybil attacks.
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
-		oldPeer, err := g.randomInboundPeer()
-		if err == nil {
-			g.peers[oldPeer].sess.Close()
-			delete(g.peers, oldPeer)
-			g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
+		// first choose a random peer, preferably inbound. If have only
+		// outbound peers, we'll wind up kicking an outbound peer; but
+		// subsequent inbound connections will kick each other instead of
+		// continuing to replace outbound peers.
+		kick, err := g.randomInboundPeer()
+		if err != nil {
+			kick, _ = g.randomPeer()
 		}
+		// if another peer shares this IP, choose that one instead
+		for p := range g.peers {
+			if p.Host() == addr.Host() {
+				kick = p
+				break
+			}
+		}
+		g.peers[kick].sess.Close()
+		delete(g.peers, kick)
+		g.log.Printf("INFO: disconnected from %v to make room for %v", kick, addr)
 	}
 	// add the peer
 	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
@@ -240,11 +245,20 @@ func (g *Gateway) threadedPeerManager() {
 		// If we are well-connected, sleep in increments of five minutes until
 		// we are no longer well-connected.
 		id := g.mu.RLock()
-		numPeers := len(g.peers)
+		numOutboundPeers := 0
+		for _, p := range g.peers {
+			if !p.inbound {
+				numOutboundPeers++
+			}
+		}
 		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
-		if numPeers >= wellConnectedThreshold {
-			time.Sleep(5 * time.Minute)
+		if numOutboundPeers >= wellConnectedThreshold {
+			select {
+			case <-time.After(5 * time.Minute):
+			case <-g.closeChan:
+				return
+			}
 			continue
 		}
 
@@ -254,10 +268,15 @@ func (g *Gateway) threadedPeerManager() {
 		if err == nil {
 			go g.Connect(addr)
 		}
-		time.Sleep(5 * time.Second)
+		select {
+		case <-time.After(5 * time.Second):
+		case <-g.closeChan:
+			return
+		}
 	}
 }
 
+// Peers returns the addresses currently connected to the Gateway.
 func (g *Gateway) Peers() []modules.NetAddress {
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)

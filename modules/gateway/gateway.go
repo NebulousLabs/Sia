@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 )
@@ -32,6 +33,9 @@ type Gateway struct {
 	// network.
 	nodes map[modules.NetAddress]struct{}
 
+	// closeChan is used to shut down the Gateway's goroutines.
+	closeChan chan struct{}
+
 	persistDir string
 
 	log *log.Logger
@@ -53,6 +57,8 @@ func (g *Gateway) Close() error {
 		return err
 	}
 	g.mu.RUnlock(id)
+	// send close signal
+	close(g.closeChan)
 	// clear the port mapping (no effect if UPnP not supported)
 	g.clearPort(g.myAddr.Port())
 	// shut down the listener
@@ -78,15 +84,24 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		initRPCs:   make(map[string]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]*peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
+		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 2),
 		log:        logger,
 	}
 
-	// Load the old peer list. If it doesn't exist, no problem, but if it does,
+	// Load the old node list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
+	}
+
+	// Add the bootstrap peers to the node list.
+	if build.Release != "testing" {
+		for _, addr := range modules.BootstrapPeers {
+			g.addNode(addr)
+		}
+		g.save()
 	}
 
 	// Create listener and set address.

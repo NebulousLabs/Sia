@@ -161,7 +161,7 @@ func TestRelayNodes(t *testing.T) {
 	g2 := newTestingGateway("TestRelayNodes2", t)
 	defer g2.Close()
 	g3 := newTestingGateway("TestRelayNodes3", t)
-	defer g2.Close()
+	defer g3.Close()
 
 	// overwrite g3's address with a non-loopback address;
 	// otherwise it will be rejected
