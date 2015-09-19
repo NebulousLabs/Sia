@@ -6,18 +6,34 @@ import (
 
 // TestFileContractTax probes the Tax function.
 func TestTax(t *testing.T) {
-	fc := FileContract{
-		Payout: NewCurrency64(435000),
+	// Test explicit values for post-hardfork tax values.
+	if Tax(1e9, NewCurrency64(125e9)).Cmp(NewCurrency64(4875e6)) != 0 {
+		t.Error("tax is being calculated incorrectly")
 	}
-	if fc.Tax().Cmp(NewCurrency64(10000)) != 0 {
-		t.Error("Tax producing unexpected result")
+	if PostTax(1e9, NewCurrency64(125e9)).Cmp(NewCurrency64(120125e6)) != 0 {
+		t.Error("tax is being calculated incorrectly")
 	}
-	fc.Payout = NewCurrency64(150000)
-	if fc.Tax().Cmp(NewCurrency64(0)) != 0 {
-		t.Error("Tax producing unexpected result")
+
+	// Test equivalency for a series of values.
+	if testing.Short() {
+		t.Skip()
 	}
-	fc.Payout = NewCurrency64(123456789)
-	if fc.Tax().Cmp(NewCurrency64(4810000)) != 0 {
-		t.Error("Tax producing unexpected result")
+	// COMPATv0.4.0 - check at height 0.
+	for i := uint64(0); i < 10e3; i++ {
+		val := NewCurrency64((1e3 * i) + i)
+		tax := Tax(0, val)
+		postTax := PostTax(0, val)
+		if val.Cmp(tax.Add(postTax)) != 0 {
+			t.Error("tax calculation inconsistent for", i)
+		}
+	}
+	// Check at height 1e9
+	for i := uint64(0); i < 10e3; i++ {
+		val := NewCurrency64((1e3 * i) + i)
+		tax := Tax(1e9, val)
+		postTax := PostTax(1e9, val)
+		if val.Cmp(tax.Add(postTax)) != 0 {
+			t.Error("tax calculation inconsistent for", i)
+		}
 	}
 }

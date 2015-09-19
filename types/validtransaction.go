@@ -48,7 +48,7 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		for _, output := range fc.MissedProofOutputs {
 			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
-		outputPortion := fc.Payout.Sub(fc.Tax())
+		outputPortion := PostTax(currentHeight, fc.Payout)
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
 			return ErrFileContractOutputSumViolation
 		}
