@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 
@@ -27,6 +28,16 @@ type consensusSetTester struct {
 	cs *ConsensusSet
 
 	persistDir string
+}
+
+// randAddress returns a random address that is not spendable.
+func randAddress() types.UnlockHash {
+	var uh types.UnlockHash
+	_, err := rand.Read(uh[:])
+	if err != nil {
+		panic(err)
+	}
+	return uh
 }
 
 // createConsensusSetTester creates a consensusSetTester that's ready for use.

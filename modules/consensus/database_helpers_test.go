@@ -16,51 +16,79 @@ import (
 // dbBlockHeight is a convenience function allowing blockHeight to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
 		bh = blockHeight(tx)
 		return nil
 	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
 	return bh
 }
 
 // dbCurrentBlockID is a convenience function allowing currentBlockID to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
 		id = currentBlockID(tx)
 		return nil
 	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
 	return id
 }
 
 // dbCurrentProcessedBlock is a convenience function allowing
 // currentProcessedBlock to be called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
 		pb = currentProcessedBlock(tx)
 		return nil
 	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
 	return pb
 }
 
 // dbGetPath is a convenience function allowing getPath to be called without a
 // bolt.Tx.
 func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err error) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
 		id, err = getPath(tx, bh)
 		return nil
 	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
 	return id, err
 }
 
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err error) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
 		pb, err = getBlockMap(tx, id)
 		return err
 	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
 	return pb, err
+}
+
+// dbGetSiacoinOutput is a convenience function allowing getSiacoinOutput to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbGetSiacoinOutput(id types.SiacoinOutputID) (sco types.SiacoinOutput, err error) {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+		sco, err = getSiacoinOutput(tx, id)
+		return err
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return sco, err
 }
 
 /// BREAK ///

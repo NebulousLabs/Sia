@@ -371,166 +371,6 @@ func TestInconsistentCheck(t *testing.T) {
 }
 */
 
-// testSimpleBlock mines a simple block (no transactions except those
-// automatically added by the miner) and adds it to the consnesus set.
-func (cst *consensusSetTester) testSimpleBlock() error {
-	// Get the starting hash of the consenesus set.
-	initialChecksum := cst.cs.dbConsensusChecksum()
-	initialHeight := cst.cs.dbBlockHeight()
-	initialBlockID := cst.cs.dbCurrentBlockID()
-
-	// Mine and submit a block
-	block, err := cst.miner.AddBlock()
-	if err != nil {
-		return err
-	}
-
-	// Check that the consensus info functions changed as expected.
-	resultingChecksum := cst.cs.dbConsensusChecksum()
-	if initialChecksum == resultingChecksum {
-		return errors.New("checksum is unchanged after mining a block")
-	}
-	resultingHeight := cst.cs.dbBlockHeight()
-	if resultingHeight != initialHeight+1 {
-		return errors.New("height of consensus set did not increase as expected")
-	}
-	currentPB := cst.cs.dbCurrentProcessedBlock()
-	if currentPB.Block.ParentID != initialBlockID {
-		return errors.New("new processed block does not have correct information")
-	}
-	if currentPB.Block.ID() != block.ID() {
-		return errors.New("the state's current block is not reporting as the recently mined block.")
-	}
-	if currentPB.Height != initialHeight+1 {
-		return errors.New("the processed block is not reporting the correct height")
-	}
-	pathID, err := cst.cs.dbGetPath(currentPB.Height)
-	if err != nil {
-		return err
-	}
-	if pathID != block.ID() {
-		return errors.New("current path does not point to the correct block")
-	}
-
-	// Revert the block that was just added to the consensus set and check for
-	// parity with the original state of consensus.
-	parent, err := cst.cs.dbGetBlockMap(currentPB.Block.ParentID)
-	if err != nil {
-		return err
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		_, _, err := cst.cs.forkBlockchain(tx, parent)
-		return err
-	})
-	if err != nil {
-		return err
-	}
-	if cst.cs.dbConsensusChecksum() != initialChecksum {
-		return errors.New("adding and reverting a block changed the consensus set")
-	}
-	// Re-add the block and check for parity with the first time it was added.
-	// This test is useful because a different codepath is followed if the
-	// diffs have already been generated.
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		_, _, err := cst.cs.forkBlockchain(tx, currentPB)
-		return err
-	})
-	if cst.cs.dbConsensusChecksum() != resultingChecksum {
-		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
-	}
-	return nil
-}
-
-// TestIntegrationSimpleBlock creates a consensus set tester and uses it to
-// call testSimpleBlock.
-func TestIntegrationSimpleBlock(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestIntegrationSimpleBlock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-	err = cst.testSimpleBlock()
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-// testSpendSiacoinsBlock mines a block with a transaction spending siacoins
-// and adds it to the consensus set.
-func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
-	// Create a random destination address for the output in the transaction.
-	var destAddr types.UnlockHash
-	_, err := rand.Read(destAddr[:])
-	if err != nil {
-		return err
-	}
-
-	// Create a block containing a transaction with a valid siacoin output.
-	txnValue := types.NewCurrency64(1200)
-	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(txnValue)
-	if err != nil {
-		return err
-	}
-	outputIndex := txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: txnValue, UnlockHash: destAddr})
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		return err
-	}
-	err = cst.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		return err
-	}
-	outputID := txnSet[len(txnSet)-1].SiacoinOutputID(int(outputIndex))
-
-	// Mine and apply the block to the consensus set.
-	_, err = cst.miner.AddBlock()
-	if err != nil {
-		return err
-	}
-
-	// Find the destAddr among the outputs.
-	var found bool
-	cst.cs.db.forEachSiacoinOutputs(func(id types.SiacoinOutputID, output types.SiacoinOutput) {
-		if id == outputID {
-			if found {
-				err = errors.New("output found twice")
-			}
-			if output.Value.Cmp(txnValue) != 0 {
-				err = errors.New("output has wrong value")
-			}
-			found = true
-		}
-	})
-	if err != nil {
-		return err
-	}
-	if !found {
-		return errors.New("could not find created siacoin output")
-	}
-	return nil
-}
-
-// TestSpendSiacoinsBlock creates a consensus set tester and uses it to call
-// testSpendSiacoinsBlock.
-func TestSpendSiacoinsBlock(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-	err = cst.testSpendSiacoinsBlock()
-	if err != nil {
-		t.Error(err)
-	}
-}
-
 // testFileContractsBlocks creates a series of blocks that create, revise,
 // prove, and fail to prove file contracts.
 func (cst *consensusSetTester) testFileContractsBlocks() error {
@@ -1639,6 +1479,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 //
 // This test checks that the hardfork scheduled for block 12,000 rolls through
 // smoothly.
+/*
 func TestTaxHardfork(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -1705,3 +1546,4 @@ func TestTaxHardfork(t *testing.T) {
 		}
 	}
 }
+*/

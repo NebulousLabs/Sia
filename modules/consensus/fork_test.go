@@ -3,30 +3,8 @@ package consensus
 import (
 	"testing"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/modules"
 )
-
-// dbBacktrackToCurrentPath is a convenience function to call
-// backtrackToCurrentPath without a bolt.Tx.
-func (cs *ConsensusSet) dbBacktrackToCurrentPath(pb *processedBlock) (pbs []*processedBlock) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		pbs = backtrackToCurrentPath(tx, pb)
-		return nil
-	})
-	return pbs
-}
-
-// dbRevertToNode is a convenience function to call revertToBlock without a
-// bolt.Tx.
-func (cs *ConsensusSet) dbRevertToNode(pb *processedBlock) (pbs []*processedBlock) {
-	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		pbs = revertToBlock(tx, pb)
-		return nil
-	})
-	return pbs
-}
 
 // TestBacktrackToCurrentPath probes the backtrackToCurrentPath method of the
 // consensus set.
