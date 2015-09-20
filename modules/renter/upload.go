@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -120,12 +119,6 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // Upload takes an upload parameters, which contain a file to upload, and then
 // creates a redundant copy of the file on the Sia network.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
-	// TODO: This type of restriction is something that should be handled by
-	// the frontend, not the backend.
-	if filepath.Ext(up.Filename) != filepath.Ext(up.Nickname) {
-		return errors.New("nickname and file name must have the same extension")
-	}
-
 	// Open the file.
 	handle, err := os.Open(up.Filename)
 	if err != nil {
