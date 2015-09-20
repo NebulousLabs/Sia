@@ -420,7 +420,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 		}},
 		UnlockHash: types.UnlockConditions{}.UnlockHash(),
 	}
-	outputSize := payout.Sub(validFC.Tax())
+	outputSize := payout.Sub(types.Tax(cst.cs.dbBlockHeight(), validFC.Payout))
 	validFC.ValidProofOutputs[0].Value = outputSize
 	validFC.MissedProofOutputs[0].Value = outputSize
 	missedFC := types.FileContract{
@@ -714,7 +714,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 		WindowEnd:   cst.cs.height() + 4,
 		Payout:      payout,
 	}
-	outputSize := payout.Sub(fc.Tax())
+	outputSize := payout.Sub(types.Tax(cst.cs.dbBlockHeight(), fc.Payout))
 	fc.ValidProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
 	fc.MissedProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
 

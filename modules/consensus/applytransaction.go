@@ -79,7 +79,7 @@ func applyFileContracts(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 		sfpd := modules.SiafundPoolDiff{
 			Direction: modules.DiffApply,
 			Previous:  sfp,
-			Adjusted:  sfp.Add(fc.Tax()),
+			Adjusted:  sfp.Add(types.Tax(blockHeight(tx), fc.Payout)),
 		}
 		pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
 		commitSiafundPoolDiff(tx, sfpd, modules.DiffApply)

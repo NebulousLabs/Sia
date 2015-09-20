@@ -25,20 +25,18 @@ func TestNegotiateContract(t *testing.T) {
 		WindowEnd:      1000,
 		Payout:         payout,
 		ValidProofOutputs: []types.SiacoinOutput{
-			{Value: payout, UnlockHash: types.UnlockHash{}},
+			{Value: types.PostTax(rt.renter.blockHeight, payout), UnlockHash: types.UnlockHash{}},
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// same as above
-			{Value: payout, UnlockHash: types.UnlockHash{}},
+			{Value: types.PostTax(rt.renter.blockHeight, payout), UnlockHash: types.UnlockHash{}},
 			// goes to the void, not the renter
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 		UnlockHash:     types.UnlockHash{},
 		RevisionNumber: 0,
 	}
-	fc.ValidProofOutputs[0].Value = fc.ValidProofOutputs[0].Value.Sub(fc.Tax())
-	fc.MissedProofOutputs[0].Value = fc.MissedProofOutputs[0].Value.Sub(fc.Tax())
 
 	txnBuilder := rt.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
@@ -102,7 +100,7 @@ func TestReviseContract(t *testing.T) {
 	}
 	// outputs need account for tax
 	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: payout.Sub(fc.Tax()), UnlockHash: ourAddr.UnlockHash()},
+		{Value: types.PostTax(rt.renter.blockHeight, payout), UnlockHash: ourAddr.UnlockHash()},
 		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}}, // no collateral
 	}
 	fc.MissedProofOutputs = []types.SiacoinOutput{

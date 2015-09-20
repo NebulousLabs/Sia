@@ -177,10 +177,10 @@ func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 		for _, output := range fcr.NewMissedProofOutputs {
 			missedPayout = missedPayout.Add(output.Value)
 		}
-		if validPayout.Cmp(fc.Payout.Sub(fc.Tax())) != 0 {
+		if validPayout.Cmp(types.PostTax(blockHeight(tx), fc.Payout)) != 0 {
 			return ErrAlteredRevisionPayouts
 		}
-		if missedPayout.Cmp(fc.Payout.Sub(fc.Tax())) != 0 {
+		if missedPayout.Cmp(types.PostTax(blockHeight(tx), fc.Payout)) != 0 {
 			return ErrAlteredRevisionPayouts
 		}
 	}
