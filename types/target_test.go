@@ -134,6 +134,10 @@ func TestTargetOverflow(t *testing.T) {
 // TestTargetNegativeIntToTarget tries to create a negative target using
 // IntToTarget.
 func TestTargetNegativeIntToTarget(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// In debug mode, attempting to create a negative target should trigger a
 	// panic.
 	defer func() {
@@ -149,6 +153,10 @@ func TestTargetNegativeIntToTarget(t *testing.T) {
 // TestTargetNegativeRatToTarget tries to create a negative target using
 // RatToTarget.
 func TestTargetNegativeRatToTarget(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// In debug mode, attempting to create a negative target should trigger a
 	// panic.
 	defer func() {

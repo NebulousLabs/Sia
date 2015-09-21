@@ -44,6 +44,10 @@ func TestRandomInboundPeer(t *testing.T) {
 }
 
 func TestListen(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestListen", t)
 	defer g.Close()
 

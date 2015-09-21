@@ -16,7 +16,7 @@ func TestTax(t *testing.T) {
 
 	// Test equivalency for a series of values.
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 	// COMPATv0.4.0 - check at height 0.
 	for i := uint64(0); i < 10e3; i++ {
