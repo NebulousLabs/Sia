@@ -107,8 +107,15 @@ func TestBlockKnownHandling(t *testing.T) {
 	}
 
 	// Try the genesis block edge case.
-	genesisBlock := cst.cs.db.getBlockMap(cst.cs.db.getPath(0)).Block
-	err = cst.cs.acceptBlock(genesisBlock)
+	id, err := cst.cs.dbGetPath(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	genesisBlock, err := cst.cs.dbGetBlockMap(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.cs.acceptBlock(genesisBlock.Block)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -1141,7 +1148,7 @@ func TestBuriedBadFork(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.closeCst()
-	pb := cst.cs.currentProcessedBlock()
+	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Create a bad block that builds on a parent, so that it is part of not
 	// the longest fork.
@@ -1153,7 +1160,10 @@ func TestBuriedBadFork(t *testing.T) {
 			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
 		}},
 	}
-	parent := cst.cs.db.getBlockMap(pb.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	badBlock, _ = cst.miner.SolveBlock(badBlock, parent.ChildTarget)
 	err = cst.cs.AcceptBlock(badBlock)
 	if err != modules.ErrNonExtendingBlock {
@@ -1186,7 +1196,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.closeCst()
-	pb := cst.cs.currentProcessedBlock()
+	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Create a good transaction using the wallet.
 	txnValue := types.NewCurrency64(1200)

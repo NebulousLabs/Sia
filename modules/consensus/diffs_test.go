@@ -454,7 +454,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pb := cst.cs.currentProcessedBlock()
+	pb := cst.cs.dbCurrentProcessedBlock()
 	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
 		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
 		return nil

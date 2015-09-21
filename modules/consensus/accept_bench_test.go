@@ -32,7 +32,15 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 	// Synchronisze the cst and the subscriberless consensus set.
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
-		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
+		id, err := cst.cs.dbGetPath(i)
+		if err != nil {
+			b.Fatal(err)
+		}
+		processedBlock, err := cst.cs.dbGetBlockMap(id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = cs.AcceptBlock(processedBlock.Block)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -91,7 +99,15 @@ func BenchmarkAcceptAcceptSmallBlocks(b *testing.B) {
 	// Synchronize the consensus set with the consensus set tester.
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
-		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
+		id, err := cst.cs.dbGetPath(i)
+		if err != nil {
+			b.Fatal(err)
+		}
+		processedBlock, err := cst.cs.dbGetBlockMap(id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = cs.AcceptBlock(processedBlock.Block)
 		if err != nil {
 			b.Fatal(err)
 		}

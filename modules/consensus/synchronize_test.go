@@ -43,7 +43,7 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// blockchains should now match
-	for cst1.cs.currentBlockID() != cst2.cs.currentBlockID() {
+	for cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
 		time.Sleep(10 * time.Millisecond)
 	}
 
@@ -116,7 +116,7 @@ func TestResynchronize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cst1.cs.currentBlockID() != cst2.cs.currentBlockID() {
+	if cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
 		t.Fatal("Consensus Sets did not synchronize")
 	}
 
@@ -187,20 +187,32 @@ func TestBlockHistory(t *testing.T) {
 	lockID := cst.cs.mu.Lock()
 	// first 10 IDs are linear
 	for i := types.BlockHeight(0); i < 10; i++ {
-		if history[i] != cst.cs.db.getPath(cst.cs.dbBlockHeight()-i) {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.dbBlockHeight()-i), history[i])
+		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight()-i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if history[i] != id {
+			t.Errorf("Wrong ID in history: expected %v, got %v", id, history[i])
 		}
 	}
 	// next 4 IDs are exponential
 	heights := []types.BlockHeight{11, 15, 23, 39}
 	for i, height := range heights {
-		if history[10+i] != cst.cs.db.getPath(cst.cs.dbBlockHeight()-height) {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.dbBlockHeight()-height), history[10+i])
+		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight()-height)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if history[10+i] != id {
+			t.Errorf("Wrong ID in history: expected %v, got %v", height, history[10+i])
 		}
 	}
 	// finally, the genesis ID
-	if history[31] != cst.cs.db.getPath(0) {
-		t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(0), history[16])
+	genesisID, err := cst.cs.dbGetPath(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if history[31] != genesisID {
+		t.Errorf("Wrong ID in history: expected %v, got %v", genesisID, history[31])
 	}
 
 	cst.cs.mu.Unlock(lockID)

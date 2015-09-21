@@ -16,7 +16,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pb := cst.cs.currentProcessedBlock()
+	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Backtrack from the current node to the blockchain.
 	nodes := cst.cs.dbBacktrackToCurrentPath(pb)
@@ -38,12 +38,18 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
 	}
-	pb = cst.cs.db.getBlockMap(child1.ID())
+	pb, err = cst.cs.dbGetBlockMap(child1.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
 	nodes = cst.cs.dbBacktrackToCurrentPath(pb)
 	if len(nodes) != 2 {
 		t.Error("backtracking grabbed wrong number of nodes")
 	}
-	parent := cst.cs.db.getBlockMap(pb.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if nodes[0].Block.ID() != parent.Block.ID() {
 		t.Error("grabbed the wrong block as the common block")
 	}
@@ -61,11 +67,17 @@ func TestRevertToNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pb := cst.cs.currentProcessedBlock()
+	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Revert to a grandparent and verify the returned array is correct.
-	parent := cst.cs.db.getBlockMap(pb.Block.ParentID)
-	grandParent := cst.cs.db.getBlockMap(parent.Block.ParentID)
+	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grandParent, err := cst.cs.dbGetBlockMap(parent.Block.ParentID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	revertedNodes := cst.cs.dbRevertToNode(grandParent)
 	if len(revertedNodes) != 2 {
 		t.Error("wrong number of nodes reverted")

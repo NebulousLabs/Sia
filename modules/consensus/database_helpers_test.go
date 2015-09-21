@@ -428,15 +428,6 @@ func (cs *ConsensusSet) Height() types.BlockHeight {
 	return cs.dbBlockHeight()
 }
 
-// currentBlockID returns the ID of the current block.
-func (cs *ConsensusSet) currentBlockID() types.BlockID {
-	return cs.db.getPath(cs.dbBlockHeight())
-}
-
-func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
-	return cs.db.getBlockMap(cs.currentBlockID())
-}
-
 // rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket []byte, key interface{}) error {
 	k := encoding.Marshal(key)
@@ -496,11 +487,6 @@ func (db *setDB) inBlockMap(id types.BlockID) bool {
 	return db.inBucket(BlockMap, id)
 }
 
-// rmBlockMap removes a processedBlock from the blockMap bucket
-func (db *setDB) rmBlockMap(id types.BlockID) error {
-	return db.rmItem(BlockMap, id)
-}
-
 func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
 	db.forEachItem(SiafundOutputs, func(kb, vb []byte) error {
 		var key types.SiafundOutputID
@@ -530,34 +516,6 @@ func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
 		panic(err)
 	}
 	return fc
-}
-
-// getPath retreives the block id of a block at a given hegiht from the path
-func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
-	idBytes, err := db.getItem(BlockPath, h)
-	if err != nil {
-		panic(err)
-	}
-	err = encoding.Unmarshal(idBytes, &id)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
-// getBlockMap queries the set database to return a processedBlock
-// with the given ID
-func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
-	bnBytes, err := db.getItem(BlockMap, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var pb processedBlock
-	err = encoding.Unmarshal(bnBytes, &pb)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return &pb
 }
 
 // getItem is a generic function to insert an item into the set database

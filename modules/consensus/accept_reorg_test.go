@@ -291,17 +291,20 @@ func TestComplexForking(t *testing.T) {
 
 	// Give all the blocks in cstMain to cstBackup - as a holding place.
 	var cstMainBlocks []types.Block
-	pb := cstMain.cs.currentProcessedBlock()
+	pb := cstMain.cs.dbCurrentProcessedBlock()
 	for pb.Block.ID() != cstMain.cs.blockRoot.Block.ID() {
 		cstMainBlocks = append([]types.Block{pb.Block}, cstMainBlocks...) // prepend
-		pb = cstMain.cs.db.getBlockMap(pb.Block.ParentID)
+		pb, err = cstMain.cs.dbGetBlockMap(pb.Block.ParentID)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for _, block := range cstMainBlocks {
 		// Some blocks will return errors.
 		_ = cstBackup.cs.AcceptBlock(block)
 	}
-	if cstBackup.cs.currentBlockID() != cstMain.cs.currentBlockID() {
+	if cstBackup.cs.dbCurrentBlockID() != cstMain.cs.dbCurrentBlockID() {
 		t.Error("cstMain and cstBackup do not share the same path")
 	}
 	if cstBackup.cs.dbConsensusChecksum() != cstMain.cs.dbConsensusChecksum() {
@@ -323,16 +326,19 @@ func TestComplexForking(t *testing.T) {
 		t.Error(err)
 	}
 	var cstAltBlocks []types.Block
-	pb = cstAlt.cs.currentProcessedBlock()
+	pb = cstAlt.cs.dbCurrentProcessedBlock()
 	for pb.Block.ID() != cstAlt.cs.blockRoot.Block.ID() {
 		cstAltBlocks = append([]types.Block{pb.Block}, cstAltBlocks...) // prepend
-		pb = cstAlt.cs.db.getBlockMap(pb.Block.ParentID)
+		pb, err = cstAlt.cs.dbGetBlockMap(pb.Block.ParentID)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, block := range cstAltBlocks {
 		// Some blocks will return errors.
 		_ = cstMain.cs.AcceptBlock(block)
 	}
-	if cstMain.cs.currentBlockID() != cstAlt.cs.currentBlockID() {
+	if cstMain.cs.dbCurrentBlockID() != cstAlt.cs.dbCurrentBlockID() {
 		t.Error("cstMain and cstAlt do not share the same path")
 	}
 	if cstMain.cs.dbConsensusChecksum() != cstAlt.cs.dbConsensusChecksum() {
@@ -350,16 +356,19 @@ func TestComplexForking(t *testing.T) {
 		}
 	}
 	var cstBackupBlocks []types.Block
-	pb = cstBackup.cs.currentProcessedBlock()
+	pb = cstBackup.cs.dbCurrentProcessedBlock()
 	for pb.Block.ID() != cstBackup.cs.blockRoot.Block.ID() {
 		cstBackupBlocks = append([]types.Block{pb.Block}, cstBackupBlocks...) // prepend
-		pb = cstBackup.cs.db.getBlockMap(pb.Block.ParentID)
+		pb, err = cstBackup.cs.dbGetBlockMap(pb.Block.ParentID)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, block := range cstBackupBlocks {
 		// Some blocks will return errors.
 		_ = cstMain.cs.AcceptBlock(block)
 	}
-	if cstMain.cs.currentBlockID() != cstBackup.cs.currentBlockID() {
+	if cstMain.cs.dbCurrentBlockID() != cstBackup.cs.dbCurrentBlockID() {
 		t.Error("cstMain and cstBackup do not share the same path")
 	}
 	if cstMain.cs.dbConsensusChecksum() != cstBackup.cs.dbConsensusChecksum() {

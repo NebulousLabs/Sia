@@ -120,7 +120,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.closeCst()
-	pb := cst.cs.currentProcessedBlock()
+	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Trigger the sanity check concerning already-matured outputs.
 	defer func() {
