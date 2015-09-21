@@ -12,6 +12,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// testBlockSuite tests a wide variety of blocks.
+func (cst *consensusSetTester) testBlockSuite() {
+	cst.testSimpleBlock()
+	cst.testSpendSiacoinsBlock()
+	cst.testValidStorageProofBlocks()
+	cst.testMissedStorageProofBlocks()
+}
+
 // testSimpleBlock mines a simple block (no transactions except those
 // automatically added by the miner) and adds it to the consnesus set.
 func (cst *consensusSetTester) testSimpleBlock() {
@@ -388,6 +396,26 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 	defer cst.closeCst()
 	cst.testMissedStorageProofBlocks()
 }
+
+// testFileContractRevision creates and revises a file contract on the
+// blockchain.
+
+// TestIntegrationFileContractRevision creates a consensus set tester and uses
+// it to call testFileContractRevision.
+
+// testSpendEmptySiafunds spends siafunds on the blockchain when the siafund
+// pool is empty.
+
+// TestIntegrationSpendEmptySiafunds creates a consensus set tester and uses it
+// to call testSpendEmptySiafunds.
+
+// testSpendSiafunds spends siafunds on the blockchain when the siafund pool is
+// not empty.
+//
+// TODO: Make sure you check that the ClaimStart value is being set correclty.
+
+// TestIntegrationSpendSiafunds creates a consensus set tester and uses it to
+// call testSpendSiafunds.
 
 /// BREAK ///
 /// BREAK ///

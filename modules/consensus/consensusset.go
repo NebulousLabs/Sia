@@ -42,6 +42,14 @@ type ConsensusSet struct {
 	// known to the expensive part of block validation.
 	dosBlocks map[types.BlockID]struct{}
 
+	// checkingConsistency is a bool indicating whether or not a consistency
+	// check is in progress. The consistency check logic call itself, resulting
+	// in infinite loops. This bool prevents that while still allowing for full
+	// granularity consistency checks. Previously, consistency checks were only
+	// performed after a full reorg, but now they are performed after every
+	// block.
+	checkingConsistency bool
+
 	persistDir string
 	mu         *sync.RWMutex
 }

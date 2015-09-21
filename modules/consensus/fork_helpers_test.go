@@ -18,7 +18,7 @@ func (cs *ConsensusSet) dbBacktrackToCurrentPath(pb *processedBlock) (pbs []*pro
 // bolt.Tx.
 func (cs *ConsensusSet) dbRevertToNode(pb *processedBlock) (pbs []*processedBlock) {
 	_ = cs.db.Update(func(tx *bolt.Tx) error {
-		pbs = revertToBlock(tx, pb)
+		pbs = cs.revertToBlock(tx, pb)
 		return nil
 	})
 	return pbs

@@ -12,7 +12,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/boltdb/bolt"
 
@@ -488,8 +487,7 @@ func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) {
 	// Sanity check - should not remove an item not in the db.
 	dscoBucket := tx.Bucket(bucketID)
 	if build.DEBUG && dscoBucket.Get(id[:]) == nil {
-		fmt.Println("NIL DSCO", id)
-		// panic("nil dsco")
+		panic("nil dsco")
 	}
 	err := dscoBucket.Delete(id[:])
 	if build.DEBUG && err != nil {
@@ -524,23 +522,4 @@ func deleteDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-}
-
-// forEachDSCO iterates through each delayed siacoin output that matures at a
-// given height, and performs a given function on each.
-func forEachDSCO(tx *bolt.Tx, bh types.BlockHeight, fn func(id types.SiacoinOutputID, sco types.SiacoinOutput) error) error {
-	bucketID := append(prefixDSCO, encoding.Marshal(bh)...)
-	return tx.Bucket(bucketID).ForEach(func(kb, vb []byte) error {
-		var key types.SiacoinOutputID
-		var value types.SiacoinOutput
-		err := encoding.Unmarshal(kb, &key)
-		if err != nil {
-			return err
-		}
-		err = encoding.Unmarshal(vb, &value)
-		if err != nil {
-			return err
-		}
-		return fn(key, value)
-	})
 }

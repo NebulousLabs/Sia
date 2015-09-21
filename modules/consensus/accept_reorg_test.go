@@ -205,6 +205,28 @@ func TestIntegrationMissedStorageProofReorg(t *testing.T) {
 	rs.fullReorg()
 }
 
+// TestIntegrationComplexReorg stacks up blocks of all types into a single
+// blockchain that undergoes a massive reorg as a stress test to the codebase.
+func TestIntegrationComplexReorg(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rs := createReorgSets("TestIntegrationComplexReorg")
+
+	// Give a wide variety of block types to cstMain.
+	for i := 0; i < 3; i++ {
+		rs.cstMain.testBlockSuite()
+	}
+	// Give fewer blocks to cstAlt, while still using the same variety.
+	for i := 0; i < 2; i++ {
+		rs.cstAlt.testBlockSuite()
+	}
+
+	// Try to trigger consensus inconsistencies by doing a full reorg on the
+	// simple block.
+	rs.fullReorg()
+}
+
 /// BREAK ///
 /// BREAK ///
 /// BREAK ///
@@ -242,109 +264,105 @@ func (cst *consensusSetTester) complexBlockSet() error {
 // consensus, and then forks to a new chain, forcing the whole structure to be
 // reverted.
 func TestComplexForking(t *testing.T) {
-	/*
-		if testing.Short() {
-			t.SkipNow()
-		}
-		cstMain, err := createConsensusSetTester("TestComplexForking - 1")
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cstMain, err := createConsensusSetTester("TestComplexForking - 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstMain.closeCst()
+	cstAlt, err := createConsensusSetTester("TestComplexForking - 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstAlt.closeCst()
+	cstBackup, err := createConsensusSetTester("TestComplexForking - 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstBackup.closeCst()
+
+	// Give each type of major block to cstMain.
+	err = cstMain.complexBlockSet()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Give all the blocks in cstMain to cstBackup - as a holding place.
+	var cstMainBlocks []types.Block
+	pb := cstMain.cs.currentProcessedBlock()
+	for pb.Block.ID() != cstMain.cs.blockRoot.Block.ID() {
+		cstMainBlocks = append([]types.Block{pb.Block}, cstMainBlocks...) // prepend
+		pb = cstMain.cs.db.getBlockMap(pb.Block.ParentID)
+	}
+
+	for _, block := range cstMainBlocks {
+		// Some blocks will return errors.
+		_ = cstBackup.cs.AcceptBlock(block)
+	}
+	if cstBackup.cs.currentBlockID() != cstMain.cs.currentBlockID() {
+		t.Error("cstMain and cstBackup do not share the same path")
+	}
+	if cstBackup.cs.consensusSetHash() != cstMain.cs.consensusSetHash() {
+		t.Error("cstMain and cstBackup do not share a consensus set hash")
+	}
+
+	// Mine 3 blocks on cstAlt, then all the block types, to give it a heavier
+	// weight, then give all of its blocks to cstMain. This will cause a complex
+	// fork to happen.
+	for i := 0; i < 3; i++ {
+		block, _ := cstAlt.miner.FindBlock()
+		err = cstAlt.cs.AcceptBlock(block)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer cstMain.closeCst()
-		cstAlt, err := createConsensusSetTester("TestComplexForking - 2")
+	}
+	err = cstAlt.complexBlockSet()
+	if err != nil {
+		t.Error(err)
+	}
+	var cstAltBlocks []types.Block
+	pb = cstAlt.cs.currentProcessedBlock()
+	for pb.Block.ID() != cstAlt.cs.blockRoot.Block.ID() {
+		cstAltBlocks = append([]types.Block{pb.Block}, cstAltBlocks...) // prepend
+		pb = cstAlt.cs.db.getBlockMap(pb.Block.ParentID)
+	}
+	for _, block := range cstAltBlocks {
+		// Some blocks will return errors.
+		_ = cstMain.cs.AcceptBlock(block)
+	}
+	if cstMain.cs.currentBlockID() != cstAlt.cs.currentBlockID() {
+		t.Error("cstMain and cstAlt do not share the same path")
+	}
+	if cstMain.cs.consensusSetHash() != cstAlt.cs.consensusSetHash() {
+		t.Error("cstMain and cstAlt do not share the same consensus set hash")
+	}
+
+	// Mine 6 blocks on cstBackup and then give those blocks to cstMain, which will
+	// cause cstMain to switch back to its old chain. cstMain will then have created,
+	// reverted, and reapplied all the significant types of blocks.
+	for i := 0; i < 6; i++ {
+		block, _ := cstBackup.miner.FindBlock()
+		err = cstBackup.cs.AcceptBlock(block)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer cstAlt.closeCst()
-		cstBackup, err := createConsensusSetTester("TestComplexForking - 3")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer cstBackup.closeCst()
-
-		// Give each type of major block to cstMain.
-		err = cstMain.complexBlockSet()
-		if err != nil {
-			t.Error(err)
-		}
-
-		// Give all the blocks in cstMain to cstBackup - as a holding place.
-		var cstMainBlocks []types.Block
-		pb := cstMain.cs.currentProcessedBlock()
-		for pb.Block.ID() != cstMain.cs.blockRoot.Block.ID() {
-			cstMainBlocks = append([]types.Block{pb.Block}, cstMainBlocks...) // prepend
-			pb = cstMain.cs.db.getBlockMap(pb.Block.ParentID)
-		}
-
-		for _, block := range cstMainBlocks {
-			// Some blocks will return errors.
-			_ = cstBackup.cs.AcceptBlock(block)
-		}
-		if cstBackup.cs.currentBlockID() != cstMain.cs.currentBlockID() {
-			t.Error("cstMain and cstBackup do not share the same path")
-		}
-		if cstBackup.cs.consensusSetHash() != cstMain.cs.consensusSetHash() {
-			t.Error("cstMain and cstBackup do not share a consensus set hash")
-		}
-
-		// Mine 3 blocks on cstAlt, then all the block types, to give it a heavier
-		// weight, then give all of its blocks to cstMain. This will cause a complex
-		// fork to happen.
-		for i := 0; i < 3; i++ {
-			block, _ := cstAlt.miner.FindBlock()
-			err = cstAlt.cs.AcceptBlock(block)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		err = cstAlt.complexBlockSet()
-		if err != nil {
-			t.Error(err)
-		}
-		var cstAltBlocks []types.Block
-		pb = cstAlt.cs.currentProcessedBlock()
-		for pb.Block.ID() != cstAlt.cs.blockRoot.Block.ID() {
-			cstAltBlocks = append([]types.Block{pb.Block}, cstAltBlocks...) // prepend
-			pb = cstAlt.cs.db.getBlockMap(pb.Block.ParentID)
-		}
-		fmt.Println(cstMain.cs.dbBlockHeight())
-		for i, block := range cstAltBlocks {
-			// Some blocks will return errors.
-			fmt.Println(i, cstMain.cs.dbBlockHeight())
-			_ = cstMain.cs.AcceptBlock(block)
-		}
-		if cstMain.cs.currentBlockID() != cstAlt.cs.currentBlockID() {
-			t.Error("cstMain and cstAlt do not share the same path")
-		}
-		if cstMain.cs.consensusSetHash() != cstAlt.cs.consensusSetHash() {
-			t.Error("cstMain and cstAlt do not share the same consensus set hash")
-		}
-
-		// Mine 6 blocks on cstBackup and then give those blocks to cstMain, which will
-		// cause cstMain to switch back to its old chain. cstMain will then have created,
-		// reverted, and reapplied all the significant types of blocks.
-		for i := 0; i < 6; i++ {
-			block, _ := cstBackup.miner.FindBlock()
-			err = cstBackup.cs.AcceptBlock(block)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		var cstBackupBlocks []types.Block
-		pb = cstBackup.cs.currentProcessedBlock()
-		for pb.Block.ID() != cstBackup.cs.blockRoot.Block.ID() {
-			cstBackupBlocks = append([]types.Block{pb.Block}, cstBackupBlocks...) // prepend
-			pb = cstBackup.cs.db.getBlockMap(pb.Block.ParentID)
-		}
-		for _, block := range cstBackupBlocks {
-			// Some blocks will return errors.
-			_ = cstMain.cs.AcceptBlock(block)
-		}
-		if cstMain.cs.currentBlockID() != cstBackup.cs.currentBlockID() {
-			t.Error("cstMain and cstBackup do not share the same path")
-		}
-		if cstMain.cs.consensusSetHash() != cstBackup.cs.consensusSetHash() {
-			t.Error("cstMain and cstBackup do not share the same consensus set hash")
-		}
-	*/
+	}
+	var cstBackupBlocks []types.Block
+	pb = cstBackup.cs.currentProcessedBlock()
+	for pb.Block.ID() != cstBackup.cs.blockRoot.Block.ID() {
+		cstBackupBlocks = append([]types.Block{pb.Block}, cstBackupBlocks...) // prepend
+		pb = cstBackup.cs.db.getBlockMap(pb.Block.ParentID)
+	}
+	for _, block := range cstBackupBlocks {
+		// Some blocks will return errors.
+		_ = cstMain.cs.AcceptBlock(block)
+	}
+	if cstMain.cs.currentBlockID() != cstBackup.cs.currentBlockID() {
+		t.Error("cstMain and cstBackup do not share the same path")
+	}
+	if cstMain.cs.consensusSetHash() != cstBackup.cs.consensusSetHash() {
+		t.Error("cstMain and cstBackup do not share the same consensus set hash")
+	}
 }

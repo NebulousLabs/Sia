@@ -46,7 +46,7 @@ func backtrackToCurrentPath(tx *bolt.Tx, pb *processedBlock) []*processedBlock {
 // revertToBlock will revert blocks from the ConsensusSet's current path until
 // 'pb' is the current block. Blocks are returned in the order that they were
 // reverted.  'pb' is not reverted.
-func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processedBlock) {
+func (cs *ConsensusSet) revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processedBlock) {
 	// Sanity check - make sure that pb is in the current path.
 	currentPathID, err := getPath(tx, pb.Height)
 	if build.DEBUG && (err != nil || currentPathID != pb.Block.ID()) {
@@ -58,6 +58,12 @@ func revertToBlock(tx *bolt.Tx, pb *processedBlock) (revertedBlocks []*processed
 		block := currentProcessedBlock(tx)
 		commitDiffSet(tx, block, modules.DiffRevert)
 		revertedBlocks = append(revertedBlocks, block)
+
+		// Sanity check - after removing a block, check that the consensus set
+		// has maintained consistency.
+		if build.DEBUG {
+			cs.checkConsistency(tx)
+		}
 	}
 	return revertedBlocks
 }
@@ -81,6 +87,12 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 			}
 		}
 		appliedBlocks = append(appliedBlocks, block)
+
+		// Sanity check - after applying a block, check that the consensus set
+		// has maintained consistency.
+		if build.DEBUG {
+			cs.checkConsistency(tx)
+		}
 	}
 	return appliedBlocks, nil
 }
@@ -91,7 +103,7 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 // updated if the function returns nil.
 func (cs *ConsensusSet) forkBlockchain(tx *bolt.Tx, newBlock *processedBlock) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
 	commonParent := backtrackToCurrentPath(tx, newBlock)[0]
-	revertedBlocks = revertToBlock(tx, commonParent)
+	revertedBlocks = cs.revertToBlock(tx, commonParent)
 	appliedBlocks, err = cs.applyUntilBlock(tx, newBlock)
 	if err != nil {
 		return nil, nil, err

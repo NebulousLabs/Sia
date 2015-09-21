@@ -165,12 +165,10 @@ func commitNodeDiffs(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection)
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
 func deleteObsoleteDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
-	if dir == modules.DiffApply {
-		// There are no outputs that mature in the first MaturityDelay blocks.
-		if pb.Height >= types.MaturityDelay {
-			deleteDSCOBucket(tx, pb.Height)
-		}
-	} else {
+	// There are no outputs that mature in the first MaturityDelay blocks.
+	if dir == modules.DiffApply && pb.Height >= types.MaturityDelay {
+		deleteDSCOBucket(tx, pb.Height)
+	} else if dir == modules.DiffRevert {
 		deleteDSCOBucket(tx, pb.Height+types.MaturityDelay)
 	}
 }
