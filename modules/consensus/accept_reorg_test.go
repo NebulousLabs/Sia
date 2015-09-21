@@ -163,8 +163,25 @@ func TestIntegrationSiacoinReorg(t *testing.T) {
 	}
 	rs := createReorgSets("TestIntegrationSiacoinReorg")
 
-	// Give a simple block to cstMain.
-	rs.cstMain.testSimpleBlock()
+	// Give a siacoin block to cstMain.
+	rs.cstMain.testSpendSiacoinsBlock()
+
+	// Try to trigger consensus inconsistencies by doing a full reorg on the
+	// simple block.
+	rs.fullReorg()
+}
+
+// TestIntegrationValidStorageProofReorg tries to reorganize a valid storage
+// proof block out of, and then back into, the consensus set.
+func TestIntegrationValidStorageProofReorg(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rs := createReorgSets("TestIntegrationValidStorageProofReorg")
+
+	// Give a series of blocks containing a file contract and a valid storage
+	// proof to cstMain.
+	rs.cstMain.testValidStorageProofBlocks()
 
 	// Try to trigger consensus inconsistencies by doing a full reorg on the
 	// simple block.

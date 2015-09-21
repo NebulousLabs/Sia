@@ -16,7 +16,7 @@ import (
 // dbBlockHeight is a convenience function allowing blockHeight to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
 		bh = blockHeight(tx)
 		return nil
 	})
@@ -29,7 +29,7 @@ func (cs *ConsensusSet) dbBlockHeight() (bh types.BlockHeight) {
 // dbCurrentBlockID is a convenience function allowing currentBlockID to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
 		id = currentBlockID(tx)
 		return nil
 	})
@@ -42,7 +42,7 @@ func (cs *ConsensusSet) dbCurrentBlockID() (id types.BlockID) {
 // dbCurrentProcessedBlock is a convenience function allowing
 // currentProcessedBlock to be called without a bolt.Tx.
 func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
 		pb = currentProcessedBlock(tx)
 		return nil
 	})
@@ -55,7 +55,7 @@ func (cs *ConsensusSet) dbCurrentProcessedBlock() (pb *processedBlock) {
 // dbGetPath is a convenience function allowing getPath to be called without a
 // bolt.Tx.
 func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err error) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
 		id, err = getPath(tx, bh)
 		return nil
 	})
@@ -68,9 +68,9 @@ func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err e
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err error) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
 		pb, err = getBlockMap(tx, id)
-		return err
+		return nil
 	})
 	if dbErr != nil {
 		panic(dbErr)
@@ -81,14 +81,68 @@ func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err
 // dbGetSiacoinOutput is a convenience function allowing getSiacoinOutput to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiacoinOutput(id types.SiacoinOutputID) (sco types.SiacoinOutput, err error) {
-	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
 		sco, err = getSiacoinOutput(tx, id)
-		return err
+		return nil
 	})
 	if dbErr != nil {
 		panic(dbErr)
 	}
 	return sco, err
+}
+
+// dbGetFileContract is a convenience function allowing getFileContract to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.FileContract, err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		fc, err = getFileContract(tx, id)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return fc, err
+}
+
+// dbGetSiafundPool is a convenience function allowing getSiafundPool to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return siafundPool
+}
+
+// dbGetDSCO is a convenience function allowing a delayed siacoin output to be
+// fetched without a bolt.Tx. An error is returned if the delayed output is not
+// found at the maturity height indicated by the input.
+func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutputID) (dsco types.SiacoinOutput, err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		dscoBucketID := append(prefixDSCO, encoding.Marshal(height)...)
+		dscoBucket := tx.Bucket(dscoBucketID)
+		if dscoBucket == nil {
+			err = errNilItem
+			return nil
+		}
+		dscoBytes := dscoBucket.Get(id[:])
+		if dscoBytes == nil {
+			err = errNilItem
+			return nil
+		}
+		err = encoding.Unmarshal(dscoBytes, &dsco)
+		if err != nil {
+			panic(err)
+		}
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return dsco, err
 }
 
 /// BREAK ///

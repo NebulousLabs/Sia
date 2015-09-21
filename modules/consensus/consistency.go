@@ -337,4 +337,5 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) error {
 	return nil
 }
 
-// TODO: Check that every file contract has an expiration too.
+// TODO: Check that every file contract has an expiration too, and that the
+// number of file contracts + the number of expirations is equal.

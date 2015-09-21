@@ -178,7 +178,7 @@ func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 			missedPayout = missedPayout.Add(output.Value)
 		}
 		for _, output := range fc.ValidProofOutputs {
-			oldPayout = validPayout.Add(output.Value)
+			oldPayout = oldPayout.Add(output.Value)
 		}
 		if validPayout.Cmp(oldPayout) != 0 {
 			return ErrAlteredRevisionPayouts
