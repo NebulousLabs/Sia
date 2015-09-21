@@ -585,8 +585,9 @@ func TestValidTransaction(t *testing.T) {
 }
 */
 
-// TestTryTransactionSet probes the TryTransactionSet method of the consensus set.
-func TestTryTransactionSet(t *testing.T) {
+// TestTryValidTransactionSet submits a valid transaction set to the
+// TryTransactionSet method.
+func TestTryValidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -595,42 +596,57 @@ func TestTryTransactionSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.closeCst()
-	initialHash := cst.cs.consensusSetHash()
+	initialHash := cst.cs.dbConsensusChecksum()
 
 	// Try a valid transaction.
-	var txns []types.Transaction
 	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	txns = cst.tpool.TransactionList()
+	txns := cst.tpool.TransactionList()
 	cc, err := cst.cs.TryTransactionSet(txns)
 	if err != nil {
 		t.Error(err)
 	}
-	if cst.cs.consensusSetHash() != initialHash {
+	if cst.cs.dbConsensusChecksum() != initialHash {
 		t.Error("TryTransactionSet did not resotre order")
 	}
 	if len(cc.SiacoinOutputDiffs) == 0 {
 		t.Error("consensus change is missing diffs after verifying a transction clump")
 	}
+}
+
+// TestTryInvalidTransactionSet submits an invalid transaction set to the
+// TryTransaction method.
+func TestTryInvalidTransactionSet(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+	initialHash := cst.cs.dbConsensusChecksum()
 
 	// Try a valid transaction followed by an invalid transaction.
+	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txns := cst.tpool.TransactionList()
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
 	txns = append(txns, txn)
-	cc, err = cst.cs.TryTransactionSet(txns)
+	cc, err := cst.cs.TryTransactionSet(txns)
 	if err == nil {
 		t.Error("bad transaction survived filter")
 	}
-	if cst.cs.consensusSetHash() != initialHash {
+	if cst.cs.dbConsensusChecksum() != initialHash {
 		t.Error("TryTransactionSet did not restore order")
 	}
 	if len(cc.SiacoinOutputDiffs) != 0 {
 		t.Error("consensus change was not empty despite an error being returned")
 	}
-
-	// TODO: Try invalid transactions on the corner cases. (transaction is
-	// about to expire, etc.)
 }

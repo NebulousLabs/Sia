@@ -7,7 +7,6 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -587,8 +586,4 @@ func (cs *ConsensusSet) height() (bh types.BlockHeight) {
 		return nil
 	})
 	return bh
-}
-
-func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
-	return crypto.Hash{}
 }

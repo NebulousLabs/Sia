@@ -304,7 +304,7 @@ func TestComplexForking(t *testing.T) {
 	if cstBackup.cs.currentBlockID() != cstMain.cs.currentBlockID() {
 		t.Error("cstMain and cstBackup do not share the same path")
 	}
-	if cstBackup.cs.consensusSetHash() != cstMain.cs.consensusSetHash() {
+	if cstBackup.cs.dbConsensusChecksum() != cstMain.cs.dbConsensusChecksum() {
 		t.Error("cstMain and cstBackup do not share a consensus set hash")
 	}
 
@@ -335,7 +335,7 @@ func TestComplexForking(t *testing.T) {
 	if cstMain.cs.currentBlockID() != cstAlt.cs.currentBlockID() {
 		t.Error("cstMain and cstAlt do not share the same path")
 	}
-	if cstMain.cs.consensusSetHash() != cstAlt.cs.consensusSetHash() {
+	if cstMain.cs.dbConsensusChecksum() != cstAlt.cs.dbConsensusChecksum() {
 		t.Error("cstMain and cstAlt do not share the same consensus set hash")
 	}
 
@@ -362,7 +362,7 @@ func TestComplexForking(t *testing.T) {
 	if cstMain.cs.currentBlockID() != cstBackup.cs.currentBlockID() {
 		t.Error("cstMain and cstBackup do not share the same path")
 	}
-	if cstMain.cs.consensusSetHash() != cstBackup.cs.consensusSetHash() {
+	if cstMain.cs.dbConsensusChecksum() != cstBackup.cs.dbConsensusChecksum() {
 		t.Error("cstMain and cstBackup do not share the same consensus set hash")
 	}
 }
