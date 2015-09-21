@@ -13,15 +13,15 @@ import (
 )
 
 var (
-	ErrBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
-	ErrDoSBlock               = errors.New("block is known to be invalid")
-	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
-	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
-	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
-	ErrInconsistentSet        = errors.New("consensus set is not in a consistent state")
-	ErrLargeBlock             = errors.New("block is too large to be accepted")
-	ErrMissedTarget           = errors.New("block does not meet target")
-	ErrOrphan                 = errors.New("block has no known parent")
+	errBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
+	errDoSBlock               = errors.New("block is known to be invalid")
+	errEarlyTimestamp         = errors.New("block timestamp is too early")
+	errExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
+	errFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
+	errInconsistentSet        = errors.New("consensus set is not in a consistent state")
+	errLargeBlock             = errors.New("block is too large to be accepted")
+	errMissedTarget           = errors.New("block does not meet target")
+	errOrphan                 = errors.New("block has no known parent")
 )
 
 // validHeader does some early, low computation verification on the block.
@@ -30,7 +30,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
-		return ErrDoSBlock
+		return errDoSBlock
 	}
 
 	// Check if the block is already known.
@@ -42,7 +42,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	// Check for the parent.
 	parentBytes := blockMap.Get(b.ParentID[:])
 	if parentBytes == nil {
-		return ErrOrphan
+		return errOrphan
 	}
 	var parent processedBlock
 	err := encoding.Unmarshal(parentBytes, &parent)
@@ -52,18 +52,18 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 
 	// Check that the target of the new block is sufficient.
 	if !b.CheckTarget(parent.ChildTarget) {
-		return ErrMissedTarget
+		return errMissedTarget
 	}
 
 	// Check that the timestamp is not too far in the past to be
 	// acceptable.
 	if earliestChildTimestamp(blockMap, &parent) > b.Timestamp {
-		return ErrEarlyTimestamp
+		return errEarlyTimestamp
 	}
 
 	// Check that the block is below the size limit.
 	if uint64(len(encoding.Marshal(b))) > types.BlockSizeLimit {
-		return ErrLargeBlock
+		return errLargeBlock
 	}
 
 	// If the block is in the extreme future, return an error and do nothing
@@ -71,12 +71,12 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	// future arrives, this block will no longer be a part of the longest fork
 	// because it will have been ignored by all of the miners.
 	if b.Timestamp > types.CurrentTimestamp()+types.ExtremeFutureThreshold {
-		return ErrExtremeFutureTimestamp
+		return errExtremeFutureTimestamp
 	}
 
 	// Verify that the miner payouts are valid.
 	if !b.CheckMinerPayouts(parent.Height + 1) {
-		return ErrBadMinerPayouts
+		return errBadMinerPayouts
 	}
 
 	// If the block is in the near future, but too far to be acceptable, then
@@ -90,7 +90,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 			defer cs.mu.Unlock(lockID)
 			cs.acceptBlock(b) // NOTE: Error is not handled.
 		}()
-		return ErrFutureTimestamp
+		return errFutureTimestamp
 	}
 	return nil
 }
@@ -159,7 +159,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// the longest fork.
 	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
-		// TODO: Add the incoming block to the list of DoS blocks.
 		return err
 	}
 	if len(appliedBlocks) > 0 {
@@ -223,7 +222,7 @@ func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
 
 	// Submit the block to the consensus set.
 	err = cs.AcceptBlock(b)
-	if err == ErrOrphan {
+	if err == errOrphan {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.

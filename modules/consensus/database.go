@@ -38,6 +38,8 @@ var (
 		Header:  "Consensus Set Database",
 	}
 
+	// BlockHeight is a bucket that stores the current block height.
+	//
 	// Generally we would just look at BlockPath.Stats(), but there is an error
 	// in boltdb that prevents the bucket stats from updating until a tx is
 	// committed. Wasn't a problem until we started doing the entire block as
@@ -49,12 +51,28 @@ var (
 	// BlockPath is a database bucket containing a mapping from the height of a
 	// block to the id of the block at that height. BlockPath only includes
 	// blocks in the current path.
-	BlockPath      = []byte("BlockPath")
-	BlockMap       = []byte("BlockMap")
+	BlockPath = []byte("BlockPath")
+
+	// BlockMap is a database bucket containing all of the processed blocks,
+	// keyed by their id. This includes blocks that are not currently in the
+	// consensus set, and blocks that may not have been fully validated yet.
+	BlockMap = []byte("BlockMap")
+
+	// SiacoinOutputs is a database bucket that contains all of the unspent
+	// siacoin outputs.
 	SiacoinOutputs = []byte("SiacoinOutputs")
-	FileContracts  = []byte("FileContracts")
+
+	// FileContracts is a database bucket that contains all of the open file
+	// contracts.
+	FileContracts = []byte("FileContracts")
+
+	// SiafundOutputs is a database bucket that contains all of the unspent
+	// siafund outputs.
 	SiafundOutputs = []byte("SiafundOutputs")
-	SiafundPool    = []byte("SiafundPool")
+
+	// SiafundPool is a database bucket storing the current value of the
+	// siafund pool.
+	SiafundPool = []byte("SiafundPool")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the

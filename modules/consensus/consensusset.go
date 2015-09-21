@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	ErrNilGateway = errors.New("cannot have a nil gateway as input")
+	errNilGateway = errors.New("cannot have a nil gateway as input")
 )
 
 // The ConsensusSet is the object responsible for tracking the current status
@@ -52,7 +52,7 @@ type ConsensusSet struct {
 func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	// Check for nil dependencies.
 	if gateway == nil {
-		return nil, ErrNilGateway
+		return nil, errNilGateway
 	}
 
 	// Create the genesis block.

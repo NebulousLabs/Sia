@@ -423,10 +423,10 @@ func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput
 }
 
 // Height returns the height of the current blockchain (the longest fork).
-func (s *ConsensusSet) Height() types.BlockHeight {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.height()
+func (cs *ConsensusSet) Height() types.BlockHeight {
+	lockID := cs.mu.RLock()
+	defer cs.mu.RUnlock(lockID)
+	return cs.height()
 }
 
 // currentBlockID returns the ID of the current block.

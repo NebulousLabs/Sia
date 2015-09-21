@@ -123,7 +123,7 @@ func (cst *consensusSetTester) closeCst() error {
 func TestNilInputs(t *testing.T) {
 	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")
 	_, err := New(nil, testdir)
-	if err != ErrNilGateway {
+	if err != errNilGateway {
 		t.Fatal(err)
 	}
 }

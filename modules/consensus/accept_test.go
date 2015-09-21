@@ -46,15 +46,15 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 	block.Transactions = append(block.Transactions, txnSet...)
 	dosBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.AcceptBlock(dosBlock)
-	if err != ErrSiacoinInputOutputMismatch {
-		t.Fatalf("expected %v, got %v", ErrSiacoinInputOutputMismatch, err)
+	if err != errSiacoinInputOutputMismatch {
+		t.Fatalf("expected %v, got %v", errSiacoinInputOutputMismatch, err)
 	}
 
 	// Submit the same block a second time. The complaint should be that the
 	// block is already known to be invalid.
 	err = cst.cs.AcceptBlock(dosBlock)
-	if err != ErrDoSBlock {
-		t.Fatalf("expected %v, got %v", ErrDoSBlock, err)
+	if err != errDoSBlock {
+		t.Fatalf("expected %v, got %v", errDoSBlock, err)
 	}
 }
 
@@ -128,12 +128,12 @@ func TestOrphanHandling(t *testing.T) {
 	// The empty block is an orphan.
 	orphan := types.Block{}
 	err = cst.cs.acceptBlock(orphan)
-	if err != ErrOrphan {
-		t.Fatalf("expected %v, got %v", ErrOrphan, err)
+	if err != errOrphan {
+		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
 	err = cst.cs.acceptBlock(orphan)
-	if err != ErrOrphan {
-		t.Fatalf("expected %v, got %v", ErrOrphan, err)
+	if err != errOrphan {
+		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
 }
 
@@ -160,8 +160,8 @@ func TestMissedTarget(t *testing.T) {
 		t.Fatal("unable to find a failing target")
 	}
 	err = cst.cs.acceptBlock(block)
-	if err != ErrMissedTarget {
-		t.Fatalf("expected %v, got %v", ErrMissedTarget, err)
+	if err != errMissedTarget {
+		t.Fatalf("expected %v, got %v", errMissedTarget, err)
 	}
 }
 
@@ -191,8 +191,8 @@ func TestLargeBlock(t *testing.T) {
 	block.Transactions = append(block.Transactions, txn)
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
-	if err != ErrLargeBlock {
-		t.Fatalf("expected %v, got %v", ErrLargeBlock, err)
+	if err != errLargeBlock {
+		t.Fatalf("expected %v, got %v", errLargeBlock, err)
 	}
 }
 
@@ -217,8 +217,8 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 	block.Timestamp = 0
 	earlyBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(earlyBlock)
-	if err != ErrEarlyTimestamp {
-		t.Fatalf("expected %v, got %v", ErrEarlyTimestamp, err)
+	if err != errEarlyTimestamp {
+		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
 	}
 }
 
@@ -242,8 +242,8 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
-	if err != ErrExtremeFutureTimestamp {
-		t.Fatalf("expected %v, got %v", ErrExtremeFutureTimestamp, err)
+	if err != errExtremeFutureTimestamp {
+		t.Fatalf("expected %v, got %v", errExtremeFutureTimestamp, err)
 	}
 
 	// Check that after waiting until the block is no longer in the future, the
@@ -280,8 +280,8 @@ func TestMinerPayoutHandling(t *testing.T) {
 	block.MinerPayouts = append(block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(1)})
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
-	if err != ErrBadMinerPayouts {
-		t.Fatalf("expected %v, got %v", ErrBadMinerPayouts, err)
+	if err != errBadMinerPayouts {
+		t.Fatalf("expected %v, got %v", errBadMinerPayouts, err)
 	}
 }
 
@@ -297,8 +297,8 @@ func (cst *consensusSetTester) testFutureTimestampHandling() error {
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(solvedBlock)
-	if err != ErrFutureTimestamp {
-		return fmt.Errorf("expected %v, got %v", ErrFutureTimestamp, err)
+	if err != errFutureTimestamp {
+		return fmt.Errorf("expected %v, got %v", errFutureTimestamp, err)
 	}
 
 	// Check that after waiting until the block is no longer too far in the

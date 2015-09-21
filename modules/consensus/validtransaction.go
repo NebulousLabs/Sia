@@ -14,17 +14,17 @@ import (
 )
 
 var (
-	ErrAlteredRevisionPayouts     = errors.New("file contract revision has altered payout volume")
-	ErrInvalidStorageProof        = errors.New("provided storage proof is invalid")
-	ErrLateRevision               = errors.New("file contract revision submitted after deadline")
-	ErrLowRevisionNumber          = errors.New("transaction has a file contract with an outdated revision number")
-	ErrMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
-	ErrMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
-	ErrSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
-	ErrSiafundInputOutputMismatch = errors.New("siafund inputs do not equal siafund outputs for transaction")
-	ErrUnfinishedFileContract     = errors.New("file contract window has not yet openend")
-	ErrUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
-	ErrWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
+	errAlteredRevisionPayouts     = errors.New("file contract revision has altered payout volume")
+	errInvalidStorageProof        = errors.New("provided storage proof is invalid")
+	errLateRevision               = errors.New("file contract revision submitted after deadline")
+	errLowRevisionNumber          = errors.New("transaction has a file contract with an outdated revision number")
+	errMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
+	errMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
+	errSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	errSiafundInputOutputMismatch = errors.New("siafund inputs do not equal siafund outputs for transaction")
+	errUnfinishedFileContract     = errors.New("file contract window has not yet openend")
+	errUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
+	errWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 )
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
@@ -36,7 +36,7 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 		// Check that the input spends an existing output.
 		scoBytes := scoBucket.Get(sci.ParentID[:])
 		if scoBytes == nil {
-			return ErrMissingSiacoinOutput
+			return errMissingSiacoinOutput
 		}
 
 		// Check that the unlock conditions match the required unlock hash.
@@ -46,13 +46,13 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 			panic(err)
 		}
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
-			return ErrWrongUnlockConditions
+			return errWrongUnlockConditions
 		}
 
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return ErrSiacoinInputOutputMismatch
+		return errSiacoinInputOutputMismatch
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func storageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error)
 	fcBucket := tx.Bucket(FileContracts)
 	fcBytes := fcBucket.Get(fcid[:])
 	if fcBytes == nil {
-		return 0, ErrUnrecognizedFileContractID
+		return 0, errUnrecognizedFileContractID
 	}
 
 	// Decode the file contract.
@@ -78,7 +78,7 @@ func storageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error)
 	blockPath := tx.Bucket(BlockPath)
 	triggerHeight := fc.WindowStart - 1
 	if triggerHeight > blockHeight(tx) {
-		return 0, ErrUnfinishedFileContract
+		return 0, errUnfinishedFileContract
 	}
 	var triggerID types.BlockID
 	copy(triggerID[:], blockPath.Get(encoding.EncUint64(uint64(triggerHeight))))
@@ -134,7 +134,7 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 			fc.FileMerkleRoot,
 		)
 		if !verified {
-			return ErrInvalidStorageProof
+			return errInvalidStorageProof
 		}
 	}
 
@@ -154,18 +154,18 @@ func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 		// not allowed to be submitted once the storage proof window has
 		// opened.  This reduces complexity for unconfirmed transactions.
 		if blockHeight(tx) > fc.WindowStart {
-			return ErrLateRevision
+			return errLateRevision
 		}
 
 		// Check that the revision number of the revision is greater than the
 		// revision number of the existing file contract.
 		if fc.RevisionNumber >= fcr.NewRevisionNumber {
-			return ErrLowRevisionNumber
+			return errLowRevisionNumber
 		}
 
 		// Check that the unlock conditions match the unlock hash.
 		if fcr.UnlockConditions.UnlockHash() != fc.UnlockHash {
-			return ErrWrongUnlockConditions
+			return errWrongUnlockConditions
 		}
 
 		// Check that the payout of the revision matches the payout of the
@@ -181,10 +181,10 @@ func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 			oldPayout = oldPayout.Add(output.Value)
 		}
 		if validPayout.Cmp(oldPayout) != 0 {
-			return ErrAlteredRevisionPayouts
+			return errAlteredRevisionPayouts
 		}
 		if missedPayout.Cmp(oldPayout) != 0 {
-			return ErrAlteredRevisionPayouts
+			return errAlteredRevisionPayouts
 		}
 	}
 	return nil
@@ -204,7 +204,7 @@ func validSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
 
 		// Check the unlock conditions match the unlock hash.
 		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
-			return ErrWrongUnlockConditions
+			return errWrongUnlockConditions
 		}
 
 		siafundInputSum = siafundInputSum.Add(sfo.Value)
@@ -213,7 +213,7 @@ func validSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
 		siafundOutputSum = siafundOutputSum.Add(sfo.Value)
 	}
 	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
-		return ErrSiafundInputOutputMismatch
+		return errSiafundInputOutputMismatch
 	}
 	return
 }

@@ -488,7 +488,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 	exists = cst.cs.db.inFileContracts(missedFCID)
 	if exists {
-		return errors.New("missed file contract was not consumed when the window was closed.")
+		return errors.New("missed file contract was not consumed when the window was closed")
 	}
 
 	// Mine enough blocks to get all of the outputs into the set of siacoin
@@ -502,7 +502,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 
 	// Check that all of the outputs have ended up at the right destination.
 	if cst.cs.db.getSiacoinOutputs(validFCID.StorageProofOutputID(types.ProofValid, 0)).UnlockHash != validProofDest {
-		return errors.New("file contract output did not end up at the right place.")
+		return errors.New("file contract output did not end up at the right place")
 	}
 	if cst.cs.db.getSiacoinOutputs(missedFCID.StorageProofOutputID(types.ProofMissed, 0)).UnlockHash != revisionDest {
 		return errors.New("missed file proof output did not end up at the revised destination")

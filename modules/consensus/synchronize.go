@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks       = 10
-	MaxSynchronizeAttempts = 8
+	// MaxCatchUpBlocks is the maxiumum number of blocks that can be given to
+	// the consensus set in a single iteration during the initial blockchain
+	// download.
+	MaxCatchUpBlocks = 10
 )
 
 // blockHistory returns up to 32 block ids, starting with recent blocks and

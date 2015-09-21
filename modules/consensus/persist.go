@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	// DatabaseFilename contains the filename of the database that will be used
+	// when managing consensus.
 	DatabaseFilename = "consensus.db"
 )
 

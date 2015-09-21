@@ -4,24 +4,11 @@ package consensus
 // There is an assumption that the transaction has already been verified.
 
 import (
-	"errors"
-
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	ErrDuplicateValidProofOutput        = errors.New("applying a storage proof created a duplicate proof output")
-	ErrMisuseApplySiacoinInput          = errors.New("applying a transaction with an invalid unspent siacoin output")
-	ErrMisuseApplySiacoinOutput         = errors.New("applying a transaction with an invalid siacoin output")
-	ErrMisuseApplyFileContracts         = errors.New("applying a transaction with an invalid file contract")
-	ErrMisuseApplyFileContractRevisions = errors.New("applying a revision for a nonexistant file contract")
-	ErrMisuseApplySiafundInput          = errors.New("applying a transaction with invalid siafund input")
-	ErrMisuseApplySiafundOutput         = errors.New("applying a transaction with an invalid siafund output")
-	ErrNonexistentStorageProof          = errors.New("applying a storage proof for a nonexistent file contract")
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
