@@ -152,8 +152,6 @@ func TestIntegrationSpendSiacoinsBlock(t *testing.T) {
 // testValidStorageProofBlocks adds a block with a file contract, and then
 // submits a storage proof for that file contract.
 func (cst *consensusSetTester) testValidStorageProofBlocks() {
-	validProofDest := randAddress()
-
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
@@ -165,6 +163,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	file.Seek(0, 0)
 
 	// Create a file contract that will be successful.
+	validProofDest := randAddress()
 	payout := types.NewCurrency64(400e6)
 	fc := types.FileContract{
 		FileSize:       filesize,
@@ -284,6 +283,110 @@ func TestIntegrationValidStorageProofBlocks(t *testing.T) {
 	}
 	defer cst.closeCst()
 	cst.testValidStorageProofBlocks()
+}
+
+// testMissedStorageProofBlocks adds a block with a file contract, and then
+// fails to submit a storage proof before expiration.
+func (cst *consensusSetTester) testMissedStorageProofBlocks() {
+	// Create a file contract that will be successful.
+	filesize := uint64(4e3)
+	payout := types.NewCurrency64(400e6)
+	missedProofDest := randAddress()
+	fc := types.FileContract{
+		FileSize:       filesize,
+		FileMerkleRoot: crypto.Hash{},
+		WindowStart:    cst.cs.dbBlockHeight() + 1,
+		WindowEnd:      cst.cs.dbBlockHeight() + 2,
+		Payout:         payout,
+		ValidProofOutputs: []types.SiacoinOutput{{
+			UnlockHash: types.UnlockHash{},
+			Value:      types.PostTax(cst.cs.dbBlockHeight(), payout),
+		}},
+		MissedProofOutputs: []types.SiacoinOutput{{
+			UnlockHash: missedProofDest,
+			Value:      types.PostTax(cst.cs.dbBlockHeight(), payout),
+		}},
+	}
+
+	// Submit a transaction with the file contract.
+	oldSiafundPool := cst.cs.dbGetSiafundPool()
+	txnBuilder := cst.wallet.StartTransaction()
+	err := txnBuilder.FundSiacoins(payout)
+	if err != nil {
+		panic(err)
+	}
+	fcIndex := txnBuilder.AddFileContract(fc)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		panic(err)
+	}
+	err = cst.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		panic(err)
+	}
+	_, err = cst.miner.AddBlock()
+	if err != nil {
+		panic(err)
+	}
+
+	// Check that the siafund pool was increased by the tax on the payout.
+	siafundPool := cst.cs.dbGetSiafundPool()
+	if siafundPool.Cmp(oldSiafundPool.Add(types.Tax(cst.cs.dbBlockHeight()-1, payout))) != 0 {
+		panic("siafund pool was not increased correctly")
+	}
+
+	// Check that the file contract made it into the database.
+	ti := len(txnSet) - 1
+	fcid := txnSet[ti].FileContractID(int(fcIndex))
+	_, err = cst.cs.dbGetFileContract(fcid)
+	if err != nil {
+		panic(err)
+	}
+
+	// Mine a block to close the storage proof window.
+	_, err = cst.miner.AddBlock()
+	if err != nil {
+		panic(err)
+	}
+
+	// Check that the file contract has been removed.
+	_, err = cst.cs.dbGetFileContract(fcid)
+	if err != errNilItem {
+		panic("file contract should not exist in the database")
+	}
+
+	// Check that the siafund pool has not changed.
+	postProofPool := cst.cs.dbGetSiafundPool()
+	if postProofPool.Cmp(siafundPool) != 0 {
+		panic("siafund pool should not change after submitting a storage proof")
+	}
+
+	// Check that a delayed output was created for the missed proof.
+	spoid := fcid.StorageProofOutputID(types.ProofMissed, 0)
+	dsco, err := cst.cs.dbGetDSCO(cst.cs.dbBlockHeight()+types.MaturityDelay, spoid)
+	if err != nil {
+		panic(err)
+	}
+	if dsco.UnlockHash != fc.MissedProofOutputs[0].UnlockHash {
+		panic("wrong unlock hash in dsco")
+	}
+	if dsco.Value.Cmp(fc.MissedProofOutputs[0].Value) != 0 {
+		panic("wrong sco value in dsco")
+	}
+}
+
+// TestIntegrationMissedStorageProofBlocks creates a consensus set tester and
+// uses it to call testMissedStorageProofBlocks.
+func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestIntegrationMissedStorageProofBlocks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+	cst.testMissedStorageProofBlocks()
 }
 
 /// BREAK ///
