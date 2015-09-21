@@ -330,7 +330,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 	}()
 
 	// Commit a delayed siacoin output with maturity height = cs.height()+1
-	maturityHeight := cst.cs.height() - 1
+	maturityHeight := cst.cs.dbBlockHeight() - 1
 	id := types.SiacoinOutputID{'1'}
 	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
 	dscod := modules.DelayedSiacoinOutputDiff{
@@ -494,7 +494,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	dscod := modules.DelayedSiacoinOutputDiff{
 		Direction:      modules.DiffApply,
 		ID:             dscoid,
-		MaturityHeight: cst.cs.height() + types.MaturityDelay,
+		MaturityHeight: cst.cs.dbBlockHeight() + types.MaturityDelay,
 	}
 	var siafundPool types.Currency
 	err = cst.cs.db.Update(func(tx *bolt.Tx) error {

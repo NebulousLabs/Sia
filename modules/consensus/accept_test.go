@@ -460,8 +460,8 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	oldSiafundPool := siafundPool
 	payout := types.NewCurrency64(400e6)
 	fc := types.FileContract{
-		WindowStart: cst.cs.height() + 2,
-		WindowEnd:   cst.cs.height() + 4,
+		WindowStart: cst.cs.dbBlockHeight() + 2,
+		WindowEnd:   cst.cs.dbBlockHeight() + 4,
 		Payout:      payout,
 	}
 	outputSize := payout.Sub(types.Tax(cst.cs.dbBlockHeight(), fc.Payout))
@@ -547,7 +547,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	}
 	found := false
 	expectedBalance := siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
-	cst.cs.db.forEachDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
+	cst.cs.db.forEachDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
 		if output.UnlockHash == claimDest {
 			found = true
 			if output.Value.Cmp(expectedBalance) != 0 {
@@ -754,7 +754,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
 		ParentID:       crypto.Hash(channelOutputID),
 		PublicKeyIndex: 1,
-		Timelock:       cst.cs.height() + 2,
+		Timelock:       cst.cs.dbBlockHeight() + 2,
 		CoveredFields:  types.CoveredFields{WholeTransaction: true},
 	})
 	sigHash = refundTxn.SigHash(1)
@@ -1052,7 +1052,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
 			ParentID:       crypto.Hash(channelOutputID),
 			PublicKeyIndex: 1,
-			Timelock:       cst.cs.height() + 2,
+			Timelock:       cst.cs.dbBlockHeight() + 2,
 			CoveredFields:  types.CoveredFields{WholeTransaction: true},
 		})
 		sigHash = refundTxn.SigHash(1)

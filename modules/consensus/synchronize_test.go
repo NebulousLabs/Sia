@@ -187,15 +187,15 @@ func TestBlockHistory(t *testing.T) {
 	lockID := cst.cs.mu.Lock()
 	// first 10 IDs are linear
 	for i := types.BlockHeight(0); i < 10; i++ {
-		if history[i] != cst.cs.db.getPath(cst.cs.height()-i) {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.height()-i), history[i])
+		if history[i] != cst.cs.db.getPath(cst.cs.dbBlockHeight()-i) {
+			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.dbBlockHeight()-i), history[i])
 		}
 	}
 	// next 4 IDs are exponential
 	heights := []types.BlockHeight{11, 15, 23, 39}
 	for i, height := range heights {
-		if history[10+i] != cst.cs.db.getPath(cst.cs.height()-height) {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.height()-height), history[10+i])
+		if history[10+i] != cst.cs.db.getPath(cst.cs.dbBlockHeight()-height) {
+			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.getPath(cst.cs.dbBlockHeight()-height), history[10+i])
 		}
 	}
 	// finally, the genesis ID

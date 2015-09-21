@@ -412,10 +412,27 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 // testSpendSiafunds spends siafunds on the blockchain when the siafund pool is
 // not empty.
 //
-// TODO: Make sure you check that the ClaimStart value is being set correclty.
+// TODO: Make sure the ClaimStart value is being set correclty.
 
 // TestIntegrationSpendSiafunds creates a consensus set tester and uses it to
 // call testSpendSiafunds.
+
+// testDelayedOutputMaturity adds blocks that result in many delayed outputs
+// maturing at the same time, verifying that bulk maturity is handled
+// correctly.
+
+// TestRegressionDelayedOutputMaturity creates a consensus set tester and uses
+// it to call testDelayedOutputMaturity. In the past, bolt's ForEach function
+// had been used incorrectly resulting in the incorrect processing of bulk
+// delayed outputs.
+
+// testFileContractMaturity adds blocks that result in many file contracts
+// being closed at the same time.
+
+// TestRegressionFileContractMaturity creates a consensus set tester and uses
+// it to call testFileContractMaturity. In the past, bolt's ForEach function
+// had been used incorrectly, resulting in the incorrect processing of bulk
+// file contracts.
 
 /// BREAK ///
 /// BREAK ///
@@ -459,8 +476,8 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	validFC := types.FileContract{
 		FileSize:       filesize,
 		FileMerkleRoot: merkleRoot,
-		WindowStart:    cst.cs.height() + 2,
-		WindowEnd:      cst.cs.height() + 4,
+		WindowStart:    cst.cs.dbBlockHeight() + 2,
+		WindowEnd:      cst.cs.dbBlockHeight() + 4,
 		Payout:         payout,
 		ValidProofOutputs: []types.SiacoinOutput{{
 			UnlockHash: validProofDest,
@@ -476,8 +493,8 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	missedFC := types.FileContract{
 		FileSize:       uint64(filesize),
 		FileMerkleRoot: merkleRoot,
-		WindowStart:    cst.cs.height() + 2,
-		WindowEnd:      cst.cs.height() + 4,
+		WindowStart:    cst.cs.dbBlockHeight() + 2,
+		WindowEnd:      cst.cs.dbBlockHeight() + 4,
 		Payout:         payout,
 		ValidProofOutputs: []types.SiacoinOutput{{
 			Value:      outputSize,
@@ -603,7 +620,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	// Check that the file contract output made it into the set of delayed
 	// outputs.
 	validProofID := validFCID.StorageProofOutputID(types.ProofValid, 0)
-	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, validProofID)
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay, validProofID)
 	if !exists {
 		return errors.New("file contract payout is not in the delayed outputs set")
 	}

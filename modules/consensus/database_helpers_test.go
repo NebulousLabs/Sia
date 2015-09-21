@@ -425,12 +425,12 @@ func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput
 func (cs *ConsensusSet) Height() types.BlockHeight {
 	lockID := cs.mu.RLock()
 	defer cs.mu.RUnlock(lockID)
-	return cs.height()
+	return cs.dbBlockHeight()
 }
 
 // currentBlockID returns the ID of the current block.
 func (cs *ConsensusSet) currentBlockID() types.BlockID {
-	return cs.db.getPath(cs.height())
+	return cs.db.getPath(cs.dbBlockHeight())
 }
 
 func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
@@ -577,13 +577,4 @@ func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error
 		return nil
 	})
 	return item, err
-}
-
-// height returns the current height of the state.
-func (cs *ConsensusSet) height() (bh types.BlockHeight) {
-	_ = cs.db.View(func(tx *bolt.Tx) error {
-		bh = blockHeight(tx)
-		return nil
-	})
-	return bh
 }

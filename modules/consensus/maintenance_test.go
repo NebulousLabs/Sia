@@ -23,7 +23,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 
 	// Create a block node with a single miner payout.
 	pb := new(processedBlock)
-	pb.Height = cst.cs.height()
+	pb.Height = cst.cs.dbBlockHeight()
 	pb.Block.Timestamp = 2 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
 	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(12)})
 	mpid0 := pb.Block.MinerPayoutID(0)
@@ -33,11 +33,11 @@ func TestApplyMinerPayouts(t *testing.T) {
 		applyMinerPayouts(tx, pb)
 		return nil
 	})
-	exists := cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid0)
+	exists := cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay, mpid0)
 	if !exists {
 		t.Error("miner payout was not created in the delayed outputs set")
 	}
-	dsco := cst.cs.db.getDelayedSiacoinOutputs(cst.cs.height()+types.MaturityDelay, mpid0)
+	dsco := cst.cs.db.getDelayedSiacoinOutputs(cst.cs.dbBlockHeight()+types.MaturityDelay, mpid0)
 	if dsco.Value.Cmp(types.NewCurrency64(12)) != 0 {
 		t.Error("miner payout created with wrong currency value")
 	}
@@ -45,7 +45,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if exists {
 		t.Error("miner payout was added to the siacoin output set")
 	}
-	if cst.cs.db.lenDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay) != 2 { // 1 for consensus set creation, 1 for the output that just got added.
+	if cst.cs.db.lenDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay) != 2 { // 1 for consensus set creation, 1 for the output that just got added.
 		t.Error("wrong number of delayed siacoin outputs in consensus set")
 	}
 	if len(pb.DelayedSiacoinOutputDiffs) != 1 {
@@ -60,7 +60,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 
 	// Apply a processed block with two miner payouts.
 	pb2 := new(processedBlock)
-	pb2.Height = cst.cs.height()
+	pb2.Height = cst.cs.dbBlockHeight()
 	pb2.Block.Timestamp = 5 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
 	pb2.Block.MinerPayouts = []types.SiacoinOutput{
 		{Value: types.NewCurrency64(5)},
@@ -72,11 +72,11 @@ func TestApplyMinerPayouts(t *testing.T) {
 		applyMinerPayouts(tx, pb2)
 		return nil
 	})
-	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid1)
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay, mpid1)
 	if !exists {
 		t.Error("delayed siacoin output was not created")
 	}
-	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, mpid2)
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay, mpid2)
 	if !exists {
 		t.Error("delayed siacoin output was not created")
 	}
