@@ -8,7 +8,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -145,60 +144,6 @@ func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutp
 }
 
 /// BREAK ///
-
-// applyMissedStorageProof adds the outputs and diffs that result from a file
-// contract expiring.
-func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) error {
-	// Sanity checks.
-	fc := cs.db.getFileContracts(fcid)
-	if build.DEBUG {
-		// Check that the file contract in question expires at pb.Height.
-		if fc.WindowEnd != pb.Height {
-			panic(errStorageProofTiming)
-		}
-	}
-
-	// Add all of the outputs in the missed proof outputs to the consensus set.
-	for i, mpo := range fc.MissedProofOutputs {
-		// Sanity check - output should not already exist.
-		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
-		if build.DEBUG {
-			exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
-			if exists {
-				panic(errPayoutsAlreadyPaid)
-			}
-			exists = cs.db.inSiacoinOutputs(spoid)
-			if exists {
-				panic(errPayoutsAlreadyPaid)
-			}
-		}
-
-		dscod := modules.DelayedSiacoinOutputDiff{
-			Direction:      modules.DiffApply,
-			ID:             spoid,
-			SiacoinOutput:  mpo,
-			MaturityHeight: pb.Height + types.MaturityDelay,
-		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		_ = cs.db.Update(func(tx *bolt.Tx) error {
-			commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-			return nil
-		})
-	}
-
-	// Remove the file contract from the consensus set and record the diff in
-	// the blockNode.
-	fcd := modules.FileContractDiff{
-		Direction:    modules.DiffRevert,
-		ID:           fcid,
-		FileContract: fc,
-	}
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		commitFileContractDiff(tx, fcd, modules.DiffApply)
-		return nil
-	})
-}
 
 // addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
 func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
@@ -419,13 +364,6 @@ func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput
 		panic(err)
 	}
 	return sfo
-}
-
-// Height returns the height of the current blockchain (the longest fork).
-func (cs *ConsensusSet) Height() types.BlockHeight {
-	lockID := cs.mu.RLock()
-	defer cs.mu.RUnlock(lockID)
-	return cs.dbBlockHeight()
 }
 
 // rmItem removes an item from a bucket

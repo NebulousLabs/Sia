@@ -28,7 +28,7 @@ func TestSynchronize(t *testing.T) {
 	defer cst2.closeCst()
 
 	// mine on cst2 until it is above cst1
-	for cst1.cs.Height() >= cst2.cs.Height() {
+	for cst1.cs.dbBlockHeight() >= cst2.cs.dbBlockHeight() {
 		b, _ := cst2.miner.FindBlock()
 		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
@@ -55,7 +55,7 @@ func TestSynchronize(t *testing.T) {
 		t.Fatal(err)
 	}
 	// TODO: more than 30 causes a race condition!
-	for cst2.cs.Height() < cst1.cs.Height()+20 {
+	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+20 {
 		b, _ := cst2.miner.FindBlock()
 		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
@@ -69,7 +69,7 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// block heights should now match
-	for cst1.cs.Height() != cst2.cs.Height() {
+	for cst1.cs.dbBlockHeight() != cst2.cs.dbBlockHeight() {
 		time.Sleep(250 * time.Millisecond)
 	}
 
@@ -149,7 +149,7 @@ func TestResynchronize(t *testing.T) {
 		cst2.cs.mu.Unlock(lockID)
 
 		// cst1 should not have the block
-		if cst1.cs.Height() == cst2.cs.Height() {
+		if cst1.cs.dbBlockHeight() == cst2.cs.dbBlockHeight() {
 			t.Fatal("Consensus Sets should not have the same height")
 		}
 	*/
@@ -169,7 +169,7 @@ func TestBlockHistory(t *testing.T) {
 	defer cst.closeCst()
 
 	// mine until we have enough blocks to test blockHistory
-	for cst.cs.Height() < 50 {
+	for cst.cs.dbBlockHeight() < 50 {
 		b, _ := cst.miner.FindBlock()
 		err = cst.cs.AcceptBlock(b)
 		if err != nil {
@@ -187,7 +187,7 @@ func TestBlockHistory(t *testing.T) {
 	lockID := cst.cs.mu.Lock()
 	// first 10 IDs are linear
 	for i := types.BlockHeight(0); i < 10; i++ {
-		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight()-i)
+		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight() - i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -198,7 +198,7 @@ func TestBlockHistory(t *testing.T) {
 	// next 4 IDs are exponential
 	heights := []types.BlockHeight{11, 15, 23, 39}
 	for i, height := range heights {
-		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight()-height)
+		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight() - height)
 		if err != nil {
 			t.Fatal(err)
 		}
