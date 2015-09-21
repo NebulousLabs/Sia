@@ -136,7 +136,7 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock) error {
+func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock) {
 	// Fetch the parent block.
 	var parent processedBlock
 	parentBytes := blockMap.Get(pb.Block.ParentID[:])
@@ -147,19 +147,16 @@ func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock
 
 	if pb.Height%(types.TargetWindow/2) != 0 {
 		pb.ChildTarget = parent.ChildTarget
-		return nil
+		return
 	}
 	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(blockMap, pb))
 	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
 	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
-	return nil
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
 // children. The new node is also returned. It necessairly modifies the database
-//
-// TODO: newChild has a fair amount of room for optimization.
-func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block) (*processedBlock, error) {
+func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block) *processedBlock {
 	// Create the child node.
 	childID := b.ID()
 	child := &processedBlock{
@@ -168,13 +165,10 @@ func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block)
 		Depth:  pb.childDepth(),
 	}
 	blockMap := tx.Bucket(BlockMap)
-	err := cs.setChildTarget(blockMap, child)
-	if err != nil {
-		return nil, err
+	cs.setChildTarget(blockMap, child)
+	err := blockMap.Put(childID[:], encoding.Marshal(*child))
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
-	err = blockMap.Put(childID[:], encoding.Marshal(*child))
-	if err != nil {
-		return nil, err
-	}
-	return child, nil
+	return child
 }

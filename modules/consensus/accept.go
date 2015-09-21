@@ -108,10 +108,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 			panic(err)
 		}
 		currentNode := currentProcessedBlock(tx)
-		newNode, err := cs.newChild(tx, pb, b)
-		if err != nil {
-			return err
-		}
+		newNode := cs.newChild(tx, pb, b)
 
 		// modules.ErrNonExtendingBlock should be returned if the block does
 		// not extend the current blockchain, however the changes from newChild
