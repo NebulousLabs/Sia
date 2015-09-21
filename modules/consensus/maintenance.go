@@ -55,11 +55,8 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 		// Decode the key-value pair into an id and a siacoin output.
 		var id types.SiacoinOutputID
 		var sco types.SiacoinOutput
-		encErr := encoding.Unmarshal(idBytes, &id)
-		if build.DEBUG && encErr != nil {
-			panic(encErr)
-		}
-		encErr = encoding.Unmarshal(scoBytes, &sco)
+		copy(id[:], idBytes)
+		encErr := encoding.Unmarshal(scoBytes, &sco)
 		if build.DEBUG && encErr != nil {
 			panic(encErr)
 		}
@@ -102,7 +99,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) {
+func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) (fcd modules.FileContractDiff) {
 	// Sanity checks.
 	fc, err := getFileContract(tx, fcid)
 	if build.DEBUG && err != nil {
@@ -135,13 +132,11 @@ func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileCon
 
 	// Remove the file contract from the consensus set and record the diff in
 	// the blockNode.
-	fcd := modules.FileContractDiff{
+	return modules.FileContractDiff{
 		Direction:    modules.DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
 	}
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	commitFileContractDiff(tx, fcd, modules.DiffApply)
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have
@@ -156,14 +151,19 @@ func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) {
 		return
 	}
 
+	var fcds []modules.FileContractDiff
 	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
 		var id types.FileContractID
 		copy(id[:], keyBytes)
-		applyMissedStorageProof(tx, pb, id)
+		fcds = append(fcds, applyMissedStorageProof(tx, pb, id))
 		return nil
 	})
 	if build.DEBUG && err != nil {
 		panic(err)
+	}
+	for _, fcd := range fcds {
+		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+		commitFileContractDiff(tx, fcd, modules.DiffApply)
 	}
 	err = tx.DeleteBucket(fceBucketID)
 	if build.DEBUG && err != nil {
