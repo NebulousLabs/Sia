@@ -102,6 +102,19 @@ func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.Fil
 	return fc, err
 }
 
+// dbGetSiafundOutput is a convenience function allowing getSiafundOutput to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbGetSiafundOutput(id types.SiafundOutputID) (sfo types.SiafundOutput, err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		sfo, err = getSiafundOutput(tx, id)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return sfo, err
+}
+
 // dbGetSiafundPool is a convenience function allowing getSiafundPool to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {
@@ -145,17 +158,6 @@ func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutp
 
 /// BREAK ///
 
-// addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
-func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
-	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
-	err := db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, bucketID, id, sco)
-	})
-	if err != nil {
-		panic(err)
-	}
-}
-
 // rmDelayedSiacoinOutputsHeight removes a siacoin output with a given ID at the given height
 func (db *setDB) rmDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) error {
 	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
@@ -194,49 +196,6 @@ func (db *setDB) rmFileContracts(id types.FileContractID) error {
 	return db.rmItem(FileContracts, id)
 }
 
-// addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
-func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, SiacoinOutputs, id, sco)
-	})
-}
-
-// addBlockMap adds a processedBlock to the block map
-// This will eventually take a processed block as an argument
-func (db *setDB) addBlockMap(pb *processedBlock) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, BlockMap, pb.Block.ID(), *pb)
-	})
-}
-
-// addFileContracts is a wrapper around addItem for adding a file
-// contract to the consensusset
-func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, FileContracts, id, fc)
-	})
-}
-
-// insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
-// the bucket does not exist or if the item is already in the bucket.
-func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
-	b := tx.Bucket(bucket)
-	if build.DEBUG && b == nil {
-		panic(errNilBucket)
-	}
-	k := encoding.Marshal(key)
-	v := encoding.Marshal(value)
-	if build.DEBUG && b.Get(k) != nil {
-		panic(errRepeatInsert)
-	}
-	return b.Put(k, v)
-}
-
-// pathHeight returns the size of the current path
-func (db *setDB) pathHeight() types.BlockHeight {
-	return types.BlockHeight(db.lenBucket(BlockPath))
-}
-
 // forEachDelayedSiacoinOutputsHeight applies a function to every siacoin output at a given height
 func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
 	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
@@ -268,21 +227,6 @@ func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.Sia
 	return db.inBucket(bucketID, id)
 }
 
-// getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
-func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinOutputID) types.SiacoinOutput {
-	bucketID := append(prefixDSCO, encoding.Marshal(h)...)
-	scoBytes, err := db.getItem(bucketID, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var sco types.SiacoinOutput
-	err = encoding.Unmarshal(scoBytes, &sco)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sco
-}
-
 // forEachSiacoinOutputs applies a function to every siacoin output and ID
 func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
 	db.forEachItem(SiacoinOutputs, func(kb, vb []byte) error {
@@ -305,20 +249,6 @@ func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.
 // in the siacoin outputs bucket
 func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
 	return db.inBucket(SiacoinOutputs, id)
-}
-
-// getSiacoinOutputs retrieves a saicoin output by ID
-func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput {
-	scoBytes, err := db.getItem(SiacoinOutputs, id)
-	if err != nil {
-		panic(err)
-	}
-	var sco types.SiacoinOutput
-	err = encoding.Unmarshal(scoBytes, &sco)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sco
 }
 
 // forEachFileContracts applies a function to each (file contract id, filecontract)
@@ -349,21 +279,6 @@ func (db *setDB) rmSiafundOutputs(id types.SiafundOutputID) error {
 // if an output with the given id is in the database
 func (db *setDB) inSiafundOutputs(id types.SiafundOutputID) bool {
 	return db.inBucket(SiafundOutputs, id)
-}
-
-// getSiafundOutputs is a wrapper around getItem which decodes the
-// result into a siafundOutput
-func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput {
-	sfoBytes, err := db.getItem(SiafundOutputs, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var sfo types.SiafundOutput
-	err = encoding.Unmarshal(sfoBytes, &sfo)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return sfo
 }
 
 // rmItem removes an item from a bucket
@@ -419,12 +334,6 @@ func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
 	}
 }
 
-// inBlockMap checks for the existance of a block with a given ID in
-// the consensus set
-func (db *setDB) inBlockMap(id types.BlockID) bool {
-	return db.inBucket(BlockMap, id)
-}
-
 func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
 	db.forEachItem(SiafundOutputs, func(kb, vb []byte) error {
 		var key types.SiafundOutputID
@@ -440,37 +349,4 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 		fn(key, value)
 		return nil
 	})
-}
-
-// getFileContracts is a wrapper around getItem for retrieving a file contract
-func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
-	fcBytes, err := db.getItem(FileContracts, id)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	var fc types.FileContract
-	err = encoding.Unmarshal(fcBytes, &fc)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return fc
-}
-
-// getItem is a generic function to insert an item into the set database
-func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error) {
-	k := encoding.Marshal(key)
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		// Sanity check to make sure the bucket exists.
-		if build.DEBUG && b == nil {
-			panic(errNilBucket)
-		}
-		item = b.Get(k)
-		// Sanity check to make sure the item requested exists
-		if item == nil {
-			return errNilItem
-		}
-		return nil
-	})
-	return item, err
 }

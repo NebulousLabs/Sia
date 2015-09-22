@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"testing"
 
@@ -37,7 +38,10 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if !exists {
 		t.Error("miner payout was not created in the delayed outputs set")
 	}
-	dsco := cst.cs.db.getDelayedSiacoinOutputs(cst.cs.dbBlockHeight()+types.MaturityDelay, mpid0)
+	dsco, err := cst.cs.dbGetDSCO(cst.cs.dbBlockHeight()+types.MaturityDelay, mpid0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dsco.Value.Cmp(types.NewCurrency64(12)) != 0 {
 		t.Error("miner payout created with wrong currency value")
 	}
@@ -143,7 +147,6 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 
 // TestApplyMissedStorageProof probes the applyMissedStorageProof method of the
 // consensus set.
-/*
 func TestApplyMissedStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

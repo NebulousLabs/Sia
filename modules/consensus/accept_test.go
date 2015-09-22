@@ -259,8 +259,8 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	time.Sleep(time.Second * time.Duration(3+types.ExtremeFutureThreshold))
 	lockID := cst.cs.mu.RLock()
 	defer cst.cs.mu.RUnlock(lockID)
-	exists := cst.cs.db.inBlockMap(solvedBlock.ID())
-	if exists {
+	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
+	if err != errNilItem {
 		t.Error("extreme future block made it into the consensus set after waiting")
 	}
 }
@@ -313,8 +313,8 @@ func (cst *consensusSetTester) testFutureTimestampHandling() error {
 	time.Sleep(time.Second * 3) // 3 seconds, as the block was originally 2 seconds too far into the future.
 	lockID := cst.cs.mu.RLock()
 	defer cst.cs.mu.RUnlock(lockID)
-	exists := cst.cs.db.inBlockMap(solvedBlock.ID())
-	if !exists {
+	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
+	if err == errNilItem {
 		return errors.New("future block was not added to the consensus set after waiting the appropriate amount of time")
 	}
 	return nil
@@ -435,7 +435,10 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	if !exists {
 		return errors.New("siafund output was not properly created")
 	}
-	sfo := cst.cs.db.getSiafundOutputs(sfoid0)
+	sfo, err := cst.cs.dbGetSiafundOutput(sfoid0)
+	if err != nil {
+		return err
+	}
 	if sfo.Value.Cmp(srcValue.Sub(types.NewCurrency64(1))) != 0 {
 		return errors.New("created siafund has wrong value")
 	}
@@ -446,7 +449,10 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	if !exists {
 		return errors.New("second siafund output was not properly created")
 	}
-	sfo = cst.cs.db.getSiafundOutputs(sfoid1)
+	sfo, err = cst.cs.dbGetSiafundOutput(sfoid1)
+	if err != nil {
+		return err
+	}
 	if sfo.Value.Cmp(types.NewCurrency64(1)) != 0 {
 		return errors.New("second siafund output has wrong value")
 	}

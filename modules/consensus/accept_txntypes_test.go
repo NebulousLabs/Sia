@@ -571,10 +571,14 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 
 	// Check that the revision was successful.
-	if cst.cs.db.getFileContracts(missedFCID).RevisionNumber != 1 {
+	getFC, err := cst.cs.dbGetFileContract(missedFCID)
+	if err != nil {
+		return err
+	}
+	if getFC.RevisionNumber != 1 {
 		return errors.New("revision did not update revision number")
 	}
-	if cst.cs.db.getFileContracts(missedFCID).FileSize != 10e3 {
+	if getFC.FileSize != 10e3 {
 		return errors.New("revision did not update file contract size")
 	}
 
@@ -649,10 +653,18 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 
 	// Check that all of the outputs have ended up at the right destination.
-	if cst.cs.db.getSiacoinOutputs(validFCID.StorageProofOutputID(types.ProofValid, 0)).UnlockHash != validProofDest {
+	getSCOValid, err := cst.cs.dbGetSiacoinOutput(validFCID.StorageProofOutputID(types.ProofValid, 0))
+	if err != nil {
+		return err
+	}
+	if getSCOValid.UnlockHash != validProofDest {
 		return errors.New("file contract output did not end up at the right place")
 	}
-	if cst.cs.db.getSiacoinOutputs(missedFCID.StorageProofOutputID(types.ProofMissed, 0)).UnlockHash != revisionDest {
+	getSCOMissed, err := cst.cs.dbGetSiacoinOutput(missedFCID.StorageProofOutputID(types.ProofMissed, 0))
+	if err != nil {
+		return err
+	}
+	if getSCOMissed.UnlockHash != revisionDest {
 		return errors.New("missed file proof output did not end up at the revised destination")
 	}
 
