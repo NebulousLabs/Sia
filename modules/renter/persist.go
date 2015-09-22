@@ -172,7 +172,13 @@ func (r *Renter) saveFile(f *file) error {
 	}
 
 	// Write file.
-	return f.save(handle)
+	err = f.save(handle)
+	if err != nil {
+		return err
+	}
+
+	// Commit the SafeFile.
+	return handle.Commit()
 }
 
 // save stores the current renter data to disk.

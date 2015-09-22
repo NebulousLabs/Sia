@@ -27,23 +27,19 @@ func RandomSuffix() string {
 	return str[:20]
 }
 
-// A safeFile is a file that is stored under a temporary filename. When the
-// safeFile is closed, it will be renamed to the "final" filename. This allows
-// for atomic updating of files; otherwise, an unexpected shutdown could leave
-// a valuable file in a corrupted state.
+// A safeFile is a file that is stored under a temporary filename. When Commit
+// is called, the file is renamed to its "final" filename. This allows for
+// atomic updating of files; otherwise, an unexpected shutdown could leave a
+// valuable file in a corrupted state. Callers must still Close the file handle
+// as usual.
 type safeFile struct {
 	*os.File
 	finalName string
 }
 
-// Close renames the file to the intended final filename, and then closes the
-// file handle.
-func (sf *safeFile) Close() error {
-	err := os.Rename(sf.finalName+"_temp", sf.finalName)
-	if err != nil {
-		return err
-	}
-	return sf.File.Close()
+// Commit renames the file to the intended final filename.
+func (sf *safeFile) Commit() error {
+	return os.Rename(sf.finalName+"_temp", sf.finalName)
 }
 
 func NewSafeFile(filename string) (*safeFile, error) {
