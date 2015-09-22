@@ -120,7 +120,7 @@ func applyFileContractRevisions(tx *bolt.Tx, pb *processedBlock, t types.Transac
 func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for _, sp := range t.StorageProofs {
 		fc, err := getFileContract(tx, sp.ParentID)
-		if err != nil {
+		if build.DEBUG && err != nil {
 			panic(err)
 		}
 
@@ -153,7 +153,7 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Calculate the volume of siacoins to put in the claim output.
 		sfo, err := getSiafundOutput(tx, sfi.ParentID)
-		if err != nil {
+		if build.DEBUG && err != nil {
 			panic(err)
 		}
 		claimPortion := getSiafundPool(tx).Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)

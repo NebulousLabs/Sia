@@ -1,9 +1,9 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/boltdb/bolt"
 
@@ -47,7 +47,7 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 		// If the bucket is not a delayed siacoin output bucket or a file
 		// contract expiration bucket, skip.
-		if !strings.HasPrefix(string(name), string(prefixDSCO)) && !strings.HasPrefix(string(name), string(prefixFCEX)) {
+		if !bytes.HasPrefix(name, prefixDSCO) && !bytes.HasPrefix(name, prefixFCEX) {
 			return nil
 		}
 
@@ -73,7 +73,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 	var dscoSiacoins types.Currency
 	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 		// Check if the bucket is a delayed siacoin output bucket.
-		if !strings.HasPrefix(string(name), string(prefixDSCO)) {
+		if !bytes.HasPrefix(name, prefixDSCO) {
 			return nil
 		}
 
@@ -92,7 +92,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		}
 		return nil
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 
@@ -107,7 +107,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		scoSiacoins = scoSiacoins.Add(sco.Value)
 		return nil
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 
@@ -123,7 +123,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		fcSiacoins = fcSiacoins.Add(fcCoins)
 		return nil
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 
@@ -141,7 +141,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		claimSiacoins = claimSiacoins.Add(claimCoins)
 		return nil
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 
@@ -157,7 +157,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 	}
 
 	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
-	if totalSiacoins.Cmp(expectedSiacoins) != 0 {
+	if build.DEBUG && totalSiacoins.Cmp(expectedSiacoins) != 0 {
 		fmt.Println("Wrong number of siacoins... diagnostics:")
 		fmt.Println("Dsco:", dscoSiacoins)
 		fmt.Println("Sco:", scoSiacoins)
@@ -189,7 +189,7 @@ func checkSiafundCount(tx *bolt.Tx) {
 		total = total.Add(sfo.Value)
 		return nil
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 	if total.Cmp(types.SiafundCount) != 0 {
@@ -210,7 +210,7 @@ func checkDSCOs(tx *bolt.Tx) {
 	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 		// If the bucket is not a delayed siacoin output bucket or a file
 		// contract expiration bucket, skip.
-		if !strings.HasPrefix(string(name), string(prefixDSCO)) {
+		if !bytes.HasPrefix(name, prefixDSCO) {
 			return nil
 		}
 
@@ -258,7 +258,7 @@ func checkDSCOs(tx *bolt.Tx) {
 		}
 		return nil
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 
@@ -270,12 +270,12 @@ func checkDSCOs(tx *bolt.Tx) {
 			continue
 		}
 		_, exists := dscoTracker[i]
-		if !exists {
+		if build.DEBUG && !exists {
 			panic("missing a dsco bucket")
 		}
 		expectedBuckets++
 	}
-	if len(dscoTracker) != expectedBuckets {
+	if build.DEBUG && len(dscoTracker) != expectedBuckets {
 		panic("too many dsco buckets")
 	}
 }
@@ -292,24 +292,24 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
 	}
 
 	parent, err := getBlockMap(tx, current.Block.ParentID)
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	if current.Height != parent.Height+1 {
+	if build.DEBUG && current.Height != parent.Height+1 {
 		panic("parent structure of a block is incorrect")
 	}
 	_, _, err = cs.forkBlockchain(tx, parent)
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	if consensusChecksum(tx) != parent.ConsensusChecksum {
+	if build.DEBUG && consensusChecksum(tx) != parent.ConsensusChecksum {
 		panic("consensus checksum mismatch after reverting")
 	}
 	_, _, err = cs.forkBlockchain(tx, current)
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	if consensusChecksum(tx) != current.ConsensusChecksum {
+	if build.DEBUG && consensusChecksum(tx) != current.ConsensusChecksum {
 		panic("consensus checksum mismatch after re-applying")
 	}
 }

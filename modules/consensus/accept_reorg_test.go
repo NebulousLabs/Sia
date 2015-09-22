@@ -45,7 +45,8 @@ func createReorgSets(name string) *reorgSets {
 
 // save takes all of the blocks in cstMain and moves them to cstBackup.
 func (rs *reorgSets) save() {
-	for i := types.BlockHeight(1); i <= rs.cstMain.cs.dbBlockHeight(); i++ {
+	mainHeight := rs.cstMain.cs.dbBlockHeight()
+	for i := types.BlockHeight(1); i <= mainHeight; i++ {
 		id, err := rs.cstMain.cs.dbGetPath(i)
 		if err != nil {
 			panic(err)

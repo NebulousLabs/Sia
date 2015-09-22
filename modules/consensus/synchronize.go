@@ -26,8 +26,8 @@ const (
 func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 	height := blockHeight(tx)
 	step := types.BlockHeight(1)
-	// The final step is to include the genesis block, which is why `step <
-	// height` is used as opposed to `step <= height`.
+	// The final step is to include the genesis block, which is why the final
+	// element is skipped during iteration.
 	for i := 0; i < 31; i++ {
 		// Include the next block.
 		blockID, err := getPath(tx, height)

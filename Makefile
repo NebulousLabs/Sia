@@ -68,11 +68,11 @@ pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/con
        ./modules/miner ./modules/renter ./modules/transactionpool \
        ./modules/wallet ./persist ./siac ./siae ./types
 test: REBUILD
-	go test -short -tags='testing' -timeout=3s $(pkgs) -run $(run)
+	go test -short -tags='testing' -timeout=3s $(pkgs) -run=$(run)
 test-v: REBUILD
-	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run $(run)
+	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=300s $(pkgs) -run $(run)
+	go test -v -race -tags='testing debug' -timeout=300s $(pkgs) -run=$(run)
 bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=300s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD

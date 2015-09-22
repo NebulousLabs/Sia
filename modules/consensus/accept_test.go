@@ -17,7 +17,7 @@ import (
 // TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestIntegrationDoSBlockHandling(t *testing.T) {
 	// TestIntegrationDoSBlockHandling catches a wide array of simple errors,
-	// and therefore is included in the short tests despite being someone
+	// and therefore is included in the short tests despite being somewhat
 	// computationally expensive.
 	cst, err := createConsensusSetTester("TestIntegrationDoSBlockHandling")
 	if err != nil {
