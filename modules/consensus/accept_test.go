@@ -337,46 +337,6 @@ func TestFutureTimestampHandling(t *testing.T) {
 	}
 }
 
-/*
-// TestInconsistentCheck submits a block on a consensus set that is
-// inconsistent, attempting to trigger a panic.
-func TestInconsistentCheck(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestInconsistentCheck")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// Corrupt the consensus set.
-	var sfod types.SiafundOutputID
-	var sfo types.SiafundOutput
-	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, output types.SiafundOutput) {
-		sfod = id
-		sfo = output
-	})
-	sfo.Value = sfo.Value.Add(types.NewCurrency64(1))
-	cst.cs.db.rmSiafundOutputs(sfod)
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		return addSiafundOutput(tx, sfod, sfo)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Mine and submit a block, triggering the inconsistency check.
-	defer func() {
-		r := recover()
-		if r != errSiafundMiscount {
-			t.Fatalf("expected %v, got %v", errSiafundMiscount, err)
-		}
-	}()
-	cst.miner.AddBlock()
-}
-*/
-
 // testSpendSiafundsBlock mines a block with a transaction spending siafunds
 // and adds it to the consensus set.
 func (cst *consensusSetTester) testSpendSiafundsBlock() error {
@@ -1311,5 +1271,45 @@ func TestTaxHardfork(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+*/
+
+/*
+// TestInconsistentCheck submits a block on a consensus set that is
+// inconsistent, attempting to trigger a panic.
+func TestInconsistentCheck(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestInconsistentCheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+
+	// Corrupt the consensus set.
+	var sfod types.SiafundOutputID
+	var sfo types.SiafundOutput
+	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, output types.SiafundOutput) {
+		sfod = id
+		sfo = output
+	})
+	sfo.Value = sfo.Value.Add(types.NewCurrency64(1))
+	cst.cs.db.rmSiafundOutputs(sfod)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return addSiafundOutput(tx, sfod, sfo)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine and submit a block, triggering the inconsistency check.
+	defer func() {
+		r := recover()
+		if r != errSiafundMiscount {
+			t.Fatalf("expected %v, got %v", errSiafundMiscount, err)
+		}
+	}()
+	cst.miner.AddBlock()
 }
 */

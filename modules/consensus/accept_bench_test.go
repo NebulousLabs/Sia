@@ -71,12 +71,13 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 // integrated into the consensus set.
 //
 // i7-4770, 61ab2f5: 10.047 ms / op
-func BenchmarkAcceptAcceptSmallBlocks(b *testing.B) {
+func BenchmarkAcceptSmallBlocks(b *testing.B) {
 	cst, err := createConsensusSetTester("BenchmarkAcceptSmallBlocks")
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer cst.closeCst()
+
 	// COMPAT v0.4.0
 	//
 	// Push the height of the consensus set tester beyond the fork height.

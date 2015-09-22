@@ -434,12 +434,13 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 // had been used incorrectly, resulting in the incorrect processing of bulk
 // file contracts.
 
-/// BREAK ///
-/// BREAK ///
-/// BREAK ///
+/// All functions below this point are deprecated. ///
 
 // testFileContractsBlocks creates a series of blocks that create, revise,
 // prove, and fail to prove file contracts.
+//
+// testFileContractsBlocks can be removed once testFileContractRevision has
+// been implemented.
 func (cst *consensusSetTester) testFileContractsBlocks() error {
 	var validProofDest, missedProofDest, revisionDest types.UnlockHash
 	_, err := rand.Read(validProofDest[:])
@@ -673,6 +674,9 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 
 // TestFileContractsBlocks creates a consensus set tester and uses it to call
 // testFileContractsBlocks.
+//
+// TestFileContractBlocks can be removed once
+// TestIntegrationFileContractRevision has been implemented.
 func TestFileContractsBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

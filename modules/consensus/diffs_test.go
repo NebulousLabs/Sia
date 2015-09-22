@@ -9,6 +9,151 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed sicoin
+// output that has a bad maturity height and triggers a panic.
+func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiffBadMaturity")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Trigger an inconsistency check.
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expecting error after corrupting database")
+		}
+	}()
+
+	// Commit a delayed siacoin output with maturity height = cs.height()+1
+	maturityHeight := cst.cs.dbBlockHeight() - 1
+	id := types.SiacoinOutputID{'1'}
+	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
+	dscod := modules.DelayedSiacoinOutputDiff{
+		Direction:      modules.DiffApply,
+		ID:             id,
+		SiacoinOutput:  dsco,
+		MaturityHeight: maturityHeight,
+	}
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		return nil
+	})
+}
+
+// TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
+func TestCommitNodeDiffs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitNodeDiffs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pb := cst.cs.dbCurrentProcessedBlock()
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
+		return nil
+	})
+
+	// For diffs that can be destroyed in the same block they are created,
+	// create diffs that do just that. This has in the past caused issues upon
+	// rewinding.
+	scoid := types.SiacoinOutputID{'1'}
+	scod0 := modules.SiacoinOutputDiff{
+		Direction: modules.DiffApply,
+		ID:        scoid,
+	}
+	scod1 := modules.SiacoinOutputDiff{
+		Direction: modules.DiffRevert,
+		ID:        scoid,
+	}
+	fcid := types.FileContractID{'2'}
+	fcd0 := modules.FileContractDiff{
+		Direction: modules.DiffApply,
+		ID:        fcid,
+	}
+	fcd1 := modules.FileContractDiff{
+		Direction: modules.DiffRevert,
+		ID:        fcid,
+	}
+	sfoid := types.SiafundOutputID{'3'}
+	sfod0 := modules.SiafundOutputDiff{
+		Direction: modules.DiffApply,
+		ID:        sfoid,
+	}
+	sfod1 := modules.SiafundOutputDiff{
+		Direction: modules.DiffRevert,
+		ID:        sfoid,
+	}
+	dscoid := types.SiacoinOutputID{'4'}
+	dscod := modules.DelayedSiacoinOutputDiff{
+		Direction:      modules.DiffApply,
+		ID:             dscoid,
+		MaturityHeight: cst.cs.dbBlockHeight() + types.MaturityDelay,
+	}
+	var siafundPool types.Currency
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		siafundPool = getSiafundPool(tx)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	sfpd := modules.SiafundPoolDiff{
+		Direction: modules.DiffApply,
+		Previous:  siafundPool,
+		Adjusted:  siafundPool.Add(types.NewCurrency64(1)),
+	}
+	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod0)
+	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod1)
+	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd0)
+	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd1)
+	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod0)
+	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod1)
+	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		return nil
+	})
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitNodeDiffs(tx, pb, modules.DiffApply)
+		return nil
+	})
+	exists := cst.cs.db.inSiacoinOutputs(scoid)
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	exists = cst.cs.db.inFileContracts(fcid)
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	exists = cst.cs.db.inSiafundOutputs(sfoid)
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		commitNodeDiffs(tx, pb, modules.DiffRevert)
+		return nil
+	})
+	exists = cst.cs.db.inSiacoinOutputs(scoid)
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	exists = cst.cs.db.inFileContracts(fcid)
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	exists = cst.cs.db.inSiafundOutputs(sfoid)
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+}
+
 /*
 // TestSiacoinOutputDiff applies and reverts a siacoin output diff, then
 // triggers an inconsistency panic.
@@ -310,41 +455,6 @@ func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
 }
 */
 
-// TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed sicoin
-// output that has a bad maturity height and triggers a panic.
-func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiffBadMaturity")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Trigger an inconsistency check.
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("expecting error after corrupting database")
-		}
-	}()
-
-	// Commit a delayed siacoin output with maturity height = cs.height()+1
-	maturityHeight := cst.cs.dbBlockHeight() - 1
-	id := types.SiacoinOutputID{'1'}
-	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
-	dscod := modules.DelayedSiacoinOutputDiff{
-		Direction:      modules.DiffApply,
-		ID:             id,
-		SiacoinOutput:  dsco,
-		MaturityHeight: maturityHeight,
-	}
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		return nil
-	})
-}
-
 /*
 // TestCommitSiafundPoolDiff probes the commitSiafundPoolDiff method of the
 // consensus set.
@@ -444,116 +554,6 @@ func TestCommitSiafundPoolDiff(t *testing.T) {
 	cst.cs.commitSiafundPoolDiff(negativeSfpd, modules.DiffApply)
 }
 */
-
-// TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
-func TestCommitNodeDiffs(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestCommitNodeDiffs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	pb := cst.cs.dbCurrentProcessedBlock()
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
-		return nil
-	})
-
-	// For diffs that can be destroyed in the same block they are created,
-	// create diffs that do just that. This has in the past caused issues upon
-	// rewinding.
-	scoid := types.SiacoinOutputID{'1'}
-	scod0 := modules.SiacoinOutputDiff{
-		Direction: modules.DiffApply,
-		ID:        scoid,
-	}
-	scod1 := modules.SiacoinOutputDiff{
-		Direction: modules.DiffRevert,
-		ID:        scoid,
-	}
-	fcid := types.FileContractID{'2'}
-	fcd0 := modules.FileContractDiff{
-		Direction: modules.DiffApply,
-		ID:        fcid,
-	}
-	fcd1 := modules.FileContractDiff{
-		Direction: modules.DiffRevert,
-		ID:        fcid,
-	}
-	sfoid := types.SiafundOutputID{'3'}
-	sfod0 := modules.SiafundOutputDiff{
-		Direction: modules.DiffApply,
-		ID:        sfoid,
-	}
-	sfod1 := modules.SiafundOutputDiff{
-		Direction: modules.DiffRevert,
-		ID:        sfoid,
-	}
-	dscoid := types.SiacoinOutputID{'4'}
-	dscod := modules.DelayedSiacoinOutputDiff{
-		Direction:      modules.DiffApply,
-		ID:             dscoid,
-		MaturityHeight: cst.cs.dbBlockHeight() + types.MaturityDelay,
-	}
-	var siafundPool types.Currency
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-	sfpd := modules.SiafundPoolDiff{
-		Direction: modules.DiffApply,
-		Previous:  siafundPool,
-		Adjusted:  siafundPool.Add(types.NewCurrency64(1)),
-	}
-	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod0)
-	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod1)
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd0)
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd1)
-	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod0)
-	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod1)
-	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
-		return nil
-	})
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		commitNodeDiffs(tx, pb, modules.DiffApply)
-		return nil
-	})
-	exists := cst.cs.db.inSiacoinOutputs(scoid)
-	if exists {
-		t.Error("intradependent outputs not treated correctly")
-	}
-	exists = cst.cs.db.inFileContracts(fcid)
-	if exists {
-		t.Error("intradependent outputs not treated correctly")
-	}
-	exists = cst.cs.db.inSiafundOutputs(sfoid)
-	if exists {
-		t.Error("intradependent outputs not treated correctly")
-	}
-	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		commitNodeDiffs(tx, pb, modules.DiffRevert)
-		return nil
-	})
-	exists = cst.cs.db.inSiacoinOutputs(scoid)
-	if exists {
-		t.Error("intradependent outputs not treated correctly")
-	}
-	exists = cst.cs.db.inFileContracts(fcid)
-	if exists {
-		t.Error("intradependent outputs not treated correctly")
-	}
-	exists = cst.cs.db.inSiafundOutputs(sfoid)
-	if exists {
-		t.Error("intradependent outputs not treated correctly")
-	}
-}
 
 /*
 // TestDeleteObsoleteDelayedOutputMapsSanity probes the sanity checks of the

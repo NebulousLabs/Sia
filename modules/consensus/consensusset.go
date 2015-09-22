@@ -9,6 +9,8 @@ package consensus
 import (
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -114,9 +116,74 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	return cs, nil
 }
 
+// ChildTarget returns the target for the child of a block.
+func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exists bool) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return nil
+		}
+		target = pb.ChildTarget
+		exists = true
+		return nil
+	})
+	return target, exists
+}
+
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
 	return cs.db.Close()
+}
+
+// EarliestChildTimestamp returns the earliest timestamp that the next block can
+// have in order for it to be considered valid.
+func (cs *ConsensusSet) EarliestChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
+	// Error is not checked because it does not matter.
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		timestamp = earliestChildTimestamp(tx.Bucket(BlockMap), pb)
+		exists = true
+		return nil
+	})
+	return timestamp, exists
+}
+
+// GenesisBlock returns the genesis block.
+func (cs *ConsensusSet) GenesisBlock() types.Block {
+	return cs.blockRoot.Block
+}
+
+// InCurrentPath returns true if the block presented is in the current path,
+// false otherwise.
+func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			inPath = false
+			return nil
+		}
+		pathID, err := getPath(tx, pb.Height)
+		if err != nil {
+			inPath = false
+			return nil
+		}
+		inPath = pathID == id
+		return nil
+	})
+	return inPath
+}
+
+// StorageProofSegment returns the segment to be used in the storage proof for
+// a given file contract.
+func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		index, err = storageProofSegment(tx, fcid)
+		return nil
+	})
+	return index, err
 }

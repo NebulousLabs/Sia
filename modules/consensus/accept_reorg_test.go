@@ -228,12 +228,14 @@ func TestIntegrationComplexReorg(t *testing.T) {
 	rs.fullReorg()
 }
 
-/// BREAK ///
-/// BREAK ///
-/// BREAK ///
+/// All functions below this point are deprecated. ///
 
 // complexBlockSet puts a set of blocks with many types of transactions into
 // the consensus set.
+//
+// complexBlockSet can be deleted once equivalent functionality has been added
+// to 'testBlockSuite', which is currently missing file contract revisions and
+// all forms of siafund testing.
 func (cst *consensusSetTester) complexBlockSet() error {
 	cst.testSimpleBlock()
 	cst.testSpendSiacoinsBlock()
@@ -264,6 +266,8 @@ func (cst *consensusSetTester) complexBlockSet() error {
 // TestComplexForking adds every type of test block into two parallel chains of
 // consensus, and then forks to a new chain, forcing the whole structure to be
 // reverted.
+//
+// testComplexForking can be removed once testBlockSuite is complete.
 func TestComplexForking(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

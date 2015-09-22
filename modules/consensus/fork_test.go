@@ -29,7 +29,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 
 	// Backtrack from a node that has diverted from the current blockchain.
 	child0, _ := cst.miner.FindBlock()
-	child1, _ := cst.miner.FindBlock()
+	child1, _ := cst.miner.FindBlock() // Is the block not on hte current path.
 	err = cst.cs.AcceptBlock(child0)
 	if err != nil {
 		t.Fatal(err)
