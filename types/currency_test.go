@@ -222,10 +222,6 @@ func TestCurrencyEncoding(t *testing.T) {
 // TestNegativeCurrencyMulRat checks that negative numbers are rejected when
 // calling MulRat on the currency type.
 func TestNegativeCurrencyMulRat(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
@@ -241,10 +237,6 @@ func TestNegativeCurrencyMulRat(t *testing.T) {
 // TestNegativeCurrencySub checks that negative numbers are prevented when
 // using subtraction on the currency type.
 func TestNegativeCurrencySub(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
@@ -294,10 +286,6 @@ func TestNegativeCurrencyScan(t *testing.T) {
 
 // TestNegativeCurrencies tries an array of ways to produce a negative currency.
 func TestNegativeNewCurrency(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
