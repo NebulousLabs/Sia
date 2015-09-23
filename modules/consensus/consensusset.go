@@ -12,6 +12,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -33,7 +34,7 @@ type ConsensusSet struct {
 	blockRoot processedBlock
 
 	// The db is a database holding the current consensus set.
-	db *setDB
+	db *persist.BoltDatabase
 
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.

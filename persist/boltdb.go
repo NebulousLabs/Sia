@@ -7,11 +7,9 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-// See json.go for definitions of errors and metadata
-
 type BoltDatabase struct {
+	Metadata
 	*bolt.DB
-	meta Metadata
 }
 
 var (
@@ -26,11 +24,11 @@ func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
 	if err != nil {
 		return err
 	}
-	err = bucket.Put([]byte("Header"), []byte(db.meta.Header))
+	err = bucket.Put([]byte("Header"), []byte(db.Header))
 	if err != nil {
 		return err
 	}
-	err = bucket.Put([]byte("Version"), []byte(db.meta.Version))
+	err = bucket.Put([]byte("Version"), []byte(db.Version))
 	if err != nil {
 		return err
 	}
@@ -39,7 +37,7 @@ func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
 
 // checkDbMetadata confirms that the metadata in the database is
 // correct. If there is no metadata, correct metadata is inserted
-func (db *BoltDatabase) checkMetadata(meta Metadata) error {
+func (db *BoltDatabase) checkMetadata(md Metadata) error {
 	err := db.Update(func(tx *bolt.Tx) error {
 		// Check if the database has metadata. If not, create metadata for the
 		// database.
@@ -54,70 +52,16 @@ func (db *BoltDatabase) checkMetadata(meta Metadata) error {
 
 		// Verify that the metadata matches the expected metadata.
 		header := bucket.Get([]byte("Header"))
-		if string(header) != meta.Header {
+		if string(header) != md.Header {
 			return ErrBadHeader
 		}
 		version := bucket.Get([]byte("Version"))
-		if string(version) != meta.Version {
+		if string(version) != md.Version {
 			return ErrBadVersion
 		}
 		return nil
 	})
 	return err
-}
-
-// GetFromBucket is a wrapper around a bolt database lookup. If the
-// element does not exist, no error will be thrown, but the requested
-// element will be nil.
-func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, error) {
-	var bytes []byte
-	err := db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(bucketName))
-		if bucket == nil {
-			return errors.New("requested bucket does not exist: " + bucketName)
-		}
-
-		// Note that bytes could be nil. This is OK, but needs
-		// to be checked in calling functions
-		value := bucket.Get(key)
-		if value == nil {
-			return ErrNilEntry
-		}
-		bytes = make([]byte, len(value))
-		copy(bytes, value)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return bytes, nil
-}
-
-// Exists checks for the existance of an item in the specified bucket
-func (db *BoltDatabase) Exists(bucketName []byte, key []byte) (bool, error) {
-	var exists bool
-	err := db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketName)
-		if bucket == nil {
-			return errors.New("requested bucket does not exist: " + string(bucketName))
-		}
-
-		v := bucket.Get(key)
-		exists = v != nil
-		return nil
-	})
-	return exists, err
-}
-
-// BucketSize returns the number of keys in a bucket.
-func (db *BoltDatabase) BucketSize(bucketName []byte) (uint64, error) {
-	var size uint64
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketName)
-		size = uint64(b.Stats().KeyN)
-		return nil
-	})
-	return size, err
 }
 
 // CloseDatabase saves the bolt database to a file, and updates metadata
@@ -127,16 +71,19 @@ func (db *BoltDatabase) CloseDatabase() error {
 }
 
 // openDatabase opens a database filename and checks metadata
-func OpenDatabase(meta Metadata, filename string) (*BoltDatabase, error) {
+func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 	// Open the database using a 1 second timeout (without the timeout,
 	// database will potentially hang indefinitely.
-	db, err := bolt.Open(filename, 0600, &bolt.Options{Timeout: 1 * time.Second})
+	db, err := bolt.Open(filename, 0600, &bolt.Options{Timeout: 3 * time.Second})
 	if err != nil {
 		return nil, err
 	}
 
-	boltDB := &BoltDatabase{db, meta}
-	err = boltDB.checkMetadata(meta)
+	boltDB := &BoltDatabase{
+		Metadata: md,
+		DB:       db,
+	}
+	err = boltDB.checkMetadata(md)
 	if err != nil {
 		return nil, err
 	}

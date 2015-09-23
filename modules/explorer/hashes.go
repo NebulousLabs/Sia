@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -18,6 +20,20 @@ const (
 	responseAddress      = "Address"
 )
 
+// getFromBucket returns an object fetched from a bucket.
+//
+// DEPRECATED
+func (db *explorerDB) getFromBucket(bucketName string, key []byte) (obj []byte, err error) {
+	dbErr := db.View(func(tx *bolt.Tx) error {
+		obj = tx.Bucket([]byte(bucketName)).Get(key)
+		return nil
+	})
+	if dbErr != nil {
+		return nil, dbErr
+	}
+	return obj, nil
+}
+
 // GetHashInfo returns sufficient data about the hash that was
 // provided to do more extensive lookups
 func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
@@ -29,7 +45,7 @@ func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
 	defer e.mu.RUnlock(lockID)
 
 	// Perform a lookup to tell which type of hash it is
-	typeBytes, err := e.db.GetFromBucket("Hashes", hash[:crypto.HashSize])
+	typeBytes, err := e.db.getFromBucket("Hashes", hash[:crypto.HashSize])
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +101,7 @@ func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
 func (db *explorerDB) getBlock(id types.BlockID) (modules.BlockResponse, error) {
 	var br modules.BlockResponse
 
-	b, err := db.GetFromBucket("Blocks", encoding.Marshal(id))
+	b, err := db.getFromBucket("Blocks", encoding.Marshal(id))
 	if err != nil {
 		return br, err
 	}
@@ -106,7 +122,7 @@ func (db *explorerDB) getTransaction(id crypto.Hash) (modules.TransactionRespons
 	var tr modules.TransactionResponse
 
 	// Look up the transaction's location
-	tBytes, err := db.GetFromBucket("Transactions", encoding.Marshal(id))
+	tBytes, err := db.getFromBucket("Transactions", encoding.Marshal(id))
 	if err != nil {
 		return tr, err
 	}
@@ -118,7 +134,7 @@ func (db *explorerDB) getTransaction(id crypto.Hash) (modules.TransactionRespons
 	}
 
 	// Look up the block specified by the location and extract the transaction
-	bBytes, err := db.GetFromBucket("Blocks", encoding.Marshal(tLocation.BlockID))
+	bBytes, err := db.getFromBucket("Blocks", encoding.Marshal(tLocation.BlockID))
 	if err != nil {
 		return tr, err
 	}
@@ -138,7 +154,7 @@ func (db *explorerDB) getTransaction(id crypto.Hash) (modules.TransactionRespons
 // Returns the list of transactions a file contract with a given id has taken part in
 func (db *explorerDB) getFileContract(id types.FileContractID) (modules.FcResponse, error) {
 	var fr modules.FcResponse
-	fcBytes, err := db.GetFromBucket("FileContracts", encoding.Marshal(id))
+	fcBytes, err := db.getFromBucket("FileContracts", encoding.Marshal(id))
 	if err != nil {
 		return fr, err
 	}
@@ -161,7 +177,7 @@ func (db *explorerDB) getFileContract(id types.FileContractID) (modules.FcRespon
 // database and puts it into a response structure
 func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (modules.OutputResponse, error) {
 	var or modules.OutputResponse
-	otBytes, err := db.GetFromBucket("SiacoinOutputs", encoding.Marshal(id))
+	otBytes, err := db.getFromBucket("SiacoinOutputs", encoding.Marshal(id))
 	if err != nil {
 		return or, err
 	}
@@ -183,7 +199,7 @@ func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (modules.Output
 // into a response structure
 func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (modules.OutputResponse, error) {
 	var or modules.OutputResponse
-	otBytes, err := db.GetFromBucket("SiafundOutputs", encoding.Marshal(id))
+	otBytes, err := db.getFromBucket("SiafundOutputs", encoding.Marshal(id))
 	if err != nil {
 		return or, err
 	}
@@ -206,7 +222,7 @@ func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (modules.Output
 // result in a response structure
 func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (modules.AddrResponse, error) {
 	var ar modules.AddrResponse
-	txBytes, err := db.GetFromBucket("Addresses", encoding.Marshal(address))
+	txBytes, err := db.getFromBucket("Addresses", encoding.Marshal(address))
 	if err != nil {
 		return ar, err
 	}

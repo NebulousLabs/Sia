@@ -32,7 +32,7 @@ var (
 	prefixDSCO = []byte("dsco_")
 	prefixFCEX = []byte("fcex_")
 
-	meta = persist.Metadata{
+	dbMetadata = persist.Metadata{
 		Version: "0.4.3",
 		Header:  "Consensus Set Database",
 	}
@@ -74,19 +74,10 @@ var (
 	SiafundPool = []byte("SiafundPool")
 )
 
-// setDB is a wrapper around the persist bolt db which backs the
-// consensus set
-type setDB struct {
-	*persist.BoltDatabase
-}
-
 // openDB loads the set database and populates it with the necessary buckets
-func openDB(filename string) (*setDB, error) {
-	db, err := persist.OpenDatabase(meta, filename)
-	if err != nil {
-		return nil, err
-	}
-	return &setDB{BoltDatabase: db}, nil
+func (cs *ConsensusSet) openDB(filename string) (err error) {
+	cs.db, err = persist.OpenDatabase(dbMetadata, filename)
+	return err
 }
 
 // dbInitialized returns true if the database appears to be initialized, false

@@ -162,10 +162,16 @@ func (e *Explorer) addBlockDB(b types.Block) error {
 		}
 	}
 
-	// Check if the block exists
-	exists, err := e.db.Exists([]byte("Blocks"), encoding.Marshal(b.ID()))
-	if err != nil {
-		return err
+	// Check if the block exsts.
+	var exists bool
+	dbErr := e.db.View(func(tx *bolt.Tx) error {
+		id := b.ID()
+		block := tx.Bucket([]byte("Blocks")).Get(id[:])
+		exists = block != nil
+		return nil
+	})
+	if dbErr != nil {
+		return dbErr
 	}
 	if exists {
 		return nil

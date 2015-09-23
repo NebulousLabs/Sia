@@ -21,11 +21,10 @@ const (
 // them to fill out the ConsensusSet.
 func (cs *ConsensusSet) loadDB() error {
 	// Open the database - a new bolt database will be created if none exists.
-	db, err := openDB(filepath.Join(cs.persistDir, DatabaseFilename))
+	err := cs.openDB(filepath.Join(cs.persistDir, DatabaseFilename))
 	if err != nil {
 		return err
 	}
-	cs.db = db
 
 	// Walk through initialization for Sia.
 	var height types.BlockHeight
