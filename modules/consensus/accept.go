@@ -191,26 +191,3 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 
 	return nil
 }
-
-// RelayBlock is an RPC that accepts a block from a peer.
-func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
-	// Decode the block from the connection.
-	var b types.Block
-	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
-	if err != nil {
-		return err
-	}
-
-	// Submit the block to the consensus set.
-	err = cs.AcceptBlock(b)
-	if err == errOrphan {
-		// If the block is an orphan, try to find the parents. The block
-		// received from the peer is discarded and will be downloaded again if
-		// the parent is found.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.receiveBlocks)
-	}
-	if err != nil {
-		return err
-	}
-	return nil
-}

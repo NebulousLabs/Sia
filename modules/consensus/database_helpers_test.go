@@ -114,6 +114,18 @@ func (cs *ConsensusSet) dbGetSiafundOutput(id types.SiafundOutputID) (sfo types.
 	return sfo, err
 }
 
+// dbAddSiafundOutput is a convenience function allowing addSiafundOutput to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbAddSiafundOutput(id types.SiafundOutputID, sfo types.SiafundOutput) {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+		addSiafundOutput(tx, id, sfo)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+}
+
 // dbGetSiafundPool is a convenience function allowing getSiafundPool to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiafundPool() (siafundPool types.Currency) {

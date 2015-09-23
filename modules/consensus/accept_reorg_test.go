@@ -3,6 +3,7 @@ package consensus
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -372,5 +373,57 @@ func TestComplexForking(t *testing.T) {
 	}
 	if cstMain.cs.dbConsensusChecksum() != cstBackup.cs.dbConsensusChecksum() {
 		t.Error("cstMain and cstBackup do not share the same consensus set hash")
+	}
+}
+
+// TestBuriedBadFork creates a block with an invalid transaction that's not on
+// the longest fork. The consensus set will not validate that block. Then valid
+// blocks are added on top of it to make it the longest fork. When it becomes
+// the longest fork, all the blocks should be fully validated and thrown out
+// because a parent is invalid.
+func TestBuriedBadFork(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cst, err := createConsensusSetTester("TestBuriedBadFork")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+	pb := cst.cs.dbCurrentProcessedBlock()
+
+	// Create a bad block that builds on a parent, so that it is part of not
+	// the longest fork.
+	badBlock := types.Block{
+		ParentID:     pb.Block.ParentID,
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(pb.Height)}},
+		Transactions: []types.Transaction{{
+			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
+		}},
+	}
+	parent, err := cst.cs.dbGetBlockMap(pb.Block.ParentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badBlock, _ = cst.miner.SolveBlock(badBlock, parent.ChildTarget)
+	err = cst.cs.AcceptBlock(badBlock)
+	if err != modules.ErrNonExtendingBlock {
+		t.Fatal(err)
+	}
+
+	// Build another bock on top of the bad block that is fully valid, this
+	// will cause a fork and full validation of the bad block, both the bad
+	// block and this block should be thrown away.
+	block := types.Block{
+		ParentID:     badBlock.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(pb.Height + 1)}},
+	}
+	block, _ = cst.miner.SolveBlock(block, parent.ChildTarget) // okay because the target will not change
+	err = cst.cs.AcceptBlock(block)
+	if err == nil {
+		t.Fatal("a bad block failed to cause an error")
 	}
 }
