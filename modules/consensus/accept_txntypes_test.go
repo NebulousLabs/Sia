@@ -1,12 +1,7 @@
 package consensus
 
 import (
-	"bytes"
-	"crypto/rand"
-	"errors"
 	"testing"
-
-	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -441,6 +436,7 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 //
 // testFileContractsBlocks can be removed once testFileContractRevision has
 // been implemented.
+/*
 func (cst *consensusSetTester) testFileContractsBlocks() error {
 	var validProofDest, missedProofDest, revisionDest types.UnlockHash
 	_, err := rand.Read(validProofDest[:])
@@ -702,3 +698,4 @@ func TestFileContractsBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/

@@ -45,6 +45,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 }
 
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
+/*
 func TestCommitNodeDiffs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -153,6 +154,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 		t.Error("intradependent outputs not treated correctly")
 	}
 }
+*/
 
 /*
 // TestSiacoinOutputDiff applies and reverts a siacoin output diff, then

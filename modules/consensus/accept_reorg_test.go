@@ -252,14 +252,8 @@ func (cst *consensusSetTester) complexBlockSet() error {
 		}
 	}
 
-	err := cst.testFileContractsBlocks()
-	if err != nil {
-		return err
-	}
-	err = cst.testSpendSiafundsBlock()
-	if err != nil {
-		return err
-	}
+	// err := cst.testFileContractsBlocks()
+	// err = cst.testSpendSiafundsBlock()
 	return nil
 }
 
