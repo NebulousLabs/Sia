@@ -35,7 +35,7 @@ func applySiacoinInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 func applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
-		scoid := t.SiacoinOutputID(i)
+		scoid := t.SiacoinOutputID(uint64(i))
 		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            scoid,
@@ -51,7 +51,7 @@ func applySiacoinOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 // block.
 func applyFileContracts(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for i, fc := range t.FileContracts {
-		fcid := t.FileContractID(i)
+		fcid := t.FileContractID(uint64(i))
 		fcd := modules.FileContractDiff{
 			Direction:    modules.DiffApply,
 			ID:           fcid,
@@ -188,7 +188,7 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 // applySiafundOutput applies a siafund output to the consensus set.
 func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
-		sfoid := t.SiafundOutputID(i)
+		sfoid := t.SiafundOutputID(uint64(i))
 		sfo.ClaimStart = getSiafundPool(tx)
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,

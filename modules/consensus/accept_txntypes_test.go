@@ -125,7 +125,7 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() {
 	}
 
 	// See that the destination output was created.
-	outputID := txnSet[len(txnSet)-1].SiacoinOutputID(int(outputIndex))
+	outputID := txnSet[len(txnSet)-1].SiacoinOutputID(outputIndex)
 	sco, err := cst.cs.dbGetSiacoinOutput(outputID)
 	if err != nil {
 		panic(err)
@@ -213,7 +213,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 
 	// Check that the file contract made it into the database.
 	ti := len(txnSet) - 1
-	fcid := txnSet[ti].FileContractID(int(fcIndex))
+	fcid := txnSet[ti].FileContractID(fcIndex)
 	_, err = cst.cs.dbGetFileContract(fcid)
 	if err != nil {
 		panic(err)
@@ -340,7 +340,7 @@ func (cst *consensusSetTester) testMissedStorageProofBlocks() {
 
 	// Check that the file contract made it into the database.
 	ti := len(txnSet) - 1
-	fcid := txnSet[ti].FileContractID(int(fcIndex))
+	fcid := txnSet[ti].FileContractID(fcIndex)
 	_, err = cst.cs.dbGetFileContract(fcid)
 	if err != nil {
 		panic(err)

@@ -93,7 +93,7 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 
 	// Create the diffs for the genesis siafund outputs.
 	for i, siafundOutput := range genesisBlock.Transactions[0].SiafundOutputs {
-		sfid := genesisBlock.Transactions[0].SiafundOutputID(i)
+		sfid := genesisBlock.Transactions[0].SiafundOutputID(uint64(i))
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfid,

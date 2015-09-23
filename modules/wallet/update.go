@@ -154,7 +154,7 @@ func (w *Wallet) applyHistory(cc modules.ConsensusChange) {
 					RelatedAddress: sco.UnlockHash,
 					Value:          sco.Value,
 				})
-				w.historicOutputs[types.OutputID(txn.SiacoinOutputID(i))] = sco.Value
+				w.historicOutputs[types.OutputID(txn.SiacoinOutputID(uint64(i)))] = sco.Value
 			}
 			for _, sfi := range txn.SiafundInputs {
 				_, exists := w.keys[sfi.UnlockConditions.UnlockHash()]
@@ -189,8 +189,8 @@ func (w *Wallet) applyHistory(cc modules.ConsensusChange) {
 					RelatedAddress: sfo.UnlockHash,
 					Value:          sfo.Value,
 				})
-				w.historicOutputs[types.OutputID(txn.SiafundOutputID(i))] = sfo.Value
-				w.historicClaimStarts[txn.SiafundOutputID(i)] = sfo.ClaimStart
+				w.historicOutputs[types.OutputID(txn.SiafundOutputID(uint64(i)))] = sfo.Value
+				w.historicClaimStarts[txn.SiafundOutputID(uint64(i))] = sfo.ClaimStart
 			}
 			for _, fee := range txn.MinerFees {
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
@@ -257,7 +257,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 				RelatedAddress: sco.UnlockHash,
 				Value:          sco.Value,
 			})
-			w.historicOutputs[types.OutputID(txn.SiacoinOutputID(i))] = sco.Value
+			w.historicOutputs[types.OutputID(txn.SiacoinOutputID(uint64(i)))] = sco.Value
 		}
 		for _, fee := range txn.MinerFees {
 			pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{

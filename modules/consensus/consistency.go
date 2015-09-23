@@ -119,7 +119,10 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		if build.DEBUG && err != nil {
 			panic(err)
 		}
-		fcCoins := types.PostTax(blockHeight(tx), fc.Payout)
+		var fcCoins types.Currency
+		for _, output := range fc.ValidProofOutputs {
+			fcCoins = fcCoins.Add(output.Value)
+		}
 		fcSiacoins = fcSiacoins.Add(fcCoins)
 		return nil
 	})

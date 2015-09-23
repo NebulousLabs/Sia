@@ -43,10 +43,10 @@ func relatedObjectIDs(ts []types.Transaction) []ObjectID {
 			oidMap[ObjectID(sci.ParentID)] = struct{}{}
 		}
 		for i := range t.SiacoinOutputs {
-			oidMap[ObjectID(t.SiacoinOutputID(i))] = struct{}{}
+			oidMap[ObjectID(t.SiacoinOutputID(uint64(i)))] = struct{}{}
 		}
 		for i := range t.FileContracts {
-			oidMap[ObjectID(t.FileContractID(i))] = struct{}{}
+			oidMap[ObjectID(t.FileContractID(uint64(i)))] = struct{}{}
 		}
 		for _, fcr := range t.FileContractRevisions {
 			oidMap[ObjectID(fcr.ParentID)] = struct{}{}
@@ -58,7 +58,7 @@ func relatedObjectIDs(ts []types.Transaction) []ObjectID {
 			oidMap[ObjectID(sfi.ParentID)] = struct{}{}
 		}
 		for i := range t.SiafundOutputs {
-			oidMap[ObjectID(t.SiafundOutputID(i))] = struct{}{}
+			oidMap[ObjectID(t.SiafundOutputID(uint64(i)))] = struct{}{}
 		}
 	}
 

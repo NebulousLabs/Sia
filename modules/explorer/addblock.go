@@ -225,12 +225,12 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 	// Handle all the transaction outputs
 	for i, output := range txn.SiacoinOutputs {
 		tx.addAddress(output.UnlockHash, txid)
-		tx.addNewOutput(txn.SiacoinOutputID(i), txid)
+		tx.addNewOutput(txn.SiacoinOutputID(uint64(i)), txid)
 	}
 
 	// Handle each file contract individually
 	for i, contract := range txn.FileContracts {
-		fcid := txn.FileContractID(i)
+		fcid := txn.FileContractID(uint64(i))
 		tx.addNewHash("FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
 			Contract: txid,
 		})
@@ -279,7 +279,7 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 	// Handle all the siafund outputs
 	for i, output := range txn.SiafundOutputs {
 		tx.addAddress(output.UnlockHash, txid)
-		tx.addNewSFOutput(txn.SiafundOutputID(i), txid)
+		tx.addNewSFOutput(txn.SiafundOutputID(uint64(i)), txid)
 
 	}
 

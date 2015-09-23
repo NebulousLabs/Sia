@@ -88,7 +88,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			if !exists {
 				continue
 			}
-			so.ids = append(so.ids, upt.Transaction.SiacoinOutputID(i))
+			so.ids = append(so.ids, upt.Transaction.SiacoinOutputID(uint64(i)))
 			so.outputs = append(so.outputs, sco)
 		}
 	}
