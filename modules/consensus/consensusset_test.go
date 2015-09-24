@@ -52,6 +52,56 @@ func randFile(filesize uint64) *bytes.Reader {
 	return bytes.NewReader(fileBytes)
 }
 
+// addSiafunds makes a transaction that moves all of the testing genesis
+// siafunds into the wallet.
+func (cst *consensusSetTester) addSiafunds() {
+	// Get an address to receive the siafunds.
+	uc, err := cst.wallet.NextAddress()
+	if err != nil {
+		panic(err)
+	}
+
+	// Create the transaction that sends the anyone-can-spend siafund output to
+	// the wallet address (output only available during testing).
+	txn := types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID:         cst.cs.blockRoot.Block.Transactions[0].SiafundOutputID(2),
+			UnlockConditions: types.UnlockConditions{},
+		}},
+		SiafundOutputs: []types.SiafundOutput{{
+			Value:      types.NewCurrency64(1e3),
+			UnlockHash: uc.UnlockHash(),
+		}},
+	}
+
+	// Mine the transaction into the blockchain.
+	err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
+	if err != nil {
+		panic(err)
+	}
+	_, err = cst.miner.AddBlock()
+	if err != nil {
+		panic(err)
+	}
+
+	// Check that the siafunds made it to the wallet.
+	_, siafundBalance, _ := cst.wallet.ConfirmedBalance()
+	if siafundBalance.Cmp(types.NewCurrency64(1e3)) != 0 {
+		panic("wallet does not have the siafunds")
+	}
+}
+
+// mineCoins mines blocks until there are siacoins in the wallet.
+func (cst *consensusSetTester) mineSiacoins() {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		b, _ := cst.miner.FindBlock()
+		err := cst.cs.AcceptBlock(b)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 // createConsensusSetTester creates a consensusSetTester that's ready for use.
 func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	testdir := build.TempDir(modules.ConsensusDir, name)
@@ -102,15 +152,9 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 
 		persistDir: testdir,
 	}
+	cst.addSiafunds()
+	cst.mineSiacoins()
 
-	// Mine until the wallet has money.
-	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		b, _ := cst.miner.FindBlock()
-		err = cst.cs.AcceptBlock(b)
-		if err != nil {
-			return nil, err
-		}
-	}
 	return cst, nil
 }
 

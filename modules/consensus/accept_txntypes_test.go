@@ -570,6 +570,9 @@ func TestIntegrationFileContractRevision(t *testing.T) {
 
 // testSpendEmptySiafunds spends siafunds on the blockchain when the siafund
 // pool is empty.
+func (cst *consensusSetTester) testSpendEmptySiafunds() {
+	// Do nothing.
+}
 
 // TestIntegrationSpendEmptySiafunds creates a consensus set tester and uses it
 // to call testSpendEmptySiafunds.
