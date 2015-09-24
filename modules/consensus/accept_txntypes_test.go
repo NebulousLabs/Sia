@@ -13,6 +13,7 @@ func (cst *consensusSetTester) testBlockSuite() {
 	cst.testSpendSiacoinsBlock()
 	cst.testValidStorageProofBlocks()
 	cst.testMissedStorageProofBlocks()
+	cst.testFileContractRevision()
 }
 
 // testSimpleBlock mines a simple block (no transactions except those

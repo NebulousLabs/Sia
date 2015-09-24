@@ -207,6 +207,23 @@ func TestIntegrationMissedStorageProofReorg(t *testing.T) {
 	rs.fullReorg()
 }
 
+// TestIntegrationFileContractRevisionReorg tries to reorganize a valid storage
+// proof block out of, and then back into, the consensus set.
+func TestIntegrationFileContractRevisionReorg(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rs := createReorgSets("TestIntegrationFileContractRevisionReorg")
+
+	// Give a series of blocks containing a file contract and a valid storage
+	// proof to cstMain.
+	rs.cstMain.testFileContractRevision()
+
+	// Try to trigger consensus inconsistencies by doing a full reorg on the
+	// simple block.
+	rs.fullReorg()
+}
+
 // TestIntegrationComplexReorg stacks up blocks of all types into a single
 // blockchain that undergoes a massive reorg as a stress test to the codebase.
 func TestIntegrationComplexReorg(t *testing.T) {
