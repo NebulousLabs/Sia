@@ -6,10 +6,13 @@ things is documented at the end of the (incomplete) new documentation. The new
 documentation is a spec for the 0.4.0 api. After a round of fixes and
 improvments for 0.4.1, the API will be frozen into 'compatibility mode', such
 that backwards compatibility is preserved with all apps in future upgrades. The
-api may change again when 1.0.0 is released.
+API may change again when 1.0.0 is released.
 
-The types.Currency object is an infinite precision unsigned integer that gets
-represented in json as a base-10 string.
+Notes:
+- Requests must have their User-Agent string set to "Sia-Agent".
+- The `types.Currency` object is an arbitrary-precision unsigned integer. In JSON,
+  it is represented as a base-10 string. You must use a "bignum" library to handle
+  these values, or you risk losing precision.
 
 Consensus
 ---------
