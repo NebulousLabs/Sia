@@ -74,12 +74,12 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		}
 		wg.Wait()
 		atomic.AddUint64(&f.chunksUploaded, 1)
-	}
 
-	// gather final contracts
-	for _, h := range hosts {
-		contract := h.fileContract()
-		f.contracts[contract.IP] = contract
+		// update contracts
+		for _, h := range hosts {
+			contract := h.fileContract()
+			f.contracts[contract.IP] = contract
+		}
 	}
 
 	return nil
