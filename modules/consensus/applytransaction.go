@@ -126,15 +126,18 @@ func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
-			spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
-			dscod := modules.DelayedSiacoinOutputDiff{
-				Direction:      modules.DiffApply,
-				ID:             spoid,
-				SiacoinOutput:  vpo,
-				MaturityHeight: pb.Height + types.MaturityDelay,
+			// Do not add the output to the consensus set if the value is 0.
+			if !vpo.Value.IsZero() {
+				spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
+				dscod := modules.DelayedSiacoinOutputDiff{
+					Direction:      modules.DiffApply,
+					ID:             spoid,
+					SiacoinOutput:  vpo,
+					MaturityHeight: pb.Height + types.MaturityDelay,
+				}
+				pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+				commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 			}
-			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		}
 
 		fcd := modules.FileContractDiff{

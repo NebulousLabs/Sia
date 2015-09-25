@@ -103,7 +103,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) (fcd modules.FileContractDiff) {
+func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) (dscods []modules.DelayedSiacoinOutputDiff, fcd modules.FileContractDiff) {
 	// Sanity checks.
 	fc, err := getFileContract(tx, fcid)
 	if build.DEBUG && err != nil {
@@ -124,23 +124,26 @@ func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileCon
 			panic(errPayoutsAlreadyPaid)
 		}
 
-		dscod := modules.DelayedSiacoinOutputDiff{
-			Direction:      modules.DiffApply,
-			ID:             spoid,
-			SiacoinOutput:  mpo,
-			MaturityHeight: pb.Height + types.MaturityDelay,
+		// Don't add the output if the value is zero.
+		if !mpo.Value.IsZero() {
+			dscod := modules.DelayedSiacoinOutputDiff{
+				Direction:      modules.DiffApply,
+				ID:             spoid,
+				SiacoinOutput:  mpo,
+				MaturityHeight: pb.Height + types.MaturityDelay,
+			}
+			dscods = append(dscods, dscod)
 		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 
 	// Remove the file contract from the consensus set and record the diff in
 	// the blockNode.
-	return modules.FileContractDiff{
+	fcd = modules.FileContractDiff{
 		Direction:    modules.DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
 	}
+	return dscods, fcd
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have
@@ -155,15 +158,22 @@ func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) {
 		return
 	}
 
+	var dscods []modules.DelayedSiacoinOutputDiff
 	var fcds []modules.FileContractDiff
 	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
 		var id types.FileContractID
 		copy(id[:], keyBytes)
-		fcds = append(fcds, applyMissedStorageProof(tx, pb, id))
+		amspDSCODS, fcd := applyMissedStorageProof(tx, pb, id)
+		fcds = append(fcds, fcd)
+		dscods = append(dscods, amspDSCODS...)
 		return nil
 	})
 	if build.DEBUG && err != nil {
 		panic(err)
+	}
+	for _, dscod := range dscods {
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
 	for _, fcd := range fcds {
 		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)

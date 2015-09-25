@@ -43,15 +43,19 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		// siafund fee has been applied.
 		var validProofOutputSum, missedProofOutputSum Currency
 		for _, output := range fc.ValidProofOutputs {
+			/* - Future hardforking code.
 			if output.Value.IsZero() {
 				return ErrZeroOutput
 			}
+			*/
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
 		}
 		for _, output := range fc.MissedProofOutputs {
+			/* - Future hardforking code.
 			if output.Value.IsZero() {
 				return ErrZeroOutput
 			}
+			*/
 			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
 		outputPortion := PostTax(currentHeight, fc.Payout)
@@ -81,15 +85,19 @@ func (t Transaction) correctFileContractRevisions(currentHeight BlockHeight) err
 		// value.
 		var validProofOutputSum, missedProofOutputSum Currency
 		for _, output := range fcr.NewValidProofOutputs {
+			/* - Future hardforking code.
 			if output.Value.IsZero() {
 				return ErrZeroOutput
 			}
+			*/
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
 		}
 		for _, output := range fcr.NewMissedProofOutputs {
+			/* - Future hardforking code.
 			if output.Value.IsZero() {
 				return ErrZeroOutput
 			}
+			*/
 			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
 		if validProofOutputSum.Cmp(missedProofOutputSum) != 0 {
