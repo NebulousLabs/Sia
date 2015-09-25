@@ -294,6 +294,9 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 // addSiacoinOutput adds a siacoin output to the database. An error is returned
 // if the siacoin output is already in the database.
 func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) {
+	if build.DEBUG && sco.Value.IsZero() {
+		panic("discovered a zero value siacoin output")
+	}
 	siacoinOutputs := tx.Bucket(SiacoinOutputs)
 	// Sanity check - should not be adding an item that exists.
 	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
@@ -338,6 +341,10 @@ func getFileContract(tx *bolt.Tx, id types.FileContractID) (fc types.FileContrac
 func addFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) {
 	// Add the file contract to the database.
 	fcBucket := tx.Bucket(FileContracts)
+	// Sanity check - should not be adding a zero-payout file contract.
+	if build.DEBUG && fc.Payout.IsZero() {
+		panic("adding zero-payout file contract")
+	}
 	// Sanity check - should not be adding a file contract already in the db.
 	if build.DEBUG && fcBucket.Get(id[:]) != nil {
 		panic("repeat file contract")
@@ -408,6 +415,11 @@ func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutpu
 // if the siafund output is already in the database.
 func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sco types.SiafundOutput) {
 	siafundOutputs := tx.Bucket(SiafundOutputs)
+	// Sanity check - should not be adding a siafund output with a value of
+	// zero.
+	if build.DEBUG && sco.Value.IsZero() {
+		panic("zero value siafund being added")
+	}
 	// Sanity check - should not be adding an item already in the db.
 	if build.DEBUG && siafundOutputs.Get(id[:]) != nil {
 		panic("repeat siafund output")
@@ -456,6 +468,10 @@ func setSiafundPool(tx *bolt.Tx, c types.Currency) {
 
 // addDSCO adds a delayed siacoin output to the consnesus set.
 func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
+	// Sanity check - dsco should never have a value of zero.
+	if build.DEBUG && sco.Value.IsZero() {
+		panic("zero-value dsco being added")
+	}
 	// Sanity check - output should not already be in the full set of outputs.
 	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
 		panic("dsco already in output set")
