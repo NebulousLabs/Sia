@@ -21,6 +21,7 @@ dependencies:
 	go get -u github.com/laher/goxc
 	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful
+	go get -u github.com/stretchr/testify
 	go get -u golang.org/x/crypto/twofish
 	go get -u golang.org/x/tools/cmd/cover
 
