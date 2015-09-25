@@ -108,7 +108,8 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	h.spaceRemaining = h.TotalStorage
 
 	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateSignatureKeys()
+	skg := crypto.NewSignatureKeyGenerator()
+	sk, pk, err := skg.Generate()
 	if err != nil {
 		return nil, err
 	}

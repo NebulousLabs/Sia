@@ -23,25 +23,58 @@ type (
 var (
 	ErrNilInput         = errors.New("cannot use nil input")
 	ErrInvalidSignature = errors.New("invalid signature")
+	ErrRandUnexpected   = errors.New("unexpected result from random number generator")
 )
 
-// GenerateKeyPair creates a public-secret keypair that can be used to sign and
-// verify messages.
-func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
+// KeyPairGenerator is an interface that allows the caller to generate
+// public-secret key pairs.
+type KeyPairGenerator interface {
+	Generate() (SecretKey, PublicKey, error)
+	GenerateDetermistically(entropy [EntropySize]byte) (SecretKey, PublicKey)
+}
+
+// readBytesFunc is a function pointer that reads bytes into a buffer and
+// returns the total number of bytes written to the buffer.
+type readBytesFunc func([]byte) (int, error)
+
+// deriveEd25519KeyPairFunc is a function pointer that matches the signature of
+// ed25519.GenerateKey.
+type deriveEd25519KeyPairFunc func([EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey)
+
+// SignatureKeyGenerator is an implementation of KeyPairGenerator.
+type SignatureKeyGenerator struct {
+	readRandBytes readBytesFunc
+	deriveKeyPair deriveEd25519KeyPairFunc
+}
+
+// NewSignatureKeyGenerator creates a new SignatureKeyGenerator type that uses
+// random data and depends on the ed25519.GenerateKey function for deriving
+// key pairs.
+func NewSignatureKeyGenerator() SignatureKeyGenerator {
+	return SignatureKeyGenerator{rand.Read, ed25519.GenerateKey}
+}
+
+// Generate creates a public-secret keypair that can be used to sign and verify
+// messages.
+func (skg SignatureKeyGenerator) Generate() (sk SecretKey, pk PublicKey, err error) {
 	var entropy [EntropySize]byte
-	_, err = rand.Read(entropy[:])
+	written, err := skg.readRandBytes(entropy[:])
 	if err != nil {
 		return
 	}
+	if written != EntropySize {
+		// readRandBytes did not fill the buffer. This should never happen.
+		return sk, pk, ErrRandUnexpected
+	}
 
-	skPointer, pkPointer := ed25519.GenerateKey(entropy)
+	skPointer, pkPointer := skg.deriveKeyPair(entropy)
 	return *skPointer, *pkPointer, nil
 }
 
-// DeterministicSignatureKeys generates keys deterministically using the input
+// GenerateDeterministic generates keys deterministically using the input
 // entropy. The input entropy must be 32 bytes in length.
-func DeterministicSignatureKeys(entropy [EntropySize]byte) (SecretKey, PublicKey) {
-	skPointer, pkPointer := ed25519.GenerateKey(entropy)
+func (skg SignatureKeyGenerator) GenerateDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
+	skPointer, pkPointer := skg.deriveKeyPair(entropy)
 	return *skPointer, *pkPointer
 }
 

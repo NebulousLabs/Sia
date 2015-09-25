@@ -14,10 +14,11 @@ func BenchmarkStandaloneValid(b *testing.B) {
 	// make a transaction numSigs with valid inputs with valid signatures
 	b.ReportAllocs()
 	txn := Transaction{}
+	skg := crypto.NewSignatureKeyGenerator()
 	sk := make([]crypto.SecretKey, numSigs)
 	pk := make([]crypto.PublicKey, numSigs)
 	for i := 0; i < numSigs; i++ {
-		s, p, err := crypto.GenerateSignatureKeys()
+		s, p, err := skg.Generate()
 		if err != nil {
 			b.Fatal(err)
 		}

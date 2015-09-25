@@ -72,7 +72,8 @@ func TestReviseContract(t *testing.T) {
 	}
 
 	// generate keys
-	sk, pk, err := crypto.GenerateSignatureKeys()
+	skg := crypto.NewSignatureKeyGenerator()
+	sk, pk, err := skg.Generate()
 	if err != nil {
 		t.Fatal(err)
 	}

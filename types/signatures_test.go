@@ -168,7 +168,8 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 // Transaction type.
 func TestTransactionValidSignatures(t *testing.T) {
 	// Create keys for use in signing and verifying.
-	sk, pk, err := crypto.GenerateSignatureKeys()
+	skg := crypto.NewSignatureKeyGenerator()
+	sk, pk, err := skg.Generate()
 	if err != nil {
 		t.Fatal(err)
 	}
