@@ -94,7 +94,11 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 		if build.DEBUG {
 			cs.checkConsistency(tx)
 		}
-		refreshDB(tx)
+		// Database refresh is not needed unless multiple blocks are being
+		// applied.
+		if len(newPath[1:]) > 1 {
+			refreshDB(tx)
+		}
 	}
 	return appliedBlocks, nil
 }

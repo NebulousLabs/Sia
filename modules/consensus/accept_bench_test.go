@@ -31,7 +31,7 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 
 	// Synchronisze the cst and the subscriberless consensus set.
 	h := cst.cs.dbBlockHeight()
-	for i := types.BlockHeight(1); i < h; i++ {
+	for i := types.BlockHeight(1); i <= h; i++ {
 		id, err := cst.cs.dbGetPath(i)
 		if err != nil {
 			b.Fatal(err)
@@ -99,7 +99,7 @@ func BenchmarkAcceptSmallBlocks(b *testing.B) {
 
 	// Synchronize the consensus set with the consensus set tester.
 	h := cst.cs.dbBlockHeight()
-	for i := types.BlockHeight(1); i < h; i++ {
+	for i := types.BlockHeight(1); i <= h; i++ {
 		id, err := cst.cs.dbGetPath(i)
 		if err != nil {
 			b.Fatal(err)
