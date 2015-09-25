@@ -50,6 +50,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 	// elements are collected into an array and then deleted after the bucket
 	// scan is complete.
 	bucketID := append(prefixDSCO, encoding.Marshal(pb.Height)...)
+	var scods []modules.SiacoinOutputDiff
 	var dscods []modules.DelayedSiacoinOutputDiff
 	dbErr := tx.Bucket(bucketID).ForEach(func(idBytes, scoBytes []byte) error {
 		// Decode the key-value pair into an id and a siacoin output.
@@ -73,8 +74,7 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 			ID:            id,
 			SiacoinOutput: sco,
 		}
-		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
+		scods = append(scods, scod)
 
 		// Create the dscod and add it to the list of dscods that should be
 		// deleted.
@@ -89,6 +89,10 @@ func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 	})
 	if build.DEBUG && dbErr != nil {
 		panic(dbErr)
+	}
+	for _, scod := range scods {
+		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
 	}
 	for _, dscod := range dscods {
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)

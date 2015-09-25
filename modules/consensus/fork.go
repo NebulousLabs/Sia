@@ -64,6 +64,7 @@ func (cs *ConsensusSet) revertToBlock(tx *bolt.Tx, pb *processedBlock) (reverted
 		if build.DEBUG {
 			cs.checkConsistency(tx)
 		}
+		refreshDB(tx)
 	}
 	return revertedBlocks
 }
@@ -93,6 +94,7 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 		if build.DEBUG {
 			cs.checkConsistency(tx)
 		}
+		refreshDB(tx)
 	}
 	return appliedBlocks, nil
 }
