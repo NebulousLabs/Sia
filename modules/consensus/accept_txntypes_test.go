@@ -14,6 +14,7 @@ func (cst *consensusSetTester) testBlockSuite() {
 	cst.testValidStorageProofBlocks()
 	cst.testMissedStorageProofBlocks()
 	cst.testFileContractRevision()
+	cst.testSpendSiafunds()
 }
 
 // testSimpleBlock mines a simple block (no transactions except those
@@ -568,22 +569,64 @@ func TestIntegrationFileContractRevision(t *testing.T) {
 	cst.testFileContractRevision()
 }
 
-// testSpendEmptySiafunds spends siafunds on the blockchain when the siafund
-// pool is empty.
-func (cst *consensusSetTester) testSpendEmptySiafunds() {
-	// Do nothing.
+// testSpendSiafunds spends siafunds on the blockchain.
+func (cst *consensusSetTester) testSpendSiafunds() {
+	// Create a random destination address for the output in the transaction.
+	destAddr := randAddress()
+
+	// Create a block containing a transaction with a valid siafund output.
+	txnValue := types.NewCurrency64(3)
+	txnBuilder := cst.wallet.StartTransaction()
+	err := txnBuilder.FundSiafunds(txnValue)
+	if err != nil {
+		panic(err)
+	}
+	outputIndex := txnBuilder.AddSiafundOutput(types.SiafundOutput{Value: txnValue, UnlockHash: destAddr})
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		panic(err)
+	}
+	err = cst.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		panic(err)
+	}
+
+	// Mine and apply the block to the consensus set.
+	_, err = cst.miner.AddBlock()
+	if err != nil {
+		panic(err)
+	}
+
+	// See that the destination output was created.
+	outputID := txnSet[len(txnSet)-1].SiafundOutputID(outputIndex)
+	sfo, err := cst.cs.dbGetSiafundOutput(outputID)
+	if err != nil {
+		panic(err)
+	}
+	if sfo.Value.Cmp(txnValue) != 0 {
+		panic("output added with wrong value")
+	}
+	if sfo.UnlockHash != destAddr {
+		panic("output sent to the wrong address")
+	}
+	if sfo.ClaimStart.Cmp(cst.cs.dbGetSiafundPool()) != 0 {
+		panic("ClaimStart is not being set correctly")
+	}
 }
 
-// TestIntegrationSpendEmptySiafunds creates a consensus set tester and uses it
-// to call testSpendEmptySiafunds.
-
-// testSpendSiafunds spends siafunds on the blockchain when the siafund pool is
-// not empty.
-//
-// TODO: Make sure the ClaimStart value is being set correclty.
-
-// TestIntegrationSpendSiafunds creates a consensus set tester and uses it to
-// call testSpendSiafunds.
+// TestIntegrationSpendSiafunds creates a consensus set tester and uses it
+// to call testSpendSiafunds.
+func (cst *consensusSetTester) TestIntegrationSpendSiafunds(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestIntegtrationSpendSiafunds")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+	cst.testSpendSiafunds()
+}
 
 // testDelayedOutputMaturity adds blocks that result in many delayed outputs
 // maturing at the same time, verifying that bulk maturity is handled
