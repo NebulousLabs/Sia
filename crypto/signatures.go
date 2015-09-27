@@ -37,14 +37,14 @@ type KeyPairGenerator interface {
 // returns the total number of bytes written to the buffer.
 type readBytesFunc func([]byte) (int, error)
 
-// deriveEd25519KeyPairFunc is a function pointer that matches the signature of
+// deriveEd25519Func is a function pointer that matches the signature of
 // ed25519.GenerateKey.
-type deriveEd25519KeyPairFunc func([EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey)
+type deriveEd25519Func func([EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey)
 
 // SignatureKeyGenerator is an implementation of KeyPairGenerator.
 type SignatureKeyGenerator struct {
 	readRandBytes readBytesFunc
-	deriveKeyPair deriveEd25519KeyPairFunc
+	deriveKeyPair deriveEd25519Func
 }
 
 // NewSignatureKeyGenerator creates a new SignatureKeyGenerator type that uses

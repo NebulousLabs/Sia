@@ -25,7 +25,7 @@ func (m *mockRandGenerator) Read(b []byte) (n int, err error) {
 	return args.Int(0), args.Error(1)
 }
 
-// mockKeyDeriver is a mock implementation of deriveEd25519KeyPairFunc, allowing
+// mockKeyDeriver is a mock implementation of deriveEd25519Func, allowing
 // tests to mock out calls to ed25519.GenerateKey.
 type mockKeyDeriver struct {
 	mock.Mock
