@@ -30,7 +30,7 @@ var (
 // public-secret key pairs.
 type KeyPairGenerator interface {
 	Generate() (SecretKey, PublicKey, error)
-	GenerateDetermistically(entropy [EntropySize]byte) (SecretKey, PublicKey)
+	GenerateDetermistic(entropy [EntropySize]byte) (SecretKey, PublicKey)
 }
 
 // readBytesFunc is a function pointer that reads bytes into a buffer and
