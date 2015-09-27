@@ -36,12 +36,6 @@ func (m *mockKeyDeriver) Derive(b [EntropySize]byte) (sk ed25519.SecretKey, pk e
 	return args.Get(0).(ed25519.SecretKey), args.Get(1).(ed25519.PublicKey)
 }
 
-// Create a testable version of SignatureKeyGenerator whose readRandBytes and
-// deriveKeyPair members are caller-specified.
-func NewTestableSignatureKeyGenerator(readBytes readBytesFunc, deriveKeyPair deriveEd25519KeyPairFunc) SignatureKeyGenerator {
-	return SignatureKeyGenerator{readBytes, deriveKeyPair}
-}
-
 // Test that the Generate method is properly calling its dependencies and
 // returning the expected key pair.
 func TestGenerateRandomKeyPair(t *testing.T) {
@@ -56,7 +50,7 @@ func TestGenerateRandomKeyPair(t *testing.T) {
 	mockEd22519.On("Derive", *new([EntropySize]byte)).Return(derivedSk, derivedPk)
 
 	// Create a SignatureKeyGenerator using mocks.
-	skg := NewTestableSignatureKeyGenerator(mockRandGenerator.Read, mockEd22519.Derive)
+	skg := SignatureKeyGenerator{mockRandGenerator.Read, mockEd22519.Derive}
 
 	// Create key pair.
 	skActual, pkActual, err := skg.Generate()
@@ -81,7 +75,7 @@ func TestGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
 	mockEd22519 := new(mockKeyDeriver)
 	mockEd22519.On("Derive", *new([EntropySize]byte)).Return(derivedSk, derivedPk)
 
-	skg := NewTestableSignatureKeyGenerator(mockRandGenerator.Read, mockEd22519.Derive)
+	skg := SignatureKeyGenerator{mockRandGenerator.Read, mockEd22519.Derive}
 	_, _, err := skg.Generate()
 	assert.NotNil(t, err, "Generate should fail when readRandBytes fails")
 }
@@ -99,7 +93,7 @@ func TestGenerateRandomKeyPairFailsWhenRandWritesInsufficientBytes(t *testing.T)
 	mockEd22519 := new(mockKeyDeriver)
 	mockEd22519.On("Derive", *new([EntropySize]byte)).Return(derivedSk, derivedPk)
 
-	skg := NewTestableSignatureKeyGenerator(mockRandGenerator.Read, mockEd22519.Derive)
+	skg := SignatureKeyGenerator{mockRandGenerator.Read, mockEd22519.Derive}
 	_, _, err := skg.Generate()
 	assert.Equal(t, ErrRandUnexpected, err, "Generate should fail when readRandBytes writes insufficient bytes")
 }
@@ -118,7 +112,7 @@ func TestGenerateDeterministicKeyPair(t *testing.T) {
 	mockEd22519 := new(mockKeyDeriver)
 	mockEd22519.On("Derive", entropy).Return(derivedSk, derivedPk)
 
-	skg := NewTestableSignatureKeyGenerator(nil, mockEd22519.Derive)
+	skg := SignatureKeyGenerator{nil, mockEd22519.Derive}
 
 	// Create key pair.
 	skActual, pkActual := skg.GenerateDeterministic(entropy)
