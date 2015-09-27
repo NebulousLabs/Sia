@@ -47,7 +47,7 @@ func TestGenerateRandomKeyPair(t *testing.T) {
 	derivedSk := ed25519.SecretKey(new([SecretKeySize]byte))
 	derivedPk := ed25519.PublicKey(new([PublicKeySize]byte))
 	mockEd22519 := new(mockKeyDeriver)
-	mockEd22519.On("Derive", *new([EntropySize]byte)).Return(derivedSk, derivedPk)
+	mockEd22519.On("Derive", [EntropySize]byte{}).Return(derivedSk, derivedPk)
 
 	// Create a SignatureKeyGenerator using mocks.
 	skg := SignatureKeyGenerator{mockRandGenerator.Read, mockEd22519.Derive}
@@ -73,7 +73,7 @@ func TestGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
 	derivedSk := ed25519.SecretKey(new([SecretKeySize]byte))
 	derivedPk := ed25519.PublicKey(new([PublicKeySize]byte))
 	mockEd22519 := new(mockKeyDeriver)
-	mockEd22519.On("Derive", *new([EntropySize]byte)).Return(derivedSk, derivedPk)
+	mockEd22519.On("Derive", [EntropySize]byte{}).Return(derivedSk, derivedPk)
 
 	skg := SignatureKeyGenerator{mockRandGenerator.Read, mockEd22519.Derive}
 	_, _, err := skg.Generate()
@@ -91,7 +91,7 @@ func TestGenerateRandomKeyPairFailsWhenRandWritesInsufficientBytes(t *testing.T)
 	derivedSk := ed25519.SecretKey(new([SecretKeySize]byte))
 	derivedPk := ed25519.PublicKey(new([PublicKeySize]byte))
 	mockEd22519 := new(mockKeyDeriver)
-	mockEd22519.On("Derive", *new([EntropySize]byte)).Return(derivedSk, derivedPk)
+	mockEd22519.On("Derive", [EntropySize]byte{}).Return(derivedSk, derivedPk)
 
 	skg := SignatureKeyGenerator{mockRandGenerator.Read, mockEd22519.Derive}
 	_, _, err := skg.Generate()
