@@ -126,18 +126,15 @@ func applyStorageProofs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
-			// Do not add the output to the consensus set if the value is 0.
-			if !vpo.Value.IsZero() {
-				spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
-				dscod := modules.DelayedSiacoinOutputDiff{
-					Direction:      modules.DiffApply,
-					ID:             spoid,
-					SiacoinOutput:  vpo,
-					MaturityHeight: pb.Height + types.MaturityDelay,
-				}
-				pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-				commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+			spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
+			dscod := modules.DelayedSiacoinOutputDiff{
+				Direction:      modules.DiffApply,
+				ID:             spoid,
+				SiacoinOutput:  vpo,
+				MaturityHeight: pb.Height + types.MaturityDelay,
 			}
+			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+			commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 		}
 
 		fcd := modules.FileContractDiff{
@@ -161,23 +158,20 @@ func applySiafundInputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 		}
 		claimPortion := getSiafundPool(tx).Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
-		// Add the claim output to the delayed set of outputs - skip adding the
-		// output if the value is 0.
-		if claimPortion.Cmp(types.NewCurrency64(0)) > 0 {
-			sco := types.SiacoinOutput{
-				Value:      claimPortion,
-				UnlockHash: sfi.ClaimUnlockHash,
-			}
-			sfoid := sfi.ParentID.SiaClaimOutputID()
-			dscod := modules.DelayedSiacoinOutputDiff{
-				Direction:      modules.DiffApply,
-				ID:             sfoid,
-				SiacoinOutput:  sco,
-				MaturityHeight: pb.Height + types.MaturityDelay,
-			}
-			pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-			commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		// Add the claim output to the delayed set of outputs.
+		sco := types.SiacoinOutput{
+			Value:      claimPortion,
+			UnlockHash: sfi.ClaimUnlockHash,
 		}
+		sfoid := sfi.ParentID.SiaClaimOutputID()
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffApply,
+			ID:             sfoid,
+			SiacoinOutput:  sco,
+			MaturityHeight: pb.Height + types.MaturityDelay,
+		}
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 
 		// Create the siafund output diff and remove the output from the
 		// consensus set.

@@ -18,12 +18,7 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = cst.complexBlockSet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	cst.testBlockSuite()
 	oldHash := cst.cs.dbConsensusChecksum()
 	cst.cs.Close()
 

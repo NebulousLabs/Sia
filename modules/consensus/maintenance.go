@@ -125,15 +125,13 @@ func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileCon
 		}
 
 		// Don't add the output if the value is zero.
-		if !mpo.Value.IsZero() {
-			dscod := modules.DelayedSiacoinOutputDiff{
-				Direction:      modules.DiffApply,
-				ID:             spoid,
-				SiacoinOutput:  mpo,
-				MaturityHeight: pb.Height + types.MaturityDelay,
-			}
-			dscods = append(dscods, dscod)
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffApply,
+			ID:             spoid,
+			SiacoinOutput:  mpo,
+			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
+		dscods = append(dscods, dscod)
 	}
 
 	// Remove the file contract from the consensus set and record the diff in

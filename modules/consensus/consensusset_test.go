@@ -158,7 +158,7 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	return cst, nil
 }
 
-// closeCst safely closes the consensus set tester. 'close' is a builtin
+// closeCst safely closes the consensus set tester.
 func (cst *consensusSetTester) closeCst() error {
 	return cst.gateway.Close()
 }

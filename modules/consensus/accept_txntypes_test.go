@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -591,6 +592,28 @@ func (cst *consensusSetTester) testSpendSiafunds() {
 		panic(err)
 	}
 
+	// Find the siafund inputs used in the txn set.
+	var claimValues []types.Currency
+	var claimIDs []types.SiacoinOutputID
+	for _, txn := range txnSet {
+		for _, sfi := range txn.SiafundInputs {
+			sfo, err := cst.cs.dbGetSiafundOutput(sfi.ParentID)
+			if err != nil {
+				// It's not in the database because it's in an earlier
+				// transaction: disregard it - testing the first layer of
+				// dependencies is sufficient.
+				continue
+			}
+			poolDiff := cst.cs.dbGetSiafundPool().Sub(sfo.ClaimStart)
+			value := poolDiff.Div(types.SiafundCount).Mul(sfo.Value)
+			claimValues = append(claimValues, value)
+			claimIDs = append(claimIDs, sfi.ParentID.SiaClaimOutputID())
+		}
+	}
+	if len(claimValues) == 0 {
+		panic("no siafund outputs created?")
+	}
+
 	// Mine and apply the block to the consensus set.
 	_, err = cst.miner.AddBlock()
 	if err != nil {
@@ -611,6 +634,21 @@ func (cst *consensusSetTester) testSpendSiafunds() {
 	}
 	if sfo.ClaimStart.Cmp(cst.cs.dbGetSiafundPool()) != 0 {
 		panic("ClaimStart is not being set correctly")
+	}
+
+	// Verify that all expected claims were created and added to the set of
+	// delayed siacoin outputs.
+	for i, id := range claimIDs {
+		dsco, err := cst.cs.dbGetDSCO(cst.cs.dbBlockHeight()+types.MaturityDelay, id)
+		if err != nil {
+			fmt.Println(id)
+			fmt.Println(cst.cs.dbBlockHeight())
+			fmt.Println(cst.cs.dbBlockHeight() + types.MaturityDelay - 1)
+			panic(err)
+		}
+		if dsco.Value.Cmp(claimValues[i]) != 0 {
+			panic("expected a different claim value on the siaclaim")
+		}
 	}
 }
 
@@ -647,243 +685,9 @@ func (cst *consensusSetTester) TestIntegrationSpendSiafunds(t *testing.T) {
 
 /// All functions below this point are deprecated. ///
 
-// testSpendSiafundsBlock mines a block with a transaction spending siafunds
-// and adds it to the consensus set.
 /*
-func (cst *consensusSetTester) testSpendSiafundsBlock() error {
-	// Create a destination for the siafunds.
-	var destAddr types.UnlockHash
-	_, err := rand.Read(destAddr[:])
-	if err != nil {
-		return err
-	}
-
-	// Find the siafund output that is 'anyone can spend' (output exists only
-	// in the testing setup).
-	var srcID types.SiafundOutputID
-	var srcValue types.Currency
-	anyoneSpends := types.UnlockConditions{}.UnlockHash()
-	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, sfo types.SiafundOutput) {
-		if sfo.UnlockHash == anyoneSpends {
-			srcID = id
-			srcValue = sfo.Value
-		}
-	})
-
-	// Create a transaction that spends siafunds.
-	txn := types.Transaction{
-		SiafundInputs: []types.SiafundInput{{
-			ParentID:         srcID,
-			UnlockConditions: types.UnlockConditions{},
-		}},
-		SiafundOutputs: []types.SiafundOutput{
-			{
-				Value:      srcValue.Sub(types.NewCurrency64(1)),
-				UnlockHash: types.UnlockConditions{}.UnlockHash(),
-			},
-			{
-				Value:      types.NewCurrency64(1),
-				UnlockHash: destAddr,
-			},
-		},
-	}
-	sfoid0 := txn.SiafundOutputID(0)
-	sfoid1 := txn.SiafundOutputID(1)
-	cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
-
-	// Mine a block containing the txn.
-	_, err = cst.miner.AddBlock()
-	if err != nil {
-		return err
-	}
-
-	// Check that the input got consumed, and that the outputs got created.
-	exists := cst.cs.db.inSiafundOutputs(srcID)
-	if exists {
-		return errors.New("siafund output was not properly consumed")
-	}
-	exists = cst.cs.db.inSiafundOutputs(sfoid0)
-	if !exists {
-		return errors.New("siafund output was not properly created")
-	}
-	sfo, err := cst.cs.dbGetSiafundOutput(sfoid0)
-	if err != nil {
-		return err
-	}
-	if sfo.Value.Cmp(srcValue.Sub(types.NewCurrency64(1))) != 0 {
-		return errors.New("created siafund has wrong value")
-	}
-	if sfo.UnlockHash != anyoneSpends {
-		return errors.New("siafund output sent to wrong unlock hash")
-	}
-	exists = cst.cs.db.inSiafundOutputs(sfoid1)
-	if !exists {
-		return errors.New("second siafund output was not properly created")
-	}
-	sfo, err = cst.cs.dbGetSiafundOutput(sfoid1)
-	if err != nil {
-		return err
-	}
-	if sfo.Value.Cmp(types.NewCurrency64(1)) != 0 {
-		return errors.New("second siafund output has wrong value")
-	}
-	if sfo.UnlockHash != destAddr {
-		return errors.New("second siafund output sent to wrong addr")
-	}
-
-	// Put a file contract into the blockchain that will add values to siafund
-	// outputs.
-	var siafundPool types.Currency
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-	oldSiafundPool := siafundPool
-	payout := types.NewCurrency64(400e6)
-	fc := types.FileContract{
-		WindowStart: cst.cs.dbBlockHeight() + 2,
-		WindowEnd:   cst.cs.dbBlockHeight() + 4,
-		Payout:      payout,
-	}
-	outputSize := payout.Sub(types.Tax(cst.cs.dbBlockHeight(), fc.Payout))
-	fc.ValidProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
-	fc.MissedProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
-
-	// Create and fund a transaction with a file contract.
-	txnBuilder := cst.wallet.StartTransaction()
-	err = txnBuilder.FundSiacoins(payout)
-	if err != nil {
-		return err
-	}
-	txnBuilder.AddFileContract(fc)
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		return err
-	}
-	err = cst.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		return err
-	}
-	_, err = cst.miner.AddBlock()
-	if err != nil {
-		return err
-	}
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-	if siafundPool.Cmp(types.NewCurrency64(15600e3).Add(oldSiafundPool)) != 0 {
-		return errors.New("siafund pool did not update correctly")
-	}
-
-	// Create a transaction that spends siafunds.
-	var claimDest types.UnlockHash
-	_, err = rand.Read(claimDest[:])
-	if err != nil {
-		return err
-	}
-	var srcClaimStart types.Currency
-	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, sfo types.SiafundOutput) {
-		if sfo.UnlockHash == anyoneSpends {
-			srcID = id
-			srcValue = sfo.Value
-			srcClaimStart = sfo.ClaimStart
-		}
-	})
-	txn = types.Transaction{
-		SiafundInputs: []types.SiafundInput{{
-			ParentID:         srcID,
-			UnlockConditions: types.UnlockConditions{},
-			ClaimUnlockHash:  claimDest,
-		}},
-		SiafundOutputs: []types.SiafundOutput{
-			{
-				Value:      srcValue.Sub(types.NewCurrency64(1)),
-				UnlockHash: types.UnlockConditions{}.UnlockHash(),
-			},
-			{
-				Value:      types.NewCurrency64(1),
-				UnlockHash: destAddr,
-			},
-		},
-	}
-	sfoid1 = txn.SiafundOutputID(1)
-	cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
-	_, err = cst.miner.AddBlock()
-	if err != nil {
-		return err
-	}
-
-	// Find the siafund output and check that it has the expected number of
-	// siafunds.
-	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-	found := false
-	expectedBalance := siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
-	cst.cs.db.forEachDelayedSiacoinOutputsHeight(cst.cs.dbBlockHeight()+types.MaturityDelay, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
-		if output.UnlockHash == claimDest {
-			found = true
-			if output.Value.Cmp(expectedBalance) != 0 {
-				// err is scoped outside this func
-				err = errors.New("siafund output has the wrong balance")
-			}
-		}
-	})
-	if err != nil {
-		return err
-	}
-	if !found {
-		return errors.New("could not find siafund claim output")
-	}
-
-	return nil
-}
-*/
-
-// TestSpendSiafundsBlock creates a consensus set tester and uses it to call
-// testSpendSiafundsBlock.
-/*
-func TestSpendSiafundsBlock(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestSpendSiafundsBlock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// COMPATv0.4.0
-	//
-	// Mine enough blocks to get above the file contract hardfork threshold
-	// (10).
-	for i := 0; i < 10; i++ {
-		_, err = cst.miner.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = cst.testSpendSiafundsBlock()
-	if err != nil {
-		t.Error(err)
-	}
-}
-*/
-
 // testPaymentChannelBlocks submits blocks to set up, use, and close a payment
 // channel.
-/*
 func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	// The current method of doing payment channels is gimped because public
 	// keys do not have timelocks. We will be hardforking to include timelocks
@@ -1398,9 +1202,9 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 }
 */
 
+/*
 // TestPaymentChannelBlocks creates a consensus set tester and uses it to call
 // testPaymentChannelBlocks.
-/*
 func TestPaymentChannelBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

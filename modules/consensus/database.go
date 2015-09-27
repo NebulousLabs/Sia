@@ -295,7 +295,8 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 // if the siacoin output is already in the database.
 func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	if build.DEBUG && sco.Value.IsZero() {
-		panic("discovered a zero value siacoin output")
+		// println("Zero Sco")
+		// panic("discovered a zero value siacoin output")
 	}
 	siacoinOutputs := tx.Bucket(SiacoinOutputs)
 	// Sanity check - should not be adding an item that exists.
@@ -413,18 +414,18 @@ func getSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (types.SiafundOutpu
 
 // addSiafundOutput adds a siafund output to the database. An error is returned
 // if the siafund output is already in the database.
-func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sco types.SiafundOutput) {
+func addSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, sfo types.SiafundOutput) {
 	siafundOutputs := tx.Bucket(SiafundOutputs)
 	// Sanity check - should not be adding a siafund output with a value of
 	// zero.
-	if build.DEBUG && sco.Value.IsZero() {
+	if build.DEBUG && sfo.Value.IsZero() {
 		panic("zero value siafund being added")
 	}
 	// Sanity check - should not be adding an item already in the db.
 	if build.DEBUG && siafundOutputs.Get(id[:]) != nil {
 		panic("repeat siafund output")
 	}
-	err := siafundOutputs.Put(id[:], encoding.Marshal(sco))
+	err := siafundOutputs.Put(id[:], encoding.Marshal(sfo))
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -470,7 +471,8 @@ func setSiafundPool(tx *bolt.Tx, c types.Currency) {
 func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	// Sanity check - dsco should never have a value of zero.
 	if build.DEBUG && sco.Value.IsZero() {
-		panic("zero-value dsco being added")
+		// println("Zero DSCO")
+		// panic("zero-value dsco being added")
 	}
 	// Sanity check - output should not already be in the full set of outputs.
 	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
