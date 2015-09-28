@@ -21,7 +21,6 @@ type (
 )
 
 var (
-	ErrNilInput         = errors.New("cannot use nil input")
 	ErrInvalidSignature = errors.New("invalid signature")
 	ErrRandUnexpected   = errors.New("unexpected result from random number generator")
 )
