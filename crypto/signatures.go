@@ -23,60 +23,75 @@ type (
 var (
 	ErrNilInput         = errors.New("cannot use nil input")
 	ErrInvalidSignature = errors.New("invalid signature")
-	ErrRandUnexpected   = errors.New("unexpected result from random number generator")
 )
 
-// KeyPairGenerator is an interface that allows the caller to generate
-// public-secret key pairs.
+// KeyPairGenerator allows the caller to generate public-secret key pairs.
 type KeyPairGenerator interface {
 	Generate() (SecretKey, PublicKey, error)
-	GenerateDetermistic(entropy [EntropySize]byte) (SecretKey, PublicKey)
+	GenerateDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey)
 }
 
-// readBytesFunc is a function pointer that reads bytes into a buffer and
-// returns the total number of bytes written to the buffer.
-type readBytesFunc func([]byte) (int, error)
-
-// deriveEd25519Func is a function pointer that matches the signature of
-// ed25519.GenerateKey.
-type deriveEd25519Func func([EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey)
-
-// SignatureKeyGenerator is an implementation of KeyPairGenerator.
-type SignatureKeyGenerator struct {
-	readRandBytes readBytesFunc
-	deriveKeyPair deriveEd25519Func
+// entropySource allows the caller to retrieve an array of bytes populated to
+// random values.
+type entropySource interface {
+	getEntropy() ([EntropySize]byte, error)
 }
 
-// NewSignatureKeyGenerator creates a new SignatureKeyGenerator type that uses
-// random data and depends on the ed25519.GenerateKey function for deriving
-// key pairs.
-func NewSignatureKeyGenerator() SignatureKeyGenerator {
-	return SignatureKeyGenerator{rand.Read, ed25519.GenerateKey}
+// keyDeriver allows the caller to generate a public-secret key pair based on
+// provided entropy.
+type keyDeriver interface {
+	deriveKeyPair([EntropySize]byte) (SecretKey, PublicKey)
+}
+
+// stdGenerator is an implementation of KeyPairGenerator, allowing the caller
+// to generate public-secret key pairs.
+type stdGenerator struct {
+	es entropySource
+	kd keyDeriver
 }
 
 // Generate creates a public-secret keypair that can be used to sign and verify
 // messages.
-func (skg SignatureKeyGenerator) Generate() (sk SecretKey, pk PublicKey, err error) {
-	var entropy [EntropySize]byte
-	written, err := skg.readRandBytes(entropy[:])
+func (sg stdGenerator) Generate() (sk SecretKey, pk PublicKey, err error) {
+	entropy, err := sg.es.getEntropy()
 	if err != nil {
 		return
 	}
-	if written != EntropySize {
-		// readRandBytes did not fill the buffer. This should never happen.
-		return sk, pk, ErrRandUnexpected
-	}
-
-	skPointer, pkPointer := skg.deriveKeyPair(entropy)
-	return *skPointer, *pkPointer, nil
+	sk, pk = sg.kd.deriveKeyPair(entropy)
+	return sk, pk, nil
 }
 
 // GenerateDeterministic generates keys deterministically using the input
 // entropy. The input entropy must be 32 bytes in length.
-func (skg SignatureKeyGenerator) GenerateDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
-	skPointer, pkPointer := skg.deriveKeyPair(entropy)
+func (sg stdGenerator) GenerateDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
+	return sg.kd.deriveKeyPair(entropy)
+}
+
+// randSource is an implementation of entropySource that uses rand.Read to
+// generate random bytes.
+type randSource struct{}
+
+// getEntropy returns an array of bytes with random values.
+func (rs randSource) getEntropy() (entropy [EntropySize]byte, err error) {
+	if _, err := rand.Read(entropy[:]); err != nil {
+		return entropy, err
+	}
+	return entropy, nil
+}
+
+// ed25519Deriver is an implementation of keyDeriver that uses
+// ed25519.GenerateKey to derive keys.
+type ed25519Deriver struct{}
+
+// deriveKeyPair derives a public-secret key pair derived from the provided
+// array of bytes.
+func (ed ed25519Deriver) deriveKeyPair(entropy [EntropySize]byte) (sk SecretKey, pk PublicKey) {
+	skPointer, pkPointer := ed25519.GenerateKey(entropy)
 	return *skPointer, *pkPointer
 }
+
+// StdKeyGen is a KeyPairGenerator based on randSource and ed25519Deriver.
+var StdKeyGen KeyPairGenerator = stdGenerator{es: randSource{}, kd: ed25519Deriver{}}
 
 // SignHash signs a message using a secret key.
 func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
