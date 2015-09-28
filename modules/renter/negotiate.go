@@ -88,8 +88,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	// create our own key by combining the renter entropy with the host key
 	entropy := crypto.HashAll(hu.renter.entropy, hostPublicKey)
-	skg := crypto.NewSignatureKeyGenerator()
-	ourSK, ourPK := skg.GenerateDeterministic(entropy)
+	ourSK, ourPK := crypto.StdKeyGen.GenerateDeterministic(entropy)
 	ourPublicKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       ourPK[:],
