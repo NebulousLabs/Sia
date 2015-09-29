@@ -1,25 +1,14 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/rand"
 	"errors"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/ed25519"
 )
-
-// mockEntropySource is a mock implementation of entropySource that allows the
-// client to specify the returned entropy and error.
-type mockEntropySource struct {
-	called  bool
-	entropy [EntropySize]byte
-	err     error
-}
-
-func (es *mockEntropySource) getEntropy() (entropy [EntropySize]byte, err error) {
-	es.called = true
-	return es.entropy, es.err
-}
 
 // mockKeyDeriver is a mock implementation of keyDeriver that saves its provided
 // entropy and allows the client to specify the returned SecretKey and
@@ -27,11 +16,11 @@ func (es *mockEntropySource) getEntropy() (entropy [EntropySize]byte, err error)
 type mockKeyDeriver struct {
 	called  bool
 	entropy [EntropySize]byte
-	sk      SecretKey
-	pk      PublicKey
+	sk      ed25519.SecretKey
+	pk      ed25519.PublicKey
 }
 
-func (kd *mockKeyDeriver) deriveKeyPair(entropy [EntropySize]byte) (sk SecretKey, pk PublicKey) {
+func (kd *mockKeyDeriver) deriveKeyPair(entropy [EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey) {
 	kd.called = true
 	kd.entropy = entropy
 	return kd.sk, kd.pk
@@ -41,16 +30,19 @@ func (kd *mockKeyDeriver) deriveKeyPair(entropy [EntropySize]byte) (sk SecretKey
 // returning the expected key pair.
 func TestGenerateRandomKeyPair(t *testing.T) {
 	var mockEntropy [EntropySize]byte
-	mockEntropy[0] = 0x0a
-	mockEntropy[EntropySize-1] = 0x0b
-	es := mockEntropySource{entropy: mockEntropy}
+	mockEntropy[0] = 5
+	mockEntropy[EntropySize-1] = 5
+	entropyReader := bytes.NewReader(mockEntropy[:])
 
-	sk := SecretKey([SecretKeySize]byte{})
-	pk := PublicKey([PublicKeySize]byte{})
+	sk := ed25519.SecretKey(&[SecretKeySize]byte{})
+	sk[0] = 7
+	sk[32] = 8
+	pk := ed25519.PublicKey(&[PublicKeySize]byte{})
+	pk[0] = sk[32]
 	kd := mockKeyDeriver{sk: sk, pk: pk}
 
 	// Create a SignatureKeyGenerator using mocks.
-	g := stdGenerator{&es, &kd}
+	g := stdGenerator{entropyReader, &kd}
 
 	// Create key pair.
 	skActual, pkActual, err := g.Generate()
@@ -59,29 +51,36 @@ func TestGenerateRandomKeyPair(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if sk != skActual {
+	if *sk != skActual {
 		t.Errorf("Generated secret key does not match expected! expected = %v, actual = %v", sk, skActual)
 	}
-	if pk != pkActual {
+	if *pk != pkActual {
 		t.Errorf("Generated public key does not match expected! expected = %v, actual = %v", pk, pkActual)
 	}
 
 	// Verify the dependencies were called correctly
-	if !es.called {
-		t.Error("entropySource was never called.")
-	}
 	if !kd.called {
 		t.Error("keyDeriver was never called.")
 	}
 	if mockEntropy != kd.entropy {
-		t.Error("keyDeriver was called with the wrong entropy. expected = %v, actual = %v", mockEntropy, kd.entropy)
+		t.Errorf("keyDeriver was called with the wrong entropy. expected = %v, actual = %v", mockEntropy, kd.entropy)
 	}
+}
+
+// failingReader is a mock implementation of io.Reader that fails with a client-
+// defined error.
+type failingReader struct {
+	err error
+}
+
+func (fr failingReader) Read([]byte) (int, error) {
+	return 0, fr.err
 }
 
 // Test that the Generate method fails if the call to entropy source fails
 func TestGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
-	es := mockEntropySource{err: errors.New("mock error from entropy source")}
-	g := stdGenerator{es: &es}
+	fr := failingReader{err: errors.New("mock error from entropy reader")}
+	g := stdGenerator{entropySource: &fr}
 	if _, _, err := g.Generate(); err == nil {
 		t.Error("Generate should fail when entropy source fails.")
 	}
@@ -93,11 +92,14 @@ func TestGenerateDeterministicKeyPair(t *testing.T) {
 	// Create entropy bytes, setting a few bytes explicitly instead of using a
 	// buffer of random bytes.
 	var mockEntropy [EntropySize]byte
-	mockEntropy[0] = 0x0a
-	mockEntropy[EntropySize-1] = 0x0b
+	mockEntropy[0] = 4
+	mockEntropy[EntropySize-1] = 5
 
-	sk := SecretKey([SecretKeySize]byte{})
-	pk := PublicKey([PublicKeySize]byte{})
+	sk := ed25519.SecretKey(&[SecretKeySize]byte{})
+	sk[0] = 7
+	sk[32] = 8
+	pk := ed25519.PublicKey(&[PublicKeySize]byte{})
+	pk[0] = sk[32]
 	kd := mockKeyDeriver{sk: sk, pk: pk}
 	g := stdGenerator{kd: &kd}
 
@@ -105,10 +107,10 @@ func TestGenerateDeterministicKeyPair(t *testing.T) {
 	skActual, pkActual := g.GenerateDeterministic(mockEntropy)
 
 	// Verify that we got back the right results.
-	if sk != skActual {
+	if *sk != skActual {
 		t.Errorf("Generated secret key does not match expected! expected = %v, actual = %v", sk, skActual)
 	}
-	if pk != pkActual {
+	if *pk != pkActual {
 		t.Errorf("Generated public key does not match expected! expected = %v, actual = %v", pk, pkActual)
 	}
 
@@ -117,7 +119,7 @@ func TestGenerateDeterministicKeyPair(t *testing.T) {
 		t.Error("keyDeriver was never called.")
 	}
 	if mockEntropy != kd.entropy {
-		t.Error("keyDeriver was called with the wrong entropy. expected = %v, actual = %v", mockEntropy, kd.entropy)
+		t.Errorf("keyDeriver was called with the wrong entropy. expected = %v, actual = %v", mockEntropy, kd.entropy)
 	}
 }
 
@@ -126,8 +128,8 @@ func TestGenerateDeterministicKeyPair(t *testing.T) {
 func TestSignatureEncoding(t *testing.T) {
 	// Create a dummy key pair.
 	var sk SecretKey
-	sk[0] = 0x0a
-	sk[32] = 0x0b
+	sk[0] = 4
+	sk[32] = 5
 	pk := sk.PublicKey()
 
 	// Marshal and unmarshal the public key.
@@ -180,8 +182,8 @@ func TestSigning(t *testing.T) {
 	for i := 0; i < iterations; i++ {
 		// Create dummy key pair.
 		var entropy [EntropySize]byte
-		entropy[0] = 0x05
-		entropy[1] = 0x08
+		entropy[0] = 5
+		entropy[1] = 8
 		sk, pk := StdKeyGen.GenerateDeterministic(entropy)
 
 		// Generate and sign the data.

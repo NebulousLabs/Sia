@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/rand"
 	"errors"
+	"io"
 
 	"github.com/NebulousLabs/ed25519"
 )
@@ -25,58 +26,39 @@ var (
 	ErrInvalidSignature = errors.New("invalid signature")
 )
 
-// KeyPairGenerator allows the caller to generate public-secret key pairs.
-type KeyPairGenerator interface {
-	Generate() (SecretKey, PublicKey, error)
-	GenerateDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey)
-}
+type (
+	// keyDeriver allows the caller to generate a public-secret key pair based on
+	// provided entropy.
+	keyDeriver interface {
+		deriveKeyPair([EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey)
+	}
 
-// entropySource allows the caller to retrieve an array of bytes populated to
-// random values.
-type entropySource interface {
-	getEntropy() ([EntropySize]byte, error)
-}
-
-// keyDeriver allows the caller to generate a public-secret key pair based on
-// provided entropy.
-type keyDeriver interface {
-	deriveKeyPair([EntropySize]byte) (SecretKey, PublicKey)
-}
-
-// stdGenerator is an implementation of KeyPairGenerator, allowing the caller
-// to generate public-secret key pairs.
-type stdGenerator struct {
-	es entropySource
-	kd keyDeriver
-}
+	// stdGenerator is an implementation of KeyPairGenerator, allowing the caller
+	// to generate public-secret key pairs.
+	stdGenerator struct {
+		entropySource io.Reader
+		kd            keyDeriver
+	}
+)
 
 // Generate creates a public-secret keypair that can be used to sign and verify
 // messages.
 func (sg stdGenerator) Generate() (sk SecretKey, pk PublicKey, err error) {
-	entropy, err := sg.es.getEntropy()
+	var entropy [EntropySize]byte
+	_, err = sg.entropySource.Read(entropy[:])
 	if err != nil {
 		return
 	}
-	sk, pk = sg.kd.deriveKeyPair(entropy)
-	return sk, pk, nil
+
+	skPointer, pkPointer := sg.kd.deriveKeyPair(entropy)
+	return *skPointer, *pkPointer, nil
 }
 
 // GenerateDeterministic generates keys deterministically using the input
 // entropy. The input entropy must be 32 bytes in length.
 func (sg stdGenerator) GenerateDeterministic(entropy [EntropySize]byte) (SecretKey, PublicKey) {
-	return sg.kd.deriveKeyPair(entropy)
-}
-
-// randSource is an implementation of entropySource that uses rand.Read to
-// generate random bytes.
-type randSource struct{}
-
-// getEntropy returns an array of bytes with random values.
-func (rs randSource) getEntropy() (entropy [EntropySize]byte, err error) {
-	if _, err := rand.Read(entropy[:]); err != nil {
-		return entropy, err
-	}
-	return entropy, nil
+	skPointer, pkPointer := sg.kd.deriveKeyPair(entropy)
+	return *skPointer, *pkPointer
 }
 
 // ed25519Deriver is an implementation of keyDeriver that uses
@@ -85,13 +67,12 @@ type ed25519Deriver struct{}
 
 // deriveKeyPair derives a public-secret key pair derived from the provided
 // array of bytes.
-func (ed ed25519Deriver) deriveKeyPair(entropy [EntropySize]byte) (sk SecretKey, pk PublicKey) {
-	skPointer, pkPointer := ed25519.GenerateKey(entropy)
-	return *skPointer, *pkPointer
+func (ed ed25519Deriver) deriveKeyPair(entropy [EntropySize]byte) (ed25519.SecretKey, ed25519.PublicKey) {
+	return ed25519.GenerateKey(entropy)
 }
 
-// StdKeyGen is a KeyPairGenerator based on randSource and ed25519Deriver.
-var StdKeyGen KeyPairGenerator = stdGenerator{es: randSource{}, kd: ed25519Deriver{}}
+// StdKeyGen is a stdGenerator based on randSource and ed25519Deriver.
+var StdKeyGen stdGenerator = stdGenerator{entropySource: rand.Reader, kd: ed25519Deriver{}}
 
 // SignHash signs a message using a secret key.
 func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
