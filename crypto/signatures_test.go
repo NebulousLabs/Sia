@@ -28,7 +28,7 @@ func (kd *mockKeyDeriver) deriveKeyPair(entropy [EntropySize]byte) (ed25519.Secr
 
 // Test that the Generate method is properly calling its dependencies and
 // returning the expected key pair.
-func TestGenerateRandomKeyPair(t *testing.T) {
+func TestUnitGenerateRandomKeyPair(t *testing.T) {
 	var mockEntropy [EntropySize]byte
 	mockEntropy[0] = 5
 	mockEntropy[EntropySize-1] = 5
@@ -78,7 +78,7 @@ func (fr failingReader) Read([]byte) (int, error) {
 }
 
 // Test that the Generate method fails if the call to entropy source fails
-func TestGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
+func TestUnitGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
 	fr := failingReader{err: errors.New("mock error from entropy reader")}
 	g := stdGenerator{entropySource: &fr}
 	if _, _, err := g.Generate(); err == nil {
@@ -88,7 +88,7 @@ func TestGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
 
 // Test that the GenerateDeterministic method is properly calling its
 // dependencies and returning the expected key pair.
-func TestGenerateDeterministicKeyPair(t *testing.T) {
+func TestUnitGenerateDeterministicKeyPair(t *testing.T) {
 	// Create entropy bytes, setting a few bytes explicitly instead of using a
 	// buffer of random bytes.
 	var mockEntropy [EntropySize]byte
