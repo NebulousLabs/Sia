@@ -731,23 +731,39 @@ Parameters: none
 Response:
 ```
 struct {
-	TotalStorage     int
-	MinFilesize      int
-	MaxFilesize      int
-	MinDuration      int
-	MaxDuration      int
-	WindowSize       int
-	Price            int
-	Collateral       int
-	StorageRemaining int
+	TotalStorage     int64
+	MinFilesize      uint64
+	MaxFilesize      uint64
+	MinDuration      types.BlockHeight (uint64)
+	MaxDuration      types.BlockHeight (uint64)
+	WindowSize       types.BlockHeight (uint64)
+	Price            types.Currency (string)
+	Collateral       types.Currency (string)
+	UnlockHash       types.UnlockHash (string)
+	StorageRemaining int64
 	NumContracts     int
-	Profit           int
-	PotentialProfit  int
-	Competition      int
-	UnlockHash       string
-	IPAddress        string
+	Profit           types.Currency (string)
+	PotentialProfit  types.Currency (string)
+	Competition      types.Currency (string)
+	IPAddress        modules.NetAddress (string)
 }
 ```
+
+`StorageRemaining` is `TotalStorage` minus the number of bytes currently being stored.
+
+`NumContracts` is the number of active contracts that the host is engaged in.
+
+`Profit` is the total number of Hastings earned from hosting.
+
+`PotentialProfit` is `Profit` plus the value of the current active contracts.
+
+`Competition` is the average price of storage on the network.
+
+`UnlockHash` is the address that hosting profits will be sent to.
+
+`IPAddress` is the network address of the host.
+
+Other fields are documented in `/host/configure`.
 
 HostDB
 ------
