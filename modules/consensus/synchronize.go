@@ -59,8 +59,8 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 	return blockIDs
 }
 
-// receiveBlocks is the calling end of the SendBlocks RPC.
-func (cs *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
+// threadedReceiveBlocks is the calling end of the SendBlocks RPC.
+func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	// Get blockIDs to send.
 	var history [32]types.BlockID
 	err := cs.db.View(func(tx *bolt.Tx) error {
@@ -91,9 +91,7 @@ func (cs *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 
 		// Integrate the blocks into the consensus set.
 		for _, block := range newBlocks {
-			lockID := cs.mu.Lock()
-			acceptErr := cs.acceptBlock(block)
-			cs.mu.Unlock(lockID)
+			acceptErr := cs.AcceptBlock(block)
 
 			// ErrNonExtendingBlock must be ignored until headers-first block
 			// sharing is implemented, block already in database should also be
@@ -224,7 +222,7 @@ func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.receiveBlocks)
+		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 	}
 	if err != nil {
 		return err

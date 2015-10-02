@@ -81,21 +81,21 @@ func TestBlockKnownHandling(t *testing.T) {
 	}
 
 	// Submit the stale block.
-	err = cst.cs.acceptBlock(staleBlock)
+	err = cst.cs.AcceptBlock(staleBlock)
 	if err != nil && err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
 	}
 
 	// Submit all the blocks again, looking for a 'stale block' error.
-	err = cst.cs.acceptBlock(block1)
+	err = cst.cs.AcceptBlock(block1)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
-	err = cst.cs.acceptBlock(block2)
+	err = cst.cs.AcceptBlock(block2)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
-	err = cst.cs.acceptBlock(staleBlock)
+	err = cst.cs.AcceptBlock(staleBlock)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -109,7 +109,7 @@ func TestBlockKnownHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst.cs.acceptBlock(genesisBlock.Block)
+	err = cst.cs.AcceptBlock(genesisBlock.Block)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -130,11 +130,11 @@ func TestOrphanHandling(t *testing.T) {
 	// be used, because looking for a parent is one of the first checks the
 	// consensus set performs.
 	orphan := types.Block{}
-	err = cst.cs.acceptBlock(orphan)
+	err = cst.cs.AcceptBlock(orphan)
 	if err != errOrphan {
 		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
-	err = cst.cs.acceptBlock(orphan)
+	err = cst.cs.AcceptBlock(orphan)
 	if err != errOrphan {
 		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
@@ -162,7 +162,7 @@ func TestMissedTarget(t *testing.T) {
 	if block.CheckTarget(target) {
 		t.Fatal("unable to find a failing target")
 	}
-	err = cst.cs.acceptBlock(block)
+	err = cst.cs.AcceptBlock(block)
 	if err != errMissedTarget {
 		t.Fatalf("expected %v, got %v", errMissedTarget, err)
 	}
@@ -192,7 +192,7 @@ func TestLargeBlock(t *testing.T) {
 	}
 	block.Transactions = append(block.Transactions, txn)
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.acceptBlock(solvedBlock)
+	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errLargeBlock {
 		t.Fatalf("expected %v, got %v", errLargeBlock, err)
 	}
@@ -218,7 +218,7 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = 0
 	earlyBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.acceptBlock(earlyBlock)
+	err = cst.cs.AcceptBlock(earlyBlock)
 	if err != errEarlyTimestamp {
 		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
 	}
@@ -243,7 +243,7 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.acceptBlock(solvedBlock)
+	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errExtremeFutureTimestamp {
 		t.Fatalf("expected %v, got %v", errExtremeFutureTimestamp, err)
 	}
@@ -281,7 +281,7 @@ func TestMinerPayoutHandling(t *testing.T) {
 	}
 	block.MinerPayouts = append(block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(1)})
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.acceptBlock(solvedBlock)
+	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errBadMinerPayouts {
 		t.Fatalf("expected %v, got %v", errBadMinerPayouts, err)
 	}
@@ -307,7 +307,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.acceptBlock(solvedBlock)
+	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errFutureTimestamp {
 		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
 	}
