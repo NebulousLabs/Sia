@@ -220,17 +220,13 @@ func checkSiacoinCount(tx *bolt.Tx) {
 
 	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
 	if build.DEBUG && totalSiacoins.Cmp(expectedSiacoins) != 0 {
-		fmt.Printf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
+		diagnostics := fmt.Sprintf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
 		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
-			fmt.Println("total:", totalSiacoins)
-			fmt.Println("expected:", expectedSiacoins)
-			fmt.Println("expected is bigger:", expectedSiacoins.Sub(totalSiacoins))
+			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, expectedSiacoins.Sub(totalSiacoins))
 		} else {
-			fmt.Println("total:", totalSiacoins)
-			fmt.Println("expected:", expectedSiacoins)
-			fmt.Println("total is bigger:", totalSiacoins.Sub(expectedSiacoins))
+			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, totalSiacoins.Sub(expectedSiacoins))
 		}
-		manageErr(tx, errors.New("wrong number of siacoins in the consensus set"))
+		manageErr(tx, errors.New(diagnostics))
 	}
 }
 
