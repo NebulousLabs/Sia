@@ -149,7 +149,7 @@ func (t Transaction) ID() TransactionID {
 // which is calculated by hashing the concatenation of the SiacoinOutput
 // Specifier, all of the fields in the transaction (except the signatures),
 // and output index.
-func (t Transaction) SiacoinOutputID(i int) SiacoinOutputID {
+func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierSiacoinOutput,
 		t.SiacoinInputs,
@@ -169,7 +169,7 @@ func (t Transaction) SiacoinOutputID(i int) SiacoinOutputID {
 // is calculated by hashing the concatenation of the FileContract Specifier,
 // all of the fields in the transaction (except the signatures), and the
 // contract index.
-func (t Transaction) FileContractID(i int) FileContractID {
+func (t Transaction) FileContractID(i uint64) FileContractID {
 	return FileContractID(crypto.HashAll(
 		SpecifierFileContract,
 		t.SiacoinInputs,
@@ -189,7 +189,7 @@ func (t Transaction) FileContractID(i int) FileContractID {
 // is calculated by hashing the concatenation of the SiafundOutput Specifier,
 // all of the fields in the transaction (except the signatures), and output
 // index.
-func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
+func (t Transaction) SiafundOutputID(i uint64) SiafundOutputID {
 	return SiafundOutputID(crypto.HashAll(
 		SpecifierSiafundOutput,
 		t.SiacoinInputs,

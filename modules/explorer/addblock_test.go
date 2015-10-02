@@ -21,6 +21,10 @@ func genHashNum(x byte) crypto.Hash {
 // Add a couple blocks to the database, then perform lookups to see if
 // they were added and crossed referenced correctly
 func (et *explorerTester) testAddBlock(t *testing.T) error {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// This block will *NOT* be valid, but should contain
 	// addresses that can cross reference each other.
 	b1 := types.Block{
@@ -67,7 +71,7 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 
 	// Now query the database to see if it has been linked properly
 	lockID = et.explorer.mu.RLock()
-	bytes, err := et.explorer.db.GetFromBucket("Blocks", encoding.Marshal(b1.ID()))
+	bytes, err := et.explorer.db.getFromBucket("Blocks", encoding.Marshal(b1.ID()))
 	et.explorer.mu.RUnlock(lockID)
 	var b types.Block
 	err = encoding.Unmarshal(bytes, &b)
@@ -80,7 +84,7 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 
 	// Query to see if the input is added to the output field
 	lockID = et.explorer.mu.RLock()
-	bytes, err = et.explorer.db.GetFromBucket("SiacoinOutputs", encoding.Marshal(b1.MinerPayoutID(0)))
+	bytes, err = et.explorer.db.getFromBucket("SiacoinOutputs", encoding.Marshal(b1.MinerPayoutID(0)))
 	et.explorer.mu.RUnlock(lockID)
 	if err != nil {
 		t.Fatal(err.Error())

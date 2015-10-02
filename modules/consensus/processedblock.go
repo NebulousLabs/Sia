@@ -26,10 +26,7 @@ var SurpassThreshold = big.NewRat(20, 100)
 // other blockNodes replaced with block ID's, and all the fields
 // exported, so that a block node can be marshalled
 type processedBlock struct {
-	Block    types.Block
-	Parent   types.BlockID
-	Children []types.BlockID // COMPAT v0.4.0 - not used anywhere, but old versions still need the field to decode properly.
-
+	Block       types.Block
 	Height      types.BlockHeight
 	Depth       types.Target
 	ChildTarget types.Target
@@ -41,7 +38,7 @@ type processedBlock struct {
 	DelayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
 	SiafundPoolDiffs          []modules.SiafundPoolDiff
 
-	ConsensusSetHash crypto.Hash
+	ConsensusChecksum crypto.Hash
 }
 
 // earliestChildTimestamp returns the earliest timestamp that a child node
@@ -54,7 +51,7 @@ func earliestChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Tim
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	windowTimes[0] = pb.Block.Timestamp
-	parent := pb.Parent
+	parent := pb.Block.ParentID
 	for i := uint64(1); i < types.MedianTimestampWindow; i++ {
 		// If the genesis block is 'parent', use the genesis block timestamp
 		// for all remaining times.
@@ -139,7 +136,7 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock) error {
+func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock) {
 	// Fetch the parent block.
 	var parent processedBlock
 	parentBytes := blockMap.Get(pb.Block.ParentID[:])
@@ -150,36 +147,28 @@ func (cs *ConsensusSet) setChildTarget(blockMap *bolt.Bucket, pb *processedBlock
 
 	if pb.Height%(types.TargetWindow/2) != 0 {
 		pb.ChildTarget = parent.ChildTarget
-		return nil
+		return
 	}
 	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(blockMap, pb))
 	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
 	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
-	return nil
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
 // children. The new node is also returned. It necessairly modifies the database
-//
-// TODO: newChild has a fair amount of room for optimization.
-func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block) (*processedBlock, error) {
+func (cs *ConsensusSet) newChild(tx *bolt.Tx, pb *processedBlock, b types.Block) *processedBlock {
 	// Create the child node.
 	childID := b.ID()
 	child := &processedBlock{
 		Block:  b,
-		Parent: b.ParentID,
-
 		Height: pb.Height + 1,
 		Depth:  pb.childDepth(),
 	}
 	blockMap := tx.Bucket(BlockMap)
-	err := cs.setChildTarget(blockMap, child)
-	if err != nil {
-		return nil, err
+	cs.setChildTarget(blockMap, child)
+	err := blockMap.Put(childID[:], encoding.Marshal(*child))
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
-	err = blockMap.Put(childID[:], encoding.Marshal(*child))
-	if err != nil {
-		return nil, err
-	}
-	return child, nil
+	return child
 }

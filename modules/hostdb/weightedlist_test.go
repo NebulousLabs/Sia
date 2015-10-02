@@ -87,6 +87,10 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 // TestWeightedList inserts and removes nodes in a semi-random manner and
 // verifies that the tree stays consistent through the adjustments.
 func TestWeightedList(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Create a hostdb and 3 equal entries to insert.
 	hdbt, err := newHDBTester("TestWeightedList")
 	if err != nil {
@@ -211,6 +215,9 @@ func TestVariedWeights(t *testing.T) {
 
 // TestRepeatInsert inserts 2 hosts with the same address.
 func TestRepeatInsert(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdbt, err := newHDBTester("TestRepeatInsert")
 	if err != nil {
 		t.Fatal(err)

@@ -12,6 +12,9 @@ import (
 )
 
 func TestStorageProof(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	ht := CreateHostTester("TestStorageProof", t)
 
 	// create a file contract

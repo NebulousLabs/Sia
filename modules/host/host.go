@@ -182,7 +182,7 @@ func (h *Host) Info() modules.HostInfo {
 	// sum up the current obligations to calculate PotentialProfit
 	for _, obligation := range h.obligationsByID {
 		fc := obligation.FileContract
-		info.PotentialProfit = info.PotentialProfit.Add(fc.Payout.Sub(fc.Tax()))
+		info.PotentialProfit = info.PotentialProfit.Add(types.PostTax(h.blockHeight, fc.Payout))
 	}
 
 	// Calculate estimated competition (reported in per GB per month). Price

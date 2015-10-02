@@ -162,10 +162,16 @@ func (e *Explorer) addBlockDB(b types.Block) error {
 		}
 	}
 
-	// Check if the block exists
-	exists, err := e.db.Exists([]byte("Blocks"), encoding.Marshal(b.ID()))
-	if err != nil {
-		return err
+	// Check if the block exsts.
+	var exists bool
+	dbErr := e.db.View(func(tx *bolt.Tx) error {
+		id := b.ID()
+		block := tx.Bucket([]byte("Blocks")).Get(id[:])
+		exists = block != nil
+		return nil
+	})
+	if dbErr != nil {
+		return dbErr
 	}
 	if exists {
 		return nil
@@ -225,12 +231,12 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 	// Handle all the transaction outputs
 	for i, output := range txn.SiacoinOutputs {
 		tx.addAddress(output.UnlockHash, txid)
-		tx.addNewOutput(txn.SiacoinOutputID(i), txid)
+		tx.addNewOutput(txn.SiacoinOutputID(uint64(i)), txid)
 	}
 
 	// Handle each file contract individually
 	for i, contract := range txn.FileContracts {
-		fcid := txn.FileContractID(i)
+		fcid := txn.FileContractID(uint64(i))
 		tx.addNewHash("FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
 			Contract: txid,
 		})
@@ -279,7 +285,7 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 	// Handle all the siafund outputs
 	for i, output := range txn.SiafundOutputs {
 		tx.addAddress(output.UnlockHash, txid)
-		tx.addNewSFOutput(txn.SiafundOutputID(i), txid)
+		tx.addNewSFOutput(txn.SiafundOutputID(uint64(i)), txid)
 
 	}
 

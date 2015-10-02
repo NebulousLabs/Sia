@@ -94,6 +94,10 @@ func TestSortedUnique(t *testing.T) {
 // TestTransactionValidCoveredFields probes the validCoveredFields menthod of
 // the transaction type.
 func TestTransactionValidCoveredFields(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Create a transaction with all fields filled in minimally. The first
 	// check has a legal CoveredFields object with 'WholeTransaction' set.
 	txn := Transaction{

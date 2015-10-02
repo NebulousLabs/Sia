@@ -124,6 +124,10 @@ func TestIntegrationPreEncryption(t *testing.T) {
 // TestIntegrationUserSuppliedEncryption probes the encryption process when the
 // user manually supplies an encryption key.
 func TestIntegrationUserSuppliedEncryption(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Create and wallet and user-specified key, then encrypt the wallet and
 	// run post-encryption tests on it.
 	wt, err := createBlankWalletTester("TestIntegrationUserSuppliedEncryption")
@@ -146,6 +150,10 @@ func TestIntegrationUserSuppliedEncryption(t *testing.T) {
 // TestIntegrationBlankEncryption probes the encryption process when the user
 // supplies a blank encryption key during the encryption process.
 func TestIntegrationBlankEncryption(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Create the wallet.
 	wt, err := createBlankWalletTester("TestIntegrationBlankEncryption")
 	if err != nil {
@@ -178,6 +186,9 @@ func TestIntegrationBlankEncryption(t *testing.T) {
 // TestLock checks that lock correctly wipes keys when locking the wallet,
 // while still being able to track the balance of the wallet.
 func TestLock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	wt, err := createWalletTester("TestLock")
 	if err != nil {
 		t.Fatal(err)

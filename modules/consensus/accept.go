@@ -13,15 +13,15 @@ import (
 )
 
 var (
-	ErrBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
-	ErrDoSBlock               = errors.New("block is known to be invalid")
-	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
-	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
-	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
-	ErrInconsistentSet        = errors.New("consensus set is not in a consistent state")
-	ErrLargeBlock             = errors.New("block is too large to be accepted")
-	ErrMissedTarget           = errors.New("block does not meet target")
-	ErrOrphan                 = errors.New("block has no known parent")
+	errBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
+	errDoSBlock               = errors.New("block is known to be invalid")
+	errEarlyTimestamp         = errors.New("block timestamp is too early")
+	errExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
+	errFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
+	errInconsistentSet        = errors.New("consensus set is not in a consistent state")
+	errLargeBlock             = errors.New("block is too large to be accepted")
+	errMissedTarget           = errors.New("block does not meet target")
+	errOrphan                 = errors.New("block has no known parent")
 )
 
 // validHeader does some early, low computation verification on the block.
@@ -30,7 +30,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
-		return ErrDoSBlock
+		return errDoSBlock
 	}
 
 	// Check if the block is already known.
@@ -42,7 +42,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	// Check for the parent.
 	parentBytes := blockMap.Get(b.ParentID[:])
 	if parentBytes == nil {
-		return ErrOrphan
+		return errOrphan
 	}
 	var parent processedBlock
 	err := encoding.Unmarshal(parentBytes, &parent)
@@ -52,18 +52,18 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 
 	// Check that the target of the new block is sufficient.
 	if !b.CheckTarget(parent.ChildTarget) {
-		return ErrMissedTarget
+		return errMissedTarget
 	}
 
 	// Check that the timestamp is not too far in the past to be
 	// acceptable.
 	if earliestChildTimestamp(blockMap, &parent) > b.Timestamp {
-		return ErrEarlyTimestamp
+		return errEarlyTimestamp
 	}
 
 	// Check that the block is below the size limit.
 	if uint64(len(encoding.Marshal(b))) > types.BlockSizeLimit {
-		return ErrLargeBlock
+		return errLargeBlock
 	}
 
 	// If the block is in the extreme future, return an error and do nothing
@@ -71,12 +71,12 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	// future arrives, this block will no longer be a part of the longest fork
 	// because it will have been ignored by all of the miners.
 	if b.Timestamp > types.CurrentTimestamp()+types.ExtremeFutureThreshold {
-		return ErrExtremeFutureTimestamp
+		return errExtremeFutureTimestamp
 	}
 
 	// Verify that the miner payouts are valid.
 	if !b.CheckMinerPayouts(parent.Height + 1) {
-		return ErrBadMinerPayouts
+		return errBadMinerPayouts
 	}
 
 	// If the block is in the near future, but too far to be acceptable, then
@@ -90,7 +90,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 			defer cs.mu.Unlock(lockID)
 			cs.acceptBlock(b) // NOTE: Error is not handled.
 		}()
-		return ErrFutureTimestamp
+		return errFutureTimestamp
 	}
 	return nil
 }
@@ -100,41 +100,34 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*processedBlock, err error) {
-	parentNode := cs.db.getBlockMap(b.ParentID)
-	// COMPATv0.4.0
-	//
-	// When validating/accepting a block, the types height needs to be set to
-	// the height of the block that's being analyzed. After analysis is
-	// finished, the height needs to be set to the height of the current block.
-	//
-	// This is so that the Tax() logic correctly handles the hardfork that
-	// changes the tax from a float64 to a big.Rat during computation.
-	//
-	// TODO: Upon removing this compatibility code, optimize everything up to
-	// forkBlockchain into a single bolt tx, among other speedups.
-	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = parentNode.Height
-	types.CurrentHeightLock.Unlock()
-	defer func() {
-		types.CurrentHeightLock.Lock()
-		types.CurrentHeight = cs.height()
-		types.CurrentHeightLock.Unlock()
-	}()
-
-	var newNode *processedBlock
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
+	var nonExtending bool
 	err = cs.db.Update(func(tx *bolt.Tx) error {
-		var err2 error
-		newNode, err2 = cs.newChild(tx, parentNode, b)
-		return err2
+		pb, err := getBlockMap(tx, b.ParentID)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		currentNode := currentProcessedBlock(tx)
+		newNode := cs.newChild(tx, pb, b)
+
+		// modules.ErrNonExtendingBlock should be returned if the block does
+		// not extend the current blockchain, however the changes from newChild
+		// should be comitted (which means 'nil' must be returned). A flag is
+		// set to indicate that modules.ErrNonExtending should be returned.
+		nonExtending = !newNode.heavierThan(currentNode)
+		if nonExtending {
+			return nil
+		}
+		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
+		return err
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	if newNode.heavierThan(cs.currentProcessedBlock()) {
-		return cs.forkBlockchain(newNode)
+	if nonExtending {
+		return nil, nil, modules.ErrNonExtendingBlock
 	}
-	return nil, nil, modules.ErrNonExtendingBlock
+	return revertedBlocks, appliedBlocks, nil
 }
 
 // acceptBlock is the internal consensus function for adding
@@ -142,25 +135,23 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // transactions. Trusted blocks, like those on disk, should already
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
-	err := cs.db.startConsistencyGuard()
-	if err != nil {
-		return err
-	}
-
 	// Start verification inside of a bolt View tx.
-	err = cs.db.View(func(tx *bolt.Tx) error {
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Do not accept a block if the database is inconsistent.
+		if inconsistencyDetected(tx) {
+			return errors.New("inconsistent database")
+		}
+
 		// Check that the header is valid. The header is checked first because it
 		// is not computationally expensive to verify, but it is computationally
 		// expensive to create.
-		err = cs.validHeader(tx, b)
+		err := cs.validHeader(tx, b)
 		if err != nil {
 			return err
 		}
-
 		return nil
 	})
 	if err != nil {
-		cs.db.stopConsistencyGuard()
 		return err
 	}
 
@@ -168,28 +159,21 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
+	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
-		cs.db.stopConsistencyGuard()
 		return err
 	}
-	if len(appliedNodes) > 0 {
-		cs.updateSubscribers(revertedNodes, appliedNodes)
+	if len(appliedBlocks) > 0 {
+		cs.updateSubscribers(revertedBlocks, appliedBlocks)
 	}
 
 	// Sanity checks.
 	if build.DEBUG {
-		// If appliedNodes is 0, revertedNodes will also be 0.
-		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
-			panic("appliedNodes and revertedNodes are mismatched!")
-		}
-		// Check that the general setup makes sense.
-		err = cs.checkConsistency()
-		if err != nil {
-			panic(err)
+		// If appliedBlocks is 0, revertedBlocks will also be 0.
+		if len(appliedBlocks) == 0 && len(revertedBlocks) != 0 {
+			panic("appliedBlocks and revertedBlocks are mismatched!")
 		}
 	}
-	cs.db.stopConsistencyGuard()
 	return nil
 }
 
@@ -210,28 +194,5 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	// and not necessary during synchronize or when loading from disk.
 	go cs.gateway.Broadcast("RelayBlock", b)
 
-	return nil
-}
-
-// RelayBlock is an RPC that accepts a block from a peer.
-func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
-	// Decode the block from the connection.
-	var b types.Block
-	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
-	if err != nil {
-		return err
-	}
-
-	// Submit the block to the consensus set.
-	err = cs.AcceptBlock(b)
-	if err == ErrOrphan {
-		// If the block is an orphan, try to find the parents. The block
-		// received from the peer is discarded and will be downloaded again if
-		// the parent is found.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.receiveBlocks)
-	}
-	if err != nil {
-		return err
-	}
 	return nil
 }

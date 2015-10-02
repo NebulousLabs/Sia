@@ -96,6 +96,9 @@ func TestRandomNode(t *testing.T) {
 }
 
 func TestShareNodes(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	g1 := newTestingGateway("TestShareNodes1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestShareNodes2", t)
@@ -156,6 +159,9 @@ func TestShareNodes(t *testing.T) {
 }
 
 func TestRelayNodes(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	g1 := newTestingGateway("TestRelayNodes1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRelayNodes2", t)

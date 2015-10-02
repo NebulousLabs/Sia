@@ -1,282 +1,400 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
-	"sort"
+	"fmt"
 
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-var (
-	errSiacoinMiscount = errors.New("consensus set has the wrong number of siacoins given the height")
-	errSiafundMiscount = errors.New("consensus set has the wrong number of siafunds")
-)
-
-// checkCurrentPath looks at the blocks in the current path and verifies that
-// they are all ordered correctly and in the block map.
-func (cs *ConsensusSet) checkCurrentPath() error {
-	// Check is too slow to be done on a full node.
-	if build.Release == "standard" {
-		return nil
-	}
-
-	currentNode := cs.currentProcessedBlock()
-	for i := cs.height(); i != 0; i-- {
-		// The block should be in the block map.
-		exists := cs.db.inBlockMap(currentNode.Block.ID())
-		if !exists {
-			return errors.New("current path block not found in block map")
-		}
-		// Current node should match the id in the current path.
-		if currentNode.Block.ID() != cs.db.getPath(i) {
-			return errors.New("current path points to an incorrect block")
-		}
-		// Height of node needs to be listed correctly.
-		if currentNode.Height != i {
-			return errors.New("node height mismatches its location in the blockchain")
-		}
-		// Current node's parent needs the right id.
-		parent := cs.db.getBlockMap(currentNode.Parent)
-		if currentNode.Block.ParentID != parent.Block.ID() {
-			return errors.New("node parent id mismatches actual parent id")
-		}
-
-		currentNode = cs.db.getBlockMap(currentNode.Parent)
-	}
-	return nil
-}
-
-// checkDelayedSiacoinOutputMaps checks that the delayed siacoin output maps
-// have the right number of maps at the right heights.
-func (cs *ConsensusSet) checkDelayedSiacoinOutputMaps() error {
-	expected := uint64(0)
-	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
-		if !(i > types.MaturityDelay) {
-			continue
-		}
-		exists := cs.db.inDelayedSiacoinOutputs(i)
-		if !exists {
-			return errors.New("delayed siacoin outputs are in an inconsistent state")
-		}
-		expected++
-	}
-	if cs.db.lenDelayedSiacoinOutputs() != expected {
-		return errors.New("delayed siacoin outputs has too many maps")
-	}
-
-	return nil
-}
-
-// checkSiacoins counts the number of siacoins in the database and verifies
-// that it matches the sum of all the coinbases.
-func (cs *ConsensusSet) checkSiacoins() error {
-	// Calculate the number of expected coins in constant time.
-	deflationBlocks := types.InitialCoinbase - types.MinimumCoinbase
-	expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(cs.height())).Div(types.NewCurrency64(2))
-	if cs.height() < types.BlockHeight(deflationBlocks) {
-		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(cs.height()) + 1))
-	} else {
-		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(deflationBlocks + 1))
-		trailingSiacoins := types.NewCurrency64(uint64(cs.height()) - deflationBlocks).Mul(types.CalculateCoinbase(cs.height()))
-		expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
-	}
-
-	totalSiacoins := types.ZeroCurrency
-	cs.db.forEachSiacoinOutputs(func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		totalSiacoins = totalSiacoins.Add(sco.Value)
-	})
-	cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
-		var payout types.Currency
-		for _, output := range fc.ValidProofOutputs {
-			payout = payout.Add(output.Value)
-		}
-		totalSiacoins = totalSiacoins.Add(payout)
-	})
-	cs.db.forEachDelayedSiacoinOutputs(func(v types.SiacoinOutputID, dso types.SiacoinOutput) {
-		totalSiacoins = totalSiacoins.Add(dso.Value)
-	})
-	var siafundPool types.Currency
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		sfoSiacoins := siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
-		totalSiacoins = totalSiacoins.Add(sfoSiacoins)
-	})
-	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
-		return errSiacoinMiscount
-	}
-	return nil
-}
-
-// checkSiafunds counts the siafund outputs and checks that there are 10,000.
-func (cs *ConsensusSet) checkSiafunds() error {
-	totalSiafunds := types.ZeroCurrency
-	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		totalSiafunds = totalSiafunds.Add(sfo.Value)
-	})
-	if totalSiafunds.Cmp(types.SiafundCount) != 0 {
-		return errSiafundMiscount
-	}
-	return nil
-}
-
-// consensusSetHash returns the Merkle root of the current state of consensus.
-func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
-	// Check is too slow to be done on a full node.
-	if build.Release == "standard" {
-		return crypto.Hash{}
-	}
-
-	// Items of interest:
-	// 1.	genesis block
-	// 3.	current height
-	// 4.	current target
-	// 5.	current depth
-	// 6.	current path + diffs
-	// (7)	earliest allowed timestamp of next block
-	// 8.	unspent siacoin outputs, sorted by id.
-	// 9.	open file contracts, sorted by id.
-	// 10.	unspent siafund outputs, sorted by id.
-	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
-	// 12.	siafund pool
-
-	// Create a slice of hashes representing all items of interest.
-	tree := crypto.NewTree()
-	tree.PushObject(cs.blockRoot.Block)
-	tree.PushObject(cs.height())
-	tree.PushObject(cs.currentProcessedBlock().ChildTarget)
-	tree.PushObject(cs.currentProcessedBlock().Depth)
-	// tree.PushObject(cs.earliestChildTimestamp(cs.currentProcessedBlock()))
-
-	// Add all the blocks in the current path TODO: along with their diffs.
-	for i := 0; i < int(cs.db.pathHeight()); i++ {
-		tree.PushObject(cs.db.getPath(types.BlockHeight(i)))
-	}
-
-	// Add all of the siacoin outputs, sorted by id.
-	var openSiacoinOutputs crypto.HashSlice
-	cs.db.forEachSiacoinOutputs(func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		openSiacoinOutputs = append(openSiacoinOutputs, crypto.Hash(scoid))
-	})
-	sort.Sort(openSiacoinOutputs)
-	for _, id := range openSiacoinOutputs {
-		sco := cs.db.getSiacoinOutputs(types.SiacoinOutputID(id))
-		tree.PushObject(id)
-		tree.PushObject(sco)
-	}
-
-	// Add all of the file contracts, sorted by id.
-	var openFileContracts crypto.HashSlice
-	cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
-		openFileContracts = append(openFileContracts, crypto.Hash(fcid))
-	})
-	sort.Sort(openFileContracts)
-	for _, id := range openFileContracts {
-		// Sanity Check - file contract should exist.
-		fc := cs.db.getFileContracts(types.FileContractID(id))
-		tree.PushObject(id)
-		tree.PushObject(fc)
-	}
-
-	// Add all of the siafund outputs, sorted by id.
-	var openSiafundOutputs crypto.HashSlice
-	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
-		openSiafundOutputs = append(openSiafundOutputs, crypto.Hash(sfoid))
-	})
-	sort.Sort(openSiafundOutputs)
-	for _, id := range openSiafundOutputs {
-		sco := cs.db.getSiafundOutputs(types.SiafundOutputID(id))
-		tree.PushObject(id)
-		tree.PushObject(sco)
-	}
-
-	// Get the set of delayed siacoin outputs, sorted by maturity height then
-	// sorted by id and add them.
-	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
-		var delayedSiacoinOutputs crypto.HashSlice
-		if cs.db.inDelayedSiacoinOutputs(i) {
-			cs.db.forEachDelayedSiacoinOutputsHeight(i, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
-				delayedSiacoinOutputs = append(delayedSiacoinOutputs, crypto.Hash(id))
-			})
-		}
-		sort.Sort(delayedSiacoinOutputs)
-		for _, delayedSiacoinOutputID := range delayedSiacoinOutputs {
-			delayedSiacoinOutput := cs.db.getDelayedSiacoinOutputs(i, types.SiacoinOutputID(delayedSiacoinOutputID))
-			tree.PushObject(delayedSiacoinOutput)
-			tree.PushObject(delayedSiacoinOutputID)
-		}
-	}
-
-	// Add the siafund pool
-	var siafundPool types.Currency
-	err := cs.db.Update(func(tx *bolt.Tx) error {
-		siafundPool = getSiafundPool(tx)
-		return nil
-	})
-	if err != nil {
+// manageErr handles an error detected by the consistency checks.
+func manageErr(tx *bolt.Tx, err error) {
+	markInconsistency(tx)
+	if build.DEBUG {
 		panic(err)
+	} else {
+		fmt.Println(err)
 	}
-	tree.PushObject(siafundPool)
+}
+
+// refreshDB saves, deletes, and then restores all of the buckets in the
+// database. This eliminates bugs during reorgs. The exact source of the bugs
+// is unknown, but the problem is that after excessive use by Sia, calling
+// Delete on a bucket will occasionally delete many more elements than the
+// single element being targeted. It is strongly suspected that this is due to
+// an error in the boltdb code, but the source remains unknown for the time
+// being. Refreshing the database between blocks has solved the issue for the
+// time being - it is currently unknown whether large blocks are able to
+// trigger the error, but it is suspected that large blocks are safe.
+func refreshDB(tx *bolt.Tx) {
+	// Get a list of buckets.
+	var bucketNames [][]byte
+	err := tx.ForEach(func(bucketName []byte, _ *bolt.Bucket) error {
+		bucketNames = append(bucketNames, bucketName)
+		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
+	}
+
+	for _, bucketName := range bucketNames {
+		var keys [][]byte
+		var values [][]byte
+		err := tx.Bucket(bucketName).ForEach(func(k, v []byte) error {
+			keys = append(keys, k)
+			values = append(values, v)
+			return nil
+		})
+		if err != nil {
+			manageErr(tx, err)
+		}
+
+		err = tx.DeleteBucket(bucketName)
+		if err != nil {
+			manageErr(tx, err)
+		}
+		bucket, err := tx.CreateBucket(bucketName)
+		if err != nil {
+			manageErr(tx, err)
+		}
+		for i := range keys {
+			err := bucket.Put(keys[i], values[i])
+			if err != nil {
+				manageErr(tx, err)
+			}
+		}
+	}
+}
+
+// consensusChecksum grabs a checksum of the consensus set by pushing all of
+// the elements in sorted order into a merkle tree and taking the root. All
+// consensus sets with the same current block should have identical consensus
+// checksums.
+func consensusChecksum(tx *bolt.Tx) crypto.Hash {
+	// Create a checksum tree.
+	tree := crypto.NewTree()
+
+	// For all of the constant buckets, push every key and every value. Buckets
+	// are sorted in byte-order, therefore this operation is deterministic.
+	consensusSetBuckets := []*bolt.Bucket{
+		tx.Bucket(BlockPath),
+		tx.Bucket(SiacoinOutputs),
+		tx.Bucket(FileContracts),
+		tx.Bucket(SiafundOutputs),
+		tx.Bucket(SiafundPool),
+	}
+	for i := range consensusSetBuckets {
+		err := consensusSetBuckets[i].ForEach(func(k, v []byte) error {
+			tree.Push(k)
+			tree.Push(v)
+			return nil
+		})
+		if err != nil {
+			manageErr(tx, err)
+		}
+	}
+
+	// Iterate through all the buckets looking for buckets prefixed with
+	// prefixDSCO or prefixFCEX. Buckets are presented in byte-sorted order by
+	// name.
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// If the bucket is not a delayed siacoin output bucket or a file
+		// contract expiration bucket, skip.
+		if !bytes.HasPrefix(name, prefixDSCO) && !bytes.HasPrefix(name, prefixFCEX) {
+			return nil
+		}
+
+		// The bucket is a prefixed bucket - add all elements to the tree.
+		return b.ForEach(func(k, v []byte) error {
+			tree.Push(k)
+			tree.Push(v)
+			return nil
+		})
+	})
+	if err != nil {
+		manageErr(tx, err)
+	}
 
 	return tree.Root()
 }
 
-// checkRewindApply rewinds and reapplies the current block, checking that the
-// consensus set hashes meet the expected values.
-func (cs *ConsensusSet) checkRewindApply() error {
-	// Do nothing if the DEBUG flag is not set.
-	if !build.DEBUG {
+// checkSiacoinCount checks that the number of siacoins countable within the
+// consensus set equal the expected number of siacoins for the block height.
+func checkSiacoinCount(tx *bolt.Tx) {
+	// Iterate through all the buckets looking for the delayed siacoin output
+	// buckets, and check that they are for the correct heights.
+	var dscoSiacoins types.Currency
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// Check if the bucket is a delayed siacoin output bucket.
+		if !bytes.HasPrefix(name, prefixDSCO) {
+			return nil
+		}
+
+		// Sum up the delayed outputs in this bucket.
+		err := b.ForEach(func(_, delayedOutput []byte) error {
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(delayedOutput, &sco)
+			if err != nil {
+				manageErr(tx, err)
+			}
+			dscoSiacoins = dscoSiacoins.Add(sco.Value)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
 	}
 
-	// Rewind a block, check that the consensus set hash after rewiding is the
-	// same as it was before the current block was added, then reapply the
-	// block and check that the new consensus set has is the same as originally
-	// calculated.
-	currentNode := cs.currentProcessedBlock()
-	parent := cs.db.getBlockMap(currentNode.Parent)
-	cs.revertToNode(parent)
-	if cs.consensusSetHash() != parent.ConsensusSetHash {
-		return errors.New("rewinding a block resulted in unexpected consensus set hash")
+	// Add all of the siacoin outputs.
+	var scoSiacoins types.Currency
+	err = tx.Bucket(SiacoinOutputs).ForEach(func(_, scoBytes []byte) error {
+		var sco types.SiacoinOutput
+		err := encoding.Unmarshal(scoBytes, &sco)
+		if err != nil {
+			manageErr(tx, err)
+		}
+		scoSiacoins = scoSiacoins.Add(sco.Value)
+		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
 	}
-	cs.applyUntilNode(currentNode)
-	if cs.consensusSetHash() != currentNode.ConsensusSetHash {
-		return errors.New("reapplying a block resulted in unexpected consensus set hash")
+
+	// Add all of the payouts from file contracts.
+	var fcSiacoins types.Currency
+	err = tx.Bucket(FileContracts).ForEach(func(_, fcBytes []byte) error {
+		var fc types.FileContract
+		err := encoding.Unmarshal(fcBytes, &fc)
+		if err != nil {
+			manageErr(tx, err)
+		}
+		var fcCoins types.Currency
+		for _, output := range fc.ValidProofOutputs {
+			fcCoins = fcCoins.Add(output.Value)
+		}
+		fcSiacoins = fcSiacoins.Add(fcCoins)
+		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
 	}
-	return nil
+
+	// Add all of the siafund claims.
+	var claimSiacoins types.Currency
+	err = tx.Bucket(SiafundOutputs).ForEach(func(_, sfoBytes []byte) error {
+		var sfo types.SiafundOutput
+		err := encoding.Unmarshal(sfoBytes, &sfo)
+		if err != nil {
+			manageErr(tx, err)
+		}
+
+		coinsPerFund := getSiafundPool(tx).Sub(sfo.ClaimStart)
+		claimCoins := coinsPerFund.Mul(sfo.Value).Div(types.SiafundCount)
+		claimSiacoins = claimSiacoins.Add(claimCoins)
+		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
+	}
+
+	// Count how many coins should exist
+	deflationBlocks := types.BlockHeight(types.InitialCoinbase - types.MinimumCoinbase)
+	expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(blockHeight(tx))).Div(types.NewCurrency64(2))
+	if blockHeight(tx) < deflationBlocks {
+		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(blockHeight(tx) + 1)))
+	} else {
+		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(deflationBlocks + 1)))
+		trailingSiacoins := types.NewCurrency64(uint64(blockHeight(tx) - deflationBlocks)).Mul(types.CalculateCoinbase(blockHeight(tx)))
+		expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
+	}
+
+	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
+	if totalSiacoins.Cmp(expectedSiacoins) != 0 {
+		diagnostics := fmt.Sprintf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
+		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
+			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, expectedSiacoins.Sub(totalSiacoins))
+		} else {
+			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, totalSiacoins.Sub(expectedSiacoins))
+		}
+		manageErr(tx, errors.New(diagnostics))
+	}
+}
+
+// checkSiafundCount checks that the number of siafunds countable within the
+// consensus set equal the expected number of siafunds for the block height.
+func checkSiafundCount(tx *bolt.Tx) {
+	var total types.Currency
+	err := tx.Bucket(SiafundOutputs).ForEach(func(_, siafundOutputBytes []byte) error {
+		var sfo types.SiafundOutput
+		err := encoding.Unmarshal(siafundOutputBytes, &sfo)
+		if err != nil {
+			manageErr(tx, err)
+		}
+		total = total.Add(sfo.Value)
+		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
+	}
+	if total.Cmp(types.SiafundCount) != 0 {
+		manageErr(tx, errors.New("wrong number if siafunds in the consensus set"))
+	}
+}
+
+// checkDSCOs scans the sets of delayed siacoin outputs and checks for
+// consistency.
+func checkDSCOs(tx *bolt.Tx) {
+	// Create a map to track which delayed siacoin output maps exist, and
+	// another map to track which ids have appeared in the dsco set.
+	dscoTracker := make(map[types.BlockHeight]struct{})
+	idMap := make(map[types.SiacoinOutputID]struct{})
+
+	// Iterate through all the buckets looking for the delayed siacoin output
+	// buckets, and check that they are for the correct heights.
+	err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+		// If the bucket is not a delayed siacoin output bucket or a file
+		// contract expiration bucket, skip.
+		if !bytes.HasPrefix(name, prefixDSCO) {
+			return nil
+		}
+
+		// Add the bucket to the dscoTracker.
+		var height types.BlockHeight
+		err := encoding.Unmarshal(name[len(prefixDSCO):], &height)
+		if err != nil {
+			manageErr(tx, err)
+		}
+		_, exists := dscoTracker[height]
+		if exists {
+			return errors.New("repeat dsco map")
+		}
+		dscoTracker[height] = struct{}{}
+
+		var total types.Currency
+		err = b.ForEach(func(idBytes, delayedOutput []byte) error {
+			// Check that the output id has not appeared in another dsco.
+			var id types.SiacoinOutputID
+			copy(id[:], idBytes)
+			_, exists := idMap[id]
+			if exists {
+				return errors.New("repeat delayed siacoin output")
+			}
+			idMap[id] = struct{}{}
+
+			// Sum the funds in the bucket.
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(delayedOutput, &sco)
+			if err != nil {
+				manageErr(tx, err)
+			}
+			total = total.Add(sco.Value)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// Check that the minimum value has been achieved - the coinbase from
+		// an earlier block is guaranteed to be in the bucket.
+		minimumValue := types.CalculateCoinbase(height - types.MaturityDelay)
+		if total.Cmp(minimumValue) < 0 {
+			return errors.New("total number of coins in the delayed output bucket is incorrect")
+		}
+		return nil
+	})
+	if err != nil {
+		manageErr(tx, err)
+	}
+
+	// Check that all of the correct heights are represented.
+	currentHeight := blockHeight(tx)
+	expectedBuckets := 0
+	for i := currentHeight + 1; i <= currentHeight+types.MaturityDelay; i++ {
+		if i < types.MaturityDelay {
+			continue
+		}
+		_, exists := dscoTracker[i]
+		if !exists {
+			manageErr(tx, errors.New("missing a dsco bucket"))
+		}
+		expectedBuckets++
+	}
+	if len(dscoTracker) != expectedBuckets {
+		manageErr(tx, errors.New("too many dsco buckets"))
+	}
+}
+
+// checkRevertApply reverts the most recent block, checking to see that the
+// consensus set hash matches the hash obtained for the previous block. Then it
+// applies the block again and checks that the consensus set hash matches the
+// original consensus set hash.
+func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
+	current := currentProcessedBlock(tx)
+	// Don't perform the check if this block is the genesis block.
+	if current.Block.ID() == cs.blockRoot.Block.ID() {
+		return
+	}
+
+	parent, err := getBlockMap(tx, current.Block.ParentID)
+	if err != nil {
+		manageErr(tx, err)
+	}
+	if current.Height != parent.Height+1 {
+		manageErr(tx, errors.New("parent structure of a block is incorrect"))
+	}
+	_, _, err = cs.forkBlockchain(tx, parent)
+	if err != nil {
+		manageErr(tx, err)
+	}
+	if consensusChecksum(tx) != parent.ConsensusChecksum {
+		manageErr(tx, errors.New("consensus checksum mismatch after reverting"))
+	}
+	_, _, err = cs.forkBlockchain(tx, current)
+	if err != nil {
+		manageErr(tx, err)
+	}
+	if consensusChecksum(tx) != current.ConsensusChecksum {
+		manageErr(tx, errors.New("consensus checksum mismatch after re-applying"))
+	}
 }
 
 // checkConsistency runs a series of checks to make sure that the consensus set
 // is consistent with some rules that should always be true.
-func (cs *ConsensusSet) checkConsistency() error {
-	err := cs.checkCurrentPath()
-	if err != nil {
-		return err
+func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
+	if cs.checkingConsistency {
+		return
 	}
-	err = cs.checkDelayedSiacoinOutputMaps()
-	if err != nil {
-		return err
-	}
-	err = cs.checkSiacoins()
-	if err != nil {
-		return err
-	}
-	err = cs.checkSiafunds()
-	if err != nil {
-		return err
-	}
-	err = cs.checkRewindApply()
-	if err != nil {
-		return err
-	}
-	return nil
+	cs.checkingConsistency = true
+	checkDSCOs(tx)
+	checkSiacoinCount(tx)
+	checkSiafundCount(tx)
+	cs.checkRevertApply(tx)
+	cs.checkingConsistency = false
 }
+
+// maybeCheckConsistency runs a consistency check with a small probability.
+// Useful for detecting database corruption in production without needing to go
+// through the extremely slow process of running a consistency check every
+// block.
+func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
+	n, err := crypto.RandIntn(1000)
+	if err != nil {
+		manageErr(tx, err)
+	}
+	if n == 0 {
+		cs.checkConsistency(tx)
+	}
+}
+
+// TODO: Check that every file contract has an expiration too, and that the
+// number of file contracts + the number of expirations is equal.

@@ -108,15 +108,23 @@ func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i uint6
 	))
 }
 
-// Tax returns the amount of Currency that will be taxed from fc.
-func (fc FileContract) Tax() Currency {
+// PostTax returns the amount of currency remaining in a file contract payout
+// after tax.
+func PostTax(height BlockHeight, payout Currency) Currency {
 	// COMPATv0.4.0 - until the first 20,000 blocks have been archived, they
 	// will need to be handled in a special way.
-	CurrentHeightLock.Lock()
-	height := CurrentHeight
-	CurrentHeightLock.Unlock()
 	if (height < 21e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
-		return fc.Payout.MulFloat(0.039).RoundDown(SiafundCount)
+		return payout.Sub(payout.MulFloat(0.039).RoundDown(SiafundCount))
 	}
-	return fc.Payout.MulTax().RoundDown(SiafundCount)
+	return payout.Sub(payout.MulTax().RoundDown(SiafundCount))
+}
+
+// Tax returns the amount of Currency that will be taxed from fc.
+func Tax(height BlockHeight, payout Currency) Currency {
+	// COMPATv0.4.0 - until the first 20,000 blocks have been archived, they
+	// will need to be handled in a special way.
+	if (height < 21e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
+		return payout.MulFloat(0.039).RoundDown(SiafundCount)
+	}
+	return payout.MulTax().RoundDown(SiafundCount)
 }

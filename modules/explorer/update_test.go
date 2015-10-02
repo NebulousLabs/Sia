@@ -16,10 +16,6 @@ func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 		if err != nil {
 			et.t.Fatal(err)
 		}
-
-		if et.explorer.currentBlock.ID() != et.cs.CurrentBlock().ID() {
-			et.t.Fatal("Current block does not match consensus block")
-		}
 	}
 }
 

@@ -118,7 +118,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 	// outputs need account for tax
 	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: renterCost.Sub(fc.Tax()), UnlockHash: ourAddr.UnlockHash()},
+		{Value: renterCost.Sub(types.Tax(hu.renter.blockHeight, fc.Payout)), UnlockHash: ourAddr.UnlockHash()},
 		{Value: types.ZeroCurrency, UnlockHash: hu.settings.UnlockHash}, // no collateral
 	}
 	fc.MissedProofOutputs = []types.SiacoinOutput{

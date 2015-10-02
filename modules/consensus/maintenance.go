@@ -20,9 +20,8 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error {
+func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) {
 	for i := range pb.Block.MinerPayouts {
-		// Create and apply the delayed miner payout.
 		mpid := pb.Block.MinerPayoutID(uint64(i))
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
@@ -31,26 +30,38 @@ func (cs *ConsensusSet) applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) error
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
 		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err := cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
 	}
-	return nil
 }
 
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) error {
+func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
-	if !(pb.Height > types.MaturityDelay) {
-		return nil
+	if pb.Height < types.MaturityDelay {
+		return
 	}
 
-	scoBucket := tx.Bucket(SiacoinOutputs)
-	err := forEachDSCO(tx, pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	// Iterate through the list of delayed siacoin outputs. Sometimes boltdb
+	// has trouble if you delete elements in a bucket while iterating through
+	// the bucket (and sometimes not - nondeterministic), so all of the
+	// elements are collected into an array and then deleted after the bucket
+	// scan is complete.
+	bucketID := append(prefixDSCO, encoding.Marshal(pb.Height)...)
+	var scods []modules.SiacoinOutputDiff
+	var dscods []modules.DelayedSiacoinOutputDiff
+	dbErr := tx.Bucket(bucketID).ForEach(func(idBytes, scoBytes []byte) error {
+		// Decode the key-value pair into an id and a siacoin output.
+		var id types.SiacoinOutputID
+		var sco types.SiacoinOutput
+		copy(id[:], idBytes)
+		encErr := encoding.Unmarshal(scoBytes, &sco)
+		if build.DEBUG && encErr != nil {
+			panic(encErr)
+		}
+
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG && isSiacoinOutput(tx, id) {
 			panic(errOutputAlreadyMature)
@@ -63,35 +74,40 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlo
 			ID:            id,
 			SiacoinOutput: sco,
 		}
-		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
-		err := cs.commitBucketSiacoinOutputDiff(scoBucket, scod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		scods = append(scods, scod)
 
-		// Remove the delayed siacoin output from the consensus set.
+		// Create the dscod and add it to the list of dscods that should be
+		// deleted.
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffRevert,
 			ID:             id,
 			SiacoinOutput:  sco,
 			MaturityHeight: pb.Height,
 		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+		dscods = append(dscods, dscod)
+		return nil
 	})
-	if err != nil {
-		return err
+	if build.DEBUG && dbErr != nil {
+		panic(dbErr)
 	}
-	return removeDSCOBucket(tx, pb.Height)
+	for _, scod := range scods {
+		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
+		commitSiacoinOutputDiff(tx, scod, modules.DiffApply)
+	}
+	for _, dscod := range dscods {
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+	}
+	deleteDSCOBucket(tx, pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) error {
+func applyMissedStorageProof(tx *bolt.Tx, pb *processedBlock, fcid types.FileContractID) (dscods []modules.DelayedSiacoinOutputDiff, fcd modules.FileContractDiff) {
 	// Sanity checks.
 	fc, err := getFileContract(tx, fcid)
-	if err != nil {
-		return err
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 	if build.DEBUG {
 		// Check that the file contract in question expires at pb.Height.
@@ -104,72 +120,74 @@ func (cs *ConsensusSet) applyTxMissedStorageProof(tx *bolt.Tx, pb *processedBloc
 	for i, mpo := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
 		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
-		if build.DEBUG {
-			exists := isSiacoinOutput(tx, spoid)
-			if exists {
-				panic(errPayoutsAlreadyPaid)
-			}
+		if build.DEBUG && isSiacoinOutput(tx, spoid) {
+			panic(errPayoutsAlreadyPaid)
 		}
 
+		// Don't add the output if the value is zero.
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
 			ID:             spoid,
 			SiacoinOutput:  mpo,
 			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
-		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
-		err = cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
-		if err != nil {
-			return err
-		}
+		dscods = append(dscods, dscod)
 	}
 
 	// Remove the file contract from the consensus set and record the diff in
 	// the blockNode.
-	fcd := modules.FileContractDiff{
+	fcd = modules.FileContractDiff{
 		Direction:    modules.DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
 	}
-	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
-	return cs.commitTxFileContractDiff(tx, fcd, modules.DiffApply)
+	return dscods, fcd
 }
 
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func (cs *ConsensusSet) applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) error {
+func applyFileContractMaintenance(tx *bolt.Tx, pb *processedBlock) {
 	// Get the bucket pointing to all of the expiring file contracts.
-	fceBucketID := append(prefix_fcex, encoding.Marshal(pb.Height)...)
+	fceBucketID := append(prefixFCEX, encoding.Marshal(pb.Height)...)
 	fceBucket := tx.Bucket(fceBucketID)
+	// Finish if there are no expiring file contracts.
 	if fceBucket == nil {
-		return nil
+		return
 	}
+
+	var dscods []modules.DelayedSiacoinOutputDiff
+	var fcds []modules.FileContractDiff
 	err := fceBucket.ForEach(func(keyBytes, valBytes []byte) error {
 		var id types.FileContractID
 		copy(id[:], keyBytes)
-		return cs.applyTxMissedStorageProof(tx, pb, id)
+		amspDSCODS, fcd := applyMissedStorageProof(tx, pb, id)
+		fcds = append(fcds, fcd)
+		dscods = append(dscods, amspDSCODS...)
+		return nil
 	})
-	if err != nil {
-		return err
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
-	return nil
-	// return tx.DeleteBucket(fceBucketID)
+	for _, dscod := range dscods {
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+		commitDelayedSiacoinOutputDiff(tx, dscod, modules.DiffApply)
+	}
+	for _, fcd := range fcds {
+		pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
+		commitFileContractDiff(tx, fcd, modules.DiffApply)
+	}
+	err = tx.DeleteBucket(fceBucketID)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 }
 
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
-func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
-	return cs.db.Update(func(tx *bolt.Tx) error {
-		err := cs.applyMinerPayouts(tx, pb)
-		if err != nil {
-			return err
-		}
-		err = cs.applyMaturedSiacoinOutputs(tx, pb)
-		if err != nil {
-			return err
-		}
-		return cs.applyFileContractMaintenance(tx, pb)
-	})
+func applyMaintenance(tx *bolt.Tx, pb *processedBlock) {
+	applyMinerPayouts(tx, pb)
+	applyMaturedSiacoinOutputs(tx, pb)
+	applyFileContractMaintenance(tx, pb)
 }

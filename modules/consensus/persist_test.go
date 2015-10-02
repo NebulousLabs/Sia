@@ -18,13 +18,8 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = cst.complexBlockSet()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	oldHash := cst.cs.consensusSetHash()
+	cst.testBlockSuite()
+	oldHash := cst.cs.dbConsensusChecksum()
 	cst.cs.Close()
 
 	// Reassigning this will lose subscribers and such, but we
@@ -34,32 +29,8 @@ func TestSaveLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newHash := cst.cs.consensusSetHash()
+	newHash := cst.cs.dbConsensusChecksum()
 	if oldHash != newHash {
 		t.Fatal("consensus set hash changed after load")
-	}
-}
-
-// TestConsistencyGuard verifies that the database cannot be modified after it
-// has been corrupted
-func TestConsistencyGuard(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestConsistencyGuard")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Improperly trigger the guard, simulating a situation where the guard is
-	// added at the beginning of editing but not removed at the end of editing.
-	err = cst.cs.db.startConsistencyGuard()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = cst.miner.AddBlock()
-	if err != errDBInconsistent {
-		t.Fatal(err)
 	}
 }

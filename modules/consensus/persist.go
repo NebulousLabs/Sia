@@ -1,136 +1,96 @@
 package consensus
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// initDatabase is run when the database. This has become the true
-// init function for consensus set
-func (cs *ConsensusSet) initSetDB() error {
-	err := cs.db.startConsistencyGuard()
-	if err != nil {
-		return err
-	}
+const (
+	// DatabaseFilename contains the filename of the database that will be used
+	// when managing consensus.
+	DatabaseFilename = "consensus.db"
+)
 
-	// add genesis block
-	err = cs.db.addBlockMap(&cs.blockRoot)
-	if err != nil {
-		return err
-	}
-	err = cs.db.pushPath(cs.blockRoot.Block.ID())
-	if err != nil {
-		return err
-	}
-
-	// Set the siafund pool to 0.
-	err = cs.db.Update(func(tx *bolt.Tx) error {
-		sfpBucket := tx.Bucket(SiafundPool)
-		return sfpBucket.Put(SiafundPool, encoding.Marshal(types.NewCurrency64(0)))
-	})
-	if err != nil {
-		return err
-	}
-
-	// Update the siafundoutput diffs map for the genesis block on
-	// disk. This needs to happen between the database being
-	// opened/initilized and the consensus set hash being calculated
-	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-	}
-
-	// Prevent the miner payout for the genesis block from being spent
-	cs.db.addSiacoinOutputs(cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
-		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.UnlockHash{},
-	})
-
-	if build.DEBUG {
-		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
-		cs.db.updateBlockMap(&cs.blockRoot)
-	}
-	cs.db.stopConsistencyGuard()
-	return nil
-}
-
-// load pulls all the blocks that have been saved to disk into memory, using
+// loadDB pulls all the blocks that have been saved to disk into memory, using
 // them to fill out the ConsensusSet.
-func (cs *ConsensusSet) load(saveDir string) error {
-	db, err := openDB(filepath.Join(saveDir, "set.db"))
+func (cs *ConsensusSet) loadDB() error {
+	// Open the database - a new bolt database will be created if none exists.
+	err := cs.openDB(filepath.Join(cs.persistDir, DatabaseFilename))
 	if err != nil {
 		return err
 	}
-	cs.db = db
 
-	// Check the height. If the height is 0, then it's a new file and the
-	// genesis block should be added.
-	height := cs.db.pathHeight()
-	if height == 0 {
-		return cs.initSetDB()
-	}
-
-	// Check that the db's genesis block matches our genesis block.
-	bid := cs.db.getPath(0)
-	// If this happens, print a warning and start a new db.
-	if bid != cs.blockRoot.Block.ID() {
-		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
-		cs.db.Close()
-		err = os.Rename(filepath.Join(saveDir, "set.db"), filepath.Join(saveDir, "set.db.bck"))
-		if err != nil {
-			return err
+	// Walk through initialization for Sia.
+	var height types.BlockHeight
+	err = cs.db.Update(func(tx *bolt.Tx) error {
+		// Check if the database has been initialized.
+		if !dbInitialized(tx) {
+			return cs.initDB(tx)
 		}
-		// Now that chain.db no longer exists, recursing will create a new
-		// empty db and add the genesis block to it.
-		return cs.load(saveDir)
+
+		// Check that inconsistencies have not been detected in the database.
+		if inconsistencyDetected(tx) {
+			return errors.New("database contains inconsistencies")
+		}
+
+		// Check that the genesis block is correct - typically only incorrect
+		// in the event of developer binaries vs. release binaires.
+		genesisID, err := getPath(tx, 0)
+		if build.DEBUG && err != nil {
+			panic(err)
+		}
+		if genesisID != cs.blockRoot.Block.ID() {
+			return errors.New("Blockchain has wrong genesis block, exiting.")
+		}
+
+		height = blockHeight(tx)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
-	// The state cannot be easily reverted to a point where the
-	// consensusSetHash for the genesis block can be re-made. Load
-	// from disk instead
-	pb := cs.db.getBlockMap(bid)
+	// Send all of the existing blocks to subscribers - temporary while
+	// subscribers don't have any persistence for block progress.
+	return cs.db.View(func(tx *bolt.Tx) error {
+		for i := types.BlockHeight(0); i <= height; i++ {
+			// Fetch the processed block at height 'i'.
+			id, err := getPath(tx, i)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
+			pb, err := getBlockMap(tx, id)
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
 
-	cs.blockRoot.ConsensusSetHash = pb.ConsensusSetHash
-
-	return nil
+			// Send the block to subscribers.
+			cs.updateSubscribers(nil, []*processedBlock{pb})
+		}
+		return nil
+	})
 }
 
-// loadDiffs is a transitional function to load the processed blocks
-// from disk and move the diffs into memory
-func (cs *ConsensusSet) loadDiffs() {
-	height := cs.db.pathHeight()
-
-	// Load all blocks from disk, skipping the genesis block.
-	for i := types.BlockHeight(1); i < height; i++ {
-		bid := cs.db.getPath(i)
-		pb := cs.db.getBlockMap(bid)
-
-		lockID := cs.mu.Lock()
-		cs.updateSubscribers(nil, []*processedBlock{pb})
-		cs.mu.Unlock(lockID)
-
-		// Yield the processor so that other goroutines have a chance to grab
-		// the lock before it is immeditately grabbed again in the tight loop.
-		runtime.Gosched()
+// initPersist initializes the persistence structures of the consensus set, in
+// particular loading the database and preparing to manage subscribers.
+func (cs *ConsensusSet) initPersist() error {
+	// Create the consensus directory.
+	err := os.MkdirAll(cs.persistDir, 0700)
+	if err != nil {
+		return err
 	}
 
-	// Do a consistency check after loading the database.
-	if height > 1 && build.DEBUG {
-		err := cs.db.startConsistencyGuard()
-		if err != nil {
-			panic(err)
-		}
-		err = cs.checkConsistency()
-		if err != nil {
-			panic(err)
-		}
-		cs.db.stopConsistencyGuard()
+	// Try to load an existing database from disk - a new one will be created
+	// if one does not exist.
+	err = cs.loadDB()
+	if err != nil {
+		return err
 	}
+	return nil
 }

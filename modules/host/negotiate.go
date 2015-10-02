@@ -108,7 +108,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	fc := obligation.FileContract
 	duration := types.NewCurrency64(uint64(fc.WindowStart - h.blockHeight))
 	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.Price)
-	expectedPayout := fc.Payout.Sub(fc.Tax())
+	expectedPayout := types.PostTax(h.blockHeight, fc.Payout)
 
 	switch {
 	// these fields should never change

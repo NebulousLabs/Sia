@@ -11,6 +11,10 @@ import (
 // TestIntegrationLargeTransactions tries to add a large transaction to the
 // transaction pool.
 func TestIntegrationLargeTransactions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	tpt, err := createTpoolTester("TestIntegrationLargeTransaction")
 	if err != nil {
 		t.Fatal(err)

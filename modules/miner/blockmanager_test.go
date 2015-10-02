@@ -34,6 +34,9 @@ func mineHeader(m *Miner, header types.BlockHeader) (types.BlockHeader, error) {
 // headers to mine. It ensures that the blockmanager properly hands
 // out headers, then reconstructs the blocks
 func TestBlockManager(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	mt, err := createMinerTester("TestBlockManager")
 	if err != nil {
 		t.Fatal(err)

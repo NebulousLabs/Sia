@@ -126,6 +126,9 @@ func TestEncode(t *testing.T) {
 }
 
 func TestDecode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// use Unmarshal for convenience
 	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
 	for i := range testEncodings {

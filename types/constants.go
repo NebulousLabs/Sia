@@ -8,21 +8,9 @@ package types
 
 import (
 	"math/big"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 )
-
-// COMPATv0.4.0 - until the first 10e3 blocks have been archived, CurrentHeight
-// is needed to keep code consistent while verifying earlier blocks.
-//
-// CurrentHeight is a global variable to help with an upcoming hardfork. When
-// the height is less than 12,000, one set of code will be run. When the height
-// is greater than 12,000, a different set of code will be run. After the
-// hardfork has passed and everyone has upgraded, a checkpoint will be created
-// and blocks below 12,000 will never be viewed again.
-var CurrentHeight BlockHeight = 0
-var CurrentHeightLock sync.Mutex
 
 var (
 	BlockSizeLimit   = uint64(2e6)

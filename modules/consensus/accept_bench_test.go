@@ -12,7 +12,7 @@ import (
 // BenchmarkAcceptEmptyBlocks measures how quckly empty blocks are integrated
 // into the consensus set.
 //
-// i7-4770, 61ab2f5: 6.377 ms / op
+// i7-4770, 1d60d69: 1.356 ms / op
 func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 	cst, err := createConsensusSetTester("BenchmarkEmptyBlocks")
 	if err != nil {
@@ -30,9 +30,17 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 	defer cs.Close()
 
 	// Synchronisze the cst and the subscriberless consensus set.
-	h := cst.cs.db.pathHeight()
-	for i := types.BlockHeight(1); i < h; i++ {
-		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
+	h := cst.cs.dbBlockHeight()
+	for i := types.BlockHeight(1); i <= h; i++ {
+		id, err := cst.cs.dbGetPath(i)
+		if err != nil {
+			b.Fatal(err)
+		}
+		processedBlock, err := cst.cs.dbGetBlockMap(id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = cs.AcceptBlock(processedBlock.Block)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -62,13 +70,14 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 // BenchmarkAcceptSmallBlocks measures how quickly smaller blocks are
 // integrated into the consensus set.
 //
-// i7-4770, 61ab2f5: 10.047 ms / op
-func BenchmarkAcceptAcceptSmallBlocks(b *testing.B) {
+// i7-4770, 1d60d69: 3.579 ms / op
+func BenchmarkAcceptSmallBlocks(b *testing.B) {
 	cst, err := createConsensusSetTester("BenchmarkAcceptSmallBlocks")
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer cst.closeCst()
+
 	// COMPAT v0.4.0
 	//
 	// Push the height of the consensus set tester beyond the fork height.
@@ -89,9 +98,17 @@ func BenchmarkAcceptAcceptSmallBlocks(b *testing.B) {
 	defer cs.Close()
 
 	// Synchronize the consensus set with the consensus set tester.
-	h := cst.cs.db.pathHeight()
-	for i := types.BlockHeight(1); i < h; i++ {
-		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
+	h := cst.cs.dbBlockHeight()
+	for i := types.BlockHeight(1); i <= h; i++ {
+		id, err := cst.cs.dbGetPath(i)
+		if err != nil {
+			b.Fatal(err)
+		}
+		processedBlock, err := cst.cs.dbGetBlockMap(id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = cs.AcceptBlock(processedBlock.Block)
 		if err != nil {
 			b.Fatal(err)
 		}

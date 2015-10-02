@@ -67,6 +67,9 @@ func TestSignedUpdate(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st, err := createServerTester("TestSignedUpdate")
 	if err != nil {
 		t.Fatal(err)
