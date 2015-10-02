@@ -34,6 +34,11 @@ func (cs *ConsensusSet) loadDB() error {
 			return cs.initDB(tx)
 		}
 
+		// Check that inconsistencies have not been detected in the database.
+		if inconsistencyDetected(tx) {
+			return errors.New("database contains inconsistencies")
+		}
+
 		// Check that the genesis block is correct - typically only incorrect
 		// in the event of developer binaries vs. release binaires.
 		genesisID, err := getPath(tx, 0)

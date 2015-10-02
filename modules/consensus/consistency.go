@@ -13,6 +13,16 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// manageErr handles an error detected by the consistency checks.
+func manageErr(tx *bolt.Tx, err error) {
+	markInconsistency(tx)
+	if build.DEBUG {
+		panic(err)
+	} else {
+		fmt.Println(err)
+	}
+}
+
 // refreshDB saves, deletes, and then restores all of the buckets in the
 // database. This eliminates bugs during reorgs. The exact source of the bugs
 // is unknown, but the problem is that after excessive use by Sia, calling
@@ -30,7 +40,7 @@ func refreshDB(tx *bolt.Tx) {
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	for _, bucketName := range bucketNames {
@@ -42,21 +52,21 @@ func refreshDB(tx *bolt.Tx) {
 			return nil
 		})
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 
 		err = tx.DeleteBucket(bucketName)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 		bucket, err := tx.CreateBucket(bucketName)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 		for i := range keys {
 			err := bucket.Put(keys[i], values[i])
 			if build.DEBUG && err != nil {
-				panic(err)
+				manageErr(tx, err)
 			}
 		}
 	}
@@ -86,7 +96,7 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 			return nil
 		})
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 	}
 
@@ -108,7 +118,7 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 		})
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	return tree.Root()
@@ -131,7 +141,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 			var sco types.SiacoinOutput
 			err := encoding.Unmarshal(delayedOutput, &sco)
 			if build.DEBUG && err != nil {
-				panic(err)
+				manageErr(tx, err)
 			}
 			dscoSiacoins = dscoSiacoins.Add(sco.Value)
 			return nil
@@ -142,7 +152,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	// Add all of the siacoin outputs.
@@ -151,13 +161,13 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		var sco types.SiacoinOutput
 		err := encoding.Unmarshal(scoBytes, &sco)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 		scoSiacoins = scoSiacoins.Add(sco.Value)
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	// Add all of the payouts from file contracts.
@@ -166,7 +176,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		var fc types.FileContract
 		err := encoding.Unmarshal(fcBytes, &fc)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 		var fcCoins types.Currency
 		for _, output := range fc.ValidProofOutputs {
@@ -176,7 +186,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	// Add all of the siafund claims.
@@ -185,7 +195,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		var sfo types.SiafundOutput
 		err := encoding.Unmarshal(sfoBytes, &sfo)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 
 		coinsPerFund := getSiafundPool(tx).Sub(sfo.ClaimStart)
@@ -194,7 +204,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	// Count how many coins should exist
@@ -220,7 +230,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 			fmt.Println("expected:", expectedSiacoins)
 			fmt.Println("total is bigger:", totalSiacoins.Sub(expectedSiacoins))
 		}
-		panic("wrong number of siacoins in the consensus set")
+		manageErr(tx, errors.New("wrong number of siacoins in the consensus set"))
 	}
 }
 
@@ -232,16 +242,16 @@ func checkSiafundCount(tx *bolt.Tx) {
 		var sfo types.SiafundOutput
 		err := encoding.Unmarshal(siafundOutputBytes, &sfo)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 		total = total.Add(sfo.Value)
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 	if total.Cmp(types.SiafundCount) != 0 {
-		panic("wrong number if siafunds in the consensus set")
+		manageErr(tx, errors.New("wrong number if siafunds in the consensus set"))
 	}
 }
 
@@ -266,7 +276,7 @@ func checkDSCOs(tx *bolt.Tx) {
 		var height types.BlockHeight
 		err := encoding.Unmarshal(name[len(prefixDSCO):], &height)
 		if build.DEBUG && err != nil {
-			panic(err)
+			manageErr(tx, err)
 		}
 		_, exists := dscoTracker[height]
 		if exists {
@@ -289,7 +299,7 @@ func checkDSCOs(tx *bolt.Tx) {
 			var sco types.SiacoinOutput
 			err := encoding.Unmarshal(delayedOutput, &sco)
 			if build.DEBUG && err != nil {
-				panic(err)
+				manageErr(tx, err)
 			}
 			total = total.Add(sco.Value)
 			return nil
@@ -307,7 +317,7 @@ func checkDSCOs(tx *bolt.Tx) {
 		return nil
 	})
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 
 	// Check that all of the correct heights are represented.
@@ -319,12 +329,12 @@ func checkDSCOs(tx *bolt.Tx) {
 		}
 		_, exists := dscoTracker[i]
 		if build.DEBUG && !exists {
-			panic("missing a dsco bucket")
+			manageErr(tx, errors.New("missing a dsco bucket"))
 		}
 		expectedBuckets++
 	}
 	if build.DEBUG && len(dscoTracker) != expectedBuckets {
-		panic("too many dsco buckets")
+		manageErr(tx, errors.New("too many dsco buckets"))
 	}
 }
 
@@ -341,24 +351,24 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
 
 	parent, err := getBlockMap(tx, current.Block.ParentID)
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 	if build.DEBUG && current.Height != parent.Height+1 {
-		panic("parent structure of a block is incorrect")
+		manageErr(tx, errors.New("parent structure of a block is incorrect"))
 	}
 	_, _, err = cs.forkBlockchain(tx, parent)
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 	if build.DEBUG && consensusChecksum(tx) != parent.ConsensusChecksum {
-		panic("consensus checksum mismatch after reverting")
+		manageErr(tx, errors.New("consensus checksum mismatch after reverting"))
 	}
 	_, _, err = cs.forkBlockchain(tx, current)
 	if build.DEBUG && err != nil {
-		panic(err)
+		manageErr(tx, err)
 	}
 	if build.DEBUG && consensusChecksum(tx) != current.ConsensusChecksum {
-		panic("consensus checksum mismatch after re-applying")
+		manageErr(tx, errors.New("consensus checksum mismatch after re-applying"))
 	}
 }
 
@@ -374,6 +384,20 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 	checkSiafundCount(tx)
 	cs.checkRevertApply(tx)
 	cs.checkingConsistency = false
+}
+
+// maybeCheckConsistency runs a consistency check with a small probability.
+// Useful for detecting database corruption in production without needing to go
+// through the extremely slow process of running a consistency check every
+// block.
+func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
+	n, err := crypto.RandIntn(1000)
+	if build.DEBUG && err != nil {
+		manageErr(tx, err)
+	}
+	if n == 0 {
+		cs.checkConsistency(tx)
+	}
 }
 
 // TODO: Check that every file contract has an expiration too, and that the

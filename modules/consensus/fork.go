@@ -63,6 +63,8 @@ func (cs *ConsensusSet) revertToBlock(tx *bolt.Tx, pb *processedBlock) (reverted
 		// has maintained consistency.
 		if build.DEBUG {
 			cs.checkConsistency(tx)
+		} else {
+			cs.maybeCheckConsistency(tx)
 		}
 		refreshDB(tx)
 	}
@@ -93,6 +95,8 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 		// has maintained consistency.
 		if build.DEBUG {
 			cs.checkConsistency(tx)
+		} else {
+			cs.maybeCheckConsistency(tx)
 		}
 		// Database refresh is not needed unless multiple blocks are being
 		// applied.

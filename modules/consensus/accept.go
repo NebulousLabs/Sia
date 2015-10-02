@@ -137,6 +137,11 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// Start verification inside of a bolt View tx.
 	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Do not accept a block if the database is inconsistent.
+		if inconsistencyDetected(tx) {
+			return errors.New("inconsistent database")
+		}
+
 		// Check that the header is valid. The header is checked first because it
 		// is not computationally expensive to verify, but it is computationally
 		// expensive to create.

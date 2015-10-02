@@ -47,15 +47,19 @@ var (
 	// DEPRECATED.
 	BlockHeight = []byte("BlockHeight")
 
+	// BlockMap is a database bucket containing all of the processed blocks,
+	// keyed by their id. This includes blocks that are not currently in the
+	// consensus set, and blocks that may not have been fully validated yet.
+	BlockMap = []byte("BlockMap")
+
 	// BlockPath is a database bucket containing a mapping from the height of a
 	// block to the id of the block at that height. BlockPath only includes
 	// blocks in the current path.
 	BlockPath = []byte("BlockPath")
 
-	// BlockMap is a database bucket containing all of the processed blocks,
-	// keyed by their id. This includes blocks that are not currently in the
-	// consensus set, and blocks that may not have been fully validated yet.
-	BlockMap = []byte("BlockMap")
+	// Consistency is a database bucket with a flag indicating whether
+	// inconsistencies within the database have been detected.
+	Consistency = []byte("Consistency")
 
 	// SiacoinOutputs is a database bucket that contains all of the unspent
 	// siacoin outputs.
@@ -93,13 +97,14 @@ func dbInitialized(tx *bolt.Tx) bool {
 func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	// Enumerate the database buckets.
 	buckets := [][]byte{
-		BlockPath,
+		BlockHeight,
 		BlockMap,
+		BlockPath,
+		Consistency,
 		SiacoinOutputs,
 		FileContracts,
 		SiafundOutputs,
 		SiafundPool,
-		BlockHeight,
 	}
 
 	// Create the database buckets.
@@ -110,10 +115,17 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 		}
 	}
 
+	// Place a 'false' in the consistency bucket to indicate that no
+	// inconsistencies have been found.
+	err := tx.Bucket(Consistency).Put(Consistency, encoding.Marshal(false))
+	if err != nil {
+		return err
+	}
+
 	// Set the block height to -1, so the genesis block is at height 0.
 	blockHeight := tx.Bucket(BlockHeight)
 	underflow := types.BlockHeight(0)
-	err := blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
+	err = blockHeight.Put(BlockHeight, encoding.Marshal(underflow-1))
 	if err != nil {
 		return err
 	}
@@ -144,6 +156,29 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	}
 	addBlockMap(tx, &cs.blockRoot)
 	return nil
+}
+
+// inconsistencyDetected indicates whether inconsistency has been detected
+// within the database.
+func inconsistencyDetected(tx *bolt.Tx) (detected bool) {
+	inconsistencyBytes := tx.Bucket(Consistency).Get(Consistency)
+	err := encoding.Unmarshal(inconsistencyBytes, &detected)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return
+}
+
+// markInconsistency flags the database to indicate that inconsistency has been
+// detected.
+func markInconsistency(tx *bolt.Tx) {
+	// Place a 'true' in the consistency bucket to indicate that
+	// inconsistencies have been found.
+	err := tx.Bucket(Consistency).Put(Consistency, encoding.Marshal(true))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
 }
 
 // blockHeight returns the height of the blockchain.
