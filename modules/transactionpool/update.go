@@ -63,9 +63,10 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Inform subscribers that an update has executed.
 	tp.consensusChangeIndex++
+	tp.mu.Demote()
 	tp.updateSubscribersConsensus(cc)
 	tp.updateSubscribersTransactions()
-	tp.mu.Unlock(lockID)
+	tp.mu.RUnlock(lockID)
 }
 
 // PurgeTransactionPool deletes all transactions from the transaction pool.
