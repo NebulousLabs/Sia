@@ -39,7 +39,7 @@ func refreshDB(tx *bolt.Tx) {
 		bucketNames = append(bucketNames, bucketName)
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -51,21 +51,21 @@ func refreshDB(tx *bolt.Tx) {
 			values = append(values, v)
 			return nil
 		})
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 
 		err = tx.DeleteBucket(bucketName)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 		bucket, err := tx.CreateBucket(bucketName)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 		for i := range keys {
 			err := bucket.Put(keys[i], values[i])
-			if build.DEBUG && err != nil {
+			if err != nil {
 				manageErr(tx, err)
 			}
 		}
@@ -95,7 +95,7 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 			tree.Push(v)
 			return nil
 		})
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 	}
@@ -117,7 +117,7 @@ func consensusChecksum(tx *bolt.Tx) crypto.Hash {
 			return nil
 		})
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -140,7 +140,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		err := b.ForEach(func(_, delayedOutput []byte) error {
 			var sco types.SiacoinOutput
 			err := encoding.Unmarshal(delayedOutput, &sco)
-			if build.DEBUG && err != nil {
+			if err != nil {
 				manageErr(tx, err)
 			}
 			dscoSiacoins = dscoSiacoins.Add(sco.Value)
@@ -151,7 +151,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		}
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -160,13 +160,13 @@ func checkSiacoinCount(tx *bolt.Tx) {
 	err = tx.Bucket(SiacoinOutputs).ForEach(func(_, scoBytes []byte) error {
 		var sco types.SiacoinOutput
 		err := encoding.Unmarshal(scoBytes, &sco)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 		scoSiacoins = scoSiacoins.Add(sco.Value)
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -175,7 +175,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 	err = tx.Bucket(FileContracts).ForEach(func(_, fcBytes []byte) error {
 		var fc types.FileContract
 		err := encoding.Unmarshal(fcBytes, &fc)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 		var fcCoins types.Currency
@@ -185,7 +185,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		fcSiacoins = fcSiacoins.Add(fcCoins)
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -194,7 +194,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 	err = tx.Bucket(SiafundOutputs).ForEach(func(_, sfoBytes []byte) error {
 		var sfo types.SiafundOutput
 		err := encoding.Unmarshal(sfoBytes, &sfo)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 
@@ -203,7 +203,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		claimSiacoins = claimSiacoins.Add(claimCoins)
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -219,7 +219,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 	}
 
 	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
-	if build.DEBUG && totalSiacoins.Cmp(expectedSiacoins) != 0 {
+	if totalSiacoins.Cmp(expectedSiacoins) != 0 {
 		diagnostics := fmt.Sprintf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
 		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
 			diagnostics += fmt.Sprintf("total: %v\nexpected: %v\n expected is bigger: %v", totalSiacoins, expectedSiacoins, expectedSiacoins.Sub(totalSiacoins))
@@ -237,13 +237,13 @@ func checkSiafundCount(tx *bolt.Tx) {
 	err := tx.Bucket(SiafundOutputs).ForEach(func(_, siafundOutputBytes []byte) error {
 		var sfo types.SiafundOutput
 		err := encoding.Unmarshal(siafundOutputBytes, &sfo)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 		total = total.Add(sfo.Value)
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 	if total.Cmp(types.SiafundCount) != 0 {
@@ -271,7 +271,7 @@ func checkDSCOs(tx *bolt.Tx) {
 		// Add the bucket to the dscoTracker.
 		var height types.BlockHeight
 		err := encoding.Unmarshal(name[len(prefixDSCO):], &height)
-		if build.DEBUG && err != nil {
+		if err != nil {
 			manageErr(tx, err)
 		}
 		_, exists := dscoTracker[height]
@@ -294,7 +294,7 @@ func checkDSCOs(tx *bolt.Tx) {
 			// Sum the funds in the bucket.
 			var sco types.SiacoinOutput
 			err := encoding.Unmarshal(delayedOutput, &sco)
-			if build.DEBUG && err != nil {
+			if err != nil {
 				manageErr(tx, err)
 			}
 			total = total.Add(sco.Value)
@@ -312,7 +312,7 @@ func checkDSCOs(tx *bolt.Tx) {
 		}
 		return nil
 	})
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 
@@ -324,12 +324,12 @@ func checkDSCOs(tx *bolt.Tx) {
 			continue
 		}
 		_, exists := dscoTracker[i]
-		if build.DEBUG && !exists {
+		if !exists {
 			manageErr(tx, errors.New("missing a dsco bucket"))
 		}
 		expectedBuckets++
 	}
-	if build.DEBUG && len(dscoTracker) != expectedBuckets {
+	if len(dscoTracker) != expectedBuckets {
 		manageErr(tx, errors.New("too many dsco buckets"))
 	}
 }
@@ -346,24 +346,24 @@ func (cs *ConsensusSet) checkRevertApply(tx *bolt.Tx) {
 	}
 
 	parent, err := getBlockMap(tx, current.Block.ParentID)
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
-	if build.DEBUG && current.Height != parent.Height+1 {
+	if current.Height != parent.Height+1 {
 		manageErr(tx, errors.New("parent structure of a block is incorrect"))
 	}
 	_, _, err = cs.forkBlockchain(tx, parent)
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
-	if build.DEBUG && consensusChecksum(tx) != parent.ConsensusChecksum {
+	if consensusChecksum(tx) != parent.ConsensusChecksum {
 		manageErr(tx, errors.New("consensus checksum mismatch after reverting"))
 	}
 	_, _, err = cs.forkBlockchain(tx, current)
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
-	if build.DEBUG && consensusChecksum(tx) != current.ConsensusChecksum {
+	if consensusChecksum(tx) != current.ConsensusChecksum {
 		manageErr(tx, errors.New("consensus checksum mismatch after re-applying"))
 	}
 }
@@ -388,7 +388,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 // block.
 func (cs *ConsensusSet) maybeCheckConsistency(tx *bolt.Tx) {
 	n, err := crypto.RandIntn(1000)
-	if build.DEBUG && err != nil {
+	if err != nil {
 		manageErr(tx, err)
 	}
 	if n == 0 {
