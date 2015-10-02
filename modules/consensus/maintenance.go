@@ -40,7 +40,7 @@ func applyMinerPayouts(tx *bolt.Tx, pb *processedBlock) {
 func applyMaturedSiacoinOutputs(tx *bolt.Tx, pb *processedBlock) {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
-	if !(pb.Height >= types.MaturityDelay) {
+	if pb.Height < types.MaturityDelay {
 		return
 	}
 

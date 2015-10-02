@@ -210,11 +210,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 
 	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
 	if build.DEBUG && totalSiacoins.Cmp(expectedSiacoins) != 0 {
-		fmt.Println("Wrong number of siacoins... diagnostics:")
-		fmt.Println("Dsco:", dscoSiacoins)
-		fmt.Println("Sco:", scoSiacoins)
-		fmt.Println("Fc:", fcSiacoins)
-		fmt.Println("Claim:", claimSiacoins)
+		fmt.Printf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)
 		if totalSiacoins.Cmp(expectedSiacoins) < 0 {
 			fmt.Println("total:", totalSiacoins)
 			fmt.Println("expected:", expectedSiacoins)

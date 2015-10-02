@@ -142,7 +142,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			if pathID != pb.Block.ID() {
 				continue
 			}
-			if pb.Height == blockHeight(tx) {
+			if pb.Height == csHeight {
 				break
 			}
 			found = true

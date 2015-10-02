@@ -104,7 +104,7 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 
 	// Create the database buckets.
 	for _, bucket := range buckets {
-		_, err := tx.CreateBucketIfNotExists(bucket)
+		_, err := tx.CreateBucket(bucket)
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 
 // blockHeight returns the height of the blockchain.
 func blockHeight(tx *bolt.Tx) types.BlockHeight {
-	var height int
+	var height types.BlockHeight
 	bh := tx.Bucket(BlockHeight)
 	err := encoding.Unmarshal(bh.Get(BlockHeight), &height)
 	if build.DEBUG && err != nil {
@@ -294,10 +294,15 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 // addSiacoinOutput adds a siacoin output to the database. An error is returned
 // if the siacoin output is already in the database.
 func addSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, sco types.SiacoinOutput) {
-	if build.DEBUG && sco.Value.IsZero() {
-		// println("Zero Sco")
-		// panic("discovered a zero value siacoin output")
-	}
+	// While this is not supposed to be allowed, there's a bug in the consensus
+	// code which means that earlier versions have accetped 0-value outputs
+	// onto the blockchain. A hardfork to remove 0-value outputs will fix this,
+	// and that hardfork is planned, but not yet.
+	/*
+		if build.DEBUG && sco.Value.IsZero() {
+			panic("discovered a zero value siacoin output")
+		}
+	*/
 	siacoinOutputs := tx.Bucket(SiacoinOutputs)
 	// Sanity check - should not be adding an item that exists.
 	if build.DEBUG && siacoinOutputs.Get(id[:]) != nil {
@@ -470,10 +475,13 @@ func setSiafundPool(tx *bolt.Tx, c types.Currency) {
 // addDSCO adds a delayed siacoin output to the consnesus set.
 func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
 	// Sanity check - dsco should never have a value of zero.
-	if build.DEBUG && sco.Value.IsZero() {
-		// println("Zero DSCO")
-		// panic("zero-value dsco being added")
-	}
+	// An error in the consensus code means sometimes there are 0-value dscos
+	// in the blockchain. A hardfork will fix this.
+	/*
+		if build.DEBUG && sco.Value.IsZero() {
+			panic("zero-value dsco being added")
+		}
+	*/
 	// Sanity check - output should not already be in the full set of outputs.
 	if build.DEBUG && tx.Bucket(SiacoinOutputs).Get(id[:]) != nil {
 		panic("dsco already in output set")

@@ -683,8 +683,6 @@ func (cst *consensusSetTester) TestIntegrationSpendSiafunds(t *testing.T) {
 // had been used incorrectly, resulting in the incorrect processing of bulk
 // file contracts.
 
-/// All functions below this point are deprecated. ///
-
 /*
 // testPaymentChannelBlocks submits blocks to set up, use, and close a payment
 // channel.
