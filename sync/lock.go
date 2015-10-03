@@ -18,8 +18,7 @@ type RWMutex struct {
 	callDepth   int
 	maxLockTime time.Duration
 
-	outer sync.Mutex
-	inner sync.RWMutex
+	mu sync.RWMutex
 }
 
 // lockInfo contains information about when and how a lock call was made.
@@ -67,10 +66,9 @@ func (rwm *RWMutex) threadedDeadlockFinder() {
 
 				// Undo the deadlock and delete the entry from the map.
 				if info.read {
-					rwm.inner.RUnlock()
+					rwm.mu.RUnlock()
 				} else {
-					rwm.inner.Unlock()
-					rwm.outer.Unlock()
+					rwm.mu.Unlock()
 				}
 				delete(rwm.openLocks, id)
 			}
@@ -95,10 +93,9 @@ func (rwm *RWMutex) safeLock(read bool) int {
 
 	// Lock the mutex.
 	if read {
-		rwm.inner.RLock()
+		rwm.mu.RLock()
 	} else {
-		rwm.outer.Lock()
-		rwm.inner.Lock()
+		rwm.mu.Lock()
 	}
 
 	// Safely register that a lock has been triggered.
@@ -137,27 +134,11 @@ func (rwm *RWMutex) safeUnlock(read bool, id int) {
 
 	// Remove the lock and delete the entry from the map.
 	if read {
-		rwm.inner.RUnlock()
+		rwm.mu.RUnlock()
 	} else {
-		rwm.inner.Unlock()
-		rwm.outer.Unlock()
+		rwm.mu.Unlock()
 	}
 	delete(rwm.openLocks, id)
-}
-
-// safeDemote demotes a safelock from a Lock to a RLock.
-func (rwm *RWMutex) safeDemote() {
-	rwm.openLocksMutex.Lock()
-	defer rwm.openLocksMutex.Unlock()
-
-	// Demote the lock. Ordering is important. First the inner lock is released
-	// and then regrabbed as a readlock. Then the outer lock is released.
-	// Because no safelock can grab the inner lock as a writelock until it has
-	// the outer lock, there is no risk of changes being made during the
-	// transition.
-	rwm.inner.Unlock()
-	rwm.inner.RLock()
-	rwm.outer.Unlock()
 }
 
 // RLock will read lock the RWMutex. The return value must be used as input
@@ -176,12 +157,6 @@ func (rwm *RWMutex) RUnlock(id int) {
 // calling RUnlock.
 func (rwm *RWMutex) Lock() int {
 	return rwm.safeLock(false)
-}
-
-// Demote will demote the lock from a writelock to a readlock. Demote should
-// only be called on a writelocked safelock.
-func (rwm *RWMutex) Demote() {
-	rwm.safeDemote()
 }
 
 // Unlock will unlock the RWMutex. The return value of calling Lock must be
