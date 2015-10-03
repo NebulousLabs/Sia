@@ -73,7 +73,9 @@ func (cs *ConsensusSet) loadDB() error {
 			// Send the block to subscribers.
 			ce := changeEntry{revertedBlocks: nil, appliedBlocks: []types.BlockID{pb.Block.ID()}}
 			cs.changeLog = append(cs.changeLog, ce)
-			cs.updateSubscribers(ce)
+			// Readlock is implicitly held - initialization is fully blocking
+			// and there are no subscribers yet.
+			cs.readlockUpdateSubscribers(ce)
 		}
 		return nil
 	})

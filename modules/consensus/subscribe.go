@@ -86,11 +86,11 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, i int) (cc modules.C
 	return
 }
 
-// updateSubscribers will inform all subscribers of the new update to the
-// consensus set. A call to updateSubscribers should always be preceeded by an
-// append to the changeLog. This does not happen inside of updateSubscribers
-// because updateSubscribers is called from read-only contexts.
-func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
+// readlockUpdateSubscribers will inform all subscribers of a new update to the
+// consensus set. The call must be made with a demoted lock or a readlock.
+// readlockUpdateSubscribers does not alter the changelog, the changelog must
+// be updated beforehand.
+func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	var cc modules.ConsensusChange
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		var err error

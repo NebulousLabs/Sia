@@ -86,8 +86,6 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		// that no consensus changes have been sent yet. The first consensus
 		// change will then have an index of '0'.
 		consensusChangeIndex: -1,
-
-		mu: demotemutex.DemoteMutex{},
 	}
 
 	// Register RPCs

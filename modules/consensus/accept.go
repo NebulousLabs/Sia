@@ -86,7 +86,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	if b.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
 		go func() {
 			time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-			go cs.AcceptBlock(b) // NOTE: Error is not handled.
+			cs.AcceptBlock(b) // NOTE: Error is not handled.
 		}()
 		return errFutureTimestamp
 	}
@@ -180,7 +180,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	cs.mu.Demote()
 	defer cs.mu.DemotedUnlock()
 	if len(appliedBlocks) > 0 {
-		cs.updateSubscribers(ce)
+		cs.readlockUpdateSubscribers(ce)
 	}
 
 	// Sanity checks.

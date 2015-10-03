@@ -89,7 +89,6 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		dosBlocks: make(map[types.BlockID]struct{}),
 
 		persistDir: persistDir,
-		mu:         demotemutex.DemoteMutex{},
 	}
 
 	// Create the diffs for the genesis siafund outputs.
