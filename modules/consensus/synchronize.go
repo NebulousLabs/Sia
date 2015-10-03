@@ -125,7 +125,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	found := false
 	var start types.BlockHeight
 	var csHeight types.BlockHeight
-	lockID := cs.mu.RLock()
+	cs.mu.RLock()
 	err = cs.db.View(func(tx *bolt.Tx) error {
 		csHeight = blockHeight(tx)
 		for _, id := range knownBlocks {
@@ -149,7 +149,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 		}
 		return nil
 	})
-	cs.mu.RUnlock(lockID)
+	cs.mu.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	for moreAvailable {
 		// Get the set of blocks to send.
 		var blocks []types.Block
-		lockID = cs.mu.RLock()
+		cs.mu.RLock()
 		cs.db.View(func(tx *bolt.Tx) error {
 			height := blockHeight(tx)
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
@@ -189,7 +189,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			start += MaxCatchUpBlocks
 			return nil
 		})
-		cs.mu.RUnlock(lockID)
+		cs.mu.RUnlock()
 		if err != nil {
 			return err
 		}

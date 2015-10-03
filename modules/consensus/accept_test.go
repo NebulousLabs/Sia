@@ -252,8 +252,6 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	// block still has not been added to the consensus set (prove that the
 	// block was correctly discarded).
 	time.Sleep(time.Second * time.Duration(3+types.ExtremeFutureThreshold))
-	lockID := cst.cs.mu.RLock()
-	defer cst.cs.mu.RUnlock(lockID)
 	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
 	if err != errNilItem {
 		t.Error("extreme future block made it into the consensus set after waiting")
@@ -315,9 +313,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 	// Check that after waiting until the block is no longer too far in the
 	// future, the block gets added to the consensus set.
 	time.Sleep(time.Second * 3) // 3 seconds, as the block was originally 2 seconds too far into the future.
-	lockID := cst.cs.mu.RLock()
 	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
-	cst.cs.mu.RUnlock(lockID)
 	if err == errNilItem {
 		t.Fatalf("future block was not added to the consensus set after waiting the appropriate amount of time")
 	}

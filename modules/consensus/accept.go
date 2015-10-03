@@ -133,7 +133,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 // it will be relayed to connected peers. This function should only be called
 // for new, untrusted blocks.
 func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
-	lockID := cs.mu.Lock()
+	cs.mu.Lock()
 
 	// Start verification inside of a bolt View tx.
 	err := cs.db.View(func(tx *bolt.Tx) error {
@@ -152,7 +152,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 		return nil
 	})
 	if err != nil {
-		cs.mu.Unlock(lockID)
+		cs.mu.Unlock()
 		return err
 	}
 
@@ -162,11 +162,11 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	// the longest fork.
 	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
-		cs.mu.Unlock(lockID)
+		cs.mu.Unlock()
 		return err
 	}
 	cs.mu.Demote()
-	defer cs.mu.RUnlock(lockID)
+	defer cs.mu.DemotedUnlock()
 	if len(appliedBlocks) > 0 {
 		cs.updateSubscribers(revertedBlocks, appliedBlocks)
 	}

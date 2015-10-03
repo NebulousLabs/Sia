@@ -119,8 +119,9 @@ func (cs *ConsensusSet) updateSubscribers(revertedBlocks []*processedBlock, appl
 // ConsensusChange(5) will return the 6th consensus change that was issued to
 // subscribers. ConsensusChanges can be assumed to be consecutive.
 func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err error) {
-	id := cs.mu.RLock()
-	defer cs.mu.RUnlock(id)
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
 	err = cs.db.View(func(tx *bolt.Tx) error {
 		cc, err = cs.computeConsensusChange(tx, i)
 		return err
@@ -134,7 +135,9 @@ func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err 
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
 // ProcessConsensusChange every time there is a change in the consensus set.
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
-	id := cs.mu.Lock()
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
 	cs.subscribers = append(cs.subscribers, subscriber)
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		for i := range cs.changeLog {
@@ -149,5 +152,4 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	cs.mu.Unlock(id)
 }

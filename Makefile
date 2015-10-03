@@ -6,6 +6,7 @@ all: install
 # Sia.
 dependencies:
 	go install -race std
+	go get -u github.com/NebulousLabs/demotemutex
 	go get -u github.com/NebulousLabs/ed25519
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp

@@ -278,8 +278,8 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 // transactions. If the transaction is accepted, it will be relayed to
 // connected peers.
 func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
-	id := tp.mu.Lock()
-	defer tp.mu.Unlock(id)
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
 
 	err := tp.acceptTransactionSet(ts)
 	if err != nil {

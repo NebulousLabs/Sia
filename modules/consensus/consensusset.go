@@ -9,11 +9,11 @@ package consensus
 import (
 	"errors"
 
+	"github.com/NebulousLabs/demotemutex"
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -54,7 +54,7 @@ type ConsensusSet struct {
 	checkingConsistency bool
 
 	persistDir string
-	mu         *sync.RWMutex
+	mu         demotemutex.DemoteMutex
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If
@@ -89,7 +89,7 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		dosBlocks: make(map[types.BlockID]struct{}),
 
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
+		mu:         demotemutex.DemoteMutex{},
 	}
 
 	// Create the diffs for the genesis siafund outputs.
@@ -133,8 +133,8 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
-	lockID := cs.mu.Lock()
-	defer cs.mu.Unlock(lockID)
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 	return cs.db.Close()
 }
 

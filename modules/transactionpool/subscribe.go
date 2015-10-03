@@ -35,7 +35,7 @@ func (tp *TransactionPool) updateSubscribersConsensus(cc modules.ConsensusChange
 // Subscribers will receive all consensus set changes as well as transaction
 // pool changes, and should not subscribe to both.
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
-	lockID := tp.mu.Lock()
+	tp.mu.Lock()
 	tp.subscribers = append(tp.subscribers, subscriber)
 	for i := 0; i <= tp.consensusChangeIndex; i++ {
 		cc, err := tp.consensusSet.ConsensusChange(i)
@@ -47,9 +47,9 @@ func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.Transacti
 		// Release the lock between iterations to smooth out performance a bit
 		// - tpool does not need to hold the lock for 15,000 consensus change
 		// objects.
-		tp.mu.Unlock(lockID)
+		tp.mu.Unlock()
 		runtime.Gosched()
-		lockID = tp.mu.Lock()
+		tp.mu.Lock()
 	}
 
 	// Send the new subscriber the transaction pool set.
@@ -62,5 +62,5 @@ func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.Transacti
 		cc = cc.Append(tSetDiff)
 	}
 	subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
-	tp.mu.Unlock(lockID)
+	tp.mu.Unlock()
 }

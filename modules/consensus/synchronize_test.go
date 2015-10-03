@@ -184,7 +184,7 @@ func TestBlockHistory(t *testing.T) {
 	})
 
 	// validate history
-	lockID := cst.cs.mu.Lock()
+	cst.cs.mu.Lock()
 	// first 10 IDs are linear
 	for i := types.BlockHeight(0); i < 10; i++ {
 		id, err := cst.cs.dbGetPath(cst.cs.dbBlockHeight() - i)
@@ -215,7 +215,7 @@ func TestBlockHistory(t *testing.T) {
 		t.Errorf("Wrong ID in history: expected %v, got %v", genesisID, history[31])
 	}
 
-	cst.cs.mu.Unlock(lockID)
+	cst.cs.mu.Unlock()
 
 	// remaining IDs should be empty
 	var emptyID types.BlockID
