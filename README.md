@@ -1,4 +1,4 @@
-Sia 0.4.2
+Sia 0.4.3
 ===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -142,7 +142,14 @@ on what we do in the next few months. Thank you!
 Version History
 ---------------
 
-August 2015:
+October 2015:
+
+v0.4.3 (patch)
+- Block database is now faster and more stable
+- Wallet no longer freezes when unlocked during IBD
+- Optimized block encoding/decoding
+
+September 2015:
 
 v0.4.2 (patch)
 - HostDB is now smarter
@@ -152,6 +159,8 @@ v0.4.1 (patch)
 - Added support for loading v0.3.3.x wallets
 - Better pruning of dead nodes
 - Improve database consistency
+
+August 2015:
 
 v0.4.0: Second stable currency release.
 - Wallets are encrypted and generated from seed phrases
