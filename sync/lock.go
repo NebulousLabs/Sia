@@ -112,19 +112,19 @@ func (rwm *RWMutex) safeLock(read bool) int {
 // safeUnlock is the generic function for doing safe unlocking. If the lock had
 // to be removed because a deadlock was detected, an error is printed.
 func (rwm *RWMutex) safeUnlock(read bool, id int) {
-	// Get the call stack.
-	callingFiles := make([]string, rwm.callDepth+1)
-	callingLines := make([]int, rwm.callDepth+1)
-	for i := 0; i <= rwm.callDepth; i++ {
-		_, callingFiles[i], callingLines[i], _ = runtime.Caller(2 + i)
-	}
-
 	rwm.openLocksMutex.Lock()
 	defer rwm.openLocksMutex.Unlock()
 
 	// Check if a deadlock has been detected and fixed manually.
 	_, exists := rwm.openLocks[id]
 	if !exists {
+		// Get the call stack.
+		callingFiles := make([]string, rwm.callDepth+1)
+		callingLines := make([]int, rwm.callDepth+1)
+		for i := 0; i <= rwm.callDepth; i++ {
+			_, callingFiles[i], callingLines[i], _ = runtime.Caller(2 + i)
+		}
+
 		fmt.Printf("A lock was held until deadlock, subsequent call to unlock failed. id '%v'. Call stack:\n", id)
 		for i := 0; i <= rwm.callDepth; i++ {
 			fmt.Printf("\tFile: '%v:%v'\n", callingFiles[i], callingLines[i])
@@ -132,7 +132,7 @@ func (rwm *RWMutex) safeUnlock(read bool, id int) {
 		return
 	}
 
-	// Remove the lock and delete the netry from the map.
+	// Remove the lock and delete the entry from the map.
 	if read {
 		rwm.mu.RUnlock()
 	} else {

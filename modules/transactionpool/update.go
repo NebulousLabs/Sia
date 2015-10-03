@@ -16,7 +16,7 @@ func (tp *TransactionPool) purge() {
 // ProcessConsensusChange gets called to inform the transaction pool of changes
 // to the consensus set.
 func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := tp.mu.Lock()
+	tp.mu.Lock()
 
 	// TODO: Right now, transactions that were reverted to not get saved and
 	// retried, because some transactions such as storage proofs might be
@@ -63,14 +63,15 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Inform subscribers that an update has executed.
 	tp.consensusChangeIndex++
+	tp.mu.Demote()
 	tp.updateSubscribersConsensus(cc)
 	tp.updateSubscribersTransactions()
-	tp.mu.Unlock(lockID)
+	tp.mu.DemotedUnlock()
 }
 
 // PurgeTransactionPool deletes all transactions from the transaction pool.
 func (tp *TransactionPool) PurgeTransactionPool() {
-	lockID := tp.mu.Lock()
+	tp.mu.Lock()
 	tp.purge()
-	tp.mu.Unlock(lockID)
+	tp.mu.Unlock()
 }

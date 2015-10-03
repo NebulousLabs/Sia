@@ -86,9 +86,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	if b.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
 		go func() {
 			time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-			lockID := cs.mu.Lock()
-			defer cs.mu.Unlock(lockID)
-			cs.acceptBlock(b) // NOTE: Error is not handled.
+			cs.AcceptBlock(b) // NOTE: Error is not handled.
 		}()
 		return errFutureTimestamp
 	}
@@ -130,11 +128,13 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 	return revertedBlocks, appliedBlocks, nil
 }
 
-// acceptBlock is the internal consensus function for adding
-// blocks. There is no block relaying. acceptBlock will verify all
-// transactions. Trusted blocks, like those on disk, should already
-// be processed and this function can be bypassed.
-func (cs *ConsensusSet) acceptBlock(b types.Block) error {
+// AcceptBlock will add a block to the state, forking the blockchain if it is
+// on a fork that is heavier than the current fork. If the block is accepted,
+// it will be relayed to connected peers. This function should only be called
+// for new, untrusted blocks.
+func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
+	cs.mu.Lock()
+
 	// Start verification inside of a bolt View tx.
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
@@ -152,6 +152,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		return nil
 	})
 	if err != nil {
+		cs.mu.Unlock()
 		return err
 	}
 
@@ -161,10 +162,25 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// the longest fork.
 	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
 	if err != nil {
+		cs.mu.Unlock()
 		return err
 	}
+
+	// Log the changes in the change log.
+	var ce changeEntry
+	for _, rn := range revertedBlocks {
+		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
+	}
+	for _, an := range appliedBlocks {
+		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
+	}
+	cs.changeLog = append(cs.changeLog, ce)
+
+	// Demote the lock and send the update to the subscribers.
+	cs.mu.Demote()
+	defer cs.mu.DemotedUnlock()
 	if len(appliedBlocks) > 0 {
-		cs.updateSubscribers(revertedBlocks, appliedBlocks)
+		cs.readlockUpdateSubscribers(ce)
 	}
 
 	// Sanity checks.
@@ -174,24 +190,8 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic("appliedBlocks and revertedBlocks are mismatched!")
 		}
 	}
-	return nil
-}
 
-// AcceptBlock will add a block to the state, forking the blockchain if it is
-// on a fork that is heavier than the current fork. If the block is accepted,
-// it will be relayed to connected peers. This function should only be called
-// for new, untrusted blocks.
-func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
-	lockID := cs.mu.Lock()
-	defer cs.mu.Unlock(lockID)
-
-	err := cs.acceptBlock(b)
-	if err != nil {
-		return err
-	}
-
-	// Broadcast the new block to all peers. This is an expensive operation,
-	// and not necessary during synchronize or when loading from disk.
+	// Broadcast the new block to all peers.
 	go cs.gateway.Broadcast("RelayBlock", b)
 
 	return nil

@@ -3,9 +3,10 @@ package transactionpool
 import (
 	"errors"
 
+	"github.com/NebulousLabs/demotemutex"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -58,7 +59,7 @@ type (
 		consensusChangeIndex int
 		subscribers          []modules.TransactionPoolSubscriber
 
-		mu *sync.RWMutex
+		mu demotemutex.DemoteMutex
 	}
 )
 
@@ -85,8 +86,6 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		// that no consensus changes have been sent yet. The first consensus
 		// change will then have an index of '0'.
 		consensusChangeIndex: -1,
-
-		mu: sync.New(modules.SafeMutexDelay, 5),
 	}
 
 	// Register RPCs
