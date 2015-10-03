@@ -165,10 +165,22 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 		cs.mu.Unlock()
 		return err
 	}
+
+	// Log the changes in the change log.
+	var ce changeEntry
+	for _, rn := range revertedBlocks {
+		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
+	}
+	for _, an := range appliedBlocks {
+		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
+	}
+	cs.changeLog = append(cs.changeLog, ce)
+
+	// Demote the lock and send the update to the subscribers.
 	cs.mu.Demote()
 	defer cs.mu.DemotedUnlock()
 	if len(appliedBlocks) > 0 {
-		cs.updateSubscribers(revertedBlocks, appliedBlocks)
+		cs.updateSubscribers(ce)
 	}
 
 	// Sanity checks.

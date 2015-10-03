@@ -87,19 +87,10 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, i int) (cc modules.C
 }
 
 // updateSubscribers will inform all subscribers of the new update to the
-// consensus set.
-func (cs *ConsensusSet) updateSubscribers(revertedBlocks []*processedBlock, appliedBlocks []*processedBlock) {
-	// Log the changes in the change log.
-	var ce changeEntry
-	for _, rn := range revertedBlocks {
-		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
-	}
-	for _, an := range appliedBlocks {
-		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
-	}
-	cs.changeLog = append(cs.changeLog, ce)
-
-	// Notify each update channel that a new update is ready.
+// consensus set. A call to updateSubscribers should always be preceeded by an
+// append to the changeLog. This does not happen inside of updateSubscribers
+// because updateSubscribers is called from read-only contexts.
+func (cs *ConsensusSet) updateSubscribers(ce changeEntry) {
 	var cc modules.ConsensusChange
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		var err error
