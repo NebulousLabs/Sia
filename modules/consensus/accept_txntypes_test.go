@@ -429,7 +429,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	file.Seek(0, 0)
 
 	// Create a spendable unlock hash for the file contract.
-	sk, pk, err := crypto.GenerateSignatureKeys()
+	sk, pk, err := crypto.StdKeyGen.Generate()
 	if err != nil {
 		panic(err)
 	}
@@ -739,11 +739,11 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 
 	// Create a 2-of-2 unlock conditions, 1 key for each the sender and the
 	// receiver in the payment channel.
-	sk1, pk1, err := crypto.GenerateSignatureKeys() // Funding entity.
+	sk1, pk1, err := crypto.StdKeyGen.Generate() // Funding entity.
 	if err != nil {
 		return err
 	}
-	sk2, pk2, err := crypto.GenerateSignatureKeys() // Receiving entity.
+	sk2, pk2, err := crypto.StdKeyGen.Generate() // Receiving entity.
 	if err != nil {
 		return err
 	}
@@ -767,7 +767,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	// txn needs to be fully custom. To get a custom txn, manually create an
 	// address and then use the wallet to fund that address.
 	channelSize := types.NewCurrency64(10e3)
-	channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+	channelFundingSK, channelFundingPK, err := crypto.StdKeyGen.Generate()
 	if err != nil {
 		return err
 	}
@@ -947,7 +947,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		// txn needs to be fully custom. To get a custom txn, manually create an
 		// address and then use the wallet to fund that address.
 		channelSize := types.NewCurrency64(10e3)
-		channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+		channelFundingSK, channelFundingPK, err := crypto.StdKeyGen.Generate()
 		if err != nil {
 			return err
 		}
@@ -1068,7 +1068,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		// txn needs to be fully custom. To get a custom txn, manually create an
 		// address and then use the wallet to fund that address.
 		channelSize := types.NewCurrency64(10e3)
-		channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+		channelFundingSK, channelFundingPK, err := crypto.StdKeyGen.Generate()
 		if err != nil {
 			return err
 		}
