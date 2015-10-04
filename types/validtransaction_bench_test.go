@@ -17,7 +17,7 @@ func BenchmarkStandaloneValid(b *testing.B) {
 	sk := make([]crypto.SecretKey, numSigs)
 	pk := make([]crypto.PublicKey, numSigs)
 	for i := 0; i < numSigs; i++ {
-		s, p, err := crypto.GenerateSignatureKeys()
+		s, p, err := crypto.StdKeyGen.Generate()
 		if err != nil {
 			b.Fatal(err)
 		}
