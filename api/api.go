@@ -66,7 +66,8 @@ func (srv *Server) initAPI(addr string) {
 
 	// Consensus API Calls
 	if srv.cs != nil {
-		handleHTTPRequest(mux, "/consensus", srv.consensusHandler) // GET
+		handleHTTPRequest(mux, "/consensus", srv.consensusHandler)            // GET
+		handleHTTPRequest(mux, "/consensus/block", srv.consensusBlockHandler) // GET
 	}
 
 	// Gateway API Calls - Unfinished

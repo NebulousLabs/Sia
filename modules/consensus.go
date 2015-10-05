@@ -126,6 +126,10 @@ type (
 		// still be returned.
 		AcceptBlock(types.Block) error
 
+		// BlockAtHeight returns the block found at the input height, with a
+		// bool to indicate whether that block exists.
+		BlockAtHeight(types.BlockHeight) (types.Block, bool)
+
 		// ChildTarget returns the target required to extend the current heaviest
 		// fork. This function is typically used by miners looking to extend the
 		// heaviest fork.
