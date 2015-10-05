@@ -13,6 +13,9 @@ func (h *testHost) addPiece(p uploadPiece) error {
 	// simulate I/O delay
 	time.Sleep(h.delay)
 
+	h.Lock()
+	defer h.Unlock()
+
 	// randomly fail
 	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
 		return crypto.ErrNilInput
@@ -27,7 +30,14 @@ func (h *testHost) addPiece(p uploadPiece) error {
 	return nil
 }
 
-func (h *testHost) fileContract() fileContract { return fileContract{} }
+func (h *testHost) fileContract() fileContract {
+	var fc fileContract
+	for _, ps := range h.pieceMap {
+		fc.Pieces = append(fc.Pieces, ps...)
+	}
+	fc.IP = h.ip
+	return fc
+}
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.
 func TestErasureUpload(t *testing.T) {
