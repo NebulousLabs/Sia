@@ -205,6 +205,11 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return errors.New("failed to upload any file pieces")
 	}
 
+	// Add file to repair set.
+	lockID = r.mu.Lock()
+	r.repairing[up.Nickname] = up.Filename
+	r.mu.Unlock(lockID)
+
 	// Save the .sia file to the renter directory.
 	err = r.saveFile(f)
 	if err != nil {

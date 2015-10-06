@@ -2,6 +2,7 @@ package renter
 
 import (
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 )
@@ -15,6 +16,7 @@ func (f *file) repair(r io.ReaderAt, hosts []uploader) error {
 		present[i] = make([]bool, f.erasureCode.NumPieces())
 	}
 	for _, fc := range f.contracts {
+		// TODO: ping host, and don't mark pieces if unresponsive?
 		for _, p := range fc.Pieces {
 			present[p.Chunk][p.Piece] = true
 		}
@@ -75,8 +77,66 @@ func (f *file) repair(r io.ReaderAt, hosts []uploader) error {
 // threadedRepairUploads improves the health of files tracked by the renter by
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
-//
-// TODO: can't have this running on foreign .sia files...
 func (r *Renter) threadedRepairUploads() {
+	for {
+		// make copy of r.repairing under lock
+		repairing := make(map[string]string)
+		id := r.mu.RLock()
+		for name, path := range r.repairing {
+			repairing[name] = path
+		}
+		r.mu.RUnlock(id)
 
+		for name, path := range repairing {
+			// retrieve file object
+			id = r.mu.RLock()
+			f, ok := r.files[name]
+			r.mu.RUnlock(id)
+			if !ok {
+				r.log.Printf("failed to repair %v: no longer tracking that file", name)
+				id = r.mu.Lock()
+				delete(r.repairing, name)
+				r.mu.Unlock(id)
+				continue
+			}
+
+			// open file handle
+			handle, err := os.Open(path)
+			if err != nil {
+				r.log.Printf("failed to repair %v: %v", name, err)
+				id = r.mu.Lock()
+				delete(r.repairing, name)
+				r.mu.Unlock(id)
+				continue
+			}
+
+			// build host list
+			var hosts []uploader
+			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces())
+			for i := range randHosts {
+				// TODO: use smarter duration
+				hostUploader, err := r.newHostUploader(randHosts[i], f.size, defaultDuration, f.masterKey)
+				if err != nil {
+					continue
+				}
+				defer hostUploader.Close()
+				hosts = append(hosts, hostUploader)
+			}
+
+			// repair
+			err = f.repair(handle, hosts)
+			if err != nil {
+				r.log.Printf("failed to repair %v: %v", name, err)
+				id = r.mu.Lock()
+				delete(r.repairing, name)
+				r.mu.Unlock(id)
+			}
+
+			// close the host connections
+			for i := range hosts {
+				hosts[i].(*hostUploader).Close()
+			}
+		}
+
+	}
 }
