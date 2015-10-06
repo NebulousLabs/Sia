@@ -19,7 +19,8 @@ Consensus
 
 Queries:
 
-* /consensus [GET]
+* /consensus       [GET]
+* /consensus/block [GET]
 
 #### /consensus [GET]
 
@@ -42,6 +43,25 @@ struct {
 
 'Target' is the hash that needs to be met by a block for the block to be valid.
 The target is inversely proportional to the difficulty.
+
+#### /consensus/block [GET]
+
+Function: Returns the block found at a given height.
+
+Parameters:
+```
+height types.BlockHeight (uint64)
+```
+'height' is the height of the block that is being requested. The genesis block
+is at height 0, it's child is at height 1, etc.
+
+Response:
+```
+struct {
+	block types.Block
+}
+```
+'block' is a block. The struct is defined in types/block.go.
 
 Wallet
 ------
