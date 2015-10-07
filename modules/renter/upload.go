@@ -124,6 +124,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if err != nil {
 		return err
 	}
+	defer handle.Close()
 
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
