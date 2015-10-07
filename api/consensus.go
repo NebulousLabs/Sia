@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -44,7 +45,8 @@ func (srv *Server) consensusHandler(w http.ResponseWriter, req *http.Request) {
 
 // consensusBlockHandlerGET handles a GET request to /consensus/block.
 func (srv *Server) consensusBlockHandlerGET(w http.ResponseWriter, req *http.Request) {
-	height, err := scanBlockHeight(req.FormValue("height"))
+	var height types.BlockHeight
+	_, err := fmt.Sscan(req.FormValue("height"), &height)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return

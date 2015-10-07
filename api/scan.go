@@ -1,9 +1,7 @@
 package api
 
 import (
-	"errors"
 	"math/big"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -22,17 +20,8 @@ func scanAmount(amount string) (types.Currency, bool) {
 // scanAddres scans a types.UnlockHash from a string.
 func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
 	err = addr.LoadString(addrStr)
-	return
-}
-
-// scanBlockHeight scans a block height from a string.
-func scanBlockHeight(bhStr string) (types.BlockHeight, error) {
-	bhInt, err := strconv.Atoi(bhStr)
 	if err != nil {
-		return 0, err
+		return types.UnlockHash{}, err
 	}
-	if bhInt < 0 {
-		return 0, errors.New("negative block height not allowed")
-	}
-	return types.BlockHeight(bhInt), nil
+	return addr, nil
 }
