@@ -112,8 +112,25 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
 	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
 	gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
-
 	return cs, nil
+}
+
+// BlockAtHeight returns the block at a given height.
+func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Block, exists bool) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		id, err := getPath(tx, height)
+		if err != nil {
+			return err
+		}
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		block = pb.Block
+		exists = true
+		return nil
+	})
+	return block, exists
 }
 
 // ChildTarget returns the target for the child of a block.
@@ -121,7 +138,7 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
-			return nil
+			return err
 		}
 		target = pb.ChildTarget
 		exists = true
