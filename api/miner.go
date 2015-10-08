@@ -17,17 +17,6 @@ type MinerStatus struct {
 	StaleBlocksMined int
 }
 
-// minerBlockforworkHandler handles the API call that retrieves a block for
-// work.
-func (srv *Server) minerBlockforworkHandler(w http.ResponseWriter, req *http.Request) {
-	bfw, _, target, err := srv.miner.BlockForWork()
-	if err != nil {
-		writeError(w, "call to /miner/blockforwork failed: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	w.Write(encoding.MarshalAll(target, bfw.Header(), bfw))
-}
-
 // minerHeaderforworkHandler handles the API call that retrieves a block header
 // for work.
 func (srv *Server) minerHeaderforworkHandler(w http.ResponseWriter, req *http.Request) {
@@ -60,28 +49,6 @@ func (srv *Server) minerStatusHandler(w http.ResponseWriter, req *http.Request) 
 // minerStopHandler handles the API call to stop the miner.
 func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	srv.miner.StopCPUMining()
-	writeSuccess(w)
-}
-
-// minerSubmitblockHandler handles the API call to submit a block to the miner.
-func (srv *Server) minerSubmitblockHandler(w http.ResponseWriter, req *http.Request) {
-	var b types.Block
-	encodedBlock, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	err = encoding.Unmarshal(encodedBlock, &b)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = srv.miner.SubmitBlock(b)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	writeSuccess(w)
 }
 
