@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // repair attempts to repair a file by uploading missing pieces to more hosts.
@@ -79,6 +80,8 @@ func (f *file) repair(r io.ReaderAt, hosts []uploader) error {
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairUploads() {
 	for {
+		time.Sleep(5 * time.Second)
+
 		// make copy of repair set under lock
 		repairing := make(map[string]string)
 		id := r.mu.RLock()
@@ -131,6 +134,9 @@ func (r *Renter) threadedRepairUploads() {
 				delete(r.repairSet, name)
 				r.mu.Unlock(id)
 			}
+
+			// close the file
+			handle.Close()
 
 			// close the host connections
 			for i := range hosts {
