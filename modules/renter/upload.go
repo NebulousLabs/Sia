@@ -208,7 +208,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 
 	// Add file to repair set.
 	lockID = r.mu.Lock()
-	r.repairing[up.Nickname] = up.Filename
+	r.repairSet[up.Nickname] = up.Filename
 	r.save()
 	r.mu.Unlock(lockID)
 

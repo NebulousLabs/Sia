@@ -187,7 +187,7 @@ func (r *Renter) save() error {
 		Contracts map[string]types.FileContract
 		Repairing map[string]string
 		Entropy   [32]byte
-	}{make(map[string]types.FileContract), r.repairing, r.entropy}
+	}{make(map[string]types.FileContract), r.repairSet, r.entropy}
 	// Convert renter's contract map to a JSON-friendly type.
 	for id, fc := range r.contracts {
 		b, _ := id.MarshalJSON()
@@ -234,7 +234,7 @@ func (r *Renter) load() error {
 	if err != nil {
 		return err
 	}
-	r.repairing = data.Repairing
+	r.repairSet = data.Repairing
 	r.entropy = data.Entropy
 	var fcid types.FileContractID
 	for id, fc := range data.Contracts {

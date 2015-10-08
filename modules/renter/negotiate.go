@@ -52,6 +52,7 @@ func (hu *hostUploader) Close() error {
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
+// TODO: better error messages. In many cases we simply return "no data"
 func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight) error {
 	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
 	if err != nil {

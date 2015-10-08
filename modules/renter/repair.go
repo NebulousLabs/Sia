@@ -79,10 +79,10 @@ func (f *file) repair(r io.ReaderAt, hosts []uploader) error {
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairUploads() {
 	for {
-		// make copy of r.repairing under lock
+		// make copy of repair set under lock
 		repairing := make(map[string]string)
 		id := r.mu.RLock()
-		for name, path := range r.repairing {
+		for name, path := range r.repairSet {
 			repairing[name] = path
 		}
 		r.mu.RUnlock(id)
@@ -95,7 +95,7 @@ func (r *Renter) threadedRepairUploads() {
 			if !ok {
 				r.log.Printf("failed to repair %v: no longer tracking that file", name)
 				id = r.mu.Lock()
-				delete(r.repairing, name)
+				delete(r.repairSet, name)
 				r.mu.Unlock(id)
 				continue
 			}
@@ -105,7 +105,7 @@ func (r *Renter) threadedRepairUploads() {
 			if err != nil {
 				r.log.Printf("failed to repair %v: %v", name, err)
 				id = r.mu.Lock()
-				delete(r.repairing, name)
+				delete(r.repairSet, name)
 				r.mu.Unlock(id)
 				continue
 			}
@@ -128,7 +128,7 @@ func (r *Renter) threadedRepairUploads() {
 			if err != nil {
 				r.log.Printf("failed to repair %v: %v", name, err)
 				id = r.mu.Lock()
-				delete(r.repairing, name)
+				delete(r.repairSet, name)
 				r.mu.Unlock(id)
 			}
 
