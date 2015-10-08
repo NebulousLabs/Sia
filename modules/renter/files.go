@@ -83,7 +83,7 @@ func (f *file) Available() bool {
 // reaches 100%.
 func (f *file) UploadProgress() float32 {
 	totalBytes := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
-	return 100 * float32(atomic.LoadUint64(&f.bytesUploaded)) / float32(totalBytes)
+	return 100 * (float32(atomic.LoadUint64(&f.bytesUploaded)) / float32(totalBytes))
 }
 
 // Nickname returns the nickname of the file.
