@@ -21,7 +21,7 @@ type renterTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	hostdb    modules.HostDB
-	miner     modules.Miner
+	miner     modules.TestMiner
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey

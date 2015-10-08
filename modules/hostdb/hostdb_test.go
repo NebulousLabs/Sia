@@ -24,7 +24,7 @@ type hdbTester struct {
 	cs      modules.ConsensusSet
 	gateway modules.Gateway
 	host    modules.Host
-	miner   modules.Miner
+	miner   modules.TestMiner
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 

@@ -21,7 +21,7 @@ import (
 type hostTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
-	miner     modules.Miner
+	miner     modules.TestMiner
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey

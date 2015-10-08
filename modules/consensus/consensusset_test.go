@@ -21,7 +21,7 @@ import (
 // the tester and the modules.
 type consensusSetTester struct {
 	gateway   modules.Gateway
-	miner     modules.Miner
+	miner     modules.TestMiner
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
