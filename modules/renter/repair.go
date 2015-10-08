@@ -8,10 +8,9 @@ import (
 	"time"
 )
 
-// repair attempts to repair a file by uploading missing pieces to more hosts.
-func (f *file) repair(r io.ReaderAt, hosts []uploader) error {
-	// determine which chunks need to be repaired
-	// TODO: inefficient -- O(2n) on number of pieces
+// incompleteChunks returns a map of chunks in need of repair.
+// TODO: inefficient -- O(2n) on number of pieces
+func (f *file) incompleteChunks() map[uint64][]uint64 {
 	present := make([][]bool, f.numChunks())
 	for i := range present {
 		present[i] = make([]bool, f.erasureCode.NumPieces())
@@ -30,7 +29,11 @@ func (f *file) repair(r io.ReaderAt, hosts []uploader) error {
 			}
 		}
 	}
+	return missing
+}
 
+// repair attempts to repair a file by uploading missing pieces to more hosts.
+func (f *file) repair(r io.ReaderAt, missing map[uint64][]uint64, hosts []uploader) error {
 	// For each chunk with missing pieces, re-encode the chunk and upload each
 	// missing piece.
 	var wg sync.WaitGroup
@@ -103,6 +106,13 @@ func (r *Renter) threadedRepairUploads() {
 				continue
 			}
 
+			// determine file health
+			missing := f.incompleteChunks()
+			if len(missing) == 0 {
+				// nothing to do
+				continue
+			}
+
 			// open file handle
 			handle, err := os.Open(path)
 			if err != nil {
@@ -127,7 +137,7 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// repair
-			err = f.repair(handle, hosts)
+			err = f.repair(handle, missing, hosts)
 			if err != nil {
 				r.log.Printf("failed to repair %v: %v", name, err)
 				id = r.mu.Lock()
