@@ -1,15 +1,7 @@
 package miner
 
 import (
-	"bytes"
-	"encoding/binary"
-	"errors"
 	"time"
-	"unsafe"
-
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // increaseAttempts is the miner's way of guaging it's own hashrate. After it's
@@ -62,19 +54,6 @@ func (m *Miner) threadedMine() {
 	}
 }
 
-// AddBlock adds a block to the consensus set.
-func (m *Miner) AddBlock() (types.Block, error) {
-	block, err := m.FindBlock()
-	if err != nil {
-		return types.Block{}, err
-	}
-	err = m.cs.AcceptBlock(block)
-	if err != nil {
-		return types.Block{}, err
-	}
-	return block, nil
-}
-
 // CPUHashrate returns the cpu hashrate.
 func (m *Miner) CPUHashrate() int {
 	lockID := m.mu.Lock()
@@ -87,53 +66,6 @@ func (m *Miner) CPUMining() bool {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 	return m.mining
-}
-
-// FindBlock finds at most one block that extends the current blockchain.
-func (m *Miner) FindBlock() (types.Block, error) {
-	lockID := m.mu.Lock()
-	if !m.wallet.Unlocked() {
-		return types.Block{}, modules.ErrLockedWallet
-	}
-	err := m.checkAddress()
-	if err != nil {
-		return types.Block{}, err
-	}
-	m.mu.Unlock(lockID)
-
-	// Get a block for work.
-	lockID = m.mu.Lock()
-	bfw, target := m.blockForWork()
-	m.mu.Unlock(lockID)
-
-	block, ok := m.SolveBlock(bfw, target)
-	if !ok {
-		return types.Block{}, errors.New("could not solve block using limited hashing power")
-	}
-	return block, nil
-}
-
-// SolveBlock takes a block, target, and number of iterations as input and
-// tries to find a block that meets the target. This function can take a long
-// time to complete, and should not be called with a lock.
-func (m *Miner) SolveBlock(b types.Block, target types.Target) (types.Block, bool) {
-	// Assemble the header.
-	merkleRoot := b.MerkleRoot()
-	header := make([]byte, 80)
-	copy(header, b.ParentID[:])
-	binary.LittleEndian.PutUint64(header[40:48], uint64(b.Timestamp))
-	copy(header[48:], merkleRoot[:])
-
-	nonce := (*uint64)(unsafe.Pointer(&header[32]))
-	for i := 0; i < iterationsPerAttempt; i++ {
-		id := crypto.HashBytes(header)
-		if bytes.Compare(target[:], id[:]) >= 0 {
-			copy(b.Nonce[:], header[32:40])
-			return b, true
-		}
-		*nonce++
-	}
-	return b, false
 }
 
 // StartMining will spawn a thread to begin mining. The thread will only start

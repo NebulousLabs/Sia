@@ -70,27 +70,6 @@ func (m *Miner) prepareNewBlock() {
 	}
 }
 
-// BlockForWork returns a block that is ready for nonce grinding, along with
-// the root hash of the block.
-func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target, err error) {
-	// Check if the wallet is unlocked. If the wallet is unlocked, make sure
-	// that the miner has a recent address.
-	if !m.wallet.Unlocked() {
-		err = modules.ErrLockedWallet
-		return
-	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
-	err = m.checkAddress()
-	if err != nil {
-		return
-	}
-
-	b, t = m.blockForWork()
-	merkleRoot = b.MerkleRoot()
-	return b, merkleRoot, t, nil
-}
-
 // HeaderForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {

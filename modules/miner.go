@@ -43,7 +43,7 @@ type CPUMiner interface {
 }
 
 // TestMiner provides direct acesss to block fetching, solving, and
-// manipulation.
+// manipulation. The primary use of this interface is integration testing.
 type TestMiner interface {
 	// AddBlock is an extension of FindBlock - AddBlock will submit the block
 	// after finding it.
