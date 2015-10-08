@@ -39,14 +39,11 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 // the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
-		permittedClients := []string{"Sia-Agent", "Sia-Miner", "Electron", "AtomShell"}
-		for _, pc := range permittedClients {
-			if strings.Contains(req.UserAgent(), pc) {
-				handler(w, req)
-				return
-			}
+		if !strings.Contains(req.UserAgent(), "Sia-Agent") {
+			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusBadRequest)
+			return
 		}
-		writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusInternalServerError)
+		handler(w, req)
 	})
 }
 
@@ -95,8 +92,6 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
 		handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
 		handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
-		handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler)
-		handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)
 		handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
 		handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
 	}
