@@ -46,8 +46,11 @@ func (hu *hostUploader) Close() error {
 	encoding.WriteObject(hu.conn, types.Transaction{})
 	hu.conn.Close()
 	// submit the most recent revision to the blockchain
-	hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
-	return nil
+	err := hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+	if err != nil {
+		hu.renter.log.Println("Could not submit final contract revision:", err)
+	}
+	return err
 }
 
 // negotiateContract establishes a connection to a host and negotiates an
