@@ -133,7 +133,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	if err != nil {
 		return nil, err
 	}
-	m.cs.ConsensusSetSubscribe(m)
+	m.cs.ConsensusSetDigestSubscribe(m)
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
 }

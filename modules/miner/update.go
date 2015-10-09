@@ -7,20 +7,21 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// ProcessConsensusChange will update the miner's most recent block. This is a
-// part of the ConsensusSetSubscriber interface.
-func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
+// ProcessConsensusDigest will update the miner's most recent block.
+func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.height -= types.BlockHeight(len(cc.RevertedBlocks))
-	m.height += types.BlockHeight(len(cc.AppliedBlocks))
-
-	if len(cc.AppliedBlocks) == 0 {
-		return
+	// Sanity check - the length of appliedIDs should always be non-zero.
+	if build.DEBUG && len(appliedIDs) == 0 {
+		panic("received a digest with no applied blocks")
 	}
 
-	m.parent = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
+	// Adjust the height of the miner.
+	m.height -= types.BlockHeight(len(revertedIDs))
+	m.height += types.BlockHeight(len(appliedIDs))
+
+	m.parent = appliedIDs[len(appliedIDs)-1]
 	target, exists1 := m.cs.ChildTarget(m.parent)
 	timestamp, exists2 := m.cs.EarliestChildTimestamp(m.parent)
 	if build.DEBUG {
@@ -37,8 +38,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
-// set of transactions with the input transactions. This is a part of the
-// TransactionPoolSubscriber interface.
+// set of transactions with the input transactions.
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

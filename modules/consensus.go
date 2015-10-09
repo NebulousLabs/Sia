@@ -30,6 +30,8 @@ type (
 	ConsensusSetSubscriber interface {
 		// ProcessConsensusChange sends a consensus update to a module through
 		// a function call. Updates will always be sent in the correct order.
+		// There may not be any reverted blocks, but there will always be
+		// applied blocks.
 		ProcessConsensusChange(ConsensusChange)
 	}
 
@@ -39,7 +41,8 @@ type (
 	// of the reverted blocks followed by all of the applied blocks.
 	ConsensusSetDigestSubscriber interface {
 		// ProcessConsensusDigest sends a list of reverted blocks and applied
-		// blocks to the module.
+		// blocks to the module. There may not be any reverted blocks, but
+		// there will always be applied blocks.
 		ProcessConsensusDigest(revertedBlocks []types.BlockID, appliedBlocks []types.BlockID)
 	}
 
@@ -163,7 +166,8 @@ type (
 
 		// ConsensusSetDigestSubscribe subscribes a module to a digest of the
 		// changes in the consensus set. Immediately upon subscription, a
-		// digest containing the current block will be provided.
+		// digest containing the list of blocks from the starting id to the
+		// current block.
 		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
 
 		// EarliestChildTimestamp returns the earliest timestamp that is acceptable

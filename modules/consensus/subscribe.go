@@ -145,8 +145,21 @@ func (cs *ConsensusSet) ConsensusSetDigestSubscribe(subscriber modules.Consensus
 	cs.mu.Demote()
 	defer cs.mu.DemotedUnlock()
 
+	var currentPath []types.BlockID
 	err := cs.db.View(func(tx *bolt.Tx) error {
-		subscriber.ProcessConsensusDigest(nil, []types.BlockID{currentBlockID(tx)})
+		// Get the whole current path into memory to be sent as the first
+		// digest.
+		//
+		// TODO: Change this construction to something simpler.
+		height := blockHeight(tx)
+		for i := types.BlockHeight(0); i <= height; i++ {
+			id, err := getPath(tx, i)
+			if err != nil {
+				return err
+			}
+			currentPath = append(currentPath, id)
+		}
+		subscriber.ProcessConsensusDigest(nil, currentPath)
 		return nil
 	})
 	if build.DEBUG && err != nil {

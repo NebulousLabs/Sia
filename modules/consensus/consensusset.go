@@ -38,8 +38,8 @@ type ConsensusSet struct {
 
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
-	changeLog   []changeEntry
-	subscribers []modules.ConsensusSetSubscriber
+	changeLog         []changeEntry
+	subscribers       []modules.ConsensusSetSubscriber
 	digestSubscribers []modules.ConsensusSetDigestSubscriber
 
 	// dosBlocks keeps track of seen blocks. It is a "blacklist" of blocks
