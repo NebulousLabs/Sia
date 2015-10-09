@@ -76,8 +76,8 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	if !m.wallet.Unlocked() {
 		return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
 	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	err := m.checkAddress()
 	if err != nil {
 		return types.BlockHeader{}, types.Target{}, err
@@ -139,8 +139,8 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 		m.log.Println("ERROR: an invalid block was submitted:", err)
 		return err
 	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Grab a new address for the miner. Call may fail if the wallet is locked
 	// or if the wallet addresses have been exhausted.
@@ -159,10 +159,10 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	var zeroNonce [8]byte
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
-	lockID := m.mu.Lock()
+	m.mu.Lock()
 	b, bExists := m.blockMem[lookupBH]
 	arbData, arbExists := m.arbDataMem[lookupBH]
-	m.mu.Unlock(lockID)
+	m.mu.Unlock()
 	if !bExists || !arbExists {
 		err := errors.New("block header returned late - block was cleared from memory")
 		m.log.Println("ERROR:", err)

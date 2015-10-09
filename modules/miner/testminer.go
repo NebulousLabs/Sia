@@ -23,8 +23,8 @@ func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.T
 		err = modules.ErrLockedWallet
 		return
 	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	err = m.checkAddress()
 	if err != nil {
 		return
@@ -50,7 +50,7 @@ func (m *Miner) AddBlock() (types.Block, error) {
 
 // FindBlock finds at most one block that extends the current blockchain.
 func (m *Miner) FindBlock() (types.Block, error) {
-	lockID := m.mu.Lock()
+	m.mu.Lock()
 	if !m.wallet.Unlocked() {
 		return types.Block{}, modules.ErrLockedWallet
 	}
@@ -58,12 +58,12 @@ func (m *Miner) FindBlock() (types.Block, error) {
 	if err != nil {
 		return types.Block{}, err
 	}
-	m.mu.Unlock(lockID)
+	m.mu.Unlock()
 
 	// Get a block for work.
-	lockID = m.mu.Lock()
+	m.mu.Lock()
 	bfw, target := m.blockForWork()
-	m.mu.Unlock(lockID)
+	m.mu.Unlock()
 
 	block, ok := m.SolveBlock(bfw, target)
 	if !ok {

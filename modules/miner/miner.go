@@ -3,11 +3,11 @@ package miner
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -81,7 +81,7 @@ type Miner struct {
 
 	persistDir string
 	log        *log.Logger
-	mu         *sync.RWMutex
+	mu         sync.RWMutex
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -128,7 +128,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 	err := m.initPersist()
 	if err != nil {
@@ -156,8 +155,8 @@ func (m *Miner) checkAddress() error {
 // BlocksMined returns the number of good blocks and stale blocks that have
 // been mined by the miner.
 func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	for _, blockID := range m.blocksFound {
 		if m.cs.InCurrentPath(blockID) {
