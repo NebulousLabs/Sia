@@ -33,6 +33,16 @@ type (
 		ProcessConsensusChange(ConsensusChange)
 	}
 
+	// ConsensusSetDigestSubscriber receives digests about changes to the
+	// consensus set in the form of a list of ids of blocks that got reverted
+	// and a list of ids of blocks that got applied. The ordering is always all
+	// of the reverted blocks followed by all of the applied blocks.
+	ConsensusSetDigestSubscriber interface {
+		// ProcessConsensusDigest sends a list of reverted blocks and applied
+		// blocks to the module.
+		ProcessConsensusDigest(revertedBlocks []types.BlockID, appliedBlocks []types.BlockID)
+	}
+
 	// A ConsensusChange enumerates a set of changes that occured to the consensus set.
 	ConsensusChange struct {
 		// RevertedBlocks is the list of blocks that were reverted by the change.
@@ -150,6 +160,11 @@ type (
 		// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.
 		// This is a thread-safe way of managing updates.
 		ConsensusSetSubscribe(ConsensusSetSubscriber)
+
+		// ConsensusSetDigestSubscribe subscribes a module to a digest of the
+		// changes in the consensus set. Immediately upon subscription, a
+		// digest containing the current block will be provided.
+		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
 
 		// EarliestChildTimestamp returns the earliest timestamp that is acceptable
 		// on the current longest fork according to the consensus set. This is a
