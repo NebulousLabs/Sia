@@ -129,8 +129,8 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	return header, m.target, nil
 }
 
-// submitBlock takes a solved block and submits it to the blockchain.
-// submitBlock should not be called with a lock.
+// SubmitBlock takes a solved block and submits it to the blockchain.
+// SubmitBlock should not be called with a lock.
 func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
@@ -153,8 +153,7 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	return err
 }
 
-// submitBlock takes a solved block and submits it to the blockchain.
-// submitBlock should not be called with a lock.
+// SubmitHeader accepts a block header.
 func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	// Fetch the block from the blockMem.
 	var zeroNonce [8]byte

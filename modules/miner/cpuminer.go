@@ -4,20 +4,6 @@ import (
 	"time"
 )
 
-// increaseAttempts is the miner's way of guaging it's own hashrate. After it's
-// made 100 attempts to find a block, it calculates a hashrate based on how
-// much time has passed. The number of attempts in progress is set to 0
-// whenever mining starts or stops, which prevents weird low values from
-// cropping up.
-func (m *Miner) increaseAttempts() {
-	m.attempts++
-	if m.attempts >= 25 { // Waiting for 25 attempts minimizes hashrate variance.
-		m.hashRate = int64((m.attempts * iterationsPerAttempt * 1e9)) / (time.Now().UnixNano() - m.startTime.UnixNano())
-		m.startTime = time.Now()
-		m.attempts = 0
-	}
-}
-
 // threadedMine starts a gothread that does CPU mining. threadedMine is the
 // only function that should be setting the mining flag to true.
 func (m *Miner) threadedMine() {
@@ -34,6 +20,7 @@ func (m *Miner) threadedMine() {
 	for {
 		// Kill the thread if mining has been turned off.
 		lockID := m.mu.Lock()
+		m.cycleStart = time.Now()
 		if !m.miningOn {
 			m.mining = false
 			m.mu.Unlock(lockID)
@@ -42,7 +29,6 @@ func (m *Miner) threadedMine() {
 
 		// Grab a block and try to solve it.
 		bfw, target := m.blockForWork()
-		m.increaseAttempts()
 		m.mu.Unlock(lockID)
 		b, solved := m.SolveBlock(bfw, target)
 		if solved {
@@ -51,25 +37,34 @@ func (m *Miner) threadedMine() {
 				m.log.Println("ERROR: An error occurred while cpu mining:", err)
 			}
 		}
+
+		// Update the hashrate. If the block was solved, the full set of
+		// iterations was not completed, so the hashrate should not be updated.
+		lockID = m.mu.Lock()
+		if !solved {
+			nanosecondsElapsed := 1 + time.Since(m.cycleStart).Nanoseconds() // Add 1 to prevent divide by zero errors.
+			m.hashRate = 1e9 * iterationsPerAttempt / nanosecondsElapsed
+		}
+		m.mu.Unlock(lockID)
 	}
 }
 
-// CPUHashrate returns the cpu hashrate.
+// CPUHashrate returns an estimated cpu hashrate.
 func (m *Miner) CPUHashrate() int {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 	return int(m.hashRate)
 }
 
-// CPUMining indicates whether a cpu miner is running.
+// CPUMining indicates whether the cpu miner is running.
 func (m *Miner) CPUMining() bool {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 	return m.mining
 }
 
-// StartMining will spawn a thread to begin mining. The thread will only start
-// mining if there is not another thread mining yet.
+// StartCPUMining will start a single threaded cpu miner. If the miner is
+// already running, nothing will happen.
 func (m *Miner) StartCPUMining() {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
@@ -77,8 +72,8 @@ func (m *Miner) StartCPUMining() {
 	go m.threadedMine()
 }
 
-// StopMining sets desiredThreads to 0, a value which is polled by mining
-// threads. When set to 0, the mining threads will all cease mining.
+// StopCPUMining will stop the cpu miner. If the cpu miner is already stopped,
+// nothing will happen.
 func (m *Miner) StopCPUMining() {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)

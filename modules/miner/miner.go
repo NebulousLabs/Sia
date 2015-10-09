@@ -76,11 +76,12 @@ type Miner struct {
 	// indicates whether these is a thread that is actively mining. There may
 	// be some lag between starting the miner and a thread actually beginning
 	// to mine.
-	startTime time.Time
-	attempts  uint64
-	hashRate  int64
-	miningOn  bool
-	mining    bool
+
+	// CPUMiner variables.
+	miningOn   bool      // indicates if the miner is supposed to be running
+	mining     bool      // indicates if the miner is actually running
+	cycleStart time.Time // indicates the start time of the recent call to SolveBlock
+	hashRate   int64     // indicates hashes per second
 
 	persistDir string
 	log        *log.Logger
