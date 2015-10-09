@@ -8,15 +8,15 @@ dependencies:
 	# Consensus Dependencies
 	go get -u github.com/NebulousLabs/demotemutex
 	go get -u github.com/NebulousLabs/ed25519
-	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
-	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/boltdb/bolt
 	go get -u github.com/dchest/blake2b
 	go get -u golang.org/x/crypto/twofish
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
+	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/inconshreveable/go-update
+	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/kardianos/osext
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/stretchr/graceful
