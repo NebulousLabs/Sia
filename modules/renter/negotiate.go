@@ -52,7 +52,6 @@ func (hu *hostUploader) Close() error {
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-// TODO: better error messages. In many cases we simply return "no data"
 func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight) error {
 	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
 	if err != nil {
@@ -77,14 +76,14 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	// write rpcID
 	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
-		return err
+		return errors.New("couldn't initiate RPC: " + err.Error())
 	}
 
 	// read host key
 	// TODO: need to save this?
 	var hostPublicKey types.SiaPublicKey
 	if err := encoding.ReadObject(conn, &hostPublicKey, 256); err != nil {
-		return err
+		return errors.New("couldn't read host's public key: " + err.Error())
 	}
 
 	// create our own key by combining the renter entropy with the host key
@@ -98,7 +97,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	// send our public key
 	if err := encoding.WriteObject(conn, ourPublicKey); err != nil {
-		return err
+		return errors.New("couldn't send our public key: " + err.Error())
 	}
 
 	// create unlock conditions
@@ -145,14 +144,14 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	// send txn
 	if err := encoding.WriteObject(conn, txnSet); err != nil {
 		txnBuilder.Drop()
-		return err
+		return errors.New("couldn't send our proposed contract: " + err.Error())
 	}
 
 	// read back acceptance
 	var response string
 	if err := encoding.ReadObject(conn, &response, 128); err != nil {
 		txnBuilder.Drop()
-		return err
+		return errors.New("couldn't read the host's response to our proposed contract: " + err.Error())
 	}
 	if response != modules.AcceptResponse {
 		txnBuilder.Drop()
@@ -163,7 +162,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	var hostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
 		txnBuilder.Drop()
-		return err
+		return errors.New("couldn't read the host's updated contract: " + err.Error())
 	}
 
 	// check that txn is okay. For now, no collateral will be added, so the
@@ -190,14 +189,14 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
 		txnBuilder.Drop()
-		return err
+		return errors.New("couldn't send the contract signed by us: " + err.Error())
 	}
 
 	// read signed txn from host
 	var signedHostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
 		txnBuilder.Drop()
-		return err
+		return errors.New("couldn't read the contract signed by the host: " + err.Error())
 	}
 
 	// submit to blockchain

@@ -180,6 +180,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	for i := range randHosts {
 		hostUploader, err := r.newHostUploader(randHosts[i], totalsize, up.Duration, f.masterKey)
 		if err != nil {
+			r.log.Printf("Upload: could not form contract with %v: %v", randHosts[i].IPAddress, err)
 			continue
 		}
 		defer hostUploader.Close()
