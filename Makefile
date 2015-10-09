@@ -5,23 +5,27 @@ all: install
 # dependencies installs all of the dependencies that are required for building
 # Sia.
 dependencies:
-	go install -race std
+	# Consensus Dependencies
 	go get -u github.com/NebulousLabs/demotemutex
 	go get -u github.com/NebulousLabs/ed25519
-	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
-	go get -u github.com/bgentry/speakeasy
+	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/boltdb/bolt
 	go get -u github.com/dchest/blake2b
+	go get -u golang.org/x/crypto/twofish
+	# Module + Daemon Dependencies
+	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/inconshreveable/go-update
-	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/kardianos/osext
 	go get -u github.com/klauspost/reedsolomon
-	go get -u github.com/laher/goxc
-	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful
-	go get -u golang.org/x/crypto/twofish
+	# Frontend Dependencies
+	go get -u github.com/bgentry/speakeasy
+	go get -u github.com/spf13/cobra
+	# Developer Dependencies
+	go install -race std
+	go get -u github.com/laher/goxc
 	go get -u golang.org/x/tools/cmd/cover
 
 # fmt calls go fmt on all packages.
