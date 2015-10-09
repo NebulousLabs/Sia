@@ -1,9 +1,6 @@
 package transactionpool
 
 import (
-	"runtime"
-
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -24,43 +21,24 @@ func (tp *TransactionPool) updateSubscribersTransactions() {
 	}
 }
 
-// updateSubscribersConsensus sends a new consensus change to all subscribers.
-func (tp *TransactionPool) updateSubscribersConsensus(cc modules.ConsensusChange) {
-	for _, subscriber := range tp.subscribers {
-		subscriber.ProcessConsensusChange(cc)
-	}
-}
-
 // TransactionPoolSubscribe adds a subscriber to the transaction pool.
-// Subscribers will receive all consensus set changes as well as transaction
-// pool changes, and should not subscribe to both.
+// Subscribers will receive the full transaction set every time there is a
+// signficant change to the transaction pool.
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	tp.mu.Lock()
-	tp.subscribers = append(tp.subscribers, subscriber)
-	for i := 0; i <= tp.consensusChangeIndex; i++ {
-		cc, err := tp.consensusSet.ConsensusChange(i)
-		if err != nil && build.DEBUG {
-			panic(err)
-		}
-		subscriber.ProcessConsensusChange(cc)
+	defer tp.mu.Unlock()
 
-		// Release the lock between iterations to smooth out performance a bit
-		// - tpool does not need to hold the lock for 15,000 consensus change
-		// objects.
-		tp.mu.Unlock()
-		runtime.Gosched()
-		tp.mu.Lock()
-	}
+	// Add the subscriber to the subscriber list.
+	tp.subscribers = append(tp.subscribers, subscriber)
 
 	// Send the new subscriber the transaction pool set.
 	var txns []types.Transaction
-	var cc modules.ConsensusChange
 	for _, tSet := range tp.transactionSets {
 		txns = append(txns, tSet...)
 	}
+	var cc modules.ConsensusChange
 	for _, tSetDiff := range tp.transactionSetDiffs {
 		cc = cc.Append(tSetDiff)
 	}
 	subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
-	tp.mu.Unlock()
 }

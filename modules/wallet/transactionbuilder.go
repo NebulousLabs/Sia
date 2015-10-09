@@ -71,8 +71,8 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 // correct value. The siacoin input will not be signed until 'Sign' is called
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
-	lockID := tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock(lockID)
+	tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock()
 
 	// Collect a value-sorted set of siacoin outputs.
 	var so sortedOutputs
@@ -202,8 +202,8 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 // correct value. The siafund input will not be signed until 'Sign' is called
 // on the transaction builder.
 func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
-	lockID := tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock(lockID)
+	tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock()
 
 	// Create and fund a parent transaction that will add the correct amount of
 	// siafunds to the transaction.
@@ -388,8 +388,8 @@ func (tb *transactionBuilder) AddTransactionSignature(sig types.TransactionSigna
 // pool so that other transactions may use them. 'Drop' should only be called
 // if a transaction is both unsigned and will not be used any further.
 func (tb *transactionBuilder) Drop() {
-	lockID := tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock(lockID)
+	tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock()
 
 	// Iterate through all parents and the transaction itself and restore all
 	// outputs to the list of available outputs.
@@ -459,8 +459,8 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 
 	// For each siacoin input in the transaction that we added, provide a
 	// signature.
-	lockID := tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock(lockID)
+	tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock()
 	for _, inputIndex := range tb.siacoinInputs {
 		input := txn.SiacoinInputs[inputIndex]
 		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]

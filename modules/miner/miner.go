@@ -34,6 +34,12 @@ const (
 	secondsBetweenBlocks = 30
 )
 
+var (
+	errNilCS     = errors.New("miner cannot use a nil consensus set")
+	errNilTpool  = errors.New("miner cannot use a nil transaction pool")
+	errNilWallet = errors.New("miner cannot use a nil wallet")
+)
+
 // Miner struct contains all variables the miner needs
 // in order to create and submit blocks.
 type Miner struct {
@@ -67,16 +73,6 @@ type Miner struct {
 	lastBlock   time.Time
 	memProgress int
 
-	// CPUMiner variables. startTime, attempts, and hashRate are used to
-	// calculate the hashrate. When attempts reaches a certain threshold, the
-	// time is compared to the startTime, and divided against the number of
-	// hashes per attempt, returning an approximate hashrate.
-	//
-	// miningOn indicates whether the miner is supposed to be mining. 'mining'
-	// indicates whether these is a thread that is actively mining. There may
-	// be some lag between starting the miner and a thread actually beginning
-	// to mine.
-
 	// CPUMiner variables.
 	miningOn   bool      // indicates if the miner is supposed to be running
 	mining     bool      // indicates if the miner is actually running
@@ -92,13 +88,13 @@ type Miner struct {
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
 	// Create the miner and its dependencies.
 	if cs == nil {
-		return nil, errors.New("miner cannot use a nil state")
+		return nil, errNilCS
 	}
 	if tpool == nil {
-		return nil, errors.New("miner cannot use a nil transaction pool")
+		return nil, errNilTpool
 	}
 	if w == nil {
-		return nil, errors.New("miner cannot use a nil wallet")
+		return nil, errNilWallet
 	}
 
 	// Grab some starting block variables.
@@ -138,8 +134,23 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	if err != nil {
 		return nil, err
 	}
+	m.cs.ConsensusSetSubscribe(m)
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
+}
+
+// checkAddress checks that the miner has an address, fetching an address from
+// the wallet if not.
+func (m *Miner) checkAddress() error {
+	if m.address != (types.UnlockHash{}) {
+		return nil
+	}
+	uc, err := m.wallet.NextAddress()
+	if err != nil {
+		return err
+	}
+	m.address = uc.UnlockHash()
+	return nil
 }
 
 // BlocksMined returns the number of good blocks and stale blocks that have
@@ -156,18 +167,4 @@ func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
 		}
 	}
 	return
-}
-
-// checkAddress checks that the miner has an address, fetching an address from
-// the wallet if not.
-func (m *Miner) checkAddress() error {
-	if m.address != (types.UnlockHash{}) {
-		return nil
-	}
-	uc, err := m.wallet.NextAddress()
-	if err != nil {
-		return err
-	}
-	m.address = uc.UnlockHash()
-	return nil
 }

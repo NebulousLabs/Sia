@@ -209,8 +209,8 @@ func (w *Wallet) applyHistory(cc modules.ConsensusChange) {
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.updateConfirmedSet(cc)
 	w.revertHistory(cc)
 	w.applyHistory(cc)
@@ -219,8 +219,8 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, _ modules.ConsensusChange) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	w.unconfirmedProcessedTransactions = nil
 	for _, txn := range txns {

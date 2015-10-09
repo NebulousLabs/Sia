@@ -136,8 +136,8 @@ func (w *Wallet) createBackup(backupFilepath string) error {
 
 // CreateBackup creates a backup file at the desired filepath.
 func (w *Wallet) CreateBackup(backupFilepath string) error {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.createBackup(backupFilepath)
 }
 

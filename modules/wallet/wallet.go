@@ -4,10 +4,10 @@ import (
 	"errors"
 	"log"
 	"sort"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -94,7 +94,7 @@ type Wallet struct {
 
 	persistDir string
 	log        *log.Logger
-	mu         *sync.RWMutex
+	mu         sync.RWMutex
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -126,7 +126,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		historicClaimStarts: make(map[types.SiafundOutputID]types.Currency),
 
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 	err := w.initPersist()
 	if err != nil {
@@ -138,8 +137,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 // AllAddresses returns all addresses that the wallet is able to spend from,
 // including unseeded addresses. Addresses are returned sorted in byte-order.
 func (w *Wallet) AllAddresses() []types.UnlockHash {
-	lockID := w.mu.RLock()
-	defer w.mu.RUnlock(lockID)
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 
 	addrs := make(types.UnlockHashSlice, 0, len(w.keys))
 	for addr := range w.keys {
