@@ -40,6 +40,9 @@ type uploader interface {
 	// fileContract returns the fileContract containing the metadata of all
 	// previously added pieces.
 	fileContract() fileContract
+
+	// addr returns the IP address of the uploader.
+	addr() modules.NetAddress
 }
 
 // upload reads chunks from r and uploads them to hosts. It spawns a worker

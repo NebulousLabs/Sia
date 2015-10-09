@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // incompleteChunks returns a map of chunks in need of repair.
@@ -32,15 +34,44 @@ func (f *file) incompleteChunks() map[uint64][]uint64 {
 	return missing
 }
 
+// chunkHosts returns the IPs of the hosts storing a given chunk.
+func (f *file) chunkHosts(index uint64) []modules.NetAddress {
+	var hosts []modules.NetAddress
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			if p.Chunk == index {
+				hosts = append(hosts, fc.IP)
+				break
+			}
+		}
+	}
+	return hosts
+}
+
 // repair attempts to repair a file by uploading missing pieces to more hosts.
-func (f *file) repair(r io.ReaderAt, missing map[uint64][]uint64, hosts []uploader) error {
+func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploader) error {
 	// For each chunk with missing pieces, re-encode the chunk and upload each
 	// missing piece.
 	var wg sync.WaitGroup
-	for chunkIndex, missingPieces := range missing {
+	for chunkIndex, missingPieces := range pieceMap {
+		// can only upload to hosts that aren't already storing this chunk
+		curHosts := f.chunkHosts(chunkIndex)
+		var chunkHosts []uploader
+	outer:
+		for _, h := range hosts {
+			for _, ip := range curHosts {
+				if ip == h.addr() {
+					continue outer
+				}
+			}
+			chunkHosts = append(chunkHosts, h)
+		}
+		// don't bother encoding if there aren't any hosts to upload to
+		if len(chunkHosts) == 0 {
+			continue
+		}
+
 		// read chunk data
-		// NOTE: ReadAt is stricter than Read, and is guaranteed to return an
-		// error after a partial read.
 		chunk := make([]byte, f.chunkSize())
 		_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
 		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
@@ -52,10 +83,11 @@ func (f *file) repair(r io.ReaderAt, missing map[uint64][]uint64, hosts []upload
 		if err != nil {
 			return err
 		}
+
 		// upload pieces, split evenly among hosts
 		wg.Add(len(missingPieces))
 		for j, pieceIndex := range missingPieces {
-			host := hosts[j%len(hosts)]
+			host := chunkHosts[j%len(chunkHosts)]
 			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
 			go func(host uploader, up uploadPiece) {
 				err := host.addPiece(up)
@@ -107,8 +139,8 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// determine file health
-			missing := f.incompleteChunks()
-			if len(missing) == 0 {
+			missingPieceMap := f.incompleteChunks()
+			if len(missingPieceMap) == 0 {
 				// nothing to do
 				continue
 			}
@@ -137,7 +169,7 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// repair
-			err = f.repair(handle, missing, hosts)
+			err = f.repair(handle, missingPieceMap, hosts)
 			if err != nil {
 				r.log.Printf("failed to repair %v: %v", name, err)
 				id = r.mu.Lock()

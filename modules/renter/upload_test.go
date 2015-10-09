@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 func (h *testHost) addPiece(p uploadPiece) error {
@@ -37,6 +38,10 @@ func (h *testHost) fileContract() fileContract {
 	}
 	fc.IP = h.ip
 	return fc
+}
+
+func (h *testHost) addr() modules.NetAddress {
+	return h.ip
 }
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.

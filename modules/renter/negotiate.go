@@ -41,6 +41,10 @@ func (hu *hostUploader) fileContract() fileContract {
 	return hu.contract
 }
 
+func (hu *hostUploader) addr() modules.NetAddress {
+	return hu.settings.IPAddress
+}
+
 func (hu *hostUploader) Close() error {
 	// send an empty revision to indicate that we are finished
 	encoding.WriteObject(hu.conn, types.Transaction{})

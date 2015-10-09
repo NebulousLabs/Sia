@@ -59,7 +59,7 @@ func TestRepair(t *testing.T) {
 	// repair until file becomes available
 	const maxAttempts = 20
 	for i := 0; i < maxAttempts; i++ {
-		err = f.repair(bytes.NewReader(data), hosts)
+		err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hosts)
 		if err != nil {
 			t.Fatal(err)
 		}
