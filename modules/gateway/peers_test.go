@@ -12,12 +12,25 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// dummyConn implements the net.Conn interface, but does not carry any actual
+// data. It is passed to muxado, because passing nil results in segfaults.
+type dummyConn struct {
+	net.Conn
+}
+
+// muxado uses these methods when sending its GoAway signal
+func (dc *dummyConn) Write(p []byte) (int, error) { return len(p), nil }
+
+func (dc *dummyConn) Close() error { return nil }
+
+func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
+
 func TestAddPeer(t *testing.T) {
 	g := newTestingGateway("TestAddPeer", t)
 	defer g.Close()
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	g.addPeer(&peer{addr: "foo", sess: muxado.Client(nil)})
+	g.addPeer(&peer{addr: "foo", sess: muxado.Client(new(dummyConn))})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
 	}
@@ -33,7 +46,7 @@ func TestRandomInboundPeer(t *testing.T) {
 		t.Fatal("expected errNoPeers, got", err)
 	}
 
-	g.addPeer(&peer{addr: "foo", sess: muxado.Client(nil), inbound: true})
+	g.addPeer(&peer{addr: "foo", sess: muxado.Client(new(dummyConn)), inbound: true})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
 	}
