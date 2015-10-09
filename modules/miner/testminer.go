@@ -1,5 +1,8 @@
 package miner
 
+// testminer.go implements the TestMiner interface, whose primary purpose is
+// integration testing.
+
 import (
 	"bytes"
 	"encoding/binary"
@@ -11,8 +14,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// testminer.go implements the TestMiner interface, whose primary purpose is
-// integration testing.
+const (
+	// solveAttempts is the number of times that SolveBlock will try to solve a
+	// block before giving up.
+	solveAttempts = 16 * 1024
+)
 
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
@@ -72,9 +78,9 @@ func (m *Miner) FindBlock() (types.Block, error) {
 	return block, nil
 }
 
-// SolveBlock takes a block, target, and number of iterations as input and
-// tries to find a block that meets the target. This function can take a long
-// time to complete, and should not be called with a lock.
+// SolveBlock takes a block and a target and tries to solve the block for the
+// target. A bool is returned indicating whether the block was successfully
+// solved.
 func (m *Miner) SolveBlock(b types.Block, target types.Target) (types.Block, bool) {
 	// Assemble the header.
 	merkleRoot := b.MerkleRoot()
@@ -83,14 +89,15 @@ func (m *Miner) SolveBlock(b types.Block, target types.Target) (types.Block, boo
 	binary.LittleEndian.PutUint64(header[40:48], uint64(b.Timestamp))
 	copy(header[48:], merkleRoot[:])
 
-	nonce := (*uint64)(unsafe.Pointer(&header[32]))
-	for i := 0; i < iterationsPerAttempt; i++ {
+	var nonce uint64
+	for i := 0; i < solveAttempts; i++ {
 		id := crypto.HashBytes(header)
 		if bytes.Compare(target[:], id[:]) >= 0 {
 			copy(b.Nonce[:], header[32:40])
 			return b, true
 		}
-		*nonce++
+		*(*uint64)(unsafe.Pointer(&header[32])) = nonce
+		nonce++
 	}
 	return b, false
 }

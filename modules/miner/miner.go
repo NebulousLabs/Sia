@@ -12,18 +12,16 @@ import (
 )
 
 const (
-	iterationsPerAttempt = 16 * 1024
-
 	// headerForWorkMemory is the number of previous calls to 'headerForWork'
 	// that are remembered. Additionally, 'headerForWork' will only poll for a
 	// new block every 'headerForWorkMemory / blockForWorkMemory' times it is
 	// called. This reduces the amount of memory used, but comes at the cost of
 	// not always having the most recent transactions
-	headerForWorkMemory = 1000
+	headerForWorkMemory = 10000
 
 	// blockForWorkMemory is the maximum number of blocks the miner will store
 	// Blocks take up to 2 megabytes of memory, so it is important to keep a cap
-	blockForWorkMemory = 20
+	blockForWorkMemory = 50
 
 	// secondsBetweenBlocks is the maximum amount of time the block manager will
 	// go between generating new blocks. If the miner is not polling more than
@@ -56,7 +54,7 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	// A list of blocks that have been submitted through SubmitBlock.
+	// A list of blocks that have been submitted to the miner.
 	blocksFound []types.BlockID
 
 	// BlockManager variables. The BlockManager passes out and receives unique

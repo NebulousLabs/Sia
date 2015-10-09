@@ -43,7 +43,7 @@ func (m *Miner) threadedMine() {
 		m.mu.Lock()
 		if !solved {
 			nanosecondsElapsed := 1 + time.Since(m.cycleStart).Nanoseconds() // Add 1 to prevent divide by zero errors.
-			m.hashRate = 1e9 * iterationsPerAttempt / nanosecondsElapsed
+			m.hashRate = 1e9 * solveAttempts / nanosecondsElapsed
 		}
 		m.mu.Unlock()
 	}

@@ -18,7 +18,7 @@ type BlockManager interface {
 	HeaderForWork() (types.BlockHeader, types.Target, error)
 
 	// SubmitHeader takes a block header that has been worked on and has a
-	// valid target. A superior choice to SubmitBlock.
+	// valid target.
 	SubmitHeader(types.BlockHeader) error
 
 	// BlocksMined returns the number of blocks and stale blocks that have been
