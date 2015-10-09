@@ -21,7 +21,7 @@ type tpoolTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	tpool     *TransactionPool
-	miner     modules.Miner
+	miner     modules.TestMiner
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
 }

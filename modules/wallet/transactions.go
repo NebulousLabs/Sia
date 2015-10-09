@@ -15,8 +15,8 @@ var (
 // AddressTransactions returns all of the wallet transactions associated with a
 // single unlock hash.
 func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	for _, pt := range w.processedTransactions {
 		relevant := false
@@ -42,8 +42,8 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 // AddressUnconfirmedHistory returns all of the unconfirmed wallet transactions
 // related to a specific address.
 func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modules.ProcessedTransaction) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	// Scan the full list of unconfirmed transactions to see if there are any
 	// related transactions.
@@ -71,8 +71,8 @@ func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modu
 // Transaction returns the transaction with the given id. 'False' is returned
 // if the transaction does not exist.
 func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransaction, bool) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	pt, exists := w.processedTransactionMap[txid]
 	if !exists {
 		return modules.ProcessedTransaction{}, exists
@@ -83,8 +83,8 @@ func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransac
 // Transactions returns all transactions relevant to the wallet that were
 // confirmed in the range [startHeight, endHeight].
 func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []modules.ProcessedTransaction, err error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	if startHeight > w.consensusSetHeight || startHeight > endHeight {
 		return nil, errOutOfBounds
@@ -107,7 +107,7 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 // UnconfirmedTransactions returns the set of unconfirmed transactions that are
 // relevant to the wallet.
 func (w *Wallet) UnconfirmedTransactions() []modules.ProcessedTransaction {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.unconfirmedProcessedTransactions
 }

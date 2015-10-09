@@ -141,8 +141,8 @@ func (w *Wallet) wipeSecrets() {
 
 // Encrypted returns whether or not the wallet has been encrypted.
 func (w *Wallet) Encrypted() bool {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if build.DEBUG && w.unlocked && len(w.persist.EncryptionVerification) == 0 {
 		panic("wallet is both unlocked and unencrypted")
 	}
@@ -159,23 +159,23 @@ func (w *Wallet) Encrypted() bool {
 // reset the wallet, the wallet files must be moved to a different directory or
 // deleted.
 func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.initEncryption(masterKey)
 }
 
 // Unlocked indicates whether the wallet is locked or unlocked.
 func (w *Wallet) Unlocked() bool {
-	lockID := w.mu.RLock()
-	defer w.mu.RUnlock(lockID)
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.unlocked
 }
 
 // Lock will erase all keys from memory and prevent the wallet from spending
 // coins until it is unlocked.
 func (w *Wallet) Lock() error {
-	lockID := w.mu.RLock()
-	defer w.mu.RUnlock(lockID)
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	if !w.unlocked {
 		return modules.ErrLockedWallet
 	}
@@ -195,10 +195,10 @@ func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 
 	// Initialize all of the keys in the wallet under a lock. While holding the
 	// lock, also grab the subscriber status.
-	lockID := w.mu.Lock()
+	w.mu.Lock()
 	subscribed := w.subscribed
 	err := w.unlock(masterKey)
-	w.mu.Unlock(lockID)
+	w.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -206,10 +206,11 @@ func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 	// Subscribe to the consensus set if this is the first unlock for the
 	// wallet object.
 	if !subscribed {
+		w.cs.ConsensusSetSubscribe(w)
 		w.tpool.TransactionPoolSubscribe(w)
-		lockID = w.mu.Lock()
+		w.mu.Lock()
 		w.subscribed = true
-		w.mu.Unlock(lockID)
+		w.mu.Unlock()
 	}
 	return nil
 }

@@ -10,8 +10,8 @@ import (
 // ProcessConsensusChange will update the miner's most recent block. This is a
 // part of the ConsensusSetSubscriber interface.
 func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	m.height -= types.BlockHeight(len(cc.RevertedBlocks))
 	m.height += types.BlockHeight(len(cc.AppliedBlocks))
@@ -40,8 +40,8 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 // set of transactions with the input transactions. This is a part of the
 // TransactionPoolSubscriber interface.
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	m.transactions = nil
 	remainingSize := int(types.BlockSizeLimit - 5e3)

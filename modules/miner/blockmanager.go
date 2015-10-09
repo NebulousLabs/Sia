@@ -70,35 +70,14 @@ func (m *Miner) prepareNewBlock() {
 	}
 }
 
-// BlockForWork returns a block that is ready for nonce grinding, along with
-// the root hash of the block.
-func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target, err error) {
-	// Check if the wallet is unlocked. If the wallet is unlocked, make sure
-	// that the miner has a recent address.
-	if !m.wallet.Unlocked() {
-		err = modules.ErrLockedWallet
-		return
-	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
-	err = m.checkAddress()
-	if err != nil {
-		return
-	}
-
-	b, t = m.blockForWork()
-	merkleRoot = b.MerkleRoot()
-	return b, merkleRoot, t, nil
-}
-
 // HeaderForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	if !m.wallet.Unlocked() {
 		return types.BlockHeader{}, types.Target{}, modules.ErrLockedWallet
 	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	err := m.checkAddress()
 	if err != nil {
 		return types.BlockHeader{}, types.Target{}, err
@@ -150,8 +129,8 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	return header, m.target, nil
 }
 
-// submitBlock takes a solved block and submits it to the blockchain.
-// submitBlock should not be called with a lock.
+// SubmitBlock takes a solved block and submits it to the blockchain.
+// SubmitBlock should not be called with a lock.
 func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
@@ -160,8 +139,8 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 		m.log.Println("ERROR: an invalid block was submitted:", err)
 		return err
 	}
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Grab a new address for the miner. Call may fail if the wallet is locked
 	// or if the wallet addresses have been exhausted.
@@ -174,17 +153,16 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	return err
 }
 
-// submitBlock takes a solved block and submits it to the blockchain.
-// submitBlock should not be called with a lock.
+// SubmitHeader accepts a block header.
 func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	// Fetch the block from the blockMem.
 	var zeroNonce [8]byte
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
-	lockID := m.mu.Lock()
+	m.mu.Lock()
 	b, bExists := m.blockMem[lookupBH]
 	arbData, arbExists := m.arbDataMem[lookupBH]
-	m.mu.Unlock(lockID)
+	m.mu.Unlock()
 	if !bExists || !arbExists {
 		err := errors.New("block header returned late - block was cleared from memory")
 		m.log.Println("ERROR:", err)

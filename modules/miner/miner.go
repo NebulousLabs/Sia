@@ -3,11 +3,11 @@ package miner
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -32,6 +32,12 @@ const (
 	// mining on the most recent block, but this will come at the cost of preventing
 	// the block manger from storing as many headers
 	secondsBetweenBlocks = 30
+)
+
+var (
+	errNilCS     = errors.New("miner cannot use a nil consensus set")
+	errNilTpool  = errors.New("miner cannot use a nil transaction pool")
+	errNilWallet = errors.New("miner cannot use a nil wallet")
 )
 
 // Miner struct contains all variables the miner needs
@@ -67,37 +73,28 @@ type Miner struct {
 	lastBlock   time.Time
 	memProgress int
 
-	// CPUMiner variables. startTime, attempts, and hashRate are used to
-	// calculate the hashrate. When attempts reaches a certain threshold, the
-	// time is compared to the startTime, and divided against the number of
-	// hashes per attempt, returning an approximate hashrate.
-	//
-	// miningOn indicates whether the miner is supposed to be mining. 'mining'
-	// indicates whether these is a thread that is actively mining. There may
-	// be some lag between starting the miner and a thread actually beginning
-	// to mine.
-	startTime time.Time
-	attempts  uint64
-	hashRate  int64
-	miningOn  bool
-	mining    bool
+	// CPUMiner variables.
+	miningOn   bool      // indicates if the miner is supposed to be running
+	mining     bool      // indicates if the miner is actually running
+	cycleStart time.Time // indicates the start time of the recent call to SolveBlock
+	hashRate   int64     // indicates hashes per second
 
 	persistDir string
 	log        *log.Logger
-	mu         *sync.RWMutex
+	mu         sync.RWMutex
 }
 
 // New returns a ready-to-go miner that is not mining.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
 	// Create the miner and its dependencies.
 	if cs == nil {
-		return nil, errors.New("miner cannot use a nil state")
+		return nil, errNilCS
 	}
 	if tpool == nil {
-		return nil, errors.New("miner cannot use a nil transaction pool")
+		return nil, errNilTpool
 	}
 	if w == nil {
-		return nil, errors.New("miner cannot use a nil wallet")
+		return nil, errNilWallet
 	}
 
 	// Grab some starting block variables.
@@ -131,30 +128,14 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 	err := m.initPersist()
 	if err != nil {
 		return nil, err
 	}
+	m.cs.ConsensusSetSubscribe(m)
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
-}
-
-// BlocksMined returns the number of good blocks and stale blocks that have
-// been mined by the miner.
-func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
-	lockID := m.mu.Lock()
-	defer m.mu.Unlock(lockID)
-
-	for _, blockID := range m.blocksFound {
-		if m.cs.InCurrentPath(blockID) {
-			goodBlocks++
-		} else {
-			staleBlocks++
-		}
-	}
-	return
 }
 
 // checkAddress checks that the miner has an address, fetching an address from
@@ -169,4 +150,20 @@ func (m *Miner) checkAddress() error {
 	}
 	m.address = uc.UnlockHash()
 	return nil
+}
+
+// BlocksMined returns the number of good blocks and stale blocks that have
+// been mined by the miner.
+func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, blockID := range m.blocksFound {
+		if m.cs.InCurrentPath(blockID) {
+			goodBlocks++
+		} else {
+			staleBlocks++
+		}
+	}
+	return
 }

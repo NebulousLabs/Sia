@@ -78,8 +78,7 @@ func createMinerTester(name string) (*minerTester, error) {
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		b, _ := m.FindBlock()
-		err = cs.AcceptBlock(b)
+		_, err = m.AddBlock()
 		if err != nil {
 			return nil, err
 		}
@@ -88,9 +87,9 @@ func createMinerTester(name string) (*minerTester, error) {
 	return mt, nil
 }
 
-// TestMiner creates a miner, mines a few blocks, and checks that the wallet
-// balance is updating as the blocks get mined.
-func TestMiner(t *testing.T) {
+// TestIntegrationMiner creates a miner, mines a few blocks, and checks that
+// the wallet balance is updating as the blocks get mined.
+func TestIntegrationMiner(t *testing.T) {
 	mt, err := createMinerTester("TestMiner")
 	if err != nil {
 		t.Fatal(err)
@@ -112,5 +111,30 @@ func TestMiner(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// TestIntegrationNilMinerDependencies tests that the miner properly handles
+// nil inputs for its dependencies.
+func TestIntegrationNilMinerDependencies(t *testing.T) {
+	mt, err := createMinerTester("TestIntegrationNilMinerDependencies")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = New(mt.cs, mt.tpool, nil, "")
+	if err != errNilWallet {
+		t.Fatal(err)
+	}
+	_, err = New(mt.cs, nil, mt.wallet, "")
+	if err != errNilTpool {
+		t.Fatal(err)
+	}
+	_, err = New(nil, mt.tpool, mt.wallet, "")
+	if err != errNilCS {
+		t.Fatal(err)
+	}
+	_, err = New(nil, nil, nil, "")
+	if err == nil {
+		t.Fatal(err)
 	}
 }

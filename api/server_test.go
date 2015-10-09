@@ -39,7 +39,7 @@ type serverTester struct {
 	gateway   modules.Gateway
 	host      modules.Host
 	hostdb    modules.HostDB
-	miner     modules.Miner
+	miner     modules.TestMiner
 	renter    modules.Renter
 	tpool     modules.TransactionPool
 	exp       modules.Explorer

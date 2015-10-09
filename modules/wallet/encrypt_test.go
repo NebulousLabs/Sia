@@ -15,7 +15,7 @@ import (
 // been encrypted, to make sure that locking, unlocking, and spending after
 // unlocking are all happening in the correct order and returning the correct
 // errors.
-func postEncryptionTesting(m modules.Miner, w *Wallet, masterKey crypto.TwofishKey) {
+func postEncryptionTesting(m modules.TestMiner, w *Wallet, masterKey crypto.TwofishKey) {
 	if !w.Encrypted() {
 		panic("wallet is not encrypted when starting postEncryptionTesting")
 	}
