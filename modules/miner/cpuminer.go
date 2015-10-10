@@ -16,20 +16,20 @@ func (m *Miner) threadedMine() {
 	m.mining = true
 	m.mu.Unlock()
 
-	// Solve blocks repeatedly.
+	// Solve blocks repeatedly, keeping track of how fast hashing is occuring.
+	cycleStart := time.Now()
 	for {
 		// Kill the thread if mining has been turned off.
 		m.mu.Lock()
-		m.cycleStart = time.Now()
 		if !m.miningOn {
 			m.mining = false
 			m.mu.Unlock()
 			return
 		}
-
-		// Grab a block and try to solve it.
 		bfw, target := m.blockForWork()
 		m.mu.Unlock()
+
+		// Grab a block and try to solve it.
 		b, solved := m.SolveBlock(bfw, target)
 		if solved {
 			err := m.SubmitBlock(b)
@@ -42,7 +42,8 @@ func (m *Miner) threadedMine() {
 		// iterations was not completed, so the hashrate should not be updated.
 		m.mu.Lock()
 		if !solved {
-			nanosecondsElapsed := 1 + time.Since(m.cycleStart).Nanoseconds() // Add 1 to prevent divide by zero errors.
+			nanosecondsElapsed := 1 + time.Since(cycleStart).Nanoseconds() // Add 1 to prevent divide by zero errors.
+			cycleStart = time.Now()                                        // Reset the cycle counter as soon as the previous value is measured.
 			m.hashRate = 1e9 * solveAttempts / nanosecondsElapsed
 		}
 		m.mu.Unlock()

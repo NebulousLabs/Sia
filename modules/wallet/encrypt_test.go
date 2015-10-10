@@ -199,7 +199,7 @@ func TestLock(t *testing.T) {
 	// has been locked, and the test needs to mine a block after locking the
 	// wallet to verify  that the balance reporting of a locked wallet is
 	// correct.
-	block, _, target, err := wt.miner.BlockForWork()
+	block, target, err := wt.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}

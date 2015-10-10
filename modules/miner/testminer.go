@@ -22,7 +22,7 @@ const (
 
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
-func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target, err error) {
+func (m *Miner) BlockForWork() (b types.Block, t types.Target, err error) {
 	// Check if the wallet is unlocked. If the wallet is unlocked, make sure
 	// that the miner has a recent address.
 	if !m.wallet.Unlocked() {
@@ -37,8 +37,7 @@ func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.T
 	}
 
 	b, t = m.blockForWork()
-	merkleRoot = b.MerkleRoot()
-	return b, merkleRoot, t, nil
+	return b, t, nil
 }
 
 // AddBlock adds a block to the consensus set.

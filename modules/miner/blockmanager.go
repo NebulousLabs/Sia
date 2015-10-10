@@ -15,42 +15,25 @@ import (
 // require external miners to need to worry about. All blocks returned are
 // unique, which means all miners can safely start at the '0' nonce.
 func (m *Miner) blockForWork() (types.Block, types.Target) {
-	// Determine the timestamp.
-	blockTimestamp := types.CurrentTimestamp()
-	if blockTimestamp < m.earliestTimestamp {
-		blockTimestamp = m.earliestTimestamp
+	// Update the timestmap.
+	if m.unsolvedBlock.Timestamp < types.CurrentTimestamp() {
+		m.unsolvedBlock.Timestamp = types.CurrentTimestamp()
 	}
 
-	// Create the miner payouts.
-	subsidy := types.CalculateCoinbase(m.height)
-	for _, txn := range m.transactions {
-		for _, fee := range txn.MinerFees {
-			subsidy = subsidy.Add(fee)
-		}
-	}
-	blockPayouts := []types.SiacoinOutput{types.SiacoinOutput{Value: subsidy, UnlockHash: m.address}}
+	// Update the address + payouts.
+	_ = m.checkAddress() // Err is ignored - address generation failed but can't do anything about it (log maybe).
+	m.unsolvedBlock.MinerPayouts = []types.SiacoinOutput{types.SiacoinOutput{Value: m.unsolvedBlock.CalculateSubsidy(m.height + 1), UnlockHash: m.address}}
 
-	// Create the list of transacitons, including the randomized transaction.
-	// The transactions are assembled by calling append(singleElem,
-	// existingSlic) because doing it the reverse way has some side effects,
-	// creating a race condition and ultimately changing the block hash for
-	// other parts of the program. This is related to the fact that slices are
-	// pointers, and not immutable objects. Use of the builtin `copy` function
-	// when passing objects like blocks around may fix this problem.
+	// TODO: DEPRECATED
+	//
+	// Add an arb-data txn to the block.
 	randBytes, _ := crypto.RandBytes(types.SpecifierLen)
 	randTxn := types.Transaction{
 		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 	}
-	blockTransactions := append([]types.Transaction{randTxn}, m.transactions...)
+	m.unsolvedBlock.Transactions = append([]types.Transaction{randTxn}, m.unsolvedBlock.Transactions...)
 
-	// Assemble the block
-	b := types.Block{
-		ParentID:     m.parent,
-		Timestamp:    blockTimestamp,
-		MinerPayouts: blockPayouts,
-		Transactions: blockTransactions,
-	}
-	return b, m.target
+	return m.unsolvedBlock, m.target
 }
 
 // prepareNewBlock sets the blockmanager up to generate a new block next time
@@ -83,7 +66,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 		return types.BlockHeader{}, types.Target{}, err
 	}
 
-	if time.Since(m.lastBlock).Seconds() > secondsBetweenBlocks {
+	if time.Since(m.sourceBlockAge).Seconds() > secondsBetweenBlocks {
 		m.prepareNewBlock()
 	}
 
@@ -103,7 +86,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 		header = block.Header()
 		arbData = block.Transactions[0].ArbitraryData[0]
 
-		m.lastBlock = time.Now()
+		m.sourceBlockAge = time.Now()
 	} else {
 		// Set block to previous block, but create new arbData
 		block = m.blockMem[m.headerMem[m.memProgress-1]]

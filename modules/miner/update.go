@@ -21,19 +21,19 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 	m.height -= types.BlockHeight(len(revertedIDs))
 	m.height += types.BlockHeight(len(appliedIDs))
 
-	m.parent = appliedIDs[len(appliedIDs)-1]
-	target, exists1 := m.cs.ChildTarget(m.parent)
-	timestamp, exists2 := m.cs.EarliestChildTimestamp(m.parent)
-	if build.DEBUG {
-		if !exists1 {
-			panic("could not get child target")
-		}
-		if !exists2 {
-			panic("could not get child earliest timestamp")
-		}
+	// Update the unsolved block.
+	var exists1, exists2 bool
+	m.unsolvedBlock.ParentID = appliedIDs[len(appliedIDs)-1]
+	m.target, exists1 = m.cs.ChildTarget(m.unsolvedBlock.ParentID)
+	m.unsolvedBlock.Timestamp, exists2 = m.cs.EarliestChildTimestamp(m.unsolvedBlock.ParentID)
+	if build.DEBUG && !exists1 {
+		panic("could not get child target")
 	}
-	m.target = target
-	m.earliestTimestamp = timestamp
+	if build.DEBUG && !exists2 {
+		panic("could not get child earliest timestamp")
+	}
+
+	// ARGHGHGHGHGHGHGHGHGHGHGHGHGHGHGHGHGHGGHGH
 	m.prepareNewBlock()
 }
 
@@ -42,14 +42,18 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if len(unconfirmedTransactions) == 0 {
+		m.unsolvedBlock.Transactions = nil
+		return
+	}
 
-	m.transactions = nil
+	var i int
 	remainingSize := int(types.BlockSizeLimit - 5e3)
-	for i := range unconfirmedTransactions {
+	for i = range unconfirmedTransactions {
 		remainingSize -= len(encoding.Marshal(unconfirmedTransactions[i]))
 		if remainingSize < 0 {
 			break
 		}
-		m.transactions = unconfirmedTransactions[0 : i+1]
 	}
+	m.unsolvedBlock.Transactions = unconfirmedTransactions[0 : i+1]
 }

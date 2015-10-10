@@ -69,7 +69,7 @@ func TestIntegrationEarliestChildTimestamp(t *testing.T) {
 	timestampOffsets := []types.Timestamp{1, 3, 2, 5, 4, 6, 7, 8, 9, 10}
 	blockIDs := []types.BlockID{cs.blockRoot.Block.ID()}
 	for _, offset := range timestampOffsets {
-		bfw, _, target, err := m.BlockForWork()
+		bfw, target, err := m.BlockForWork()
 		if err != nil {
 			t.Fatal(err)
 		}

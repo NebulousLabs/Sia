@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -16,11 +15,12 @@ const (
 	// that are remembered. Additionally, 'headerForWork' will only poll for a
 	// new block every 'headerForWorkMemory / blockForWorkMemory' times it is
 	// called. This reduces the amount of memory used, but comes at the cost of
-	// not always having the most recent transactions
+	// not always having the most recent transactions. Headers take around 200
+	// bytes of memory.
 	headerForWorkMemory = 10000
 
 	// blockForWorkMemory is the maximum number of blocks the miner will store
-	// Blocks take up to 2 megabytes of memory, so it is important to keep a cap
+	// Blocks take up to 2 megabytes of memory.
 	blockForWorkMemory = 50
 
 	// secondsBetweenBlocks is the maximum amount of time the block manager will
@@ -29,7 +29,7 @@ const (
 	// then the block manager will create new blocks in order to keep the miner
 	// mining on the most recent block, but this will come at the cost of preventing
 	// the block manger from storing as many headers
-	secondsBetweenBlocks = 30
+	secondsBetweenBlocks = 60
 )
 
 var (
@@ -46,37 +46,36 @@ type Miner struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// Block variables - helps the miner construct the next block.
-	parent            types.BlockID
-	height            types.BlockHeight
-	transactions      []types.Transaction
-	target            types.Target
-	earliestTimestamp types.Timestamp
-	address           types.UnlockHash
+	// Miner data.
+	height        types.BlockHeight // Current consensus height.
+	target        types.Target      // Target of the child of the current block.
+	address       types.UnlockHash  // An address which should receive miner payouts.
+	blocksFound   []types.BlockID   // A list of blocks that have been found by the miner.
+	unsolvedBlock types.Block       // A block containing the most recent parent and transactions.
 
-	// A list of blocks that have been submitted to the miner.
-	blocksFound []types.BlockID
-
-	// BlockManager variables. The BlockManager passes out and receives unique
-	// block headers on each call, these variables help to map the received
-	// block header to the original block. The headers are passed instead of
-	// the block because a full block is 2mB and is a lot to send over http.
-	// In order to store multiple headers per block, some headers map to an
-	// identical address, but each header maps to a unique arbData, which can
-	// be used to construct a unique block
-	// lastBlock stores the Time the last block was requested.
-	blockMem    map[types.BlockHeader]*types.Block
-	arbDataMem  map[types.BlockHeader][]byte
-	headerMem   []types.BlockHeader
-	lastBlock   time.Time
-	memProgress int
+	// BlockManager variables. Becaues blocks are large, one block is used to
+	// make many headers which can be used by miners. Headers include an
+	// arbitrary data transaction (appended to the block) to make the merkle
+	// roots unique (preventing miners from doing redundant work). Every N
+	// requests or M seconds, a new block is used to create headers.
+	//
+	// Only 'blocksForWorkMemory' blocks are kept in memory at a time, which
+	// keeps ram usage reasonable. Miners may request many headers in parallel,
+	// and thus may be working on different blocks. When they submit the solved
+	// header to the block manager, the rest of the block needs to be found in
+	// a lookup.
+	blockMem       map[types.BlockHeader]*types.Block // Mappings from headers to the blocks they are derived from.
+	arbDataMem     map[types.BlockHeader][]byte       // Mappings from the headers to their unique arb data txns.
+	headerMem      []types.BlockHeader                // A circular list of headers that have been given out from the api recently.
+	sourceBlockAge time.Time                          // How long headers have been using the same block (different from 'recent block').
+	memProgress    int                                // The index of the most recent header used in headerMem.
 
 	// CPUMiner variables.
-	miningOn   bool      // indicates if the miner is supposed to be running
-	mining     bool      // indicates if the miner is actually running
-	cycleStart time.Time // indicates the start time of the recent call to SolveBlock
-	hashRate   int64     // indicates hashes per second
+	miningOn bool  // indicates if the miner is supposed to be running
+	mining   bool  // indicates if the miner is actually running
+	hashRate int64 // indicates hashes per second
 
+	// Utils
 	persistDir string
 	log        *log.Logger
 	mu         sync.RWMutex
@@ -95,19 +94,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		return nil, errNilWallet
 	}
 
-	// Grab some starting block variables.
-	currentBlock := cs.GenesisBlock().ID()
-	currentTarget, exists1 := cs.ChildTarget(currentBlock)
-	earliestTimestamp, exists2 := cs.EarliestChildTimestamp(currentBlock)
-	if build.DEBUG {
-		if !exists1 {
-			panic("could not get child target")
-		}
-		if !exists2 {
-			panic("could not get child earliest timestamp")
-		}
-	}
-
 	// Assemble the miner. The miner is assembled without an address because
 	// the wallet is likely not unlocked yet. The miner will grab an address
 	// after the miner is unlocked (this must be coded manually for each
@@ -117,16 +103,14 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		tpool:  tpool,
 		wallet: w,
 
-		parent:            currentBlock,
-		target:            currentTarget,
-		earliestTimestamp: earliestTimestamp,
-
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][]byte),
 		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
 		persistDir: persistDir,
 	}
+	m.height--
+
 	err := m.initPersist()
 	if err != nil {
 		return nil, err
