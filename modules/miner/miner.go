@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -60,12 +61,12 @@ type Miner struct {
 	// and thus may be working on different blocks. When they submit the solved
 	// header to the block manager, the rest of the block needs to be found in
 	// a lookup.
-	blockMem       map[types.BlockHeader]*types.Block // Mappings from headers to the blocks they are derived from.
-	arbDataMem     map[types.BlockHeader][]byte       // Mappings from the headers to their unique arb data txns.
-	headerMem      []types.BlockHeader                // A circular list of headers that have been given out from the api recently.
-	sourceBlock    *types.Block                       // The block from which new headers for mining are created.
-	sourceBlockAge time.Time                          // How long headers have been using the same block (different from 'recent block').
-	memProgress    int                                // The index of the most recent header used in headerMem.
+	blockMem        map[types.BlockHeader]*types.Block             // Mappings from headers to the blocks they are derived from.
+	arbDataMem      map[types.BlockHeader][crypto.EntropySize]byte // Mappings from the headers to their unique arb data.
+	headerMem       []types.BlockHeader                            // A circular list of headers that have been given out from the api recently.
+	sourceBlock     *types.Block                                   // The block from which new headers for mining are created.
+	sourceBlockTime time.Time                                      // How long headers have been using the same block (different from 'recent block').
+	memProgress     int                                            // The index of the most recent header used in headerMem.
 
 	// CPUMiner variables.
 	miningOn bool  // indicates if the miner is supposed to be running
@@ -101,7 +102,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		wallet: w,
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
-		arbDataMem: make(map[types.BlockHeader][]byte),
+		arbDataMem: make(map[types.BlockHeader][crypto.EntropySize]byte),
 		headerMem:  make([]types.BlockHeader, HeaderMemory),
 
 		persistDir: persistDir,

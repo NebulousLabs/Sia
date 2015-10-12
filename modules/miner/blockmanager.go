@@ -5,9 +5,14 @@ import (
 	"errors"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	errLateHeader = errors.New("header is old, block could not be recovered")
 )
 
 // blockForWork returns a block that is ready for nonce grinding, including
@@ -53,6 +58,7 @@ func (m *Miner) newSourceBlock() {
 	// Update the source block.
 	block := m.blockForWork()
 	m.sourceBlock = &block
+	m.sourceBlockTime = time.Now()
 }
 
 // HeaderForWork returns a header that is ready for nonce grinding. The miner
@@ -80,15 +86,19 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	// This typically only happens if the miner has just turned on after being
 	// off for a while. If the current block has been used for too many
 	// requests, fetch a new source block.
-	if time.Since(m.sourceBlockAge) > MaxSourceBlockAge || m.memProgress%(HeaderMemory/BlockMemory) == 0 {
+	if time.Since(m.sourceBlockTime) > MaxSourceBlockAge || m.memProgress%(HeaderMemory/BlockMemory) == 0 {
 		m.newSourceBlock()
 	}
 
-	// Create a header from the source block.
-	_, err = rand.Read(m.sourceBlock.Transactions[0].ArbitraryData[0])
+	// Create a header from the source block - this may be a race condition,
+	// but I don't think so (underlying slice may be shared with other blocks
+	// accessible outside the miner).
+	var arbData [crypto.EntropySize]byte
+	_, err = rand.Read(arbData[:])
 	if err != nil {
 		return types.BlockHeader{}, types.Target{}, err
 	}
+	copy(m.sourceBlock.Transactions[0].ArbitraryData[0], arbData[:])
 	header := m.sourceBlock.Header()
 
 	// Save the mapping from the header to its block and from the header to its
@@ -96,7 +106,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	delete(m.blockMem, m.headerMem[m.memProgress])
 	delete(m.arbDataMem, m.headerMem[m.memProgress])
 	m.blockMem[header] = m.sourceBlock
-	m.arbDataMem[header] = m.sourceBlock.Transactions[0].ArbitraryData[0]
+	m.arbDataMem[header] = arbData
 	m.headerMem[m.memProgress] = header
 	m.memProgress++
 	if m.memProgress == HeaderMemory {
@@ -133,23 +143,39 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 
 // SubmitHeader accepts a block header.
 func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
+	m.mu.Lock()
+
 	// Lookup the block that corresponds to the provided header.
 	var b types.Block
 	nonce := bh.Nonce
 	bh.Nonce = [8]byte{}
-	m.mu.Lock()
 	bPointer, bExists := m.blockMem[bh]
 	arbData, arbExists := m.arbDataMem[bh]
 	if !bExists || !arbExists {
-		err := errors.New("block header returned late - block was cleared from memory")
-		m.log.Println("ERROR:", err)
+		m.log.Println("ERROR:", errLateHeader)
 		m.mu.Unlock()
-		return err
+		return errLateHeader
+	} else {
 	}
-	b = *bPointer // Must be done before releasing the lock.
-	b.Transactions[0].ArbitraryData[0] = arbData
-	b.Nonce = nonce
-	m.mu.Unlock()
 
+	// Block is going to be passed to external memory, but the memory pointed
+	// to by the transactions slice is still being modified - needs to be
+	// copied. Same with the memory being pointed to by the arb data slice.
+	b = *bPointer
+	txns := make([]types.Transaction, len(b.Transactions))
+	copy(txns, b.Transactions)
+	b.Transactions = txns
+	b.Transactions[0].ArbitraryData = [][]byte{arbData[:]}
+	b.Nonce = nonce
+
+	// Sanity check - block should have same id as header.
+	if build.DEBUG {
+		bh.Nonce = nonce
+		if types.BlockID(crypto.HashObject(bh)) != b.ID() {
+			panic("block reconstruction failed")
+		}
+	}
+
+	m.mu.Unlock()
 	return m.SubmitBlock(b)
 }
