@@ -20,7 +20,6 @@ var (
 	errFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
 	errInconsistentSet        = errors.New("consensus set is not in a consistent state")
 	errLargeBlock             = errors.New("block is too large to be accepted")
-	errMissedTarget           = errors.New("block does not meet target")
 	errOrphan                 = errors.New("block has no known parent")
 )
 
@@ -52,7 +51,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 
 	// Check that the target of the new block is sufficient.
 	if !b.CheckTarget(parent.ChildTarget) {
-		return errMissedTarget
+		return modules.ErrBlockUnsolved
 	}
 
 	// Check that the timestamp is not too far in the past to be

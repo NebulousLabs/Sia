@@ -17,6 +17,7 @@ const (
 
 var (
 	ErrBlockKnown        = errors.New("block already present in database")
+	ErrBlockUnsolved     = errors.New("block does not meet target")
 	ErrNonExtendingBlock = errors.New("block does not extend the longest fork")
 )
 

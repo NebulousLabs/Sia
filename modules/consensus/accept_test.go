@@ -163,8 +163,8 @@ func TestMissedTarget(t *testing.T) {
 		t.Fatal("unable to find a failing target")
 	}
 	err = cst.cs.AcceptBlock(block)
-	if err != errMissedTarget {
-		t.Fatalf("expected %v, got %v", errMissedTarget, err)
+	if err != modules.ErrBlockUnsolved {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
 	}
 }
 

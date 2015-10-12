@@ -122,6 +122,12 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
+	// Add the miner to the blocks list if the only problem is that it's stale.
+	if err == modules.ErrNonExtendingBlock {
+		m.mu.Lock()
+		m.blocksFound = append(m.blocksFound, b.ID())
+		m.mu.Unlock()
+	}
 	if err != nil {
 		m.tpool.PurgeTransactionPool()
 		m.log.Println("ERROR: an invalid block was submitted:", err)
@@ -155,7 +161,6 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 		m.log.Println("ERROR:", errLateHeader)
 		m.mu.Unlock()
 		return errLateHeader
-	} else {
 	}
 
 	// Block is going to be passed to external memory, but the memory pointed
