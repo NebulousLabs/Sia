@@ -1,12 +1,48 @@
 package miner
 
 import (
-	"errors"
+	"bytes"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
+// TestIntegrationHeaderForWork checks that header requesting, solving, and
+// submitting naively works.
+func TestIntegrationHeaderForWork(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	mt, err := createMinerTester("TestIntegreationHeaderForWork")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get a header to grind on.
+	header, target, err := mt.miner.HeaderForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Solve the header.
+	for {
+		id := crypto.HashObject(header)
+		if bytes.Compare(target[:], id[:]) >= 0 {
+			break
+		}
+		header.Nonce[0]++
+	}
+
+	// Submit the header.
+	err = mt.miner.SubmitHeader(header)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+///////////////////
+
+/*
 // reconstructBlock reconstructs a block given the miner and the header
 func reconstructBlock(m *Miner, header types.BlockHeader) (*types.Block, error) {
 	block, exists := m.blockMem[header]
@@ -42,20 +78,20 @@ func TestBlockManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Once we have polled for 2*headerForWorkMemory headers, the first
-	// headerForWorkMemory headers should be overwritten and no longer
+	// Once we have polled for 2*HeaderMemory headers, the first
+	// HeaderMemory headers should be overwritten and no longer
 	// work.
-	headers := make([]types.BlockHeader, 2*headerForWorkMemory)
+	headers := make([]types.BlockHeader, 2*HeaderMemory)
 
-	for i := 0; i < headerForWorkMemory; i++ {
+	for i := 0; i < HeaderMemory; i++ {
 		headers[i], _, err = mt.miner.HeaderForWork()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	// Make sure Miner still has headerForWorkMemory headers stored
-	for i := 0; i < headerForWorkMemory; i++ {
+	// Make sure Miner still has HeaderMemory headers stored
+	for i := 0; i < HeaderMemory; i++ {
 		_, exists := mt.miner.blockMem[headers[i]]
 		if !exists {
 			t.Error("Miner did not remember enough headers")
@@ -75,36 +111,36 @@ func TestBlockManager(t *testing.T) {
 			numUniqueBlocks++
 		}
 	}
-	if numUniqueBlocks != blockForWorkMemory {
+	if numUniqueBlocks != BlockMemory {
 		t.Error("Miner is storing an incorrect number of blocks ", numUniqueBlocks)
 	}
 
-	// Start getting headers beyond headerForWorkMemory
-	for i := headerForWorkMemory; i < 2*headerForWorkMemory; i++ {
+	// Start getting headers beyond HeaderMemory
+	for i := HeaderMemory; i < 2*HeaderMemory; i++ {
 		headers[i], _, err = mt.miner.HeaderForWork()
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Make sure the oldest headers are being erased
-		_, exists := mt.miner.blockMem[headers[i-headerForWorkMemory]]
+		_, exists := mt.miner.blockMem[headers[i-HeaderMemory]]
 		if exists {
 			t.Error("Miner remembered too many headers")
 		}
-		_, exists = mt.miner.arbDataMem[headers[i-headerForWorkMemory]]
+		_, exists = mt.miner.arbDataMem[headers[i-HeaderMemory]]
 		if exists {
 			t.Error("Miner remembered too many headers")
 		}
 	}
 
 	// Try submitting a header that's just barely too old
-	err = mt.miner.SubmitHeader(headers[headerForWorkMemory-1])
+	err = mt.miner.SubmitHeader(headers[HeaderMemory-1])
 	if err == nil {
 		t.Error("Miner accepted a header that should have been too old")
 	}
 
 	// Try submitting the oldest header that should still work
-	minedHeader, err := mineHeader(mt.miner, headers[headerForWorkMemory])
+	minedHeader, err := mineHeader(mt.miner, headers[HeaderMemory])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,3 +149,4 @@ func TestBlockManager(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/

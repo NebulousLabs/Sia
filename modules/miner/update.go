@@ -33,8 +33,9 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 		panic("could not get child earliest timestamp")
 	}
 
-	// ARGHGHGHGHGHGHGHGHGHGHGHGHGHGHGHGHGHGGHGH
-	m.prepareNewBlock()
+	// There is a new parent block, the source block should be updated to keep
+	// the stale rate as low as possible.
+	m.newSourceBlock()
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
@@ -42,11 +43,16 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Edge case - if there are no transactions, set the block's transactions
+	// to nil and return.
 	if len(unconfirmedTransactions) == 0 {
 		m.unsolvedBlock.Transactions = nil
 		return
 	}
 
+	// Add transactions to the block until the block size limit is reached.
+	// Transactions are assumed to be in a sensible order.
 	var i int
 	remainingSize := int(types.BlockSizeLimit - 5e3)
 	for i = range unconfirmedTransactions {

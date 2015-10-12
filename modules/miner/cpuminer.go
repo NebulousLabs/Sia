@@ -26,7 +26,8 @@ func (m *Miner) threadedMine() {
 			m.mu.Unlock()
 			return
 		}
-		bfw, target := m.blockForWork()
+		bfw := m.blockForWork()
+		target := m.target
 		m.mu.Unlock()
 
 		// Grab a block and try to solve it.

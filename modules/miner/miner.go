@@ -11,25 +11,21 @@ import (
 )
 
 const (
-	// headerForWorkMemory is the number of previous calls to 'headerForWork'
-	// that are remembered. Additionally, 'headerForWork' will only poll for a
-	// new block every 'headerForWorkMemory / blockForWorkMemory' times it is
+	// HeaderMemory is the number of previous calls to 'header'
+	// that are remembered. Additionally, 'header' will only poll for a
+	// new block every 'headerMemory / blockMemory' times it is
 	// called. This reduces the amount of memory used, but comes at the cost of
-	// not always having the most recent transactions. Headers take around 200
-	// bytes of memory.
-	headerForWorkMemory = 10000
+	// not always having the most recent transactions.
+	HeaderMemory = 10000
 
-	// blockForWorkMemory is the maximum number of blocks the miner will store
-	// Blocks take up to 2 megabytes of memory.
-	blockForWorkMemory = 50
+	// BlockMemory is the maximum number of blocks the miner will store
+	// Blocks take up to 2 megabytes of memory, which is why this number is
+	// limited.
+	BlockMemory = 50
 
-	// secondsBetweenBlocks is the maximum amount of time the block manager will
-	// go between generating new blocks. If the miner is not polling more than
-	// headerForWorkMemory / blockForWorkMemory blocks every secondsBetweenBlocks
-	// then the block manager will create new blocks in order to keep the miner
-	// mining on the most recent block, but this will come at the cost of preventing
-	// the block manger from storing as many headers
-	secondsBetweenBlocks = 60
+	// MaxSourceBlockAge is the maximum amount of time that is allowed to
+	// elapse between generating source blocks.
+	MaxSourceBlockAge = 60 * time.Second
 )
 
 var (
@@ -51,7 +47,7 @@ type Miner struct {
 	target        types.Target      // Target of the child of the current block.
 	address       types.UnlockHash  // An address which should receive miner payouts.
 	blocksFound   []types.BlockID   // A list of blocks that have been found by the miner.
-	unsolvedBlock types.Block       // A block containing the most recent parent and transactions.
+	unsolvedBlock types.Block       // A block containing the most recent parent, transactions, and earliest legal timestamp.
 
 	// BlockManager variables. Becaues blocks are large, one block is used to
 	// make many headers which can be used by miners. Headers include an
@@ -59,7 +55,7 @@ type Miner struct {
 	// roots unique (preventing miners from doing redundant work). Every N
 	// requests or M seconds, a new block is used to create headers.
 	//
-	// Only 'blocksForWorkMemory' blocks are kept in memory at a time, which
+	// Only 'blocksMemory' blocks are kept in memory at a time, which
 	// keeps ram usage reasonable. Miners may request many headers in parallel,
 	// and thus may be working on different blocks. When they submit the solved
 	// header to the block manager, the rest of the block needs to be found in
@@ -67,6 +63,7 @@ type Miner struct {
 	blockMem       map[types.BlockHeader]*types.Block // Mappings from headers to the blocks they are derived from.
 	arbDataMem     map[types.BlockHeader][]byte       // Mappings from the headers to their unique arb data txns.
 	headerMem      []types.BlockHeader                // A circular list of headers that have been given out from the api recently.
+	sourceBlock    *types.Block                       // The block from which new headers for mining are created.
 	sourceBlockAge time.Time                          // How long headers have been using the same block (different from 'recent block').
 	memProgress    int                                // The index of the most recent header used in headerMem.
 
@@ -105,7 +102,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][]byte),
-		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
+		headerMem:  make([]types.BlockHeader, HeaderMemory),
 
 		persistDir: persistDir,
 	}
