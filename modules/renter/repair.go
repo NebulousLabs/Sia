@@ -177,6 +177,14 @@ func (r *Renter) threadedRepairUploads() {
 				r.mu.Unlock(id)
 			}
 
+			// save the repaired file data
+			err = r.saveFile(f)
+			if err != nil {
+				// definitely bad, but we probably shouldn't delete from the
+				// repair set if this happens
+				r.log.Printf("failed to save repaired file %v: %v", name, err)
+			}
+
 			// close the file
 			handle.Close()
 
