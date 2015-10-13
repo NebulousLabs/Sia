@@ -10,6 +10,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// addPiece adds a piece to the testHost. It randomly fails according to the
+// testHost's parameters.
 func (h *testHost) addPiece(p uploadPiece) error {
 	// simulate I/O delay
 	time.Sleep(h.delay)
@@ -31,6 +33,8 @@ func (h *testHost) addPiece(p uploadPiece) error {
 	return nil
 }
 
+// fileContract returns the file contract that would have been created if
+// testHost were a real host.
 func (h *testHost) fileContract() fileContract {
 	var fc fileContract
 	for _, ps := range h.pieceMap {

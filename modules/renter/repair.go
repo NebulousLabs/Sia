@@ -56,7 +56,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 	for chunkIndex, missingPieces := range pieceMap {
 		// can only upload to hosts that aren't already storing this chunk
 		curHosts := f.chunkHosts(chunkIndex)
-		var chunkHosts []uploader
+		var newHosts []uploader
 	outer:
 		for _, h := range hosts {
 			for _, ip := range curHosts {
@@ -64,21 +64,19 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 					continue outer
 				}
 			}
-			chunkHosts = append(chunkHosts, h)
+			newHosts = append(newHosts, h)
 		}
 		// don't bother encoding if there aren't any hosts to upload to
-		if len(chunkHosts) == 0 {
+		if len(newHosts) == 0 {
 			continue
 		}
 
-		// read chunk data
+		// read chunk data and encode
 		chunk := make([]byte, f.chunkSize())
 		_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
 		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			return err
 		}
-
-		// encode
 		pieces, err := f.erasureCode.Encode(chunk)
 		if err != nil {
 			return err
@@ -87,7 +85,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 		// upload pieces, split evenly among hosts
 		wg.Add(len(missingPieces))
 		for j, pieceIndex := range missingPieces {
-			host := chunkHosts[j%len(chunkHosts)]
+			host := newHosts[j%len(newHosts)]
 			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
 			go func(host uploader, up uploadPiece) {
 				err := host.addPiece(up)
@@ -168,7 +166,6 @@ func (r *Renter) threadedRepairUploads() {
 				hosts = append(hosts, hostUploader)
 			}
 
-			// repair
 			err = f.repair(handle, missingPieceMap, hosts)
 			if err != nil {
 				r.log.Printf("failed to repair %v: %v", name, err)
