@@ -14,6 +14,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	// the renter will not form contracts above this price
+	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320 * 1024 * 1024 * 1024 / 400)) // 400 SC / GB / Month
+
+	errTooExpensive = errors.New("host price was too high")
+)
+
 // A hostUploader uploads pieces to a host. It implements the uploader interface.
 type hostUploader struct {
 	// constants
@@ -374,6 +381,11 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 }
 
 func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, duration types.BlockHeight, masterKey crypto.TwofishKey) (*hostUploader, error) {
+	// reject hosts that are too expensive
+	if settings.Price.Cmp(maxPrice) > 0 {
+		return nil, errTooExpensive
+	}
+
 	hu := &hostUploader{
 		settings:  settings,
 		masterKey: masterKey,
