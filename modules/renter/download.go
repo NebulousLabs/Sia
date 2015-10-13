@@ -13,6 +13,11 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+var (
+	errInsufficientHosts  = errors.New("insufficient hosts to recover file")
+	errInsufficientPieces = errors.New("couldn't fetch enough pieces to recover data")
+)
+
 // A fetcher fetches pieces from a host. This interface exists to facilitate
 // easy testing.
 type fetcher interface {
@@ -110,7 +115,7 @@ func checkHosts(hosts []fetcher, minPieces int, numChunks uint64) error {
 			pieces += len(h.pieces(i))
 		}
 		if pieces < minPieces {
-			return errors.New("insufficient hosts to recover file")
+			return errInsufficientHosts
 		}
 	}
 	return nil
@@ -194,7 +199,7 @@ func (d *download) run(w io.Writer) error {
 			}
 		}
 		if left != 0 {
-			return errors.New("couldn't fetch enough pieces to recover data")
+			return errInsufficientPieces
 		}
 
 		// Write pieces to w. We always write chunkSize bytes unless this is

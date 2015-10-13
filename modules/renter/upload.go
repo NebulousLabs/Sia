@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -41,6 +40,9 @@ type uploader interface {
 	// fileContract returns the fileContract containing the metadata of all
 	// previously added pieces.
 	fileContract() fileContract
+
+	// addr returns the IP address of the uploader.
+	addr() modules.NetAddress
 }
 
 // upload reads chunks from r and uploads them to hosts. It spawns a worker
@@ -75,12 +77,12 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		}
 		wg.Wait()
 		atomic.AddUint64(&f.chunksUploaded, 1)
-	}
 
-	// gather final contracts
-	for _, h := range hosts {
-		contract := h.fileContract()
-		f.contracts[contract.IP] = contract
+		// update contracts
+		for _, h := range hosts {
+			contract := h.fileContract()
+			f.contracts[contract.IP] = contract
+		}
 	}
 
 	return nil
@@ -120,17 +122,12 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // Upload takes an upload parameters, which contain a file to upload, and then
 // creates a redundant copy of the file on the Sia network.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
-	// TODO: This type of restriction is something that should be handled by
-	// the frontend, not the backend.
-	if filepath.Ext(up.Filename) != filepath.Ext(up.Nickname) {
-		return errors.New("nickname and file name must have the same extension")
-	}
-
 	// Open the file.
 	handle, err := os.Open(up.Filename)
 	if err != nil {
 		return err
 	}
+	defer handle.Close()
 
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
@@ -186,6 +183,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	for i := range randHosts {
 		hostUploader, err := r.newHostUploader(randHosts[i], totalsize, up.Duration, f.masterKey)
 		if err != nil {
+			r.log.Printf("Upload: could not form contract with %v: %v", randHosts[i].IPAddress, err)
 			continue
 		}
 		defer hostUploader.Close()
@@ -211,6 +209,12 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		r.mu.Unlock(lockID)
 		return errors.New("failed to upload any file pieces")
 	}
+
+	// Add file to repair set.
+	lockID = r.mu.Lock()
+	r.repairSet[up.Nickname] = up.Filename
+	r.save()
+	r.mu.Unlock(lockID)
 
 	// Save the .sia file to the renter directory.
 	err = r.saveFile(f)

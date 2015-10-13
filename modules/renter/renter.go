@@ -28,7 +28,8 @@ type Renter struct {
 
 	files         map[string]*file
 	contracts     map[types.FileContractID]types.FileContract
-	entropy       [32]byte // used to generate signing keys
+	repairSet     map[string]string // map from nickname to filepath
+	entropy       [32]byte          // used to generate signing keys
 	downloadQueue []*download
 
 	persistDir string
@@ -59,6 +60,7 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 
 		files:     make(map[string]*file),
 		contracts: make(map[types.FileContractID]types.FileContract),
+		repairSet: make(map[string]string),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
@@ -72,7 +74,9 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 		return nil, err
 	}
 
-	r.cs.ConsensusSetSubscribe(r)
+	cs.ConsensusSetSubscribe(r)
+
+	go r.threadedRepairUploads()
 
 	return r, nil
 }

@@ -7,11 +7,17 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
+// addPiece adds a piece to the testHost. It randomly fails according to the
+// testHost's parameters.
 func (h *testHost) addPiece(p uploadPiece) error {
 	// simulate I/O delay
 	time.Sleep(h.delay)
+
+	h.Lock()
+	defer h.Unlock()
 
 	// randomly fail
 	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
@@ -27,7 +33,20 @@ func (h *testHost) addPiece(p uploadPiece) error {
 	return nil
 }
 
-func (h *testHost) fileContract() fileContract { return fileContract{} }
+// fileContract returns the file contract that would have been created if
+// testHost were a real host.
+func (h *testHost) fileContract() fileContract {
+	var fc fileContract
+	for _, ps := range h.pieceMap {
+		fc.Pieces = append(fc.Pieces, ps...)
+	}
+	fc.IP = h.ip
+	return fc
+}
+
+func (h *testHost) addr() modules.NetAddress {
+	return h.ip
+}
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.
 func TestErasureUpload(t *testing.T) {

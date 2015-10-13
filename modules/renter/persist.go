@@ -172,15 +172,22 @@ func (r *Renter) saveFile(f *file) error {
 	}
 
 	// Write file.
-	return f.save(handle)
+	err = f.save(handle)
+	if err != nil {
+		return err
+	}
+
+	// Commit the SafeFile.
+	return handle.Commit()
 }
 
 // save stores the current renter data to disk.
 func (r *Renter) save() error {
 	data := struct {
 		Contracts map[string]types.FileContract
+		Repairing map[string]string
 		Entropy   [32]byte
-	}{make(map[string]types.FileContract), r.entropy}
+	}{make(map[string]types.FileContract), r.repairSet, r.entropy}
 	// Convert renter's contract map to a JSON-friendly type.
 	for id, fc := range r.contracts {
 		b, _ := id.MarshalJSON()
@@ -217,15 +224,17 @@ func (r *Renter) load() error {
 		}
 	}
 
-	// Load contracts and entropy.
+	// Load contracts, repair set, and entropy.
 	data := struct {
 		Contracts map[string]types.FileContract
+		Repairing map[string]string
 		Entropy   [32]byte
 	}{}
 	err = persist.LoadFile(saveMetadata, &data, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
 		return err
 	}
+	r.repairSet = data.Repairing
 	r.entropy = data.Entropy
 	var fcid types.FileContractID
 	for id, fc := range data.Contracts {
@@ -350,13 +359,9 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 		r.files[f.name] = f
 		names[i] = f.name
 	}
-	// Save the files, and their renter metadata.
+	// Save the files.
 	for _, f := range files {
 		r.saveFile(f)
-	}
-	err = r.save()
-	if err != nil {
-		return nil, err
 	}
 
 	return names, nil

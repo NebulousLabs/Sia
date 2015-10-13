@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"crypto/rand"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 type testHost struct {
+	ip        modules.NetAddress
 	data      []byte
 	pieceMap  map[uint64][]pieceData // key is chunkIndex
 	pieceSize uint64
@@ -20,6 +23,8 @@ type testHost struct {
 	// used to simulate real-world conditions
 	delay    time.Duration // transfers will take this long
 	failRate int           // transfers will randomly fail with probability 1/failRate
+
+	sync.Mutex
 }
 
 func (h *testHost) pieces(chunkIndex uint64) []pieceData {

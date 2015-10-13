@@ -142,7 +142,9 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f3)
 
 	// load should now load the files into memory.
+	id := rt.renter.mu.Lock()
 	err = rt.renter.load()
+	rt.renter.mu.Unlock(id)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
