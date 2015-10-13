@@ -7,31 +7,14 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
-// incompleteChunks returns a map of chunks in need of repair.
-// TODO: inefficient -- O(2n) on number of pieces
-func (f *file) incompleteChunks() map[uint64][]uint64 {
-	present := make([][]bool, f.numChunks())
-	for i := range present {
-		present[i] = make([]bool, f.erasureCode.NumPieces())
-	}
-	for _, fc := range f.contracts {
-		// TODO: ping host, and don't mark pieces if unresponsive?
-		for _, p := range fc.Pieces {
-			present[p.Chunk][p.Piece] = true
-		}
-	}
-	missing := make(map[uint64][]uint64)
-	for chunkIndex, pieceBools := range present {
-		for pieceIndex, ok := range pieceBools {
-			if !ok {
-				missing[uint64(chunkIndex)] = append(missing[uint64(chunkIndex)], uint64(pieceIndex))
-			}
-		}
-	}
-	return missing
-}
+const (
+	// When a file contract is within this many blocks of expiring, the renter
+	// will attempt to reupload the data covered by the contract.
+	renewThreshold = 2000
+)
 
 // chunkHosts returns the IPs of the hosts storing a given chunk.
 func (f *file) chunkHosts(index uint64) []modules.NetAddress {
@@ -47,6 +30,43 @@ func (f *file) chunkHosts(index uint64) []modules.NetAddress {
 	return hosts
 }
 
+// incompleteChunks returns a map of chunks in need of repair.
+func (f *file) incompleteChunks() map[uint64][]uint64 {
+	present := make([][]bool, f.numChunks())
+	for i := range present {
+		present[i] = make([]bool, f.erasureCode.NumPieces())
+	}
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			present[p.Chunk][p.Piece] = true
+		}
+	}
+	incomplete := make(map[uint64][]uint64)
+	for chunkIndex, pieceBools := range present {
+		for pieceIndex, ok := range pieceBools {
+			if !ok {
+				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
+			}
+		}
+	}
+	return incomplete
+}
+
+// expiringChunks returns a map of chunks whose pieces will expire within
+// 'renewThreshold' blocks.
+func (f *file) expiringChunks(currentHeight types.BlockHeight) map[uint64][]uint64 {
+	expiring := make(map[uint64][]uint64)
+	for _, fc := range f.contracts {
+		if currentHeight >= fc.WindowStart-renewThreshold {
+			// mark every piece in the chunk
+			for _, p := range fc.Pieces {
+				expiring[p.Chunk] = append(expiring[p.Chunk], p.Piece)
+			}
+		}
+	}
+	return expiring
+}
+
 // repair attempts to repair a file by uploading missing pieces to more hosts.
 func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploader) error {
 	// For each chunk with missing pieces, re-encode the chunk and upload each
@@ -54,6 +74,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 	var wg sync.WaitGroup
 	for chunkIndex, missingPieces := range pieceMap {
 		// can only upload to hosts that aren't already storing this chunk
+		// TODO: what if we're renewing?
 		curHosts := f.chunkHosts(chunkIndex)
 		var newHosts []uploader
 	outer:
@@ -119,9 +140,10 @@ func (r *Renter) threadedRepairUploads() {
 		r.mu.RUnlock(id)
 
 		for name, path := range repairing {
-			// retrieve file object
+			// retrieve file object and get current height
 			id = r.mu.RLock()
 			f, ok := r.files[name]
+			height := r.blockHeight
 			r.mu.RUnlock(id)
 			if !ok {
 				r.log.Printf("failed to repair %v: no longer tracking that file", name)
@@ -132,10 +154,13 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// determine file health
-			missingPieceMap := f.incompleteChunks()
-			if len(missingPieceMap) == 0 {
-				// nothing to do
-				continue
+			badChunks := f.incompleteChunks()
+			if len(badChunks) == 0 {
+				badChunks = f.expiringChunks(height)
+				if len(badChunks) == 0 {
+					// nothing to do
+					continue
+				}
 			}
 
 			// open file handle
@@ -161,7 +186,7 @@ func (r *Renter) threadedRepairUploads() {
 				hosts = append(hosts, hostUploader)
 			}
 
-			err = f.repair(handle, missingPieceMap, hosts)
+			err = f.repair(handle, badChunks, hosts)
 			if err != nil {
 				r.log.Printf("failed to repair %v: %v", name, err)
 				id = r.mu.Lock()
