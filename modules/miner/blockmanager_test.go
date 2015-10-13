@@ -110,28 +110,22 @@ func TestIntegrationManyHeaders(t *testing.T) {
 	}
 
 	// Create a suite of headers for imaginary parallel mining.
-	headerDepth := HeaderMemory / BlockMemory * 2
-	var solvedHeaders []types.BlockHeader
-	for i := 0; i < headerDepth; i++ {
+	solvedHeaders := make([]types.BlockHeader, HeaderMemory/BlockMemory*2)
+	for i := range solvedHeaders {
 		header, target, err := mt.miner.HeaderForWork()
 		if err != nil {
 			t.Fatal(err)
 		}
-		solvedHeader := solveHeader(header, target)
-		solvedHeaders = append(solvedHeaders, solvedHeader)
+		solvedHeaders[i] = solveHeader(header, target)
 	}
 
 	// Submit the headers randomly and make sure they are all considered valid.
-	for len(solvedHeaders) > 0 {
-		choice, err := crypto.RandIntn(len(solvedHeaders))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = mt.miner.SubmitHeader(solvedHeaders[choice])
+	selectionOrder := crypto.Perm(len(solvedHeaders))
+	for _, selection := range selectionOrder {
+		err = mt.miner.SubmitHeader(solvedHeaders[selection])
 		if err != nil && err != modules.ErrNonExtendingBlock {
 			t.Error(err)
 		}
-		solvedHeaders = append(solvedHeaders[0:choice], solvedHeaders[choice+1:]...)
 	}
 }
 
