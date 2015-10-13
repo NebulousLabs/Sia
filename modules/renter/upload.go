@@ -81,7 +81,7 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		// update contracts
 		for _, h := range hosts {
 			contract := h.fileContract()
-			f.contracts[contract.IP] = contract
+			f.contracts[contract.ID] = contract
 		}
 	}
 

@@ -29,7 +29,7 @@ type file struct {
 
 	name        string
 	size        uint64
-	contracts   map[modules.NetAddress]fileContract
+	contracts   map[types.FileContractID]fileContract
 	masterKey   crypto.TwofishKey
 	erasureCode modules.ErasureCoder
 	pieceSize   uint64
@@ -117,7 +117,7 @@ func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64)
 	return &file{
 		name:        name,
 		size:        fileSize,
-		contracts:   make(map[modules.NetAddress]fileContract),
+		contracts:   make(map[types.FileContractID]fileContract),
 		masterKey:   key,
 		erasureCode: code,
 		pieceSize:   pieceSize,

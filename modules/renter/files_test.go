@@ -3,7 +3,7 @@ package renter
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestFileAvailable probes the Available method of the file type.
@@ -36,7 +36,7 @@ func TestFileNickname(t *testing.T) {
 // TestFileExpiration probes the Expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
 	f := &file{
-		contracts: make(map[modules.NetAddress]fileContract),
+		contracts: make(map[types.FileContractID]fileContract),
 	}
 
 	if f.Expiration() != 0 {
@@ -46,21 +46,21 @@ func TestFileExpiration(t *testing.T) {
 	// Add a contract.
 	fc := fileContract{}
 	fc.WindowStart = 100
-	f.contracts["foo"] = fc
+	f.contracts[types.FileContractID{0}] = fc
 	if f.Expiration() != 100 {
-		t.Error("file with expired contract should report as having no time remaining")
+		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a lower WindowStart.
 	fc.WindowStart = 50
-	f.contracts["bar"] = fc
+	f.contracts[types.FileContractID{1}] = fc
 	if f.Expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a higher WindowStart.
 	fc.WindowStart = 75
-	f.contracts["baz"] = fc
+	f.contracts[types.FileContractID{2}] = fc
 	if f.Expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}

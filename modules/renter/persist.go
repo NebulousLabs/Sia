@@ -13,7 +13,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -142,13 +141,13 @@ func (f *file) load(r io.Reader) error {
 	if err := dec.Decode(&nContracts); err != nil {
 		return err
 	}
-	f.contracts = make(map[modules.NetAddress]fileContract)
+	f.contracts = make(map[types.FileContractID]fileContract)
 	var contract fileContract
 	for i := uint64(0); i < nContracts; i++ {
 		if err := dec.Decode(&contract); err != nil {
 			return err
 		}
-		f.contracts[contract.IP] = contract
+		f.contracts[contract.ID] = contract
 	}
 	return nil
 }

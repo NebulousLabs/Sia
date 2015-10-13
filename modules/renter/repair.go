@@ -101,7 +101,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 		// update contracts
 		for _, h := range hosts {
 			contract := h.fileContract()
-			f.contracts[contract.IP] = contract
+			f.contracts[contract.ID] = contract
 		}
 	}
 
