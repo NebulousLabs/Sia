@@ -7,49 +7,59 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// ProcessConsensusChange will update the miner's most recent block. This is a
-// part of the ConsensusSetSubscriber interface.
-func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
+// ProcessConsensusDigest will update the miner's most recent block.
+func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.height -= types.BlockHeight(len(cc.RevertedBlocks))
-	m.height += types.BlockHeight(len(cc.AppliedBlocks))
-
-	if len(cc.AppliedBlocks) == 0 {
-		return
+	// Sanity check - the length of appliedIDs should always be non-zero.
+	if build.DEBUG && len(appliedIDs) == 0 {
+		panic("received a digest with no applied blocks")
 	}
 
-	m.parent = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
-	target, exists1 := m.cs.ChildTarget(m.parent)
-	timestamp, exists2 := m.cs.EarliestChildTimestamp(m.parent)
-	if build.DEBUG {
-		if !exists1 {
-			panic("could not get child target")
-		}
-		if !exists2 {
-			panic("could not get child earliest timestamp")
-		}
+	// Adjust the height of the miner.
+	m.height -= types.BlockHeight(len(revertedIDs))
+	m.height += types.BlockHeight(len(appliedIDs))
+
+	// Update the unsolved block.
+	var exists1, exists2 bool
+	m.unsolvedBlock.ParentID = appliedIDs[len(appliedIDs)-1]
+	m.target, exists1 = m.cs.ChildTarget(m.unsolvedBlock.ParentID)
+	m.unsolvedBlock.Timestamp, exists2 = m.cs.EarliestChildTimestamp(m.unsolvedBlock.ParentID)
+	if build.DEBUG && !exists1 {
+		panic("could not get child target")
 	}
-	m.target = target
-	m.earliestTimestamp = timestamp
-	m.prepareNewBlock()
+	if build.DEBUG && !exists2 {
+		panic("could not get child earliest timestamp")
+	}
+
+	// There is a new parent block, the source block should be updated to keep
+	// the stale rate as low as possible.
+	m.newSourceBlock()
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
-// set of transactions with the input transactions. This is a part of the
-// TransactionPoolSubscriber interface.
+// set of transactions with the input transactions.
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.transactions = nil
+	// Edge case - if there are no transactions, set the block's transactions
+	// to nil and return.
+	if len(unconfirmedTransactions) == 0 {
+		m.unsolvedBlock.Transactions = nil
+		return
+	}
+
+	// Add transactions to the block until the block size limit is reached.
+	// Transactions are assumed to be in a sensible order.
+	var i int
 	remainingSize := int(types.BlockSizeLimit - 5e3)
-	for i := range unconfirmedTransactions {
+	for i = range unconfirmedTransactions {
 		remainingSize -= len(encoding.Marshal(unconfirmedTransactions[i]))
 		if remainingSize < 0 {
 			break
 		}
-		m.transactions = unconfirmedTransactions[0 : i+1]
 	}
+	m.unsolvedBlock.Transactions = unconfirmedTransactions[0 : i+1]
 }

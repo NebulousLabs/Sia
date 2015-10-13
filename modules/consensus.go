@@ -17,6 +17,7 @@ const (
 
 var (
 	ErrBlockKnown        = errors.New("block already present in database")
+	ErrBlockUnsolved     = errors.New("block does not meet target")
 	ErrNonExtendingBlock = errors.New("block does not extend the longest fork")
 )
 
@@ -30,7 +31,21 @@ type (
 	ConsensusSetSubscriber interface {
 		// ProcessConsensusChange sends a consensus update to a module through
 		// a function call. Updates will always be sent in the correct order.
+		// There may not be any reverted blocks, but there will always be
+		// applied blocks.
 		ProcessConsensusChange(ConsensusChange)
+	}
+
+	// ConsensusSetDigestSubscriber receives digests about changes to the
+	// consensus set in the form of a list of ids of blocks that got reverted
+	// and a list of ids of blocks that got applied. The IDs are given in the
+	// order in which they were processed. Reverted blocks are always processed
+	// before applied blocks.
+	ConsensusSetDigestSubscriber interface {
+		// ProcessConsensusDigest sends a list of reverted blocks and applied
+		// blocks to the module. There may not be any reverted blocks, but
+		// there will always be applied blocks.
+		ProcessConsensusDigest(revertedBlocks []types.BlockID, appliedBlocks []types.BlockID)
 	}
 
 	// A ConsensusChange enumerates a set of changes that occured to the consensus set.
@@ -150,6 +165,12 @@ type (
 		// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.
 		// This is a thread-safe way of managing updates.
 		ConsensusSetSubscribe(ConsensusSetSubscriber)
+
+		// ConsensusSetDigestSubscribe subscribes a module to a digest of the
+		// changes in the consensus set. Immediately upon subscription, a
+		// digest containing the list of blocks from the starting id to the
+		// current block is presented to the subscriber.
+		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
 
 		// EarliestChildTimestamp returns the earliest timestamp that is acceptable
 		// on the current longest fork according to the consensus set. This is a

@@ -1,6 +1,7 @@
 package miner
 
 import (
+	"bytes"
 	"crypto/rand"
 	"path/filepath"
 	"testing"
@@ -136,5 +137,64 @@ func TestIntegrationNilMinerDependencies(t *testing.T) {
 	_, err = New(nil, nil, nil, "")
 	if err == nil {
 		t.Fatal(err)
+	}
+}
+
+// TestIntegrationBlocksMined checks that the BlocksMined function correctly
+// indicates the number of real blocks and stale blocks that have been mined.
+func TestIntegrationBlocksMined(t *testing.T) {
+	mt, err := createMinerTester("TestIntegrationBlocksMined")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get an unsolved header.
+	unsolvedHeader, target, err := mt.miner.HeaderForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Unsolve the header.
+	for {
+		unsolvedHeader.Nonce[0]++
+		id := crypto.HashObject(unsolvedHeader)
+		if bytes.Compare(target[:], id[:]) < 0 {
+			break
+		}
+	}
+
+	// Get two solved headers.
+	header1, target, err := mt.miner.HeaderForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	header1 = solveHeader(header1, target)
+	header2, target, err := mt.miner.HeaderForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	header2 = solveHeader(header2, target)
+
+	// Submit the unsolved header followed by the two solved headers, this
+	// should result in 1 real block mined and 1 stale block mined.
+	err = mt.miner.SubmitHeader(unsolvedHeader)
+	if err != modules.ErrBlockUnsolved {
+		t.Fatal(err)
+	}
+	err = mt.miner.SubmitHeader(header1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = mt.miner.SubmitHeader(header2)
+	if err != modules.ErrNonExtendingBlock {
+		t.Fatal(err)
+	}
+
+	goodBlocks, staleBlocks := mt.miner.BlocksMined()
+	if goodBlocks != 1 {
+		t.Error("expexting 1 good block")
+	}
+	if staleBlocks != 1 {
+		t.Error(len(mt.miner.blocksFound))
+		t.Error("expecting 1 stale block, got", staleBlocks)
 	}
 }

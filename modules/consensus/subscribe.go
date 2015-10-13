@@ -91,6 +91,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, i int) (cc modules.C
 // readlockUpdateSubscribers does not alter the changelog, the changelog must
 // be updated beforehand.
 func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
+	// Get the consensus change and send it to all subscribers.
 	var cc modules.ConsensusChange
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		var err error
@@ -102,6 +103,18 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	}
 	for _, subscriber := range cs.subscribers {
 		subscriber.ProcessConsensusChange(cc)
+	}
+
+	// Get the change digest and send it to all subscribers.
+	var revertedIDs, appliedIDs []types.BlockID
+	for _, rb := range cc.RevertedBlocks {
+		revertedIDs = append(revertedIDs, rb.ID())
+	}
+	for _, ab := range cc.AppliedBlocks {
+		appliedIDs = append(appliedIDs, ab.ID())
+	}
+	for _, ds := range cs.digestSubscribers {
+		ds.ProcessConsensusDigest(revertedIDs, appliedIDs)
 	}
 }
 
@@ -123,13 +136,45 @@ func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err 
 	return cc, nil
 }
 
+// ConsensusSetDigestSubscribe accepts a new digest subscriber who will receive
+// a call to ProcessConsensusDigest every time there is a change in the
+// consensus set.
+func (cs *ConsensusSet) ConsensusSetDigestSubscribe(subscriber modules.ConsensusSetDigestSubscriber) {
+	cs.mu.Lock()
+	cs.digestSubscribers = append(cs.digestSubscribers, subscriber)
+	cs.mu.Demote()
+	defer cs.mu.DemotedUnlock()
+
+	var currentPath []types.BlockID
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Get the whole current path into memory to be sent as the first
+		// digest.
+		//
+		// TODO: Change this construction to something simpler.
+		height := blockHeight(tx)
+		for i := types.BlockHeight(0); i <= height; i++ {
+			id, err := getPath(tx, i)
+			if err != nil {
+				return err
+			}
+			currentPath = append(currentPath, id)
+		}
+		subscriber.ProcessConsensusDigest(nil, currentPath)
+		return nil
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
 // ProcessConsensusChange every time there is a change in the consensus set.
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
 	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
 	cs.subscribers = append(cs.subscribers, subscriber)
+	cs.mu.Demote()
+	defer cs.mu.DemotedUnlock()
+
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		for i := range cs.changeLog {
 			cc, err := cs.computeConsensusChange(tx, i)

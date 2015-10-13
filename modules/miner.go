@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -18,7 +17,7 @@ type BlockManager interface {
 	HeaderForWork() (types.BlockHeader, types.Target, error)
 
 	// SubmitHeader takes a block header that has been worked on and has a
-	// valid target. A superior choice to SubmitBlock.
+	// valid target.
 	SubmitHeader(types.BlockHeader) error
 
 	// BlocksMined returns the number of blocks and stale blocks that have been
@@ -52,7 +51,7 @@ type TestMiner interface {
 	// BlockForWork returns a block that is ready for nonce grinding. All
 	// blocks returned by BlockForWork have a unique merkle root, meaning that
 	// each can safely start from nonce 0.
-	BlockForWork() (types.Block, crypto.Hash, types.Target, error)
+	BlockForWork() (types.Block, types.Target, error)
 
 	// FindBlock will have the miner make 1 attempt to find a solved block that
 	// builds on the current consensus set. It will give up after a few

@@ -52,8 +52,8 @@ func randFile(filesize uint64) *bytes.Reader {
 	return bytes.NewReader(fileBytes)
 }
 
-// addSiafunds makes a transaction that moves all of the testing genesis
-// siafunds into the wallet.
+// addSiafunds makes a transaction that moves some testing genesis siafunds
+// into the wallet.
 func (cst *consensusSetTester) addSiafunds() {
 	// Get an address to receive the siafunds.
 	uc, err := cst.wallet.NextAddress()

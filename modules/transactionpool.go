@@ -27,10 +27,6 @@ var (
 // unconfirmed set from the transaction pool. Generally, there is no need to
 // subscribe to both the consensus set and the transaction pool.
 type TransactionPoolSubscriber interface {
-	// All transaction pool subscribers must also be able to receive consensus
-	// set updates.
-	ConsensusSetSubscriber
-
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
 	// consensus set and/or unconfirmed set, and includes the consensus change
 	// that would result if all of the transactions made it into a block.

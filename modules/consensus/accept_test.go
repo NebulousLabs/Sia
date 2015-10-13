@@ -33,7 +33,7 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 
 	// Mine and submit the invalid block to the consensus set. The first time
 	// around, the complaint should be about the rule-breaking transaction.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestBlockKnownHandling(t *testing.T) {
 	defer cst.closeCst()
 
 	// Get a block destined to be stale.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestMissedTarget(t *testing.T) {
 	defer cst.closeCst()
 
 	// Mine a block that doesn't meet the target.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,8 +163,8 @@ func TestMissedTarget(t *testing.T) {
 		t.Fatal("unable to find a failing target")
 	}
 	err = cst.cs.AcceptBlock(block)
-	if err != errMissedTarget {
-		t.Fatalf("expected %v, got %v", errMissedTarget, err)
+	if err != modules.ErrBlockUnsolved {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
 	}
 }
 
@@ -186,7 +186,7 @@ func TestLargeBlock(t *testing.T) {
 	}
 
 	// Fetch a block and add the transaction, then submit the block.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 
 	// Create a block with a too early timestamp - block should be rejected
 	// outright.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	defer cst.closeCst()
 
 	// Submit a block with a timestamp in the extreme future.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestMinerPayoutHandling(t *testing.T) {
 	// Create a block with the wrong miner payout structure - testing can be
 	// light here because there is heavier testing in the 'types' package,
 	// where the logic is defined.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 
 	// Submit a block with a timestamp in the future, but not the extreme
 	// future.
-	block, _, target, err := cst.miner.BlockForWork()
+	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
 	}
