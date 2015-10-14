@@ -36,6 +36,8 @@ func (f *file) chunkHosts(index uint64) []modules.NetAddress {
 // removeExpiredContracts deletes contracts in the file object that have
 // expired.
 func (f *file) removeExpiredContracts(currentHeight types.BlockHeight) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var expired []types.FileContractID
 	for id, fc := range f.contracts {
 		if currentHeight >= fc.WindowStart {
@@ -84,14 +86,13 @@ func (f *file) expiringChunks(currentHeight types.BlockHeight) map[uint64][]uint
 	return expiring
 }
 
-// threadedOfflineChunks returns a map of chunks whose pieces are not
+// offlineChunks returns a map of chunks whose pieces are not
 // immediately available for download.
-func (f *file) threadedOfflineChunks() map[uint64][]uint64 {
+func (f *file) offlineChunks() map[uint64][]uint64 {
 	offline := make(map[uint64][]uint64)
 	var mapLock sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(len(f.contracts))
-	f.mu.RLock()
 	for _, fc := range f.contracts {
 		go func(fc fileContract) {
 			defer wg.Done()
@@ -108,7 +109,6 @@ func (f *file) threadedOfflineChunks() map[uint64][]uint64 {
 			mapLock.Unlock()
 		}(fc)
 	}
-	f.mu.RUnlock()
 	wg.Wait()
 	return offline
 }
@@ -121,9 +121,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 	for chunkIndex, missingPieces := range pieceMap {
 		// can only upload to hosts that aren't already storing this chunk
 		// TODO: what if we're renewing?
-		f.mu.RLock()
 		curHosts := f.chunkHosts(chunkIndex)
-		f.mu.RUnlock()
 		var newHosts []uploader
 	outer:
 		for _, h := range hosts {
@@ -204,22 +202,17 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// delete any expired contracts
-			f.mu.Lock()
 			f.removeExpiredContracts(height)
-			f.mu.Unlock()
 
 			// determine file health
-			f.mu.RLock()
 			badChunks := f.incompleteChunks()
 			if len(badChunks) == 0 {
 				badChunks = f.expiringChunks(height)
 				if len(badChunks) == 0 {
 					// nothing to do
-					f.mu.RUnlock()
 					continue
 				}
 			}
-			f.mu.RUnlock()
 
 			// open file handle
 			handle, err := os.Open(path)

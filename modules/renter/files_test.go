@@ -106,21 +106,23 @@ func TestRenterDeleteFile(t *testing.T) {
 		t.Error("file was deleted, but is still reported in FileList")
 	}
 
-	// Put a file in the renter, then rename it.
-	rt.renter.files["1"] = &file{
-		name: "one",
-	}
-	rt.renter.RenameFile("1", "one")
-	// Call delete on the previous name.
-	err = rt.renter.DeleteFile("1")
-	if err != ErrUnknownNickname {
-		t.Error("Expected ErrUnknownNickname:", err)
-	}
-	// Call delete on the new name.
-	err = rt.renter.DeleteFile("one")
-	if err != nil {
-		t.Error(err)
-	}
+	/*
+		// Put a file in the renter, then rename it.
+		rt.renter.files["1"] = &file{
+			name: "one",
+		}
+		rt.renter.RenameFile("1", "one")
+		// Call delete on the previous name.
+		err = rt.renter.DeleteFile("1")
+		if err != ErrUnknownNickname {
+			t.Error("Expected ErrUnknownNickname:", err)
+		}
+		// Call delete on the new name.
+		err = rt.renter.DeleteFile("one")
+		if err != nil {
+			t.Error(err)
+		}
+	*/
 }
 
 // TestRenterFileList probes the FileList method of the renter type.
@@ -167,9 +169,8 @@ func TestRenterFileList(t *testing.T) {
 
 // TestRenterRenameFile probes the rename method of the renter.
 func TestRenterRenameFile(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
+	t.Skip("Renaming disabled")
+
 	rt, err := newRenterTester("TestRenterRenameFile")
 	if err != nil {
 		t.Fatal(err)
