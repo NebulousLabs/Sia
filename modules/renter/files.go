@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -28,6 +29,7 @@ type file struct {
 	erasureCode modules.ErasureCoder
 	pieceSize   uint64
 	mode        uint32 // actually an os.FileMode
+	mu          sync.RWMutex
 }
 
 // A fileContract is a contract covering an arbitrary number of file pieces.
@@ -69,6 +71,8 @@ func (f *file) numChunks() uint64 {
 
 // Available indicates whether the file is ready to be downloaded.
 func (f *file) Available() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	chunkPieces := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
 		for _, p := range fc.Pieces {
@@ -87,6 +91,8 @@ func (f *file) Available() bool {
 // been uploaded. Note that a file may be Available long before UploadProgress
 // reaches 100%, and UploadProgress may report a value greater than 100%.
 func (f *file) UploadProgress() float32 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	var uploaded uint64
 	for _, fc := range f.contracts {
 		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
@@ -109,6 +115,8 @@ func (f *file) Filesize() uint64 {
 // Expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) Expiration() types.BlockHeight {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	if len(f.contracts) == 0 {
 		return 0
 	}
@@ -180,8 +188,11 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	}
 
 	// Do the renaming.
+	file.mu.Lock()
+	file.name = newName
+	file.mu.Unlock()
+	r.saveFile(file)
 	delete(r.files, currentName)
-	file.name = newName // make atomic?
 	r.files[newName] = file
 
 	r.save()

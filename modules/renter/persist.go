@@ -40,7 +40,6 @@ var (
 // save saves a file to w in shareable form. Files are stored in binary format
 // and gzipped to reduce size.
 func (f *file) save(w io.Writer) error {
-	// TODO: error checking
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
 	defer zip.Close()
 	enc := encoding.NewEncoder(zip)
@@ -94,7 +93,6 @@ func (f *file) save(w io.Writer) error {
 
 // load loads a file created by save.
 func (f *file) load(r io.Reader) error {
-	// TODO: error checking
 	zip, err := gzip.NewReader(r)
 	if err != nil {
 		return err
@@ -178,7 +176,9 @@ func (r *Renter) saveFile(f *file) error {
 	}
 
 	// Write file.
+	f.mu.RLock()
 	err = f.save(handle)
+	f.mu.RUnlock()
 	if err != nil {
 		return err
 	}

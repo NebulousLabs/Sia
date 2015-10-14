@@ -75,7 +75,9 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 	for chunkIndex, missingPieces := range pieceMap {
 		// can only upload to hosts that aren't already storing this chunk
 		// TODO: what if we're renewing?
+		f.mu.RLock()
 		curHosts := f.chunkHosts(chunkIndex)
+		f.mu.RUnlock()
 		var newHosts []uploader
 	outer:
 		for _, h := range hosts {
@@ -115,10 +117,12 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 		wg.Wait()
 
 		// update contracts
+		f.mu.Lock()
 		for _, h := range hosts {
 			contract := h.fileContract()
 			f.contracts[contract.ID] = contract
 		}
+		f.mu.Unlock()
 	}
 
 	return nil
@@ -154,14 +158,17 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// determine file health
+			f.mu.RLock()
 			badChunks := f.incompleteChunks()
 			if len(badChunks) == 0 {
 				badChunks = f.expiringChunks(height)
 				if len(badChunks) == 0 {
 					// nothing to do
+					f.mu.RUnlock()
 					continue
 				}
 			}
+			f.mu.RUnlock()
 
 			// open file handle
 			handle, err := os.Open(path)

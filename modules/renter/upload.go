@@ -76,10 +76,12 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		wg.Wait()
 
 		// update contracts
+		f.mu.Lock()
 		for _, h := range hosts {
 			contract := h.fileContract()
 			f.contracts[contract.ID] = contract
 		}
+		f.mu.Unlock()
 	}
 
 	return nil
