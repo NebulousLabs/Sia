@@ -4,7 +4,6 @@ package types
 // for working with blocks.
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -67,32 +66,6 @@ func (b Block) CalculateSubsidy(height BlockHeight) Currency {
 		}
 	}
 	return subsidy
-}
-
-// CheckMinerPayouts compares the miner payouts to the subsidy and returns true
-// if they are equal, false otherwise.
-func (b Block) CheckMinerPayouts(height BlockHeight) bool {
-	// Add up the payouts and check that all values are legal.
-	var payoutSum Currency
-	for _, payout := range b.MinerPayouts {
-		if payout.Value.IsZero() {
-			return false
-		}
-		payoutSum = payoutSum.Add(payout.Value)
-	}
-
-	// Compare the payouts to the subsidy.
-	subsidy := b.CalculateSubsidy(height)
-	if subsidy.Cmp(payoutSum) != 0 {
-		return false
-	}
-	return true
-}
-
-// CheckTarget returns true if the block's ID meets the given target.
-func (b Block) CheckTarget(target Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
 // Header returns the header of a block.
