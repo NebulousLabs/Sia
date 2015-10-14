@@ -226,15 +226,18 @@ func (r *Renter) threadedRepairUploads() {
 
 			// build host list
 			var hosts []uploader
-			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces())
+			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
 			for i := range randHosts {
 				// TODO: use smarter duration
 				hostUploader, err := r.newHostUploader(randHosts[i], f.size, defaultDuration, f.masterKey)
 				if err != nil {
 					continue
 				}
-				defer hostUploader.Close()
+
 				hosts = append(hosts, hostUploader)
+				if len(hosts) >= f.erasureCode.NumPieces() {
+					break
+				}
 			}
 
 			err = f.repair(handle, badChunks, hosts)

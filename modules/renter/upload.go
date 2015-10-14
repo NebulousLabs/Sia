@@ -178,15 +178,19 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Select and connect to hosts.
 	totalsize := up.PieceSize * uint64(up.ErasureCode.NumPieces()) * f.numChunks()
 	var hosts []uploader
-	randHosts := r.hostDB.RandomHosts(up.ErasureCode.NumPieces())
-	for i := range randHosts {
-		hostUploader, err := r.newHostUploader(randHosts[i], totalsize, up.Duration, f.masterKey)
+	randHosts := r.hostDB.RandomHosts(up.ErasureCode.NumPieces() * 2)
+	for _, h := range randHosts {
+		hostUploader, err := r.newHostUploader(h, totalsize, up.Duration, f.masterKey)
 		if err != nil {
-			r.log.Printf("Upload: could not form contract with %v: %v", randHosts[i].IPAddress, err)
+			r.log.Printf("Upload: could not form contract with %v: %v", h.IPAddress, err)
 			continue
 		}
 		defer hostUploader.Close()
+
 		hosts = append(hosts, hostUploader)
+		if len(hosts) >= up.ErasureCode.NumPieces() {
+			break
+		}
 	}
 	if len(hosts) < up.ErasureCode.MinPieces() {
 		return errors.New("not enough hosts to support upload")
