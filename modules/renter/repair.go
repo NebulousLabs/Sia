@@ -2,6 +2,7 @@ package renter
 
 import (
 	"io"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -14,6 +15,8 @@ const (
 	// When a file contract is within this many blocks of expiring, the renter
 	// will attempt to reupload the data covered by the contract.
 	renewThreshold = 2000
+
+	hostTimeout = 3 * time.Second // TODO: longer?
 )
 
 // chunkHosts returns the IPs of the hosts storing a given chunk.
@@ -79,6 +82,35 @@ func (f *file) expiringChunks(currentHeight types.BlockHeight) map[uint64][]uint
 		}
 	}
 	return expiring
+}
+
+// threadedOfflineChunks returns a map of chunks whose pieces are not
+// immediately available for download.
+func (f *file) threadedOfflineChunks() map[uint64][]uint64 {
+	offline := make(map[uint64][]uint64)
+	var mapLock sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(len(f.contracts))
+	f.mu.RLock()
+	for _, fc := range f.contracts {
+		go func(fc fileContract) {
+			defer wg.Done()
+			conn, err := net.DialTimeout("tcp", string(fc.IP), hostTimeout)
+			if err == nil {
+				conn.Close()
+				return
+			}
+			// host did not respond in time; mark all pieces as offline
+			mapLock.Lock()
+			for _, p := range fc.Pieces {
+				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+			}
+			mapLock.Unlock()
+		}(fc)
+	}
+	f.mu.RUnlock()
+	wg.Wait()
+	return offline
 }
 
 // repair attempts to repair a file by uploading missing pieces to more hosts.
