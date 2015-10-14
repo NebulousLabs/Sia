@@ -240,7 +240,9 @@ func (r *Renter) load() error {
 	if err != nil {
 		return err
 	}
-	r.repairSet = data.Repairing
+	if data.Repairing != nil {
+		r.repairSet = data.Repairing
+	}
 	r.entropy = data.Entropy
 	var fcid types.FileContractID
 	for id, fc := range data.Contracts {
