@@ -30,6 +30,20 @@ func (f *file) chunkHosts(index uint64) []modules.NetAddress {
 	return hosts
 }
 
+// removeExpiredContracts deletes contracts in the file object that have
+// expired.
+func (f *file) removeExpiredContracts(currentHeight types.BlockHeight) {
+	var expired []types.FileContractID
+	for id, fc := range f.contracts {
+		if currentHeight >= fc.WindowStart {
+			expired = append(expired, id)
+		}
+	}
+	for _, id := range expired {
+		delete(f.contracts, id)
+	}
+}
+
 // incompleteChunks returns a map of chunks in need of repair.
 func (f *file) incompleteChunks() map[uint64][]uint64 {
 	present := make([][]bool, f.numChunks())
@@ -156,6 +170,11 @@ func (r *Renter) threadedRepairUploads() {
 				r.mu.Unlock(id)
 				continue
 			}
+
+			// delete any expired contracts
+			f.mu.Lock()
+			f.removeExpiredContracts(height)
+			f.mu.Unlock()
 
 			// determine file health
 			f.mu.RLock()
