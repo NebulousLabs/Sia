@@ -4,7 +4,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -88,15 +87,11 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 			host := newHosts[j%len(newHosts)]
 			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
 			go func(host uploader, up uploadPiece) {
-				err := host.addPiece(up)
-				if err == nil {
-					atomic.AddUint64(&f.bytesUploaded, uint64(len(up.data)))
-				}
+				_ = host.addPiece(up)
 				wg.Done()
 			}(host, up)
 		}
 		wg.Wait()
-		atomic.AddUint64(&f.chunksUploaded, 1)
 
 		// update contracts
 		for _, h := range hosts {

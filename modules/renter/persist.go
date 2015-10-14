@@ -52,9 +52,13 @@ func (f *file) save(w io.Writer) error {
 		f.masterKey,
 		f.pieceSize,
 		f.mode,
-		f.bytesUploaded,
-		f.chunksUploaded,
 	)
+	if err != nil {
+		return err
+	}
+	// COMPATv0.4.3 - encode the bytesUploaded and chunksUploaded fields
+	// TODO: the resulting .sia file may confuse old clients.
+	err = enc.EncodeAll(f.pieceSize*f.numChunks()*uint64(f.erasureCode.NumPieces()), f.numChunks())
 	if err != nil {
 		return err
 	}
@@ -98,6 +102,9 @@ func (f *file) load(r io.Reader) error {
 	defer zip.Close()
 	dec := encoding.NewDecoder(zip)
 
+	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
+	var bytesUploaded, chunksUploaded uint64
+
 	// decode easy fields
 	err = dec.DecodeAll(
 		&f.name,
@@ -105,8 +112,8 @@ func (f *file) load(r io.Reader) error {
 		&f.masterKey,
 		&f.pieceSize,
 		&f.mode,
-		&f.bytesUploaded,
-		&f.chunksUploaded,
+		&bytesUploaded,
+		&chunksUploaded,
 	)
 	if err != nil {
 		return err

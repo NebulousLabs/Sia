@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -22,11 +21,6 @@ var (
 // master key. The pieces are uploaded to hosts in groups, such that one file
 // contract covers many pieces.
 type file struct {
-	// NOTE: these fields are defined first to ensure 64-bit alignment, which
-	// is required for atomic operations.
-	bytesUploaded  uint64
-	chunksUploaded uint64
-
 	name        string
 	size        uint64
 	contracts   map[types.FileContractID]fileContract
@@ -75,15 +69,31 @@ func (f *file) numChunks() uint64 {
 
 // Available indicates whether the file is ready to be downloaded.
 func (f *file) Available() bool {
-	return atomic.LoadUint64(&f.chunksUploaded) >= f.numChunks()
+	chunkPieces := make([]int, f.numChunks())
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			chunkPieces[p.Chunk]++
+		}
+	}
+	for _, n := range chunkPieces {
+		if n < f.erasureCode.MinPieces() {
+			return false
+		}
+	}
+	return true
 }
 
 // UploadProgress indicates what percentage of the file (plus redundancy) has
 // been uploaded. Note that a file may be Available long before UploadProgress
-// reaches 100%.
+// reaches 100%, and UploadProgress may report a value greater than 100%.
 func (f *file) UploadProgress() float32 {
-	totalBytes := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
-	return 100 * (float32(atomic.LoadUint64(&f.bytesUploaded)) / float32(totalBytes))
+	var uploaded uint64
+	for _, fc := range f.contracts {
+		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
+	}
+	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
+
+	return 100 * (float32(uploaded) / float32(desired))
 }
 
 // Nickname returns the nickname of the file.

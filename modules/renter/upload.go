@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -67,16 +66,14 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 		// upload pieces, split evenly among hosts
 		wg.Add(len(pieces))
 		for j, data := range pieces {
-			go func(j int, data []byte) {
-				err := hosts[j%len(hosts)].addPiece(uploadPiece{data, i, uint64(j)})
-				if err == nil {
-					atomic.AddUint64(&f.bytesUploaded, uint64(len(data)))
-				}
+			host := hosts[j%len(hosts)]
+			up := uploadPiece{data, i, uint64(j)}
+			go func(host uploader, up uploadPiece) {
+				_ = host.addPiece(up)
 				wg.Done()
-			}(j, data)
+			}(host, up)
 		}
 		wg.Wait()
-		atomic.AddUint64(&f.chunksUploaded, 1)
 
 		// update contracts
 		for _, h := range hosts {

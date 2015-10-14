@@ -8,7 +8,7 @@ import (
 
 // TestFileAvailable probes the Available method of the file type.
 func TestFileAvailable(t *testing.T) {
-	rsc, _ := NewRSCode(2, 10)
+	rsc, _ := NewRSCode(1, 10)
 	f := &file{
 		size:        1000,
 		erasureCode: rsc,
@@ -19,7 +19,12 @@ func TestFileAvailable(t *testing.T) {
 		t.Error("file should not be available")
 	}
 
-	f.chunksUploaded = f.numChunks()
+	var fc fileContract
+	for i := uint64(0); i < f.numChunks(); i++ {
+		fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
+	}
+	f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
+
 	if !f.Available() {
 		t.Error("file should be available")
 	}

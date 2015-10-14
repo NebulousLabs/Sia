@@ -16,7 +16,7 @@ import (
 // newTestingFile initializes a file object with random parameters.
 func newTestingFile() *file {
 	key, _ := crypto.GenerateTwofishKey()
-	data, _ := crypto.RandBytes(14)
+	data, _ := crypto.RandBytes(8)
 	nData, _ := crypto.RandIntn(10)
 	nParity, _ := crypto.RandIntn(10)
 	rsc, _ := NewRSCode(nData+1, nParity+1)
@@ -27,9 +27,6 @@ func newTestingFile() *file {
 		masterKey:   key,
 		erasureCode: rsc,
 		pieceSize:   encoding.DecUint64(data[6:8]),
-
-		bytesUploaded:  encoding.DecUint64(data[9:11]),
-		chunksUploaded: encoding.DecUint64(data[12:14]),
 	}
 }
 
@@ -49,12 +46,6 @@ func equalFiles(f1, f2 *file) error {
 	}
 	if f1.pieceSize != f2.pieceSize {
 		return fmt.Errorf("pieceSizes do not match: %v %v", f1.pieceSize, f2.pieceSize)
-	}
-	if f1.bytesUploaded != f2.bytesUploaded {
-		return fmt.Errorf("bytesUploaded does not match: %v %v", f1.bytesUploaded, f2.bytesUploaded)
-	}
-	if f1.chunksUploaded != f2.chunksUploaded {
-		return fmt.Errorf("chunksUploaded does not match: %v %v", f1.chunksUploaded, f2.chunksUploaded)
 	}
 	return nil
 }
