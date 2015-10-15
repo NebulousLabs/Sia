@@ -262,11 +262,9 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 		return err
 	}
 
-	// Revise the file contract. If revision fails, submit most recent
-	// successful revision to the blockchain.
+	// revise the file contract
 	err = hu.revise(fc, encPiece, height)
 	if err != nil {
-		hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
 		return err
 	}
 
