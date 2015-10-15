@@ -239,6 +239,10 @@ func (r *Renter) threadedRepairUploads() {
 					break
 				}
 			}
+			if len(hosts) < f.erasureCode.MinPieces() {
+				r.log.Printf("failed to repair %v: not enough hosts", name)
+				continue
+			}
 
 			err = f.repair(handle, badChunks, hosts)
 			if err != nil {
