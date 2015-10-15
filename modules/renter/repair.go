@@ -227,9 +227,10 @@ func (r *Renter) threadedRepairUploads() {
 			// build host list
 			var hosts []uploader
 			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
-			for i := range randHosts {
+			r.hostLock.Lock()
+			for _, h := range randHosts {
 				// TODO: use smarter duration
-				hostUploader, err := r.newHostUploader(randHosts[i], f.size, defaultDuration, f.masterKey)
+				hostUploader, err := r.newHostUploader(h, f.size, defaultDuration, f.masterKey)
 				if err != nil {
 					continue
 				}
@@ -239,6 +240,7 @@ func (r *Renter) threadedRepairUploads() {
 					break
 				}
 			}
+			r.hostLock.Unlock()
 			if len(hosts) < f.erasureCode.MinPieces() {
 				r.log.Printf("failed to repair %v: not enough hosts", name)
 				continue
