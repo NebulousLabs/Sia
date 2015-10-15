@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/stretchr/graceful"
@@ -29,6 +30,7 @@ type Server struct {
 	blockchainHeight int
 	currentBlock     types.Block
 
+	listener  net.Listener
 	apiServer *graceful.Server
 
 	mu *sync.RWMutex
@@ -36,6 +38,11 @@ type Server struct {
 
 // NewServer creates a new API server from the provided modules.
 func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
+	l, err := net.Listen("tcp", APIaddr)
+	if err != nil {
+		return nil, err
+	}
+
 	srv := &Server{
 		cs:      s,
 		gateway: g,
@@ -49,6 +56,8 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 
 		blockchainHeight: -1,
 
+		listener: l,
+
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
@@ -57,7 +66,7 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 	srv.cs.ConsensusSetSubscribe(srv)
 
 	// Register API handlers
-	srv.initAPI(APIaddr)
+	srv.initAPI()
 
 	return srv, nil
 }
@@ -66,7 +75,7 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 func (srv *Server) Serve() error {
 	// graceful will run until it catches a signal.
 	// It can also be stopped manually by stopHandler.
-	err := srv.apiServer.ListenAndServe()
+	err := srv.apiServer.Serve(srv.listener)
 	// despite its name, graceful still propogates this benign error
 	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
 		return err

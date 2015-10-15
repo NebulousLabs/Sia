@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -22,14 +21,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	// CONTRIBUTE: The naive version of ":0" doesn't work because then the rest
-	// of the api tests attempt to call ":0" when making api requests. It would
-	// be prefereable to not need to use a port counter and rely on N ports
-	// being free starting from 25500 for testing to work.
-	APIPort int = 25500
 )
 
 // serverTester contains a server and a set of channels for keeping all of the
@@ -52,10 +43,8 @@ type serverTester struct {
 // createServerTester creates a server tester object that is ready for testing,
 // including money in the wallet and all modules initalized.
 func createServerTester(name string) (*serverTester, error) {
-	// Create the testing directory and assign the api port.
+	// Create the testing directory.
 	testdir := build.TempDir("api", name)
-	APIAddr := ":" + strconv.Itoa(APIPort)
-	APIPort++
 
 	// Create the modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
@@ -106,7 +95,7 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, r, tp, w, exp)
+	srv, err := NewServer(":0", cs, g, h, hdb, m, r, tp, w, exp)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +151,7 @@ func (st *serverTester) coinAddress() string {
 
 // getAPI makes an API call and decodes the response.
 func (st *serverTester) getAPI(call string, obj interface{}) error {
-	resp, err := HttpGET("http://localhost" + st.server.apiServer.Addr + call)
+	resp, err := HttpGET("http://" + st.server.listener.Addr().String() + call)
 	if err != nil {
 		return err
 	}
@@ -187,7 +176,7 @@ func (st *serverTester) getAPI(call string, obj interface{}) error {
 
 // postAPI makes an API call and decodes the response.
 func (st *serverTester) postAPI(call string, values url.Values, obj interface{}) error {
-	resp, err := HttpPOST("http://localhost"+st.server.apiServer.Addr+call, values.Encode())
+	resp, err := HttpPOST("http://"+st.server.listener.Addr().String()+call, values.Encode())
 	if err != nil {
 		return err
 	}
@@ -212,7 +201,7 @@ func (st *serverTester) postAPI(call string, values url.Values, obj interface{})
 
 // stdGetAPI makes an API call and discards the response.
 func (st *serverTester) stdGetAPI(call string) error {
-	resp, err := HttpGET("http://localhost" + st.server.apiServer.Addr + call)
+	resp, err := HttpGET("http://" + st.server.listener.Addr().String() + call)
 	if err != nil {
 		return err
 	}
@@ -231,7 +220,7 @@ func (st *serverTester) stdGetAPI(call string) error {
 
 // stdPostAPI makes an API call and discards the response.
 func (st *serverTester) stdPostAPI(call string, values url.Values) error {
-	resp, err := HttpPOST("http://localhost"+st.server.apiServer.Addr+call, values.Encode())
+	resp, err := HttpPOST("http://"+st.server.listener.Addr().String()+call, values.Encode())
 	if err != nil {
 		return err
 	}
