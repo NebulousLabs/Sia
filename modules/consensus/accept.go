@@ -50,7 +50,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	}
 
 	// Check that the target of the new block is sufficient.
-	if !b.CheckTarget(parent.ChildTarget) {
+	if !checkTarget(b, parent.ChildTarget) {
 		return modules.ErrBlockUnsolved
 	}
 
@@ -74,7 +74,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	}
 
 	// Verify that the miner payouts are valid.
-	if !b.CheckMinerPayouts(parent.Height + 1) {
+	if !checkMinerPayouts(b, parent.Height+1) {
 		return errBadMinerPayouts
 	}
 

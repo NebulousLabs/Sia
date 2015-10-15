@@ -156,10 +156,10 @@ func TestMissedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for block.CheckTarget(target) && block.Nonce[0] != 255 {
+	for checkTarget(block, target) && block.Nonce[0] != 255 {
 		block.Nonce[0]++
 	}
-	if block.CheckTarget(target) {
+	if checkTarget(block, target) {
 		t.Fatal("unable to find a failing target")
 	}
 	err = cst.cs.AcceptBlock(block)
