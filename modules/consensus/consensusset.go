@@ -142,6 +142,7 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 		}
 		block = pb.Block
 		exists = true
+		return nil
 	})
 	return block, exists
 }

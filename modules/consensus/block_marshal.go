@@ -31,9 +31,5 @@ func (m stdBlockMarshaller) Marshal(block types.Block) []byte {
 }
 
 func (um stdProcessedBlockUnmarshaller) Unmarshal(blockBytes []byte, block *processedBlock) error {
-	err := encoding.Unmarshal(blockBytes, block)
-	if err != nil {
-		return err
-	}
-	return nil
+	return encoding.Unmarshal(blockBytes, block)
 }
