@@ -57,6 +57,12 @@ type ConsensusSet struct {
 	// clock is a Clock interface that indicates the current system time.
 	clock types.Clock
 
+	// blockMarshaller encodes Blocks for storage.
+	blockMarshaller blockMarshaller
+
+	// processedBlockUnmarshaller decodes processedBlocks from bytes.
+	processedBlockUnmarshaller stdProcessedBlockUnmarshaller
+
 	persistDir string
 	mu         demotemutex.DemoteMutex
 }
@@ -92,7 +98,9 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		clock: types.StdClock{},
+		clock:                      types.StdClock{},
+		blockMarshaller:            stdBlockMarshaller{},
+		processedBlockUnmarshaller: stdProcessedBlockUnmarshaller{},
 
 		persistDir: persistDir,
 	}
@@ -134,7 +142,6 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 		}
 		block = pb.Block
 		exists = true
-		return nil
 	})
 	return block, exists
 }
