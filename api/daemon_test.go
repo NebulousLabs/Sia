@@ -51,8 +51,10 @@ func TestSignedUpdate(t *testing.T) {
 
 	// newer version
 	uh.version = "100.0"
-	st.getAPI("/daemon/updates/check", &info)
-	if !info.Available {
+	err = st.getAPI("/daemon/updates/check", &info)
+	if err != nil {
+		t.Error(err)
+	} else if !info.Available {
 		t.Error("new version should be available")
 	}
 
