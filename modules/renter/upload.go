@@ -12,7 +12,7 @@ import (
 const (
 	defaultDuration     = 6000 // Duration that hosts will hold onto the file
 	defaultDataPieces   = 2    // Data pieces per erasure-coded chunk
-	defaultParityPieces = 10   // Parity pieces per erasure-coded chunk
+	defaultParityPieces = 8    // Parity pieces per erasure-coded chunk
 
 	// piece sizes
 	// NOTE: The encryption overhead is subtracted so that encrypted piece
@@ -89,13 +89,13 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if err != nil {
 		return err
 	}
-	// NOTE: The upload max of 5 GiB is temporary and therefore does not have
+	// NOTE: The upload max of 20 GiB is temporary and therefore does not have
 	// a constant. This should be removed once micropayments + upload resuming
-	// are in place. 5 GiB is chosen to prevent confusion - on anybody's
-	// machine any file appearing to be under 5 GB will be below the hard
+	// are in place. 20 GiB is chosen to prevent confusion - on anybody's
+	// machine any file appearing to be under 20 GB will be below the hard
 	// limit.
-	if fileInfo.Size() > 5*1024*1024*1024 {
-		return errors.New("cannot upload a file larger than 5 GB")
+	if fileInfo.Size() > 20*1024*1024*1024 {
+		return errors.New("cannot upload a file larger than 20 GB")
 	}
 
 	// Fill in any missing upload params with sensible defaults.
