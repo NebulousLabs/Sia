@@ -4,9 +4,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -239,9 +241,20 @@ func (r *Renter) threadedRepairUploads() {
 			var hosts []uploader
 			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
 			for _, h := range randHosts {
+				// probabilistically filter out known bad hosts
+				// unresponsive hosts will be selected with probability 1/(1+nFailures)
+				nFailures, ok := r.blacklist[h.IPAddress]
+				if n, _ := crypto.RandIntn(1 + nFailures); ok && n != 0 {
+					continue
+				}
+
 				// TODO: use smarter duration
 				hostUploader, err := r.newHostUploader(h, totalsize, defaultDuration, f.masterKey)
 				if err != nil {
+					// penalize unresponsive hosts
+					if strings.Contains(err.Error(), "timeout") {
+						r.blacklist[h.IPAddress]++
+					}
 					continue
 				}
 				hosts = append(hosts, hostUploader)

@@ -73,16 +73,9 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	return nil
 }
 
-// Upload takes an upload parameters, which contain a file to upload, and then
-// creates a redundant copy of the file on the Sia network.
+// Upload instructs the renter to start tracking a file. The renter will
+// automatically upload and repair tracked files using a background loop.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
-	// Open the file.
-	handle, err := os.Open(up.Filename)
-	if err != nil {
-		return err
-	}
-	defer handle.Close()
-
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
 	_, exists := r.files[up.Nickname]
@@ -92,7 +85,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Check that the file is less than 5 GiB.
-	fileInfo, err := handle.Stat()
+	fileInfo, err := os.Stat(up.Filename)
 	if err != nil {
 		return err
 	}
