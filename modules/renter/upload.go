@@ -2,9 +2,7 @@ package renter
 
 import (
 	"errors"
-	"io"
 	"os"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -42,49 +40,6 @@ type uploader interface {
 
 	// addr returns the IP address of the uploader.
 	addr() modules.NetAddress
-}
-
-// upload reads chunks from r and uploads them to hosts. It spawns a worker
-// for each host, and instructs them to upload pieces of each chunk.
-func (f *file) upload(r io.Reader, hosts []uploader) error {
-	// encode and upload each chunk
-	var wg sync.WaitGroup
-	for i := uint64(0); ; i++ {
-		// read next chunk
-		chunk := make([]byte, f.chunkSize())
-		_, err := io.ReadFull(r, chunk)
-		if err == io.EOF {
-			break
-		} else if err != nil && err != io.ErrUnexpectedEOF {
-			return err
-		}
-		// encode
-		pieces, err := f.erasureCode.Encode(chunk)
-		if err != nil {
-			return err
-		}
-		// upload pieces, split evenly among hosts
-		wg.Add(len(pieces))
-		for j, data := range pieces {
-			host := hosts[j%len(hosts)]
-			up := uploadPiece{data, i, uint64(j)}
-			go func(host uploader, up uploadPiece) {
-				_ = host.addPiece(up)
-				wg.Done()
-			}(host, up)
-		}
-		wg.Wait()
-
-		// update contracts
-		f.mu.Lock()
-		for _, h := range hosts {
-			contract := h.fileContract()
-			f.contracts[contract.ID] = contract
-		}
-		f.mu.Unlock()
-	}
-
-	return nil
 }
 
 // checkWalletBalance looks at an upload and determines if there is enough
@@ -175,48 +130,9 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	f := newFile(up.Nickname, up.ErasureCode, up.PieceSize, uint64(fileInfo.Size()))
 	f.mode = uint32(fileInfo.Mode())
 
-	// Select and connect to hosts.
-	totalsize := up.PieceSize * uint64(up.ErasureCode.NumPieces()) * f.numChunks()
-	var hosts []uploader
-	randHosts := r.hostDB.RandomHosts(up.ErasureCode.NumPieces() * 2)
-	r.hostLock.Lock()
-	for _, h := range randHosts {
-		hostUploader, err := r.newHostUploader(h, totalsize, up.Duration, f.masterKey)
-		if err != nil {
-			r.log.Printf("Upload: could not form contract with %v: %v", h.IPAddress, err)
-			continue
-		}
-		defer hostUploader.Close()
-
-		hosts = append(hosts, hostUploader)
-		if len(hosts) >= up.ErasureCode.NumPieces() {
-			break
-		}
-	}
-	r.hostLock.Unlock()
-	if len(hosts) < up.ErasureCode.MinPieces() {
-		return errors.New("not enough hosts to support upload")
-	}
-
 	// Add file to renter.
 	lockID = r.mu.Lock()
 	r.files[up.Nickname] = f
-	r.save()
-	r.mu.Unlock(lockID)
-
-	// Upload in parallel.
-	err = f.upload(handle, hosts)
-	if err != nil {
-		// Upload failed; remove the file object.
-		lockID = r.mu.Lock()
-		delete(r.files, up.Nickname)
-		r.save()
-		r.mu.Unlock(lockID)
-		return errors.New("failed to upload any file pieces")
-	}
-
-	// Add file to repair set.
-	lockID = r.mu.Lock()
 	r.repairSet[up.Nickname] = up.Filename
 	r.save()
 	r.mu.Unlock(lockID)

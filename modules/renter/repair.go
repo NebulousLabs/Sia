@@ -121,17 +121,19 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 	for chunkIndex, missingPieces := range pieceMap {
 		// can only upload to hosts that aren't already storing this chunk
 		// TODO: what if we're renewing?
-		curHosts := f.chunkHosts(chunkIndex)
-		var newHosts []uploader
-	outer:
-		for _, h := range hosts {
-			for _, ip := range curHosts {
-				if ip == h.addr() {
-					continue outer
-				}
-			}
-			newHosts = append(newHosts, h)
-		}
+		// 	curHosts := f.chunkHosts(chunkIndex)
+		// 	var newHosts []uploader
+		// outer:
+		// 	for _, h := range hosts {
+		// 		for _, ip := range curHosts {
+		// 			if ip == h.addr() {
+
+		// 				continue outer
+		// 			}
+		// 		}
+		// 		newHosts = append(newHosts, h)
+		// 	}
+		newHosts := hosts
 		// don't bother encoding if there aren't any hosts to upload to
 		if len(newHosts) == 0 {
 			continue
@@ -153,10 +155,13 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 		for j, pieceIndex := range missingPieces {
 			host := newHosts[j%len(newHosts)]
 			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
-			go func(host uploader, up uploadPiece) {
-				_ = host.addPiece(up)
-				wg.Done()
-			}(host, up)
+			//go func(host uploader, up uploadPiece) {
+			err := host.addPiece(up)
+			if err != nil {
+			} else {
+			}
+			wg.Done()
+			//}(host, up)
 		}
 		wg.Wait()
 
@@ -179,6 +184,10 @@ func (r *Renter) threadedRepairUploads() {
 	for {
 		time.Sleep(5 * time.Second)
 
+		if !r.wallet.Unlocked() {
+			continue
+		}
+
 		// make copy of repair set under lock
 		repairing := make(map[string]string)
 		id := r.mu.RLock()
@@ -191,7 +200,7 @@ func (r *Renter) threadedRepairUploads() {
 			// retrieve file object and get current height
 			id = r.mu.RLock()
 			f, ok := r.files[name]
-			height := r.blockHeight
+			//height := r.blockHeight
 			r.mu.RUnlock(id)
 			if !ok {
 				r.log.Printf("failed to repair %v: no longer tracking that file", name)
@@ -202,16 +211,17 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// delete any expired contracts
-			f.removeExpiredContracts(height)
+			//f.removeExpiredContracts(height)
 
 			// determine file health
 			badChunks := f.incompleteChunks()
 			if len(badChunks) == 0 {
-				badChunks = f.expiringChunks(height)
-				if len(badChunks) == 0 {
-					// nothing to do
-					continue
-				}
+				//badChunks = f.expiringChunks(height)
+				// if len(badChunks) == 0 {
+				// 	// nothing to do
+				// 	continue
+				// }
+				continue
 			}
 
 			// open file handle
@@ -225,22 +235,21 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// build host list
+			totalsize := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 			var hosts []uploader
 			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
-			r.hostLock.Lock()
 			for _, h := range randHosts {
 				// TODO: use smarter duration
-				hostUploader, err := r.newHostUploader(h, f.size, defaultDuration, f.masterKey)
+				hostUploader, err := r.newHostUploader(h, totalsize, defaultDuration, f.masterKey)
 				if err != nil {
 					continue
 				}
-
 				hosts = append(hosts, hostUploader)
 				if len(hosts) >= f.erasureCode.NumPieces() {
 					break
 				}
 			}
-			r.hostLock.Unlock()
+
 			if len(hosts) < f.erasureCode.MinPieces() {
 				r.log.Printf("failed to repair %v: not enough hosts", name)
 				continue

@@ -4,10 +4,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"log"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
-	safesync "github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -31,12 +30,11 @@ type Renter struct {
 	contracts     map[types.FileContractID]types.FileContract
 	repairSet     map[string]string // map from nickname to filepath
 	entropy       [32]byte          // used to generate signing keys
-	hostLock      sync.Mutex
 	downloadQueue []*download
 
 	persistDir string
 	log        *log.Logger
-	mu         *safesync.RWMutex
+	mu         *sync.RWMutex
 }
 
 // New returns an empty renter.
@@ -65,7 +63,7 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 		repairSet: make(map[string]string),
 
 		persistDir: persistDir,
-		mu:         safesync.New(modules.SafeMutexDelay, 1),
+		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 	_, err := rand.Read(r.entropy[:])
 	if err != nil {

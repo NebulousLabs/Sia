@@ -176,9 +176,7 @@ func (r *Renter) saveFile(f *file) error {
 	}
 
 	// Write file.
-	f.mu.RLock()
 	err = f.save(handle)
-	f.mu.RUnlock()
 	if err != nil {
 		return err
 	}

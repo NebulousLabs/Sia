@@ -59,7 +59,6 @@ func (hu *hostUploader) Close() error {
 	// submit the most recent revision to the blockchain
 	err := hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
 	if err != nil {
-		hu.renter.log.Println("Could not submit final contract revision:", err)
 	}
 	return err
 }
@@ -358,7 +357,7 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 		return err
 	}
 	if response != modules.AcceptResponse {
-		return errors.New("host rejected revision")
+		return errors.New("host rejected revision: " + response)
 	}
 
 	// transfer piece
@@ -371,6 +370,7 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 	if err := encoding.ReadObject(hu.conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
 		return err
 	}
+
 	if signedHostTxn.ID() != signedTxn.ID() {
 		return errors.New("host sent bad signed transaction")
 	} else if err = signedHostTxn.StandaloneValid(height); err != nil {
@@ -395,7 +395,7 @@ func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64,
 		renter:    r,
 	}
 
-	// TODO: maybe do this later?
+	// TODO: check for existing contract?
 	err := hu.negotiateContract(filesize, duration)
 	if err != nil {
 		return nil, err
