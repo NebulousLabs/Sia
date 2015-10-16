@@ -38,8 +38,8 @@ func TestReadPrefix(t *testing.T) {
 	// empty
 	b.Write([]byte{})
 	_, err = ReadPrefix(b, 3)
-	if err != errNoData {
-		t.Error("expected errNoData, got", err)
+	if err != io.EOF {
+		t.Error("expected EOF, got", err)
 	}
 
 	// less than 8 bytes
@@ -83,8 +83,8 @@ func TestReadObject(t *testing.T) {
 	// empty
 	b.Write([]byte{})
 	err = ReadObject(b, &obj, 0)
-	if err != errNoData {
-		t.Error("expected errNoData, got", err)
+	if err != io.EOF {
+		t.Error("expected EOF, got", err)
 	}
 
 	// bad object

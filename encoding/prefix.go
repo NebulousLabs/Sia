@@ -17,7 +17,10 @@ var (
 func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 	prefix := make([]byte, 8)
 	if n, err := io.ReadFull(r, prefix); n == 0 {
-		return nil, errNoData
+		if err == nil {
+			err = errNoData
+		}
+		return nil, err
 	} else if err != nil {
 		return nil, errBadPrefix
 	}
