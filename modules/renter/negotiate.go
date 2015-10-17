@@ -3,7 +3,6 @@ package renter
 import (
 	"bytes"
 	"errors"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -292,16 +291,9 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 	defer hu.conn.SetDeadline(time.Time{})               // reset timeout after each revision
 
 	// calculate new merkle root
-	r := bytes.NewReader(piece)
-	buf := make([]byte, crypto.SegmentSize)
-	for {
-		_, err := io.ReadFull(r, buf)
-		if err == io.EOF {
-			break
-		} else if err != nil && err != io.ErrUnexpectedEOF {
-			return err
-		}
-		hu.tree.Push(buf)
+	err := hu.tree.ReadSegments(bytes.NewReader(piece))
+	if err != nil {
+		return err
 	}
 
 	// create revision

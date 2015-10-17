@@ -28,6 +28,23 @@ func (t MerkleTree) PushObject(obj interface{}) {
 	t.Push(encoding.Marshal(obj))
 }
 
+// ReadSegments reads segments from r into the tree. If EOF is encountered
+// mid-segment, the zero-padded segment is added to the tree and no error is
+// returned.
+func (t MerkleTree) ReadSegments(r io.Reader) error {
+	buf := make([]byte, SegmentSize)
+	for {
+		_, err := io.ReadFull(r, buf)
+		if err == io.EOF {
+			break
+		} else if err != nil && err != io.ErrUnexpectedEOF {
+			return err
+		}
+		t.Push(buf)
+	}
+	return nil
+}
+
 // Root returns the Merkle root of all the objects pushed to the tree.
 func (t MerkleTree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
