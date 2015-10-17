@@ -71,7 +71,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return err
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(15 * time.Second))
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// inital calculations before connecting to host
 	lockID := hu.renter.mu.RLock()
@@ -288,8 +288,8 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 // revise revises fc to cover piece and uploads both the revision and the
 // piece data to the host.
 func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types.BlockHeight) error {
-	hu.conn.SetDeadline(time.Now().Add(30 * time.Second)) // sufficient to transfer 4 MB over 1 Mbps
-	defer hu.conn.SetDeadline(time.Time{})                // reset timeout after each revision
+	hu.conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
+	defer hu.conn.SetDeadline(time.Time{})               // reset timeout after each revision
 
 	// calculate new merkle root
 	r := bytes.NewReader(piece)
