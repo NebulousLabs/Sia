@@ -230,51 +230,57 @@ func (r *Renter) threadedRepairUploads() {
 
 			r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
 
-			// open file handle
-			handle, err := os.Open(path)
-			if err != nil {
-				r.log.Printf("failed to repair %v: %v", name, err)
-				id = r.mu.Lock()
-				delete(r.repairSet, name)
-				r.mu.Unlock(id)
-				continue
-			}
-
-			// build host list
-			bytesPerHost := f.pieceSize * f.numChunks()
-			var hosts []uploader
-			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
-			for _, h := range randHosts {
-				// probabilistically filter out known bad hosts
-				// unresponsive hosts will be selected with probability 1/(1+nFailures)
-				nFailures, ok := blacklist[h.IPAddress]
-				if n, _ := crypto.RandIntn(1 + nFailures); ok && n != 0 {
-					continue
-				}
-
-				// TODO: use smarter duration
-				hostUploader, err := r.newHostUploader(h, bytesPerHost, defaultDuration, f.masterKey)
+			// defer is really convenient for cleaning up resources, so an
+			// inline function is justified
+			err := func() error {
+				// open file handle
+				handle, err := os.Open(path)
 				if err != nil {
-					// penalize unresponsive hosts
-					if strings.Contains(err.Error(), "timeout") {
-						blacklist[h.IPAddress]++
+					return err
+				}
+				defer handle.Close()
+
+				// build host list
+				bytesPerHost := f.pieceSize * f.numChunks()
+				var hosts []uploader
+				randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
+				for _, h := range randHosts {
+					// probabilistically filter out known bad hosts
+					// unresponsive hosts will be selected with probability 1/(1+nFailures)
+					nFailures, ok := blacklist[h.IPAddress]
+					if n, _ := crypto.RandIntn(1 + nFailures); ok && n != 0 {
+						continue
 					}
-					continue
-				}
-				hosts = append(hosts, hostUploader)
-				if len(hosts) >= f.erasureCode.NumPieces() {
-					break
-				}
-			}
 
-			if len(hosts) < f.erasureCode.MinPieces() {
-				r.log.Printf("failed to repair %v: not enough hosts", name)
-				continue
-			}
+					// TODO: use smarter duration
+					hostUploader, err := r.newHostUploader(h, bytesPerHost, defaultDuration, f.masterKey)
+					if err != nil {
+						// penalize unresponsive hosts
+						if strings.Contains(err.Error(), "timeout") {
+							blacklist[h.IPAddress]++
+						}
+						continue
+					}
+					defer hostUploader.Close()
 
-			err = f.repair(handle, badChunks, hosts)
+					hosts = append(hosts, hostUploader)
+					if len(hosts) >= f.erasureCode.NumPieces() {
+						break
+					}
+				}
+
+				if len(hosts) < f.erasureCode.MinPieces() {
+					// don't return an error in this case, since the file
+					// should not be removed from the repair set
+					r.log.Printf("failed to repair %v: not enough hosts", name)
+					return nil
+				}
+
+				return f.repair(handle, badChunks, hosts)
+			}()
+
 			if err != nil {
-				r.log.Printf("failed to repair %v: %v", name, err)
+				r.log.Printf("%v cannot be repaired: %v", name, err)
 				id = r.mu.Lock()
 				delete(r.repairSet, name)
 				r.mu.Unlock(id)
@@ -287,15 +293,6 @@ func (r *Renter) threadedRepairUploads() {
 				// repair set if this happens
 				r.log.Printf("failed to save repaired file %v: %v", name, err)
 			}
-
-			// close the file
-			handle.Close()
-
-			// close the host connections
-			for i := range hosts {
-				hosts[i].(*hostUploader).Close()
-			}
 		}
-
 	}
 }
