@@ -18,7 +18,7 @@ const (
 	// will attempt to reupload the data covered by the contract.
 	renewThreshold = 2000
 
-	hostTimeout = 3 * time.Second // TODO: longer?
+	hostTimeout = 15 * time.Second
 )
 
 // chunkHosts returns the IPs of the hosts storing a given chunk.
@@ -158,10 +158,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 			host := newHosts[j%len(newHosts)]
 			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
 			//go func(host uploader, up uploadPiece) {
-			err := host.addPiece(up)
-			if err != nil {
-			} else {
-			}
+			_ = host.addPiece(up)
 			wg.Done()
 			//}(host, up)
 		}
@@ -237,7 +234,7 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			// build host list
-			totalsize := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
+			bytesPerHost := f.pieceSize * f.numChunks()
 			var hosts []uploader
 			randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
 			for _, h := range randHosts {
@@ -249,7 +246,7 @@ func (r *Renter) threadedRepairUploads() {
 				}
 
 				// TODO: use smarter duration
-				hostUploader, err := r.newHostUploader(h, totalsize, defaultDuration, f.masterKey)
+				hostUploader, err := r.newHostUploader(h, bytesPerHost, defaultDuration, f.masterKey)
 				if err != nil {
 					// penalize unresponsive hosts
 					if strings.Contains(err.Error(), "timeout") {

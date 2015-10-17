@@ -285,6 +285,8 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	return nil
 }
 
+// revise revises fc to cover piece and uploads both the revision and the
+// piece data to the host.
 func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types.BlockHeight) error {
 	hu.conn.SetDeadline(time.Now().Add(30 * time.Second)) // sufficient to transfer 4 MB over 1 Mbps
 	defer hu.conn.SetDeadline(time.Time{})                // reset timeout after each revision
@@ -382,6 +384,8 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 	return nil
 }
 
+// newHostUploader negotiates an initial file contract with the specified host
+// and returns a hostUploader, which satisfies the uploader interface.
 func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, duration types.BlockHeight, masterKey crypto.TwofishKey) (*hostUploader, error) {
 	// reject hosts that are too expensive
 	if settings.Price.Cmp(maxPrice) > 0 {
