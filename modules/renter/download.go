@@ -45,6 +45,8 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
+	hf.conn.SetDeadline(time.Now().Add(1 * time.Minute)) // sufficient to transfer 4 MB over 500 kbps
+	defer hf.conn.SetDeadline(time.Time{})
 	// request piece
 	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, hf.pieceSize})
 	if err != nil {
@@ -77,10 +79,12 @@ func (hf *hostFetcher) Close() error {
 // the connection open the entire time). This is wasteful of host resources.
 // Consider only opening the connection after the first request has been made.
 func newHostFetcher(fc fileContract, pieceSize uint64, masterKey crypto.TwofishKey) (*hostFetcher, error) {
-	conn, err := net.DialTimeout("tcp", string(fc.IP), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", string(fc.IP), 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
+	conn.SetDeadline(time.Now().Add(15 * time.Second))
+	defer conn.SetDeadline(time.Time{})
 
 	// send RPC
 	err = encoding.WriteObject(conn, modules.RPCDownload)
