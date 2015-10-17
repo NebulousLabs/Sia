@@ -13,7 +13,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -41,7 +40,6 @@ var (
 // save saves a file to w in shareable form. Files are stored in binary format
 // and gzipped to reduce size.
 func (f *file) save(w io.Writer) error {
-	// TODO: error checking
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
 	defer zip.Close()
 	enc := encoding.NewEncoder(zip)
@@ -53,9 +51,13 @@ func (f *file) save(w io.Writer) error {
 		f.masterKey,
 		f.pieceSize,
 		f.mode,
-		f.bytesUploaded,
-		f.chunksUploaded,
 	)
+	if err != nil {
+		return err
+	}
+	// COMPATv0.4.3 - encode the bytesUploaded and chunksUploaded fields
+	// TODO: the resulting .sia file may confuse old clients.
+	err = enc.EncodeAll(f.pieceSize*f.numChunks()*uint64(f.erasureCode.NumPieces()), f.numChunks())
 	if err != nil {
 		return err
 	}
@@ -91,13 +93,15 @@ func (f *file) save(w io.Writer) error {
 
 // load loads a file created by save.
 func (f *file) load(r io.Reader) error {
-	// TODO: error checking
 	zip, err := gzip.NewReader(r)
 	if err != nil {
 		return err
 	}
 	defer zip.Close()
 	dec := encoding.NewDecoder(zip)
+
+	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
+	var bytesUploaded, chunksUploaded uint64
 
 	// decode easy fields
 	err = dec.DecodeAll(
@@ -106,8 +110,8 @@ func (f *file) load(r io.Reader) error {
 		&f.masterKey,
 		&f.pieceSize,
 		&f.mode,
-		&f.bytesUploaded,
-		&f.chunksUploaded,
+		&bytesUploaded,
+		&chunksUploaded,
 	)
 	if err != nil {
 		return err
@@ -142,13 +146,13 @@ func (f *file) load(r io.Reader) error {
 	if err := dec.Decode(&nContracts); err != nil {
 		return err
 	}
-	f.contracts = make(map[modules.NetAddress]fileContract)
+	f.contracts = make(map[types.FileContractID]fileContract)
 	var contract fileContract
 	for i := uint64(0); i < nContracts; i++ {
 		if err := dec.Decode(&contract); err != nil {
 			return err
 		}
-		f.contracts[contract.IP] = contract
+		f.contracts[contract.ID] = contract
 	}
 	return nil
 }
@@ -234,7 +238,9 @@ func (r *Renter) load() error {
 	if err != nil {
 		return err
 	}
-	r.repairSet = data.Repairing
+	if data.Repairing != nil {
+		r.repairSet = data.Repairing
+	}
 	r.entropy = data.Entropy
 	var fcid types.FileContractID
 	for id, fc := range data.Contracts {

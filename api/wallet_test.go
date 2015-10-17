@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -25,8 +24,6 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 
 	// Check a wallet that has never been encrypted.
 	testdir := build.TempDir("api", "TestIntegrationWalletGETEncrypted")
-	APIAddr := ":" + strconv.Itoa(APIPort)
-	APIPort++
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
@@ -43,7 +40,7 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	srv, err := NewServer(APIAddr, cs, g, nil, nil, nil, nil, tp, w, nil)
+	srv, err := NewServer(":0", cs, g, nil, nil, nil, nil, tp, w, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,8 +83,6 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	}
 	// Create a server object without encrypting or unlocking the wallet.
 	testdir := build.TempDir("api", "TestIntegrationWalletBlankEncrypt")
-	APIAddr := ":" + strconv.Itoa(APIPort)
-	APIPort++
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +99,7 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := NewServer(APIAddr, cs, g, nil, nil, nil, nil, tp, w, nil)
+	srv, err := NewServer(":0", cs, g, nil, nil, nil, nil, tp, w, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

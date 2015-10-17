@@ -48,7 +48,7 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 }
 
 // initAPI determines which functions handle each API call.
-func (srv *Server) initAPI(addr string) {
+func (srv *Server) initAPI() {
 	mux := http.NewServeMux()
 
 	// 404 Calls
@@ -147,7 +147,7 @@ func (srv *Server) initAPI(addr string) {
 	// Create graceful HTTP server
 	srv.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
-		Server:  &http.Server{Addr: addr, Handler: mux},
+		Server:  &http.Server{Handler: mux},
 	}
 }
 

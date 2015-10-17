@@ -51,13 +51,15 @@ func TestSignedUpdate(t *testing.T) {
 
 	// newer version
 	uh.version = "100.0"
-	st.getAPI("/daemon/updates/check", &info)
-	if !info.Available {
+	err = st.getAPI("/daemon/updates/check", &info)
+	if err != nil {
+		t.Error(err)
+	} else if !info.Available {
 		t.Error("new version should be available")
 	}
 
 	// apply (bad signature)
-	resp, err := HttpGET("http://localhost" + st.server.apiServer.Addr + "/daemon/updates/apply?version=current")
+	resp, err := HttpGET("http://" + st.server.listener.Addr().String() + "/daemon/updates/apply?version=current")
 	if err != nil {
 		t.Fatal("GET failed:", err)
 	}

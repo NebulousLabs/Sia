@@ -83,7 +83,7 @@ func TestErasureUpload(t *testing.T) {
 
 	// upload data to hosts
 	f := newFile("foo", rsc, pieceSize, dataSize)
-	err = f.upload(bytes.NewReader(data), hosts)
+	err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hosts)
 	if err != nil {
 		t.Fatal(err)
 	}

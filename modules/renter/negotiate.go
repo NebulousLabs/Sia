@@ -14,6 +14,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	// the renter will not form contracts above this price
+	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320 * 1024 * 1024 * 1024 / 500)) // 500 SC / GB / Month
+
+	errTooExpensive = errors.New("host price was too high")
+)
+
 // A hostUploader uploads pieces to a host. It implements the uploader interface.
 type hostUploader struct {
 	// constants
@@ -52,7 +59,6 @@ func (hu *hostUploader) Close() error {
 	// submit the most recent revision to the blockchain
 	err := hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
 	if err != nil {
-		hu.renter.log.Println("Could not submit final contract revision:", err)
 	}
 	return err
 }
@@ -65,6 +71,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return err
 	}
 	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// inital calculations before connecting to host
 	lockID := hu.renter.mu.RLock()
@@ -254,11 +261,9 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 		return err
 	}
 
-	// Revise the file contract. If revision fails, submit most recent
-	// successful revision to the blockchain.
+	// revise the file contract
 	err = hu.revise(fc, encPiece, height)
 	if err != nil {
-		hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
 		return err
 	}
 
@@ -280,7 +285,12 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	return nil
 }
 
+// revise revises fc to cover piece and uploads both the revision and the
+// piece data to the host.
 func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types.BlockHeight) error {
+	hu.conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
+	defer hu.conn.SetDeadline(time.Time{})               // reset timeout after each revision
+
 	// calculate new merkle root
 	r := bytes.NewReader(piece)
 	buf := make([]byte, crypto.SegmentSize)
@@ -349,7 +359,7 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 		return err
 	}
 	if response != modules.AcceptResponse {
-		return errors.New("host rejected revision")
+		return errors.New("host rejected revision: " + response)
 	}
 
 	// transfer piece
@@ -362,6 +372,7 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 	if err := encoding.ReadObject(hu.conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
 		return err
 	}
+
 	if signedHostTxn.ID() != signedTxn.ID() {
 		return errors.New("host sent bad signed transaction")
 	} else if err = signedHostTxn.StandaloneValid(height); err != nil {
@@ -373,7 +384,14 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 	return nil
 }
 
+// newHostUploader negotiates an initial file contract with the specified host
+// and returns a hostUploader, which satisfies the uploader interface.
 func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, duration types.BlockHeight, masterKey crypto.TwofishKey) (*hostUploader, error) {
+	// reject hosts that are too expensive
+	if settings.Price.Cmp(maxPrice) > 0 {
+		return nil, errTooExpensive
+	}
+
 	hu := &hostUploader{
 		settings:  settings,
 		masterKey: masterKey,
@@ -381,7 +399,7 @@ func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64,
 		renter:    r,
 	}
 
-	// TODO: maybe do this later?
+	// TODO: check for existing contract?
 	err := hu.negotiateContract(filesize, duration)
 	if err != nil {
 		return nil, err

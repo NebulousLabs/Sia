@@ -174,8 +174,8 @@ func (w *Wallet) Unlocked() bool {
 // Lock will erase all keys from memory and prevent the wallet from spending
 // coins until it is unlocked.
 func (w *Wallet) Lock() error {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if !w.unlocked {
 		return modules.ErrLockedWallet
 	}

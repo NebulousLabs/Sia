@@ -3,12 +3,12 @@ package renter
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestFileAvailable probes the Available method of the file type.
 func TestFileAvailable(t *testing.T) {
-	rsc, _ := NewRSCode(2, 10)
+	rsc, _ := NewRSCode(1, 10)
 	f := &file{
 		size:        1000,
 		erasureCode: rsc,
@@ -19,7 +19,12 @@ func TestFileAvailable(t *testing.T) {
 		t.Error("file should not be available")
 	}
 
-	f.chunksUploaded = f.numChunks()
+	var fc fileContract
+	for i := uint64(0); i < f.numChunks(); i++ {
+		fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
+	}
+	f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
+
 	if !f.Available() {
 		t.Error("file should be available")
 	}
@@ -36,7 +41,7 @@ func TestFileNickname(t *testing.T) {
 // TestFileExpiration probes the Expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
 	f := &file{
-		contracts: make(map[modules.NetAddress]fileContract),
+		contracts: make(map[types.FileContractID]fileContract),
 	}
 
 	if f.Expiration() != 0 {
@@ -46,21 +51,21 @@ func TestFileExpiration(t *testing.T) {
 	// Add a contract.
 	fc := fileContract{}
 	fc.WindowStart = 100
-	f.contracts["foo"] = fc
+	f.contracts[types.FileContractID{0}] = fc
 	if f.Expiration() != 100 {
-		t.Error("file with expired contract should report as having no time remaining")
+		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a lower WindowStart.
 	fc.WindowStart = 50
-	f.contracts["bar"] = fc
+	f.contracts[types.FileContractID{1}] = fc
 	if f.Expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a higher WindowStart.
 	fc.WindowStart = 75
-	f.contracts["baz"] = fc
+	f.contracts[types.FileContractID{2}] = fc
 	if f.Expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
@@ -101,21 +106,23 @@ func TestRenterDeleteFile(t *testing.T) {
 		t.Error("file was deleted, but is still reported in FileList")
 	}
 
-	// Put a file in the renter, then rename it.
-	rt.renter.files["1"] = &file{
-		name: "one",
-	}
-	rt.renter.RenameFile("1", "one")
-	// Call delete on the previous name.
-	err = rt.renter.DeleteFile("1")
-	if err != ErrUnknownNickname {
-		t.Error("Expected ErrUnknownNickname:", err)
-	}
-	// Call delete on the new name.
-	err = rt.renter.DeleteFile("one")
-	if err != nil {
-		t.Error(err)
-	}
+	/*
+		// Put a file in the renter, then rename it.
+		rt.renter.files["1"] = &file{
+			name: "one",
+		}
+		rt.renter.RenameFile("1", "one")
+		// Call delete on the previous name.
+		err = rt.renter.DeleteFile("1")
+		if err != ErrUnknownNickname {
+			t.Error("Expected ErrUnknownNickname:", err)
+		}
+		// Call delete on the new name.
+		err = rt.renter.DeleteFile("one")
+		if err != nil {
+			t.Error(err)
+		}
+	*/
 }
 
 // TestRenterFileList probes the FileList method of the renter type.
@@ -162,9 +169,8 @@ func TestRenterFileList(t *testing.T) {
 
 // TestRenterRenameFile probes the rename method of the renter.
 func TestRenterRenameFile(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
+	t.Skip("Renaming disabled")
+
 	rt, err := newRenterTester("TestRenterRenameFile")
 	if err != nil {
 		t.Fatal(err)

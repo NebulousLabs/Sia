@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sync/atomic"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -22,18 +22,14 @@ var (
 // master key. The pieces are uploaded to hosts in groups, such that one file
 // contract covers many pieces.
 type file struct {
-	// NOTE: these fields are defined first to ensure 64-bit alignment, which
-	// is required for atomic operations.
-	bytesUploaded  uint64
-	chunksUploaded uint64
-
 	name        string
 	size        uint64
-	contracts   map[modules.NetAddress]fileContract
+	contracts   map[types.FileContractID]fileContract
 	masterKey   crypto.TwofishKey
 	erasureCode modules.ErasureCoder
 	pieceSize   uint64
 	mode        uint32 // actually an os.FileMode
+	mu          sync.RWMutex
 }
 
 // A fileContract is a contract covering an arbitrary number of file pieces.
@@ -75,15 +71,35 @@ func (f *file) numChunks() uint64 {
 
 // Available indicates whether the file is ready to be downloaded.
 func (f *file) Available() bool {
-	return atomic.LoadUint64(&f.chunksUploaded) >= f.numChunks()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	chunkPieces := make([]int, f.numChunks())
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			chunkPieces[p.Chunk]++
+		}
+	}
+	for _, n := range chunkPieces {
+		if n < f.erasureCode.MinPieces() {
+			return false
+		}
+	}
+	return true
 }
 
 // UploadProgress indicates what percentage of the file (plus redundancy) has
 // been uploaded. Note that a file may be Available long before UploadProgress
-// reaches 100%.
+// reaches 100%, and UploadProgress may report a value greater than 100%.
 func (f *file) UploadProgress() float32 {
-	totalBytes := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
-	return 100 * (float32(atomic.LoadUint64(&f.bytesUploaded)) / float32(totalBytes))
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	var uploaded uint64
+	for _, fc := range f.contracts {
+		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
+	}
+	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
+
+	return 100 * (float32(uploaded) / float32(desired))
 }
 
 // Nickname returns the nickname of the file.
@@ -99,6 +115,8 @@ func (f *file) Filesize() uint64 {
 // Expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) Expiration() types.BlockHeight {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	if len(f.contracts) == 0 {
 		return 0
 	}
@@ -117,7 +135,7 @@ func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64)
 	return &file{
 		name:        name,
 		size:        fileSize,
-		contracts:   make(map[modules.NetAddress]fileContract),
+		contracts:   make(map[types.FileContractID]fileContract),
 		masterKey:   key,
 		erasureCode: code,
 		pieceSize:   pieceSize,
@@ -156,24 +174,30 @@ func (r *Renter) FileList() (files []modules.FileInfo) {
 // file must exist, and there must not be any file that already has the
 // replacement nickname.
 func (r *Renter) RenameFile(currentName, newName string) error {
-	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
+	return errors.New("renaming is disabled")
 
-	// Check that the currentName exists and the newName doesn't.
-	file, exists := r.files[currentName]
-	if !exists {
-		return ErrUnknownNickname
-	}
-	_, exists = r.files[newName]
-	if exists {
-		return ErrNicknameOverload
-	}
+	/*
+		lockID := r.mu.Lock()
+		defer r.mu.Unlock(lockID)
 
-	// Do the renaming.
-	delete(r.files, currentName)
-	file.name = newName // make atomic?
-	r.files[newName] = file
+		// Check that the currentName exists and the newName doesn't.
+		file, exists := r.files[currentName]
+		if !exists {
+			return ErrUnknownNickname
+		}
+		_, exists = r.files[newName]
+		if exists {
+			return ErrNicknameOverload
+		}
 
-	r.save()
-	return nil
+		// Do the renaming.
+		file.name = newName
+		r.saveFile(file)
+		delete(r.files, currentName)
+		r.files[newName] = file
+
+		r.save()
+		return nil
+
+	*/
 }

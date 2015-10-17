@@ -21,6 +21,10 @@ const (
 	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 )
 
+var (
+	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320 * 1024 * 1024 * 1024 / 200)) // 200 SC / GB / Month
+)
+
 // A contractObligation tracks a file contract that the host is obligated to
 // fulfill.
 type contractObligation struct {
@@ -90,11 +94,11 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 10e9,                        // 10 GB
-			MaxFilesize:  5 * 1024 * 1024 * 1024,      // 5 GiB
-			MaxDuration:  144 * 60,                    // 60 days
-			WindowSize:   288,                         // 48 hours
-			Price:        types.NewCurrency64(100e12), // 0.1 siacoin / mb / week
+			TotalStorage: 10e9,                   // 10 GB
+			MaxFilesize:  5 * 1024 * 1024 * 1024, // 5 GiB
+			MaxDuration:  144 * 60,               // 60 days
+			WindowSize:   288,                    // 48 hours
+			Price:        defaultPrice,           // 200 SC / GB / Month
 			Collateral:   types.NewCurrency64(0),
 		},
 

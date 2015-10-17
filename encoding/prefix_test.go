@@ -38,23 +38,21 @@ func TestReadPrefix(t *testing.T) {
 	// empty
 	b.Write([]byte{})
 	_, err = ReadPrefix(b, 3)
-	if err != errNoData {
-		t.Error("expected errNoData, got", err)
+	if err != io.EOF {
+		t.Error("expected EOF, got", err)
 	}
 
 	// less than 8 bytes
 	b.Write([]byte{1, 2, 3})
 	_, err = ReadPrefix(b, 3)
-	if err != errBadPrefix {
-		t.Error("expected errBadPrefix, got", err)
+	if err != io.ErrUnexpectedEOF {
+		t.Error("expected unexpected EOF, got", err)
 	}
 
 	// exceed maxLen
 	b.Write(EncUint64(4))
 	_, err = ReadPrefix(b, 3)
-	if err == nil {
-		t.Error("expected errBadPrefix, got nil")
-	} else if err.Error() != "length 4 exceeds maxLen of 3" {
+	if err == nil || err.Error() != "length 4 exceeds maxLen of 3" {
 		t.Error("expected maxLen error, got", err)
 	}
 
@@ -83,18 +81,16 @@ func TestReadObject(t *testing.T) {
 	// empty
 	b.Write([]byte{})
 	err = ReadObject(b, &obj, 0)
-	if err != errNoData {
-		t.Error("expected errNoData, got", err)
+	if err != io.EOF {
+		t.Error("expected EOF, got", err)
 	}
 
 	// bad object
 	b.Write(EncUint64(3))
 	b.WriteString("foo") // strings need an additional length prefix
 	err = ReadObject(b, &obj, 3)
-	if err == nil {
-		t.Error("expected err, got nil")
-	} else if err.Error() != "could not decode type string: "+errBadPrefix.Error() {
-		t.Error("expected errBadPrefix, got", err)
+	if err == nil || err.Error() != "could not decode type string: "+io.ErrUnexpectedEOF.Error() {
+		t.Error("expected unexpected EOF, got", err)
 	}
 }
 
