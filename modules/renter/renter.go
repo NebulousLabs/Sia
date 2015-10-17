@@ -32,11 +32,6 @@ type Renter struct {
 	entropy       [32]byte          // used to generate signing keys
 	downloadQueue []*download
 
-	// a primitive blacklist is used to augment the hostdb's weights. Each
-	// negotiation failure increments the integer, and the probability of
-	// selecting the host for upload is 1/n.
-	blacklist map[modules.NetAddress]int
-
 	persistDir string
 	log        *log.Logger
 	mu         *sync.RWMutex
@@ -66,8 +61,6 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 		files:     make(map[string]*file),
 		contracts: make(map[types.FileContractID]types.FileContract),
 		repairSet: make(map[string]string),
-
-		blacklist: make(map[modules.NetAddress]int),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),

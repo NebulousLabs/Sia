@@ -180,6 +180,11 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairUploads() {
+	// a primitive blacklist is used to augment the hostdb's weights. Each
+	// negotiation failure increments the integer, and the probability of
+	// selecting the host for upload is 1/n.
+	blacklist := make(map[modules.NetAddress]int)
+
 	for {
 		time.Sleep(5 * time.Second)
 
@@ -223,6 +228,8 @@ func (r *Renter) threadedRepairUploads() {
 				continue
 			}
 
+			r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
+
 			// open file handle
 			handle, err := os.Open(path)
 			if err != nil {
@@ -240,7 +247,7 @@ func (r *Renter) threadedRepairUploads() {
 			for _, h := range randHosts {
 				// probabilistically filter out known bad hosts
 				// unresponsive hosts will be selected with probability 1/(1+nFailures)
-				nFailures, ok := r.blacklist[h.IPAddress]
+				nFailures, ok := blacklist[h.IPAddress]
 				if n, _ := crypto.RandIntn(1 + nFailures); ok && n != 0 {
 					continue
 				}
@@ -250,7 +257,7 @@ func (r *Renter) threadedRepairUploads() {
 				if err != nil {
 					// penalize unresponsive hosts
 					if strings.Contains(err.Error(), "timeout") {
-						r.blacklist[h.IPAddress]++
+						blacklist[h.IPAddress]++
 					}
 					continue
 				}
