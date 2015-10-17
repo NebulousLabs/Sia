@@ -138,7 +138,6 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 		newHosts := hosts
 		// don't bother encoding if there aren't any hosts to upload to
 		if len(newHosts) == 0 {
-			println("no unique hosts")
 			newHosts = hosts
 		}
 
@@ -229,12 +228,6 @@ func (r *Renter) threadedRepairUploads() {
 			}
 
 			r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
-			println("repairing")
-			for c, ps := range badChunks {
-				for _, p := range ps {
-					println(c, p)
-				}
-			}
 
 			// defer is really convenient for cleaning up resources, so an
 			// inline function is justified
@@ -268,7 +261,6 @@ func (r *Renter) threadedRepairUploads() {
 						continue
 					}
 					defer hostUploader.Close()
-					println("got host", h.IPAddress)
 
 					hosts = append(hosts, hostUploader)
 					if len(hosts) >= f.erasureCode.NumPieces() {
