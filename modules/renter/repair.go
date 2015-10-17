@@ -157,20 +157,19 @@ func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploa
 		for j, pieceIndex := range missingPieces {
 			host := newHosts[j%len(newHosts)]
 			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
-			//go func(host uploader, up uploadPiece) {
-			_ = host.addPiece(up)
-			wg.Done()
-			//}(host, up)
+			go func(host uploader, up uploadPiece) {
+				err := host.addPiece(up)
+				if err == nil {
+					// update contract
+					f.mu.Lock()
+					contract := host.fileContract()
+					f.contracts[contract.ID] = contract
+					f.mu.Unlock()
+				}
+				wg.Done()
+			}(host, up)
 		}
 		wg.Wait()
-
-		// update contracts
-		f.mu.Lock()
-		for _, h := range hosts {
-			contract := h.fileContract()
-			f.contracts[contract.ID] = contract
-		}
-		f.mu.Unlock()
 	}
 
 	return nil
