@@ -23,7 +23,7 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	}
 	for _, sfo := range w.siafundOutputs {
 		siafundBalance = siafundBalance.Add(sfo.Value)
-		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value))
+		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
 	}
 	return
 }
