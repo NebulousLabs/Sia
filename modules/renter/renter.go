@@ -86,17 +86,15 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 // being rented.
 func (r *Renter) Info() (ri modules.RentInfo) {
 	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
-
 	// Include the list of files the renter knows about.
 	for filename := range r.files {
 		ri.Files = append(ri.Files, filename)
 	}
+	r.mu.RUnlock(lockID)
 
 	// Calculate the average cost of a file.
 	var totalPrice types.Currency
-	redundancy := 6 // reasonable estimate until we come up with an alternative
-	sampleSize := redundancy * 3
+	sampleSize := defaultParityPieces + defaultDataPieces
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {
 		totalPrice = totalPrice.Add(host.Price)
@@ -104,11 +102,10 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 	if len(hosts) == 0 {
 		return
 	}
-	averagePrice := totalPrice.Div(types.NewCurrency64(uint64(len(hosts)))).Mul(types.NewCurrency64(uint64(redundancy)))
-	// HACK: 6000 is the duration (set by the API), and 1024^3 is a GB. Price
-	// is reported as per GB, no timeframe is given.
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(6000)).Mul(types.NewCurrency64(1024 * 1024 * 1024))
-	bufferedCost := estimatedCost.Mul(types.NewCurrency64(3)) // For some reason, this estimate can still be off by a large factor.
+	averagePrice := totalPrice.Div(types.NewCurrency64(uint64(len(hosts))))
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(defaultDuration)).Mul(types.NewCurrency64(1e9)).Mul(types.NewCurrency64(defaultParityPieces + defaultDataPieces))
+	// this also accounts for the buffering in the contract negotiation
+	bufferedCost := estimatedCost.Mul(types.NewCurrency64(5)).Div(types.NewCurrency64(2))
 	ri.Price = bufferedCost
 
 	// Report the number of known hosts.
