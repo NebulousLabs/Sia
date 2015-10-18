@@ -45,7 +45,7 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	hf.conn.SetDeadline(time.Now().Add(1 * time.Minute)) // sufficient to transfer 4 MB over 500 kbps
+	hf.conn.SetDeadline(time.Now().Add(2 * time.Minute)) // sufficient to transfer 4 MB over 250 kbps
 	defer hf.conn.SetDeadline(time.Time{})
 	// request piece
 	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, hf.pieceSize})
