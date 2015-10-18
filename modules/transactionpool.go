@@ -8,7 +8,7 @@ import (
 
 const (
 	TransactionSizeLimit    = 16e3
-	TransactionSetSizeLimit = 100e3
+	TransactionSetSizeLimit = 250e3
 )
 
 var (
