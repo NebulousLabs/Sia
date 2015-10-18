@@ -31,6 +31,7 @@ type Renter struct {
 	repairSet     map[string]string // map from nickname to filepath
 	entropy       [32]byte          // used to generate signing keys
 	downloadQueue []*download
+	cachedAddress types.UnlockHash // to prevent excessive address creation
 
 	persistDir string
 	log        *log.Logger

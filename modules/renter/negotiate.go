@@ -64,7 +64,7 @@ func (hu *hostUploader) Close() error {
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight) error {
+func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockHeight, renterAddress types.UnlockHash) error {
 	conn, err := net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
 	if err != nil {
 		return err
@@ -80,12 +80,6 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	renterCost := hu.settings.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
-
-	// get an address from the wallet
-	ourAddr, err := hu.renter.wallet.NextAddress()
-	if err != nil {
-		return err
-	}
 
 	// write rpcID
 	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
@@ -131,7 +125,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 	// outputs need account for tax
 	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: renterCost.Sub(types.Tax(hu.renter.blockHeight, fc.Payout)), UnlockHash: ourAddr.UnlockHash()},
+		{Value: renterCost.Sub(types.Tax(hu.renter.blockHeight, fc.Payout)), UnlockHash: renterAddress},
 		{Value: types.ZeroCurrency, UnlockHash: hu.settings.UnlockHash}, // no collateral
 	}
 	fc.MissedProofOutputs = []types.SiacoinOutput{
@@ -391,11 +385,24 @@ func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64,
 		renter:    r,
 	}
 
+	// get an address to use for negotiation
+	// TODO: use more than one shared address
+	if r.cachedAddress == (types.UnlockHash{}) {
+		uc, err := r.wallet.NextAddress()
+		if err != nil {
+			return nil, err
+		}
+		r.cachedAddress = uc.UnlockHash()
+	}
+
 	// TODO: check for existing contract?
-	err := hu.negotiateContract(filesize, duration)
+	err := hu.negotiateContract(filesize, duration, r.cachedAddress)
 	if err != nil {
 		return nil, err
 	}
+
+	// if negotiation was sucessful, clear the cached address
+	r.cachedAddress = types.UnlockHash{}
 
 	// initiate the revision loop
 	hu.conn, err = net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
