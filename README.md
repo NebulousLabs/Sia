@@ -1,4 +1,4 @@
-Sia 0.4.3
+Sia 0.4.4
 ===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -143,6 +143,11 @@ Version History
 ---------------
 
 October 2015:
+
+v0.4.4 (patch)
+- Uploading is much more reliable
+- Price estimations are more accurate
+- Bumped filesize limit to 20 GB
 
 v0.4.3 (patch)
 - Block database is now faster and more stable
