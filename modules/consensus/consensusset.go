@@ -54,6 +54,9 @@ type ConsensusSet struct {
 	// block.
 	checkingConsistency bool
 
+	// clock is a Clock interface that indicates the current system time.
+	clock types.Clock
+
 	persistDir string
 	mu         demotemutex.DemoteMutex
 }
@@ -88,6 +91,8 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		},
 
 		dosBlocks: make(map[types.BlockID]struct{}),
+
+		clock: types.StdClock{},
 
 		persistDir: persistDir,
 	}
