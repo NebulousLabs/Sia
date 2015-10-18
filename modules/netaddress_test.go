@@ -45,6 +45,7 @@ func TestIsLocal(t *testing.T) {
 		{"localhost:1234", true},
 		{"127.0.0.1", false},
 		{"127.0.0.1:6723", true},
+		{"0.0.0.0:1234", true},
 		{"::1", false},
 		{"[::1]:7124", true},
 
@@ -53,13 +54,13 @@ func TestIsLocal(t *testing.T) {
 		{"hn.com:8811", false},
 		{"12.34.45.64", false},
 		{"12.34.45.64:7777", false},
-		{"::1:4646", false},
 
 		// Garbage name tests.
 		{"", false},
 		{"garbage", false},
 		{"garbage:6432", false},
 		{"garbage:6146:616", false},
+		{"::1:4646", false},
 		{"[::1]", false},
 	}
 	for _, test := range testSet {
