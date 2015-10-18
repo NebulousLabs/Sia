@@ -47,7 +47,7 @@ type processedBlock struct {
 //
 // To boost performance, earliestChildTimestamp is passed a bucket that it can
 // use from inside of a boltdb transaction.
-func earliestChildTimestamp(blockMap *bolt.Bucket, pb *processedBlock) types.Timestamp {
+func earliestChildTimestamp(blockMap dbBucket, pb *processedBlock) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	windowTimes[0] = pb.Block.Timestamp

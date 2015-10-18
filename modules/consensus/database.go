@@ -78,6 +78,31 @@ var (
 	SiafundPool = []byte("SiafundPool")
 )
 
+type (
+	// dbBucket represents a collection of key/value pairs inside the database.
+	dbBucket interface {
+		Get(key []byte) []byte
+	}
+
+	// dbTx represents a read-only transaction on the database that can be used
+	// for retrieving values.
+	dbTx interface {
+		Bucket(name []byte) dbBucket
+	}
+
+	// boltTxWrapper wraps a bolt.Tx so that it matches the dbTx interface. The
+	// wrap is necessary because bolt.Tx.Bucket() returns a fixed type
+	// (bolt.Bucket), but we want it to return an interface (dbBucket).
+	boltTxWrapper struct {
+		tx *bolt.Tx
+	}
+)
+
+// Bucket returns the dbBucket associated with the given bucket name.
+func (b boltTxWrapper) Bucket(name []byte) dbBucket {
+	return b.tx.Bucket(name)
+}
+
 // openDB loads the set database and populates it with the necessary buckets
 func (cs *ConsensusSet) openDB(filename string) (err error) {
 	cs.db, err = persist.OpenDatabase(dbMetadata, filename)
