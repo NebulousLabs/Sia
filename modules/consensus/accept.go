@@ -44,7 +44,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 		return errOrphan
 	}
 	var parent processedBlock
-	err := cs.processedBlockUnmarshaller.Unmarshal(parentBytes, &parent)
+	err := cs.marshaler.Unmarshal(parentBytes, &parent)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	}
 
 	// Check that the block is below the size limit.
-	if uint64(len(cs.blockMarshaller.Marshal(b))) > types.BlockSizeLimit {
+	if uint64(len(cs.marshaler.Marshal(b))) > types.BlockSizeLimit {
 		return errLargeBlock
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/demotemutex"
 	"github.com/boltdb/bolt"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -57,11 +58,8 @@ type ConsensusSet struct {
 	// clock is a Clock interface that indicates the current system time.
 	clock types.Clock
 
-	// blockMarshaller encodes Blocks for storage.
-	blockMarshaller blockMarshaller
-
-	// processedBlockUnmarshaller decodes processedBlocks from bytes.
-	processedBlockUnmarshaller stdProcessedBlockUnmarshaller
+	// marshaler encodes and decodes between objects and byte slices.
+	marshaler encoding.GenericMarshaler
 
 	persistDir string
 	mu         demotemutex.DemoteMutex
@@ -98,9 +96,9 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		clock:                      types.StdClock{},
-		blockMarshaller:            stdBlockMarshaller{},
-		processedBlockUnmarshaller: stdProcessedBlockUnmarshaller{},
+		clock: types.StdClock{},
+
+		marshaler: encoding.StdGenericMarshaler{},
 
 		persistDir: persistDir,
 	}
