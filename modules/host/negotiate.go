@@ -288,15 +288,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 
 	// rebuild current Merkle tree
 	tree := crypto.NewTree()
-	buf := make([]byte, crypto.SegmentSize)
-	for {
-		_, err := io.ReadFull(file, buf)
-		if err == io.EOF {
-			break
-		} else if err != nil && err != io.ErrUnexpectedEOF {
-			return err
-		}
-		tree.Push(buf)
+	err = tree.ReadSegments(file)
+	if err != nil {
+		return err
 	}
 
 	// accept new revisions in a loop. The final good transaction will be
@@ -331,7 +325,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 
 		// read piece
-		// TODO: simultaneously read into tree?
+		// TODO: simultaneously read into tree and file
 		rev := revTxn.FileContractRevisions[0]
 		piece := make([]byte, rev.NewFileSize-obligation.FileContract.FileSize)
 		_, err = io.ReadFull(conn, piece)
@@ -340,15 +334,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		}
 
 		// verify Merkle root
-		r := bytes.NewReader(piece)
-		for {
-			_, err := io.ReadFull(r, buf)
-			if err == io.EOF {
-				break
-			} else if err != nil && err != io.ErrUnexpectedEOF {
-				return err
-			}
-			tree.Push(buf)
+		err = tree.ReadSegments(bytes.NewReader(piece))
+		if err != nil {
+			return err
 		}
 		if tree.Root() != rev.NewFileMerkleRoot {
 			return errors.New("revision has bad Merkle root")
