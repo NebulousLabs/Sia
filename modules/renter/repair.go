@@ -240,7 +240,7 @@ func (r *Renter) threadedRepairUploads() {
 				defer handle.Close()
 
 				// build host list
-				bytesPerHost := f.pieceSize * uint64(f.erasureCode.MinPieces()) * f.numChunks()
+				bytesPerHost := f.pieceSize * f.numChunks() * 2 // 2x buffer to prevent running out of money
 				var hosts []uploader
 				randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
 				for _, h := range randHosts {
