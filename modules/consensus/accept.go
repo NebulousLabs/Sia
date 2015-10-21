@@ -25,6 +25,7 @@ var (
 
 // validHeader does some early, low computation verification on the block.
 func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
+
 	// See if the block is known already.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
@@ -65,11 +66,11 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 		return errLargeBlock
 	}
 
-	// If the block is in the extreme future, return an error and do nothing
-	// more with the block. There is an assumption that by the time the extreme
-	// future arrives, this block will no longer be a part of the longest fork
-	// because it will have been ignored by all of the miners.
-	if b.Timestamp > types.CurrentTimestamp()+types.ExtremeFutureThreshold {
+	// Check if the block is in the extreme future. We make a distinction between
+	// future and extreme future because there is an assumption that by the time
+	// the extreme future arrives, this block will no longer be a part of the
+	// longest fork because it will have been ignored by all of the miners.
+	if b.Timestamp > cs.clock.Now()+types.ExtremeFutureThreshold {
 		return errExtremeFutureTimestamp
 	}
 
@@ -78,15 +79,10 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 		return errBadMinerPayouts
 	}
 
-	// If the block is in the near future, but too far to be acceptable, then
-	// the block will be saved and added to the consensus set after it is no
-	// longer too far in the future. This is the last check because it's an
-	// expensive check, and not worth performing if the payouts are incorrect.
-	if b.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
-		go func() {
-			time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-			cs.AcceptBlock(b) // NOTE: Error is not handled.
-		}()
+	// Check if the block is in the near future, but too far to be acceptable.
+	// This is the last check because it's an expensive check, and not worth
+	// performing if the payouts are incorrect.
+	if b.Timestamp > cs.clock.Now()+types.FutureThreshold {
 		return errFutureTimestamp
 	}
 	return nil
@@ -146,6 +142,15 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 		// expensive to create.
 		err := cs.validHeader(tx, b)
 		if err != nil {
+			// If the block is in the near future, but too far to be acceptable, then
+			// save the block and add it to the consensus set after it is no longer
+			// too far in the future.
+			if err == errFutureTimestamp {
+				go func() {
+					time.Sleep(time.Duration(b.Timestamp-(cs.clock.Now()+types.FutureThreshold)) * time.Second)
+					cs.AcceptBlock(b) // NOTE: Error is not handled.
+				}()
+			}
 			return err
 		}
 		return nil
