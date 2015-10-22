@@ -14,15 +14,46 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Modify the number of file contracts and how much they costed
+	// Add the stats for the reverted blocks.
+	for _, block := range cc.RevertedBlocks {
+		for _, txn := range block.Transactions {
+			// Revert all of the file contracts.
+			for _, fc := range txn.FileContracts {
+				e.totalContractCount -= 1
+				e.totalContractCost = e.totalContractCost.Sub(fc.Payout)
+				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fc.FileSize))
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				e.totalContractCount -= 1
+				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fcr.NewFileSize))
+				e.totalRevisionVolume = e.totalRevisionVolume.Sub(types.NewCurrency64(fcr.NewFileSize))
+			}
+		}
+	}
+
+	// Add the stats for the applied blocks.
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			// Revert all of the file contracts.
+			for _, fc := range txn.FileContracts {
+				e.totalContractCount += 1
+				e.totalContractCost = e.totalContractCost.Add(fc.Payout)
+				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fc.FileSize))
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				e.totalContractCount += 1
+				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
+				e.totalRevisionVolume = e.totalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
+			}
+		}
+	}
+
+	// Compute the changes in the active set.
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
 			e.activeContractCount += 1
-			e.totalContractCount += 1
 			e.activeContractCost = e.activeContractCost.Add(diff.FileContract.Payout)
-			e.totalContractCost = e.totalContractCost.Add(diff.FileContract.Payout)
 			e.activeContractSize = e.activeContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
-			e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
 		} else {
 			e.activeContractCount -= 1
 			e.activeContractCost = e.activeContractCost.Sub(diff.FileContract.Payout)

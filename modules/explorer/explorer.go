@@ -21,7 +21,7 @@ type Explorer struct {
 	totalContractCost   types.Currency
 	totalContractCount  uint64
 	totalContractSize   types.Currency
-	totalRevisionVolume uint64
+	totalRevisionVolume types.Currency
 
 	// Other factoids.
 	blockchainHeight       types.BlockHeight
