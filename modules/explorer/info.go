@@ -27,8 +27,8 @@ func totalCurrency(height types.BlockHeight) types.Currency {
 // Returns a partial slice of our stored data on the blockchain. Data
 // obtained from consensus updates
 func (e *Explorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
-	lockID := e.mu.RLock()
-	defer e.mu.RUnlock(lockID)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
 	// Error checking on the given range
 	if start > finish {
@@ -47,8 +47,8 @@ func (e *Explorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) 
 
 // Returns many pieces of readily available information
 func (e *Explorer) ExplorerStatus() modules.ExplorerStatus {
-	lockID := e.mu.RLock()
-	defer e.mu.RUnlock(lockID)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
 	// No reason that consensus should broadcast a block that it
 	// doesn't have information on

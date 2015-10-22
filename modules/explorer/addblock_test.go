@@ -39,9 +39,9 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 	}
 
 	// This should not error at least...
-	lockID := et.explorer.mu.Lock()
+	et.explorer.mu.Lock()
 	err := et.explorer.addBlockDB(b1)
-	et.explorer.mu.Unlock(lockID)
+	et.explorer.mu.Unlock()
 	if err != nil {
 		return errors.New("Error inserting basic block: " + err.Error())
 	}
@@ -62,17 +62,17 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 		}},
 	}
 
-	lockID = et.explorer.mu.Lock()
+	et.explorer.mu.Lock()
 	err = et.explorer.addBlockDB(b2)
-	et.explorer.mu.Unlock(lockID)
+	et.explorer.mu.Unlock()
 	if err != nil {
 		return errors.New("Error inserting block 2: " + err.Error())
 	}
 
 	// Now query the database to see if it has been linked properly
-	lockID = et.explorer.mu.RLock()
+	et.explorer.mu.RLock()
 	bytes, err := et.explorer.db.getFromBucket("Blocks", encoding.Marshal(b1.ID()))
-	et.explorer.mu.RUnlock(lockID)
+	et.explorer.mu.RUnlock()
 	var b types.Block
 	err = encoding.Unmarshal(bytes, &b)
 	if err != nil {
@@ -83,9 +83,9 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 	}
 
 	// Query to see if the input is added to the output field
-	lockID = et.explorer.mu.RLock()
+	et.explorer.mu.RLock()
 	bytes, err = et.explorer.db.getFromBucket("SiacoinOutputs", encoding.Marshal(b1.MinerPayoutID(0)))
-	et.explorer.mu.RUnlock(lockID)
+	et.explorer.mu.RUnlock()
 	if err != nil {
 		t.Fatal(err.Error())
 	}

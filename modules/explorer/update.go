@@ -11,7 +11,8 @@ import (
 // ProcessConsensusChange follows the most recent changes to the consensus set,
 // including parsing new blocks and updating the utxo sets.
 func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := e.mu.Lock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	// Modify the number of file contracts and how much they costed
 	for _, diff := range cc.FileContractDiffs {
@@ -50,7 +51,4 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
-
-	// Notify subscribers about updates
-	e.mu.Unlock(lockID)
 }

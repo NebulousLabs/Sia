@@ -4,10 +4,10 @@ package explorer
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -37,7 +37,7 @@ type Explorer struct {
 	cs         modules.ConsensusSet
 	db         *explorerDB
 	persistDir string
-	mu         *sync.RWMutex
+	mu         sync.RWMutex
 }
 
 // New creates the internal data structures, and subscribes to
@@ -57,7 +57,6 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 		cs:         cs,
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Intialize the persistent structures, including the database.
