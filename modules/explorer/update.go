@@ -16,16 +16,16 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Modify the number of file contracts and how much they costed
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
-			e.activeContracts += 1
-			e.totalContracts += 1
+			e.activeContractCount += 1
+			e.totalContractCount += 1
 			e.activeContractCost = e.activeContractCost.Add(diff.FileContract.Payout)
 			e.totalContractCost = e.totalContractCost.Add(diff.FileContract.Payout)
-			e.activeContractSize += diff.FileContract.FileSize
-			e.totalContractSize += diff.FileContract.FileSize
+			e.activeContractSize = e.activeContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
+			e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
 		} else {
-			e.activeContracts -= 1
+			e.activeContractCount -= 1
 			e.activeContractCost = e.activeContractCost.Sub(diff.FileContract.Payout)
-			e.activeContractSize -= diff.FileContract.FileSize
+			e.activeContractSize = e.activeContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 		}
 	}
 

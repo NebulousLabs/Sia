@@ -74,10 +74,10 @@ func (e *Explorer) ExplorerStatus() modules.ExplorerStatus {
 		Target:              currentTarget,
 		MatureTime:          types.Timestamp(matureBlockTime.Unix()),
 		TotalCurrency:       totalCurrency(e.blockchainHeight),
-		ActiveContractCount: e.activeContracts,
+		ActiveContractCount: e.activeContractCount,
 		ActiveContractCosts: e.activeContractCost,
 		ActiveContractSize:  e.activeContractSize,
-		TotalContractCount:  e.totalContracts,
+		TotalContractCount:  e.totalContractCount,
 		TotalContractCosts:  e.totalContractCost,
 		TotalContractSize:   e.totalContractSize,
 	}

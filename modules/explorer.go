@@ -25,10 +25,10 @@ type (
 		TotalCurrency       types.Currency
 		ActiveContractCount uint64
 		ActiveContractCosts types.Currency
-		ActiveContractSize  uint64
+		ActiveContractSize  types.Currency
 		TotalContractCount  uint64
 		TotalContractCosts  types.Currency
-		TotalContractSize   uint64
+		TotalContractSize   types.Currency
 	}
 
 	// The following are used when returning information about a
