@@ -50,14 +50,15 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
-		currentBlock:     cs.GenesisBlock(),
-		genesisBlockID:   cs.GenesisBlock().ID(),
-		seenTimes:        make([]time.Time, types.MaturityDelay+1),
-		startTime:        time.Now(),
+		currentBlock:   cs.GenesisBlock(),
+		genesisBlockID: cs.GenesisBlock().ID(),
+		seenTimes:      make([]time.Time, types.MaturityDelay+1),
+		startTime:      time.Now(),
 
 		cs:         cs,
 		persistDir: persistDir,
 	}
+	e.blockchainHeight-- // Set to -1 so the genesis block sets the height to 0.
 
 	// Intialize the persistent structures, including the database.
 	err := e.initPersist()
