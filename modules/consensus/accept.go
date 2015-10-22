@@ -7,7 +7,6 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -45,7 +44,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 		return errOrphan
 	}
 	var parent processedBlock
-	err := encoding.Unmarshal(parentBytes, &parent)
+	err := cs.marshaler.Unmarshal(parentBytes, &parent)
 	if err != nil {
 		return err
 	}
@@ -62,7 +61,7 @@ func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
 	}
 
 	// Check that the block is below the size limit.
-	if uint64(len(encoding.Marshal(b))) > types.BlockSizeLimit {
+	if uint64(len(cs.marshaler.Marshal(b))) > types.BlockSizeLimit {
 		return errLargeBlock
 	}
 

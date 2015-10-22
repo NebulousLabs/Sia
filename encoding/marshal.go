@@ -21,20 +21,34 @@ var (
 	errBadPointer = errors.New("cannot decode into invalid pointer")
 )
 
-// A SiaMarshaler can encode and write itself to a stream.
-type SiaMarshaler interface {
-	MarshalSia(io.Writer) error
-}
+type (
+	// GenericMarshaler marshals objects into byte slices and unmarshals byte
+	// slices into objects.
+	GenericMarshaler interface {
+		Marshal(interface{}) []byte
+		Unmarshal([]byte, interface{}) error
+	}
 
-// A SiaUnmarshaler can read and decode itself from a stream.
-type SiaUnmarshaler interface {
-	UnmarshalSia(io.Reader) error
-}
+	// A SiaMarshaler can encode and write itself to a stream.
+	SiaMarshaler interface {
+		MarshalSia(io.Writer) error
+	}
 
-// An Encoder writes objects to an output stream.
-type Encoder struct {
-	w io.Writer
-}
+	// A SiaUnmarshaler can read and decode itself from a stream.
+	SiaUnmarshaler interface {
+		UnmarshalSia(io.Reader) error
+	}
+
+	// StdGenericMarshaler is an implementation of GenericMarshaler that uses
+	// the encoding.Marshal and encoding.Unmarshal functions to perform
+	// its marshaling/unmarshaling.
+	StdGenericMarshaler struct{}
+
+	// An Encoder writes objects to an output stream.
+	Encoder struct {
+		w io.Writer
+	}
+)
 
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
@@ -323,7 +337,7 @@ func NewDecoder(r io.Reader) *Decoder {
 
 // Unmarshal decodes the encoded value b and stores it in v, which must be a
 // pointer. The decoding rules are the inverse of those specified in the
-// package docstring.
+// package docstring for marshaling.
 func Unmarshal(b []byte, v interface{}) error {
 	r := bytes.NewReader(b)
 	return NewDecoder(r).Decode(v)
@@ -337,4 +351,17 @@ func ReadFile(filename string, v interface{}) error {
 	}
 	defer file.Close()
 	return NewDecoder(file).Decode(v)
+}
+
+// Marshal returns the encoding of v. For encoding details, see the package
+// docstring.
+func (m StdGenericMarshaler) Marshal(v interface{}) []byte {
+	return Marshal(v)
+}
+
+// Unmarshal decodes the encoded value b and stores it in v, which must be a
+// pointer. The decoding rules are the inverse of those specified in the
+// package docstring for marshaling.
+func (m StdGenericMarshaler) Unmarshal(b []byte, v interface{}) error {
+	return Unmarshal(b, v)
 }
