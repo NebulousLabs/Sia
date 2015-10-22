@@ -23,8 +23,7 @@ var (
 )
 
 // validHeader does some early, low computation verification on the block.
-func (cs *ConsensusSet) validHeader(tx *bolt.Tx, b types.Block) error {
-
+func (cs *ConsensusSet) validHeader(tx dbTx, b types.Block) error {
 	// See if the block is known already.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
@@ -139,7 +138,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 		// Check that the header is valid. The header is checked first because it
 		// is not computationally expensive to verify, but it is computationally
 		// expensive to create.
-		err := cs.validHeader(tx, b)
+		err := cs.validHeader(boltTxWrapper{tx}, b)
 		if err != nil {
 			// If the block is in the near future, but too far to be acceptable, then
 			// save the block and add it to the consensus set after it is no longer
