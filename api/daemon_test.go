@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 
@@ -38,8 +39,12 @@ func TestSignedUpdate(t *testing.T) {
 	// to test the update process, we need to spoof the update server
 	uh := new(updateHandler)
 	http.Handle("/", uh)
-	go http.ListenAndServe(":8080", nil)
-	updateURL = "http://localhost:8080"
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go http.Serve(l, nil)
+	updateURL = "http://" + l.Addr().String()
 
 	// same version
 	uh.version = build.Version
