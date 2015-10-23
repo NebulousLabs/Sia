@@ -1,5 +1,5 @@
-Sia 0.4.4
-===========
+Sia 0.4.5
+=========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
 
@@ -143,6 +143,10 @@ Version History
 ---------------
 
 October 2015:
+
+v0.4.5 (patch)
+- Fixed last prominent bug in block database
+- Closed some dangling resource handles
 
 v0.4.4 (patch)
 - Uploading is much more reliable
