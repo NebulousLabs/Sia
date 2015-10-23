@@ -14,6 +14,7 @@ import (
 var (
 	errBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
 	errDoSBlock               = errors.New("block is known to be invalid")
+	errNoBlockMap             = errors.New("block map is not in database")
 	errEarlyTimestamp         = errors.New("block timestamp is too early")
 	errExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
 	errFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
@@ -22,8 +23,9 @@ var (
 	errOrphan                 = errors.New("block has no known parent")
 )
 
-// validHeader does some early, low computation verification on the block.
-func (cs *ConsensusSet) validHeader(tx dbTx, b types.Block) error {
+// validateHeader does some early, low computation verification on the block.
+// Callers should not assume that validation will happen in a particular order.
+func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
 	// See if the block is known already.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
@@ -33,12 +35,16 @@ func (cs *ConsensusSet) validHeader(tx dbTx, b types.Block) error {
 
 	// Check if the block is already known.
 	blockMap := tx.Bucket(BlockMap)
+	if blockMap == nil {
+		return errNoBlockMap
+	}
 	if blockMap.Get(id[:]) != nil {
 		return modules.ErrBlockKnown
 	}
 
 	// Check for the parent.
-	parentBytes := blockMap.Get(b.ParentID[:])
+	parentID := b.ParentID
+	parentBytes := blockMap.Get(parentID[:])
 	if parentBytes == nil {
 		return errOrphan
 	}
@@ -137,7 +143,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 		// Check that the header is valid. The header is checked first because it
 		// is not computationally expensive to verify, but it is computationally
 		// expensive to create.
-		err := cs.validHeader(boltTxWrapper{tx}, b)
+		err := cs.validateHeader(boltTxWrapper{tx}, b)
 		if err != nil {
 			// If the block is in the near future, but too far to be acceptable, then
 			// save the block and add it to the consensus set after it is no longer

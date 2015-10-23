@@ -8,7 +8,79 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly ignored.
+// mockDbBucket is an implementation of dbBucket for unit testing.
+type mockDbBucket struct{}
+
+func (bucket mockDbBucket) Get(key []byte) []byte {
+	return nil
+}
+
+// mockDbTx is an implementation of dbTx for unit testing. It uses an in-memory
+// key/value store to mock a database.
+type mockDbTx struct {
+	buckets map[string]dbBucket
+}
+
+func (db mockDbTx) Bucket(name []byte) dbBucket {
+	return db.buckets[string(name)]
+}
+
+// TestUnitValidateHeaderFailsWhenBlockMapDoesNotExist checks that
+// validateHeader correctly rejects blocks when no block map is found in the
+// database.
+func TestUnitValidateHeaderFailsWhenBlockMapDoesNotExist(t *testing.T) {
+	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
+	// validation checks in validateHeader (i.e. everything should be valid except
+	// the missing block map).
+	block := types.Block{Timestamp: 100}
+
+	// Create a transaction with no associated DB buckets.
+	tx := mockDbTx{}
+	cs := ConsensusSet{}
+	err := cs.validateHeader(tx, block)
+	if err != errNoBlockMap {
+		t.Fatalf("expected to fail with errNoBlockMap, got: %v", err)
+	}
+}
+
+// TestUnitValidateHeaderRejectsKnownBadBlocks checks that validateHeader
+// correctly rejects saved bad blocks.
+func TestUnitValidateHeaderRejectsKnownBadBlocks(t *testing.T) {
+	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
+	// validation checks in validateHeader (i.e. everything should be valid except
+	// the known bad block).
+	block := types.Block{Timestamp: 100}
+	dosBlocks := map[types.BlockID]struct{}{
+		block.ID(): struct{}{},
+	}
+
+	tx := mockDbTx{}
+	cs := ConsensusSet{dosBlocks: dosBlocks}
+	err := cs.validateHeader(tx, block)
+	if err != errDoSBlock {
+		t.Fatalf("expected to fail with errDoSBlock, got: %v", err)
+	}
+}
+
+func TestUnitValidateHeaderRejectsOrphanBlocks(t *testing.T) {
+	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
+	// validation checks in validateHeader (i.e. everything should be valid except
+	// the known bad block).
+	block := types.Block{Timestamp: 100}
+	dosBlocks := map[types.BlockID]struct{}{}
+
+	tx := mockDbTx{map[string]dbBucket{
+		string(BlockMap): mockDbBucket{},
+	}}
+	cs := ConsensusSet{dosBlocks: dosBlocks}
+	err := cs.validateHeader(tx, block)
+	if err != errOrphan {
+		t.Fatalf("expected to fail with errOrphan, got: %v", err)
+	}
+}
+
+// TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly
+// ignored.
 func TestIntegrationDoSBlockHandling(t *testing.T) {
 	// TestIntegrationDoSBlockHandling catches a wide array of simple errors,
 	// and therefore is included in the short tests despite being somewhat
