@@ -28,9 +28,9 @@ type Explorer struct {
 	totalRevisionVolume types.Currency
 
 	// Other factoids.
-	blockchainHeight       types.BlockHeight
-	currentBlock           types.Block
-	genesisBlockID         types.BlockID
+	blockchainHeight types.BlockHeight
+	currentBlock     types.Block
+	genesisBlockID   types.BlockID
 
 	// startTime tracks when the explorer got turned on.
 	startTime time.Time

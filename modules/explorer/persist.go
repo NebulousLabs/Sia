@@ -14,7 +14,7 @@ func (e *Explorer) initPersist() error {
 	}
 
 	// Initilize the database
-	db, err := openDB(filepath.Join(e.persistDir, "blocks.db")
+	db, err := openDB(filepath.Join(e.persistDir, "blocks.db"))
 	if err != nil {
 		return err
 	}
