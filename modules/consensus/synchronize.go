@@ -1,13 +1,13 @@
 package consensus
 
 import (
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 const (

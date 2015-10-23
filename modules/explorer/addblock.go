@@ -10,7 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
-	"github.com/boltdb/bolt"
+	"github.com/NebulousLabs/bolt"
 )
 
 // A boltTx is a bolt transaction. It implements monadic error handling, such that

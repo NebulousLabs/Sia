@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // manageErr handles an error detected by the consistency checks.
@@ -20,55 +20,6 @@ func manageErr(tx *bolt.Tx, err error) {
 		panic(err)
 	} else {
 		fmt.Println(err)
-	}
-}
-
-// refreshDB saves, deletes, and then restores all of the buckets in the
-// database. This eliminates bugs during reorgs. The exact source of the bugs
-// is unknown, but the problem is that after excessive use by Sia, calling
-// Delete on a bucket will occasionally delete many more elements than the
-// single element being targeted. It is strongly suspected that this is due to
-// an error in the boltdb code, but the source remains unknown for the time
-// being. Refreshing the database between blocks has solved the issue for the
-// time being - it is currently unknown whether large blocks are able to
-// trigger the error, but it is suspected that large blocks are safe.
-func refreshDB(tx *bolt.Tx) {
-	// Get a list of buckets.
-	var bucketNames [][]byte
-	err := tx.ForEach(func(bucketName []byte, _ *bolt.Bucket) error {
-		bucketNames = append(bucketNames, bucketName)
-		return nil
-	})
-	if err != nil {
-		manageErr(tx, err)
-	}
-
-	for _, bucketName := range bucketNames {
-		var keys [][]byte
-		var values [][]byte
-		err := tx.Bucket(bucketName).ForEach(func(k, v []byte) error {
-			keys = append(keys, k)
-			values = append(values, v)
-			return nil
-		})
-		if err != nil {
-			manageErr(tx, err)
-		}
-
-		err = tx.DeleteBucket(bucketName)
-		if err != nil {
-			manageErr(tx, err)
-		}
-		bucket, err := tx.CreateBucket(bucketName)
-		if err != nil {
-			manageErr(tx, err)
-		}
-		for i := range keys {
-			err := bucket.Put(keys[i], values[i])
-			if err != nil {
-				manageErr(tx, err)
-			}
-		}
 	}
 }
 
@@ -378,7 +329,7 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 	checkDSCOs(tx)
 	checkSiacoinCount(tx)
 	checkSiafundCount(tx)
-	// cs.checkRevertApply(tx)
+	cs.checkRevertApply(tx)
 	cs.checkingConsistency = false
 }
 

@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 const (

@@ -4,11 +4,11 @@ package consensus
 // There is an assumption that the transaction has already been verified.
 
 import (
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and

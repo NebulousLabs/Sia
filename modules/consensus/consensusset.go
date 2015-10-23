@@ -9,13 +9,13 @@ package consensus
 import (
 	"errors"
 
-	"github.com/NebulousLabs/demotemutex"
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
+	"github.com/NebulousLabs/demotemutex"
 )
 
 var (

@@ -7,7 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/boltdb/bolt"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 /*

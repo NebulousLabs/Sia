@@ -4,13 +4,13 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // SurpassThreshold is a percentage that dictates how much heavier a competing
