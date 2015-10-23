@@ -11,21 +11,52 @@ import (
 // ProcessConsensusChange follows the most recent changes to the consensus set,
 // including parsing new blocks and updating the utxo sets.
 func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := e.mu.Lock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
-	// Modify the number of file contracts and how much they costed
+	// Add the stats for the reverted blocks.
+	for _, block := range cc.RevertedBlocks {
+		for _, txn := range block.Transactions {
+			for _, fc := range txn.FileContracts {
+				e.totalContractCount -= 1
+				e.totalContractCost = e.totalContractCost.Sub(fc.Payout)
+				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fc.FileSize))
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				e.totalContractCount -= 1
+				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fcr.NewFileSize))
+				e.totalRevisionVolume = e.totalRevisionVolume.Sub(types.NewCurrency64(fcr.NewFileSize))
+			}
+		}
+	}
+
+	// Add the stats for the applied blocks.
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			// Revert all of the file contracts.
+			for _, fc := range txn.FileContracts {
+				e.totalContractCount += 1
+				e.totalContractCost = e.totalContractCost.Add(fc.Payout)
+				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fc.FileSize))
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				e.totalContractCount += 1
+				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
+				e.totalRevisionVolume = e.totalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
+			}
+		}
+	}
+
+	// Compute the changes in the active set.
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
-			e.activeContracts += 1
-			e.totalContracts += 1
+			e.activeContractCount += 1
 			e.activeContractCost = e.activeContractCost.Add(diff.FileContract.Payout)
-			e.totalContractCost = e.totalContractCost.Add(diff.FileContract.Payout)
-			e.activeContractSize += diff.FileContract.FileSize
-			e.totalContractSize += diff.FileContract.FileSize
+			e.activeContractSize = e.activeContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
 		} else {
-			e.activeContracts -= 1
+			e.activeContractCount -= 1
 			e.activeContractCost = e.activeContractCost.Sub(diff.FileContract.Payout)
-			e.activeContractSize -= diff.FileContract.FileSize
+			e.activeContractSize = e.activeContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 		}
 	}
 
@@ -50,7 +81,4 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
-
-	// Notify subscribers about updates
-	e.mu.Unlock(lockID)
 }

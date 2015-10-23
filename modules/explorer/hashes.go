@@ -41,8 +41,8 @@ func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
 		return nil, errors.New("requested hash not long enough")
 	}
 
-	lockID := e.mu.RLock()
-	defer e.mu.RUnlock(lockID)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
 	// Perform a lookup to tell which type of hash it is
 	typeBytes, err := e.db.getFromBucket("Hashes", hash[:crypto.HashSize])
