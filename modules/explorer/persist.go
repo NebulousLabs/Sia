@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"os"
+	"path/filepath"
 )
 
 // initPersist initializes the persistent structures of the explorer module.
@@ -13,7 +14,7 @@ func (e *Explorer) initPersist() error {
 	}
 
 	// Initilize the database
-	db, err := openDB(e.persistDir + "/blocks.db")
+	db, err := openDB(filepath.Join(e.persistDir, "blocks.db")
 	if err != nil {
 		return err
 	}
