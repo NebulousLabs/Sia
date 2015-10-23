@@ -26,51 +26,48 @@ type explorerTester struct {
 	walletKey crypto.TwofishKey
 
 	explorer *Explorer
-
-	t *testing.T
 }
 
-func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
+// createExplorerTester creates a tester object for the explorer module.
+func createExplorerTester(name string) (*explorerTester, error) {
+	// Create and assemble the dependencies.
 	testdir := build.TempDir(modules.HostDir, name)
-
-	// Create the modules
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	key, err := crypto.GenerateTwofishKey()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	_, err = w.Encrypt(key)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	err = w.Unlock(key)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	e, err := New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
 	et := &explorerTester{
 		cs:        cs,
 		gateway:   g,
@@ -80,8 +77,6 @@ func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 		walletKey: key,
 
 		explorer: e,
-
-		t: t,
 	}
 
 	// Mine until the wallet has money.
@@ -93,4 +88,38 @@ func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 		}
 	}
 	return et, nil
+}
+
+// TestNilExplorerDependencies tries to initalize an explorer with nil
+// dependencies, checks that the correct error is returned.
+func TestNilExplorerDependencies(t *testing.T) {
+	_, err := New(nil, "expdir")
+	if err != errNilCS {
+		t.Fatal("Expecting errNilCS")
+	}
+}
+
+// TestExplorerGenesisHeight checks that when the explorer is initialized and given the
+// genesis block, the result has the correct height.
+func TestExplorerGenesisHeight(t *testing.T) {
+	// Create the dependencies.
+	testdir := build.TempDir(modules.HostDir, "TestExplorerGenesisHeight")
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the explorer - from the subscription only the genesis block will
+	// be received.
+	e, err := New(cs, testdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.blockchainHeight != 0 {
+		t.Error("genesis height was not set to zero after explorer initialization")
+	}
 }

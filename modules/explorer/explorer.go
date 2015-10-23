@@ -11,6 +11,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	errNilCS = errors.New("explorer cannot use a nil consensus set")
+)
+
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
 type Explorer struct {
@@ -26,7 +30,6 @@ type Explorer struct {
 	// Other factoids.
 	blockchainHeight       types.BlockHeight
 	currentBlock           types.Block
-	currencyTransferVolume types.Currency
 	genesisBlockID         types.BlockID
 
 	// startTime tracks when the explorer got turned on.
@@ -45,7 +48,7 @@ type Explorer struct {
 func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 	// Check that input modules are non-nil
 	if cs == nil {
-		return nil, errors.New("explorer cannot use a nil ConsensusSet")
+		return nil, errNilCS
 	}
 
 	// Initialize the explorer.

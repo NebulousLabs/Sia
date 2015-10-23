@@ -17,14 +17,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Add the stats for the reverted blocks.
 	for _, block := range cc.RevertedBlocks {
 		for _, txn := range block.Transactions {
-			for _, sco := range txn.SiacoinOutputs {
-				e.currencyTransferVolume = e.currencyTransferVolume.Sub(sco.Value)
-			}
 			for _, fc := range txn.FileContracts {
 				e.totalContractCount -= 1
 				e.totalContractCost = e.totalContractCost.Sub(fc.Payout)
 				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fc.FileSize))
-				e.currencyTransferVolume = e.currencyTransferVolume.Sub(fc.Payout)
 			}
 			for _, fcr := range txn.FileContractRevisions {
 				e.totalContractCount -= 1
@@ -38,14 +34,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		for _, txn := range block.Transactions {
 			// Revert all of the file contracts.
-			for _, sco := range txn.SiacoinOutputs {
-				e.currencyTransferVolume = e.currencyTransferVolume.Add(sco.Value)
-			}
 			for _, fc := range txn.FileContracts {
 				e.totalContractCount += 1
 				e.totalContractCost = e.totalContractCost.Add(fc.Payout)
 				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fc.FileSize))
-				e.currencyTransferVolume = e.currencyTransferVolume.Add(fc.Payout)
 			}
 			for _, fcr := range txn.FileContractRevisions {
 				e.totalContractCount += 1
@@ -67,8 +59,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			e.activeContractSize = e.activeContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 		}
 	}
-
-	// Compute the
 
 	// Reverting the blockheight and block data structs from reverted blocks
 	e.blockchainHeight -= types.BlockHeight(len(cc.RevertedBlocks))

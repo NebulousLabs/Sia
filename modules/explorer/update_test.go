@@ -2,30 +2,28 @@ package explorer
 
 import (
 	"testing"
-
-	"github.com/NebulousLabs/Sia/types"
 )
 
-// Mine a bunch of blocks, checking each time that the stored
-// value agrees with consensus
-func (et *explorerTester) testConsensusUpdates(t *testing.T) {
-	// 20 here is arbitrary
-	for i := types.BlockHeight(0); i < 20; i++ {
-		b, _ := et.miner.FindBlock()
-		err := et.cs.AcceptBlock(b)
-		if err != nil {
-			et.t.Fatal(err)
-		}
-	}
-}
-
-func TestConsensusUpdates(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	et, err := createExplorerTester("TestExplorerConsensusUpdate", t)
+// TestIntegrationExplorerActiveContractMetrics checks that the siacoin
+// transfer volume metric is working correctly.
+func TestIntegrationExplorerActiveContractMetrics(t *testing.T) {
+	et, err := createExplorerTester("TestIntegrationExporerActiveContractMetrics")
 	if err != nil {
 		t.Fatal(err)
 	}
-	et.testConsensusUpdates(t)
+	if !et.explorer.activeContractCost.IsZero() {
+		t.Error("fresh explorer has nonzero active contract cost")
+	}
+	if et.explorer.activeContractCount != 0 {
+		t.Error("active contract count should initialize to zero")
+	}
+	if !et.explorer.activeContractSize.IsZero() {
+		t.Error("active contract size should initialize to zero")
+	}
+
+	// Put a file contract into the chain, and check that the explorer
+	// correctly does all of the counting.
+
+	// Perform some sort of reorg and check that the reorg is handled
+	// correctly.
 }

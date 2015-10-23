@@ -104,7 +104,7 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 }
 
 func TestAddBlock(t *testing.T) {
-	et, err := createExplorerTester("TestExplorerAddBlock", t)
+	et, err := createExplorerTester("TestExplorerAddBlock")
 	if err != nil {
 		t.Fatal(err)
 	}
