@@ -207,6 +207,7 @@ func (r *Renter) load() error {
 	if err != nil {
 		return err
 	}
+	defer dir.Close()
 	filenames, err := dir.Readdirnames(-1)
 	if err != nil {
 		return err
@@ -222,6 +223,7 @@ func (r *Renter) load() error {
 			return err
 		}
 		_, err = r.loadSharedFiles(file)
+		file.Close() // defer is probably a bad idea
 		if err != nil {
 			// maybe just skip?
 			return err
