@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/boltdb/bolt"
+	"github.com/NebulousLabs/bolt"
 )
 
 type BoltDatabase struct {

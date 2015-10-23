@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	// "math/big"
 	"path/filepath"
 	"testing"
 

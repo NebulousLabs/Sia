@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // TestSynchronize tests that the consensus set can successfully synchronize

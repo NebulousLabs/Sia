@@ -3,11 +3,11 @@ package consensus
 import (
 	"errors"
 
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // A changeEntry records a change to the consensus set that happened, and is

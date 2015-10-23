@@ -4,10 +4,10 @@ package consensus
 // compatibility with the test suite.
 
 import (
-	"github.com/boltdb/bolt"
-
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // dbBlockHeight is a convenience function allowing blockHeight to be called
