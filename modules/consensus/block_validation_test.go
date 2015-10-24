@@ -6,6 +6,23 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestUnitValidateBlockEarlyTimestamp checks that stdBlockValidator
+// appropriately handles blocks with early timestamps.
+func TestUnitValidateBlockEarlyTimestamp(t *testing.T) {
+	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
+	// is valid except for the timestamp (i.e. don't assume an ordering to the
+	// implementation of the validation function).
+	minTimestamp := types.Timestamp(5)
+	blockValidator := stdBlockValidator{}
+	b := types.Block{
+		Timestamp: minTimestamp - 1,
+	}
+	err := blockValidator.ValidateBlock(b, minTimestamp, types.Target{}, 0)
+	if err != errEarlyTimestamp {
+		t.Errorf("got %v, want %v", err, errEarlyTimestamp)
+	}
+}
+
 // TestCheckMinerPayouts probes the checkMinerPayouts function.
 func TestCheckMinerPayouts(t *testing.T) {
 	// All tests are done at height = 0.

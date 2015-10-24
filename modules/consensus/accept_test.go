@@ -270,32 +270,6 @@ func TestLargeBlock(t *testing.T) {
 	}
 }
 
-// TestEarlyBlockTimestampHandling checks that blocks with early timestamps are
-// handled appropriately.
-func TestEarlyBlockTimestampHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestBlockTimestampHandling")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// Create a block with a too early timestamp - block should be rejected
-	// outright.
-	block, target, err := cst.miner.BlockForWork()
-	if err != nil {
-		t.Fatal(err)
-	}
-	block.Timestamp = 0
-	earlyBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.AcceptBlock(earlyBlock)
-	if err != errEarlyTimestamp {
-		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
-	}
-}
-
 // TestExtremeFutureTimestampHandling checks that blocks with extreme future
 // timestamps handled correclty.
 func TestExtremeFutureTimestampHandling(t *testing.T) {
