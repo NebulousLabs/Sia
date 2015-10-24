@@ -6,8 +6,28 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+type mockMarshaler struct {
+	marshalLength uint64
+}
+
+func (m mockMarshaler) Marshal(interface{}) []byte {
+	return make([]byte, m.marshalLength)
+}
+
+func (m mockMarshaler) Unmarshal([]byte, interface{}) error {
+	return nil
+}
+
+type mockClock struct {
+	now types.Timestamp
+}
+
+func (c mockClock) Now() types.Timestamp {
+	return c.now
+}
+
 // TestUnitValidateBlockEarlyTimestamp checks that stdBlockValidator
-// appropriately handles blocks with early timestamps.
+// rejects blocks  timestamps that are too early.
 func TestUnitValidateBlockEarlyTimestamp(t *testing.T) {
 	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
 	// is valid except for the timestamp (i.e. don't assume an ordering to the
@@ -18,8 +38,57 @@ func TestUnitValidateBlockEarlyTimestamp(t *testing.T) {
 		Timestamp: minTimestamp - 1,
 	}
 	err := blockValidator.ValidateBlock(b, minTimestamp, types.Target{}, 0)
-	if err != errEarlyTimestamp {
-		t.Errorf("got %v, want %v", err, errEarlyTimestamp)
+	wantErr := errEarlyTimestamp
+	if err != wantErr {
+		t.Errorf("got %v, want %v", err, wantErr)
+	}
+}
+
+// TestUnitValidateBlockLargeBlock checks that stdBlockValidator rejects
+// excessively large blocks.
+func TestUnitValidateBlockLargeBlock(t *testing.T) {
+	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
+	// is valid except for the length (i.e. don't assume an ordering to the
+	// implementation of the validation function).
+	minTimestamp := types.Timestamp(5)
+	blockValidator := stdBlockValidator{
+		marshaler: mockMarshaler{
+			marshalLength: types.BlockSizeLimit + 1,
+		},
+	}
+	b := types.Block{
+		Timestamp: minTimestamp,
+	}
+	err := blockValidator.ValidateBlock(b, minTimestamp, types.RootDepth, 0)
+	wantErr := errLargeBlock
+	if err != wantErr {
+		t.Errorf("got %v, want %v", err, wantErr)
+	}
+}
+
+// TestUnitValidateBlockExtremeFutureTimestamp checks that stdBlockValidator
+// rejects blocks that are timestamped in the extreme future.
+func TestUnitValidateBlockExtremeFutureTimestamp(t *testing.T) {
+	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
+	// is valid except for the timestamp (i.e. don't assume an ordering to the
+	// implementation of the validation function).
+	minTimestamp := types.Timestamp(5)
+	now := types.Timestamp(50)
+	blockValidator := stdBlockValidator{
+		marshaler: mockMarshaler{
+			marshalLength: 1,
+		},
+		clock: mockClock{
+			now: now,
+		},
+	}
+	b := types.Block{
+		Timestamp: now + types.ExtremeFutureThreshold + 1,
+	}
+	err := blockValidator.ValidateBlock(b, minTimestamp, types.RootDepth, 0)
+	wantErr := errExtremeFutureTimestamp
+	if err != wantErr {
+		t.Errorf("got %v, want %v", err, wantErr)
 	}
 }
 
