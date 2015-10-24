@@ -55,15 +55,15 @@ type ConsensusSet struct {
 	// block.
 	checkingConsistency bool
 
-	// clock is a Clock interface that indicates the current system time.
-	clock types.Clock
-
 	// marshaler encodes and decodes between objects and byte slices.
 	marshaler encoding.GenericMarshaler
 
 	// blockRuleHelper calculates values on blocks for block validity rule
 	// enforcement.
 	blockRuleHelper blockRuleHelper
+
+	// blockValidator validates Blocks against validity rules.
+	blockValidator blockValidator
 
 	persistDir string
 	mu         demotemutex.DemoteMutex
@@ -100,11 +100,11 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		clock: types.StdClock{},
-
 		marshaler: encoding.StdGenericMarshaler{},
 
 		blockRuleHelper: stdBlockRuleHelper{},
+
+		blockValidator: NewBlockValidator(),
 
 		persistDir: persistDir,
 	}

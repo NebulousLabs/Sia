@@ -12,15 +12,10 @@ import (
 )
 
 var (
-	errBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
-	errDoSBlock               = errors.New("block is known to be invalid")
-	errNoBlockMap             = errors.New("block map is not in database")
-	errEarlyTimestamp         = errors.New("block timestamp is too early")
-	errExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
-	errFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
-	errInconsistentSet        = errors.New("consensus set is not in a consistent state")
-	errLargeBlock             = errors.New("block is too large to be accepted")
-	errOrphan                 = errors.New("block has no known parent")
+	errDoSBlock        = errors.New("block is known to be invalid")
+	errNoBlockMap      = errors.New("block map is not in database")
+	errInconsistentSet = errors.New("consensus set is not in a consistent state")
+	errOrphan          = errors.New("block has no known parent")
 )
 
 // validateHeader does some early, low computation verification on the block.
@@ -48,47 +43,16 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
 	if parentBytes == nil {
 		return errOrphan
 	}
+
 	var parent processedBlock
 	err := cs.marshaler.Unmarshal(parentBytes, &parent)
 	if err != nil {
 		return err
 	}
-
-	// Check that the target of the new block is sufficient.
-	if !checkTarget(b, parent.ChildTarget) {
-		return modules.ErrBlockUnsolved
-	}
-
 	// Check that the timestamp is not too far in the past to be acceptable.
-	if cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent) > b.Timestamp {
-		return errEarlyTimestamp
-	}
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
 
-	// Check that the block is below the size limit.
-	if uint64(len(cs.marshaler.Marshal(b))) > types.BlockSizeLimit {
-		return errLargeBlock
-	}
-
-	// Check if the block is in the extreme future. We make a distinction between
-	// future and extreme future because there is an assumption that by the time
-	// the extreme future arrives, this block will no longer be a part of the
-	// longest fork because it will have been ignored by all of the miners.
-	if b.Timestamp > cs.clock.Now()+types.ExtremeFutureThreshold {
-		return errExtremeFutureTimestamp
-	}
-
-	// Verify that the miner payouts are valid.
-	if !checkMinerPayouts(b, parent.Height+1) {
-		return errBadMinerPayouts
-	}
-
-	// Check if the block is in the near future, but too far to be acceptable.
-	// This is the last check because it's an expensive check, and not worth
-	// performing if the payouts are incorrect.
-	if b.Timestamp > cs.clock.Now()+types.FutureThreshold {
-		return errFutureTimestamp
-	}
-	return nil
+	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1)
 }
 
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
@@ -150,7 +114,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 			// too far in the future.
 			if err == errFutureTimestamp {
 				go func() {
-					time.Sleep(time.Duration(b.Timestamp-(cs.clock.Now()+types.FutureThreshold)) * time.Second)
+					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
 					cs.AcceptBlock(b) // NOTE: Error is not handled.
 				}()
 			}
