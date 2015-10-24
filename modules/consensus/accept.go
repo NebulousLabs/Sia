@@ -53,9 +53,8 @@ func (cs *ConsensusSet) validHeader(tx dbTx, b types.Block) error {
 		return modules.ErrBlockUnsolved
 	}
 
-	// Check that the timestamp is not too far in the past to be
-	// acceptable.
-	if earliestChildTimestamp(blockMap, &parent) > b.Timestamp {
+	// Check that the timestamp is not too far in the past to be acceptable.
+	if cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent) > b.Timestamp {
 		return errEarlyTimestamp
 	}
 

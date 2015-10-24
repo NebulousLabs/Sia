@@ -61,6 +61,10 @@ type ConsensusSet struct {
 	// marshaler encodes and decodes between objects and byte slices.
 	marshaler encoding.GenericMarshaler
 
+	// blockRuleHelper calculates values on blocks for block validity rule
+	// enforcement.
+	blockRuleHelper blockRuleHelper
+
 	persistDir string
 	mu         demotemutex.DemoteMutex
 }
@@ -99,6 +103,8 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		clock: types.StdClock{},
 
 		marshaler: encoding.StdGenericMarshaler{},
+
+		blockRuleHelper: stdBlockRuleHelper{},
 
 		persistDir: persistDir,
 	}
@@ -166,16 +172,16 @@ func (cs *ConsensusSet) Close() error {
 	return cs.db.Close()
 }
 
-// EarliestChildTimestamp returns the earliest timestamp that the next block can
-// have in order for it to be considered valid.
-func (cs *ConsensusSet) EarliestChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
+// MinimumValidChildTimestamp returns the earliest timestamp that the next block
+// can have in order for it to be considered valid.
+func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
 	// Error is not checked because it does not matter.
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
 		}
-		timestamp = earliestChildTimestamp(tx.Bucket(BlockMap), pb)
+		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
 		exists = true
 		return nil
 	})

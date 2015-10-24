@@ -25,7 +25,7 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 	var exists1, exists2 bool
 	m.unsolvedBlock.ParentID = appliedIDs[len(appliedIDs)-1]
 	m.target, exists1 = m.cs.ChildTarget(m.unsolvedBlock.ParentID)
-	m.unsolvedBlock.Timestamp, exists2 = m.cs.EarliestChildTimestamp(m.unsolvedBlock.ParentID)
+	m.unsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.unsolvedBlock.ParentID)
 	if build.DEBUG && !exists1 {
 		panic("could not get child target")
 	}

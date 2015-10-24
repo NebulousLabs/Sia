@@ -14,15 +14,15 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationEarliestChildTimestamp probes the earliestChildTimestamp method of the
-// block node type.
-func TestIntegrationEarliestChildTimestamp(t *testing.T) {
+// TestIntegrationMinimumValidChildTimestamp probes the
+// MinimumValidChildTimestamp method of the consensus type.
+func TestIntegrationMinimumValidChildTimestamp(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
 	// Create a custom consnesus set to control the blocks.
-	testdir := build.TempDir(modules.ConsensusDir, "TestIntegrationEarliestChildTimestamp")
+	testdir := build.TempDir(modules.ConsensusDir, "TestIntegrationMinimumValidChildTimestamp")
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +60,7 @@ func TestIntegrationEarliestChildTimestamp(t *testing.T) {
 	// The earliest child timestamp of the genesis block should be the
 	// timestamp of the genesis block.
 	genesisTime := cs.blockRoot.Block.Timestamp
-	earliest, ok := cs.EarliestChildTimestamp(cs.blockRoot.Block.ID())
+	earliest, ok := cs.MinimumValidChildTimestamp(cs.blockRoot.Block.ID())
 	if !ok || genesisTime != earliest {
 		t.Error("genesis block earliest timestamp producing unexpected results")
 	}
@@ -82,17 +82,17 @@ func TestIntegrationEarliestChildTimestamp(t *testing.T) {
 	}
 
 	// Median should be genesisTime for 6th block.
-	earliest, ok = cs.EarliestChildTimestamp(blockIDs[5])
+	earliest, ok = cs.MinimumValidChildTimestamp(blockIDs[5])
 	if !ok || earliest != genesisTime {
 		t.Error("incorrect child timestamp")
 	}
 	// Median should be genesisTime+1 for 7th block.
-	earliest, ok = cs.EarliestChildTimestamp(blockIDs[6])
+	earliest, ok = cs.MinimumValidChildTimestamp(blockIDs[6])
 	if !ok || earliest != genesisTime+1 {
 		t.Error("incorrect child timestamp")
 	}
 	// Median should be genesisTime + 5 for pb11.
-	earliest, ok = cs.EarliestChildTimestamp(blockIDs[10])
+	earliest, ok = cs.MinimumValidChildTimestamp(blockIDs[10])
 	if !ok || earliest != genesisTime+5 {
 		t.Error("incorrect child timestamp")
 	}
