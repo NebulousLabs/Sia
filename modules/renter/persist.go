@@ -280,17 +280,17 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 	return nil
 }
 
-// ShareFile saves the specified files to sharedest.
-func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
+// ShareFile saves the specified files to shareDest.
+func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
 	// TODO: consider just appending the proper extension.
-	if filepath.Ext(sharedest) != ShareExtension {
+	if filepath.Ext(shareDest) != ShareExtension {
 		return ErrNonShareSuffix
 	}
 
-	file, err := os.Create(sharedest)
+	file, err := os.Create(shareDest)
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 
 	err = r.shareFiles(nicknames, file)
 	if err != nil {
-		os.Remove(sharedest)
+		os.Remove(shareDest)
 		return err
 	}
 
