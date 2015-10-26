@@ -27,7 +27,7 @@ func (c mockClock) Now() types.Timestamp {
 }
 
 // TestUnitValidateBlockEarlyTimestamp checks that stdBlockValidator
-// rejects blocks  timestamps that are too early.
+// rejects blocks with timestamps that are too early.
 func TestUnitValidateBlockEarlyTimestamp(t *testing.T) {
 	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
 	// is valid except for the timestamp (i.e. don't assume an ordering to the
