@@ -1,4 +1,4 @@
-Sia 0.4.5
+Sia 0.4.6
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -143,6 +143,9 @@ Version History
 ---------------
 
 October 2015:
+
+v0.4.6 (patch)
+- Removed over-agressive consistency check
 
 v0.4.5 (patch)
 - Fixed last prominent bug in block database
