@@ -329,7 +329,9 @@ func (cs *ConsensusSet) checkConsistency(tx *bolt.Tx) {
 	checkDSCOs(tx)
 	checkSiacoinCount(tx)
 	checkSiafundCount(tx)
-	cs.checkRevertApply(tx)
+	if build.DEBUG {
+		cs.checkRevertApply(tx)
+	}
 	cs.checkingConsistency = false
 }
 
