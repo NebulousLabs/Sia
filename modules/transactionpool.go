@@ -39,10 +39,6 @@ type TransactionPool interface {
 	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
-	// RelayTransactionSet is an RPC that accepts a transaction set from a
-	// peer.
-	RelayTransactionSet(PeerConn) error
-
 	// IsStandardTransaction returns `err = nil` if the transaction is
 	// standard, otherwise it returns an error explaining what is not standard.
 	IsStandardTransaction(types.Transaction) error

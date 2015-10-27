@@ -292,10 +292,10 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	return nil
 }
 
-// RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
+// relayTransactionSet is an RPC that accepts a transaction set from a peer. If
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
-func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
+func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	var ts []types.Transaction
 	err := encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
