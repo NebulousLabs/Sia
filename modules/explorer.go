@@ -5,18 +5,12 @@ import (
 )
 
 const (
+	// ExplorerDir is the name of the directory that is typically used for the
+	// explorer.
 	ExplorerDir = "explorer"
 )
 
-// Used for the BlockInfo call
 type (
-	ExplorerBlockData struct {
-		ID        types.BlockID   // The id hash of the block
-		Timestamp types.Timestamp // The timestamp on the block
-		Target    types.Target    // The target the block was mined for
-		Size      uint64          // The size in bytes of the marshalled block
-	}
-
 	// ExplorerStatistics returns a bunch of instantaneous statistics about the
 	// explorer at the current height.
 	ExplorerStatistics struct {
@@ -49,53 +43,11 @@ type (
 		TotalContractSize   types.Currency
 	}
 
-	// The following are used when returning information about a
-	// hash (using the GetHashInfo function)
-	//
-	// The responseType field is used to differentiate the structs
-	// blindly, and must be set
-	BlockResponse struct {
-		Block        types.Block
-		Height       types.BlockHeight
-		ResponseType string
-	}
-
-	// Wrapper for a transaction, with a little extra info
-	TransactionResponse struct {
-		Tx           types.Transaction
-		ParentID     types.BlockID
-		TxNum        int
-		ResponseType string
-	}
-
-	// Wrapper for fcInfo struct, defined in database.go
-	FcResponse struct {
-		Contract     types.TransactionID
-		Revisions    []types.TransactionID
-		Proof        types.TransactionID
-		ResponseType string
-	}
-
-	// Wrapper for the address type response
-	AddrResponse struct {
-		Txns         []types.TransactionID
-		ResponseType string
-	}
-
-	OutputResponse struct {
-		OutputTx     types.TransactionID
-		InputTx      types.TransactionID
-		ResponseType string
-	}
-
-	// The BlockExplorer interface provides access to the block explorer
+	// Explorer tracks the blockchain and provides tools for gathering
+	// statistics and finding objects or patterns within the blockchain.
 	Explorer interface {
-		BlockInfo(types.BlockHeight, types.BlockHeight) ([]ExplorerBlockData, error)
-
 		Statistics() ExplorerStatistics
 
 		Close() error
-
-		GetHashInfo([]byte) (interface{}, error)
 	}
 )

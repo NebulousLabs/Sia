@@ -1,7 +1,6 @@
 package explorer
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -121,12 +120,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			e.seenTimes[e.blockchainHeight%types.BlockHeight(len(e.seenTimes))] = time.Unix(int64(block.Timestamp), 0)
 		} else {
 			e.seenTimes[e.blockchainHeight%types.BlockHeight(len(e.seenTimes))] = time.Now()
-		}
-
-		// add the block to the database.
-		err := e.addBlockDB(block)
-		if err != nil {
-			fmt.Printf("Error when adding block to database: " + err.Error() + "\n")
 		}
 	}
 	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()

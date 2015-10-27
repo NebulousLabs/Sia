@@ -1,8 +1,6 @@
 package explorer
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -20,27 +18,6 @@ func totalCurrency(height types.BlockHeight) types.Currency {
 		}
 	}
 	return types.NewCurrency64(totalCoins).Mul(types.SiacoinPrecision)
-}
-
-// Returns a partial slice of our stored data on the blockchain. Data
-// obtained from consensus updates
-func (e *Explorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	// Error checking on the given range
-	if start > finish {
-		return nil, errors.New("the start block must be higher than the end block")
-	}
-	if finish > e.blockchainHeight+1 {
-		return nil, errors.New("cannot get info on a block higher than the blockchain")
-	}
-
-	summaries, err := e.db.dbBlockSummaries(start, finish)
-	if err != nil {
-		return nil, err
-	}
-	return summaries, nil
 }
 
 // Returns many pieces of readily available information

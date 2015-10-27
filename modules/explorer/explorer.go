@@ -50,7 +50,6 @@ type Explorer struct {
 
 	// Utilities.
 	cs         modules.ConsensusSet
-	db         *explorerDB
 	persistDir string
 	mu         sync.RWMutex
 }
@@ -88,5 +87,5 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 // Close closes the explorer.
 func (e *Explorer) Close() error {
-	return e.db.CloseDatabase()
+	return nil
 }
