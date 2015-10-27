@@ -122,7 +122,7 @@ type Renter interface {
 	RenameFile(currentName, newName string) error
 
 	// ShareFiles creates a '.sia' file that can be shared with others.
-	ShareFiles(nicknames []string, sharedest string) error
+	ShareFiles(nicknames []string, shareDest string) error
 
 	// ShareFilesAscii creates an ASCII-encoded '.sia' file.
 	ShareFilesAscii(nicknames []string) (asciiSia string, err error)
