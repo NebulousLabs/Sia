@@ -207,8 +207,8 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// RelayBlock is an RPC that accepts a block from a peer.
-func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
+// relayBlock is an RPC that accepts a block from a peer.
+func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
