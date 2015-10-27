@@ -3,7 +3,6 @@ package explorer
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -14,8 +13,7 @@ func totalCurrency(height types.BlockHeight) types.Currency {
 	totalCoins := uint64(0)
 	coinbase := types.InitialCoinbase
 	minCoinbase := types.MinimumCoinbase
-	// Start the loop at i = 1 due to the genesis block
-	for i := types.BlockHeight(1); i < height; i++ {
+	for i := types.BlockHeight(0); i <= height; i++ {
 		totalCoins += coinbase
 		if coinbase > minCoinbase {
 			coinbase--
@@ -46,39 +44,37 @@ func (e *Explorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) 
 }
 
 // Returns many pieces of readily available information
-func (e *Explorer) ExplorerStatus() modules.ExplorerStatus {
+func (e *Explorer) Statistics() modules.ExplorerStatistics {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	// No reason that consensus should broadcast a block that it
-	// doesn't have information on
-	var currentTarget types.Target
-	if e.currentBlock.ID() == e.genesisBlockID {
-		currentTarget = types.RootDepth
-	} else {
-		var exists bool
-		currentTarget, exists = e.cs.ChildTarget(e.currentBlock.ParentID)
-		if build.DEBUG {
-			if !exists {
-				panic("The state of the current block cannot be found")
-			}
-		}
-	}
+	target, _ := e.cs.ChildTarget(e.currentBlock)
+	difficulty := types.NewCurrency(types.RootTarget.Int()).Div(types.NewCurrency(target.Int()))
+	maturityTimestamp := e.seenTimes[(e.blockchainHeight-types.MaturityDelay)%types.BlockHeight(len(e.seenTimes))]
+	return modules.ExplorerStatistics{
+		Height:            e.blockchainHeight,
+		Block:             e.currentBlock,
+		Target:            target,
+		Difficulty:        difficulty,
+		MaturityTimestamp: types.Timestamp(maturityTimestamp.Unix()),
+		Circulation:       totalCurrency(e.blockchainHeight),
 
-	// Find the seen time of the block 144 ago in the list
-	matureBlockTime := e.seenTimes[(e.blockchainHeight-144)%types.BlockHeight(len(e.seenTimes))]
+		TransactionCount:          e.transactionCount,
+		SiacoinInputCount:         e.siacoinInputCount,
+		SiacoinOutputCount:        e.siacoinOutputCount,
+		FileContractCount:         e.fileContractCount,
+		FileContractRevisionCount: e.fileContractRevisionCount,
+		StorageProofCount:         e.storageProofCount,
+		SiafundInputCount:         e.siafundInputCount,
+		SiafundOutputCount:        e.siafundOutputCount,
+		MinerFeeCount:             e.minerFeeCount,
+		ArbitraryDataCount:        e.arbitraryDataCount,
+		TransactionSignatureCount: e.transactionSignatureCount,
 
-	return modules.ExplorerStatus{
-		Height:              e.blockchainHeight,
-		Block:               e.currentBlock,
-		Target:              currentTarget,
-		MatureTime:          types.Timestamp(matureBlockTime.Unix()),
-		TotalCurrency:       totalCurrency(e.blockchainHeight),
 		ActiveContractCount: e.activeContractCount,
-		ActiveContractCosts: e.activeContractCost,
+		ActiveContractCost:  e.activeContractCost,
 		ActiveContractSize:  e.activeContractSize,
-		TotalContractCount:  e.totalContractCount,
-		TotalContractCosts:  e.totalContractCost,
+		TotalContractCost:   e.totalContractCost,
 		TotalContractSize:   e.totalContractSize,
 	}
 }

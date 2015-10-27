@@ -17,15 +17,40 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Add the stats for the reverted blocks.
 	for _, block := range cc.RevertedBlocks {
 		for _, txn := range block.Transactions {
+			e.transactionCount--
+			for _ = range txn.SiacoinInputs {
+				e.siacoinInputCount--
+			}
+			for _ = range txn.SiacoinOutputs {
+				e.siacoinOutputCount--
+			}
 			for _, fc := range txn.FileContracts {
-				e.totalContractCount -= 1
+				e.fileContractCount--
 				e.totalContractCost = e.totalContractCost.Sub(fc.Payout)
 				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fc.FileSize))
 			}
 			for _, fcr := range txn.FileContractRevisions {
-				e.totalContractCount -= 1
+				e.fileContractRevisionCount--
 				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fcr.NewFileSize))
 				e.totalRevisionVolume = e.totalRevisionVolume.Sub(types.NewCurrency64(fcr.NewFileSize))
+			}
+			for _ = range txn.StorageProofs {
+				e.storageProofCount--
+			}
+			for _ = range txn.SiafundInputs {
+				e.siafundInputCount--
+			}
+			for _ = range txn.SiafundOutputs {
+				e.siafundOutputCount--
+			}
+			for _ = range txn.MinerFees {
+				e.minerFeeCount--
+			}
+			for _ = range txn.ArbitraryData {
+				e.arbitraryDataCount--
+			}
+			for _ = range txn.TransactionSignatures {
+				e.transactionSignatureCount--
 			}
 		}
 	}
@@ -33,16 +58,40 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Add the stats for the applied blocks.
 	for _, block := range cc.AppliedBlocks {
 		for _, txn := range block.Transactions {
-			// Revert all of the file contracts.
+			e.transactionCount++
+			for _ = range txn.SiacoinInputs {
+				e.siacoinInputCount++
+			}
+			for _ = range txn.SiacoinOutputs {
+				e.siacoinOutputCount++
+			}
 			for _, fc := range txn.FileContracts {
-				e.totalContractCount += 1
+				e.fileContractCount++
 				e.totalContractCost = e.totalContractCost.Add(fc.Payout)
 				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fc.FileSize))
 			}
 			for _, fcr := range txn.FileContractRevisions {
-				e.totalContractCount += 1
+				e.fileContractRevisionCount++
 				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
 				e.totalRevisionVolume = e.totalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
+			}
+			for _ = range txn.StorageProofs {
+				e.storageProofCount++
+			}
+			for _ = range txn.SiafundInputs {
+				e.siafundInputCount++
+			}
+			for _ = range txn.SiafundOutputs {
+				e.siafundOutputCount++
+			}
+			for _ = range txn.MinerFees {
+				e.minerFeeCount++
+			}
+			for _ = range txn.ArbitraryData {
+				e.arbitraryDataCount++
+			}
+			for _ = range txn.TransactionSignatures {
+				e.transactionSignatureCount++
 			}
 		}
 	}
@@ -80,5 +129,5 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			fmt.Printf("Error when adding block to database: " + err.Error() + "\n")
 		}
 	}
-	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
+	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 }

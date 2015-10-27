@@ -17,17 +17,35 @@ type (
 		Size      uint64          // The size in bytes of the marshalled block
 	}
 
-	ExplorerStatus struct {
-		Height              types.BlockHeight
-		Block               types.Block
-		Target              types.Target
-		MatureTime          types.Timestamp
-		TotalCurrency       types.Currency
+	// ExplorerStatistics returns a bunch of instantaneous statistics about the
+	// explorer at the current height.
+	ExplorerStatistics struct {
+		// General consensus information.
+		Height            types.BlockHeight
+		Block             types.BlockID
+		Target            types.Target
+		Difficulty        types.Currency
+		MaturityTimestamp types.Timestamp
+		Circulation       types.Currency
+
+		// Information about transaction type usage.
+		TransactionCount          uint64
+		SiacoinInputCount         uint64
+		SiacoinOutputCount        uint64
+		FileContractCount         uint64
+		FileContractRevisionCount uint64
+		StorageProofCount         uint64
+		SiafundInputCount         uint64
+		SiafundOutputCount        uint64
+		MinerFeeCount             uint64
+		ArbitraryDataCount        uint64
+		TransactionSignatureCount uint64
+
+		// Information about file contracts and file contract revisions.
 		ActiveContractCount uint64
-		ActiveContractCosts types.Currency
+		ActiveContractCost  types.Currency
 		ActiveContractSize  types.Currency
-		TotalContractCount  uint64
-		TotalContractCosts  types.Currency
+		TotalContractCost   types.Currency
 		TotalContractSize   types.Currency
 	}
 
@@ -72,22 +90,12 @@ type (
 
 	// The BlockExplorer interface provides access to the block explorer
 	Explorer interface {
-		// Returns a slice of data points about blocks. Called
-		// primarly by the blockdata api call
 		BlockInfo(types.BlockHeight, types.BlockHeight) ([]ExplorerBlockData, error)
 
-		// Function to return status of a bunch of static variables,
-		// in the form of an ExplorerStatus struct
-		ExplorerStatus() ExplorerStatus
+		Statistics() ExplorerStatistics
 
-		// Function to safely shut down the block explorer. Closes the database
 		Close() error
 
-		// Returns information pertaining to a given hash. The
-		// type of the returned value depends on what the hash
-		// was, so an interface is returned instead (i.e. an
-		// address will return a list of transactions while a
-		// block ID will return a block
 		GetHashInfo([]byte) (interface{}, error)
 	}
 )

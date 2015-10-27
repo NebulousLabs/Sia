@@ -74,7 +74,7 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 	if et.explorer.totalContractCost.Cmp(types.NewCurrency64(5e9)) != 0 {
 		t.Error("total cost is not tallied correctly")
 	}
-	if et.explorer.totalContractCount != 1 {
+	if et.explorer.fileContractCount != 1 {
 		t.Error("total contract count is not accurate")
 	}
 	if et.explorer.totalContractSize.Cmp(types.NewCurrency64(5e3)) != 0 {
@@ -121,7 +121,7 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 	if et.explorer.totalContractCost.Cmp(types.NewCurrency64(6e9)) != 0 {
 		t.Error("total cost is not tallied correctly")
 	}
-	if et.explorer.totalContractCount != 2 {
+	if et.explorer.fileContractCount != 2 {
 		t.Error("total contract count is not accurate")
 	}
 	if et.explorer.totalContractSize.Cmp(types.NewCurrency64(20e3)) != 0 {
@@ -147,7 +147,7 @@ func TestIntegrationExplorerFileContractMetrics(t *testing.T) {
 	if et.explorer.totalContractCost.Cmp(types.NewCurrency64(6e9)) != 0 {
 		t.Error("total cost is not tallied correctly")
 	}
-	if et.explorer.totalContractCount != 2 {
+	if et.explorer.fileContractCount != 2 {
 		t.Error("total contract count is not accurate")
 	}
 	if et.explorer.totalContractSize.Cmp(types.NewCurrency64(20e3)) != 0 {

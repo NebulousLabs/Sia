@@ -23,13 +23,25 @@ type Explorer struct {
 	activeContractCount uint64
 	activeContractSize  types.Currency
 	totalContractCost   types.Currency
-	totalContractCount  uint64
 	totalContractSize   types.Currency
 	totalRevisionVolume types.Currency
 
+	// Transaction type counts.
+	transactionCount          uint64
+	siacoinInputCount         uint64
+	siacoinOutputCount        uint64
+	fileContractCount         uint64
+	fileContractRevisionCount uint64
+	storageProofCount         uint64
+	siafundInputCount         uint64
+	siafundOutputCount        uint64
+	minerFeeCount             uint64
+	arbitraryDataCount        uint64
+	transactionSignatureCount uint64
+
 	// Other factoids.
 	blockchainHeight types.BlockHeight
-	currentBlock     types.Block
+	currentBlock     types.BlockID
 	genesisBlockID   types.BlockID
 
 	// startTime tracks when the explorer got turned on.
@@ -53,7 +65,7 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
-		currentBlock:   cs.GenesisBlock(),
+		currentBlock:   cs.GenesisBlock().ID(),
 		genesisBlockID: cs.GenesisBlock().ID(),
 		seenTimes:      make([]time.Time, types.MaturityDelay+1),
 		startTime:      time.Now(),

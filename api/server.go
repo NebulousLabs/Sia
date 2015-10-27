@@ -23,7 +23,7 @@ type Server struct {
 	renter  modules.Renter
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
-	exp     modules.Explorer
+	explorer modules.Explorer
 
 	// Consensus set variables.
 	blockchainHeight int
@@ -36,7 +36,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
+func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, explorer modules.Explorer) (*Server, error) {
 	l, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 		renter:  r,
 		tpool:   tp,
 		wallet:  w,
-		exp:     exp,
+		explorer: explorer,
 
 		blockchainHeight: -1,
 
