@@ -73,7 +73,6 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength); err != nil {
 		return err
 	}
-	g.log.Printf("INFO: %v sent us %v nodes", conn.RemoteAddr(), len(nodes))
 	id := g.mu.Lock()
 	for _, node := range nodes {
 		g.addNode(node)

@@ -87,10 +87,8 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		// change will then have an index of '0'.
 		consensusChangeIndex: -1,
 	}
-
 	// Register RPCs
-	g.RegisterRPC("RelayTransactionSet", tp.RelayTransactionSet)
-	g.RegisterRPC("RelayTransaction", tp.RelayTransaction) // COMPAT v0.3.3.3
+	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
 	cs.ConsensusSetSubscribe(tp)

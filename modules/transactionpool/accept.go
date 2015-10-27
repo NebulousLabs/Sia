@@ -2,7 +2,6 @@ package transactionpool
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -290,38 +289,13 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
 	tp.updateSubscribersTransactions()
 
-	// COMPAT v0.3.3.3
-	//
-	// Transactions must be broadcast individually as well so that they will be
-	// seen by older nodes that don't support the "RelayTransactionSet" RPC.
-	go func() {
-		for _, t := range ts {
-			tp.gateway.Broadcast("RelayTransaction", t)
-			time.Sleep(time.Second * 15)
-		}
-	}()
-
 	return nil
 }
 
-// COMPAT v0.3.3.3
-//
-// RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
+// relayTransactionSet is an RPC that accepts a transaction set from a peer. If
 // the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
-func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
-	var t types.Transaction
-	err := encoding.ReadObject(conn, &t, types.BlockSizeLimit)
-	if err != nil {
-		return err
-	}
-	return tp.AcceptTransactionSet([]types.Transaction{t})
-}
-
-// RelayTransactionSet is an RPC that accepts a transaction set from a peer. If
-// the accept is successful, the transaction will be relayed to the gateway's
-// other peers.
-func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
+func (tp *TransactionPool) relayTransactionSet(conn modules.PeerConn) error {
 	var ts []types.Transaction
 	err := encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
