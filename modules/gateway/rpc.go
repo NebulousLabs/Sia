@@ -49,15 +49,7 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 		return err
 	}
 	// call fn
-	err = fn(conn)
-	// don't log benign errors
-	if err == modules.ErrDuplicateTransactionSet || err == modules.ErrBlockKnown {
-		err = nil
-	}
-	if err != nil {
-		g.log.Printf("WARN: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
-	}
-	return err
+	return fn(conn)
 }
 
 // RegisterRPC registers an RPCFunc as a handler for a given identifier. To
@@ -99,7 +91,6 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer conn.Close()
 	var id rpcID
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
-		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v", conn.RemoteAddr(), err)
 		return
 	}
 	// call registered handler for this ID
@@ -111,7 +102,13 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		return
 	}
 
-	if err := fn(conn); err != nil {
+	// call fn
+	err := fn(conn)
+	// don't log benign errors
+	if err == modules.ErrDuplicateTransactionSet || err == modules.ErrBlockKnown {
+		err = nil
+	}
+	if err != nil {
 		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
 }
