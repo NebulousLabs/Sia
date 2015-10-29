@@ -2,7 +2,6 @@ package transactionpool
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -103,12 +102,6 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 		copy(prefix[:], arb)
 		if prefix == modules.PrefixHostAnnouncement ||
 			prefix == modules.PrefixNonSia {
-			continue
-		}
-
-		// COMPATv0.3.3.3 - deprecated whitelisted prefixes.
-		strData := string(arb)
-		if strings.HasPrefix(strData, modules.PrefixStrNonSia) {
 			continue
 		}
 

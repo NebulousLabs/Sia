@@ -17,8 +17,7 @@ var (
 	ErrLargeTransactionSet     = errors.New("transaction set is too large for this transaction pool")
 	ErrInvalidArbPrefix        = errors.New("transaction contains non-standard arbitrary data")
 
-	PrefixNonSia    = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
-	PrefixStrNonSia = "NonSia" // COMPATv0.3.3.3
+	PrefixNonSia = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
 
 	TransactionPoolDir = "transactionpool"
 )
