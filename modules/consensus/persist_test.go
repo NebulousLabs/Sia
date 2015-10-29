@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
 // TestSaveLoad populates a blockchain, saves it, loads it, and checks
@@ -24,8 +25,12 @@ func TestSaveLoad(t *testing.T) {
 
 	// Reassigning this will lose subscribers and such, but we
 	// just want to call load and get a hash
-	d := filepath.Join(build.SiaTestingDir, filepath.Join(modules.ConsensusDir, filepath.Join("TestSaveLoad", modules.ConsensusDir)))
-	cst.cs, err = New(cst.gateway, d)
+	g, err := gateway.New(":0", build.TempDir(modules.ConsensusDir, "TestSaveLoad", modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := filepath.Join(build.SiaTestingDir, modules.ConsensusDir, "TestSaveLoad", modules.ConsensusDir)
+	cst.cs, err = New(g, d)
 	if err != nil {
 		t.Fatal(err)
 	}

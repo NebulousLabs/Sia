@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -58,6 +59,11 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
+	if build.DEBUG {
+		if _, ok := g.handlers[handlerName(name)]; ok {
+			panic("refusing to overwrite RPC " + name)
+		}
+	}
 	g.handlers[handlerName(name)] = fn
 }
 
@@ -66,6 +72,11 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
+	if build.DEBUG {
+		if _, ok := g.initRPCs[name]; ok {
+			panic("refusing to overwrite RPC " + name)
+		}
+	}
 	g.initRPCs[name] = fn
 }
 
