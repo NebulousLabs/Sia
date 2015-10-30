@@ -151,9 +151,9 @@ func TestConnect(t *testing.T) {
 	defer g.Close()
 
 	// first simulate a "bad" connect, where bootstrap won't share its nodes
-	bootstrap.RegisterRPC("ShareNodes", func(modules.PeerConn) error {
+	bootstrap.handlers[handlerName("ShareNodes")] = func(modules.PeerConn) error {
 		return nil
-	})
+	}
 	// connect
 	err := g.Connect(bootstrap.Address())
 	if err != nil {
@@ -169,7 +169,7 @@ func TestConnect(t *testing.T) {
 	bootstrap.Disconnect(g.Address())
 
 	// now restore the correct ShareNodes RPC and try again
-	bootstrap.RegisterRPC("ShareNodes", bootstrap.shareNodes)
+	bootstrap.handlers[handlerName("ShareNodes")] = bootstrap.shareNodes
 	err = g.Connect(bootstrap.Address())
 	if err != nil {
 		t.Fatal(err)
