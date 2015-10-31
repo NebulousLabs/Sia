@@ -15,7 +15,7 @@ import (
 
 var (
 	// the renter will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320 * 1024 * 1024 * 1024 / 500)) // 500 SC / GB / Month
+	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
 
 	errTooExpensive = errors.New("host price was too high")
 )

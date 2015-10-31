@@ -24,7 +24,7 @@ const (
 	MaxActiveHosts              = 500
 	InactiveHostCheckupQuantity = 250
 
-	maxSettingsLen = 1024
+	maxSettingsLen = 2e3
 
 	hostRequestTimeout = 5 * time.Second
 
