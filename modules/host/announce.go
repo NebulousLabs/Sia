@@ -73,8 +73,6 @@ func (h *Host) Announce() error {
 	// Check that the host's ip address is both known and reachable.
 	if addr.Host() == "::1" {
 		return errors.New("can't announce without knowing external IP")
-	} else if !ping(addr) {
-		return errors.New("host address not reachable; ensure you have forwarded port " + addr.Port())
 	}
 
 	return h.announce(addr)
