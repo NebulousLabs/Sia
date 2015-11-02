@@ -39,7 +39,7 @@ func (na NetAddress) IsLocal() bool {
 	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
 		return true
 	}
-	if host == "localhost" || host == "0.0.0.0" {
+	if host == "localhost" || host == "::" || host == "0.0.0.0" {
 		return true
 	}
 	return false

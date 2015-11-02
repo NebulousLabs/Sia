@@ -46,6 +46,7 @@ func TestIsLocal(t *testing.T) {
 		{"127.0.0.1", false},
 		{"127.0.0.1:6723", true},
 		{"0.0.0.0:1234", true},
+		{"[::]:1234", true},
 		{"::1", false},
 		{"[::1]:7124", true},
 
