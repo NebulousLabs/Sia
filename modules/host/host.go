@@ -2,8 +2,8 @@ package host
 
 import (
 	"errors"
+	"log"
 	"net"
-	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -48,6 +48,7 @@ type Host struct {
 
 	// resources
 	listener net.Listener
+	log      *log.Logger
 
 	// variables
 	blockHeight         types.BlockHeight
@@ -59,16 +60,16 @@ type Host struct {
 	modules.HostSettings
 
 	// constants
-	myAddr    modules.NetAddress
-	saveDir   string
-	secretKey crypto.SecretKey
-	publicKey types.SiaPublicKey
+	myAddr     modules.NetAddress
+	persistDir string
+	secretKey  crypto.SecretKey
+	publicKey  types.SiaPublicKey
 
 	mu *safesync.RWMutex
 }
 
 // New returns an initialized Host.
-func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, persistDir string) (*Host, error) {
 	if cs == nil {
 		return nil, errors.New("host cannot use a nil state")
 	}
@@ -80,12 +81,6 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 	}
 	if wallet == nil {
 		return nil, errors.New("host cannot use a nil wallet")
-	}
-
-	// Create host directory if it does not exist.
-	err := os.MkdirAll(saveDir, 0700)
-	if err != nil {
-		return nil, err
 	}
 
 	h := &Host{
@@ -104,7 +99,7 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 			Collateral:   types.NewCurrency64(0),
 		},
 
-		saveDir: saveDir,
+		persistDir: persistDir,
 
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
@@ -124,9 +119,9 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 		Key:       pk[:],
 	}
 
-	// Load the old host data.
-	err = h.load()
-	if err != nil && !os.IsNotExist(err) {
+	// Load the old host data and initialize the logger.
+	err = h.initPersist()
+	if err != nil {
 		return nil, err
 	}
 

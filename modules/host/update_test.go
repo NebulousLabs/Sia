@@ -46,7 +46,7 @@ func TestStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(filepath.Join(ht.host.saveDir, "foo"), data, 0777)
+	ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
 
 	// create revision
 	rev := types.FileContractRevision{
@@ -68,7 +68,7 @@ func TestStorageProof(t *testing.T) {
 	obligation := contractObligation{
 		ID:           fcid,
 		FileContract: fc,
-		Path:         filepath.Join(ht.host.saveDir, "foo"),
+		Path:         filepath.Join(ht.host.persistDir, "foo"),
 	}
 	ht.host.obligationsByID[fcid] = obligation
 	ht.host.obligationsByHeight[fc.WindowStart+1] = []contractObligation{obligation}

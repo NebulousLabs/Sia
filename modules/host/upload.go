@@ -33,7 +33,7 @@ func (h *Host) rpcRetrieve(conn net.Conn) error {
 		h.mu.RUnlock(lockID)
 		return errors.New("no record of that file")
 	}
-	path := filepath.Join(h.saveDir, contractObligation.Path)
+	path := filepath.Join(h.persistDir, contractObligation.Path)
 	h.mu.RUnlock(lockID)
 
 	// Open the file.

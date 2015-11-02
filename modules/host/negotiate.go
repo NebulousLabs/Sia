@@ -250,7 +250,7 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	co := contractObligation{
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
-		Path:         filepath.Join(h.saveDir, strconv.Itoa(h.fileCounter)),
+		Path:         filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter)),
 		mu:           new(sync.Mutex),
 	}
 	proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
