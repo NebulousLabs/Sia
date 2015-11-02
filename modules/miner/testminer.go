@@ -17,7 +17,7 @@ import (
 const (
 	// solveAttempts is the number of times that SolveBlock will try to solve a
 	// block before giving up.
-	solveAttempts = 16 * 1024
+	solveAttempts = 16e3
 )
 
 // BlockForWork returns a block that is ready for nonce grinding, along with

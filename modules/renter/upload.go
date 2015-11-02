@@ -84,21 +84,11 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return errors.New("file with that nickname already exists")
 	}
 
-	// Check that the file is less than 5 GiB.
+	// Fill in any missing upload params with sensible defaults.
 	fileInfo, err := os.Stat(up.Filename)
 	if err != nil {
 		return err
 	}
-	// NOTE: The upload max of 20 GiB is temporary and therefore does not have
-	// a constant. This should be removed once micropayments + upload resuming
-	// are in place. 20 GiB is chosen to prevent confusion - on anybody's
-	// machine any file appearing to be under 20 GB will be below the hard
-	// limit.
-	if fileInfo.Size() > 20*1024*1024*1024 {
-		return errors.New("cannot upload a file larger than 20 GB")
-	}
-
-	// Fill in any missing upload params with sensible defaults.
 	if up.Duration == 0 {
 		up.Duration = defaultDuration
 	}

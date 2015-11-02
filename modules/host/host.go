@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320 * 1024 * 1024 * 1024 / 200)) // 200 SC / GB / Month
+	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9 / 200)) // 200 SC / GB / Month
 )
 
 // A contractObligation tracks a file contract that the host is obligated to
@@ -94,11 +94,11 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 10e9,                   // 10 GB
-			MaxFilesize:  5 * 1024 * 1024 * 1024, // 5 GiB
-			MaxDuration:  144 * 60,               // 60 days
-			WindowSize:   288,                    // 48 hours
-			Price:        defaultPrice,           // 200 SC / GB / Month
+			TotalStorage: 10e9,         // 10 GB
+			MaxFilesize:  100e9,        // 100 GB
+			MaxDuration:  144 * 60,     // 60 days
+			WindowSize:   288,          // 48 hours
+			Price:        defaultPrice, // 200 SC / GB / Month
 			Collateral:   types.NewCurrency64(0),
 		},
 
@@ -203,9 +203,9 @@ func (h *Host) Info() modules.HostInfo {
 		return info
 	}
 	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
-	// HACK: 4320 is one month, and 1024^3 is a GB. Price is reported as per GB
+	// HACK: 4320 is one month, and 1e9 is a GB. Price is reported as per GB
 	// per month.
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(4320)).Mul(types.NewCurrency64(1024 * 1024 * 1024))
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(4320)).Mul(types.NewCurrency64(1e9))
 	info.Competition = estimatedCost
 
 	return info
