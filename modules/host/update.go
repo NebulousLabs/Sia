@@ -74,12 +74,12 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
+	h.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
 	h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
 	for _ = range cc.AppliedBlocks {
-		h.blockHeight++
 		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
 			go h.threadedCreateStorageProof(obligation)
 		}
@@ -87,6 +87,4 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// created, those files will never get cleared from the host.
 		delete(h.obligationsByHeight, h.blockHeight)
 	}
-	h.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
-	h.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
 }
