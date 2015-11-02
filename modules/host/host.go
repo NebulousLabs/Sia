@@ -133,14 +133,13 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	if err != nil {
 		return nil, err
 	}
-	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
-	h.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
+	h.myAddr = modules.NetAddress(h.listener.Addr().String())
+
+	// Forward the hosting port, if possible.
+	go h.forwardPort(h.myAddr.Port())
 
 	// Learn our external IP.
 	go h.learnHostname()
-
-	// Forward the hosting port, if possible.
-	go h.forwardPort(port)
 
 	// spawn listener
 	go h.listen()

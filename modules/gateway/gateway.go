@@ -90,6 +90,11 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		log:        logger,
 	}
 
+	// Register RPCs.
+	g.RegisterRPC("ShareNodes", g.shareNodes)
+	g.RegisterRPC("RelayNode", g.relayNode)
+	g.RegisterConnectCall("ShareNodes", g.requestNodes)
+
 	// Load the old node list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
@@ -109,21 +114,15 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return
 	}
-	_, port, _ := net.SplitHostPort(g.listener.Addr().String())
-	g.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
-
-	// Register RPCs.
-	g.RegisterRPC("ShareNodes", g.shareNodes)
-	g.RegisterRPC("RelayNode", g.relayNode)
-	g.RegisterConnectCall("ShareNodes", g.requestNodes)
+	g.myAddr = modules.NetAddress(g.listener.Addr().String())
 
 	g.log.Println("INFO: gateway created, started logging")
 
+	// Forward the RPC port, if possible.
+	go g.forwardPort(g.myAddr.Port())
+
 	// Learn our external IP.
 	go g.learnHostname()
-
-	// Automatically forward the RPC port, if possible.
-	go g.forwardPort(port)
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.
