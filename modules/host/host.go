@@ -28,9 +28,10 @@ var (
 // A contractObligation tracks a file contract that the host is obligated to
 // fulfill.
 type contractObligation struct {
-	ID           types.FileContractID
-	FileContract types.FileContract
-	Path         string // Where on disk the file is stored.
+	ID              types.FileContractID
+	FileContract    types.FileContract
+	LastRevisionTxn types.Transaction
+	Path            string // Where on disk the file is stored.
 
 	// each obligation needs a mutex to prevent simultaneous revisions to the
 	// same obligation

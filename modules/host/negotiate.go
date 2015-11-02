@@ -16,6 +16,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// maxRevisionSize is the maximum number of bytes added in a single revision
+	maxRevisionSize = 100e6 // 100 MB
+)
+
 var (
 	HostCapacityErr = errors.New("host is at capacity and cannot take more files")
 )
@@ -105,6 +110,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 
 	// calculate minimum expected output value
 	rev := txn.FileContractRevisions[0]
+	lastRev := obligation.LastRevisionTxn.FileContractRevisions[0]
 	fc := obligation.FileContract
 	duration := types.NewCurrency64(uint64(fc.WindowStart - h.blockHeight))
 	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.Price)
@@ -130,11 +136,15 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 		rev.NewMissedProofOutputs[1].UnlockHash != fc.MissedProofOutputs[1].UnlockHash:
 		return errors.New("bad revision proof outputs")
 
-	case rev.NewRevisionNumber <= fc.RevisionNumber:
+	case rev.NewRevisionNumber <= lastRev.NewRevisionNumber:
 		return errors.New("revision must have higher revision number")
 
 	case rev.NewFileSize > uint64(h.spaceRemaining) || rev.NewFileSize > h.MaxFilesize:
 		return errors.New("revision file size is too large")
+	case rev.NewFileSize <= lastRev.NewFileSize:
+		return errors.New("revision must add data")
+	case rev.NewFileSize-lastRev.NewFileSize > maxRevisionSize:
+		return errors.New("revision adds too much data")
 
 	// valid and missing outputs should still sum to payout
 	case rev.NewValidProofOutputs[0].Value.Add(rev.NewValidProofOutputs[1].Value).Cmp(expectedPayout) != 0,
@@ -278,110 +288,110 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// if a newly-created file was not updated, remove it
-		if stat, _ := file.Stat(); stat.Size() == 0 {
-			os.Remove(obligation.Path)
-		}
-		file.Close()
-	}()
 
 	// rebuild current Merkle tree
 	tree := crypto.NewTree()
 	err = tree.ReadSegments(file)
 	if err != nil {
+		file.Close()
 		return err
 	}
 
 	// accept new revisions in a loop. The final good transaction will be
 	// submitted to the blockchain.
-	var finalTxn types.Transaction
-	defer func() {
-		h.tpool.AcceptTransactionSet([]types.Transaction{finalTxn})
-	}()
-	for {
-		// read proposed revision
-		var revTxn types.Transaction
-		if err := encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
-			return err
-		}
-		// an empty transaction indicates completion
-		if revTxn.ID() == (types.Transaction{}).ID() {
-			break
-		}
-
-		// check revision against original file contract
-		lockID = h.mu.RLock()
-		err := h.considerRevision(revTxn, obligation)
-		h.mu.RUnlock(lockID)
-		if err != nil {
-			encoding.WriteObject(conn, err.Error())
-			continue // don't terminate loop; subsequent revisions may be okay
-		}
-
-		// indicate acceptance
-		if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
-			return err
-		}
-
-		// read piece
-		// TODO: simultaneously read into tree and file
-		rev := revTxn.FileContractRevisions[0]
-		piece := make([]byte, rev.NewFileSize-obligation.FileContract.FileSize)
-		_, err = io.ReadFull(conn, piece)
-		if err != nil {
-			return err
-		}
-
-		// verify Merkle root
-		err = tree.ReadSegments(bytes.NewReader(piece))
-		if err != nil {
-			return err
-		}
-		if tree.Root() != rev.NewFileMerkleRoot {
-			return errors.New("revision has bad Merkle root")
-		}
-
-		// manually sign the transaction
-		revTxn.TransactionSignatures = append(revTxn.TransactionSignatures, types.TransactionSignature{
-			ParentID:       crypto.Hash(fcid),
-			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
-			PublicKeyIndex: 1, // host key is always second
-		})
-		encodedSig, err := crypto.SignHash(revTxn.SigHash(1), h.secretKey)
-		if err != nil {
-			return err
-		}
-		revTxn.TransactionSignatures[1].Signature = encodedSig[:]
-
-		// send the signed transaction
-		if err := encoding.WriteObject(conn, revTxn); err != nil {
-			return err
-		}
-
-		// append piece to file
-		if _, err := file.Write(piece); err != nil {
-			return err
-		}
-
-		// save updated obligation to disk
-		lockID = h.mu.Lock()
-		h.spaceRemaining -= int64(len(piece))
-		obligation.FileContract.RevisionNumber = rev.NewRevisionNumber
-		obligation.FileContract.FileSize = rev.NewFileSize
-		obligation.FileContract.FileMerkleRoot = rev.NewFileMerkleRoot
-		h.obligationsByID[obligation.ID] = obligation
-		heightObligations := h.obligationsByHeight[obligation.FileContract.WindowStart+StorageProofReorgDepth]
-		for i := range heightObligations {
-			if heightObligations[i].ID == obligation.ID {
-				heightObligations[i] = obligation
+	err = func() error {
+		for {
+			// read proposed revision
+			var revTxn types.Transaction
+			if err := encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
+				return err
 			}
-		}
-		h.save()
-		h.mu.Unlock(lockID)
+			// an empty transaction indicates completion
+			if revTxn.ID() == (types.Transaction{}).ID() {
+				return nil
+			}
 
-		finalTxn = revTxn
+			// check revision against original file contract
+			lockID = h.mu.RLock()
+			err := h.considerRevision(revTxn, obligation)
+			h.mu.RUnlock(lockID)
+			if err != nil {
+				encoding.WriteObject(conn, err.Error())
+				continue // don't terminate loop; subsequent revisions may be okay
+			}
+
+			// indicate acceptance
+			if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
+				return err
+			}
+
+			// read piece
+			// TODO: simultaneously read into tree and file
+			rev := revTxn.FileContractRevisions[0]
+			piece := make([]byte, rev.NewFileSize-obligation.FileContract.FileSize)
+			_, err = io.ReadFull(conn, piece)
+			if err != nil {
+				return err
+			}
+
+			// verify Merkle root
+			err = tree.ReadSegments(bytes.NewReader(piece))
+			if err != nil {
+				return err
+			}
+			if tree.Root() != rev.NewFileMerkleRoot {
+				return errors.New("revision has bad Merkle root")
+			}
+
+			// manually sign the transaction
+			revTxn.TransactionSignatures = append(revTxn.TransactionSignatures, types.TransactionSignature{
+				ParentID:       crypto.Hash(fcid),
+				CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
+				PublicKeyIndex: 1, // host key is always second
+			})
+			encodedSig, err := crypto.SignHash(revTxn.SigHash(1), h.secretKey)
+			if err != nil {
+				return err
+			}
+			revTxn.TransactionSignatures[1].Signature = encodedSig[:]
+
+			// send the signed transaction
+			if err := encoding.WriteObject(conn, revTxn); err != nil {
+				return err
+			}
+
+			// append piece to file
+			if _, err := file.Write(piece); err != nil {
+				return err
+			}
+
+			// save updated obligation to disk
+			obligation.LastRevisionTxn = revTxn
+			lockID = h.mu.Lock()
+			h.spaceRemaining -= int64(len(piece))
+			h.obligationsByID[obligation.ID] = obligation
+			heightObligations := h.obligationsByHeight[obligation.FileContract.WindowStart+StorageProofReorgDepth]
+			for i := range heightObligations {
+				if heightObligations[i].ID == obligation.ID {
+					heightObligations[i] = obligation
+				}
+			}
+			h.save()
+			h.mu.Unlock(lockID)
+		}
+	}()
+	file.Close()
+
+	// if a newly-created file was not updated, remove it
+	if stat, _ := os.Stat(obligation.Path); stat.Size() == 0 {
+		os.Remove(obligation.Path)
 	}
 
-	return nil
+	acceptErr := h.tpool.AcceptTransactionSet([]types.Transaction{obligation.LastRevisionTxn})
+	if acceptErr != nil {
+		// TODO: log
+		println(acceptErr.Error())
+	}
+
+	return err
 }
