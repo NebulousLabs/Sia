@@ -214,5 +214,5 @@ func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index ui
 		index, err = storageProofSegment(tx, fcid)
 		return nil
 	})
-	return index, err
+	return
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	safesync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -41,32 +40,35 @@ type contractObligation struct {
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	cs          *consensus.ConsensusSet
-	hostdb      modules.HostDB
-	tpool       modules.TransactionPool
-	wallet      modules.Wallet
-	blockHeight types.BlockHeight
+	// modules
+	cs     modules.ConsensusSet
+	hostdb modules.HostDB
+	tpool  modules.TransactionPool
+	wallet modules.Wallet
 
-	myAddr         modules.NetAddress
-	saveDir        string
-	spaceRemaining int64
-	fileCounter    int
-	profit         types.Currency
-
+	// resources
 	listener net.Listener
 
+	// variables
+	blockHeight         types.BlockHeight
 	obligationsByID     map[types.FileContractID]contractObligation
 	obligationsByHeight map[types.BlockHeight][]contractObligation
-	secretKey           crypto.SecretKey
-	publicKey           types.SiaPublicKey
-
+	spaceRemaining      int64
+	fileCounter         int
+	profit              types.Currency
 	modules.HostSettings
+
+	// constants
+	myAddr    modules.NetAddress
+	saveDir   string
+	secretKey crypto.SecretKey
+	publicKey types.SiaPublicKey
 
 	mu *safesync.RWMutex
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
 	if cs == nil {
 		return nil, errors.New("host cannot use a nil state")
 	}

@@ -185,6 +185,10 @@ type (
 		// current path, false otherwise.
 		InCurrentPath(types.BlockID) bool
 
+		// StorageProofSegment returns the segment to be used in the storage proof for
+		// a given file contract.
+		StorageProofSegment(types.FileContractID) (uint64, error)
+
 		// TryTransactionSet checks whether the transaction set would be valid if
 		// it were added in the next block. A consensus change is returned
 		// detailing the diffs that would result from the application of the
