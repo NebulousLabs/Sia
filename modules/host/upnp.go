@@ -50,7 +50,7 @@ func (h *Host) learnHostname() {
 		host, err = myExternalIP()
 	}
 	if err != nil {
-		//g.log.Println("WARN: failed to discover external IP")
+		h.log.Println("WARN: failed to discover external IP")
 		return
 	}
 
@@ -68,18 +68,18 @@ func (h *Host) forwardPort(port string) {
 
 	d, err := upnp.Discover()
 	if err != nil {
-		//g.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found", port)
+		h.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found", port)
 		return
 	}
 
 	portInt, _ := strconv.Atoi(port)
 	err = d.Forward(uint16(portInt), "Sia Host")
 	if err != nil {
-		//g.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
+		h.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
 		return
 	}
 
-	//g.log.Println("INFO: successfully forwarded port", port)
+	h.log.Println("INFO: successfully forwarded port", port)
 }
 
 // clearPort removes a port mapping from the router.
@@ -96,9 +96,9 @@ func (h *Host) clearPort(port string) {
 	portInt, _ := strconv.Atoi(port)
 	err = d.Clear(uint16(portInt))
 	if err != nil {
-		//g.log.Printf("WARN: could not automatically unforward port %s: %v", port, err)
+		h.log.Printf("WARN: could not automatically unforward port %s: %v", port, err)
 		return
 	}
 
-	//g.log.Println("INFO: successfully unforwarded port", port)
+	h.log.Println("INFO: successfully unforwarded port", port)
 }

@@ -15,7 +15,7 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 	defer h.mu.Unlock(lockID)
 	err := h.deallocate(obligation.Path)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("WARN: failed to deallocate %v: %v", obligation.Path, err)
 	}
 	delete(h.obligationsByID, obligation.ID)
 	h.save()
@@ -30,19 +30,19 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 
 	file, err := os.Open(obligation.Path)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("ERROR: could not open obligation %v (%v) for storage proof: %v", obligation.ID, obligation.Path, err)
 		return
 	}
 	defer file.Close()
 
 	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("ERROR: could not determine storage proof index for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
 	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("ERROR: could not construct storage proof for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
 	sp := types.StorageProof{obligation.ID, [crypto.SegmentSize]byte{}, hashSet}
@@ -58,7 +58,7 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 	}
 	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
-		fmt.Println(err)
+		h.log.Printf("ERROR: could not submit storage proof txn for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
 
