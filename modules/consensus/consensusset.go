@@ -142,7 +142,7 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 		exists = true
 		return nil
 	})
-	return
+	return block, exists
 }
 
 // ChildTarget returns the target for the child of a block.
@@ -156,7 +156,7 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 		exists = true
 		return nil
 	})
-	return
+	return target, exists
 }
 
 // Close safely closes the block database.
@@ -179,7 +179,7 @@ func (cs *ConsensusSet) EarliestChildTimestamp(id types.BlockID) (timestamp type
 		exists = true
 		return nil
 	})
-	return
+	return timestamp, exists
 }
 
 // GenesisBlock returns the genesis block.
@@ -204,7 +204,7 @@ func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
 		inPath = pathID == id
 		return nil
 	})
-	return
+	return inPath
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for
@@ -214,5 +214,5 @@ func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index ui
 		index, err = storageProofSegment(tx, fcid)
 		return nil
 	})
-	return
+	return index, err
 }
