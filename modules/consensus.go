@@ -172,11 +172,11 @@ type (
 		// current block is presented to the subscriber.
 		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
 
-		// EarliestChildTimestamp returns the earliest timestamp that is acceptable
-		// on the current longest fork according to the consensus set. This is a
-		// required piece of information for the miner, who could otherwise be at
+		// MinimumValidChildTimestamp returns the earliest timestamp that is
+		// valid on the current longest fork according to the consensus set. This is
+		// a required piece of information for the miner, who could otherwise be at
 		// risk of mining invalid blocks.
-		EarliestChildTimestamp(types.BlockID) (types.Timestamp, bool)
+		MinimumValidChildTimestamp(types.BlockID) (types.Timestamp, bool)
 
 		// GenesisBlock returns the genesis block.
 		GenesisBlock() types.Block
