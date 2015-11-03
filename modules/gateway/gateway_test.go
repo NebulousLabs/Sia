@@ -32,7 +32,7 @@ func TestAddress(t *testing.T) {
 		t.Fatal("Address does not return g.myAddr")
 	}
 	port := modules.NetAddress(g.listener.Addr().String()).Port()
-	expAddr := modules.NetAddress(net.JoinHostPort("::1", port))
+	expAddr := modules.NetAddress(net.JoinHostPort("::", port))
 	if g.Address() != expAddr {
 		t.Fatalf("Wrong address: expected %v, got %v", expAddr, g.Address())
 	}

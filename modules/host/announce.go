@@ -2,28 +2,11 @@ package host
 
 import (
 	"errors"
-	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-const (
-	pingTimeout = 10 * time.Second
-)
-
-// ping establishes a connection to addr and then immediately closes it. It is
-// used to verify that an address is connectible.
-func ping(addr modules.NetAddress) bool {
-	conn, err := net.DialTimeout("tcp", string(addr), pingTimeout)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
 
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
@@ -57,6 +40,9 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
+
+	h.log.Printf("INFO: Successfully announced as %v", addr)
+
 	return nil
 }
 
@@ -66,20 +52,19 @@ func (h *Host) announce(addr modules.NetAddress) error {
 func (h *Host) Announce() error {
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	addr := h.myAddr
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 
-	// Check that the host's ip address is both known and reachable.
-	if addr.Host() == "::1" {
+	// Check that the host's ip address is known.
+	if addr.IsLocal() {
 		return errors.New("can't announce without knowing external IP")
 	}
 
 	return h.announce(addr)
 }
 
-// ForceAnnounce announces using the provided address, and without performing
-// any connectivity checks.
+// ForceAnnounce announces using the provided address.
 func (h *Host) ForceAnnounce(addr modules.NetAddress) error {
 	return h.announce(addr)
 }

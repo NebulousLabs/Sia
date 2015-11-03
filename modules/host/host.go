@@ -2,14 +2,12 @@ package host
 
 import (
 	"errors"
+	"log"
 	"net"
-	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
-	safesync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -28,9 +26,10 @@ var (
 // A contractObligation tracks a file contract that the host is obligated to
 // fulfill.
 type contractObligation struct {
-	ID           types.FileContractID
-	FileContract types.FileContract
-	Path         string // Where on disk the file is stored.
+	ID              types.FileContractID
+	FileContract    types.FileContract
+	LastRevisionTxn types.Transaction
+	Path            string // Where on disk the file is stored.
 
 	// each obligation needs a mutex to prevent simultaneous revisions to the
 	// same obligation
@@ -40,33 +39,36 @@ type contractObligation struct {
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	cs          *consensus.ConsensusSet
-	hostdb      modules.HostDB
-	tpool       modules.TransactionPool
-	wallet      modules.Wallet
-	blockHeight types.BlockHeight
+	// modules
+	cs     modules.ConsensusSet
+	hostdb modules.HostDB
+	tpool  modules.TransactionPool
+	wallet modules.Wallet
 
-	consensusHeight types.BlockHeight
-	myAddr          modules.NetAddress
-	saveDir         string
-	spaceRemaining  int64
-	fileCounter     int
-	profit          types.Currency
-
+	// resources
 	listener net.Listener
+	log      *log.Logger
 
+	// variables
+	blockHeight         types.BlockHeight
 	obligationsByID     map[types.FileContractID]contractObligation
 	obligationsByHeight map[types.BlockHeight][]contractObligation
-	secretKey           crypto.SecretKey
-	publicKey           types.SiaPublicKey
-
+	spaceRemaining      int64
+	fileCounter         int
+	profit              types.Currency
 	modules.HostSettings
 
-	mu *safesync.RWMutex
+	// constants
+	myAddr     modules.NetAddress
+	persistDir string
+	secretKey  crypto.SecretKey
+	publicKey  types.SiaPublicKey
+
+	mu sync.RWMutex
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, persistDir string) (*Host, error) {
 	if cs == nil {
 		return nil, errors.New("host cannot use a nil state")
 	}
@@ -78,12 +80,6 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	}
 	if wallet == nil {
 		return nil, errors.New("host cannot use a nil wallet")
-	}
-
-	// Create host directory if it does not exist.
-	err := os.MkdirAll(saveDir, 0700)
-	if err != nil {
-		return nil, err
 	}
 
 	h := &Host{
@@ -102,12 +98,10 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 			Collateral:   types.NewCurrency64(0),
 		},
 
-		saveDir: saveDir,
+		persistDir: persistDir,
 
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
-
-		mu: safesync.New(modules.SafeMutexDelay, 1),
 	}
 	h.spaceRemaining = h.TotalStorage
 
@@ -122,9 +116,9 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		Key:       pk[:],
 	}
 
-	// Load the old host data.
-	err = h.load()
-	if err != nil && !os.IsNotExist(err) {
+	// Load the old host data and initialize the logger.
+	err = h.initPersist()
+	if err != nil {
 		return nil, err
 	}
 
@@ -133,14 +127,13 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	if err != nil {
 		return nil, err
 	}
-	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
-	h.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
+	h.myAddr = modules.NetAddress(h.listener.Addr().String())
+
+	// Forward the hosting port, if possible.
+	go h.forwardPort(h.myAddr.Port())
 
 	// Learn our external IP.
 	go h.learnHostname()
-
-	// Forward the hosting port, if possible.
-	go h.forwardPort(port)
 
 	// spawn listener
 	go h.listen()
@@ -153,8 +146,8 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 // SetConfig updates the host's internal HostSettings object. To modify
 // a specific field, use a combination of Info and SetConfig
 func (h *Host) SetSettings(settings modules.HostSettings) {
-	lockID := h.mu.Lock()
-	defer h.mu.Unlock(lockID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.spaceRemaining += settings.TotalStorage - h.TotalStorage
 	h.HostSettings = settings
 	h.save()
@@ -162,8 +155,9 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 
 // Settings returns the settings of a host.
 func (h *Host) Settings() modules.HostSettings {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
 	return h.HostSettings
 }
 
@@ -173,9 +167,10 @@ func (h *Host) Address() modules.NetAddress {
 }
 
 func (h *Host) Info() modules.HostInfo {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 
+	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
 	info := modules.HostInfo{
 		HostSettings: h.HostSettings,
 
@@ -213,12 +208,12 @@ func (h *Host) Info() modules.HostInfo {
 
 // Close saves the state of the Gateway and stops its listener process.
 func (h *Host) Close() error {
-	id := h.mu.RLock()
+	h.mu.RLock()
 	// save the latest host state
 	if err := h.save(); err != nil {
 		return err
 	}
-	h.mu.RUnlock(id)
+	h.mu.RUnlock()
 	// clear the port mapping (no effect if UPnP not supported)
 	h.clearPort(h.myAddr.Port())
 	// shut down the listener

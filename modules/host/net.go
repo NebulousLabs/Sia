@@ -25,20 +25,24 @@ func (h *Host) handleConn(conn net.Conn) {
 
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
-		// log
 		return
 	}
+	var err error
 	switch id {
 	case modules.RPCSettings:
-		h.rpcSettings(conn)
+		err = h.rpcSettings(conn)
 	case modules.RPCUpload:
-		h.rpcUpload(conn)
+		err = h.rpcUpload(conn)
 	case modules.RPCRevise:
-		h.rpcRevise(conn)
+		err = h.rpcRevise(conn)
 	case modules.RPCDownload:
-		h.rpcDownload(conn)
+		err = h.rpcDownload(conn)
 	default:
-		// log
+		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		return
+	}
+	if err != nil {
+		h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
 }
 
