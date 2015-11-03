@@ -127,9 +127,6 @@ func (hdb *HostDB) threadedProbeHosts() {
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
 	for {
-		// Log the current number of hosts.
-		hdb.log.Printf("INFO: Starting a host scan. Active Hosts: %v. All hosts: %v.", len(hdb.activeHosts), len(hdb.allHosts))
-
 		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.

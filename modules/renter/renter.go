@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -17,34 +18,57 @@ var (
 	ErrNilTpool  = errors.New("cannot create renter with nil transaction pool")
 )
 
+// A hostDB is a database of hosts that the renter can use for figuring out who
+// to upload to, and download from.
+type hostDB interface {
+	// ActiveHosts returns the list of hosts that are actively being selected
+	// from.
+	ActiveHosts() []modules.HostSettings
+
+	// AllHosts returns the full list of hosts known to the hostdb.
+	AllHosts() []modules.HostSettings
+
+	// InsertHost adds a host to the database.
+	InsertHost(modules.HostSettings) error
+
+	// RandomHosts will pull up to 'num' random hosts from the hostdb. There
+	// will be no repeats, but the length of the slice returned may be less
+	// than 'num', and may even be 0. The hosts returned first have the higher
+	// priority.
+	RandomHosts(num int) []modules.HostSettings
+}
+
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	cs          modules.ConsensusSet
-	hostDB      modules.HostDB
-	wallet      modules.Wallet
-	tpool       modules.TransactionPool
-	blockHeight types.BlockHeight
+	// modules
+	cs     modules.ConsensusSet
+	wallet modules.Wallet
+	tpool  modules.TransactionPool
 
+	// resources
+	hostDB hostDB
+	log    *log.Logger
+
+	// variables
+	blockHeight   types.BlockHeight
 	files         map[string]*file
 	contracts     map[types.FileContractID]types.FileContract
 	repairSet     map[string]string // map from nickname to filepath
-	entropy       [32]byte          // used to generate signing keys
 	downloadQueue []*download
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 
+	// constants
 	persistDir string
-	log        *log.Logger
-	mu         *sync.RWMutex
+	entropy    [32]byte // used to generate signing keys
+
+	mu *sync.RWMutex
 }
 
 // New returns an empty renter.
-func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
+func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
-	}
-	if hdb == nil {
-		return nil, ErrNilHostDB
 	}
 	if wallet == nil {
 		return nil, ErrNilWallet
@@ -52,6 +76,8 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, tpo
 	if tpool == nil {
 		return nil, ErrNilTpool
 	}
+
+	hdb := hostdb.New()
 
 	r := &Renter{
 		cs:     cs,

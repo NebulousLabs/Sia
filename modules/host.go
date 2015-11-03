@@ -19,6 +19,34 @@ var (
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 0}
 )
 
+var (
+	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
+)
+
+// HostAnnouncements are stored in the Arbitrary Data section of transactions
+// on the blockchain. They announce the willingness of a node to host files.
+// Renters can contact the host privately to obtain more detailed hosting
+// parameters (see HostSettings).
+type HostAnnouncement struct {
+	IPAddress NetAddress
+}
+
+// HostSettings are the parameters advertised by the host. These are the
+// values that the renter will request from the host in order to build its
+// database.
+type HostSettings struct {
+	IPAddress    NetAddress
+	TotalStorage int64 // Can go negative.
+	MinFilesize  uint64
+	MaxFilesize  uint64
+	MinDuration  types.BlockHeight
+	MaxDuration  types.BlockHeight
+	WindowSize   types.BlockHeight
+	Price        types.Currency
+	Collateral   types.Currency
+	UnlockHash   types.UnlockHash
+}
+
 // A DownloadRequest is used to retrieve a particular segment of a file from a
 // host.
 type DownloadRequest struct {
