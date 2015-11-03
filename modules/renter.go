@@ -95,6 +95,13 @@ type RentInfo struct {
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
+	// ActiveHosts returns the list of hosts that are actively being selected
+	// from.
+	ActiveHosts() []HostSettings
+
+	// AllHosts returns the full list of hosts known to the renter.
+	AllHosts() []HostSettings
+
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(nickname string) error
 

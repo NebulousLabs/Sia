@@ -19,7 +19,6 @@ type Server struct {
 	cs      modules.ConsensusSet
 	gateway modules.Gateway
 	host    modules.Host
-	hostdb  modules.HostDB
 	miner   modules.Miner
 	renter  modules.Renter
 	tpool   modules.TransactionPool
@@ -37,7 +36,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
+func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
 	l, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
@@ -47,7 +46,6 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 		cs:      s,
 		gateway: g,
 		host:    h,
-		hostdb:  hdb,
 		miner:   m,
 		renter:  r,
 		tpool:   tp,

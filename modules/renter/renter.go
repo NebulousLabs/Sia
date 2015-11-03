@@ -140,5 +140,9 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 	return
 }
 
+// hostdb passthroughs
+func (r *Renter) ActiveHosts() []modules.HostSettings { return r.hostDB.ActiveHosts() }
+func (r *Renter) AllHosts() []modules.HostSettings    { return r.hostDB.AllHosts() }
+
 // enforce that Renter satisfies the modules.Renter interface
 var _ modules.Renter = (*Renter)(nil)

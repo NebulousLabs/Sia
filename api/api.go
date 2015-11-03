@@ -81,10 +81,10 @@ func (srv *Server) initAPI() {
 		handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
 	}
 
-	// HostDB API Calls - Unfinished
-	if srv.hostdb != nil {
-		handleHTTPRequest(mux, "/hostdb/hosts/active", srv.hostdbHostsActiveHandler)
-		handleHTTPRequest(mux, "/hostdb/hosts/all", srv.hostdbHostsAllHandler)
+	// HostDB API Calls - DEPRECATED
+	if srv.renter != nil {
+		handleHTTPRequest(mux, "/hostdb/hosts/active", srv.renterHostsActiveHandler)
+		handleHTTPRequest(mux, "/hostdb/hosts/all", srv.renterHostsAllHandler)
 	}
 
 	// Miner API Calls - Unfinished
