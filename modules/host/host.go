@@ -160,6 +160,7 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 func (h *Host) Settings() modules.HostSettings {
 	lockID := h.mu.RLock()
 	defer h.mu.RUnlock(lockID)
+	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
 	return h.HostSettings
 }
 
@@ -172,6 +173,7 @@ func (h *Host) Info() modules.HostInfo {
 	lockID := h.mu.RLock()
 	defer h.mu.RUnlock(lockID)
 
+	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
 	info := modules.HostInfo{
 		HostSettings: h.HostSettings,
 
