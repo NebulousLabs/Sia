@@ -15,7 +15,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/explorer"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
-	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
@@ -29,7 +28,6 @@ type serverTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	host      modules.Host
-	hostdb    modules.HostDB
 	miner     modules.TestMiner
 	renter    modules.Renter
 	tpool     modules.TransactionPool
@@ -79,15 +77,11 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := hostdb.New(cs, g, filepath.Join(testdir, modules.HostDBDir))
+	h, err := host.New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
-	h, err := host.New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
-	if err != nil {
-		return nil, err
-	}
-	r, err := renter.New(cs, hdb, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +89,7 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", cs, g, h, hdb, m, r, tp, w, exp)
+	srv, err := NewServer(":0", cs, g, h, m, r, tp, w, exp)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +99,6 @@ func createServerTester(name string) (*serverTester, error) {
 		cs:        cs,
 		gateway:   g,
 		host:      h,
-		hostdb:    hdb,
 		miner:     m,
 		renter:    r,
 		tpool:     tp,

@@ -40,7 +40,7 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	srv, err := NewServer(":0", cs, g, nil, nil, nil, nil, tp, w, nil)
+	srv, err := NewServer(":0", cs, g, nil, nil, nil, tp, w, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := NewServer(":0", cs, g, nil, nil, nil, nil, tp, w, nil)
+	srv, err := NewServer(":0", cs, g, nil, nil, nil, tp, w, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

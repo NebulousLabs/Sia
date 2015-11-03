@@ -9,7 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -68,11 +67,7 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hdb, err := hostdb.New(cs, g, filepath.Join(testdir, modules.HostDBDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	h, err := New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
+	h, err := New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
