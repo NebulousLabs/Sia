@@ -12,7 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
-	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
@@ -55,19 +54,15 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	hostdb, err := hostdb.New(cs, gateway, filepath.Join(config.Siad.SiaDir, modules.HostDBDir))
+	host, err := host.New(cs, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
 	if err != nil {
 		return err
 	}
-	host, err := host.New(cs, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
+	renter, err := renter.New(cs, wallet, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
 	if err != nil {
 		return err
 	}
-	renter, err := renter.New(cs, hostdb, wallet, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
-	if err != nil {
-		return err
-	}
-	srv, err := api.NewServer(config.Siad.APIaddr, cs, gateway, host, hostdb, miner, renter, tpool, wallet, nil)
+	srv, err := api.NewServer(config.Siad.APIaddr, cs, gateway, host, miner, renter, tpool, wallet, nil)
 	if err != nil {
 		return err
 	}
