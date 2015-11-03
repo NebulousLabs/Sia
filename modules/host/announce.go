@@ -52,9 +52,9 @@ func (h *Host) announce(addr modules.NetAddress) error {
 func (h *Host) Announce() error {
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	addr := h.myAddr
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 
 	// Check that the host's ip address is known.
 	if addr.IsLocal() {

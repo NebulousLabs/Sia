@@ -27,14 +27,14 @@ func (h *Host) rpcRetrieve(conn net.Conn) error {
 	}
 
 	// Verify the file exists, using a mutex while reading the host.
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	contractObligation, exists := h.obligationsByID[contractID]
 	if !exists {
-		h.mu.RUnlock(lockID)
+		h.mu.RUnlock()
 		return errors.New("no record of that file")
 	}
 	path := filepath.Join(h.persistDir, contractObligation.Path)
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 
 	// Open the file.
 	file, err := os.Open(path)
@@ -64,13 +64,13 @@ func (h *Host) rpcDownload(conn net.Conn) error {
 	}
 
 	// Verify the file exists, using a mutex while reading the host.
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	co, exists := h.obligationsByID[contractID]
 	if !exists {
-		h.mu.RUnlock(lockID)
+		h.mu.RUnlock()
 		return errors.New("no record of that file")
 	}
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 
 	// Open the file.
 	file, err := os.Open(co.Path)

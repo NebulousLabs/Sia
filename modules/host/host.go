@@ -8,7 +8,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	safesync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -65,7 +64,7 @@ type Host struct {
 	secretKey  crypto.SecretKey
 	publicKey  types.SiaPublicKey
 
-	mu *safesync.RWMutex
+	mu sync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -103,8 +102,6 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
-
-		mu: safesync.New(modules.SafeMutexDelay, 1),
 	}
 	h.spaceRemaining = h.TotalStorage
 
@@ -149,8 +146,8 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 // SetConfig updates the host's internal HostSettings object. To modify
 // a specific field, use a combination of Info and SetConfig
 func (h *Host) SetSettings(settings modules.HostSettings) {
-	lockID := h.mu.Lock()
-	defer h.mu.Unlock(lockID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.spaceRemaining += settings.TotalStorage - h.TotalStorage
 	h.HostSettings = settings
 	h.save()
@@ -158,8 +155,8 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 
 // Settings returns the settings of a host.
 func (h *Host) Settings() modules.HostSettings {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
 	return h.HostSettings
 }
@@ -170,8 +167,8 @@ func (h *Host) Address() modules.NetAddress {
 }
 
 func (h *Host) Info() modules.HostInfo {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 
 	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
 	info := modules.HostInfo{
@@ -211,12 +208,12 @@ func (h *Host) Info() modules.HostInfo {
 
 // Close saves the state of the Gateway and stops its listener process.
 func (h *Host) Close() error {
-	id := h.mu.RLock()
+	h.mu.RLock()
 	// save the latest host state
 	if err := h.save(); err != nil {
 		return err
 	}
-	h.mu.RUnlock(id)
+	h.mu.RUnlock()
 	// clear the port mapping (no effect if UPnP not supported)
 	h.clearPort(h.myAddr.Port())
 	// shut down the listener

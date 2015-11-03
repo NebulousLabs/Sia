@@ -11,8 +11,8 @@ import (
 
 // threadedDeleteObligation deletes a file obligation.
 func (h *Host) threadedDeleteObligation(obligation contractObligation) {
-	lockID := h.mu.Lock()
-	defer h.mu.Unlock(lockID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	err := h.deallocate(obligation.Path)
 	if err != nil {
 		fmt.Println("WARN: failed to deallocate %v: %v", obligation.Path, err)
@@ -63,16 +63,16 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 	}
 
 	// Storage proof was successful, so increment profit tracking
-	lockID := h.mu.Lock()
+	h.mu.Lock()
 	h.profit = h.profit.Add(obligation.FileContract.Payout)
-	h.mu.Unlock(lockID)
+	h.mu.Unlock()
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change to the blockchain.
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := h.mu.Lock()
-	defer h.mu.Unlock(lockID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	h.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
 	h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))

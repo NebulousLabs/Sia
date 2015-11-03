@@ -54,10 +54,10 @@ func (h *Host) learnHostname() {
 		return
 	}
 
-	id := h.mu.Lock()
+	h.mu.Lock()
 	h.myAddr = modules.NetAddress(net.JoinHostPort(host, h.myAddr.Port()))
 	h.save()
-	h.mu.Unlock(id)
+	h.mu.Unlock()
 }
 
 // forwardPort adds a port mapping to the router.

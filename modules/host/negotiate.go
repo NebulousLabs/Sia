@@ -186,9 +186,9 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 
 	// check the contract transaction, which should be the last txn in the set.
 	contractTxn := unsignedTxnSet[len(unsignedTxnSet)-1]
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	err := h.considerContract(contractTxn, renterKey)
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 	if err != nil {
 		encoding.WriteObject(conn, err.Error())
 		return errors.New("rejected file contract: " + err.Error())
@@ -244,7 +244,7 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 
 	// Add this contract to the host's list of obligations.
 	// TODO: is there a race condition here?
-	lockID = h.mu.Lock()
+	h.mu.Lock()
 	h.fileCounter++
 	co := contractObligation{
 		ID:           contractTxn.FileContractID(0),
@@ -256,7 +256,7 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
 	h.obligationsByID[co.ID] = co
 	h.save()
-	h.mu.Unlock(lockID)
+	h.mu.Unlock()
 
 	return nil
 }
@@ -269,9 +269,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
 		return errors.New("couldn't read contract ID: " + err.Error())
 	}
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	obligation, exists := h.obligationsByID[fcid]
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 	if !exists {
 		return errors.New("no record of that contract")
 	}
@@ -311,9 +311,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			}
 
 			// check revision against original file contract
-			lockID = h.mu.RLock()
+			h.mu.RLock()
 			err := h.considerRevision(revTxn, obligation)
-			h.mu.RUnlock(lockID)
+			h.mu.RUnlock()
 			if err != nil {
 				encoding.WriteObject(conn, err.Error())
 				continue // don't terminate loop; subsequent revisions may be okay
@@ -366,7 +366,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 
 			// save updated obligation to disk
 			obligation.LastRevisionTxn = revTxn
-			lockID = h.mu.Lock()
+			h.mu.Lock()
 			h.spaceRemaining -= int64(len(piece))
 			h.obligationsByID[obligation.ID] = obligation
 			heightObligations := h.obligationsByHeight[obligation.FileContract.WindowStart+StorageProofReorgDepth]
@@ -376,7 +376,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 				}
 			}
 			h.save()
-			h.mu.Unlock(lockID)
+			h.mu.Unlock()
 		}
 	}()
 	file.Close()
