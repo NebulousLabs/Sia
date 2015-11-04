@@ -107,6 +107,10 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	if len(txn.FileContractRevisions) != 1 {
 		return errors.New("transaction should have only one revision")
 	}
+	// Check that we have a previous revision
+	if len(obligation.LastRevisionTxn.FileContractRevisions) != 1 {
+		return errors.New("can't revise without a previous revision")
+	}
 
 	// calculate minimum expected output value
 	rev := txn.FileContractRevisions[0]
@@ -252,6 +256,8 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		Path:         filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter)),
 		mu:           new(sync.Mutex),
 	}
+	// first revision is empty
+	co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
 	proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
 	h.obligationsByID[co.ID] = co
