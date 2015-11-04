@@ -57,11 +57,9 @@ type ConsensusSet struct {
 
 	// marshaler encodes and decodes between objects and byte slices.
 	marshaler encoding.GenericMarshaler
-
 	// blockRuleHelper calculates values on blocks for block validity rule
 	// enforcement.
 	blockRuleHelper blockRuleHelper
-
 	// blockValidator validates Blocks against validity rules.
 	blockValidator blockValidator
 
@@ -100,11 +98,9 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		marshaler: encoding.StdGenericMarshaler{},
-
+		marshaler:       encoding.StdGenericMarshaler{},
 		blockRuleHelper: stdBlockRuleHelper{},
-
-		blockValidator: NewBlockValidator(),
+		blockValidator:  NewBlockValidator(),
 
 		persistDir: persistDir,
 	}
