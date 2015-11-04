@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -92,7 +93,13 @@ func TestWeightedList(t *testing.T) {
 	}
 
 	// Create a hostdb and 3 equal entries to insert.
-	hdb := New()
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
+	}
 
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
@@ -160,7 +167,13 @@ func TestVariedWeights(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdb := New()
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
+	}
 
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
 	// per weight added to the tree, the total number of selections necessary
@@ -215,7 +228,13 @@ func TestRepeatInsert(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdb := New()
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
+	}
 
 	entry1 := hostEntry{
 		HostSettings: modules.HostSettings{IPAddress: fakeAddr(0)},
@@ -236,7 +255,13 @@ func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdb := New()
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
+	}
 
 	// Insert 3 hosts to be selected.
 	entry1 := hostEntry{
