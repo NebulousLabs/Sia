@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -173,6 +174,9 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return errors.New("host needs an address; have you properly announced?")
 	}
 
+	// allow 1 minute for contract negotiation
+	conn.SetDeadline(time.Now().Add(1 * time.Minute))
+
 	// perform key exchange
 	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
 		return errors.New("couldn't write our public key: " + err.Error())
@@ -235,6 +239,9 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	err = h.tpool.AcceptTransactionSet(signedTxnSet)
 	if err == modules.ErrDuplicateTransactionSet {
 		// this can happen if the host is uploading to itself
+		//
+		// TODO: is it possible for renter to cause a collision, overwriting a
+		// previous file contract?
 		err = nil
 	}
 	if err != nil {
@@ -282,6 +289,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 		return errors.New("no record of that contract")
 	}
 
+	// remove conn deadline while we wait for lock and rebuild the Merkle tree
+	conn.SetDeadline(time.Time{})
+
 	// need to protect against two simultaneous revisions to the same
 	// contract; this can cause inconsistency and data loss, making storage
 	// proofs impossible
@@ -306,6 +316,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	// submitted to the blockchain.
 	revisionErr := func() error {
 		for {
+			// allow 2 minutes between revisions
+			conn.SetDeadline(time.Now().Add(2 * time.Minute))
+
 			// read proposed revision
 			var revTxn types.Transaction
 			if err := encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
@@ -315,6 +328,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			if revTxn.ID() == (types.Transaction{}).ID() {
 				return nil
 			}
+
+			// allow 5 minutes for each revision
+			conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
 			// check revision against original file contract
 			h.mu.RLock()

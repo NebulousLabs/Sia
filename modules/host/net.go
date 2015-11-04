@@ -2,6 +2,7 @@ package host
 
 import (
 	"net"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -22,6 +23,9 @@ func (h *Host) listen() {
 // TODO: maintain compatibility
 func (h *Host) handleConn(conn net.Conn) {
 	defer conn.Close()
+	// Set an initial duration that is generous, but finite. RPCs can extend
+	// this if so desired.
+	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
