@@ -31,9 +31,8 @@ type contractObligation struct {
 	LastRevisionTxn types.Transaction
 	Path            string // Where on disk the file is stored.
 
-	// each obligation needs a mutex to prevent simultaneous revisions to the
-	// same obligation
-	mu *sync.Mutex
+	// revisions must happen in serial
+	mu sync.Mutex
 }
 
 // A Host contains all the fields necessary for storing files for clients and
@@ -51,8 +50,8 @@ type Host struct {
 
 	// variables
 	blockHeight         types.BlockHeight
-	obligationsByID     map[types.FileContractID]contractObligation
-	obligationsByHeight map[types.BlockHeight][]contractObligation
+	obligationsByID     map[types.FileContractID]*contractObligation
+	obligationsByHeight map[types.BlockHeight][]*contractObligation
 	spaceRemaining      int64
 	fileCounter         int
 	profit              types.Currency
@@ -100,8 +99,8 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 
 		persistDir: persistDir,
 
-		obligationsByID:     make(map[types.FileContractID]contractObligation),
-		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
+		obligationsByID:     make(map[types.FileContractID]*contractObligation),
+		obligationsByHeight: make(map[types.BlockHeight][]*contractObligation),
 	}
 	h.spaceRemaining = h.TotalStorage
 

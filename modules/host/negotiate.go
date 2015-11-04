@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -257,11 +256,10 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	// TODO: is there a race condition here?
 	h.mu.Lock()
 	h.fileCounter++
-	co := contractObligation{
+	co := &contractObligation{
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
 		Path:         filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter)),
-		mu:           new(sync.Mutex),
 	}
 	// first revision is empty
 	co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
@@ -334,7 +332,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 
 			// check revision against original file contract
 			h.mu.RLock()
-			err := h.considerRevision(revTxn, obligation)
+			err := h.considerRevision(revTxn, *obligation)
 			h.mu.RUnlock()
 			if err != nil {
 				encoding.WriteObject(conn, err.Error())
@@ -390,13 +388,6 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			obligation.LastRevisionTxn = revTxn
 			h.mu.Lock()
 			h.spaceRemaining -= int64(len(piece))
-			h.obligationsByID[obligation.ID] = obligation
-			heightObligations := h.obligationsByHeight[obligation.FileContract.WindowStart+StorageProofReorgDepth]
-			for i := range heightObligations {
-				if heightObligations[i].ID == obligation.ID {
-					heightObligations[i] = obligation
-				}
-			}
 			h.save()
 			h.mu.Unlock()
 		}
@@ -404,7 +395,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	file.Close()
 
 	// if a newly-created file was not updated, remove it
-	if stat, _ := os.Stat(obligation.Path); stat.Size() == 0 {
+	if obligation.LastRevisionTxn.FileContractRevisions[0].NewRevisionNumber == 0 {
 		os.Remove(obligation.Path)
 		return revisionErr
 	}
