@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -90,6 +91,9 @@ func (h *Host) rpcDownload(conn net.Conn) error {
 		if request.Length == 0 {
 			break
 		}
+
+		conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
+
 		// Write segment to conn.
 		segment := io.NewSectionReader(file, int64(request.Offset), int64(request.Length))
 		_, err := io.Copy(conn, segment)

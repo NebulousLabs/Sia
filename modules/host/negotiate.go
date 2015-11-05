@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -107,6 +107,10 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	if len(txn.FileContractRevisions) != 1 {
 		return errors.New("transaction should have only one revision")
 	}
+	// Check that we have a previous revision
+	if len(obligation.LastRevisionTxn.FileContractRevisions) != 1 {
+		return errors.New("can't revise without a previous revision")
+	}
 
 	// calculate minimum expected output value
 	rev := txn.FileContractRevisions[0]
@@ -168,6 +172,9 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	if h.UnlockHash == (types.UnlockHash{}) {
 		return errors.New("host needs an address; have you properly announced?")
 	}
+
+	// allow 1 minute for contract negotiation
+	conn.SetDeadline(time.Now().Add(1 * time.Minute))
 
 	// perform key exchange
 	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
@@ -231,6 +238,9 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	err = h.tpool.AcceptTransactionSet(signedTxnSet)
 	if err == modules.ErrDuplicateTransactionSet {
 		// this can happen if the host is uploading to itself
+		//
+		// TODO: is it possible for renter to cause a collision, overwriting a
+		// previous file contract?
 		err = nil
 	}
 	if err != nil {
@@ -246,12 +256,13 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	// TODO: is there a race condition here?
 	h.mu.Lock()
 	h.fileCounter++
-	co := contractObligation{
+	co := &contractObligation{
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
 		Path:         filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter)),
-		mu:           new(sync.Mutex),
 	}
+	// first revision is empty
+	co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
 	proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
 	h.obligationsByID[co.ID] = co
@@ -275,6 +286,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	if !exists {
 		return errors.New("no record of that contract")
 	}
+
+	// remove conn deadline while we wait for lock and rebuild the Merkle tree
+	conn.SetDeadline(time.Time{})
 
 	// need to protect against two simultaneous revisions to the same
 	// contract; this can cause inconsistency and data loss, making storage
@@ -300,6 +314,9 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	// submitted to the blockchain.
 	revisionErr := func() error {
 		for {
+			// allow 2 minutes between revisions
+			conn.SetDeadline(time.Now().Add(2 * time.Minute))
+
 			// read proposed revision
 			var revTxn types.Transaction
 			if err := encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
@@ -310,9 +327,12 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 				return nil
 			}
 
+			// allow 5 minutes for each revision
+			conn.SetDeadline(time.Now().Add(5 * time.Minute))
+
 			// check revision against original file contract
 			h.mu.RLock()
-			err := h.considerRevision(revTxn, obligation)
+			err := h.considerRevision(revTxn, *obligation)
 			h.mu.RUnlock()
 			if err != nil {
 				encoding.WriteObject(conn, err.Error())
@@ -368,13 +388,6 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			obligation.LastRevisionTxn = revTxn
 			h.mu.Lock()
 			h.spaceRemaining -= int64(len(piece))
-			h.obligationsByID[obligation.ID] = obligation
-			heightObligations := h.obligationsByHeight[obligation.FileContract.WindowStart+StorageProofReorgDepth]
-			for i := range heightObligations {
-				if heightObligations[i].ID == obligation.ID {
-					heightObligations[i] = obligation
-				}
-			}
 			h.save()
 			h.mu.Unlock()
 		}
@@ -382,7 +395,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	file.Close()
 
 	// if a newly-created file was not updated, remove it
-	if stat, _ := os.Stat(obligation.Path); stat.Size() == 0 {
+	if obligation.LastRevisionTxn.FileContractRevisions[0].NewRevisionNumber == 0 {
 		os.Remove(obligation.Path)
 		return revisionErr
 	}

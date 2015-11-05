@@ -65,13 +65,13 @@ func TestStorageProof(t *testing.T) {
 	}
 
 	// create obligation
-	obligation := contractObligation{
+	obligation := &contractObligation{
 		ID:           fcid,
 		FileContract: fc,
 		Path:         filepath.Join(ht.host.persistDir, "foo"),
 	}
 	ht.host.obligationsByID[fcid] = obligation
-	ht.host.obligationsByHeight[fc.WindowStart+1] = []contractObligation{obligation}
+	ht.host.obligationsByHeight[fc.WindowStart+1] = []*contractObligation{obligation}
 
 	// submit both to tpool
 	err = ht.tpool.AcceptTransactionSet(append(signedTxnSet, revTxn))

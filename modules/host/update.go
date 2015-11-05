@@ -81,7 +81,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// ready for storage proofs.
 	for _ = range cc.AppliedBlocks {
 		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
-			go h.threadedCreateStorageProof(obligation)
+			go h.threadedCreateStorageProof(*obligation)
 		}
 		// TODO: If something happens while the storage proofs are being
 		// created, those files will never get cleared from the host.

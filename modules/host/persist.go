@@ -37,7 +37,7 @@ func (h *Host) save() error {
 		PublicKey:      h.publicKey,
 	}
 	for _, obligation := range h.obligationsByID {
-		sHost.Obligations = append(sHost.Obligations, obligation)
+		sHost.Obligations = append(sHost.Obligations, *obligation)
 	}
 
 	return persist.SaveFile(persistMetadata, sHost, filepath.Join(h.persistDir, "settings.json"))
@@ -55,7 +55,8 @@ func (h *Host) load() error {
 	h.HostSettings = sHost.HostSettings
 	h.profit = sHost.Profit
 	// recreate maps
-	for _, obligation := range sHost.Obligations {
+	for i := range sHost.Obligations {
+		obligation := &sHost.Obligations[i] // both maps should use same pointer
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
