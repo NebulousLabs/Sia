@@ -88,7 +88,7 @@ type (
 		ParentID       crypto.Hash   `json:"parentid"`
 		PublicKeyIndex uint64        `json:"publickeyindex"`
 		Timelock       BlockHeight   `json:"timelock"`
-		CoveredFields  CoveredFields `json:"coveredfileds"`
+		CoveredFields  CoveredFields `json:"coveredfields"`
 		Signature      []byte        `json:"signature"`
 	}
 
