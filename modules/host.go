@@ -9,17 +9,18 @@ const (
 	HostDir        = "host"
 )
 
-// RPC identifiers
 var (
+	// RPC identifiers
 	// Each identifier has a version number at the end, which will be
 	// incremented whenever the protocol changes.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 0}
 	RPCUpload   = types.Specifier{'U', 'p', 'l', 'o', 'a', 'd', 0}
 	RPCRevise   = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 0}
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 0}
-)
 
-var (
+	// PrefixHostAnnouncement is used to indicate that a transaction's
+	// Arbitrary Data field contains a host announcement. The encoded
+	// announcement will follow this prefix.
 	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
 )
 
