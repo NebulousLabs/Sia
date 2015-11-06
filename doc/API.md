@@ -1,18 +1,28 @@
 Siad API
 ========
 
-The siad API is currently under construction. The deprecated way of doing
-things is documented at the end of the (incomplete) new documentation. The new
-documentation is a spec for the 0.4.0 api. After a round of fixes and
-improvments for 0.4.1, the API will be frozen into 'compatibility mode', such
-that backwards compatibility is preserved with all apps in future upgrades. The
-API may change again when 1.0.0 is released.
+The siad API is currently under construction. Under semantic versioning, the
+minor version will be incremented whenever API-breaking changes are introduced.
+Once siad hits v1.0.0, the major version will be incremented instead.
+
+All API calls return JSON objects. If there is an error, the error is returned
+in plaintext with an appropriate HTTP error code. The standard response is {
+"Success": true }. In this document, the API responses are defined as Go
+structs. The structs will be encoded to JSON before being sent; they are used
+here to provide type information.
+
+There may be functional API calls which are not documented. These are not
+guaranteed to be supported beyond the current release, and should not be used
+in production.
 
 Notes:
-- Requests must have their User-Agent string set to "Sia-Agent".
+- Requests must set their User-Agent string to contain the substring "Sia-Agent".
+- By default, siad listens on "localhost:9980". This can be changed using the '-a'
+  flag when running siad.
 - The `types.Currency` object is an arbitrary-precision unsigned integer. In JSON,
   it is represented as a base-10 string. You must use a "bignum" library to handle
   these values, or you risk losing precision.
+
 
 Consensus
 ---------
@@ -554,28 +564,6 @@ encryptionpassword string
 frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
-
-Siad API (Deprecated)
-=====================
-
-All API calls return JSON objects. If there is an error, the error is returned
-in plaintext with an appropriate HTTP error code. The standard response is {
-"Success": true }. In this document, the API responses are defined as Go
-structs. The structs will be encoded to JSON before being sent; they are used
-here to provide type information.
-
-At version 0.4, the API will be locked into forwards compatibility. This means
-that we will not add new required parameters or remove response fields. We may,
-however, add additional fields and optional parameters, and we may disable
-parameters. It should be noted that significant changes in the API are planned
-between 0.3.3.2 and 0.4.
-
-There may be functional API calls which are not documented. These are not
-guaranteed to be supported beyond the current release, and should not be used
-in production.
-
-The default port for the API is "localhost:9980". This can be changed using the
-'-a' flag when running siad.
 
 Daemon
 ------
