@@ -791,10 +791,23 @@ HostDB
 Queries:
 
 * /hostdb/hosts/active
+* /hostdb/hosts/all
 
 #### /hostdb/hosts/active
 
 Function: Lists all of the active hosts in the hostdb.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Hosts []HostSettings
+```
+
+#### /hostdb/hosts/all
+
+Function: Lists all of the hosts in the hostdb.
 
 Parameters: none
 
