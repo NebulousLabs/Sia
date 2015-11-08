@@ -31,8 +31,8 @@ func TestHost(t *testing.T) {
 	}
 }
 
-// TestIsLocal tests the IsLocal method of the NetAddress type.
-func TestIsLocal(t *testing.T) {
+// TestIsLoopback tests the IsLoopback method of the NetAddress type.
+func TestIsLoopback(t *testing.T) {
 	testSet := []struct {
 		query           NetAddress
 		desiredResponse bool
@@ -65,8 +65,8 @@ func TestIsLocal(t *testing.T) {
 		{"[::1]", false},
 	}
 	for _, test := range testSet {
-		if test.query.IsLocal() != test.desiredResponse {
-			t.Error("test failed:", test, test.query.IsLocal())
+		if test.query.IsLoopback() != test.desiredResponse {
+			t.Error("test failed:", test, test.query.IsLoopback())
 		}
 	}
 }

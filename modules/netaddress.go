@@ -29,8 +29,8 @@ func (na NetAddress) Port() string {
 	return port
 }
 
-// IsLocal returns true for ip addresses that are on the same machine.
-func (na NetAddress) IsLocal() bool {
+// IsLoopback returns true for ip addresses that are on the same machine.
+func (na NetAddress) IsLoopback() bool {
 	if !na.IsValid() {
 		return false
 	}
