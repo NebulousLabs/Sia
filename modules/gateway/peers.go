@@ -175,6 +175,9 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if addr == g.Address() {
 		return errors.New("can't connect to our own address")
 	}
+	if build.Release != "testing" && addr.IsLoopback() {
+		return errors.New("can't connect to loopback address")
+	}
 
 	id := g.mu.RLock()
 	_, exists := g.peers[addr]
