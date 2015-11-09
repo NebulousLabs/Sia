@@ -44,6 +44,8 @@ type hostUploader struct {
 }
 
 func (hu *hostUploader) fileContract() fileContract {
+	hu.revisionLock.Lock()
+	defer hu.revisionLock.Unlock()
 	return hu.contract
 }
 
@@ -336,13 +338,13 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 
 	// send the transaction
 	if err := encoding.WriteObject(hu.conn, signedTxn); err != nil {
-		return err
+		return errors.New("could not send revision transaction: " + err.Error())
 	}
 
 	// host sends acceptance
 	var response string
 	if err := encoding.ReadObject(hu.conn, &response, 128); err != nil {
-		return err
+		return errors.New("could not read host acceptance: " + err.Error())
 	}
 	if response != modules.AcceptResponse {
 		return errors.New("host rejected revision: " + response)
@@ -350,13 +352,13 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 
 	// transfer piece
 	if _, err := hu.conn.Write(piece); err != nil {
-		return err
+		return errors.New("could not transfer piece: " + err.Error())
 	}
 
 	// read txn signed by host
 	var signedHostTxn types.Transaction
 	if err := encoding.ReadObject(hu.conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
-		return err
+		return errors.New("could not read signed revision transaction: " + err.Error())
 	}
 
 	if signedHostTxn.ID() != signedTxn.ID() {
