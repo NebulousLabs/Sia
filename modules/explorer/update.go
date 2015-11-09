@@ -1,8 +1,6 @@
 package explorer
 
 import (
-	"time"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -13,14 +11,33 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Add the stats for the reverted blocks.
+	// Update cumulative stats for reverted blocks.
 	for _, block := range cc.RevertedBlocks {
+		// Delete the block from the list of active blocks.
+		e.blockchainHeight -= 1
+		delete(e.blockHashes, block.ID())
+		delete(e.transactionHashes, types.TransactionID(block.ID())) // Miner payouts are a transaction.
+
+		// Catalog the removed miner payouts.
+		for j, payout := range block.MinerPayouts {
+			delete(e.siacoinOutputIDs[block.MinerPayoutID(uint64(j))], types.TransactionID(block.ID()))
+			delete(e.unlockHashes[payout.UnlockHash], types.TransactionID(block.ID()))
+		}
+
+		// Update cumulative stats for reverted transcations.
 		for _, txn := range block.Transactions {
+			// Add the transction to the list of active transactions.
 			e.transactionCount--
-			for _ = range txn.SiacoinInputs {
+			delete(e.transactionHashes, txn.ID())
+
+			for _, sci := range txn.SiacoinInputs {
+				delete(e.siacoinOutputIDs[sci.ParentID], txn.ID())
+				delete(e.unlockHashes[sci.UnlockConditions.UnlockHash()], txn.ID())
 				e.siacoinInputCount--
 			}
-			for _ = range txn.SiacoinOutputs {
+			for j, sco := range txn.SiacoinOutputs {
+				delete(e.siacoinOutputIDs[txn.SiacoinOutputID(uint64(j))], txn.ID())
+				delete(e.unlockHashes[sco.UnlockHash], txn.ID())
 				e.siacoinOutputCount--
 			}
 			for _, fc := range txn.FileContracts {
@@ -54,14 +71,57 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// Add the stats for the applied blocks.
+	// Update cumulative stats for applied blocks.
 	for _, block := range cc.AppliedBlocks {
+		// Add the block to the list of active blocks.
+		e.blockchainHeight++
+		e.blockHashes[block.ID()] = e.blockchainHeight
+		e.transactionHashes[types.TransactionID(block.ID())] = e.blockchainHeight // Miner payouts are a transaciton.
+
+		// Catalog the new miner payouts.
+		for j, payout := range block.MinerPayouts {
+			_, exists := e.siacoinOutputIDs[block.MinerPayoutID(uint64(j))]
+			if !exists {
+				e.siacoinOutputIDs[block.MinerPayoutID(uint64(j))] = make(map[types.TransactionID]struct{})
+			}
+			e.siacoinOutputIDs[block.MinerPayoutID(uint64(j))][types.TransactionID(block.ID())] = struct{}{}
+			_, exists = e.unlockHashes[payout.UnlockHash]
+			if !exists {
+				e.unlockHashes[payout.UnlockHash] = make(map[types.TransactionID]struct{})
+			}
+			e.unlockHashes[payout.UnlockHash][types.TransactionID(block.ID())] = struct{}{}
+		}
+
+		// Update cumulative stats for applied transactions.
 		for _, txn := range block.Transactions {
+			// Add the transaction to the list of active transactions.
 			e.transactionCount++
-			for _ = range txn.SiacoinInputs {
+			e.transactionHashes[txn.ID()] = e.blockchainHeight
+
+			for _, sci := range txn.SiacoinInputs {
+				_, exists := e.siacoinOutputIDs[sci.ParentID]
+				if !exists {
+					e.siacoinOutputIDs[sci.ParentID] = make(map[types.TransactionID]struct{})
+				}
+				e.siacoinOutputIDs[sci.ParentID][txn.ID()] = struct{}{}
+				_, exists = e.unlockHashes[sci.UnlockConditions.UnlockHash()]
+				if !exists {
+					e.unlockHashes[sci.UnlockConditions.UnlockHash()] = make(map[types.TransactionID]struct{})
+				}
+				e.unlockHashes[sci.UnlockConditions.UnlockHash()][txn.ID()] = struct{}{}
 				e.siacoinInputCount++
 			}
-			for _ = range txn.SiacoinOutputs {
+			for j, sco := range txn.SiacoinOutputs {
+				_, exists := e.siacoinOutputIDs[txn.SiacoinOutputID(uint64(j))]
+				if !exists {
+					e.siacoinOutputIDs[txn.SiacoinOutputID(uint64(j))] = make(map[types.TransactionID]struct{})
+				}
+				e.siacoinOutputIDs[txn.SiacoinOutputID(uint64(j))][txn.ID()] = struct{}{}
+				_, exists = e.unlockHashes[sco.UnlockHash]
+				if !exists {
+					e.unlockHashes[sco.UnlockHash] = make(map[types.TransactionID]struct{})
+				}
+				e.unlockHashes[sco.UnlockHash][txn.ID()] = struct{}{}
 				e.siacoinOutputCount++
 			}
 			for _, fc := range txn.FileContracts {
@@ -108,19 +168,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// Reverting the blockheight and block data structs from reverted blocks
-	e.blockchainHeight -= types.BlockHeight(len(cc.RevertedBlocks))
-
-	// Handle incoming blocks
-	for _, block := range cc.AppliedBlocks {
-		e.blockchainHeight += 1
-
-		// Add the current time to seenTimes
-		if time.Unix(int64(block.Timestamp), 0).Before(e.startTime) {
-			e.seenTimes[e.blockchainHeight%types.BlockHeight(len(e.seenTimes))] = time.Unix(int64(block.Timestamp), 0)
-		} else {
-			e.seenTimes[e.blockchainHeight%types.BlockHeight(len(e.seenTimes))] = time.Now()
-		}
-	}
+	// Set the id of the current block.
 	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 }

@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -27,13 +28,16 @@ func (e *Explorer) Statistics() modules.ExplorerStatistics {
 
 	target, _ := e.cs.ChildTarget(e.currentBlock)
 	difficulty := types.NewCurrency(types.RootTarget.Int()).Div(types.NewCurrency(target.Int()))
-	maturityTimestamp := e.seenTimes[(e.blockchainHeight-types.MaturityDelay)%types.BlockHeight(len(e.seenTimes))]
+	currentBlock, exists := e.cs.BlockAtHeight(e.blockchainHeight)
+	if build.DEBUG && !exists {
+		panic("current block not found in consensus set")
+	}
 	return modules.ExplorerStatistics{
 		Height:            e.blockchainHeight,
 		Block:             e.currentBlock,
 		Target:            target,
 		Difficulty:        difficulty,
-		MaturityTimestamp: types.Timestamp(maturityTimestamp.Unix()),
+		MaturityTimestamp: currentBlock.Timestamp,
 		Circulation:       totalCurrency(e.blockchainHeight),
 
 		TransactionCount:          e.transactionCount,
