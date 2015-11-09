@@ -36,8 +36,11 @@ func (h *Host) save() error {
 		SecretKey:      h.secretKey,
 		PublicKey:      h.publicKey,
 	}
-	for _, obligation := range h.obligationsByID {
-		sHost.Obligations = append(sHost.Obligations, *obligation)
+	for _, ob := range h.obligationsByID {
+		// to avoid race conditions involving the obligation's mutex, copy it
+		// manually into a new object
+		obcopy := contractObligation{ID: ob.ID, FileContract: ob.FileContract, LastRevisionTxn: ob.LastRevisionTxn}
+		sHost.Obligations = append(sHost.Obligations, obcopy)
 	}
 
 	return persist.SaveFile(persistMetadata, sHost, filepath.Join(h.persistDir, "settings.json"))

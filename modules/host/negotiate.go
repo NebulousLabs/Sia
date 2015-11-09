@@ -286,8 +286,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 
 	h.mu.RLock()
 	obligation, exists := h.obligationsByID[fcid]
+	h.mu.RUnlock()
 	if !exists {
-		h.mu.RUnlock()
 		return errors.New("no record of that contract")
 	}
 
@@ -296,9 +296,6 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	// proofs impossible
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
-	// because h.save accesses obligation.mu, we still need to hold the host
-	// readlock until we acquire the obligation lock.
-	h.mu.RUnlock()
 
 	// open the file in append mode
 	file, err := os.OpenFile(obligation.Path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
