@@ -347,7 +347,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			// read piece
 			// TODO: simultaneously read into tree and file
 			rev := revTxn.FileContractRevisions[0]
-			piece := make([]byte, rev.NewFileSize-obligation.FileContract.FileSize)
+			last := obligation.LastRevisionTxn.FileContractRevisions[0]
+			piece := make([]byte, rev.NewFileSize-last.NewFileSize)
 			_, err = io.ReadFull(conn, piece)
 			if err != nil {
 				return errors.New("couldn't read piece data: " + err.Error())
