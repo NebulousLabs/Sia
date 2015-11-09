@@ -35,28 +35,56 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				delete(e.unlockHashes[sci.UnlockConditions.UnlockHash()], txn.ID())
 				e.siacoinInputCount--
 			}
-			for j, sco := range txn.SiacoinOutputs {
-				delete(e.siacoinOutputIDs[txn.SiacoinOutputID(uint64(j))], txn.ID())
+			for k, sco := range txn.SiacoinOutputs {
+				delete(e.siacoinOutputIDs[txn.SiacoinOutputID(uint64(k))], txn.ID())
 				delete(e.unlockHashes[sco.UnlockHash], txn.ID())
 				e.siacoinOutputCount--
 			}
-			for _, fc := range txn.FileContracts {
+			for k, fc := range txn.FileContracts {
+				fcid := txn.FileContractID(uint64(k))
+				delete(e.fileContractIDs[fcid], txn.ID())
+				delete(e.unlockHashes[fc.UnlockHash], txn.ID())
+				for l, sco := range fc.ValidProofOutputs {
+					delete(e.siacoinOutputIDs[fcid.StorageProofOutputID(types.ProofValid, uint64(l))], txn.ID())
+					delete(e.unlockHashes[sco.UnlockHash], txn.ID())
+				}
+				for l, sco := range fc.MissedProofOutputs {
+					delete(e.siacoinOutputIDs[fcid.StorageProofOutputID(types.ProofMissed, uint64(l))], txn.ID())
+					delete(e.unlockHashes[sco.UnlockHash], txn.ID())
+				}
 				e.fileContractCount--
 				e.totalContractCost = e.totalContractCost.Sub(fc.Payout)
 				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fc.FileSize))
 			}
 			for _, fcr := range txn.FileContractRevisions {
+				delete(e.fileContractIDs[fcr.ParentID], txn.ID())
+				delete(e.unlockHashes[fcr.UnlockConditions.UnlockHash()], txn.ID())
+				delete(e.unlockHashes[fcr.NewUnlockHash], txn.ID())
+				for l, sco := range fcr.NewValidProofOutputs {
+					delete(e.siacoinOutputIDs[fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(l))], txn.ID())
+					delete(e.unlockHashes[sco.UnlockHash], txn.ID())
+				}
+				for l, sco := range fcr.NewMissedProofOutputs {
+					delete(e.siacoinOutputIDs[fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(l))], txn.ID())
+					delete(e.unlockHashes[sco.UnlockHash], txn.ID())
+				}
 				e.fileContractRevisionCount--
 				e.totalContractSize = e.totalContractSize.Sub(types.NewCurrency64(fcr.NewFileSize))
 				e.totalRevisionVolume = e.totalRevisionVolume.Sub(types.NewCurrency64(fcr.NewFileSize))
 			}
-			for _ = range txn.StorageProofs {
+			for _, sp := range txn.StorageProofs {
+				delete(e.fileContractIDs[sp.ParentID], txn.ID())
 				e.storageProofCount--
 			}
-			for _ = range txn.SiafundInputs {
+			for _, sfi := range txn.SiafundInputs {
+				delete(e.siafundOutputIDs[sfi.ParentID], txn.ID())
+				delete(e.unlockHashes[sfi.UnlockConditions.UnlockHash()], txn.ID())
+				delete(e.unlockHashes[sfi.ClaimUnlockHash], txn.ID())
 				e.siafundInputCount--
 			}
-			for _ = range txn.SiafundOutputs {
+			for k, sfo := range txn.SiafundOutputs {
+				delete(e.siafundOutputIDs[txn.SiafundOutputID(uint64(k))], txn.ID())
+				delete(e.unlockHashes[sfo.UnlockHash], txn.ID())
 				e.siafundOutputCount--
 			}
 			for _ = range txn.MinerFees {
