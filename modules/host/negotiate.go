@@ -280,21 +280,25 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
 		return errors.New("couldn't read contract ID: " + err.Error())
 	}
-	h.mu.RLock()
-	obligation, exists := h.obligationsByID[fcid]
-	h.mu.RUnlock()
-	if !exists {
-		return errors.New("no record of that contract")
-	}
 
 	// remove conn deadline while we wait for lock and rebuild the Merkle tree
 	conn.SetDeadline(time.Time{})
+
+	h.mu.RLock()
+	obligation, exists := h.obligationsByID[fcid]
+	if !exists {
+		h.mu.RUnlock()
+		return errors.New("no record of that contract")
+	}
 
 	// need to protect against two simultaneous revisions to the same
 	// contract; this can cause inconsistency and data loss, making storage
 	// proofs impossible
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
+	// because h.save accesses obligation.mu, we still need to hold the host
+	// readlock until we acquire the obligation lock.
+	h.mu.RUnlock()
 
 	// open the file in append mode
 	file, err := os.OpenFile(obligation.Path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
@@ -386,8 +390,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			}
 
 			// save updated obligation to disk
-			obligation.LastRevisionTxn = revTxn
 			h.mu.Lock()
+			obligation.LastRevisionTxn = revTxn
 			h.spaceRemaining -= int64(len(piece))
 			h.save()
 			h.mu.Unlock()
