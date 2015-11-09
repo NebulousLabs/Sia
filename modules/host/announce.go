@@ -57,7 +57,7 @@ func (h *Host) Announce() error {
 	h.mu.RUnlock()
 
 	// Check that the host's ip address is known.
-	if addr.IsLocal() {
+	if addr.IsLoopback() {
 		return errors.New("can't announce without knowing external IP")
 	}
 

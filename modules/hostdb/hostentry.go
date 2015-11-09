@@ -23,7 +23,7 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	if !host.IPAddress.IsValid() {
 		return
 	}
-	if host.IPAddress.IsLocal() && build.Release != "testing" {
+	if host.IPAddress.IsLoopback() && build.Release != "testing" {
 		return
 	}
 
