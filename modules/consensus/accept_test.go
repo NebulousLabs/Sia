@@ -11,6 +11,7 @@ import (
 // mockDbBucket is an implementation of dbBucket for unit testing.
 type mockDbBucket struct{}
 
+// Get returns the value associated with a given key.
 func (bucket mockDbBucket) Get(key []byte) []byte {
 	return nil
 }
@@ -21,6 +22,7 @@ type mockDbTx struct {
 	buckets map[string]dbBucket
 }
 
+// Bucket returns a mock dbBucket object associated with the given bucket name.
 func (db mockDbTx) Bucket(name []byte) dbBucket {
 	return db.buckets[string(name)]
 }
@@ -62,6 +64,8 @@ func TestUnitValidateHeaderRejectsKnownBadBlocks(t *testing.T) {
 	}
 }
 
+// TestUnitValidateHeaderRejectsOrphanBlocks checks that validateHeader rejects
+// a block if its parent block does not appear in the block database.
 func TestUnitValidateHeaderRejectsOrphanBlocks(t *testing.T) {
 	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
 	// validation checks in validateHeader (i.e. everything should be valid except
