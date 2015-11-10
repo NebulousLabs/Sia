@@ -46,7 +46,35 @@ type (
 	// Explorer tracks the blockchain and provides tools for gathering
 	// statistics and finding objects or patterns within the blockchain.
 	Explorer interface {
+		// Statistics provides general statistics about the blockchain.
 		Statistics() ExplorerStatistics
+
+		// Block returns the block that matches the input block id. The bool
+		// indicates whether the block appears in the blockchain.
+		Block(types.BlockID) (types.Block, bool)
+
+		// Transaction returns the block that contains the input transaction
+		// id. The transaction itself is either the block (indicating the miner
+		// payouts are somehow involved), or it is a transaction inside of the
+		// block. The bool indicates whether the transaction is found in the
+		// consensus set.
+		Transaction(types.TransactionID) (types.Block, bool)
+
+		// UnlockHash returns all of the transaction ids associated with the
+		// provided unlock hash.
+		UnlockHash(types.UnlockHash) []types.TransactionID
+
+		// SiacoinOutputID returns all of the transaction ids associated with
+		// the provided siacoin output id.
+		SiacoinOutputID(types.SiacoinOutputID) []types.TransactionID
+
+		// FileContractID returns all of the transaction ids associated with
+		// the provided file contract id.
+		FileContractID(types.FileContractID) []types.TransactionID
+
+		// SiafundOutputID returns all of the transaction ids associated with
+		// the provided siafund output id.
+		SiafundOutputID(types.SiafundOutputID) []types.TransactionID
 
 		Close() error
 	}

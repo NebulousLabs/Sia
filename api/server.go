@@ -16,13 +16,13 @@ import (
 // A Server is essentially a collection of modules and an API server to talk
 // to them all.
 type Server struct {
-	cs      modules.ConsensusSet
-	gateway modules.Gateway
-	host    modules.Host
-	miner   modules.Miner
-	renter  modules.Renter
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	cs       modules.ConsensusSet
+	gateway  modules.Gateway
+	host     modules.Host
+	miner    modules.Miner
+	renter   modules.Renter
+	tpool    modules.TransactionPool
+	wallet   modules.Wallet
 	explorer modules.Explorer
 
 	// Consensus set variables.
@@ -43,13 +43,13 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 	}
 
 	srv := &Server{
-		cs:      s,
-		gateway: g,
-		host:    h,
-		miner:   m,
-		renter:  r,
-		tpool:   tp,
-		wallet:  w,
+		cs:       s,
+		gateway:  g,
+		host:     h,
+		miner:    m,
+		renter:   r,
+		tpool:    tp,
+		wallet:   w,
 		explorer: explorer,
 
 		blockchainHeight: -1,

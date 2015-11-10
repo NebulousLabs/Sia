@@ -31,7 +31,7 @@ type serverTester struct {
 	miner     modules.TestMiner
 	renter    modules.Renter
 	tpool     modules.TransactionPool
-	exp       modules.Explorer
+	explorer  modules.Explorer
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
 
@@ -85,11 +85,11 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	exp, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
+	e, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", cs, g, h, m, r, tp, w, exp)
+	srv, err := NewServer(":0", cs, g, h, m, r, tp, w, e)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func createServerTester(name string) (*serverTester, error) {
 		miner:     m,
 		renter:    r,
 		tpool:     tp,
-		exp:       exp,
+		explorer:  e,
 		wallet:    w,
 		walletKey: key,
 

@@ -18,7 +18,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tbid := types.TransactionID(bid)
 		e.blockchainHeight -= 1
 		delete(e.blockHashes, bid)
-		delete(e.transactionHashes, tbid)// Miner payouts are a transaction.
+		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
 		// Catalog the removed miner payouts.
 		for j, payout := range block.MinerPayouts {
