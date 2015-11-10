@@ -31,6 +31,30 @@ type RenterFilesLoadResponse struct {
 	FilesAdded []string
 }
 
+// ActiveHosts is the struct that pads the response to the renter module call
+// "ActiveHosts". The padding is used so that the return value can have an
+// explicit name, which makes adding or removing fields easier in the future.
+type ActiveHosts struct {
+	Hosts []modules.HostSettings
+}
+
+// renterHostsActiveHandler handes the API call asking for the list of active
+// hosts.
+func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request) {
+	ah := ActiveHosts{
+		Hosts: srv.renter.ActiveHosts(),
+	}
+	writeJSON(w, ah)
+}
+
+// renterHostsAllHandler handes the API call asking for the list of all hosts.
+func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Request) {
+	ah := ActiveHosts{
+		Hosts: srv.renter.AllHosts(),
+	}
+	writeJSON(w, ah)
+}
+
 // renterFilesDownloadHandler handles the API call to download a file.
 func (srv *Server) renterFilesDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))

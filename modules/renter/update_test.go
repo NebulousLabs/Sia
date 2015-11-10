@@ -1,4 +1,4 @@
-package hostdb
+package renter
 
 import (
 	"testing"
@@ -46,40 +46,40 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestFindHostAnnouncements")
+	rt, err := newRenterTester("TestFindHostAnnouncements")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Put a host announcement into the blockchain.
 	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: hdbt.gateway.Address(),
+		IPAddress: rt.gateway.Address(),
 	})
-	txnBuilder := hdbt.wallet.StartTransaction()
+	txnBuilder := rt.wallet.StartTransaction()
 	txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], announcement...))
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = hdbt.tpool.AcceptTransactionSet(txnSet)
+	err = rt.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check that, prior to mining, the hostdb has no hosts.
-	if len(hdbt.hostdb.allHosts) != 0 {
+	if len(rt.renter.hostDB.AllHosts()) != 0 {
 		t.Fatal("Hostdb should not yet have any hosts")
 	}
 
 	// Mine a block to get the transaction into the consensus set.
-	b, _ := hdbt.miner.FindBlock()
-	err = hdbt.cs.AcceptBlock(b)
+	b, _ := rt.miner.FindBlock()
+	err = rt.cs.AcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check that there is now a host in the hostdb.
-	if len(hdbt.hostdb.allHosts) != 1 {
+	if len(rt.renter.hostDB.AllHosts()) != 1 {
 		t.Fatal("hostdb should have a host after getting a host announcement transcation")
 	}
 }

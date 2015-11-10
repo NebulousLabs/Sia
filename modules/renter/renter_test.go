@@ -9,7 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -20,7 +19,6 @@ import (
 type renterTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
-	hostdb    modules.HostDB
 	miner     modules.TestMiner
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
@@ -50,10 +48,6 @@ func newRenterTester(name string) (*renterTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := hostdb.New(cs, g, filepath.Join(testdir, modules.HostDBDir))
-	if err != nil {
-		return nil, err
-	}
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		return nil, err
@@ -74,7 +68,7 @@ func newRenterTester(name string) (*renterTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := New(cs, hdb, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +81,6 @@ func newRenterTester(name string) (*renterTester, error) {
 	rt := &renterTester{
 		cs:      cs,
 		gateway: g,
-		hostdb:  hdb,
 		miner:   m,
 		tpool:   tp,
 		wallet:  w,
@@ -115,27 +108,23 @@ func TestNilInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = New(rt.cs, rt.hostdb, rt.wallet, rt.tpool, rt.renter.persistDir+"1")
+	_, err = New(rt.cs, rt.wallet, rt.tpool, rt.renter.persistDir+"1")
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = New(nil, nil, nil, nil, rt.renter.persistDir+"2")
+	_, err = New(nil, nil, nil, rt.renter.persistDir+"2")
 	if err == nil {
 		t.Error("no error returned for nil inputs")
 	}
-	_, err = New(nil, rt.hostdb, rt.wallet, rt.tpool, rt.renter.persistDir+"3")
+	_, err = New(nil, rt.wallet, rt.tpool, rt.renter.persistDir+"3")
 	if err != ErrNilCS {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, nil, rt.wallet, rt.tpool, rt.renter.persistDir+"5")
-	if err != ErrNilHostDB {
-		t.Error(err)
-	}
-	_, err = New(rt.cs, rt.hostdb, nil, rt.tpool, rt.renter.persistDir+"6")
+	_, err = New(rt.cs, nil, rt.tpool, rt.renter.persistDir+"6")
 	if err != ErrNilWallet {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, rt.hostdb, rt.wallet, nil, rt.renter.persistDir+"6")
+	_, err = New(rt.cs, rt.wallet, nil, rt.renter.persistDir+"6")
 	if err != ErrNilTpool {
 		t.Error(err)
 	}

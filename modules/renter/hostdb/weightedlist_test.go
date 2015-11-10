@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,16 +21,16 @@ func fakeAddr(n uint8) modules.NetAddress {
 // uniformTreeVerification checks that everything makes sense in the tree given
 // the number of entries that the tree is supposed to have and also given that
 // every entropy has the same weight.
-func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
+func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 	// Check that the weight of the hostTree is what is expected.
-	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdbt.hostdb.hostTree.hostEntry.weight)
-	if hdbt.hostdb.hostTree.weight.Cmp(expectedWeight) != 0 {
+	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdb.hostTree.hostEntry.weight)
+	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		return errors.New("expected weight is incorrect")
 	}
 
 	// Check that the length of activeHosts and the count of hostTree are
 	// consistent.
-	if len(hdbt.hostdb.activeHosts) != numEntries {
+	if len(hdb.activeHosts) != numEntries {
 		return errors.New("unexpected number of active hosts")
 	}
 
@@ -41,7 +42,7 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 		selectionMap := make(map[modules.NetAddress]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
-			entries := hdbt.hostdb.RandomHosts(1)
+			entries := hdb.RandomHosts(1)
 			if len(entries) == 0 {
 				return errors.New("no hosts!")
 			}
@@ -60,26 +61,26 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 	// Try removing an re-adding all hosts.
 	var removedEntries []*hostEntry
 	for {
-		if hdbt.hostdb.hostTree.weight.IsZero() {
+		if hdb.hostTree.weight.IsZero() {
 			break
 		}
-		randWeight, err := rand.Int(rand.Reader, hdbt.hostdb.hostTree.weight.Big())
+		randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
 		if err != nil {
 			break
 		}
-		node, err := hdbt.hostdb.hostTree.nodeAtWeight(types.NewCurrency(randWeight))
+		node, err := hdb.hostTree.nodeAtWeight(types.NewCurrency(randWeight))
 		if err != nil {
 			break
 		}
 		node.removeNode()
-		delete(hdbt.hostdb.activeHosts, node.hostEntry.IPAddress)
+		delete(hdb.activeHosts, node.hostEntry.IPAddress)
 
 		// remove the entry from the hostdb so it won't be selected as a
 		// repeat.
 		removedEntries = append(removedEntries, node.hostEntry)
 	}
 	for _, entry := range removedEntries {
-		hdbt.hostdb.insertNode(entry)
+		hdb.insertNode(entry)
 	}
 	return nil
 }
@@ -92,9 +93,12 @@ func TestWeightedList(t *testing.T) {
 	}
 
 	// Create a hostdb and 3 equal entries to insert.
-	hdbt, err := newHDBTester("TestWeightedList")
-	if err != nil {
-		t.Fatal(err)
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Create a bunch of host entries of equal weight.
@@ -104,9 +108,9 @@ func TestWeightedList(t *testing.T) {
 			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
 			weight:       types.NewCurrency64(10),
 		}
-		hdbt.hostdb.insertNode(&entry)
+		hdb.insertNode(&entry)
 	}
-	err = hdbt.uniformTreeVerification(firstInsertions)
+	err := uniformTreeVerification(hdb, firstInsertions)
 	if err != nil {
 		t.Error(err)
 	}
@@ -131,13 +135,13 @@ func TestWeightedList(t *testing.T) {
 		}
 
 		// Remove the entry and add it to the list of removed entries
-		err := hdbt.hostdb.RemoveHost(fakeAddr(randInt))
+		err := hdb.RemoveHost(fakeAddr(randInt))
 		if err != nil {
 			t.Fatal(err)
 		}
 		removedMap[randInt] = struct{}{}
 	}
-	err = hdbt.uniformTreeVerification(firstInsertions - removals)
+	err = uniformTreeVerification(hdb, firstInsertions-removals)
 	if err != nil {
 		t.Error(err)
 	}
@@ -149,9 +153,12 @@ func TestWeightedList(t *testing.T) {
 			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
 			weight:       types.NewCurrency64(10),
 		}
-		hdbt.hostdb.insertNode(&entry)
+		hdb.insertNode(&entry)
 	}
-	hdbt.uniformTreeVerification(firstInsertions - removals + secondInsertions)
+	err = uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 // TestVariedWeights runs broad statistical tests on selecting hosts with
@@ -160,9 +167,12 @@ func TestVariedWeights(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestVariedWeights")
-	if err != nil {
-		t.Fatal(err)
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
@@ -176,7 +186,7 @@ func TestVariedWeights(t *testing.T) {
 			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
 			weight:       types.NewCurrency64(uint64(i)),
 		}
-		hdbt.hostdb.insertNode(&entry)
+		hdb.insertNode(&entry)
 		selections += i * expectedPerWeight
 	}
 
@@ -184,11 +194,11 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry := hdbt.hostdb.RandomHosts(1)
+		randEntry := hdb.RandomHosts(1)
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
-		node, exists := hdbt.hostdb.activeHosts[randEntry[0].IPAddress]
+		node, exists := hdb.activeHosts[randEntry[0].IPAddress]
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
@@ -218,9 +228,12 @@ func TestRepeatInsert(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestRepeatInsert")
-	if err != nil {
-		t.Fatal(err)
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	entry1 := hostEntry{
@@ -228,11 +241,11 @@ func TestRepeatInsert(t *testing.T) {
 		weight:       types.NewCurrency64(1),
 	}
 	entry2 := entry1
-	hdbt.hostdb.insertNode(&entry1)
+	hdb.insertNode(&entry1)
 
 	entry2.weight = types.NewCurrency64(100)
-	hdbt.hostdb.insertNode(&entry2)
-	if len(hdbt.hostdb.activeHosts) != 1 {
+	hdb.insertNode(&entry2)
+	if len(hdb.activeHosts) != 1 {
 		t.Error("insterting the same entry twice should result in only 1 entry in the hostdb")
 	}
 }
@@ -242,9 +255,12 @@ func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	hdbt, err := newHDBTester("TestRandomHosts")
-	if err != nil {
-		t.Fatal(err)
+	hdb := &HostDB{
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Insert 3 hosts to be selected.
@@ -260,39 +276,39 @@ func TestRandomHosts(t *testing.T) {
 		HostSettings: modules.HostSettings{IPAddress: fakeAddr(3)},
 		weight:       types.NewCurrency64(3),
 	}
-	hdbt.hostdb.insertNode(&entry1)
-	hdbt.hostdb.insertNode(&entry2)
-	hdbt.hostdb.insertNode(&entry3)
+	hdb.insertNode(&entry1)
+	hdb.insertNode(&entry2)
+	hdb.insertNode(&entry3)
 
-	if len(hdbt.hostdb.activeHosts) != 3 {
+	if len(hdb.activeHosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
-		t.Error(hdbt.hostdb.hostTree.weight)
+		t.Error(hdb.hostTree.weight)
 	}
 
 	// Grab 1 random host.
-	randHosts := hdbt.hostdb.RandomHosts(1)
+	randHosts := hdb.RandomHosts(1)
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
-	if len(hdbt.hostdb.activeHosts) != 3 {
+	if len(hdb.activeHosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
 
 	// Grab 2 random hosts.
-	randHosts = hdbt.hostdb.RandomHosts(2)
+	randHosts = hdb.RandomHosts(2)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
 	}
-	if len(hdbt.hostdb.activeHosts) != 3 {
+	if len(hdb.activeHosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
 	if randHosts[0].IPAddress == randHosts[1].IPAddress {
@@ -300,14 +316,14 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 3 random hosts.
-	randHosts = hdbt.hostdb.RandomHosts(3)
+	randHosts = hdb.RandomHosts(3)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
-	if len(hdbt.hostdb.activeHosts) != 3 {
+	if len(hdb.activeHosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
 	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {
@@ -315,14 +331,14 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts = hdbt.hostdb.RandomHosts(4)
+	randHosts = hdb.RandomHosts(4)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
-	if len(hdbt.hostdb.activeHosts) != 3 {
+	if len(hdb.activeHosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
 	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {

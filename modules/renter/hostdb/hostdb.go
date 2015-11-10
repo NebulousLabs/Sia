@@ -1,15 +1,10 @@
-// package hostdb provides a HostDB object that implements the modules.HostDB
+// package hostdb provides a HostDB object that implements the renter.hostDB
 // interface. The blockchain is scanned for host announcements and hosts that
 // are found get added to the host database. The database continually scans the
 // set of hosts it has found and updates who is online.
 package hostdb
 
-// hostdb.go defines the HostDB type and New for the funtion.
-
 import (
-	"errors"
-	"log"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 )
@@ -21,19 +16,10 @@ const (
 	scanPoolSize = 1000
 )
 
-var (
-	errNilGateway      = errors.New("gateway cannot be nil")
-	errNilConsensusSet = errors.New("consensus set cannot be nil")
-)
-
 // The HostDB is a database of potential hosts. It assigns a weight to each
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
-	consensusSet    modules.ConsensusSet
-	gateway         modules.Gateway
-	consensusHeight int
-
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
 	// random. 'activeHosts' provides a lookup from hostname to the the
@@ -52,39 +38,18 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
-	persistDir string
-	log        *log.Logger
-	mu         *sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*HostDB, error) {
-	// Check for nil dependencies.
-	if cs == nil {
-		return nil, errNilConsensusSet
-	}
-	if g == nil {
-		return nil, errNilGateway
-	}
-
-	// Build an empty hostdb.
+func New() *HostDB {
 	hdb := &HostDB{
-		consensusSet: cs,
-		gateway:      g,
-
 		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
 
-		allHosts: make(map[modules.NetAddress]*hostEntry),
-
-		scanPool: make(chan *hostEntry, scanPoolSize),
-
-		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
-	}
-	err := hdb.initPersist()
-	if err != nil {
-		return nil, err
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Begin listening to consensus and looking for hosts.
@@ -92,6 +57,6 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*HostDB
 		go hdb.threadedProbeHosts()
 	}
 	go hdb.threadedScan()
-	cs.ConsensusSetSubscribe(hdb)
-	return hdb, nil
+
+	return hdb
 }

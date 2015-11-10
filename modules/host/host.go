@@ -40,7 +40,6 @@ type contractObligation struct {
 type Host struct {
 	// modules
 	cs     modules.ConsensusSet
-	hostdb modules.HostDB
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
@@ -67,12 +66,9 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, persistDir string) (*Host, error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, addr string, persistDir string) (*Host, error) {
 	if cs == nil {
 		return nil, errors.New("host cannot use a nil state")
-	}
-	if hdb == nil {
-		return nil, errors.New("host cannot use a nil hostdb")
 	}
 	if tpool == nil {
 		return nil, errors.New("host cannot use a nil tpool")
@@ -83,7 +79,6 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionP
 
 	h := &Host{
 		cs:     cs,
-		hostdb: hdb,
 		tpool:  tpool,
 		wallet: wallet,
 
@@ -182,25 +177,6 @@ func (h *Host) Info() modules.HostInfo {
 		fc := obligation.FileContract
 		info.PotentialProfit = info.PotentialProfit.Add(types.PostTax(h.blockHeight, fc.Payout))
 	}
-
-	// Calculate estimated competition (reported in per GB per month). Price
-	// calculated by taking the average of hosts 8-15.
-	var averagePrice types.Currency
-	hosts := h.hostdb.RandomHosts(15)
-	for i, host := range hosts {
-		if i < 8 {
-			continue
-		}
-		averagePrice = averagePrice.Add(host.Price)
-	}
-	if len(hosts) == 0 {
-		return info
-	}
-	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
-	// HACK: 4320 is one month, and 1e9 is a GB. Price is reported as per GB
-	// per month.
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(4320)).Mul(types.NewCurrency64(1e9))
-	info.Competition = estimatedCost
 
 	return info
 }
