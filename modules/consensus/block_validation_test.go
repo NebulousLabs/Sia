@@ -6,22 +6,30 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// mockMarshaler is a mock implementation of the encoding.GenericMarshaler
+// interface that allows the client to pre-define the length of the marshaled
+// data.
 type mockMarshaler struct {
 	marshalLength uint64
 }
 
+// Marshal marshals an object into an empty byte slice of marshalLength.
 func (m mockMarshaler) Marshal(interface{}) []byte {
 	return make([]byte, m.marshalLength)
 }
 
+// Unmarshal is not implemented.
 func (m mockMarshaler) Unmarshal([]byte, interface{}) error {
-	return nil
+	panic("not implemented")
 }
 
+// mockClock is a mock implementation of the types.Clock interface that allows
+// the client to pre-define a return value for Now().
 type mockClock struct {
 	now types.Timestamp
 }
 
+// Now returns mockClock's pre-defined Timestamp.
 func (c mockClock) Now() types.Timestamp {
 	return c.now
 }

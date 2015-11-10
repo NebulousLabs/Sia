@@ -33,6 +33,7 @@ type stdBlockValidator struct {
 	marshaler encoding.GenericMarshaler
 }
 
+// NewBlockValidator creates a new stdBlockValidator with default settings.
 func NewBlockValidator() stdBlockValidator {
 	return stdBlockValidator{
 		clock:     types.StdClock{},
