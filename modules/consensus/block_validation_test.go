@@ -64,8 +64,8 @@ var validateBlockTests = []struct {
 // TestUnitValidateBlock runs a series of unit tests for ValidateBlock.
 func TestUnitValidateBlock(t *testing.T) {
 	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
-	// is valid except for the timestamp (i.e. don't assume an ordering to the
-	// implementation of the validation function).
+	// is valid except for the attribute that causes validation to fail. (i.e.
+	// don't assume an ordering to the implementation of the validation function).
 	for _, tt := range validateBlockTests {
 		b := types.Block{
 			Timestamp: tt.blockTimestamp,

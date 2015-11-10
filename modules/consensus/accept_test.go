@@ -72,9 +72,9 @@ var validateHeaderTests = []struct {
 
 // TestUnitValidateHeader runs a series of unit tests for validateHeader.
 func TestUnitValidateHeader(t *testing.T) {
-	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
-	// validation checks in validateHeader (i.e. everything should be valid except
-	// the known bad block).
+	// TODO(mtlynch): Populate all parameters to validateHeader so that everything
+	// is valid except for the attribute that causes validation to fail. (i.e.
+	// don't assume an ordering to the implementation of the validation function).
 	for _, tt := range validateHeaderTests {
 		cs := ConsensusSet{dosBlocks: tt.dosBlocks}
 		err := cs.validateHeader(tt.tx, tt.block)
