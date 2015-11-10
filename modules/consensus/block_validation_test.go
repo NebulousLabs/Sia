@@ -34,69 +34,54 @@ func (c mockClock) Now() types.Timestamp {
 	return c.now
 }
 
-// TestUnitValidateBlockEarlyTimestamp checks that stdBlockValidator
-// rejects blocks with timestamps that are too early.
-func TestUnitValidateBlockEarlyTimestamp(t *testing.T) {
+var validateBlockTests = []struct {
+	now            types.Timestamp
+	minTimestamp   types.Timestamp
+	blockTimestamp types.Timestamp
+	blockSize      uint64
+	errWant        error
+	msg            string
+}{
+	{
+		minTimestamp:   types.Timestamp(5),
+		blockTimestamp: types.Timestamp(4),
+		errWant:        errEarlyTimestamp,
+		msg:            "ValidateBlock should reject blocks with timestamps that are too early",
+	},
+	{
+		blockSize: types.BlockSizeLimit + 1,
+		errWant:   errLargeBlock,
+		msg:       "ValidateBlock should reject excessively large blocks",
+	},
+	{
+		now:            types.Timestamp(50),
+		blockTimestamp: types.Timestamp(50) + types.ExtremeFutureThreshold + 1,
+		errWant:        errExtremeFutureTimestamp,
+		msg:            "ValidateBlock should reject blocks timestamped in the extreme future",
+	},
+}
+
+// TestUnitValidateBlock runs a series of unit tests for ValidateBlock.
+func TestUnitValidateBlock(t *testing.T) {
 	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
 	// is valid except for the timestamp (i.e. don't assume an ordering to the
 	// implementation of the validation function).
-	minTimestamp := types.Timestamp(5)
-	blockValidator := stdBlockValidator{}
-	b := types.Block{
-		Timestamp: minTimestamp - 1,
-	}
-	err := blockValidator.ValidateBlock(b, minTimestamp, types.Target{}, 0)
-	wantErr := errEarlyTimestamp
-	if err != wantErr {
-		t.Errorf("got %v, want %v", err, wantErr)
-	}
-}
-
-// TestUnitValidateBlockLargeBlock checks that stdBlockValidator rejects
-// excessively large blocks.
-func TestUnitValidateBlockLargeBlock(t *testing.T) {
-	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
-	// is valid except for the length (i.e. don't assume an ordering to the
-	// implementation of the validation function).
-	minTimestamp := types.Timestamp(5)
-	blockValidator := stdBlockValidator{
-		marshaler: mockMarshaler{
-			marshalLength: types.BlockSizeLimit + 1,
-		},
-	}
-	b := types.Block{
-		Timestamp: minTimestamp,
-	}
-	err := blockValidator.ValidateBlock(b, minTimestamp, types.RootDepth, 0)
-	wantErr := errLargeBlock
-	if err != wantErr {
-		t.Errorf("got %v, want %v", err, wantErr)
-	}
-}
-
-// TestUnitValidateBlockExtremeFutureTimestamp checks that stdBlockValidator
-// rejects blocks that are timestamped in the extreme future.
-func TestUnitValidateBlockExtremeFutureTimestamp(t *testing.T) {
-	// TODO(mtlynch): Populate all parameters to ValidateBlock so that everything
-	// is valid except for the timestamp (i.e. don't assume an ordering to the
-	// implementation of the validation function).
-	minTimestamp := types.Timestamp(5)
-	now := types.Timestamp(50)
-	blockValidator := stdBlockValidator{
-		marshaler: mockMarshaler{
-			marshalLength: 1,
-		},
-		clock: mockClock{
-			now: now,
-		},
-	}
-	b := types.Block{
-		Timestamp: now + types.ExtremeFutureThreshold + 1,
-	}
-	err := blockValidator.ValidateBlock(b, minTimestamp, types.RootDepth, 0)
-	wantErr := errExtremeFutureTimestamp
-	if err != wantErr {
-		t.Errorf("got %v, want %v", err, wantErr)
+	for _, tt := range validateBlockTests {
+		b := types.Block{
+			Timestamp: tt.blockTimestamp,
+		}
+		blockValidator := stdBlockValidator{
+			marshaler: mockMarshaler{
+				marshalLength: tt.blockSize,
+			},
+			clock: mockClock{
+				now: tt.now,
+			},
+		}
+		err := blockValidator.ValidateBlock(b, tt.minTimestamp, types.RootDepth, 0)
+		if err != tt.errWant {
+			t.Errorf("%s: got %v, want %v", tt.msg, err, tt.errWant)
+		}
 	}
 }
 
