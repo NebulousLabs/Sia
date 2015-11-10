@@ -89,6 +89,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if err != nil {
 		return err
 	}
+	// TODO: remove this; default duration should be 0 (indefinite)
 	if up.Duration == 0 {
 		up.Duration = defaultDuration
 	}
@@ -116,7 +117,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Add file to renter.
 	lockID = r.mu.Lock()
 	r.files[up.Nickname] = f
-	r.repairSet[up.Nickname] = up.Filename
+	r.tracking[up.Nickname] = trackedFile{
+		RepairPath: up.Filename,
+		EndHeight:  r.blockHeight + up.Duration,
+	}
 	r.save()
 	r.mu.Unlock(lockID)
 

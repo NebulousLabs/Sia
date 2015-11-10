@@ -189,9 +189,9 @@ func (r *Renter) saveFile(f *file) error {
 func (r *Renter) save() error {
 	data := struct {
 		Contracts map[string]types.FileContract
-		Repairing map[string]string
+		Tracking  map[string]trackedFile
 		Entropy   [32]byte
-	}{make(map[string]types.FileContract), r.repairSet, r.entropy}
+	}{make(map[string]types.FileContract), r.tracking, r.entropy}
 	// Convert renter's contract map to a JSON-friendly type.
 	for id, fc := range r.contracts {
 		b, _ := id.MarshalJSON()
@@ -233,15 +233,22 @@ func (r *Renter) load() error {
 	// Load contracts, repair set, and entropy.
 	data := struct {
 		Contracts map[string]types.FileContract
-		Repairing map[string]string
+		Tracking  map[string]trackedFile
+		Repairing map[string]string // COMPATv0.4.8
 		Entropy   [32]byte
 	}{}
 	err = persist.LoadFile(saveMetadata, &data, filepath.Join(r.persistDir, PersistFilename))
 	if err != nil {
 		return err
 	}
-	if data.Repairing != nil {
-		r.repairSet = data.Repairing
+	if data.Tracking != nil {
+		r.tracking = data.Tracking
+	} else if data.Repairing != nil {
+		// COMPATv0.4.8
+		for nick, path := range data.Repairing {
+			// these files will be renewed indefinitely
+			r.tracking[nick] = trackedFile{RepairPath: path, EndHeight: 0}
+		}
 	}
 	r.entropy = data.Entropy
 	var fcid types.FileContractID
