@@ -27,59 +27,59 @@ func (db mockDbTx) Bucket(name []byte) dbBucket {
 	return db.buckets[string(name)]
 }
 
-// TestUnitValidateHeaderFailsWhenBlockMapDoesNotExist checks that
-// validateHeader correctly rejects blocks when no block map is found in the
-// database.
-func TestUnitValidateHeaderFailsWhenBlockMapDoesNotExist(t *testing.T) {
-	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
-	// validation checks in validateHeader (i.e. everything should be valid except
-	// the missing block map).
-	block := types.Block{Timestamp: 100}
-
-	// Create a transaction with no associated DB buckets.
-	tx := mockDbTx{}
-	cs := ConsensusSet{}
-	err := cs.validateHeader(tx, block)
-	if err != errNoBlockMap {
-		t.Fatalf("expected to fail with errNoBlockMap, got: %v", err)
-	}
-}
-
-// TestUnitValidateHeaderRejectsKnownBadBlocks checks that validateHeader
-// correctly rejects saved bad blocks.
-func TestUnitValidateHeaderRejectsKnownBadBlocks(t *testing.T) {
-	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
-	// validation checks in validateHeader (i.e. everything should be valid except
-	// the known bad block).
-	block := types.Block{Timestamp: 100}
-	dosBlocks := map[types.BlockID]struct{}{
-		block.ID(): struct{}{},
-	}
-
-	tx := mockDbTx{}
-	cs := ConsensusSet{dosBlocks: dosBlocks}
-	err := cs.validateHeader(tx, block)
-	if err != errDoSBlock {
-		t.Fatalf("expected to fail with errDoSBlock, got: %v", err)
-	}
-}
-
-// TestUnitValidateHeaderRejectsOrphanBlocks checks that validateHeader rejects
-// a block if its parent block does not appear in the block database.
-func TestUnitValidateHeaderRejectsOrphanBlocks(t *testing.T) {
-	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
-	// validation checks in validateHeader (i.e. everything should be valid except
-	// the known bad block).
-	block := types.Block{Timestamp: 100}
-	dosBlocks := map[types.BlockID]struct{}{}
-
-	tx := mockDbTx{map[string]dbBucket{
+var (
+	// validBlock is a mock valid Block.
+	validBlock = types.Block{Timestamp: 100}
+	// emptyDosBlocks is a dosBlocks map where no block is marked bad.
+	emptyDosBlocks = map[types.BlockID]struct{}{}
+	// emptyTx is a transaction associated with an empty block map.
+	emptyTx = mockDbTx{map[string]dbBucket{
 		string(BlockMap): mockDbBucket{},
 	}}
-	cs := ConsensusSet{dosBlocks: dosBlocks}
-	err := cs.validateHeader(tx, block)
-	if err != errOrphan {
-		t.Fatalf("expected to fail with errOrphan, got: %v", err)
+)
+
+var validateHeaderTests = []struct {
+	block     types.Block
+	dosBlocks map[types.BlockID]struct{}
+	tx        mockDbTx
+	errWant   error
+	msg       string
+}{
+	{
+		block:     validBlock,
+		dosBlocks: nil,
+		errWant:   errNoBlockMap,
+		msg:       "validateHeader should fail when no block map is found in the database",
+	},
+	{
+		block: validBlock,
+		// Add validBlock to the dosBlocks map.
+		dosBlocks: map[types.BlockID]struct{}{
+			validBlock.ID(): struct{}{},
+		},
+		tx:      emptyTx,
+		errWant: errDoSBlock,
+		msg:     "validateHeader should reject known bad blocks",
+	},
+	{
+		block:     validBlock,
+		dosBlocks: emptyDosBlocks,
+		tx:        emptyTx,
+		errWant:   errOrphan,
+		msg:       "validateHeader should reject a block if its parent block does not appear in the block database",
+	},
+}
+
+func TestUnitValidateHeader(t *testing.T) {
+	// TODO(mtlynch): Fix block and tx so that it does not assume an ordering of
+	// validation checks in validateHeader (i.e. everything should be valid except
+	// the known bad block).
+	for _, tt := range validateHeaderTests {
+		cs := ConsensusSet{dosBlocks: tt.dosBlocks}
+		err := cs.validateHeader(tt.tx, tt.block)
+		if err != tt.errWant {
+			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
+		}
 	}
 }
 
