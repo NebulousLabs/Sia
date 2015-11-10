@@ -203,10 +203,24 @@ func (r *Renter) threadedRepairUploads() {
 			// retrieve file object and get current height
 			id = r.mu.RLock()
 			f, ok := r.files[name]
-			//height := r.blockHeight
+			height := r.blockHeight
 			r.mu.RUnlock(id)
 			if !ok {
 				r.log.Printf("failed to repair %v: no longer tracking that file", name)
+				id = r.mu.Lock()
+				delete(r.tracking, name)
+				r.mu.Unlock(id)
+				continue
+			}
+
+			// calculate duration
+			var duration types.BlockHeight
+			if meta.EndHeight == 0 {
+				duration = defaultDuration
+			} else if meta.EndHeight > height {
+				duration = meta.EndHeight - height
+			} else {
+				r.log.Printf("removing %v from repair set: storage period has ended", name)
 				id = r.mu.Lock()
 				delete(r.tracking, name)
 				r.mu.Unlock(id)
@@ -251,8 +265,7 @@ func (r *Renter) threadedRepairUploads() {
 						continue
 					}
 
-					// TODO: use smarter duration
-					hostUploader, err := r.newHostUploader(h, bytesPerHost, defaultDuration, f.masterKey)
+					hostUploader, err := r.newHostUploader(h, bytesPerHost, duration, f.masterKey)
 					if err != nil {
 						// penalize unresponsive hosts
 						if strings.Contains(err.Error(), "timeout") {
