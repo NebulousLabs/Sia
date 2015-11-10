@@ -565,6 +565,11 @@ frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
 
+
+*Routes below this line have not been made RESTful*
+
+---
+
 Daemon
 ------
 
