@@ -64,7 +64,7 @@ func (h *Host) load() error {
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
 		// update spaceRemaining
-		h.spaceRemaining -= int64(obligation.FileContract.FileSize)
+		h.spaceRemaining -= int64(obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize)
 	}
 	h.secretKey = sHost.SecretKey
 	h.publicKey = sHost.PublicKey
