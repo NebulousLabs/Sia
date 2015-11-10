@@ -15,7 +15,7 @@ import (
 // hosting files.
 func TestIntegrationHosting(t *testing.T) {
 	if testing.Short() {
-		//t.SkipNow()
+		t.SkipNow()
 	}
 
 	st, err := createServerTester("TestIntegrationHosting")
