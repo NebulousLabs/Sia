@@ -8,7 +8,84 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly ignored.
+// mockDbBucket is an implementation of dbBucket for unit testing.
+type mockDbBucket struct{}
+
+// Get returns the value associated with a given key.
+func (bucket mockDbBucket) Get(key []byte) []byte {
+	return nil
+}
+
+// mockDbTx is an implementation of dbTx for unit testing. It uses an in-memory
+// key/value store to mock a database.
+type mockDbTx struct {
+	buckets map[string]dbBucket
+}
+
+// Bucket returns a mock dbBucket object associated with the given bucket name.
+func (db mockDbTx) Bucket(name []byte) dbBucket {
+	return db.buckets[string(name)]
+}
+
+var (
+	// validBlock is a mock valid Block.
+	validBlock = types.Block{Timestamp: 100}
+	// emptyDosBlocks is a dosBlocks map where no block is marked bad.
+	emptyDosBlocks = map[types.BlockID]struct{}{}
+	// emptyTx is a transaction associated with an empty block map.
+	emptyTx = mockDbTx{map[string]dbBucket{
+		string(BlockMap): mockDbBucket{},
+	}}
+)
+
+var validateHeaderTests = []struct {
+	block     types.Block
+	dosBlocks map[types.BlockID]struct{}
+	tx        mockDbTx
+	errWant   error
+	msg       string
+}{
+	{
+		block:     validBlock,
+		dosBlocks: nil,
+		errWant:   errNoBlockMap,
+		msg:       "validateHeader should fail when no block map is found in the database",
+	},
+	{
+		block: validBlock,
+		// Add validBlock to the dosBlocks map.
+		dosBlocks: map[types.BlockID]struct{}{
+			validBlock.ID(): struct{}{},
+		},
+		tx:      emptyTx,
+		errWant: errDoSBlock,
+		msg:     "validateHeader should reject known bad blocks",
+	},
+	{
+		block:     validBlock,
+		dosBlocks: emptyDosBlocks,
+		tx:        emptyTx,
+		errWant:   errOrphan,
+		msg:       "validateHeader should reject a block if its parent block does not appear in the block database",
+	},
+}
+
+// TestUnitValidateHeader runs a series of unit tests for validateHeader.
+func TestUnitValidateHeader(t *testing.T) {
+	// TODO(mtlynch): Populate all parameters to validateHeader so that everything
+	// is valid except for the attribute that causes validation to fail. (i.e.
+	// don't assume an ordering to the implementation of the validation function).
+	for _, tt := range validateHeaderTests {
+		cs := ConsensusSet{dosBlocks: tt.dosBlocks}
+		err := cs.validateHeader(tt.tx, tt.block)
+		if err != tt.errWant {
+			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
+		}
+	}
+}
+
+// TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly
+// ignored.
 func TestIntegrationDoSBlockHandling(t *testing.T) {
 	// TestIntegrationDoSBlockHandling catches a wide array of simple errors,
 	// and therefore is included in the short tests despite being somewhat
@@ -165,96 +242,6 @@ func TestMissedTarget(t *testing.T) {
 	err = cst.cs.AcceptBlock(block)
 	if err != modules.ErrBlockUnsolved {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
-	}
-}
-
-// testLargeBlock checks that large blocks are rejected.
-func TestLargeBlock(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestLargeBlock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// Create a transaction that puts the block over the size limit.
-	bigData := make([]byte, types.BlockSizeLimit)
-	txn := types.Transaction{
-		ArbitraryData: [][]byte{bigData},
-	}
-
-	// Fetch a block and add the transaction, then submit the block.
-	block, target, err := cst.miner.BlockForWork()
-	if err != nil {
-		t.Fatal(err)
-	}
-	block.Transactions = append(block.Transactions, txn)
-	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.AcceptBlock(solvedBlock)
-	if err != errLargeBlock {
-		t.Fatalf("expected %v, got %v", errLargeBlock, err)
-	}
-}
-
-// TestEarlyBlockTimestampHandling checks that blocks with early timestamps are
-// handled appropriately.
-func TestEarlyBlockTimestampHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestBlockTimestampHandling")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// Create a block with a too early timestamp - block should be rejected
-	// outright.
-	block, target, err := cst.miner.BlockForWork()
-	if err != nil {
-		t.Fatal(err)
-	}
-	block.Timestamp = 0
-	earlyBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.AcceptBlock(earlyBlock)
-	if err != errEarlyTimestamp {
-		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
-	}
-}
-
-// TestExtremeFutureTimestampHandling checks that blocks with extreme future
-// timestamps handled correclty.
-func TestExtremeFutureTimestampHandling(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestExtremeFutureTimestampHandling")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// Submit a block with a timestamp in the extreme future.
-	block, target, err := cst.miner.BlockForWork()
-	if err != nil {
-		t.Fatal(err)
-	}
-	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
-	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.AcceptBlock(solvedBlock)
-	if err != errExtremeFutureTimestamp {
-		t.Fatalf("expected %v, got %v", errExtremeFutureTimestamp, err)
-	}
-
-	// Check that after waiting until the block is no longer in the future, the
-	// block still has not been added to the consensus set (prove that the
-	// block was correctly discarded).
-	time.Sleep(time.Second * time.Duration(3+types.ExtremeFutureThreshold))
-	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
-	if err != errNilItem {
-		t.Error("extreme future block made it into the consensus set after waiting")
 	}
 }
 
