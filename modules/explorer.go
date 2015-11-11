@@ -51,14 +51,14 @@ type (
 
 		// Block returns the block that matches the input block id. The bool
 		// indicates whether the block appears in the blockchain.
-		Block(types.BlockID) (types.Block, bool)
+		Block(types.BlockID) (types.Block, types.BlockHeight, bool)
 
 		// Transaction returns the block that contains the input transaction
 		// id. The transaction itself is either the block (indicating the miner
 		// payouts are somehow involved), or it is a transaction inside of the
 		// block. The bool indicates whether the transaction is found in the
 		// consensus set.
-		Transaction(types.TransactionID) (types.Block, bool)
+		Transaction(types.TransactionID) (types.Block, types.BlockHeight, bool)
 
 		// UnlockHash returns all of the transaction ids associated with the
 		// provided unlock hash.

@@ -135,10 +135,10 @@ Response:
 ```
 struct {
 	 hashtype     string
-	 block        types.Block
-	 blocks       []types.Block
-	 transaction  types.Transaction
-	 transactions []types.transaction
+	 block        api.ExplorerBlock
+	 blocks       []api.ExplorerBlock
+	 transaction  api.ExplorerTransaction
+	 transactions []api.ExplorerTransaction
 }
 ```
 `hashtype` indicates what type of hash it is. The options are 'blockid',

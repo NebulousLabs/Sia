@@ -8,6 +8,24 @@ import (
 )
 
 type (
+	// ExplorerBlock is a block with some extra information such as the id and
+	// height. This information is provided for programs that may not be
+	// complex enough to compute the ID on their own.
+	ExplorerBlock struct {
+		ID       types.BlockID     `json:"id"`
+		Height   types.BlockHeight `json:"height"`
+		RawBlock types.Block       `json:"rawblock"`
+	}
+
+	// ExplorerTransaction is a transcation with some extra information such as
+	// the parent block. This information is provided for programs that may not
+	// be complex enough to compute the extra information on their own.
+	ExplorerTransaction struct {
+		ID             types.TransactionID `json:"id"`
+		Parent         ExplorerBlock       `json:"parent"`
+		RawTransaction types.Transaction   `json:"rawtransaction"`
+	}
+
 	// ExplorerGET is the object returned as a response to a GET request to
 	// /explorer.
 	ExplorerGET struct {
@@ -49,11 +67,11 @@ type (
 	// the fields will be blank. For everything else, 'Transactions' and
 	// 'Blocks' will/may be filled out and everything else will be blank.
 	ExplorerHashGET struct {
-		HashType     string              `json:"hashtype"`
-		Block        types.Block         `json:"block"`
-		Blocks       []types.Block       `json:"blocks"`
-		Transaction  types.Transaction   `json:"transaction"`
-		Transactions []types.Transaction `json:"transactions"`
+		HashType     string                `json:"hashtype"`
+		Block        ExplorerBlock         `json:"block"`
+		Blocks       []ExplorerBlock       `json:"blocks"`
+		Transaction  ExplorerTransaction   `json:"transaction"`
+		Transactions []ExplorerTransaction `json:"transactions"`
 	}
 )
 
@@ -108,17 +126,22 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	// Try the hash as each type of potential object.
-	block, exists := srv.explorer.Block(types.BlockID(hash))
+	// Try the hash as a block id.
+	block, height, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
 		writeJSON(w, ExplorerHashGET{
 			HashType: "blockid",
-			Block:    block,
+			Block: ExplorerBlock{
+				ID:       block.ID(),
+				Height:   height,
+				RawBlock: block,
+			},
 		})
 		return
 	}
 
-	block, exists = srv.explorer.Transaction(types.TransactionID(hash))
+	// Try the hash as a transaction id.
+	block, height, exists = srv.explorer.Transaction(types.TransactionID(hash))
 	if exists {
 		var txn types.Transaction
 		for _, t := range block.Transactions {
@@ -127,27 +150,48 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
-			HashType:    "transactionid",
-			Transaction: txn,
+			HashType: "transactionid",
+			Transaction: ExplorerTransaction{
+				ID: txn.ID(),
+				Parent: ExplorerBlock{
+					ID:       block.ID(),
+					Height:   height,
+					RawBlock: block,
+				},
+				RawTransaction: txn,
+			},
 		})
 		return
 	}
 
+	// Try the hash as an unlock hash.
 	txids := srv.explorer.UnlockHash(types.UnlockHash(hash))
 	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
+		var txns []ExplorerTransaction
+		var blocks []ExplorerBlock
 		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
+			block, height, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, block)
+				blocks = append(blocks, ExplorerBlock{
+					ID:       block.ID(),
+					Height:   height,
+					RawBlock: block,
+				})
 			}
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txns = append(txns, t)
+					txns = append(txns, ExplorerTransaction{
+						ID: txid,
+						Parent: ExplorerBlock{
+							ID:       block.ID(),
+							Height:   height,
+							RawBlock: block,
+						},
+						RawTransaction: t,
+					})
 				}
 			}
 		}
@@ -159,21 +203,34 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	// Try the hash as a siacoin output id.
 	txids = srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
 	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
+		var txns []ExplorerTransaction
+		var blocks []ExplorerBlock
 		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
+			block, height, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, block)
+				blocks = append(blocks, ExplorerBlock{
+					ID:       block.ID(),
+					Height:   height,
+					RawBlock: block,
+				})
 			}
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txns = append(txns, t)
+					txns = append(txns, ExplorerTransaction{
+						ID: txid,
+						Parent: ExplorerBlock{
+							ID:       block.ID(),
+							Height:   height,
+							RawBlock: block,
+						},
+						RawTransaction: t,
+					})
 				}
 			}
 		}
@@ -185,21 +242,34 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	// Try the hash as a file contract id.
 	txids = srv.explorer.FileContractID(types.FileContractID(hash))
 	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
+		var txns []ExplorerTransaction
+		var blocks []ExplorerBlock
 		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
+			block, height, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, block)
+				blocks = append(blocks, ExplorerBlock{
+					ID:       block.ID(),
+					Height:   height,
+					RawBlock: block,
+				})
 			}
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txns = append(txns, t)
+					txns = append(txns, ExplorerTransaction{
+						ID: txid,
+						Parent: ExplorerBlock{
+							ID:       block.ID(),
+							Height:   height,
+							RawBlock: block,
+						},
+						RawTransaction: t,
+					})
 				}
 			}
 		}
@@ -211,21 +281,34 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	// Try the hash as a siafund output id.
 	txids = srv.explorer.SiafundOutputID(types.SiafundOutputID(hash))
 	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
+		var txns []ExplorerTransaction
+		var blocks []ExplorerBlock
 		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
+			block, height, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, block)
+				blocks = append(blocks, ExplorerBlock{
+					ID:       block.ID(),
+					Height:   height,
+					RawBlock: block,
+				})
 			}
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txns = append(txns, t)
+					txns = append(txns, ExplorerTransaction{
+						ID: txid,
+						Parent: ExplorerBlock{
+							ID:       block.ID(),
+							Height:   height,
+							RawBlock: block,
+						},
+						RawTransaction: t,
+					})
 				}
 			}
 		}
@@ -237,6 +320,7 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	// Hash not found, return an error.
 	writeError(w, "unrecognized hash used as input to /explorer/hash", http.StatusBadRequest)
 }
 

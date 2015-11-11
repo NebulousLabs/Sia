@@ -62,23 +62,31 @@ func (e *Explorer) Statistics() modules.ExplorerStatistics {
 
 // Block takes a block id and finds the corresponding block, provided that the
 // block is in the consensus set.
-func (e *Explorer) Block(id types.BlockID) (types.Block, bool) {
+func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool) {
 	height, exists := e.blockHashes[id]
 	if !exists {
-		return types.Block{}, false
+		return types.Block{}, 0, false
 	}
-	return e.cs.BlockAtHeight(height)
+	block, exists := e.cs.BlockAtHeight(height)
+	if !exists {
+		return types.Block{}, 0, false
+	}
+	return block, height, true
 }
 
 // Transaction takes a transaction id and finds the block containing the
 // transaction. Because of the miner payouts, the transaction id might be a
 // block id. To find the transaction, iterate through the block.
-func (e *Explorer) Transaction(id types.TransactionID) (types.Block, bool) {
+func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.BlockHeight, bool) {
 	height, exists := e.transactionHashes[id]
 	if !exists {
-		return types.Block{}, false
+		return types.Block{}, 0, false
 	}
-	return e.cs.BlockAtHeight(height)
+	block, exists := e.cs.BlockAtHeight(height)
+	if !exists {
+		return types.Block{}, 0, false
+	}
+	return block, height, true
 }
 
 // UnlockHash returns the ids of all the transactions that contain the unlock
