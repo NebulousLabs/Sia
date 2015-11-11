@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -98,20 +99,25 @@ func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
 
 // explorerHashHandlerGET handles GET requests to /explorer/hash.
 func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Request) {
-	// Grab the hash in question.
-	//
-	// TODO: Might need to worry about checksums.
-	hash := ???
+	// The hash is scanned as an address, because an address can be typecast to
+	// all other necessary types, and will correclty decode hashes whether or
+	// not they have a checksum.
+	hash, err := scanAddress(req.FormValue("hash"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Try the hash as each type of potential object.
-	block, exists = srv.explorer.Block(types.BlockID(hash))
+	block, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
 		writeJSON(w, ExplorerHashGET{
 			HashType: "blockid",
-			Block: block,
+			Block:    block,
 		})
 		return
 	}
+
 	block, exists = srv.explorer.Transaction(types.TransactionID(hash))
 	if exists {
 		var txn types.Transaction
@@ -121,11 +127,12 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
-			HashType: "transactionid",
+			HashType:    "transactionid",
 			Transaction: txn,
 		})
 		return
 	}
+
 	txids := srv.explorer.UnlockHash(types.UnlockHash(hash))
 	if len(txids) != 0 {
 		var txns []types.Transaction
@@ -135,7 +142,7 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
-			if block.ID() == txid {
+			if types.TransactionID(block.ID()) == txid {
 				blocks = append(blocks, block)
 			}
 			for _, t := range block.Transactions {
@@ -145,91 +152,90 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
-			HashType: "unlockhash",
-			Blocks: blocks,
-			Transactions: txns,
-		})
-		return
-	}
-	txids := srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
-	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
-		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
-			if !exists && build.DEBUG {
-				panic("explorer pointing to nonexistant txn")
-			}
-			if block.ID() == txid {
-				blocks = append(blocks, block)
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, t)
-				}
-			}
-		}
-		writeJSON(w, ExplorerHashGET{
-			HashType: "siacoinoutputid",
-			Blocks: blocks,
-			Transactions: txns,
-		})
-		return
-	}
-	txids := srv.explorer.FileContractID(types.FileContractID(hash))
-	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
-		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
-			if !exists && build.DEBUG {
-				panic("explorer pointing to nonexistant txn")
-			}
-			if block.ID() == txid {
-				blocks = append(blocks, block)
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, t)
-				}
-			}
-		}
-		writeJSON(w, ExplorerHashGET{
-			HashType: "filecontractid",
-			Blocks: blocks,
-			Transactions: txns,
-		})
-		return
-	}
-	txids := srv.explorer.SiafundOutputID(types.SiafundOutputID(hash))
-	if len(txids) != 0 {
-		var txns []types.Transaction
-		var blocks []types.Block
-		for _, txid := range txids {
-			block, exists := srv.explorer.Transaction(txid)
-			if !exists && build.DEBUG {
-				panic("explorer pointing to nonexistant txn")
-			}
-			if block.ID() == txid {
-				blocks = append(blocks, block)
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, t)
-				}
-			}
-		}
-		writeJSON(w, ExplorerHashGET{
-			HashType: "siafundoutputid",
-			Blocks: blocks,
+			HashType:     "unlockhash",
+			Blocks:       blocks,
 			Transactions: txns,
 		})
 		return
 	}
 
-	// siacoin output ids
-	// file contract ids
-	// siafund output ids
+	txids = srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
+	if len(txids) != 0 {
+		var txns []types.Transaction
+		var blocks []types.Block
+		for _, txid := range txids {
+			block, exists := srv.explorer.Transaction(txid)
+			if !exists && build.DEBUG {
+				panic("explorer pointing to nonexistant txn")
+			}
+			if types.TransactionID(block.ID()) == txid {
+				blocks = append(blocks, block)
+			}
+			for _, t := range block.Transactions {
+				if t.ID() == txid {
+					txns = append(txns, t)
+				}
+			}
+		}
+		writeJSON(w, ExplorerHashGET{
+			HashType:     "siacoinoutputid",
+			Blocks:       blocks,
+			Transactions: txns,
+		})
+		return
+	}
+
+	txids = srv.explorer.FileContractID(types.FileContractID(hash))
+	if len(txids) != 0 {
+		var txns []types.Transaction
+		var blocks []types.Block
+		for _, txid := range txids {
+			block, exists := srv.explorer.Transaction(txid)
+			if !exists && build.DEBUG {
+				panic("explorer pointing to nonexistant txn")
+			}
+			if types.TransactionID(block.ID()) == txid {
+				blocks = append(blocks, block)
+			}
+			for _, t := range block.Transactions {
+				if t.ID() == txid {
+					txns = append(txns, t)
+				}
+			}
+		}
+		writeJSON(w, ExplorerHashGET{
+			HashType:     "filecontractid",
+			Blocks:       blocks,
+			Transactions: txns,
+		})
+		return
+	}
+
+	txids = srv.explorer.SiafundOutputID(types.SiafundOutputID(hash))
+	if len(txids) != 0 {
+		var txns []types.Transaction
+		var blocks []types.Block
+		for _, txid := range txids {
+			block, exists := srv.explorer.Transaction(txid)
+			if !exists && build.DEBUG {
+				panic("explorer pointing to nonexistant txn")
+			}
+			if types.TransactionID(block.ID()) == txid {
+				blocks = append(blocks, block)
+			}
+			for _, t := range block.Transactions {
+				if t.ID() == txid {
+					txns = append(txns, t)
+				}
+			}
+		}
+		writeJSON(w, ExplorerHashGET{
+			HashType:     "siafundoutputid",
+			Blocks:       blocks,
+			Transactions: txns,
+		})
+		return
+	}
 }
 
 // explorerHashHandler handles API calls to /explorer/hash.

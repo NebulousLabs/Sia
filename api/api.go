@@ -140,7 +140,7 @@ func (srv *Server) initAPI() {
 	// Explorer API Calls
 	if srv.explorer != nil {
 		handleHTTPRequest(mux, "/explorer", srv.explorerHandler)
-		handleHTTPRequest(mux, "/explore/hash", srv.explorerHashHandler)
+		handleHTTPRequest(mux, "/explorer/hash", srv.explorerHashHandler)
 	}
 
 	// Create graceful HTTP server
