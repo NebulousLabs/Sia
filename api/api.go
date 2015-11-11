@@ -137,9 +137,10 @@ func (srv *Server) initAPI() {
 		handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // POST
 	}
 
-	// BlockExplorer API Calls
+	// Explorer API Calls
 	if srv.explorer != nil {
 		handleHTTPRequest(mux, "/explorer", srv.explorerHandler)
+		handleHTTPRequest(mux, "/explore/hash", srv.explorerHashHandler)
 	}
 
 	// Create graceful HTTP server
