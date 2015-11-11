@@ -176,7 +176,11 @@ func WriteFile(filename string, v interface{}) error {
 		return err
 	}
 	defer file.Close()
-	return NewEncoder(file).Encode(v)
+	err = NewEncoder(file).Encode(v)
+	if err != nil {
+		return errors.New("error while writing " + filename + ": " + err.Error())
+	}
+	return nil
 }
 
 // A Decoder reads and decodes values from an input stream.
@@ -350,7 +354,11 @@ func ReadFile(filename string, v interface{}) error {
 		return err
 	}
 	defer file.Close()
-	return NewDecoder(file).Decode(v)
+	err = NewDecoder(file).Decode(v)
+	if err != nil {
+		return errors.New("error while reading " + filename + ": " + err.Error())
+	}
+	return nil
 }
 
 // Marshal returns the encoding of v. For encoding details, see the package
