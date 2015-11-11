@@ -2,6 +2,7 @@ package persist
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 )
@@ -57,7 +58,11 @@ func SaveFile(meta Metadata, data interface{}, filename string) error {
 		return err
 	}
 	defer file.Close()
-	return Save(meta, data, file)
+	err = Save(meta, data, file)
+	if err != nil {
+		return errors.New("error saving " + filename + ": " + err.Error())
+	}
+	return nil
 }
 
 // LoadFile loads json data from a file.
@@ -67,5 +72,9 @@ func LoadFile(meta Metadata, data interface{}, filename string) error {
 		return err
 	}
 	defer file.Close()
-	return Load(meta, data, file)
+	err = Load(meta, data, file)
+	if err != nil {
+		return errors.New("error loading " + filename + ": " + err.Error())
+	}
+	return nil
 }
