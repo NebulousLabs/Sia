@@ -42,16 +42,16 @@ Parameters: none
 Response:
 ```
 struct {
-	Height       types.BlockHeight (uint64)
-	CurrentBlock types.BlockID     (string)
-	Target       types.Target      (byte array)
+	height       types.BlockHeight (uint64)
+	currentblock types.BlockID     (string)
+	target       types.Target      (byte array)
 }
 ```
-'Height' is the number of blocks in the blockchain.
+'height' is the number of blocks in the blockchain.
 
-'CurrentBlock' is the hash of the current block.
+'currentblock' is the hash of the current block.
 
-'Target' is the hash that needs to be met by a block for the block to be valid.
+'target' is the hash that needs to be met by a block for the block to be valid.
 The target is inversely proportional to the difficulty.
 
 #### /consensus/block [GET]
@@ -72,6 +72,82 @@ struct {
 }
 ```
 'block' is a block. The struct is defined in types/block.go.
+
+Explorer
+--------
+
+Queries:
+
+* /explorer
+* /explorer/hash
+
+### /explorer
+
+Function: Returns the status of the blockchain and some
+statistics. All Siacoin amounts are given in Hastings
+
+Parameters: None
+
+Response:
+```
+struct {
+	height            types.BlockHeight (uint64)
+	block             types.Block
+	target            types.Target    (byte array)
+	difficulty        types.Currency  (string)
+	maturitytimestamp types.Timestamp (uint64)
+	circulation       types.Currency  (string)
+
+	transactioncount          uint64
+	siacoininputcount         uint64
+	siacoinoutputcount        uint64
+	filecontractcount         uint64
+	filecontractrevisioncount uint64
+	storageproofcount         uint64
+	siafundinputcount         uint64
+	siafundoutputcount        uint64
+	minrefeecount             uint64
+	arbitrarydatacount        uint64
+	transactionsignaturecount uint64
+
+	activecontractcount uint64
+	activecontractcost  types.Currency (string)
+	activecontractsize  types.Currency (string)
+	totalcontractcost   types.Currency (string)
+	totalcontractsize   types.Currency (string)
+}
+```
+
+### /explorer/hash
+
+Function: Return information about an unknown hash.
+
+Parameters:
+```
+hash string
+```
+`hash` is a hash that is relevant to the Sia network. It can be a block id,
+transacton id, address, unlock hash, siacoin output id, file contract id, or
+siafund output id. The daemon will determine which type of hash was presented
+(if the hash is known at all).
+
+Response:
+```
+struct {
+	 hashtype     string
+	 block        types.Block
+	 blocks       []types.Block
+	 transaction  types.Transaction
+	 transactions []types.transaction
+}
+```
+`hashtype` indicates what type of hash it is. The options are 'blockid',
+'transactionid', 'unlockhash', 'siacoinoutputid', 'filecontractid',
+'siafundoutputid'. If the object is a block, only the 'block' field will be
+filled out. If the object is a transaction, only the and 'transaction' field
+will be filled out. For all other types, the 'blocks' and 'transactions' fields
+will be filled out, returning all of the blocks and transactions that feature
+the provided hash.
 
 Wallet
 ------
@@ -1138,79 +1214,3 @@ struct {
 ```
 Please see consensus/types/transactions.go for a more detailed explanation on
 what a transaction looks like. There are many fields.
-
-Block Explorer
---------------
-
-Queries:
-
-* /blockexplorer/status
-* /blockexplorer/blockdata
-
-### /blockexplorer/status
-
-Function: Returns the status of the blockchain and some
-statistics. All Siacoin amounts are given in Hastings
-
-Parameters: None
-
-Response:
-```
-struct {
-	Height int
-	Block  Types.Block
-	Target []byte
-	CurrencySent  int
-	TotalCurrency int
-	ActiveContractCount int
-	ActiveContractcosts int
-	TotalContractCount int
-	TotalContractcosts int
-}
-```
-`Height` is the current height of the blockchain.
-
-`Block` is the most recently mined valid block. See types/block.go for
-a detailed specification of a block structure.
-
-`Target` is the target at which the current block has been mined at.
-
-`TotalCurrency` is the total amount of siacoins in ciculation
-
-`ActiveContractCount` is the number of file contracts that are currently in place.
-
-`ActiveContractCosts` is the amount of siacoins that are currently tied
-up in file contracts.
-
-`TotalContractCount` is the number of file contracts that have ever
-took place
-
-`TotalContractCosts` is the amount of siacoins that have ever been
-spent on file contracts
-
-### /blockexplorer/blockdata
-
-Function: Return information about specific blocks
-
-Parameters:
-```
-start  int
-finish int
-```
-`start` is the starting block height.
-
-`finish` is the finishing block height.
-
-Response:
-```
-[]struct {
-	 Timestamp int
-	 Target    int
-	 Size	   int
-}
-
-`Timestamp` is the timestamp registered on the block.
-
-`Target` is the target at which the block was mined at.
-
-`Size` is the size, in bytes of the marshalled block.

@@ -16,7 +16,7 @@ type (
 	ExplorerStatistics struct {
 		// General consensus information.
 		Height            types.BlockHeight
-		Block             types.BlockID
+		CurrentBlock      types.BlockID
 		Target            types.Target
 		Difficulty        types.Currency
 		MaturityTimestamp types.Timestamp

@@ -34,7 +34,7 @@ func (e *Explorer) Statistics() modules.ExplorerStatistics {
 	}
 	return modules.ExplorerStatistics{
 		Height:            e.blockchainHeight,
-		Block:             e.currentBlock,
+		CurrentBlock:      e.currentBlock,
 		Target:            target,
 		Difficulty:        difficulty,
 		MaturityTimestamp: currentBlock.Timestamp,

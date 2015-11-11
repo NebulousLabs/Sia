@@ -13,7 +13,7 @@ type (
 	ExplorerGET struct {
 		// General consensus information.
 		Height            types.BlockHeight `json:"height"`
-		Block             types.BlockID     `json:"block"`
+		CurrentBlock      types.BlockID     `json:"currentblock"`
 		Target            types.Target      `json:"target"`
 		Difficulty        types.Currency    `json:"difficulty"`
 		MaturityTimestamp types.Timestamp   `json:"maturitytimestamp"`
@@ -62,7 +62,7 @@ func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) 
 	stats := srv.explorer.Statistics()
 	writeJSON(w, ExplorerGET{
 		Height:            stats.Height,
-		Block:             stats.Block,
+		CurrentBlock:      stats.CurrentBlock,
 		Target:            stats.Target,
 		Difficulty:        stats.Difficulty,
 		MaturityTimestamp: stats.MaturityTimestamp,
@@ -236,6 +236,8 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 		})
 		return
 	}
+
+	writeError(w, "unrecognized hash used as input to /explorer/hash", http.StatusBadRequest)
 }
 
 // explorerHashHandler handles API calls to /explorer/hash.
