@@ -280,15 +280,16 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
 		return errors.New("couldn't read contract ID: " + err.Error())
 	}
+
+	// remove conn deadline while we wait for lock and rebuild the Merkle tree
+	conn.SetDeadline(time.Time{})
+
 	h.mu.RLock()
 	obligation, exists := h.obligationsByID[fcid]
 	h.mu.RUnlock()
 	if !exists {
 		return errors.New("no record of that contract")
 	}
-
-	// remove conn deadline while we wait for lock and rebuild the Merkle tree
-	conn.SetDeadline(time.Time{})
 
 	// need to protect against two simultaneous revisions to the same
 	// contract; this can cause inconsistency and data loss, making storage
@@ -347,7 +348,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			// read piece
 			// TODO: simultaneously read into tree and file
 			rev := revTxn.FileContractRevisions[0]
-			piece := make([]byte, rev.NewFileSize-obligation.FileContract.FileSize)
+			last := obligation.LastRevisionTxn.FileContractRevisions[0]
+			piece := make([]byte, rev.NewFileSize-last.NewFileSize)
 			_, err = io.ReadFull(conn, piece)
 			if err != nil {
 				return errors.New("couldn't read piece data: " + err.Error())
@@ -385,8 +387,8 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 			}
 
 			// save updated obligation to disk
-			obligation.LastRevisionTxn = revTxn
 			h.mu.Lock()
+			obligation.LastRevisionTxn = revTxn
 			h.spaceRemaining -= int64(len(piece))
 			h.save()
 			h.mu.Unlock()

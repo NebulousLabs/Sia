@@ -44,6 +44,8 @@ type hostUploader struct {
 }
 
 func (hu *hostUploader) fileContract() fileContract {
+	hu.revisionLock.Lock()
+	defer hu.revisionLock.Unlock()
 	return hu.contract
 }
 
@@ -223,6 +225,19 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		IP:          hu.settings.IPAddress,
 		WindowStart: fc.WindowStart,
 	}
+	// create initial revision
+	hu.lastTxn.FileContractRevisions = []types.FileContractRevision{{
+		ParentID:              fcid,
+		UnlockConditions:      hu.unlockConditions,
+		NewRevisionNumber:     fc.RevisionNumber,
+		NewFileSize:           fc.FileSize,
+		NewFileMerkleRoot:     fc.FileMerkleRoot,
+		NewWindowStart:        fc.WindowStart,
+		NewWindowEnd:          fc.WindowEnd,
+		NewValidProofOutputs:  []types.SiacoinOutput{fc.ValidProofOutputs[0], fc.ValidProofOutputs[1]},
+		NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1]},
+		NewUnlockHash:         fc.UnlockHash,
+	}}
 
 	lockID = hu.renter.mu.Lock()
 	hu.renter.contracts[fcid] = fc
@@ -255,7 +270,7 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	}
 
 	// revise the file contract
-	err = hu.revise(fc, encPiece, height)
+	err = hu.revise(hu.lastTxn.FileContractRevisions[0], encPiece, height)
 	if err != nil {
 		return err
 	}
@@ -278,10 +293,10 @@ func (hu *hostUploader) addPiece(p uploadPiece) error {
 	return nil
 }
 
-// revise revises fc to cover piece and uploads both the revision and the
-// piece data to the host.
-func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types.BlockHeight) error {
-	hu.conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
+// revise revises the previous revision to cover piece and uploads both the
+// revision and the piece data to the host.
+func (hu *hostUploader) revise(rev types.FileContractRevision, piece []byte, height types.BlockHeight) error {
+	hu.conn.SetDeadline(time.Now().Add(5 * time.Second)) // sufficient to transfer 4 MB over 100 kbps
 	defer hu.conn.SetDeadline(time.Time{})               // reset timeout after each revision
 
 	// calculate new merkle root
@@ -290,28 +305,19 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 		return err
 	}
 
-	// create revision
-	rev := types.FileContractRevision{
-		ParentID:          hu.contract.ID,
-		UnlockConditions:  hu.unlockConditions,
-		NewRevisionNumber: fc.RevisionNumber + 1,
-
-		NewFileSize:           fc.FileSize + uint64(len(piece)),
-		NewFileMerkleRoot:     hu.tree.Root(),
-		NewWindowStart:        fc.WindowStart,
-		NewWindowEnd:          fc.WindowEnd,
-		NewValidProofOutputs:  fc.ValidProofOutputs,
-		NewMissedProofOutputs: fc.MissedProofOutputs,
-		NewUnlockHash:         fc.UnlockHash,
-	}
-	// transfer value of piece from renter to host
-	safeDuration := uint64(fc.WindowStart - height + 20) // buffer in case host is behind
+	// calculate piece price
+	safeDuration := uint64(rev.NewWindowStart - height + 20) // buffer in case host is behind
 	piecePrice := types.NewCurrency64(uint64(len(piece))).Mul(types.NewCurrency64(safeDuration)).Mul(hu.settings.Price)
 	// prevent a negative currency panic
-	if piecePrice.Cmp(fc.ValidProofOutputs[0].Value) > 0 {
+	if piecePrice.Cmp(rev.NewValidProofOutputs[0].Value) > 0 {
 		// probably not enough money, but the host might accept it anyway
-		piecePrice = fc.ValidProofOutputs[0].Value
+		piecePrice = rev.NewValidProofOutputs[0].Value
 	}
+
+	// modify revision
+	rev.NewRevisionNumber = rev.NewRevisionNumber + 1
+	rev.NewFileSize = rev.NewFileSize + uint64(len(piece))
+	rev.NewFileMerkleRoot = hu.tree.Root()
 	rev.NewValidProofOutputs[0].Value = rev.NewValidProofOutputs[0].Value.Sub(piecePrice)   // less returned to renter
 	rev.NewValidProofOutputs[1].Value = rev.NewValidProofOutputs[1].Value.Add(piecePrice)   // more given to host
 	rev.NewMissedProofOutputs[0].Value = rev.NewMissedProofOutputs[0].Value.Sub(piecePrice) // less returned to renter
@@ -336,13 +342,13 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 
 	// send the transaction
 	if err := encoding.WriteObject(hu.conn, signedTxn); err != nil {
-		return err
+		return errors.New("could not send revision transaction: " + err.Error())
 	}
 
 	// host sends acceptance
 	var response string
 	if err := encoding.ReadObject(hu.conn, &response, 128); err != nil {
-		return err
+		return errors.New("could not read host acceptance: " + err.Error())
 	}
 	if response != modules.AcceptResponse {
 		return errors.New("host rejected revision: " + response)
@@ -350,13 +356,13 @@ func (hu *hostUploader) revise(fc types.FileContract, piece []byte, height types
 
 	// transfer piece
 	if _, err := hu.conn.Write(piece); err != nil {
-		return err
+		return errors.New("could not transfer piece: " + err.Error())
 	}
 
 	// read txn signed by host
 	var signedHostTxn types.Transaction
 	if err := encoding.ReadObject(hu.conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
-		return err
+		return errors.New("could not read signed revision transaction: " + err.Error())
 	}
 
 	if signedHostTxn.ID() != signedTxn.ID() {

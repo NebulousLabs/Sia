@@ -192,23 +192,37 @@ func (r *Renter) threadedRepairUploads() {
 		}
 
 		// make copy of repair set under lock
-		repairing := make(map[string]string)
+		repairing := make(map[string]trackedFile)
 		id := r.mu.RLock()
-		for name, path := range r.repairSet {
-			repairing[name] = path
+		for name, meta := range r.tracking {
+			repairing[name] = meta
 		}
 		r.mu.RUnlock(id)
 
-		for name, path := range repairing {
+		for name, meta := range repairing {
 			// retrieve file object and get current height
 			id = r.mu.RLock()
 			f, ok := r.files[name]
-			//height := r.blockHeight
+			height := r.blockHeight
 			r.mu.RUnlock(id)
 			if !ok {
 				r.log.Printf("failed to repair %v: no longer tracking that file", name)
 				id = r.mu.Lock()
-				delete(r.repairSet, name)
+				delete(r.tracking, name)
+				r.mu.Unlock(id)
+				continue
+			}
+
+			// calculate duration
+			var duration types.BlockHeight
+			if meta.EndHeight == 0 {
+				duration = defaultDuration
+			} else if meta.EndHeight > height {
+				duration = meta.EndHeight - height
+			} else {
+				r.log.Printf("removing %v from repair set: storage period has ended", name)
+				id = r.mu.Lock()
+				delete(r.tracking, name)
 				r.mu.Unlock(id)
 				continue
 			}
@@ -233,7 +247,7 @@ func (r *Renter) threadedRepairUploads() {
 			// inline function is justified
 			err := func() error {
 				// open file handle
-				handle, err := os.Open(path)
+				handle, err := os.Open(meta.RepairPath)
 				if err != nil {
 					return err
 				}
@@ -251,8 +265,7 @@ func (r *Renter) threadedRepairUploads() {
 						continue
 					}
 
-					// TODO: use smarter duration
-					hostUploader, err := r.newHostUploader(h, bytesPerHost, defaultDuration, f.masterKey)
+					hostUploader, err := r.newHostUploader(h, bytesPerHost, duration, f.masterKey)
 					if err != nil {
 						// penalize unresponsive hosts
 						if strings.Contains(err.Error(), "timeout") {
@@ -281,7 +294,7 @@ func (r *Renter) threadedRepairUploads() {
 			if err != nil {
 				r.log.Printf("%v cannot be repaired: %v", name, err)
 				id = r.mu.Lock()
-				delete(r.repairSet, name)
+				delete(r.tracking, name)
 				r.mu.Unlock(id)
 			}
 

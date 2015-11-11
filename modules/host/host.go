@@ -137,8 +137,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return h, nil
 }
 
-// SetConfig updates the host's internal HostSettings object. To modify
-// a specific field, use a combination of Info and SetConfig
+// SetConfig updates the host's internal HostSettings object.
 func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -149,14 +148,14 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 
 // Settings returns the settings of a host.
 func (h *Host) Settings() modules.HostSettings {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.HostSettings
 }
 
 func (h *Host) Address() modules.NetAddress {
-	// no lock needed; h.myAddr is only set once (in New).
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.myAddr
 }
 

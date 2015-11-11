@@ -1,7 +1,6 @@
 package host
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -15,7 +14,7 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 	defer h.mu.Unlock()
 	err := h.deallocate(obligation.Path)
 	if err != nil {
-		fmt.Println("WARN: failed to deallocate %v: %v", obligation.Path, err)
+		h.log.Printf("WARN: failed to deallocate %v: %v", obligation.Path, err)
 	}
 	delete(h.obligationsByID, obligation.ID)
 	h.save()
@@ -30,19 +29,19 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 
 	file, err := os.Open(obligation.Path)
 	if err != nil {
-		fmt.Println("ERROR: could not open obligation %v (%v) for storage proof: %v", obligation.ID, obligation.Path, err)
+		h.log.Printf("ERROR: could not open obligation %v (%v) for storage proof: %v", obligation.ID, obligation.Path, err)
 		return
 	}
 	defer file.Close()
 
 	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
 	if err != nil {
-		fmt.Println("ERROR: could not determine storage proof index for %v (%v): %v", obligation.ID, obligation.Path, err)
+		h.log.Printf("ERROR: could not determine storage proof index for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
 	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
 	if err != nil {
-		fmt.Println("ERROR: could not construct storage proof for %v (%v): %v", obligation.ID, obligation.Path, err)
+		h.log.Printf("ERROR: could not construct storage proof for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
 	sp := types.StorageProof{obligation.ID, [crypto.SegmentSize]byte{}, hashSet}
@@ -53,7 +52,7 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 	txnBuilder.AddStorageProof(sp)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		fmt.Println(err)
+		h.log.Println("couldn't sign storage proof transaction:", err)
 		return
 	}
 	err = h.tpool.AcceptTransactionSet(txnSet)
@@ -80,8 +79,11 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
 	for _ = range cc.AppliedBlocks {
-		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
-			go h.threadedCreateStorageProof(*obligation)
+		for _, ob := range h.obligationsByHeight[h.blockHeight] {
+			// to avoid race conditions involving the obligation's mutex, copy it
+			// manually into a new object
+			obcopy := contractObligation{ID: ob.ID, FileContract: ob.FileContract, LastRevisionTxn: ob.LastRevisionTxn}
+			go h.threadedCreateStorageProof(obcopy)
 		}
 		// TODO: If something happens while the storage proofs are being
 		// created, those files will never get cleared from the host.

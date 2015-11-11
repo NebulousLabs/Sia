@@ -38,6 +38,18 @@ type hostDB interface {
 	RandomHosts(num int) []modules.HostSettings
 }
 
+// A trackedFile contains metadata about files being tracked by the Renter.
+// Tracked files are actively repaired by the Renter.  By default, files
+// uploaded by the user are tracked, and files that are added (via loading a
+// .sia file) are not.
+type trackedFile struct {
+	// location of original file on disk
+	RepairPath string
+	// height at which file contracts should end. If EndHeight is 0, the file's
+	// contracts will be renewed indefinitely.
+	EndHeight types.BlockHeight
+}
+
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
@@ -54,7 +66,7 @@ type Renter struct {
 	blockHeight   types.BlockHeight
 	files         map[string]*file
 	contracts     map[types.FileContractID]types.FileContract
-	repairSet     map[string]string // map from nickname to filepath
+	tracking      map[string]trackedFile // map from nickname to metadata
 	downloadQueue []*download
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 
@@ -87,7 +99,7 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 
 		files:     make(map[string]*file),
 		contracts: make(map[types.FileContractID]types.FileContract),
-		repairSet: make(map[string]string),
+		tracking:  make(map[string]trackedFile),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),

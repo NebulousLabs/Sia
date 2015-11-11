@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -193,11 +194,19 @@ func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request)
 
 // renterFilesUploadHandler handles the API call to upload a file.
 func (srv *Server) renterFilesUploadHandler(w http.ResponseWriter, req *http.Request) {
+	var duration types.BlockHeight
+	if req.FormValue("duration") != "" {
+		_, err := fmt.Sscan(req.FormValue("duration"), &duration)
+		if err != nil {
+			writeError(w, "Couldn't parse duration: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	err := srv.renter.Upload(modules.FileUploadParams{
 		Filename: req.FormValue("source"),
 		Nickname: req.FormValue("nickname"),
+		Duration: duration,
 		// let the renter decide these values; eventually they will be configurable
-		Duration:    0,
 		ErasureCode: nil,
 		PieceSize:   0,
 	})
