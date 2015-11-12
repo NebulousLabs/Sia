@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -117,6 +118,86 @@ func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) 
 	})
 }
 
+// buildExplorerTransaction takes a transaction and the height + id of the
+// block it appears in an uses that to build an explorer transaction.
+func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) ExplorerTransaction {
+	var scoids []types.SiacoinOutputID
+	var fcids []types.FileContractID
+	var fcvpoidss [][]types.SiacoinOutputID
+	var fcmpoidss [][]types.SiacoinOutputID
+	var fcrvpoidss [][]types.SiacoinOutputID
+	var fcrmpoidss [][]types.SiacoinOutputID
+	var sfoids []types.SiafundOutputID
+	var sfcoids []types.SiacoinOutputID
+	for i := range txn.SiacoinOutputs {
+		scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
+	}
+	for i, fc := range txn.FileContracts {
+		fcid := txn.FileContractID(uint64(i))
+		var fcvpoids []types.SiacoinOutputID
+		var fcmpoids []types.SiacoinOutputID
+		for j := range fc.ValidProofOutputs {
+			fcvpoids = append(fcvpoids, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
+		}
+		for j := range fc.MissedProofOutputs {
+			fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
+		}
+		fcids = append(fcids, fcid)
+		fcvpoidss = append(fcvpoidss, fcvpoids)
+		fcmpoidss = append(fcmpoidss, fcmpoids)
+	}
+	for _, fcr := range txn.FileContractRevisions {
+		var fcrvpoids []types.SiacoinOutputID
+		var fcrmpoids []types.SiacoinOutputID
+		for j := range fcr.NewValidProofOutputs {
+			fcrvpoids = append(fcrvpoids, fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(j)))
+		}
+		for j := range fcr.NewMissedProofOutputs {
+			fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
+		}
+		fcrvpoidss = append(fcrvpoidss, fcrvpoids)
+		fcrmpoidss = append(fcrmpoidss, fcrmpoids)
+	}
+	for i := range txn.SiafundOutputs {
+		sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
+	}
+	for _, sfi := range txn.SiafundInputs {
+		sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
+	}
+	return ExplorerTransaction{
+		ID:                               txn.ID(),
+		Height:                           height,
+		Parent:                           parent,
+		SiacoinOutputIDs:                 scoids,
+		FileContractIDs:                  fcids,
+		FileContractValidProofOutputIDs:  fcvpoidss,
+		FileContractMissedProofOutputIDs: fcmpoidss,
+		SiafundOutputIDs:                 sfoids,
+		SiaClaimOutputIDs:                sfcoids,
+		RawTransaction:                   txn,
+	}
+}
+
+// buildExplorerBlock takes a block and its height and uses it to construct an
+// explorer block.
+func buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
+	var mpoids []types.SiacoinOutputID
+	var etxns []ExplorerTransaction
+	for i := range block.MinerPayouts {
+		mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
+	}
+	for _, txn := range block.Transactions {
+		etxns = append(etxns, buildExplorerTransaction(height, block.ID(), txn))
+	}
+	return ExplorerBlock{
+		ID:             block.ID(),
+		Height:         height,
+		Transactions:   etxns,
+		MinerPayoutIDs: mpoids,
+		RawBlock:       block,
+	}
+}
+
 // explorerHandler handles API calls to /explorer.
 func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
@@ -124,6 +205,34 @@ func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeError(w, "unrecognized method when calling /explorer", http.StatusBadRequest)
+}
+
+// explorerBlockHandlerGET handles GET requests to /explorer/block.
+func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Request) {
+	// Parse the height that's being requested.
+	var height types.BlockHeight
+	_, err := fmt.Sscan(req.FormValue("height"), &height)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Fetch and return the explorer block.
+	block, exists := srv.cs.BlockAtHeight(height)
+	if !exists {
+		writeError(w, "no block found at input height in call to /explorer/block", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, buildExplorerBlock(height, block))
+}
+
+// explorerHandler handles API calls to /explorer/block.
+func (srv *Server) explorerBlockHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "" || req.Method == "GET" {
+		srv.explorerBlockHandlerGET(w, req)
+		return
+	}
+	writeError(w, "unrecognized method when calling /explorer/block", http.StatusBadRequest)
 }
 
 // explorerHashHandlerGET handles GET requests to /explorer/hash.
@@ -140,77 +249,9 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	// Try the hash as a block id.
 	block, height, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
-		var mpoids []types.SiacoinOutputID
-		var etxns []ExplorerTransaction
-		for i := range block.MinerPayouts {
-			mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
-		}
-		for _, txn := range block.Transactions {
-			var scoids []types.SiacoinOutputID
-			var fcids []types.FileContractID
-			var fcvpoidss [][]types.SiacoinOutputID
-			var fcmpoidss [][]types.SiacoinOutputID
-			var fcrvpoidss [][]types.SiacoinOutputID
-			var fcrmpoidss [][]types.SiacoinOutputID
-			var sfoids []types.SiafundOutputID
-			var sfcoids []types.SiacoinOutputID
-			for i := range txn.SiacoinOutputs {
-				scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
-			}
-			for i, fc := range txn.FileContracts {
-				fcid := txn.FileContractID(uint64(i))
-				var fcvpoids []types.SiacoinOutputID
-				var fcmpoids []types.SiacoinOutputID
-				for j := range fc.ValidProofOutputs {
-					fcvpoids = append(fcvpoids, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
-				}
-				for j := range fc.MissedProofOutputs {
-					fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
-				}
-				fcids = append(fcids, fcid)
-				fcvpoidss = append(fcvpoidss, fcvpoids)
-				fcmpoidss = append(fcmpoidss, fcmpoids)
-			}
-			for _, fcr := range txn.FileContractRevisions {
-				var fcrvpoids []types.SiacoinOutputID
-				var fcrmpoids []types.SiacoinOutputID
-				for j := range fcr.NewValidProofOutputs {
-					fcrvpoids = append(fcrvpoids, fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(j)))
-				}
-				for j := range fcr.NewMissedProofOutputs {
-					fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
-				}
-				fcrvpoidss = append(fcrvpoidss, fcrvpoids)
-				fcrmpoidss = append(fcrmpoidss, fcrmpoids)
-			}
-			for i := range txn.SiafundOutputs {
-				sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
-			}
-			for _, sfi := range txn.SiafundInputs {
-				sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
-			}
-			etxns = append(etxns, ExplorerTransaction{
-				ID:                               txn.ID(),
-				Height:                           height,
-				Parent:                           block.ID(),
-				SiacoinOutputIDs:                 scoids,
-				FileContractIDs:                  fcids,
-				FileContractValidProofOutputIDs:  fcvpoidss,
-				FileContractMissedProofOutputIDs: fcmpoidss,
-				SiafundOutputIDs:                 sfoids,
-				SiaClaimOutputIDs:                sfcoids,
-				RawTransaction:                   txn,
-			})
-		}
 		writeJSON(w, ExplorerHashGET{
 			HashType: "blockid",
-			Block: ExplorerBlock{
-				ID:             block.ID(),
-				Height:         height,
-				Transactions:   etxns,
-				MinerPayoutIDs: mpoids,
-				RawBlock:       block,
-			},
+			Block:    buildExplorerBlock(height, block),
 		})
 		return
 	}
@@ -224,63 +265,9 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 				txn = t
 			}
 		}
-		var scoids []types.SiacoinOutputID
-		var fcids []types.FileContractID
-		var fcvpoidss [][]types.SiacoinOutputID
-		var fcmpoidss [][]types.SiacoinOutputID
-		var fcrvpoidss [][]types.SiacoinOutputID
-		var fcrmpoidss [][]types.SiacoinOutputID
-		var sfoids []types.SiafundOutputID
-		var sfcoids []types.SiacoinOutputID
-		for i := range txn.SiacoinOutputs {
-			scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
-		}
-		for i, fc := range txn.FileContracts {
-			fcid := txn.FileContractID(uint64(i))
-			var fcvpoids []types.SiacoinOutputID
-			var fcmpoids []types.SiacoinOutputID
-			for j := range fc.ValidProofOutputs {
-				fcvpoids = append(fcvpoids, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
-			}
-			for j := range fc.MissedProofOutputs {
-				fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
-			}
-			fcids = append(fcids, fcid)
-			fcvpoidss = append(fcvpoidss, fcvpoids)
-			fcmpoidss = append(fcmpoidss, fcmpoids)
-		}
-		for _, fcr := range txn.FileContractRevisions {
-			var fcrvpoids []types.SiacoinOutputID
-			var fcrmpoids []types.SiacoinOutputID
-			for j := range fcr.NewValidProofOutputs {
-				fcrvpoids = append(fcrvpoids, fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(j)))
-			}
-			for j := range fcr.NewMissedProofOutputs {
-				fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
-			}
-			fcrvpoidss = append(fcrvpoidss, fcrvpoids)
-			fcrmpoidss = append(fcrmpoidss, fcrmpoids)
-		}
-		for i := range txn.SiafundOutputs {
-			sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
-		}
-		for _, sfi := range txn.SiafundInputs {
-			sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
-		}
 		writeJSON(w, ExplorerHashGET{
-			HashType: "transactionid",
-			Transaction: ExplorerTransaction{
-				ID:                               txn.ID(),
-				Height:                           height,
-				Parent:                           block.ID(),
-				SiacoinOutputIDs:                 scoids,
-				FileContractIDs:                  fcids,
-				FileContractValidProofOutputIDs:  fcvpoidss,
-				FileContractMissedProofOutputIDs: fcmpoidss,
-				SiafundOutputIDs:                 sfoids,
-				SiaClaimOutputIDs:                sfcoids,
-				RawTransaction:                   txn,
-			},
+			HashType:    "transactionid",
+			Transaction: buildExplorerTransaction(height, block.ID(), txn),
 		})
 		return
 	}

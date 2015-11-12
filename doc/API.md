@@ -118,6 +118,22 @@ struct {
 }
 ```
 
+### /explorer/block
+
+Function: Return a block at a given height.
+
+Parameters:
+```
+height types.BlockHeight (uint64)
+```
+
+Response:
+```
+struct {
+	block api.ExplorerBlock
+}
+```
+
 ### /explorer/hash
 
 Function: Return information about an unknown hash.
