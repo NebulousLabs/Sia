@@ -95,7 +95,7 @@ func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) 
 		Target:            stats.Target,
 		Difficulty:        stats.Difficulty,
 		MaturityTimestamp: stats.MaturityTimestamp,
-		Circulation:       stats.Circulation,
+		TotalCoins:        stats.TotalCoins,
 
 		TransactionCount:          stats.TransactionCount,
 		SiacoinInputCount:         stats.SiacoinInputCount,

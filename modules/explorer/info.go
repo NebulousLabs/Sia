@@ -38,7 +38,7 @@ func (e *Explorer) Statistics() modules.ExplorerStatistics {
 		Target:            target,
 		Difficulty:        difficulty,
 		MaturityTimestamp: currentBlock.Timestamp,
-		Circulation:       totalCurrency(e.blockchainHeight),
+		TotalCoins:        totalCurrency(e.blockchainHeight),
 
 		TransactionCount:          e.transactionCount,
 		SiacoinInputCount:         e.siacoinInputCount,
