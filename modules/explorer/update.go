@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -29,7 +30,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		// Update cumulative stats for reverted transcations.
 		for _, txn := range block.Transactions {
-			// Add the transction to the list of active transactions.
 			txid := txn.ID()
 			e.transactionCount--
 			delete(e.transactionHashes, txid)
@@ -141,12 +141,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 			for _, sci := range txn.SiacoinInputs {
 				_, exists := e.siacoinOutputIDs[sci.ParentID]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("siacoin input without siacoin output")
 				}
 				e.siacoinOutputIDs[sci.ParentID][txid] = struct{}{}
 				_, exists = e.unlockHashes[sci.UnlockConditions.UnlockHash()]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("unlock conditions without a parent unlock hash")
 				}
 				e.unlockHashes[sci.UnlockConditions.UnlockHash()][txid] = struct{}{}
@@ -210,12 +210,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			for _, fcr := range txn.FileContractRevisions {
 				_, exists := e.fileContractIDs[fcr.ParentID]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("revision without entry in file contract list")
 				}
 				e.fileContractIDs[fcr.ParentID][txid] = struct{}{}
 				_, exists = e.unlockHashes[fcr.UnlockConditions.UnlockHash()]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("unlock conditions without unlock hash")
 				}
 				e.unlockHashes[fcr.UnlockConditions.UnlockHash()][txid] = struct{}{}
@@ -256,7 +256,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			for _, sp := range txn.StorageProofs {
 				_, exists := e.fileContractIDs[sp.ParentID]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("storage proof without file contract parent")
 				}
 				e.fileContractIDs[sp.ParentID][txid] = struct{}{}
@@ -264,12 +264,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			for _, sfi := range txn.SiafundInputs {
 				_, exists := e.siafundOutputIDs[sfi.ParentID]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("siafund input without corresponding output")
 				}
 				e.siafundOutputIDs[sfi.ParentID][txid] = struct{}{}
 				_, exists = e.unlockHashes[sfi.UnlockConditions.UnlockHash()]
-				if !exists {
+				if build.DEBUG && !exists {
 					panic("unlock conditions without unlock hash")
 				}
 				e.unlockHashes[sfi.UnlockConditions.UnlockHash()][txid] = struct{}{}

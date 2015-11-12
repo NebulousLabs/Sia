@@ -106,7 +106,7 @@ struct {
 	storageproofcount         uint64
 	siafundinputcount         uint64
 	siafundoutputcount        uint64
-	minrefeecount             uint64
+	minerfeecount             uint64
 	arbitrarydatacount        uint64
 	transactionsignaturecount uint64
 
@@ -144,10 +144,10 @@ struct {
 `hashtype` indicates what type of hash it is. The options are 'blockid',
 'transactionid', 'unlockhash', 'siacoinoutputid', 'filecontractid',
 'siafundoutputid'. If the object is a block, only the 'block' field will be
-filled out. If the object is a transaction, only the and 'transaction' field
-will be filled out. For all other types, the 'blocks' and 'transactions' fields
-will be filled out, returning all of the blocks and transactions that feature
-the provided hash.
+filled out. If the object is a transaction, only the 'transaction' field will
+be filled out. For all other types, the 'blocks' and 'transactions' fields will
+be filled out, returning all of the blocks and transactions that feature the
+provided hash.
 
 Wallet
 ------
