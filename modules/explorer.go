@@ -20,7 +20,7 @@ type (
 		Target            types.Target
 		Difficulty        types.Currency
 		MaturityTimestamp types.Timestamp
-		Circulation       types.Currency
+		TotalCoins        types.Currency
 
 		// Information about transaction type usage.
 		TransactionCount          uint64

@@ -12,18 +12,29 @@ type (
 	// height. This information is provided for programs that may not be
 	// complex enough to compute the ID on their own.
 	ExplorerBlock struct {
-		ID       types.BlockID     `json:"id"`
-		Height   types.BlockHeight `json:"height"`
-		RawBlock types.Block       `json:"rawblock"`
+		ID             types.BlockID           `json:"id"`
+		Height         types.BlockHeight       `json:"height"`
+		Transactions   []ExplorerTransaction   `json:"transactions"`
+		MinerPayoutIDs []types.SiacoinOutputID `json:"minerpayoutids"`
+		RawBlock       types.Block             `json:"rawblock"`
 	}
 
 	// ExplorerTransaction is a transcation with some extra information such as
 	// the parent block. This information is provided for programs that may not
 	// be complex enough to compute the extra information on their own.
 	ExplorerTransaction struct {
-		ID             types.TransactionID `json:"id"`
-		Parent         ExplorerBlock       `json:"parent"`
-		RawTransaction types.Transaction   `json:"rawtransaction"`
+		ID                                       types.TransactionID       `json:"id"`
+		Height                                   types.BlockHeight         `json:"height"`
+		Parent                                   types.BlockID             `json:"parent"`
+		SiacoinOutputIDs                         []types.SiacoinOutputID   `json:"siacoinoutputids"`
+		FileContractIDs                          []types.FileContractID    `json:"filecontractids"`
+		FileContractValidProofOutputIDs          [][]types.SiacoinOutputID `json:"filecontractvalidproofoutputids"`          // outer array is per-contract
+		FileContractMissedProofOutputIDs         [][]types.SiacoinOutputID `json:"filecontractmissedproofoutputids"`         // outer array is per-contract
+		FileContractRevisionValidProofOutputIDs  [][]types.SiacoinOutputID `json:"filecontractrevisionvalidproofoutputids"`  // outer array is per-revision
+		FileContractRevisionMissedProofOutputIDs [][]types.SiacoinOutputID `json:"filecontractrevisionmissedproofoutputids"` // outer array is per-revision
+		SiafundOutputIDs                         []types.SiafundOutputID   `json:"siafundoutputids"`
+		SiaClaimOutputIDs                        []types.SiacoinOutputID   `json:"siafundclaimoutputids"`
+		RawTransaction                           types.Transaction         `json:"rawtransaction"`
 	}
 
 	// ExplorerGET is the object returned as a response to a GET request to
@@ -35,7 +46,7 @@ type (
 		Target            types.Target      `json:"target"`
 		Difficulty        types.Currency    `json:"difficulty"`
 		MaturityTimestamp types.Timestamp   `json:"maturitytimestamp"`
-		Circulation       types.Currency    `json:"circulation"`
+		TotalCoins        types.Currency    `json:"totalcoins"`
 
 		// Information about transaction type usage.
 		TransactionCount          uint64 `json:"transactioncount"`
@@ -69,9 +80,9 @@ type (
 	ExplorerHashGET struct {
 		HashType     string                `json:"hashtype"`
 		Block        ExplorerBlock         `json:"block"`
-		Blocks       []ExplorerBlock       `json:"blocks"`
+		Blocks       []types.BlockID       `json:"blocks"`
 		Transaction  ExplorerTransaction   `json:"transaction"`
-		Transactions []ExplorerTransaction `json:"transactions"`
+		Transactions []types.TransactionID `json:"transactions"`
 	}
 )
 
@@ -129,12 +140,76 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	// Try the hash as a block id.
 	block, height, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
+		var mpoids []types.SiacoinOutputID
+		var etxns []ExplorerTransaction
+		for i := range block.MinerPayouts {
+			mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
+		}
+		for _, txn := range block.Transactions {
+			var scoids []types.SiacoinOutputID
+			var fcids []types.FileContractID
+			var fcvpoidss [][]types.SiacoinOutputID
+			var fcmpoidss [][]types.SiacoinOutputID
+			var fcrvpoidss [][]types.SiacoinOutputID
+			var fcrmpoidss [][]types.SiacoinOutputID
+			var sfoids []types.SiafundOutputID
+			var sfcoids []types.SiacoinOutputID
+			for i := range txn.SiacoinOutputs {
+				scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
+			}
+			for i, fc := range txn.FileContracts {
+				fcid := txn.FileContractID(uint64(i))
+				var fcvpoids []types.SiacoinOutputID
+				var fcmpoids []types.SiacoinOutputID
+				for j := range fc.ValidProofOutputs {
+					fcvpoids = append(fcvpoids, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
+				}
+				for j := range fc.MissedProofOutputs {
+					fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
+				}
+				fcids = append(fcids, fcid)
+				fcvpoidss = append(fcvpoidss, fcvpoids)
+				fcmpoidss = append(fcmpoidss, fcmpoids)
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				var fcrvpoids []types.SiacoinOutputID
+				var fcrmpoids []types.SiacoinOutputID
+				for j := range fcr.NewValidProofOutputs {
+					fcrvpoids = append(fcrvpoids, fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(j)))
+				}
+				for j := range fcr.NewMissedProofOutputs {
+					fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
+				}
+				fcrvpoidss = append(fcrvpoidss, fcrvpoids)
+				fcrmpoidss = append(fcrmpoidss, fcrmpoids)
+			}
+			for i := range txn.SiafundOutputs {
+				sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
+			}
+			for _, sfi := range txn.SiafundInputs {
+				sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
+			}
+			etxns = append(etxns, ExplorerTransaction{
+				ID:                               txn.ID(),
+				Height:                           height,
+				Parent:                           block.ID(),
+				SiacoinOutputIDs:                 scoids,
+				FileContractIDs:                  fcids,
+				FileContractValidProofOutputIDs:  fcvpoidss,
+				FileContractMissedProofOutputIDs: fcmpoidss,
+				SiafundOutputIDs:                 sfoids,
+				SiaClaimOutputIDs:                sfcoids,
+				RawTransaction:                   txn,
+			})
+		}
 		writeJSON(w, ExplorerHashGET{
 			HashType: "blockid",
 			Block: ExplorerBlock{
-				ID:       block.ID(),
-				Height:   height,
-				RawBlock: block,
+				ID:             block.ID(),
+				Height:         height,
+				Transactions:   etxns,
+				MinerPayoutIDs: mpoids,
+				RawBlock:       block,
 			},
 		})
 		return
@@ -149,16 +224,62 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 				txn = t
 			}
 		}
+		var scoids []types.SiacoinOutputID
+		var fcids []types.FileContractID
+		var fcvpoidss [][]types.SiacoinOutputID
+		var fcmpoidss [][]types.SiacoinOutputID
+		var fcrvpoidss [][]types.SiacoinOutputID
+		var fcrmpoidss [][]types.SiacoinOutputID
+		var sfoids []types.SiafundOutputID
+		var sfcoids []types.SiacoinOutputID
+		for i := range txn.SiacoinOutputs {
+			scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
+		}
+		for i, fc := range txn.FileContracts {
+			fcid := txn.FileContractID(uint64(i))
+			var fcvpoids []types.SiacoinOutputID
+			var fcmpoids []types.SiacoinOutputID
+			for j := range fc.ValidProofOutputs {
+				fcvpoids = append(fcvpoids, fcid.StorageProofOutputID(types.ProofValid, uint64(j)))
+			}
+			for j := range fc.MissedProofOutputs {
+				fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
+			}
+			fcids = append(fcids, fcid)
+			fcvpoidss = append(fcvpoidss, fcvpoids)
+			fcmpoidss = append(fcmpoidss, fcmpoids)
+		}
+		for _, fcr := range txn.FileContractRevisions {
+			var fcrvpoids []types.SiacoinOutputID
+			var fcrmpoids []types.SiacoinOutputID
+			for j := range fcr.NewValidProofOutputs {
+				fcrvpoids = append(fcrvpoids, fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(j)))
+			}
+			for j := range fcr.NewMissedProofOutputs {
+				fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
+			}
+			fcrvpoidss = append(fcrvpoidss, fcrvpoids)
+			fcrmpoidss = append(fcrmpoidss, fcrmpoids)
+		}
+		for i := range txn.SiafundOutputs {
+			sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
+		}
+		for _, sfi := range txn.SiafundInputs {
+			sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
+		}
 		writeJSON(w, ExplorerHashGET{
 			HashType: "transactionid",
 			Transaction: ExplorerTransaction{
-				ID: txn.ID(),
-				Parent: ExplorerBlock{
-					ID:       block.ID(),
-					Height:   height,
-					RawBlock: block,
-				},
-				RawTransaction: txn,
+				ID:                               txn.ID(),
+				Height:                           height,
+				Parent:                           block.ID(),
+				SiacoinOutputIDs:                 scoids,
+				FileContractIDs:                  fcids,
+				FileContractValidProofOutputIDs:  fcvpoidss,
+				FileContractMissedProofOutputIDs: fcmpoidss,
+				SiafundOutputIDs:                 sfoids,
+				SiaClaimOutputIDs:                sfcoids,
+				RawTransaction:                   txn,
 			},
 		})
 		return
@@ -167,32 +288,17 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	// Try the hash as an unlock hash.
 	txids := srv.explorer.UnlockHash(types.UnlockHash(hash))
 	if len(txids) != 0 {
-		var txns []ExplorerTransaction
-		var blocks []ExplorerBlock
+		var txns []types.TransactionID
+		var blocks []types.BlockID
 		for _, txid := range txids {
-			block, height, exists := srv.explorer.Transaction(txid)
+			block, _, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, ExplorerBlock{
-					ID:       block.ID(),
-					Height:   height,
-					RawBlock: block,
-				})
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, ExplorerTransaction{
-						ID: txid,
-						Parent: ExplorerBlock{
-							ID:       block.ID(),
-							Height:   height,
-							RawBlock: block,
-						},
-						RawTransaction: t,
-					})
-				}
+				blocks = append(blocks, block.ID())
+			} else {
+				txns = append(txns, txid)
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
@@ -206,32 +312,17 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	// Try the hash as a siacoin output id.
 	txids = srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
 	if len(txids) != 0 {
-		var txns []ExplorerTransaction
-		var blocks []ExplorerBlock
+		var txns []types.TransactionID
+		var blocks []types.BlockID
 		for _, txid := range txids {
-			block, height, exists := srv.explorer.Transaction(txid)
+			block, _, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, ExplorerBlock{
-					ID:       block.ID(),
-					Height:   height,
-					RawBlock: block,
-				})
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, ExplorerTransaction{
-						ID: txid,
-						Parent: ExplorerBlock{
-							ID:       block.ID(),
-							Height:   height,
-							RawBlock: block,
-						},
-						RawTransaction: t,
-					})
-				}
+				blocks = append(blocks, block.ID())
+			} else {
+				txns = append(txns, txid)
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
@@ -245,32 +336,17 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	// Try the hash as a file contract id.
 	txids = srv.explorer.FileContractID(types.FileContractID(hash))
 	if len(txids) != 0 {
-		var txns []ExplorerTransaction
-		var blocks []ExplorerBlock
+		var txns []types.TransactionID
+		var blocks []types.BlockID
 		for _, txid := range txids {
-			block, height, exists := srv.explorer.Transaction(txid)
+			block, _, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, ExplorerBlock{
-					ID:       block.ID(),
-					Height:   height,
-					RawBlock: block,
-				})
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, ExplorerTransaction{
-						ID: txid,
-						Parent: ExplorerBlock{
-							ID:       block.ID(),
-							Height:   height,
-							RawBlock: block,
-						},
-						RawTransaction: t,
-					})
-				}
+				blocks = append(blocks, block.ID())
+			} else {
+				txns = append(txns, txid)
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
@@ -284,32 +360,17 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	// Try the hash as a siafund output id.
 	txids = srv.explorer.SiafundOutputID(types.SiafundOutputID(hash))
 	if len(txids) != 0 {
-		var txns []ExplorerTransaction
-		var blocks []ExplorerBlock
+		var txns []types.TransactionID
+		var blocks []types.BlockID
 		for _, txid := range txids {
-			block, height, exists := srv.explorer.Transaction(txid)
+			block, _, exists := srv.explorer.Transaction(txid)
 			if !exists && build.DEBUG {
 				panic("explorer pointing to nonexistant txn")
 			}
 			if types.TransactionID(block.ID()) == txid {
-				blocks = append(blocks, ExplorerBlock{
-					ID:       block.ID(),
-					Height:   height,
-					RawBlock: block,
-				})
-			}
-			for _, t := range block.Transactions {
-				if t.ID() == txid {
-					txns = append(txns, ExplorerTransaction{
-						ID: txid,
-						Parent: ExplorerBlock{
-							ID:       block.ID(),
-							Height:   height,
-							RawBlock: block,
-						},
-						RawTransaction: t,
-					})
-				}
+				blocks = append(blocks, block.ID())
+			} else {
+				txns = append(txns, txid)
 			}
 		}
 		writeJSON(w, ExplorerHashGET{
