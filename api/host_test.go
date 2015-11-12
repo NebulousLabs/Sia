@@ -75,6 +75,6 @@ func TestIntegrationHosting(t *testing.T) {
 	st.getAPI("/wallet", &wi)
 	expBal := "7499794999617870000000002429474"
 	if wi.ConfirmedSiacoinBalance.String() != expBal {
-		t.Fatal("host's balance was not affected: expected %v, got %v", expBal, wi.ConfirmedSiacoinBalance)
+		t.Fatalf("host's balance was not affected: expected %v, got %v", expBal, wi.ConfirmedSiacoinBalance)
 	}
 }
