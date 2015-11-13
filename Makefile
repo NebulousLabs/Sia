@@ -79,6 +79,7 @@ bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=300s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
+	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
 		go test -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
@@ -86,6 +87,7 @@ cover: clean REBUILD
 	done
 cover-integration: clean REBUILD
 	@mkdir -p cover/modules
+	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
 		go test -run=TestIntegration -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
@@ -93,6 +95,7 @@ cover-integration: clean REBUILD
 	done
 cover-unit: clean REBUILD
 	@mkdir -p cover/modules
+	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
 		go test -run=TestUnit -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \

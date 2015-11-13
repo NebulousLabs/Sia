@@ -11,8 +11,8 @@ const (
 )
 
 type (
-	// ExplorerStatistics returns a bunch of instantaneous statistics about the
-	// explorer at the current height.
+	// ExplorerStatistics returns a bunch of statistics about the explorer at
+	// the current height.
 	ExplorerStatistics struct {
 		// General consensus information.
 		Height            types.BlockHeight
