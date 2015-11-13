@@ -50,6 +50,7 @@ type (
 		TotalCoins        types.Currency    `json:"totalcoins"`
 
 		// Information about transaction type usage.
+		MinerPayoutCount          uint64 `json:"minerpayoutcount"`
 		TransactionCount          uint64 `json:"transactioncount"`
 		SiacoinInputCount         uint64 `json:"siacoininputcount"`
 		SiacoinOutputCount        uint64 `json:"siacoinoutputcount"`
@@ -68,6 +69,12 @@ type (
 		ActiveContractSize  types.Currency `json:"activecontractsize"`
 		TotalContractCost   types.Currency `json:"totalcontractcost"`
 		TotalContractSize   types.Currency `json:"totalcontractsize"`
+	}
+
+	// ExplorerBlockGET is the object returned by a GET request to
+	// /explorer/block.
+	ExplorerBlockGET struct {
+		Block ExplorerBlock `json:"block"`
 	}
 
 	// ExplorerHashGET is the object returned as a response to a GET request to
@@ -178,6 +185,7 @@ func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) 
 		MaturityTimestamp: stats.MaturityTimestamp,
 		TotalCoins:        stats.TotalCoins,
 
+		MinerPayoutCount:          stats.MinerPayoutCount,
 		TransactionCount:          stats.TransactionCount,
 		SiacoinInputCount:         stats.SiacoinInputCount,
 		SiacoinOutputCount:        stats.SiacoinOutputCount,
@@ -223,7 +231,9 @@ func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Requ
 		writeError(w, "no block found at input height in call to /explorer/block", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, buildExplorerBlock(height, block))
+	writeJSON(w, ExplorerBlockGET{
+		Block: buildExplorerBlock(height, block),
+	})
 }
 
 // explorerHandler handles API calls to /explorer/block.

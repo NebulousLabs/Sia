@@ -13,16 +13,21 @@ func TestStatistics(t *testing.T) {
 	}
 
 	stats := et.explorer.Statistics()
-	if stats.Height != e.blockchainHeight || e.blockchainHeight == 0 {
+	if stats.Height != et.explorer.blockchainHeight || et.explorer.blockchainHeight == 0 {
 		t.Error("wrong height reported in stats object")
 	}
-	if stats.TransactionCount != e.transactionCount || e.transactionCount == 0 {
+	if stats.TransactionCount != et.explorer.transactionCount || et.explorer.transactionCount == 0 {
 		t.Error("wrong transaction count reported in stats object")
 	}
 }
 
 // TestBlock probes the Block function of the explorer.
 func TestBlock(t *testing.T) {
+	et, err := createExplorerTester("TestStatistics")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	gb := et.cs.GenesisBlock()
 	gbFetch, height, exists := et.explorer.Block(gb.ID())
 	if !exists || height != 0 || gbFetch.ID() != gb.ID() {

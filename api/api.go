@@ -69,9 +69,9 @@ func (srv *Server) initAPI() {
 
 	// Explorer API Calls
 	if srv.explorer != nil {
-		handleHTTPRequest(mux, "/explorer", srv.explorerHandler)
-		handleHTTPRequest(mux, "/explorer/hash", srv.explorerHashHandler)
-		handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler)
+		handleHTTPRequest(mux, "/explorer", srv.explorerHandler)            // GET
+		handleHTTPRequest(mux, "/explorer/hash", srv.explorerHashHandler)   // GET
+		handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler) // GET
 	}
 
 	// Gateway API Calls - Unfinished

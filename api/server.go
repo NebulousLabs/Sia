@@ -26,7 +26,7 @@ type Server struct {
 	explorer modules.Explorer
 
 	// Consensus set variables.
-	blockchainHeight int
+	blockchainHeight types.BlockHeight
 	currentBlock     types.Block
 
 	listener  net.Listener
@@ -52,12 +52,11 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 		wallet:   w,
 		explorer: explorer,
 
-		blockchainHeight: -1,
-
 		listener: l,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
+	srv.blockchainHeight-- // Underflow the blockchain height so the genesis block sets the height to 0.
 
 	// Set the genesis block and start listening to the consensus package.
 	srv.currentBlock = srv.cs.GenesisBlock()
