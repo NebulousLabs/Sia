@@ -35,6 +35,27 @@ func TestCalculateCoinbase(t *testing.T) {
 	}
 }
 
+// TestCalculateNumSiacoins checks that the siacoin calculator is correctly
+// determining the number of siacoins in circulation. The check is performed by
+// doing a naive computation, instead of by doing the optimized computation.
+func TestCalculateNumSiacoins(t *testing.T) {
+	c := CalculateNumSiacoins(0)
+	if c.Cmp(CalculateCoinbase(0)) != 0 {
+		t.Error("unexpected circulation result for value 0, got", c)
+	}
+
+	if testing.Short() {
+		t.SkipNow()
+	}
+	totalCoins := NewCurrency64(0)
+	for i := BlockHeight(0); i < 500e3; i++ {
+		totalCoins = totalCoins.Add(CalculateCoinbase(i))
+		if totalCoins.Cmp(CalculateNumSiacoins(i)) != 0 {
+			t.Fatal("coin miscalculation", i, totalCoins, CalculateNumSiacoins(i))
+		}
+	}
+}
+
 // TestBlockHeader checks that BlockHeader returns the correct value, and that
 // the hash is consistent with the old method for obtaining the hash.
 func TestBlockHeader(t *testing.T) {

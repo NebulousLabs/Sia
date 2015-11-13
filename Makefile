@@ -28,9 +28,17 @@ dependencies:
 	go get -u github.com/laher/goxc
 	go get -u golang.org/x/tools/cmd/cover
 
+# pkgs changes which packages the makefile calls operate on. run changes which
+# tests are run during testing.
+run = Test
+pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
+       ./modules/explorer ./modules/gateway ./modules/host ./modules/miner \
+       ./modules/renter ./modules/transactionpool ./modules/wallet \
+       ./persist ./siac ./siae ./sync ./types
+
 # fmt calls go fmt on all packages.
 fmt:
-	go fmt ./...
+	go fmt $(pkgs)
 
 # REBUILD touches all of the build-dependent source files, forcing them to be
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
@@ -61,17 +69,6 @@ xc: dependencies test test-long REBUILD
 clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
-# 3 commands and a variable are available for testing Sia packages. 'pkgs'
-# indicates which packages should be tested, and defaults to all the packages
-# with test files. Using './...' as default breaks compatibility with the cover
-# command. 'test' runs short tests that should last no more than a few seconds,
-# 'test-long' runs more thorough tests which should not last more than a few
-# minutes.
-run = Test
-pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
-       ./modules/explorer ./modules/gateway ./modules/host ./modules/miner \
-       ./modules/renter ./modules/transactionpool ./modules/wallet \
-       ./persist ./siac ./siae ./sync ./types
 test: REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs) -run=$(run)
 test-v: REBUILD

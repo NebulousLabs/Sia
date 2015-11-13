@@ -6,21 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Calculates the total number of coins that have ever been created
-// from the bockheight
-func totalCurrency(height types.BlockHeight) types.Currency {
-	totalCoins := uint64(0)
-	coinbase := types.InitialCoinbase
-	minCoinbase := types.MinimumCoinbase
-	for i := types.BlockHeight(0); i <= height; i++ {
-		totalCoins += coinbase
-		if coinbase > minCoinbase {
-			coinbase--
-		}
-	}
-	return types.NewCurrency64(totalCoins).Mul(types.SiacoinPrecision)
-}
-
 // Returns many pieces of readily available information
 func (e *Explorer) Statistics() modules.ExplorerStatistics {
 	e.mu.RLock()
@@ -38,7 +23,7 @@ func (e *Explorer) Statistics() modules.ExplorerStatistics {
 		Target:            target,
 		Difficulty:        difficulty,
 		MaturityTimestamp: currentBlock.Timestamp,
-		TotalCoins:        totalCurrency(e.blockchainHeight),
+		TotalCoins:        types.CalculateNumSiacoins(e.blockchainHeight),
 
 		TransactionCount:          e.transactionCount,
 		SiacoinInputCount:         e.siacoinInputCount,

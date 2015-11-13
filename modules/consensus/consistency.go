@@ -158,17 +158,7 @@ func checkSiacoinCount(tx *bolt.Tx) {
 		manageErr(tx, err)
 	}
 
-	// Count how many coins should exist
-	deflationBlocks := types.BlockHeight(types.InitialCoinbase - types.MinimumCoinbase)
-	expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(blockHeight(tx))).Div(types.NewCurrency64(2))
-	if blockHeight(tx) < deflationBlocks {
-		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(blockHeight(tx) + 1)))
-	} else {
-		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(deflationBlocks + 1)))
-		trailingSiacoins := types.NewCurrency64(uint64(blockHeight(tx) - deflationBlocks)).Mul(types.CalculateCoinbase(blockHeight(tx)))
-		expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
-	}
-
+	expectedSiacoins := types.CalculateNumSiacoins(blockHeight(tx))
 	totalSiacoins := dscoSiacoins.Add(scoSiacoins).Add(fcSiacoins).Add(claimSiacoins)
 	if totalSiacoins.Cmp(expectedSiacoins) != 0 {
 		diagnostics := fmt.Sprintf("Wrong number of siacoins\nDsco: %v\nSco: %v\nFc: %v\nClaim: %v\n", dscoSiacoins, scoSiacoins, fcSiacoins, claimSiacoins)

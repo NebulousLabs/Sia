@@ -1,5 +1,0 @@
-package explorer
-
-import (
-	"testing"
-)
