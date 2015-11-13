@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -26,12 +27,13 @@ type explorerTester struct {
 	walletKey crypto.TwofishKey
 
 	explorer *Explorer
+	testdir  string
 }
 
 // createExplorerTester creates a tester object for the explorer module.
 func createExplorerTester(name string) (*explorerTester, error) {
 	// Create and assemble the dependencies.
-	testdir := build.TempDir(modules.HostDir, name)
+	testdir := build.TempDir(modules.ExplorerDir, name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
@@ -77,6 +79,7 @@ func createExplorerTester(name string) (*explorerTester, error) {
 		walletKey: key,
 
 		explorer: e,
+		testdir:  testdir,
 	}
 
 	// Mine until the wallet has money.
@@ -88,6 +91,60 @@ func createExplorerTester(name string) (*explorerTester, error) {
 		}
 	}
 	return et, nil
+}
+
+// reorgToBlank creates a bunch of empty blocks on top of the genesis block
+// that reorgs the explorer to a state of all blank blocks.
+func (et *explorerTester) reorgToBlank() error {
+	// Get a unique directory name to house the persistence of the miner
+	// dependencies.
+	dir := et.testdir + " - " + persist.RandomSuffix()
+
+	// Create a miner and all dependencies to create an alternate chain.
+	g, err := gateway.New(":0", filepath.Join(dir, modules.GatewayDir))
+	if err != nil {
+		return err
+	}
+	cs, err := consensus.New(g, filepath.Join(dir, modules.ConsensusDir))
+	if err != nil {
+		return err
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		return err
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(dir, modules.WalletDir))
+	if err != nil {
+		return err
+	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return err
+	}
+	_, err = w.Encrypt(key)
+	if err != nil {
+		return err
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return err
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(dir, modules.RenterDir))
+	if err != nil {
+		return err
+	}
+
+	// Mine blocks until the height is higher than the existing consensus,
+	// submitting each block to the explorerTester.
+	currentHeight := et.explorer.blockchainHeight
+	for i := types.BlockHeight(0); i <= currentHeight+1; i++ {
+		block, err := m.AddBlock()
+		if err != nil {
+			return err
+		}
+		et.cs.AcceptBlock(block) // error is not checked, will not always be nil
+	}
+	return nil
 }
 
 // TestNilExplorerDependencies tries to initalize an explorer with nil
