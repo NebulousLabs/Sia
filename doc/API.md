@@ -23,6 +23,8 @@ Notes:
   it is represented as a base-10 string. You must use a "bignum" library to handle
   these values, or you risk losing precision.
 
+Example GET curl call:  `curl -A "Sia-Agent" /wallet/transactions?startheight=1&endheight=250`
+Example POST curl call: `curl -A "Sia-Agent" --data "amount=123&destination=abcd" /wallet/siacoins
 
 Consensus
 ---------
