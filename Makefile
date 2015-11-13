@@ -70,8 +70,8 @@ clean:
 run = Test
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/miner \
-       ./modules/renter ./modules/renter/hostdb ./modules/transactionpool \
-       ./modules/wallet ./persist ./siac ./siae ./sync ./types
+       ./modules/renter ./modules/transactionpool ./modules/wallet \
+       ./persist ./siac ./siae ./sync ./types
 test: REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs) -run=$(run)
 test-v: REBUILD
