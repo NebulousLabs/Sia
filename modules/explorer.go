@@ -23,6 +23,7 @@ type (
 		TotalCoins        types.Currency
 
 		// Information about transaction type usage.
+		MinerPayoutCount          uint64
 		TransactionCount          uint64
 		SiacoinInputCount         uint64
 		SiacoinOutputCount        uint64

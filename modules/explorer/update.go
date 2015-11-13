@@ -26,6 +26,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			scoid := block.MinerPayoutID(uint64(j))
 			delete(e.siacoinOutputIDs[scoid], tbid)
 			delete(e.unlockHashes[payout.UnlockHash], tbid)
+			e.minerPayoutCount--
 		}
 
 		// Update cumulative stats for reverted transcations.
@@ -130,6 +131,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				e.unlockHashes[payout.UnlockHash] = make(map[types.TransactionID]struct{})
 			}
 			e.unlockHashes[payout.UnlockHash][tbid] = struct{}{}
+			e.minerPayoutCount++
 		}
 
 		// Update cumulative stats for applied transactions.

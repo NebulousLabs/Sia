@@ -18,6 +18,7 @@ var (
 // stored here in the future
 type Explorer struct {
 	// Transaction type counts.
+	minerPayoutCount          uint64
 	transactionCount          uint64
 	siacoinInputCount         uint64
 	siacoinOutputCount        uint64

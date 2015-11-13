@@ -25,6 +25,7 @@ func (e *Explorer) Statistics() modules.ExplorerStatistics {
 		MaturityTimestamp: currentBlock.Timestamp,
 		TotalCoins:        types.CalculateNumSiacoins(e.blockchainHeight),
 
+		MinerPayoutCount:          e.minerPayoutCount,
 		TransactionCount:          e.transactionCount,
 		SiacoinInputCount:         e.siacoinInputCount,
 		SiacoinOutputCount:        e.siacoinOutputCount,
