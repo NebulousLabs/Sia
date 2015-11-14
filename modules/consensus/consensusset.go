@@ -34,17 +34,16 @@ type ConsensusSet struct {
 	// The block root contains the genesis block.
 	blockRoot processedBlock
 
-	// The db is a database holding the current consensus set.
-	db *persist.BoltDatabase
-
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
 	changeLog         []changeEntry
 	subscribers       []modules.ConsensusSetSubscriber
 	digestSubscribers []modules.ConsensusSetDigestSubscriber
 
-	// dosBlocks keeps track of seen blocks. It is a "blacklist" of blocks
-	// known to the expensive part of block validation.
+	// dosBlocks are blocks that are invalid, but the invalidity is only
+	// discoverable during an expensive step of validation. These blocks are
+	// recorded to eliminate a DoS vector where an expensive-to-validate block
+	// is submitted to the consensus set repeatedly.
 	dosBlocks map[types.BlockID]struct{}
 
 	// checkingConsistency is a bool indicating whether or not a consistency
@@ -55,14 +54,13 @@ type ConsensusSet struct {
 	// block.
 	checkingConsistency bool
 
-	// marshaler encodes and decodes between objects and byte slices.
-	marshaler encoding.GenericMarshaler
-	// blockRuleHelper calculates values on blocks for block validity rule
-	// enforcement.
+	// Interfaces to abstract the dependencies of the ConsensusSet.
+	marshaler       encoding.GenericMarshaler
 	blockRuleHelper blockRuleHelper
-	// blockValidator validates Blocks against validity rules.
-	blockValidator blockValidator
+	blockValidator  blockValidator
 
+	// Utilities
+	db         *persist.BoltDatabase
 	persistDir string
 	mu         demotemutex.DemoteMutex
 }

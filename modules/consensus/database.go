@@ -44,7 +44,9 @@ var (
 	// committed. Wasn't a problem until we started doing the entire block as
 	// one tx.
 	//
-	// DEPRECATED.
+	// DEPRECATED - block.Stats() should be sufficient to determine the block
+	// height, but currently stats are only computed after committing a
+	// transaction, therefore cannot be assumed reliable.
 	BlockHeight = []byte("BlockHeight")
 
 	// BlockMap is a database bucket containing all of the processed blocks,
@@ -191,7 +193,7 @@ func inconsistencyDetected(tx *bolt.Tx) (detected bool) {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return
+	return detected
 }
 
 // markInconsistency flags the database to indicate that inconsistency has been
