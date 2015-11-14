@@ -11,8 +11,11 @@ import (
 )
 
 const (
+	// WalletDir is the directory that contains the wallet persistance.
 	WalletDir = "wallet"
 
+	// SeedChecksumSize is the number of bytes that are used to checksum
+	// addresses to prevent accidental spending.
 	SeedChecksumSize = 6
 
 	PublicKeysPerSeed      = 2500
@@ -20,9 +23,20 @@ const (
 )
 
 var (
+	// ErrBadEncryptionKey is returned if the incorrect encryption key to a
+	// file is provided.
 	ErrBadEncryptionKey     = errors.New("provided encryption key is incorrect")
+
+	// ErrLowBalance is returned if the wallet does not have enough funds to
+	// complete the desired action.
 	ErrLowBalance           = errors.New("insufficient balance")
+
+	// ErrPotentialDoubleSpend is returned when the wallet is uncertain whether
+	// a spend is going to be legal or not.
 	ErrPotentialDoubleSpend = errors.New("wallet has coins spent in unconfirmed transactions - not enough remaining coins to complete transaction")
+
+	// ErrLockedWallet is returned when an action cannot be performed due to
+	// the wallet being locked.
 	ErrLockedWallet         = errors.New("wallet must be unlocked before it can be used")
 )
 
