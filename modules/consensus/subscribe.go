@@ -187,18 +187,33 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 // ConsensusSetPersistentSubscribe adds a subscriber to the list of
 // subscribers, and gives them every consensus change that has occured since
 // the change with the provided id.
+//
+// As a special case, using an empty id as the start will have all the changes
+// sent to the modules starting with the genesis block.
 func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	// Add the subscriber to the list of subscribers under lock, and then
+	// demote while sending the subscriber all of the changes they've missed.
 	cs.mu.Lock()
 	cs.subscribers = append(cs.subscribers, subscriber)
 	cs.mu.Demote()
 	defer cs.mu.DemotedUnlock()
 
 	err := cs.db.View(func(tx *bolt.Tx) error {
-		entry, exists := getEntry(tx, start)
-		if !exists {
-			return errChangeEntryNotFound
+		var exists bool
+		var entry changeEntry
+		// Special case: if 'start' is blank, create an initial node pointing to
+		// the genesis block.
+		if start == (modules.ConsensusChangeID{}) {
+			entry = cs.genesisEntry()
+			exists = true
+		} else {
+			entry, exists = getEntry(tx, start)
+			if !exists {
+				return errChangeEntryNotFound
+			}
+			entry, exists = entry.NextEntry(tx)
 		}
-		entry, exists = entry.NextEntry(tx)
+
 		for exists {
 			cc, err := cs.computeConsensusChange(tx, entry)
 			if err != nil {
@@ -210,7 +225,7 @@ func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.Conse
 		return nil
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 	return nil
 }

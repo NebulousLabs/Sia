@@ -58,9 +58,8 @@ func (cs *ConsensusSet) loadDB() error {
 
 	// Send all of the existing blocks to subscribers - temporary while
 	// subscribers don't have any persistence for block progress.
-	for i := types.BlockHeight(0); i <= height; i++ {
-		var ce changeEntry
-		err = cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		for i := types.BlockHeight(0); i <= height; i++ {
 			// Fetch the processed block at height 'i'.
 			id, err := getPath(tx, i)
 			if build.DEBUG && err != nil {
@@ -71,17 +70,15 @@ func (cs *ConsensusSet) loadDB() error {
 				panic(err)
 			}
 
-			// Send the block to subscribers - a lock is implicitly held
-			// because startup is fully serial and no modules can talk to the
-			// consensus set until startup has completed.
-			ce = changeEntry{RevertedBlocks: nil, AppliedBlocks: []types.BlockID{pb.Block.ID()}}
-			return nil
-		})
-		if build.DEBUG && err != nil {
-			panic(err)
+			// Add the block to the changelog. There are no subscribers yet,
+			// and startup is serial so a lock is held implicitly.
+			ce := changeEntry{RevertedBlocks: nil, AppliedBlocks: []types.BlockID{pb.Block.ID()}}
+			cs.changeLog = append(cs.changeLog, ce)
 		}
-		cs.changeLog = append(cs.changeLog, ce)
-		cs.readlockUpdateSubscribers(ce)
+		return nil
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 	return nil
 }

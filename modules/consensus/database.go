@@ -73,7 +73,7 @@ func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	if err != nil {
 		return err
 	}
-	err = createChangeLog(tx)
+	err = cs.createChangeLog(tx)
 	if err != nil {
 		return err
 	}

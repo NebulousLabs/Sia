@@ -52,15 +52,6 @@ type (
 	}
 )
 
-// createChangeLog assumes that no change log exists and creates a new one.
-func createChangeLog(tx *bolt.Tx) error {
-	_, err := tx.CreateBucket(ChangeLog)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // appendChangeLog adds a new change entry to the change log.
 func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 	// Insert the change entry.
@@ -101,11 +92,6 @@ func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 	return nil
 }
 
-// ID returns the id of a change entry.
-func (ce *changeEntry) ID() modules.ConsensusChangeID {
-	return modules.ConsensusChangeID(crypto.HashObject(ce))
-}
-
 // getEntry returns the change entry with a given id, using a bool to indicate
 // existance.
 func getEntry(tx *bolt.Tx, id modules.ConsensusChangeID) (ce changeEntry, exists bool) {
@@ -122,6 +108,11 @@ func getEntry(tx *bolt.Tx, id modules.ConsensusChangeID) (ce changeEntry, exists
 	return cn.Entry, true
 }
 
+// ID returns the id of a change entry.
+func (ce *changeEntry) ID() modules.ConsensusChangeID {
+	return modules.ConsensusChangeID(crypto.HashObject(ce))
+}
+
 // NextEntry returns the entry after the current entry.
 func (ce *changeEntry) NextEntry(tx *bolt.Tx) (nextEntry changeEntry, exists bool) {
 	// Get the change node associated with the provided change entry.
@@ -135,4 +126,37 @@ func (ce *changeEntry) NextEntry(tx *bolt.Tx) (nextEntry changeEntry, exists boo
 	}
 
 	return getEntry(tx, cn.Next)
+}
+
+// createChangeLog assumes that no change log exists and creates a new one.
+func (cs *ConsensusSet) createChangeLog(tx *bolt.Tx) error {
+	// Create the changelog bucket.
+	cl, err := tx.CreateBucket(ChangeLog)
+	if err != nil {
+		return err
+	}
+
+	// Add the genesis block as the first entry of the change log.
+	ge := cs.genesisEntry()
+	geid := ge.ID()
+	cn := changeNode{
+		Entry: ge,
+		Next: modules.ConsensusChangeID{},
+	}
+	err = cl.Put(geid[:], encoding.Marshal(cn))
+	if err != nil {
+		return err
+	}
+	err = cl.Put(ChangeLogTailID, geid[:])
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// genesisEntry returns the id of the genesis block log entry.
+func (cs *ConsensusSet) genesisEntry() changeEntry {
+	return changeEntry{
+		AppliedBlocks: []types.BlockID{cs.blockRoot.Block.ID()},
+	}
 }
