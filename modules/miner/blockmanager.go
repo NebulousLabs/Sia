@@ -144,7 +144,14 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	if err == nil { // Only update the address if there was no error.
 		m.persist.Address = uc.UnlockHash()
 	}
-	return err
+	if err != nil {
+		err2 := m.save()
+		if err2 != nil {
+			err = errors.New(err.Error() + " -and- " + err2.Error())
+		}
+		return err
+	}
+	return m.save()
 }
 
 // SubmitHeader accepts a block header.

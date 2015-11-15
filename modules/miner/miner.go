@@ -68,7 +68,7 @@ type Miner struct {
 
 	// Utils
 	persistDir string
-	persist    MinerPersist
+	persist    Persist
 	log        *log.Logger
 	mu         sync.RWMutex
 }

@@ -20,8 +20,8 @@ var (
 )
 
 type (
-	// MinerPersist contains all of the persistent miner data.
-	MinerPersist struct {
+	// Persist contains all of the persistent miner data.
+	Persist struct {
 		RecentChange  modules.ConsensusChangeID
 		Height        types.BlockHeight
 		Target        types.Target
@@ -46,5 +46,16 @@ func (m *Miner) initPersist() error {
 	}
 	m.log = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 	m.log.Println("STARTUP: Miner logger opened, logging has started.")
-	return nil
+
+	return m.save()
+}
+
+// load loads the miner persistence from disk.
+func (m *Miner) load() error {
+	return persist.LoadFile(settingsMetadata, &m.persist, filepath.Join(m.persistDir, settingsFile))
+}
+
+// save saves the miner persistence to disk.
+func (m *Miner) save() error {
+	return persist.SaveFile(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
 }

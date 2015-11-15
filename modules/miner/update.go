@@ -36,6 +36,12 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 	// There is a new parent block, the source block should be updated to keep
 	// the stale rate as low as possible.
 	m.newSourceBlock()
+
+	// Save the new consensus information.
+	err := m.save()
+	if err != nil {
+		// return err
+	}
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
