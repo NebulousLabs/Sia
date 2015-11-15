@@ -58,8 +58,9 @@ func (cs *ConsensusSet) loadDB() error {
 
 	// Send all of the existing blocks to subscribers - temporary while
 	// subscribers don't have any persistence for block progress.
-	return cs.db.View(func(tx *bolt.Tx) error {
-		for i := types.BlockHeight(0); i <= height; i++ {
+	for i := types.BlockHeight(0); i <= height; i++ {
+		var ce changeEntry
+		err = cs.db.View(func(tx *bolt.Tx) error {
 			// Fetch the processed block at height 'i'.
 			id, err := getPath(tx, i)
 			if build.DEBUG && err != nil {
@@ -70,15 +71,19 @@ func (cs *ConsensusSet) loadDB() error {
 				panic(err)
 			}
 
-			// Send the block to subscribers.
-			ce := changeEntry{revertedBlocks: nil, appliedBlocks: []types.BlockID{pb.Block.ID()}}
-			cs.changeLog = append(cs.changeLog, ce)
-			// Readlock is implicitly held - initialization is fully blocking
-			// and there are no subscribers yet.
-			cs.readlockUpdateSubscribers(ce)
+			// Send the block to subscribers - a lock is implicitly held
+			// because startup is fully serial and no modules can talk to the
+			// consensus set until startup has completed.
+			ce = changeEntry{RevertedBlocks: nil, AppliedBlocks: []types.BlockID{pb.Block.ID()}}
+			return nil
+		})
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
-		return nil
-	})
+		cs.changeLog = append(cs.changeLog, ce)
+		cs.readlockUpdateSubscribers(ce)
+	}
+	return nil
 }
 
 // initPersist initializes the persistence structures of the consensus set, in

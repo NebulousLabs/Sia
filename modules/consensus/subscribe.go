@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -10,22 +8,10 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// A changeEntry records a change to the consensus set that happened, and is
-// used during subscriptions.
-type changeEntry struct {
-	revertedBlocks []types.BlockID
-	appliedBlocks  []types.BlockID
-}
-
 // computeConsensusChange computes the consensus change from the change entry
 // at index 'i' in the change log. If i is out of bounds, an error is returned.
-func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, i int) (cc modules.ConsensusChange, err error) {
-	if i < 0 || i >= len(cs.changeLog) {
-		err = errors.New("bounds error when querying changelog")
-		return
-	}
-
-	for _, revertedBlockID := range cs.changeLog[i].revertedBlocks {
+func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (cc modules.ConsensusChange, err error) {
+	for _, revertedBlockID := range ce.RevertedBlocks {
 		revertedBlock, err := getBlockMap(tx, revertedBlockID)
 		if build.DEBUG && err != nil {
 			panic(err)
@@ -60,7 +46,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, i int) (cc modules.C
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
-	for _, appliedBlockID := range cs.changeLog[i].appliedBlocks {
+	for _, appliedBlockID := range ce.AppliedBlocks {
 		appliedBlock, err := getBlockMap(tx, appliedBlockID)
 		if build.DEBUG && err != nil {
 			panic(err)
@@ -94,8 +80,9 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	// Get the consensus change and send it to all subscribers.
 	var cc modules.ConsensusChange
 	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Compute the consensus change so it can be sent to subscribers.
 		var err error
-		cc, err = cs.computeConsensusChange(tx, len(cs.changeLog)-1)
+		cc, err = cs.computeConsensusChange(tx, cs.changeLog[len(cs.changeLog)-1])
 		return err
 	})
 	if err != nil && build.DEBUG {
@@ -127,7 +114,7 @@ func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err 
 	defer cs.mu.RUnlock()
 
 	err = cs.db.View(func(tx *bolt.Tx) error {
-		cc, err = cs.computeConsensusChange(tx, i)
+		cc, err = cs.computeConsensusChange(tx, cs.changeLog[i])
 		return err
 	})
 	if err != nil {
@@ -177,7 +164,7 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		for i := range cs.changeLog {
-			cc, err := cs.computeConsensusChange(tx, i)
+			cc, err := cs.computeConsensusChange(tx, cs.changeLog[i])
 			if err != nil && build.DEBUG {
 				panic(err)
 			}

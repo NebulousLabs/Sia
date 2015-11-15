@@ -122,6 +122,10 @@ func dbInitialized(tx *bolt.Tx) bool {
 // initDatabase is run when the database. This has become the true
 // init function for consensus set
 func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
+	// Create the change log - needs to hapen before any sort of subscriber
+	// updates are made.
+	createChangeLog(tx)
+
 	// Enumerate the database buckets.
 	buckets := [][]byte{
 		BlockHeight,
