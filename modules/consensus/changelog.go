@@ -141,7 +141,7 @@ func (cs *ConsensusSet) createChangeLog(tx *bolt.Tx) error {
 	geid := ge.ID()
 	cn := changeNode{
 		Entry: ge,
-		Next: modules.ConsensusChangeID{},
+		Next:  modules.ConsensusChangeID{},
 	}
 	err = cl.Put(geid[:], encoding.Marshal(cn))
 	if err != nil {
