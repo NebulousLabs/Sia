@@ -3,25 +3,42 @@ package modules
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
+	// ConsensusDir is the name of the directory used for all of the consensus
+	// persistence files.
 	ConsensusDir = "consensus"
 
-	// DiffApply and DiffRevert are the names given to the variables
-	// corresponding to applying and reverting diffs.
-	DiffApply  DiffDirection = true
+	// DiffApply indicates that a diff is being applied to the consensus set.
+	DiffApply DiffDirection = true
+
+	// DiffRevert indicates that a diff is being reverted from the consensus
+	// set.
 	DiffRevert DiffDirection = false
 )
 
 var (
-	ErrBlockKnown        = errors.New("block already present in database")
-	ErrBlockUnsolved     = errors.New("block does not meet target")
+	// ErrBlockKnown is an error indicating that a block is already in the
+	// database.
+	ErrBlockKnown = errors.New("block already present in database")
+
+	// ErrBlockUnsolved indicates that a block did not meet the required POW
+	// target.
+	ErrBlockUnsolved = errors.New("block does not meet target")
+
+	// ErrNonExtendingBlock indicates that a block is valid but does not result
+	// in a fork that is the heaviest known fork - the consensus set has not
+	// changed as a result of seeing the block.
 	ErrNonExtendingBlock = errors.New("block does not extend the longest fork")
 )
 
 type (
+	// ConsensusChangeID is the id of a consensus change.
+	ConsensusChangeID crypto.Hash
+
 	// A DiffDirection indicates the "direction" of a diff, either applied or
 	// reverted. A bool is used to restrict the value to these two possibilities.
 	DiffDirection bool

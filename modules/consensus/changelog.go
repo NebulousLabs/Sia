@@ -19,6 +19,7 @@ package consensus
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -36,9 +37,6 @@ var (
 )
 
 type (
-	// changeEntryID
-	changeEntryID crypto.Hash
-
 	// changeEntry records a single atomic change to the consensus set.
 	changeEntry struct {
 		RevertedBlocks []types.BlockID
@@ -49,13 +47,13 @@ type (
 	// entry, and is the object that gets stored in the database.
 	changeNode struct {
 		Entry changeEntry
-		Next  changeEntryID
+		Next  modules.ConsensusChangeID
 	}
 )
 
 // ID returns the id of a change entry.
-func (ce *changeEntry) ID() changeEntryID {
-	return changeEntryID(crypto.HashObject(ce))
+func (ce *changeEntry) ID() modules.ConsensusChangeID {
+	return modules.ConsensusChangeID(crypto.HashObject(ce))
 }
 
 // createChangeLog assumes that no change log exists and creates a new one.
@@ -79,9 +77,9 @@ func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 	}
 
 	// Update the tail node to point to the new change entry as the next entry.
-	var tailID changeEntryID
+	var tailID modules.ConsensusChangeID
 	copy(tailID[:], cl.Get(ChangeLogTailID))
-	if tailID != (changeEntryID{}) {
+	if tailID != (modules.ConsensusChangeID{}) {
 		// Get the old tail node.
 		var tailCN changeNode
 		tailCNBytes := cl.Get(tailID[:])
