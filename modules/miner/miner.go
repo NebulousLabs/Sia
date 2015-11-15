@@ -43,13 +43,6 @@ type Miner struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// Miner data.
-	height        types.BlockHeight // Current consensus height.
-	target        types.Target      // Target of the child of the current block.
-	address       types.UnlockHash  // An address which should receive miner payouts.
-	blocksFound   []types.BlockID   // A list of blocks that have been found by the miner.
-	unsolvedBlock types.Block       // A block containing the most recent parent, transactions, and earliest legal timestamp.
-
 	// BlockManager variables. Becaues blocks are large, one block is used to
 	// make many headers which can be used by miners. Headers include an
 	// arbitrary data transaction (appended to the block) to make the merkle
@@ -75,6 +68,7 @@ type Miner struct {
 
 	// Utils
 	persistDir string
+	persist    MinerPersist
 	log        *log.Logger
 	mu         sync.RWMutex
 }
@@ -107,7 +101,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 		persistDir: persistDir,
 	}
-	m.height--
+	m.persist.Height--
 
 	err := m.initPersist()
 	if err != nil {
@@ -121,14 +115,14 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 // checkAddress checks that the miner has an address, fetching an address from
 // the wallet if not.
 func (m *Miner) checkAddress() error {
-	if m.address != (types.UnlockHash{}) {
+	if m.persist.Address != (types.UnlockHash{}) {
 		return nil
 	}
 	uc, err := m.wallet.NextAddress()
 	if err != nil {
 		return err
 	}
-	m.address = uc.UnlockHash()
+	m.persist.Address = uc.UnlockHash()
 	return nil
 }
 
@@ -138,7 +132,7 @@ func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, blockID := range m.blocksFound {
+	for _, blockID := range m.persist.BlocksFound {
 		if m.cs.InCurrentPath(blockID) {
 			goodBlocks++
 		} else {

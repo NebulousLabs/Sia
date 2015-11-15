@@ -20,7 +20,7 @@ var (
 // overlapping work with other blocks being mined in parallel or for different
 // forks (during testing).
 func (m *Miner) blockForWork() types.Block {
-	b := m.unsolvedBlock
+	b := m.persist.UnsolvedBlock
 
 	// Update the timestmap.
 	if b.Timestamp < types.CurrentTimestamp() {
@@ -29,7 +29,7 @@ func (m *Miner) blockForWork() types.Block {
 
 	// Update the address + payouts.
 	_ = m.checkAddress() // Err is ignored - address generation failed but can't do anything about it (log maybe).
-	b.MinerPayouts = []types.SiacoinOutput{{Value: b.CalculateSubsidy(m.height + 1), UnlockHash: m.address}}
+	b.MinerPayouts = []types.SiacoinOutput{{Value: b.CalculateSubsidy(m.persist.Height + 1), UnlockHash: m.persist.Address}}
 
 	// Add an arb-data txn to the block to create a unique merkle root.
 	randBytes, _ := crypto.RandBytes(types.SpecifierLen)
@@ -114,7 +114,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	}
 
 	// Return the header and target.
-	return header, m.target, nil
+	return header, m.persist.Target, nil
 }
 
 // SubmitBlock takes a solved block and submits it to the blockchain.
@@ -125,7 +125,7 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	// Add the miner to the blocks list if the only problem is that it's stale.
 	if err == modules.ErrNonExtendingBlock {
 		m.mu.Lock()
-		m.blocksFound = append(m.blocksFound, b.ID())
+		m.persist.BlocksFound = append(m.persist.BlocksFound, b.ID())
 		m.mu.Unlock()
 	}
 	if err != nil {
@@ -138,11 +138,11 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 
 	// Grab a new address for the miner. Call may fail if the wallet is locked
 	// or if the wallet addresses have been exhausted.
-	m.blocksFound = append(m.blocksFound, b.ID())
+	m.persist.BlocksFound = append(m.persist.BlocksFound, b.ID())
 	var uc types.UnlockConditions
 	uc, err = m.wallet.NextAddress()
 	if err == nil { // Only update the address if there was no error.
-		m.address = uc.UnlockHash()
+		m.persist.Address = uc.UnlockHash()
 	}
 	return err
 }

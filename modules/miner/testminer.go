@@ -37,7 +37,7 @@ func (m *Miner) BlockForWork() (b types.Block, t types.Target, err error) {
 	}
 
 	b = m.blockForWork()
-	return b, m.target, nil
+	return b, m.persist.Target, nil
 }
 
 // AddBlock adds a block to the consensus set.
@@ -68,7 +68,7 @@ func (m *Miner) FindBlock() (types.Block, error) {
 	// Get a block for work.
 	m.mu.Lock()
 	bfw := m.blockForWork()
-	target := m.target
+	target := m.persist.Target
 	m.mu.Unlock()
 
 	block, ok := m.SolveBlock(bfw, target)

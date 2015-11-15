@@ -194,7 +194,7 @@ func TestIntegrationBlocksMined(t *testing.T) {
 		t.Error("expexting 1 good block")
 	}
 	if staleBlocks != 1 {
-		t.Error(len(mt.miner.blocksFound))
+		t.Error(len(mt.miner.persist.BlocksFound))
 		t.Error("expecting 1 stale block, got", staleBlocks)
 	}
 }
