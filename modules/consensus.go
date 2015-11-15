@@ -67,6 +67,10 @@ type (
 
 	// A ConsensusChange enumerates a set of changes that occured to the consensus set.
 	ConsensusChange struct {
+		// ID is a unique id for the consensus change derived from the reverted
+		// and applied blocks.
+		ID ConsensusChangeID
+
 		// RevertedBlocks is the list of blocks that were reverted by the change.
 		// The reverted blocks were always all reverted before the applied blocks
 		// were applied. The revered blocks are presented in the order that they
