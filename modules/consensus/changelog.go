@@ -17,6 +17,7 @@ package consensus
 // the genesis block will call 'append' later on during initialization.
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -51,11 +52,6 @@ type (
 	}
 )
 
-// ID returns the id of a change entry.
-func (ce *changeEntry) ID() modules.ConsensusChangeID {
-	return modules.ConsensusChangeID(crypto.HashObject(ce))
-}
-
 // createChangeLog assumes that no change log exists and creates a new one.
 func createChangeLog(tx *bolt.Tx) error {
 	_, err := tx.CreateBucket(ChangeLog)
@@ -70,7 +66,7 @@ func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 	// Insert the change entry.
 	cl := tx.Bucket(ChangeLog)
 	ceid := ce.ID()
-	cn := changeNode{Entry: ce}
+	cn := changeNode{Entry: ce, Next: modules.ConsensusChangeID{}}
 	err := cl.Put(ceid[:], encoding.Marshal(cn))
 	if err != nil {
 		return err
@@ -103,4 +99,40 @@ func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 		return err
 	}
 	return nil
+}
+
+// ID returns the id of a change entry.
+func (ce *changeEntry) ID() modules.ConsensusChangeID {
+	return modules.ConsensusChangeID(crypto.HashObject(ce))
+}
+
+// getEntry returns the change entry with a given id, using a bool to indicate
+// existance.
+func getEntry(tx *bolt.Tx, id modules.ConsensusChangeID) (ce changeEntry, exists bool) {
+	var cn changeNode
+	cl := tx.Bucket(ChangeLog)
+	changeNodeBytes := cl.Get(id[:])
+	if changeNodeBytes == nil {
+		return changeEntry{}, false
+	}
+	err := encoding.Unmarshal(changeNodeBytes, &cn)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return cn.Entry, true
+}
+
+// NextEntry returns the entry after the current entry.
+func (ce *changeEntry) NextEntry(tx *bolt.Tx) (nextEntry changeEntry, exists bool) {
+	// Get the change node associated with the provided change entry.
+	ceid := ce.ID()
+	var cn changeNode
+	cl := tx.Bucket(ChangeLog)
+	changeNodeBytes := cl.Get(ceid[:])
+	err := encoding.Unmarshal(changeNodeBytes, &cn)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+
+	return getEntry(tx, cn.Next)
 }

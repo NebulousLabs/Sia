@@ -193,6 +193,11 @@ type (
 		// current block is presented to the subscriber.
 		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
 
+		// ConsensusSetPersistentSubscribe adds a subscriber to the list of
+		// subscribers, and gives them every consensus change that has occured
+		// since the change with the provided id.
+		ConsensusSetPersistentSubscribe(ConsensusSetSubscriber, ConsensusChangeID) error
+
 		// MinimumValidChildTimestamp returns the earliest timestamp that is
 		// valid on the current longest fork according to the consensus set. This is
 		// a required piece of information for the miner, who could otherwise be at

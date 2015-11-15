@@ -1,11 +1,17 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
+)
+
+var (
+	errChangeEntryNotFound = errors.New("module requesting a consensus starting point unknown to the database")
 )
 
 // computeConsensusChange computes the consensus change from the change entry
@@ -176,4 +182,35 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
+}
+
+// ConsensusSetPersistentSubscribe adds a subscriber to the list of
+// subscribers, and gives them every consensus change that has occured since
+// the change with the provided id.
+func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	cs.mu.Lock()
+	cs.subscribers = append(cs.subscribers, subscriber)
+	cs.mu.Demote()
+	defer cs.mu.DemotedUnlock()
+
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		entry, exists := getEntry(tx, start)
+		if !exists {
+			return errChangeEntryNotFound
+		}
+		entry, exists = entry.NextEntry(tx)
+		for exists {
+			cc, err := cs.computeConsensusChange(tx, entry)
+			if err != nil {
+				return err
+			}
+			subscriber.ProcessConsensusChange(cc)
+			entry, exists = entry.NextEntry(tx)
+		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	return nil
 }
