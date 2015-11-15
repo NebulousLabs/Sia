@@ -38,7 +38,6 @@ type ConsensusSet struct {
 	// changes that occur to the consensus set, computed using the changeLog.
 	changeLog         []changeEntry
 	subscribers       []modules.ConsensusSetSubscriber
-	digestSubscribers []modules.ConsensusSetDigestSubscriber
 
 	// dosBlocks are blocks that are invalid, but the invalidity is only
 	// discoverable during an expensive step of validation. These blocks are

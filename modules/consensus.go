@@ -53,18 +53,6 @@ type (
 		ProcessConsensusChange(ConsensusChange)
 	}
 
-	// ConsensusSetDigestSubscriber receives digests about changes to the
-	// consensus set in the form of a list of ids of blocks that got reverted
-	// and a list of ids of blocks that got applied. The IDs are given in the
-	// order in which they were processed. Reverted blocks are always processed
-	// before applied blocks.
-	ConsensusSetDigestSubscriber interface {
-		// ProcessConsensusDigest sends a list of reverted blocks and applied
-		// blocks to the module. There may not be any reverted blocks, but
-		// there will always be applied blocks.
-		ProcessConsensusDigest(revertedBlocks []types.BlockID, appliedBlocks []types.BlockID)
-	}
-
 	// A ConsensusChange enumerates a set of changes that occured to the consensus set.
 	ConsensusChange struct {
 		// ID is a unique id for the consensus change derived from the reverted
@@ -186,12 +174,6 @@ type (
 		// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.
 		// This is a thread-safe way of managing updates.
 		ConsensusSetSubscribe(ConsensusSetSubscriber)
-
-		// ConsensusSetDigestSubscribe subscribes a module to a digest of the
-		// changes in the consensus set. Immediately upon subscription, a
-		// digest containing the list of blocks from the starting id to the
-		// current block is presented to the subscriber.
-		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
 
 		// ConsensusSetPersistentSubscribe adds a subscriber to the list of
 		// subscribers, and gives them every consensus change that has occured

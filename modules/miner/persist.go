@@ -31,6 +31,19 @@ type (
 	}
 )
 
+// initSettings loads the settings file if it exists and creates it if it
+// doesn't.
+func (m *Miner) initSettings() error {
+	filename := filepath.Join(m.persistDir, settingsFile)
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return m.save()
+	} else if err != nil {
+		return err
+	}
+	return m.load()
+}
+
 // initPersist initializes the persistence of the miner.
 func (m *Miner) initPersist() error {
 	// Create the miner dir.
@@ -47,7 +60,8 @@ func (m *Miner) initPersist() error {
 	m.log = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
 	m.log.Println("STARTUP: Miner logger opened, logging has started.")
 
-	return m.save()
+	// Initalize the settings file.
+	return m.initSettings()
 }
 
 // load loads the miner persistence from disk.

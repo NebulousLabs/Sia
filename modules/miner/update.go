@@ -8,22 +8,17 @@ import (
 )
 
 // ProcessConsensusDigest will update the miner's most recent block.
-func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) {
+func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Sanity check - the length of appliedIDs should always be non-zero.
-	if build.DEBUG && len(appliedIDs) == 0 {
-		panic("received a digest with no applied blocks")
-	}
-
 	// Adjust the height of the miner.
-	m.persist.Height -= types.BlockHeight(len(revertedIDs))
-	m.persist.Height += types.BlockHeight(len(appliedIDs))
+	m.persist.Height -= types.BlockHeight(len(cc.RevertedBlocks))
+	m.persist.Height += types.BlockHeight(len(cc.AppliedBlocks))
 
 	// Update the unsolved block.
 	var exists1, exists2 bool
-	m.persist.UnsolvedBlock.ParentID = appliedIDs[len(appliedIDs)-1]
+	m.persist.UnsolvedBlock.ParentID = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 	m.persist.Target, exists1 = m.cs.ChildTarget(m.persist.UnsolvedBlock.ParentID)
 	m.persist.UnsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.persist.UnsolvedBlock.ParentID)
 	if build.DEBUG && !exists1 {
@@ -40,7 +35,7 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 	// Save the new consensus information.
 	err := m.save()
 	if err != nil {
-		// return err
+		m.log.Println("ERROR: " + err.Error())
 	}
 }
 
