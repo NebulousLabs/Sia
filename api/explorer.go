@@ -96,17 +96,14 @@ type (
 
 // buildExplorerTransaction takes a transaction and the height + id of the
 // block it appears in an uses that to build an explorer transaction.
-func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) ExplorerTransaction {
-	var scoids []types.SiacoinOutputID
-	var fcids []types.FileContractID
-	var fcvpoidss [][]types.SiacoinOutputID
-	var fcmpoidss [][]types.SiacoinOutputID
-	var fcrvpoidss [][]types.SiacoinOutputID
-	var fcrmpoidss [][]types.SiacoinOutputID
-	var sfoids []types.SiafundOutputID
-	var sfcoids []types.SiacoinOutputID
+func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
+	et.ID = txn.ID()
+	et.Height = height
+	et.Parent = parent
+	et.RawTransaction = txn
+
 	for i := range txn.SiacoinOutputs {
-		scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
+		et.SiacoinOutputIDs = append(et.SiacoinOutputIDs, txn.SiacoinOutputID(uint64(i)))
 	}
 	for i, fc := range txn.FileContracts {
 		fcid := txn.FileContractID(uint64(i))
@@ -118,9 +115,9 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 		for j := range fc.MissedProofOutputs {
 			fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
 		}
-		fcids = append(fcids, fcid)
-		fcvpoidss = append(fcvpoidss, fcvpoids)
-		fcmpoidss = append(fcmpoidss, fcmpoids)
+		et.FileContractIDs = append(et.FileContractIDs, fcid)
+		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcvpoids)
+		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcmpoids)
 	}
 	for _, fcr := range txn.FileContractRevisions {
 		var fcrvpoids []types.SiacoinOutputID
@@ -131,27 +128,16 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 		for j := range fcr.NewMissedProofOutputs {
 			fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
 		}
-		fcrvpoidss = append(fcrvpoidss, fcrvpoids)
-		fcrmpoidss = append(fcrmpoidss, fcrmpoids)
+		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcrvpoids)
+		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcrmpoids)
 	}
 	for i := range txn.SiafundOutputs {
-		sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
+		et.SiafundOutputIDs = append(et.SiafundOutputIDs, txn.SiafundOutputID(uint64(i)))
 	}
 	for _, sfi := range txn.SiafundInputs {
-		sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
+		et.SiaClaimOutputIDs = append(et.SiaClaimOutputIDs, sfi.ParentID.SiaClaimOutputID())
 	}
-	return ExplorerTransaction{
-		ID:                               txn.ID(),
-		Height:                           height,
-		Parent:                           parent,
-		SiacoinOutputIDs:                 scoids,
-		FileContractIDs:                  fcids,
-		FileContractValidProofOutputIDs:  fcvpoidss,
-		FileContractMissedProofOutputIDs: fcmpoidss,
-		SiafundOutputIDs:                 sfoids,
-		SiaClaimOutputIDs:                sfcoids,
-		RawTransaction:                   txn,
-	}
+	return et
 }
 
 // buildExplorerBlock takes a block and its height and uses it to construct an
