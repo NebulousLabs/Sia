@@ -5,89 +5,78 @@ import (
 )
 
 const (
+	// ExplorerDir is the name of the directory that is typically used for the
+	// explorer.
 	ExplorerDir = "explorer"
 )
 
-// Used for the BlockInfo call
 type (
-	ExplorerBlockData struct {
-		ID        types.BlockID   // The id hash of the block
-		Timestamp types.Timestamp // The timestamp on the block
-		Target    types.Target    // The target the block was mined for
-		Size      uint64          // The size in bytes of the marshalled block
-	}
+	// ExplorerStatistics returns a bunch of statistics about the explorer at
+	// the current height.
+	ExplorerStatistics struct {
+		// General consensus information.
+		Height            types.BlockHeight
+		CurrentBlock      types.BlockID
+		Target            types.Target
+		Difficulty        types.Currency
+		MaturityTimestamp types.Timestamp
+		TotalCoins        types.Currency
 
-	ExplorerStatus struct {
-		Height              types.BlockHeight
-		Block               types.Block
-		Target              types.Target
-		MatureTime          types.Timestamp
-		TotalCurrency       types.Currency
+		// Information about transaction type usage.
+		MinerPayoutCount          uint64
+		TransactionCount          uint64
+		SiacoinInputCount         uint64
+		SiacoinOutputCount        uint64
+		FileContractCount         uint64
+		FileContractRevisionCount uint64
+		StorageProofCount         uint64
+		SiafundInputCount         uint64
+		SiafundOutputCount        uint64
+		MinerFeeCount             uint64
+		ArbitraryDataCount        uint64
+		TransactionSignatureCount uint64
+
+		// Information about file contracts and file contract revisions.
 		ActiveContractCount uint64
-		ActiveContractCosts types.Currency
+		ActiveContractCost  types.Currency
 		ActiveContractSize  types.Currency
-		TotalContractCount  uint64
-		TotalContractCosts  types.Currency
+		TotalContractCost   types.Currency
 		TotalContractSize   types.Currency
 	}
 
-	// The following are used when returning information about a
-	// hash (using the GetHashInfo function)
-	//
-	// The responseType field is used to differentiate the structs
-	// blindly, and must be set
-	BlockResponse struct {
-		Block        types.Block
-		Height       types.BlockHeight
-		ResponseType string
-	}
-
-	// Wrapper for a transaction, with a little extra info
-	TransactionResponse struct {
-		Tx           types.Transaction
-		ParentID     types.BlockID
-		TxNum        int
-		ResponseType string
-	}
-
-	// Wrapper for fcInfo struct, defined in database.go
-	FcResponse struct {
-		Contract     types.TransactionID
-		Revisions    []types.TransactionID
-		Proof        types.TransactionID
-		ResponseType string
-	}
-
-	// Wrapper for the address type response
-	AddrResponse struct {
-		Txns         []types.TransactionID
-		ResponseType string
-	}
-
-	OutputResponse struct {
-		OutputTx     types.TransactionID
-		InputTx      types.TransactionID
-		ResponseType string
-	}
-
-	// The BlockExplorer interface provides access to the block explorer
+	// Explorer tracks the blockchain and provides tools for gathering
+	// statistics and finding objects or patterns within the blockchain.
 	Explorer interface {
-		// Returns a slice of data points about blocks. Called
-		// primarly by the blockdata api call
-		BlockInfo(types.BlockHeight, types.BlockHeight) ([]ExplorerBlockData, error)
+		// Statistics provides general statistics about the blockchain.
+		Statistics() ExplorerStatistics
 
-		// Function to return status of a bunch of static variables,
-		// in the form of an ExplorerStatus struct
-		ExplorerStatus() ExplorerStatus
+		// Block returns the block that matches the input block id. The bool
+		// indicates whether the block appears in the blockchain.
+		Block(types.BlockID) (types.Block, types.BlockHeight, bool)
 
-		// Function to safely shut down the block explorer. Closes the database
+		// Transaction returns the block that contains the input transaction
+		// id. The transaction itself is either the block (indicating the miner
+		// payouts are somehow involved), or it is a transaction inside of the
+		// block. The bool indicates whether the transaction is found in the
+		// consensus set.
+		Transaction(types.TransactionID) (types.Block, types.BlockHeight, bool)
+
+		// UnlockHash returns all of the transaction ids associated with the
+		// provided unlock hash.
+		UnlockHash(types.UnlockHash) []types.TransactionID
+
+		// SiacoinOutputID returns all of the transaction ids associated with
+		// the provided siacoin output id.
+		SiacoinOutputID(types.SiacoinOutputID) []types.TransactionID
+
+		// FileContractID returns all of the transaction ids associated with
+		// the provided file contract id.
+		FileContractID(types.FileContractID) []types.TransactionID
+
+		// SiafundOutputID returns all of the transaction ids associated with
+		// the provided siafund output id.
+		SiafundOutputID(types.SiafundOutputID) []types.TransactionID
+
 		Close() error
-
-		// Returns information pertaining to a given hash. The
-		// type of the returned value depends on what the hash
-		// was, so an interface is returned instead (i.e. an
-		// address will return a list of transactions while a
-		// block ID will return a block
-		GetHashInfo([]byte) (interface{}, error)
 	}
 )

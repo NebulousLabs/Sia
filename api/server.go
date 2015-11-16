@@ -16,17 +16,17 @@ import (
 // A Server is essentially a collection of modules and an API server to talk
 // to them all.
 type Server struct {
-	cs      modules.ConsensusSet
-	gateway modules.Gateway
-	host    modules.Host
-	miner   modules.Miner
-	renter  modules.Renter
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
-	exp     modules.Explorer
+	cs       modules.ConsensusSet
+	gateway  modules.Gateway
+	host     modules.Host
+	miner    modules.Miner
+	renter   modules.Renter
+	tpool    modules.TransactionPool
+	wallet   modules.Wallet
+	explorer modules.Explorer
 
 	// Consensus set variables.
-	blockchainHeight int
+	blockchainHeight types.BlockHeight
 	currentBlock     types.Block
 
 	listener  net.Listener
@@ -36,28 +36,27 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
+func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, explorer modules.Explorer) (*Server, error) {
 	l, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
 	}
 
 	srv := &Server{
-		cs:      s,
-		gateway: g,
-		host:    h,
-		miner:   m,
-		renter:  r,
-		tpool:   tp,
-		wallet:  w,
-		exp:     exp,
-
-		blockchainHeight: -1,
+		cs:       s,
+		gateway:  g,
+		host:     h,
+		miner:    m,
+		renter:   r,
+		tpool:    tp,
+		wallet:   w,
+		explorer: explorer,
 
 		listener: l,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
+	srv.blockchainHeight-- // Underflow the blockchain height so the genesis block sets the height to 0.
 
 	// Set the genesis block and start listening to the consensus package.
 	srv.currentBlock = srv.cs.GenesisBlock()

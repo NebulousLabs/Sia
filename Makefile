@@ -28,9 +28,17 @@ dependencies:
 	go get -u github.com/laher/goxc
 	go get -u golang.org/x/tools/cmd/cover
 
+# pkgs changes which packages the makefile calls operate on. run changes which
+# tests are run during testing.
+run = Test
+pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
+       ./modules/explorer ./modules/gateway ./modules/host ./modules/renter/hostdb \
+       ./modules/miner ./modules/renter ./modules/transactionpool ./modules/wallet \
+       ./persist ./siac ./siae ./sync ./types
+
 # fmt calls go fmt on all packages.
 fmt:
-	go fmt ./...
+	go fmt $(pkgs)
 
 # REBUILD touches all of the build-dependent source files, forcing them to be
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
@@ -61,17 +69,6 @@ xc: dependencies test test-long REBUILD
 clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
-# 3 commands and a variable are available for testing Sia packages. 'pkgs'
-# indicates which packages should be tested, and defaults to all the packages
-# with test files. Using './...' as default breaks compatibility with the cover
-# command. 'test' runs short tests that should last no more than a few seconds,
-# 'test-long' runs more thorough tests which should not last more than a few
-# minutes.
-run = Test
-pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
-       ./modules/explorer ./modules/gateway ./modules/host ./modules/miner \
-       ./modules/renter ./modules/renter/hostdb ./modules/transactionpool \
-       ./modules/wallet ./persist ./siac ./siae ./sync ./types
 test: REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs) -run=$(run)
 test-v: REBUILD
@@ -82,6 +79,7 @@ bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=300s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
+	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
 		go test -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
@@ -89,6 +87,7 @@ cover: clean REBUILD
 	done
 cover-integration: clean REBUILD
 	@mkdir -p cover/modules
+	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
 		go test -run=TestIntegration -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
@@ -96,6 +95,7 @@ cover-integration: clean REBUILD
 	done
 cover-unit: clean REBUILD
 	@mkdir -p cover/modules
+	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
 		go test -run=TestUnit -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \

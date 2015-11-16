@@ -56,6 +56,20 @@ func CalculateCoinbase(height BlockHeight) Currency {
 	return NewCurrency64(base).Mul(SiacoinPrecision)
 }
 
+// CalculateNumSiacoins calculates the number of siacoins in circulation at a
+// given height.
+func CalculateNumSiacoins(height BlockHeight) Currency {
+	deflationBlocks := BlockHeight(InitialCoinbase - MinimumCoinbase)
+	avgDeflationSiacoins := CalculateCoinbase(0).Add(CalculateCoinbase(height)).Div(NewCurrency64(2))
+	if height <= deflationBlocks {
+		deflationSiacoins := avgDeflationSiacoins.Mul(NewCurrency64(uint64(height + 1)))
+		return deflationSiacoins
+	}
+	deflationSiacoins := avgDeflationSiacoins.Mul(NewCurrency64(uint64(deflationBlocks + 1)))
+	trailingSiacoins := NewCurrency64(uint64(height - deflationBlocks)).Mul(CalculateCoinbase(height))
+	return deflationSiacoins.Add(trailingSiacoins)
+}
+
 // CalculateSubsidy takes a block and a height and determines the block
 // subsidy.
 func (b Block) CalculateSubsidy(height BlockHeight) Currency {
@@ -146,7 +160,7 @@ func (bid *BlockID) UnmarshalJSON(b []byte) error {
 	var bidBytes []byte
 	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &bidBytes)
 	if err != nil {
-		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+		return errors.New("could not unmarshal BlockID: " + err.Error())
 	}
 	copy(bid[:], bidBytes)
 	return nil

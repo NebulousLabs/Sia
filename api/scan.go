@@ -17,7 +17,7 @@ func scanAmount(amount string) (types.Currency, bool) {
 	return types.NewCurrency(i), true
 }
 
-// scanAddres scans a types.UnlockHash from a string.
+// scanAddress scans a types.UnlockHash from a string.
 func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
 	err = addr.LoadString(addrStr)
 	if err != nil {

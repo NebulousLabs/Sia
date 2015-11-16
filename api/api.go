@@ -67,6 +67,13 @@ func (srv *Server) initAPI() {
 		handleHTTPRequest(mux, "/consensus/block", srv.consensusBlockHandler) // GET
 	}
 
+	// Explorer API Calls
+	if srv.explorer != nil {
+		handleHTTPRequest(mux, "/explorer", srv.explorerHandler)            // GET
+		handleHTTPRequest(mux, "/explorer/hash", srv.explorerHashHandler)   // GET
+		handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler) // GET
+	}
+
 	// Gateway API Calls - Unfinished
 	if srv.gateway != nil {
 		handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
@@ -135,13 +142,6 @@ func (srv *Server) initAPI() {
 		handleHTTPRequest(mux, "/wallet/transactions", srv.walletTransactionsHandler)  // GET
 		handleHTTPRequest(mux, "/wallet/transactions/", srv.walletTransactionsHandler) // $(addr) GET
 		handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // POST
-	}
-
-	// BlockExplorer API Calls - Unfinished
-	if srv.exp != nil {
-		handleHTTPRequest(mux, "/explorer/status", srv.explorerStatusHandler)
-		handleHTTPRequest(mux, "/explorer/blockdata", srv.explorerBlockDataHandler)
-		handleHTTPRequest(mux, "/explorer/gethash", srv.explorerGetHashHandler)
 	}
 
 	// Create graceful HTTP server

@@ -5,7 +5,6 @@ package explorer
 import (
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -18,27 +17,42 @@ var (
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
 type Explorer struct {
+	// Transaction type counts.
+	minerPayoutCount          uint64
+	transactionCount          uint64
+	siacoinInputCount         uint64
+	siacoinOutputCount        uint64
+	fileContractCount         uint64
+	fileContractRevisionCount uint64
+	storageProofCount         uint64
+	siafundInputCount         uint64
+	siafundOutputCount        uint64
+	minerFeeCount             uint64
+	arbitraryDataCount        uint64
+	transactionSignatureCount uint64
+
 	// Factoids about file contracts.
 	activeContractCost  types.Currency
 	activeContractCount uint64
 	activeContractSize  types.Currency
 	totalContractCost   types.Currency
-	totalContractCount  uint64
 	totalContractSize   types.Currency
 	totalRevisionVolume types.Currency
 
 	// Other factoids.
 	blockchainHeight types.BlockHeight
-	currentBlock     types.Block
-	genesisBlockID   types.BlockID
+	currentBlock     types.BlockID
 
-	// startTime tracks when the explorer got turned on.
-	startTime time.Time
-	seenTimes []time.Time
+	// Hash lookups.
+	blockHashes       map[types.BlockID]types.BlockHeight
+	transactionHashes map[types.TransactionID]types.BlockHeight
+	unlockHashes      map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
+	siacoinOutputIDs  map[types.SiacoinOutputID]map[types.TransactionID]struct{}
+	fileContractIDs   map[types.FileContractID]map[types.TransactionID]struct{}
+	siafundOutputIDs  map[types.SiafundOutputID]map[types.TransactionID]struct{}
 
 	// Utilities.
 	cs         modules.ConsensusSet
-	db         *explorerDB
 	persistDir string
 	mu         sync.RWMutex
 }
@@ -53,10 +67,12 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
-		currentBlock:   cs.GenesisBlock(),
-		genesisBlockID: cs.GenesisBlock().ID(),
-		seenTimes:      make([]time.Time, types.MaturityDelay+1),
-		startTime:      time.Now(),
+		blockHashes:       make(map[types.BlockID]types.BlockHeight),
+		transactionHashes: make(map[types.TransactionID]types.BlockHeight),
+		unlockHashes:      make(map[types.UnlockHash]map[types.TransactionID]struct{}),
+		siacoinOutputIDs:  make(map[types.SiacoinOutputID]map[types.TransactionID]struct{}),
+		fileContractIDs:   make(map[types.FileContractID]map[types.TransactionID]struct{}),
+		siafundOutputIDs:  make(map[types.SiafundOutputID]map[types.TransactionID]struct{}),
 
 		cs:         cs,
 		persistDir: persistDir,
@@ -76,5 +92,5 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 // Close closes the explorer.
 func (e *Explorer) Close() error {
-	return e.db.CloseDatabase()
+	return nil
 }

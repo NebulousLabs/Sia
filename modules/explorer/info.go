@@ -1,84 +1,136 @@
 package explorer
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Calculates the total number of coins that have ever been created
-// from the bockheight
-func totalCurrency(height types.BlockHeight) types.Currency {
-	totalCoins := uint64(0)
-	coinbase := types.InitialCoinbase
-	minCoinbase := types.MinimumCoinbase
-	// Start the loop at i = 1 due to the genesis block
-	for i := types.BlockHeight(1); i < height; i++ {
-		totalCoins += coinbase
-		if coinbase > minCoinbase {
-			coinbase--
-		}
-	}
-	return types.NewCurrency64(totalCoins).Mul(types.SiacoinPrecision)
-}
-
-// Returns a partial slice of our stored data on the blockchain. Data
-// obtained from consensus updates
-func (e *Explorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	// Error checking on the given range
-	if start > finish {
-		return nil, errors.New("the start block must be higher than the end block")
-	}
-	if finish > e.blockchainHeight+1 {
-		return nil, errors.New("cannot get info on a block higher than the blockchain")
-	}
-
-	summaries, err := e.db.dbBlockSummaries(start, finish)
-	if err != nil {
-		return nil, err
-	}
-	return summaries, nil
-}
-
 // Returns many pieces of readily available information
-func (e *Explorer) ExplorerStatus() modules.ExplorerStatus {
+func (e *Explorer) Statistics() modules.ExplorerStatistics {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	// No reason that consensus should broadcast a block that it
-	// doesn't have information on
-	var currentTarget types.Target
-	if e.currentBlock.ID() == e.genesisBlockID {
-		currentTarget = types.RootDepth
-	} else {
-		var exists bool
-		currentTarget, exists = e.cs.ChildTarget(e.currentBlock.ParentID)
-		if build.DEBUG {
-			if !exists {
-				panic("The state of the current block cannot be found")
-			}
-		}
+	target, _ := e.cs.ChildTarget(e.currentBlock)
+	difficulty := types.NewCurrency(types.RootTarget.Int()).Div(types.NewCurrency(target.Int()))
+	currentBlock, exists := e.cs.BlockAtHeight(e.blockchainHeight)
+	if build.DEBUG && !exists {
+		panic("current block not found in consensus set")
 	}
+	return modules.ExplorerStatistics{
+		Height:            e.blockchainHeight,
+		CurrentBlock:      e.currentBlock,
+		Target:            target,
+		Difficulty:        difficulty,
+		MaturityTimestamp: currentBlock.Timestamp,
+		TotalCoins:        types.CalculateNumSiacoins(e.blockchainHeight),
 
-	// Find the seen time of the block 144 ago in the list
-	matureBlockTime := e.seenTimes[(e.blockchainHeight-144)%types.BlockHeight(len(e.seenTimes))]
+		MinerPayoutCount:          e.minerPayoutCount,
+		TransactionCount:          e.transactionCount,
+		SiacoinInputCount:         e.siacoinInputCount,
+		SiacoinOutputCount:        e.siacoinOutputCount,
+		FileContractCount:         e.fileContractCount,
+		FileContractRevisionCount: e.fileContractRevisionCount,
+		StorageProofCount:         e.storageProofCount,
+		SiafundInputCount:         e.siafundInputCount,
+		SiafundOutputCount:        e.siafundOutputCount,
+		MinerFeeCount:             e.minerFeeCount,
+		ArbitraryDataCount:        e.arbitraryDataCount,
+		TransactionSignatureCount: e.transactionSignatureCount,
 
-	return modules.ExplorerStatus{
-		Height:              e.blockchainHeight,
-		Block:               e.currentBlock,
-		Target:              currentTarget,
-		MatureTime:          types.Timestamp(matureBlockTime.Unix()),
-		TotalCurrency:       totalCurrency(e.blockchainHeight),
 		ActiveContractCount: e.activeContractCount,
-		ActiveContractCosts: e.activeContractCost,
+		ActiveContractCost:  e.activeContractCost,
 		ActiveContractSize:  e.activeContractSize,
-		TotalContractCount:  e.totalContractCount,
-		TotalContractCosts:  e.totalContractCost,
+		TotalContractCost:   e.totalContractCost,
 		TotalContractSize:   e.totalContractSize,
 	}
+}
+
+// Block takes a block id and finds the corresponding block, provided that the
+// block is in the consensus set.
+func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool) {
+	height, exists := e.blockHashes[id]
+	if !exists {
+		return types.Block{}, 0, false
+	}
+	block, exists := e.cs.BlockAtHeight(height)
+	if !exists {
+		return types.Block{}, 0, false
+	}
+	return block, height, true
+}
+
+// Transaction takes a transaction id and finds the block containing the
+// transaction. Because of the miner payouts, the transaction id might be a
+// block id. To find the transaction, iterate through the block.
+func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.BlockHeight, bool) {
+	height, exists := e.transactionHashes[id]
+	if !exists {
+		return types.Block{}, 0, false
+	}
+	block, exists := e.cs.BlockAtHeight(height)
+	if !exists {
+		return types.Block{}, 0, false
+	}
+	return block, height, true
+}
+
+// UnlockHash returns the ids of all the transactions that contain the unlock
+// hash. An empty set indicates that the unlock hash does not appear in the
+// blockchain.
+func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
+	txnMap, exists := e.unlockHashes[uh]
+	if !exists || len(txnMap) == 0 {
+		return nil
+	}
+	ids := make([]types.TransactionID, 0, len(txnMap))
+	for txid := range txnMap {
+		ids = append(ids, txid)
+	}
+	return ids
+}
+
+// SiacoinOutputID returns all of the transactions that contain the input
+// siacoin output id. An empty set indicates that the siacoin output id does
+// not appear in the blockchain.
+func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.TransactionID {
+	txnMap, exists := e.siacoinOutputIDs[id]
+	if !exists || len(txnMap) == 0 {
+		return nil
+	}
+	ids := make([]types.TransactionID, 0, len(txnMap))
+	for txid := range txnMap {
+		ids = append(ids, txid)
+	}
+	return ids
+}
+
+// FileContractIDs returns all of the transactions that contain the input file
+// contract id. An empty set indicates that the file contract id does not
+// appear in the blockchain.
+func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID {
+	txnMap, exists := e.fileContractIDs[id]
+	if !exists || len(txnMap) == 0 {
+		return nil
+	}
+	ids := make([]types.TransactionID, 0, len(txnMap))
+	for txid := range txnMap {
+		ids = append(ids, txid)
+	}
+	return ids
+}
+
+// SiafundOutputID returns all of the transactions that contain the input
+// siafund output id. An empty set indicates that the siafund output id does
+// not appear in the blockchain.
+func (e *Explorer) SiafundOutputID(id types.SiafundOutputID) []types.TransactionID {
+	txnMap, exists := e.siafundOutputIDs[id]
+	if !exists || len(txnMap) == 0 {
+		return nil
+	}
+	ids := make([]types.TransactionID, 0, len(txnMap))
+	for txid := range txnMap {
+		ids = append(ids, txid)
+	}
+	return ids
 }
