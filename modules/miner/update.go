@@ -31,6 +31,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// There is a new parent block, the source block should be updated to keep
 	// the stale rate as low as possible.
 	m.newSourceBlock()
+	m.persist.RecentChange = cc.ID
 
 	// Save the new consensus information.
 	err := m.save()

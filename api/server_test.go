@@ -19,6 +19,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -36,14 +37,13 @@ type serverTester struct {
 	walletKey crypto.TwofishKey
 
 	server *Server
+
+	dir string
 }
 
-// createServerTester creates a server tester object that is ready for testing,
-// including money in the wallet and all modules initalized.
-func createServerTester(name string) (*serverTester, error) {
-	// Create the testing directory.
-	testdir := build.TempDir("api", name)
-
+// assembleServerTester creates a bunch of modules and assembles them into a
+// server tester, without creating any directories or mining any blocks.
+func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester, error) {
 	// Create the modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
@@ -61,13 +61,11 @@ func createServerTester(name string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		return nil, err
-	}
-	_, err = w.Encrypt(key)
-	if err != nil {
-		return nil, err
+	if !w.Encrypted() {
+		_, err = w.Encrypt(key)
+		if err != nil {
+			return nil, err
+		}
 	}
 	err = w.Unlock(key)
 	if err != nil {
@@ -107,6 +105,8 @@ func createServerTester(name string) (*serverTester, error) {
 		walletKey: key,
 
 		server: srv,
+
+		dir: testdir,
 	}
 
 	// TODO: A more reasonable way of listening for server errors.
@@ -116,6 +116,23 @@ func createServerTester(name string) (*serverTester, error) {
 			panic(listenErr)
 		}
 	}()
+	return st, nil
+}
+
+// createServerTester creates a server tester object that is ready for testing,
+// including money in the wallet and all modules initalized.
+func createServerTester(name string) (*serverTester, error) {
+	// Create the testing directory.
+	testdir := build.TempDir("api", name)
+
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return nil, err
+	}
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		return nil, err
+	}
 
 	// Mine blocks until the wallet has confirmed money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -126,6 +143,24 @@ func createServerTester(name string) (*serverTester, error) {
 	}
 
 	return st, nil
+}
+
+// reloadedServerTester creates a server tester where all of the persistent
+// data has been copied to a new folder and all of the modules re-initialized
+// on the new folder. This gives an opportunity to see how modules will behave
+// when they are relying on their persistent structures.
+func (st *serverTester) reloadedServerTester() (*serverTester, error) {
+	// Copy the testing directory.
+	copiedDir := st.dir + " - " + persist.RandomSuffix()
+	err := build.CopyDir(st.dir, copiedDir)
+	if err != nil {
+		return nil, err
+	}
+	copyST, err := assembleServerTester(st.walletKey, copiedDir)
+	if err != nil {
+		return nil, err
+	}
+	return copyST, nil
 }
 
 // netAddress returns the NetAddress of the caller.

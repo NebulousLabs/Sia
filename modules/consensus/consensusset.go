@@ -36,8 +36,8 @@ type ConsensusSet struct {
 
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
-	changeLog         []changeEntry
-	subscribers       []modules.ConsensusSetSubscriber
+	changeLog   []changeEntry
+	subscribers []modules.ConsensusSetSubscriber
 
 	// dosBlocks are blocks that are invalid, but the invalidity is only
 	// discoverable during an expensive step of validation. These blocks are

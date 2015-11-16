@@ -5,7 +5,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
 )
