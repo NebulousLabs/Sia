@@ -331,7 +331,7 @@ Confirmed Balance:   %.2f SC
 Unconfirmed Delta:  %+.2f SC
 Exact:               %v H
 Siafunds:            %v SF
-Siafund Claims:      %v SC
+Siafund Claims:      %v H
 `, encStatus, lockStatus, sc, usc, status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
 }
 

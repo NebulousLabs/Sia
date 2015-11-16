@@ -3,10 +3,12 @@ package renter
 import (
 	"bytes"
 	"crypto/rand"
+	"reflect"
 	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestRepair tests that the repair method can repeatedly improve the
@@ -77,6 +79,60 @@ func TestRepair(t *testing.T) {
 	// check data integrity
 	buf.Truncate(dataSize)
 	if !bytes.Equal(buf.Bytes(), data) {
-		t.Fatal("recovereed data does not match original")
+		t.Fatal("recovered data does not match original")
+	}
+}
+
+// TestSubtractRepairMap tests the subtract method of the repairMap type.
+func TestSubtractRepairMap(t *testing.T) {
+	orig := repairMap{
+		10: {1, 2, 3},
+		12: {4, 5, 6},
+	}
+	sub := repairMap{
+		10: {1, 2},
+		12: {5},
+		13: {7, 8, 9},
+	}
+	exp := repairMap{
+		10: {3},
+		12: {4, 6},
+	}
+	res := orig.subtract(sub)
+	if !reflect.DeepEqual(exp, res) {
+		t.Fatal("maps were merged incorrectly:", exp, res)
+	}
+}
+
+// TestChunksBelow tests the chunksBelow method of the file type.
+func TestChunksBelow(t *testing.T) {
+	var f1, f2, f3, f4 file
+	f1.contracts = map[types.FileContractID]fileContract{
+		{}: {WindowStart: 1, Pieces: []pieceData{{}}},
+	}
+	f2.contracts = map[types.FileContractID]fileContract{
+		{}: {WindowStart: 1, Pieces: []pieceData{{}}},
+	}
+	f3.contracts = map[types.FileContractID]fileContract{
+		{}: {WindowStart: 1, Pieces: []pieceData{{}}},
+	}
+	f4.contracts = map[types.FileContractID]fileContract{
+		{0}: {WindowStart: 1, Pieces: []pieceData{{}}},
+		{1}: {WindowStart: 2, Pieces: []pieceData{{}}},
+	}
+	tests := []struct {
+		f         file
+		endHeight types.BlockHeight
+		expChunks int
+	}{
+		{f1, 0, 0},
+		{f2, 1, 0},
+		{f3, 2, 1},
+		{f4, 2, 0},
+	}
+	for i, test := range tests[3:] {
+		if n := len(test.f.chunksBelow(test.endHeight)); n != test.expChunks {
+			t.Errorf("%d: expected %v expiring chunks, got %v", i, test.expChunks, n)
+		}
 	}
 }

@@ -35,24 +35,37 @@ func (f *file) chunkHosts(index uint64) []modules.NetAddress {
 	return hosts
 }
 
-// removeExpiredContracts deletes contracts in the file object that have
-// expired.
-func (f *file) removeExpiredContracts(currentHeight types.BlockHeight) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var expired []types.FileContractID
-	for id, fc := range f.contracts {
-		if currentHeight >= fc.WindowStart {
-			expired = append(expired, id)
+// A repairMap is a mapping of chunks to pieces that need repair.
+type repairMap map[uint64][]uint64
+
+// subtract deletes the pieces in r that also appear in m, and returns r. If a
+// key contains no pieces, it is removed from the map.
+func (r repairMap) subtract(m repairMap) repairMap {
+	for chunk, mPieces := range m {
+		if _, ok := r[chunk]; !ok {
+			continue
+		}
+		for _, mPieceIndex := range mPieces {
+			for i, rPieceIndex := range r[chunk] {
+				if rPieceIndex == mPieceIndex {
+					// remove i'th element
+					r[chunk] = append(r[chunk][:i], r[chunk][i+1:]...)
+					break
+				}
+			}
+			// delete empty keys
+			if len(r[chunk]) == 0 {
+				delete(r, chunk)
+				break
+			}
 		}
 	}
-	for _, id := range expired {
-		delete(f.contracts, id)
-	}
+	return r
 }
 
-// incompleteChunks returns a map of chunks in need of repair.
-func (f *file) incompleteChunks() map[uint64][]uint64 {
+// incompleteChunks returns a map of chunks containing pieces that have not
+// been uploaded.
+func (f *file) incompleteChunks() repairMap {
 	present := make([][]bool, f.numChunks())
 	for i := range present {
 		present[i] = make([]bool, f.erasureCode.NumPieces())
@@ -62,7 +75,7 @@ func (f *file) incompleteChunks() map[uint64][]uint64 {
 			present[p.Chunk][p.Piece] = true
 		}
 	}
-	incomplete := make(map[uint64][]uint64)
+	incomplete := make(repairMap)
 	for chunkIndex, pieceBools := range present {
 		for pieceIndex, ok := range pieceBools {
 			if !ok {
@@ -73,25 +86,31 @@ func (f *file) incompleteChunks() map[uint64][]uint64 {
 	return incomplete
 }
 
-// expiringChunks returns a map of chunks whose pieces will expire within
-// 'renewThreshold' blocks.
-func (f *file) expiringChunks(currentHeight types.BlockHeight) map[uint64][]uint64 {
-	expiring := make(map[uint64][]uint64)
+// chunksBelow returns a map of chunks whose pieces will expire before the
+// desired endHeight. Importantly, it will not return pieces that have
+// non-expiring duplicates; this prevents the renter from repairing the same
+// chunks over and over.
+func (f *file) chunksBelow(endHeight types.BlockHeight) repairMap {
+	expiring := make(repairMap)
+	nonexpiring := make(repairMap)
 	for _, fc := range f.contracts {
-		if currentHeight >= fc.WindowStart-renewThreshold {
-			// mark every piece in the chunk
-			for _, p := range fc.Pieces {
+		// mark every piece in the chunk
+		for _, p := range fc.Pieces {
+			if fc.WindowStart < endHeight {
 				expiring[p.Chunk] = append(expiring[p.Chunk], p.Piece)
+			} else {
+				nonexpiring[p.Chunk] = append(nonexpiring[p.Chunk], p.Piece)
 			}
 		}
 	}
-	return expiring
+	return expiring.subtract(nonexpiring)
 }
 
 // offlineChunks returns a map of chunks whose pieces are not
 // immediately available for download.
-func (f *file) offlineChunks() map[uint64][]uint64 {
-	offline := make(map[uint64][]uint64)
+func (f *file) offlineChunks() repairMap {
+	offline := make(repairMap)
+	online := make(repairMap)
 	var mapLock sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(len(f.contracts))
@@ -101,22 +120,24 @@ func (f *file) offlineChunks() map[uint64][]uint64 {
 			conn, err := net.DialTimeout("tcp", string(fc.IP), hostTimeout)
 			if err == nil {
 				conn.Close()
-				return
 			}
-			// host did not respond in time; mark all pieces as offline
 			mapLock.Lock()
 			for _, p := range fc.Pieces {
-				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+				if err == nil {
+					online[p.Chunk] = append(online[p.Chunk], p.Piece)
+				} else {
+					offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+				}
 			}
 			mapLock.Unlock()
 		}(fc)
 	}
 	wg.Wait()
-	return offline
+	return offline.subtract(online)
 }
 
 // repair attempts to repair a file by uploading missing pieces to more hosts.
-func (f *file) repair(r io.ReaderAt, pieceMap map[uint64][]uint64, hosts []uploader) error {
+func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hosts []uploader) error {
 	// For each chunk with missing pieces, re-encode the chunk and upload each
 	// missing piece.
 	var wg sync.WaitGroup
@@ -227,18 +248,23 @@ func (r *Renter) threadedRepairUploads() {
 				continue
 			}
 
-			// delete any expired contracts
-			//f.removeExpiredContracts(height)
-
-			// determine file health
+			// check for un-uploaded pieces
 			badChunks := f.incompleteChunks()
 			if len(badChunks) == 0 {
-				//badChunks = f.expiringChunks(height)
-				// if len(badChunks) == 0 {
-				// 	// nothing to do
-				// 	continue
-				// }
-				continue
+				// check for expiring contracts
+				if meta.EndHeight == 0 {
+					// if auto-renewing, mark any chunks expiring soon
+					badChunks = f.chunksBelow(height + renewThreshold)
+				} else {
+					// otherwise mark any chunks expiring before desired end
+					badChunks = f.chunksBelow(meta.EndHeight)
+				}
+				if len(badChunks) == 0 {
+					// check for offline hosts (slow)
+					// TODO: reenable
+					//badChunks = f.offlineChunks()
+					continue
+				}
 			}
 
 			r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
