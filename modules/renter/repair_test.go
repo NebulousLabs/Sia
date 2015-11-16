@@ -104,6 +104,7 @@ func TestSubtractRepairMap(t *testing.T) {
 	}
 }
 
+// TestChunksBelow tests the chunksBelow method of the file type.
 func TestChunksBelow(t *testing.T) {
 	var f1, f2, f3, f4 file
 	f1.contracts = map[types.FileContractID]fileContract{

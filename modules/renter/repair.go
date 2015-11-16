@@ -38,7 +38,8 @@ func (f *file) chunkHosts(index uint64) []modules.NetAddress {
 // A repairMap is a mapping of chunks to pieces that need repair.
 type repairMap map[uint64][]uint64
 
-// subtract deletes the values in r that also appear in m, and returns r.
+// subtract deletes the pieces in r that also appear in m, and returns r. If a
+// key contains no pieces, it is removed from the map.
 func (r repairMap) subtract(m repairMap) repairMap {
 	for chunk, mPieces := range m {
 		if _, ok := r[chunk]; !ok {
@@ -47,11 +48,12 @@ func (r repairMap) subtract(m repairMap) repairMap {
 		for _, mPieceIndex := range mPieces {
 			for i, rPieceIndex := range r[chunk] {
 				if rPieceIndex == mPieceIndex {
-					// remove slice element
+					// remove i'th element
 					r[chunk] = append(r[chunk][:i], r[chunk][i+1:]...)
 					break
 				}
 			}
+			// delete empty keys
 			if len(r[chunk]) == 0 {
 				delete(r, chunk)
 				break
@@ -259,11 +261,9 @@ func (r *Renter) threadedRepairUploads() {
 				}
 				if len(badChunks) == 0 {
 					// check for offline hosts (slow)
-					badChunks = f.offlineChunks()
-					if len(badChunks) == 0 {
-						// nothing to do
-						continue
-					}
+					// TODO: reenable
+					//badChunks = f.offlineChunks()
+					continue
 				}
 			}
 
