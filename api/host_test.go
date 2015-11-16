@@ -60,20 +60,22 @@ func TestIntegrationHosting(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fi []FileInfo
+	var loops int
 	for len(fi) != 1 || fi[0].UploadProgress != 100 {
 		st.getAPI("/renter/files/list", &fi)
 		time.Sleep(3 * time.Second)
+		loops++
 	}
 
 	// mine blocks until storage proof is complete
-	for i := 0; i < 20+int(types.MaturityDelay); i++ {
+	for i := 0; i < 50+int(types.MaturityDelay); i++ {
 		st.miner.AddBlock()
 	}
 
 	// check balance
 	var wi WalletGET
 	st.getAPI("/wallet", &wi)
-	expBal := "7499794999617870000000002429474"
+	expBal := "16499494999617870000000002429474"
 	if wi.ConfirmedSiacoinBalance.String() != expBal {
 		t.Fatalf("host's balance was not affected: expected %v, got %v", expBal, wi.ConfirmedSiacoinBalance)
 	}
