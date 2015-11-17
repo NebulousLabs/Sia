@@ -145,11 +145,15 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				_, exists := e.siacoinOutputIDs[sci.ParentID]
 				if build.DEBUG && !exists {
 					panic("siacoin input without siacoin output")
+				} else if !exists {
+					e.siacoinOutputIDs[sci.ParentID] = make(map[types.TransactionID]struct{})
 				}
 				e.siacoinOutputIDs[sci.ParentID][txid] = struct{}{}
 				_, exists = e.unlockHashes[sci.UnlockConditions.UnlockHash()]
 				if build.DEBUG && !exists {
 					panic("unlock conditions without a parent unlock hash")
+				} else if !exists {
+					e.unlockHashes[sci.UnlockConditions.UnlockHash()] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[sci.UnlockConditions.UnlockHash()][txid] = struct{}{}
 				e.siacoinInputCount++
@@ -214,11 +218,15 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				_, exists := e.fileContractIDs[fcr.ParentID]
 				if build.DEBUG && !exists {
 					panic("revision without entry in file contract list")
+				} else if !exists {
+					e.fileContractIDs[fcr.ParentID] = make(map[types.TransactionID]struct{})
 				}
 				e.fileContractIDs[fcr.ParentID][txid] = struct{}{}
 				_, exists = e.unlockHashes[fcr.UnlockConditions.UnlockHash()]
 				if build.DEBUG && !exists {
 					panic("unlock conditions without unlock hash")
+				} else if !exists {
+					e.unlockHashes[fcr.UnlockConditions.UnlockHash()] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[fcr.UnlockConditions.UnlockHash()][txid] = struct{}{}
 				_, exists = e.unlockHashes[fcr.NewUnlockHash]
@@ -260,6 +268,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				_, exists := e.fileContractIDs[sp.ParentID]
 				if build.DEBUG && !exists {
 					panic("storage proof without file contract parent")
+				} else if !exists {
+					e.fileContractIDs[sp.ParentID] = make(map[types.TransactionID]struct{})
 				}
 				e.fileContractIDs[sp.ParentID][txid] = struct{}{}
 				e.storageProofCount++
@@ -268,11 +278,15 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				_, exists := e.siafundOutputIDs[sfi.ParentID]
 				if build.DEBUG && !exists {
 					panic("siafund input without corresponding output")
+				} else if !exists {
+					e.siafundOutputIDs[sfi.ParentID] = make(map[types.TransactionID]struct{})
 				}
 				e.siafundOutputIDs[sfi.ParentID][txid] = struct{}{}
 				_, exists = e.unlockHashes[sfi.UnlockConditions.UnlockHash()]
 				if build.DEBUG && !exists {
 					panic("unlock conditions without unlock hash")
+				} else if !exists {
+					e.unlockHashes[sfi.UnlockConditions.UnlockHash()] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[sfi.UnlockConditions.UnlockHash()][txid] = struct{}{}
 				_, exists = e.unlockHashes[sfi.ClaimUnlockHash]
