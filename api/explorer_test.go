@@ -19,7 +19,7 @@ func TestIntegrationExplorerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if eg.Height != st.server.blockchainHeight {
+	if eg.Height != st.server.cs.Height() {
 		t.Error("height not accurately reported by explorer")
 	}
 	if eg.MinerPayoutCount == 0 {

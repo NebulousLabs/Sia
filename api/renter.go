@@ -89,7 +89,7 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Request) {
 	// helper fn to display number of blocks before a file expires
 	blocksLeft := func(height types.BlockHeight) types.BlockHeight {
-		curHeight := types.BlockHeight(srv.blockchainHeight)
+		curHeight := srv.cs.Height()
 		if height < curHeight {
 			return 0
 		}

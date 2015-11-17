@@ -25,7 +25,7 @@ func TestIntegrationConsensusGET(t *testing.T) {
 	if cg.Height != 4 {
 		t.Error("wrong height returned in consensus GET call")
 	}
-	if cg.CurrentBlock != st.server.currentBlock.ID() {
+	if cg.CurrentBlock != st.server.cs.CurrentBlock().ID() {
 		t.Error("wrong block returned in consensus GET call")
 	}
 	expectedTarget := types.Target{128}

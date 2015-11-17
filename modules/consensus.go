@@ -180,18 +180,25 @@ type (
 		// since the change with the provided id.
 		ConsensusSetPersistentSubscribe(ConsensusSetSubscriber, ConsensusChangeID) error
 
+		// CurrentBlock returns the latest block in the heaviest known
+		// blockchain.
+		CurrentBlock() types.Block
+
+		// GenesisBlock returns the genesis block.
+		GenesisBlock() types.Block
+
+		// Height returns the current height of consensus.
+		Height() types.BlockHeight
+
+		// InCurrentPath returns true if the block id presented is found in the
+		// current path, false otherwise.
+		InCurrentPath(types.BlockID) bool
+
 		// MinimumValidChildTimestamp returns the earliest timestamp that is
 		// valid on the current longest fork according to the consensus set. This is
 		// a required piece of information for the miner, who could otherwise be at
 		// risk of mining invalid blocks.
 		MinimumValidChildTimestamp(types.BlockID) (types.Timestamp, bool)
-
-		// GenesisBlock returns the genesis block.
-		GenesisBlock() types.Block
-
-		// InCurrentPath returns true if the block id presented is found in the
-		// current path, false otherwise.
-		InCurrentPath(types.BlockID) bool
 
 		// StorageProofSegment returns the segment to be used in the storage proof for
 		// a given file contract.

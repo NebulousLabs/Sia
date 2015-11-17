@@ -166,25 +166,28 @@ func (cs *ConsensusSet) Close() error {
 	return cs.db.Close()
 }
 
-// MinimumValidChildTimestamp returns the earliest timestamp that the next block
-// can have in order for it to be considered valid.
-func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
-	// Error is not checked because it does not matter.
+// CurrentBlock returns the latest block in the heaviest known blockchain.
+func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 	_ = cs.db.View(func(tx *bolt.Tx) error {
-		pb, err := getBlockMap(tx, id)
-		if err != nil {
-			return err
-		}
-		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
-		exists = true
+		pb := currentProcessedBlock(tx)
+		block = pb.Block
 		return nil
 	})
-	return timestamp, exists
+	return block
 }
 
 // GenesisBlock returns the genesis block.
 func (cs *ConsensusSet) GenesisBlock() types.Block {
 	return cs.blockRoot.Block
+}
+
+// Height returns the height of the consensus set.
+func (cs *ConsensusSet) Height() (height types.BlockHeight) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		height = blockHeight(tx)
+		return nil
+	})
+	return height
 }
 
 // InCurrentPath returns true if the block presented is in the current path,
@@ -205,6 +208,22 @@ func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
 		return nil
 	})
 	return inPath
+}
+
+// MinimumValidChildTimestamp returns the earliest timestamp that the next block
+// can have in order for it to be considered valid.
+func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
+	// Error is not checked because it does not matter.
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
+		exists = true
+		return nil
+	})
+	return timestamp, exists
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

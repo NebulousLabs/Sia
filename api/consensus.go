@@ -25,11 +25,11 @@ func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request)
 	id := srv.mu.RLock()
 	defer srv.mu.RUnlock(id)
 
-	curblockID := srv.currentBlock.ID()
-	currentTarget, _ := srv.cs.ChildTarget(curblockID)
+	cbid := srv.cs.CurrentBlock().ID()
+	currentTarget, _ := srv.cs.ChildTarget(cbid)
 	writeJSON(w, ConsensusGET{
-		Height:       types.BlockHeight(srv.blockchainHeight),
-		CurrentBlock: srv.currentBlock.ID(),
+		Height:       srv.cs.Height(),
+		CurrentBlock: cbid,
 		Target:       currentTarget,
 	})
 }

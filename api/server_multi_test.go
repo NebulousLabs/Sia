@@ -19,7 +19,7 @@ func TestReloading(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.server.blockchainHeight != rst.server.blockchainHeight {
+	if st.server.cs.Height() != rst.server.cs.Height() {
 		t.Error("server heights do not match")
 	}
 
