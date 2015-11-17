@@ -36,7 +36,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Save the new consensus information.
 	err := m.save()
 	if err != nil {
-		m.log.Println("ERROR: " + err.Error())
+		m.log.Println("ERROR:", err)
 	}
 }
 
@@ -63,5 +63,5 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []
 			break
 		}
 	}
-	m.persist.UnsolvedBlock.Transactions = unconfirmedTransactions[0 : i+1]
+	m.persist.UnsolvedBlock.Transactions = unconfirmedTransactions[:i+1]
 }

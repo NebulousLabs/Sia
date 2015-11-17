@@ -20,8 +20,8 @@ var (
 )
 
 type (
-	// Persist contains all of the persistent miner data.
-	Persist struct {
+	// persist contains all of the persistent miner data.
+	persistence struct {
 		RecentChange  modules.ConsensusChangeID
 		Height        types.BlockHeight
 		Target        types.Target

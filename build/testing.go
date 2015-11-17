@@ -23,7 +23,7 @@ func TempDir(dirs ...string) string {
 }
 
 // CopyFile copies a file from a source to a destination.
-func Copyfile(source, dest string) error {
+func CopyFile(source, dest string) error {
 	sf, err := os.Open(source)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func CopyDir(source, dest string) error {
 				return err
 			}
 		} else {
-			err = Copyfile(newSource, newDest)
+			err = CopyFile(newSource, newDest)
 			if err != nil {
 				return err
 			}

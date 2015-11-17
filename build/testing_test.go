@@ -52,14 +52,14 @@ func TestCopyDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(f1, data[0]) != 0 {
+	if !bytes.Equal(f1, data[0]) {
 		t.Error("f1 did not match")
 	}
 	d1f1, err := ioutil.ReadFile(filepath.Join(rootCopy, "d1", "d1f1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(d1f1, data[1]) != 0 {
+	if !bytes.Equal(d1f1, data[1]) {
 		t.Error("f1 did not match")
 	}
 }

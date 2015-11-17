@@ -126,13 +126,7 @@ func blockHeight(tx *bolt.Tx) types.BlockHeight {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-
-	// Check that there was not an underflow on the height.
-	zeroHeight := types.BlockHeight(0)
-	if height > zeroHeight-1e9 {
-		panic(height)
-	}
-	return types.BlockHeight(height)
+	return height
 }
 
 // currentBlockID returns the id of the most recent block in the consensus set.
