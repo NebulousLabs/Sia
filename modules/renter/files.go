@@ -69,8 +69,8 @@ func (f *file) numChunks() uint64 {
 	return n
 }
 
-// Available indicates whether the file is ready to be downloaded.
-func (f *file) Available() bool {
+// available indicates whether the file is ready to be downloaded.
+func (f *file) available() bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	chunkPieces := make([]int, f.numChunks())
@@ -87,10 +87,10 @@ func (f *file) Available() bool {
 	return true
 }
 
-// UploadProgress indicates what percentage of the file (plus redundancy) has
+// uploadProgress indicates what percentage of the file (plus redundancy) has
 // been uploaded. Note that a file may be Available long before UploadProgress
 // reaches 100%, and UploadProgress may report a value greater than 100%.
-func (f *file) UploadProgress() float32 {
+func (f *file) uploadProgress() float32 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	var uploaded uint64
@@ -102,19 +102,9 @@ func (f *file) UploadProgress() float32 {
 	return 100 * (float32(uploaded) / float32(desired))
 }
 
-// Nickname returns the nickname of the file.
-func (f *file) Nickname() string {
-	return f.name
-}
-
-// Filesize returns the size of the file.
-func (f *file) Filesize() uint64 {
-	return f.size
-}
-
-// Expiration returns the lowest height at which any of the file's contracts
+// expiration returns the lowest height at which any of the file's contracts
 // will expire.
-func (f *file) Expiration() types.BlockHeight {
+func (f *file) expiration() types.BlockHeight {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	if len(f.contracts) == 0 {
@@ -160,14 +150,21 @@ func (r *Renter) DeleteFile(nickname string) error {
 }
 
 // FileList returns all of the files that the renter has.
-func (r *Renter) FileList() (files []modules.FileInfo) {
+func (r *Renter) FileList() []modules.FileInfo {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
-		files = append(files, f)
+		files = append(files, modules.FileInfo{
+			Nickname:       f.name,
+			Filesize:       f.size,
+			Available:      f.available(),
+			UploadProgress: f.uploadProgress(),
+			Expiration:     f.expiration(),
+		})
 	}
-	return
+	return files
 }
 
 // RenameFile takes an existing file and changes the nickname. The original

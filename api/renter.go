@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -11,20 +10,12 @@ import (
 
 // DownloadInfo is a helper struct for the downloadqueue API call.
 type DownloadInfo struct {
-	StartTime   time.Time
-	Filesize    uint64
-	Received    uint64
-	Destination string
-	Nickname    string
+	modules.DownloadInfo
 }
 
 // FileInfo is a helper struct for the files API call.
 type FileInfo struct {
-	Available      bool
-	UploadProgress float32
-	Nickname       string
-	Filesize       uint64
-	TimeRemaining  types.BlockHeight
+	modules.FileInfo
 }
 
 // LoadedFiles lists files that were loaded into the renter.
@@ -71,15 +62,9 @@ func (srv *Server) renterFilesDownloadHandler(w http.ResponseWriter, req *http.R
 // queue.
 func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request) {
 	downloads := srv.renter.DownloadQueue()
-	downloadSet := make([]DownloadInfo, 0, len(downloads))
-	for _, dl := range downloads {
-		downloadSet = append(downloadSet, DownloadInfo{
-			StartTime:   dl.StartTime(),
-			Filesize:    dl.Filesize(),
-			Received:    dl.Received(),
-			Destination: dl.Destination(),
-			Nickname:    dl.Nickname(),
-		})
+	downloadSet := make([]DownloadInfo, len(downloads))
+	for i, dl := range downloads {
+		downloadSet[i] = DownloadInfo{dl}
 	}
 
 	writeJSON(w, downloadSet)
@@ -87,25 +72,10 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 
 // renterFilesListHandler handles the API call to list all of the files.
 func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Request) {
-	// helper fn to display number of blocks before a file expires
-	blocksLeft := func(height types.BlockHeight) types.BlockHeight {
-		curHeight := srv.cs.Height()
-		if height < curHeight {
-			return 0
-		}
-		return height - curHeight
-	}
-
 	files := srv.renter.FileList()
-	fileSet := make([]FileInfo, 0, len(files))
-	for _, file := range files {
-		fileSet = append(fileSet, FileInfo{
-			Available:      file.Available(),
-			UploadProgress: file.UploadProgress(),
-			Nickname:       file.Nickname(),
-			Filesize:       file.Filesize(),
-			TimeRemaining:  blocksLeft(file.Expiration()),
-		})
+	fileSet := make([]FileInfo, len(files))
+	for i, file := range files {
+		fileSet[i] = FileInfo{file}
 	}
 
 	writeJSON(w, fileSet)

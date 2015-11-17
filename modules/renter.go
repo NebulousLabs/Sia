@@ -43,46 +43,23 @@ type FileUploadParams struct {
 	PieceSize   uint64
 }
 
-// FileInfo is an interface providing information about a file.
-type FileInfo interface {
-	// Available indicates whether the file is available for downloading or
-	// not.
-	Available() bool
-
-	// UploadProgress is a percentage indicating the progress of the file as
-	// it is being uploaded. This percentage is calculated internally (unlike
-	// DownloadInfo) because redundancy schemes complicate the definition of
-	// "progress." Since UploadProgress includes redundancy, files will almost
-	// certainly be Available before UploadProgress == 100.
-	UploadProgress() float32
-
-	// Nickname is the nickname of the file.
-	Nickname() string
-
-	// Filesize is the size of the file.
-	Filesize() uint64
-
-	// Expiration is the block height at which the file will expire.
-	Expiration() types.BlockHeight
+// FileInfo provides information about a file.
+type FileInfo struct {
+	Nickname       string
+	Filesize       uint64
+	Available      bool    // whether file can be downloaded
+	UploadProgress float32 // percentage of full redundancy
+	Expiration     types.BlockHeight
 }
 
-// DownloadInfo is an interface providing information about a file that has
-// been requested for download.
-type DownloadInfo interface {
-	// StartTime is when the download was initiated.
-	StartTime() time.Time
-
-	// Filesize is the size of the file being downloaded.
-	Filesize() uint64
-
-	// Received is the number of bytes downloaded so far.
-	Received() uint64
-
-	// Destination is the filepath that the file was downloaded into.
-	Destination() string
-
-	// Nickname is the identifier assigned to the file when it was uploaded.
-	Nickname() string
+// DownloadInfo provides information about a file that has been requested for
+// download.
+type DownloadInfo struct {
+	Nickname    string
+	Destination string
+	Filesize    uint64
+	Received    uint64 // bytes
+	StartTime   time.Time
 }
 
 // RentInfo contains a list of all files by nickname. (deprecated)
