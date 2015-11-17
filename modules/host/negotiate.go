@@ -247,11 +247,6 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return err
 	}
 
-	// send doubly-signed transaction set
-	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
-		return errors.New("couldn't write signed transaction set: " + err.Error())
-	}
-
 	// Add this contract to the host's list of obligations.
 	// TODO: is there a race condition here?
 	h.mu.Lock()
@@ -268,6 +263,11 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	h.obligationsByID[co.ID] = co
 	h.save()
 	h.mu.Unlock()
+
+	// send doubly-signed transaction set
+	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
+		return errors.New("couldn't write signed transaction set: " + err.Error())
+	}
 
 	return nil
 }

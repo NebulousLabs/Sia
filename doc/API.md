@@ -345,7 +345,7 @@ current wallet.
 'encryptionpassword' is the encryption key of the wallet. An error will be
 returned if the wrong key is provided.
 
-Response: Standard.
+Response: standard.
 
 #### /wallet/load/seed [POST]
 
@@ -399,7 +399,7 @@ still available.
 
 Parameters: none
 
-Response: Standard.
+Response: standard.
 
 #### /wallet/seeds [GET]
 
@@ -691,7 +691,9 @@ Parameters: none
 
 Response:
 ```
-version string
+struct {
+	Version   string
+}
 ```
 
 #### /daemon/updates/apply:
@@ -931,7 +933,7 @@ Response:
 ```
 []byte
 ```
-The response is a byte array containing a targe followed by a block header
+The response is a byte array containing a target followed by a block header
 followed by a block. The target is the first 32 bytes. The block header is the
 following 80 bytes, and the nonce is bytes 32-39 (inclusive) of the header
 (bytes 64-71 of the whole array). The remaining bytes are the block. Hashing
@@ -1008,7 +1010,7 @@ byte slice. The block does not need to be modified from the block provided by
 /miner/blockforwork except that the nonce must be updated. The nonce can be
 found at bytes 32-39 (inclusive) of the block.
 
-Response Body:
+Parameters:
 ```
 []byte
 ```
@@ -1193,7 +1195,9 @@ nickname string
 
 Response:
 ```
-File string
+struct {
+	File string
+}
 ```
 `file` is the ASCII representation of the '.sia' that would have been created.
 
