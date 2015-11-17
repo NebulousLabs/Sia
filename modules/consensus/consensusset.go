@@ -34,17 +34,15 @@ type ConsensusSet struct {
 	// The block root contains the genesis block.
 	blockRoot processedBlock
 
-	// The db is a database holding the current consensus set.
-	db *persist.BoltDatabase
-
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
-	changeLog         []changeEntry
-	subscribers       []modules.ConsensusSetSubscriber
-	digestSubscribers []modules.ConsensusSetDigestSubscriber
+	changeLog   []changeEntry
+	subscribers []modules.ConsensusSetSubscriber
 
-	// dosBlocks keeps track of seen blocks. It is a "blacklist" of blocks
-	// known to the expensive part of block validation.
+	// dosBlocks are blocks that are invalid, but the invalidity is only
+	// discoverable during an expensive step of validation. These blocks are
+	// recorded to eliminate a DoS vector where an expensive-to-validate block
+	// is submitted to the consensus set repeatedly.
 	dosBlocks map[types.BlockID]struct{}
 
 	// checkingConsistency is a bool indicating whether or not a consistency
@@ -55,14 +53,13 @@ type ConsensusSet struct {
 	// block.
 	checkingConsistency bool
 
-	// marshaler encodes and decodes between objects and byte slices.
-	marshaler encoding.GenericMarshaler
-	// blockRuleHelper calculates values on blocks for block validity rule
-	// enforcement.
+	// Interfaces to abstract the dependencies of the ConsensusSet.
+	marshaler       encoding.GenericMarshaler
 	blockRuleHelper blockRuleHelper
-	// blockValidator validates Blocks against validity rules.
-	blockValidator blockValidator
+	blockValidator  blockValidator
 
+	// Utilities
+	db         *persist.BoltDatabase
 	persistDir string
 	mu         demotemutex.DemoteMutex
 }
@@ -126,6 +123,7 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
 	gateway.RegisterRPC("RelayBlock", cs.relayBlock)
 	gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+
 	return cs, nil
 }
 
@@ -168,25 +166,28 @@ func (cs *ConsensusSet) Close() error {
 	return cs.db.Close()
 }
 
-// MinimumValidChildTimestamp returns the earliest timestamp that the next block
-// can have in order for it to be considered valid.
-func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
-	// Error is not checked because it does not matter.
+// CurrentBlock returns the latest block in the heaviest known blockchain.
+func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 	_ = cs.db.View(func(tx *bolt.Tx) error {
-		pb, err := getBlockMap(tx, id)
-		if err != nil {
-			return err
-		}
-		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
-		exists = true
+		pb := currentProcessedBlock(tx)
+		block = pb.Block
 		return nil
 	})
-	return timestamp, exists
+	return block
 }
 
 // GenesisBlock returns the genesis block.
 func (cs *ConsensusSet) GenesisBlock() types.Block {
 	return cs.blockRoot.Block
+}
+
+// Height returns the height of the consensus set.
+func (cs *ConsensusSet) Height() (height types.BlockHeight) {
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		height = blockHeight(tx)
+		return nil
+	})
+	return height
 }
 
 // InCurrentPath returns true if the block presented is in the current path,
@@ -207,6 +208,22 @@ func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
 		return nil
 	})
 	return inPath
+}
+
+// MinimumValidChildTimestamp returns the earliest timestamp that the next block
+// can have in order for it to be considered valid.
+func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
+	// Error is not checked because it does not matter.
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		timestamp = cs.blockRuleHelper.minimumValidChildTimestamp(tx.Bucket(BlockMap), pb)
+		exists = true
+		return nil
+	})
+	return timestamp, exists
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

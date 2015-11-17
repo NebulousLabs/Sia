@@ -37,9 +37,9 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 
 // handleHTTPRequest is a wrapper function that handles all incoming calls to
 // the API.
-func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
+func (srv *Server) handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), "Sia-Agent") {
+		if !strings.Contains(req.UserAgent(), "Sia-Agent") && (srv.wallet != nil || srv.renter != nil || srv.host != nil || srv.miner != nil) {
 			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusBadRequest)
 			return
 		}
@@ -52,96 +52,96 @@ func (srv *Server) initAPI() {
 	mux := http.NewServeMux()
 
 	// 404 Calls
-	handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
+	srv.handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
 
 	// Daemon API Calls - Unfinished
-	handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
-	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
-	handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
-	handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
-	handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	srv.handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
+	srv.handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
+	srv.handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
+	srv.handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
+	srv.handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {
-		handleHTTPRequest(mux, "/consensus", srv.consensusHandler)            // GET
-		handleHTTPRequest(mux, "/consensus/block", srv.consensusBlockHandler) // GET
+		srv.handleHTTPRequest(mux, "/consensus", srv.consensusHandler)            // GET
+		srv.handleHTTPRequest(mux, "/consensus/block", srv.consensusBlockHandler) // GET
 	}
 
 	// Explorer API Calls
 	if srv.explorer != nil {
-		handleHTTPRequest(mux, "/explorer", srv.explorerHandler)            // GET
-		handleHTTPRequest(mux, "/explorer/hash", srv.explorerHashHandler)   // GET
-		handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler) // GET
+		srv.handleHTTPRequest(mux, "/explorer", srv.explorerHandler)            // GET
+		srv.handleHTTPRequest(mux, "/explorer/", srv.explorerHandler)           // $(hash) GET
+		srv.handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler) // GET
 	}
 
 	// Gateway API Calls - Unfinished
 	if srv.gateway != nil {
-		handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
-		handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
-		handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+		srv.handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
+		srv.handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
+		srv.handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
 	}
 
 	// Host API Calls - Unfinished
 	if srv.host != nil {
-		handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
-		handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
-		handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
+		srv.handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
+		srv.handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
+		srv.handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
 	}
 
 	// HostDB API Calls - DEPRECATED
 	if srv.renter != nil {
-		handleHTTPRequest(mux, "/hostdb/hosts/active", srv.renterHostsActiveHandler)
-		handleHTTPRequest(mux, "/hostdb/hosts/all", srv.renterHostsAllHandler)
+		srv.handleHTTPRequest(mux, "/hostdb/hosts/active", srv.renterHostsActiveHandler)
+		srv.handleHTTPRequest(mux, "/hostdb/hosts/all", srv.renterHostsAllHandler)
 	}
 
 	// Miner API Calls - Unfinished
 	if srv.miner != nil {
-		handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
-		handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
-		handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
-		handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
-		handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
+		srv.handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
+		srv.handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
+		srv.handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
+		srv.handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
+		srv.handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
 	}
 
 	// Renter API Calls - Unfinished
 	if srv.renter != nil {
-		handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
-		handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
-		handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
-		handleHTTPRequest(mux, "/renter/files/list", srv.renterFilesListHandler)
-		handleHTTPRequest(mux, "/renter/files/load", srv.renterFilesLoadHandler)
-		handleHTTPRequest(mux, "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
-		handleHTTPRequest(mux, "/renter/files/rename", srv.renterFilesRenameHandler)
-		handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
-		handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
-		handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
-		handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
+		srv.handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/list", srv.renterFilesListHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/load", srv.renterFilesLoadHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/rename", srv.renterFilesRenameHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
+		srv.handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
+		srv.handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
 	}
 
 	// TransactionPool API Calls - Unfinished
 	if srv.tpool != nil {
-		handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+		srv.handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls
 	if srv.wallet != nil {
-		handleHTTPRequest(mux, "/wallet", srv.walletHandler)                           // GET
-		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
-		handleHTTPRequest(mux, "/wallet/addresses", srv.walletAddressesHandler)        // GET
-		handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // POST
-		handleHTTPRequest(mux, "/wallet/encrypt", srv.walletEncryptHandler)            // POST - COMPATv0.4.0
-		handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
-		handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
-		handleHTTPRequest(mux, "/wallet/load/seed", srv.walletLoadSeedHandler)         // POST
-		handleHTTPRequest(mux, "/wallet/load/siag", srv.walletLoadSiagHandler)         // POST
-		handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // POST
-		handleHTTPRequest(mux, "/wallet/seeds", srv.walletSeedsHandler)                // GET
-		handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)          // POST
-		handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)          // POST
-		handleHTTPRequest(mux, "/wallet/transaction/", srv.walletTransactionHandler)   // $(id) GET
-		handleHTTPRequest(mux, "/wallet/transactions", srv.walletTransactionsHandler)  // GET
-		handleHTTPRequest(mux, "/wallet/transactions/", srv.walletTransactionsHandler) // $(addr) GET
-		handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // POST
+		srv.handleHTTPRequest(mux, "/wallet", srv.walletHandler)                           // GET
+		srv.handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
+		srv.handleHTTPRequest(mux, "/wallet/addresses", srv.walletAddressesHandler)        // GET
+		srv.handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // POST
+		srv.handleHTTPRequest(mux, "/wallet/encrypt", srv.walletEncryptHandler)            // POST - COMPATv0.4.0
+		srv.handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
+		srv.handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
+		srv.handleHTTPRequest(mux, "/wallet/load/seed", srv.walletLoadSeedHandler)         // POST
+		srv.handleHTTPRequest(mux, "/wallet/load/siag", srv.walletLoadSiagHandler)         // POST
+		srv.handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // POST
+		srv.handleHTTPRequest(mux, "/wallet/seeds", srv.walletSeedsHandler)                // GET
+		srv.handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)          // POST
+		srv.handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)          // POST
+		srv.handleHTTPRequest(mux, "/wallet/transaction/", srv.walletTransactionHandler)   // $(id) GET
+		srv.handleHTTPRequest(mux, "/wallet/transactions", srv.walletTransactionsHandler)  // GET
+		srv.handleHTTPRequest(mux, "/wallet/transactions/", srv.walletTransactionsHandler) // $(addr) GET
+		srv.handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // POST
 	}
 
 	// Create graceful HTTP server

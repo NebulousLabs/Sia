@@ -19,7 +19,7 @@ func TestIntegrationExplorerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if eg.Height != st.server.blockchainHeight {
+	if eg.Height != st.server.cs.Height() {
 		t.Error("height not accurately reported by explorer")
 	}
 	if eg.MinerPayoutCount == 0 {
@@ -50,8 +50,8 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	}
 }
 
-// TestIntegrationExplorerHashGET probes the GET call to /explorer/hash.
-func TestIntegrationExplorerHashGET(t *testing.T) {
+// TestIntegrationExplorerGEThash probes the GET call to /explorer/$(hash).
+func TestIntegrationExplorerGEThash(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -62,7 +62,7 @@ func TestIntegrationExplorerHashGET(t *testing.T) {
 
 	var ehg ExplorerHashGET
 	gb := st.server.cs.GenesisBlock()
-	err = st.getAPI("/explorer/hash?hash="+gb.ID().String(), &ehg)
+	err = st.getAPI("/explorer/"+gb.ID().String(), &ehg)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -58,17 +58,17 @@ type WalletPersist struct {
 	UnseededKeys []SpendableKeyFile
 }
 
-// saveSettings writes the wallet's settings to the wallet's settings file,
-// replacing the existing file.
-func (w *Wallet) saveSettings() error {
-	return persist.SaveFile(settingsMetadata, w.persist, filepath.Join(w.persistDir, settingsFile))
-}
-
 // loadSettings reads the wallet's settings from the wallet's settings file,
 // overwriting the settings object in memory. loadSettings should only be
 // called at startup.
 func (w *Wallet) loadSettings() error {
 	return persist.LoadFile(settingsMetadata, &w.persist, filepath.Join(w.persistDir, settingsFile))
+}
+
+// saveSettings writes the wallet's settings to the wallet's settings file,
+// replacing the existing file.
+func (w *Wallet) saveSettings() error {
+	return persist.SaveFile(settingsMetadata, w.persist, filepath.Join(w.persistDir, settingsFile))
 }
 
 // initLog begins logging the wallet, appending to any existing wallet file and

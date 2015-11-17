@@ -60,7 +60,14 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBlocks []*processedBlock, err error) {
+//
+// addBlockToTree must use its own database update because it might need to
+// modify the database while returning an error on the block. To prevent error
+// tracking complexity, the error is handled inside the function so that 'nil'
+// can be appropriately returned by the database and the transaction can be
+// committed. Switching to a managed tx through bolt will make this complexity
+// unneeded.
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error) {
 	var nonExtending bool
 	err = cs.db.Update(func(tx *bolt.Tx) error {
 		pb, err := getBlockMap(tx, b.ParentID)
@@ -78,16 +85,40 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 		if nonExtending {
 			return nil
 		}
+		var revertedBlocks, appliedBlocks []*processedBlock
 		revertedBlocks, appliedBlocks, err = cs.forkBlockchain(tx, newNode)
-		return err
+		if err != nil {
+			return err
+		}
+		for _, rn := range revertedBlocks {
+			ce.RevertedBlocks = append(ce.RevertedBlocks, rn.Block.ID())
+		}
+		for _, an := range appliedBlocks {
+			ce.AppliedBlocks = append(ce.AppliedBlocks, an.Block.ID())
+		}
+		// To have correct error handling, appendChangeLog must be called
+		// before appending to the in-memory changelog. If this call fails, the
+		// change is going to be reverted, but the in-memory changelog is not
+		// going to be reverted.
+		//
+		// Technically, if bolt fails for some other reason (such as a
+		// filesystem error), the in-memory changelog will be incorrect anyway.
+		// Restarting Sia will fix it. The in-memory changelog is being phased
+		// out.
+		err = appendChangeLog(tx, ce)
+		if err != nil {
+			return err
+		}
+		cs.changeLog = append(cs.changeLog, ce)
+		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return changeEntry{}, err
 	}
 	if nonExtending {
-		return nil, nil, modules.ErrNonExtendingBlock
+		return changeEntry{}, modules.ErrNonExtendingBlock
 	}
-	return revertedBlocks, appliedBlocks, nil
+	return ce, nil
 }
 
 // AcceptBlock will add a block to the state, forking the blockchain if it is
@@ -95,6 +126,8 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedBlocks, appliedBl
 // it will be relayed to connected peers. This function should only be called
 // for new, untrusted blocks.
 func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
+	// Grab a lock on the consensus set. Lock is demoted later in the function,
+	// failure to unlock before returning an error will cause a deadlock.
 	cs.mu.Lock()
 
 	// Start verification inside of a bolt View tx.
@@ -131,35 +164,21 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	revertedBlocks, appliedBlocks, err := cs.addBlockToTree(b)
+	changeEntry, err := cs.addBlockToTree(b)
 	if err != nil {
 		cs.mu.Unlock()
 		return err
 	}
-
-	// Log the changes in the change log.
-	var ce changeEntry
-	for _, rn := range revertedBlocks {
-		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
+	// If appliedBlocks is 0, revertedBlocks will also be 0.
+	if build.DEBUG && len(changeEntry.AppliedBlocks) == 0 && len(changeEntry.RevertedBlocks) != 0 {
+		panic("appliedBlocks and revertedBlocks are mismatched!")
 	}
-	for _, an := range appliedBlocks {
-		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
-	}
-	cs.changeLog = append(cs.changeLog, ce)
 
-	// Demote the lock and send the update to the subscribers.
+	// Updates complete, demote the lock.
 	cs.mu.Demote()
 	defer cs.mu.DemotedUnlock()
-	if len(appliedBlocks) > 0 {
-		cs.readlockUpdateSubscribers(ce)
-	}
-
-	// Sanity checks.
-	if build.DEBUG {
-		// If appliedBlocks is 0, revertedBlocks will also be 0.
-		if len(appliedBlocks) == 0 && len(revertedBlocks) != 0 {
-			panic("appliedBlocks and revertedBlocks are mismatched!")
-		}
+	if len(changeEntry.AppliedBlocks) > 0 {
+		cs.readlockUpdateSubscribers(changeEntry)
 	}
 
 	// Broadcast the new block to all peers.

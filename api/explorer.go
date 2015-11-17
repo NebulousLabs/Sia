@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
@@ -96,17 +97,14 @@ type (
 
 // buildExplorerTransaction takes a transaction and the height + id of the
 // block it appears in an uses that to build an explorer transaction.
-func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) ExplorerTransaction {
-	var scoids []types.SiacoinOutputID
-	var fcids []types.FileContractID
-	var fcvpoidss [][]types.SiacoinOutputID
-	var fcmpoidss [][]types.SiacoinOutputID
-	var fcrvpoidss [][]types.SiacoinOutputID
-	var fcrmpoidss [][]types.SiacoinOutputID
-	var sfoids []types.SiafundOutputID
-	var sfcoids []types.SiacoinOutputID
+func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
+	et.ID = txn.ID()
+	et.Height = height
+	et.Parent = parent
+	et.RawTransaction = txn
+
 	for i := range txn.SiacoinOutputs {
-		scoids = append(scoids, txn.SiacoinOutputID(uint64(i)))
+		et.SiacoinOutputIDs = append(et.SiacoinOutputIDs, txn.SiacoinOutputID(uint64(i)))
 	}
 	for i, fc := range txn.FileContracts {
 		fcid := txn.FileContractID(uint64(i))
@@ -118,9 +116,9 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 		for j := range fc.MissedProofOutputs {
 			fcmpoids = append(fcmpoids, fcid.StorageProofOutputID(types.ProofMissed, uint64(j)))
 		}
-		fcids = append(fcids, fcid)
-		fcvpoidss = append(fcvpoidss, fcvpoids)
-		fcmpoidss = append(fcmpoidss, fcmpoids)
+		et.FileContractIDs = append(et.FileContractIDs, fcid)
+		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcvpoids)
+		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcmpoids)
 	}
 	for _, fcr := range txn.FileContractRevisions {
 		var fcrvpoids []types.SiacoinOutputID
@@ -131,27 +129,16 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 		for j := range fcr.NewMissedProofOutputs {
 			fcrmpoids = append(fcrmpoids, fcr.ParentID.StorageProofOutputID(types.ProofMissed, uint64(j)))
 		}
-		fcrvpoidss = append(fcrvpoidss, fcrvpoids)
-		fcrmpoidss = append(fcrmpoidss, fcrmpoids)
+		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcrvpoids)
+		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcrmpoids)
 	}
 	for i := range txn.SiafundOutputs {
-		sfoids = append(sfoids, txn.SiafundOutputID(uint64(i)))
+		et.SiafundOutputIDs = append(et.SiafundOutputIDs, txn.SiafundOutputID(uint64(i)))
 	}
 	for _, sfi := range txn.SiafundInputs {
-		sfcoids = append(sfcoids, sfi.ParentID.SiaClaimOutputID())
+		et.SiaClaimOutputIDs = append(et.SiaClaimOutputIDs, sfi.ParentID.SiaClaimOutputID())
 	}
-	return ExplorerTransaction{
-		ID:                               txn.ID(),
-		Height:                           height,
-		Parent:                           parent,
-		SiacoinOutputIDs:                 scoids,
-		FileContractIDs:                  fcids,
-		FileContractValidProofOutputIDs:  fcvpoidss,
-		FileContractMissedProofOutputIDs: fcmpoidss,
-		SiafundOutputIDs:                 sfoids,
-		SiaClaimOutputIDs:                sfcoids,
-		RawTransaction:                   txn,
-	}
+	return et
 }
 
 // buildExplorerBlock takes a block and its height and uses it to construct an
@@ -172,47 +159,6 @@ func buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlo
 		MinerPayoutIDs: mpoids,
 		RawBlock:       block,
 	}
-}
-
-// explorerHandlerGET handles GET requests to /explorer.
-func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) {
-	stats := srv.explorer.Statistics()
-	writeJSON(w, ExplorerGET{
-		Height:            stats.Height,
-		CurrentBlock:      stats.CurrentBlock,
-		Target:            stats.Target,
-		Difficulty:        stats.Difficulty,
-		MaturityTimestamp: stats.MaturityTimestamp,
-		TotalCoins:        stats.TotalCoins,
-
-		MinerPayoutCount:          stats.MinerPayoutCount,
-		TransactionCount:          stats.TransactionCount,
-		SiacoinInputCount:         stats.SiacoinInputCount,
-		SiacoinOutputCount:        stats.SiacoinOutputCount,
-		FileContractCount:         stats.FileContractCount,
-		FileContractRevisionCount: stats.FileContractRevisionCount,
-		StorageProofCount:         stats.StorageProofCount,
-		SiafundInputCount:         stats.SiafundInputCount,
-		SiafundOutputCount:        stats.SiafundOutputCount,
-		MinerFeeCount:             stats.MinerFeeCount,
-		ArbitraryDataCount:        stats.ArbitraryDataCount,
-		TransactionSignatureCount: stats.TransactionSignatureCount,
-
-		ActiveContractCount: stats.ActiveContractCount,
-		ActiveContractCost:  stats.ActiveContractCost,
-		ActiveContractSize:  stats.ActiveContractSize,
-		TotalContractCost:   stats.TotalContractCost,
-		TotalContractSize:   stats.TotalContractSize,
-	})
-}
-
-// explorerHandler handles API calls to /explorer.
-func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.explorerHandlerGET(w, req)
-		return
-	}
-	writeError(w, "unrecognized method when calling /explorer", http.StatusBadRequest)
 }
 
 // explorerBlockHandlerGET handles GET requests to /explorer/block.
@@ -269,17 +215,40 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 	return txns, blocks
 }
 
-// explorerHashHandlerGET handles GET requests to /explorer/hash.
-func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Request) {
-	// The hash is scanned as an address, because an address can be typecast to
-	// all other necessary types, and will correclty decode hashes whether or
-	// not they have a checksum.
-	hash, err := scanAddress(req.FormValue("hash"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+// explorerHandlerGET handles GET requests to /explorer.
+func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) {
+	stats := srv.explorer.Statistics()
+	writeJSON(w, ExplorerGET{
+		Height:            stats.Height,
+		CurrentBlock:      stats.CurrentBlock,
+		Target:            stats.Target,
+		Difficulty:        stats.Difficulty,
+		MaturityTimestamp: stats.MaturityTimestamp,
+		TotalCoins:        stats.TotalCoins,
 
+		MinerPayoutCount:          stats.MinerPayoutCount,
+		TransactionCount:          stats.TransactionCount,
+		SiacoinInputCount:         stats.SiacoinInputCount,
+		SiacoinOutputCount:        stats.SiacoinOutputCount,
+		FileContractCount:         stats.FileContractCount,
+		FileContractRevisionCount: stats.FileContractRevisionCount,
+		StorageProofCount:         stats.StorageProofCount,
+		SiafundInputCount:         stats.SiafundInputCount,
+		SiafundOutputCount:        stats.SiafundOutputCount,
+		MinerFeeCount:             stats.MinerFeeCount,
+		ArbitraryDataCount:        stats.ArbitraryDataCount,
+		TransactionSignatureCount: stats.TransactionSignatureCount,
+
+		ActiveContractCount: stats.ActiveContractCount,
+		ActiveContractCost:  stats.ActiveContractCost,
+		ActiveContractSize:  stats.ActiveContractSize,
+		TotalContractCost:   stats.TotalContractCost,
+		TotalContractSize:   stats.TotalContractSize,
+	})
+}
+
+// explorerHandlerGEThash handles GET requests to /explorer/$(hash).
+func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Request, hash types.UnlockHash) {
 	// Try the hash as a block id.
 	block, height, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
@@ -358,11 +327,29 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	writeError(w, "unrecognized hash used as input to /explorer/hash", http.StatusBadRequest)
 }
 
-// explorerHashHandler handles API calls to /explorer/hash.
-func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.explorerHashHandlerGET(w, req)
+// explorerHandler handles API calls to /explorer and /explorer/
+func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path == "/explorer" && (req.Method == "" || req.Method == "GET") {
+		srv.explorerHandlerGET(w, req)
 		return
 	}
-	writeError(w, "unrecognized method when calling /explorer/hash", http.StatusBadRequest)
+
+	// only a GET call is allowed at this point.
+	if req.Method != "" && req.Method != "GET" {
+		writeError(w, "unrecognized call to /explorer/", http.StatusBadRequest)
+		return
+	}
+
+	// Only call remaining is /explore/$(hash) - parse the hash.
+	//
+	// The hash is scanned as an address, because an address can be typecast to
+	// all other necessary types, and will correclty decode hashes whether or
+	// not they have a checksum.
+	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/")
+	hash, err := scanAddress(encodedHash)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	srv.explorerHandlerGEThash(w, req, hash)
 }

@@ -8,24 +8,19 @@ import (
 )
 
 // ProcessConsensusDigest will update the miner's most recent block.
-func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) {
+func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Sanity check - the length of appliedIDs should always be non-zero.
-	if build.DEBUG && len(appliedIDs) == 0 {
-		panic("received a digest with no applied blocks")
-	}
-
 	// Adjust the height of the miner.
-	m.height -= types.BlockHeight(len(revertedIDs))
-	m.height += types.BlockHeight(len(appliedIDs))
+	m.persist.Height -= types.BlockHeight(len(cc.RevertedBlocks))
+	m.persist.Height += types.BlockHeight(len(cc.AppliedBlocks))
 
 	// Update the unsolved block.
 	var exists1, exists2 bool
-	m.unsolvedBlock.ParentID = appliedIDs[len(appliedIDs)-1]
-	m.target, exists1 = m.cs.ChildTarget(m.unsolvedBlock.ParentID)
-	m.unsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.unsolvedBlock.ParentID)
+	m.persist.UnsolvedBlock.ParentID = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
+	m.persist.Target, exists1 = m.cs.ChildTarget(m.persist.UnsolvedBlock.ParentID)
+	m.persist.UnsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.persist.UnsolvedBlock.ParentID)
 	if build.DEBUG && !exists1 {
 		panic("could not get child target")
 	}
@@ -36,6 +31,13 @@ func (m *Miner) ProcessConsensusDigest(revertedIDs, appliedIDs []types.BlockID) 
 	// There is a new parent block, the source block should be updated to keep
 	// the stale rate as low as possible.
 	m.newSourceBlock()
+	m.persist.RecentChange = cc.ID
+
+	// Save the new consensus information.
+	err := m.save()
+	if err != nil {
+		m.log.Println("ERROR:", err)
+	}
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
@@ -47,7 +49,7 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []
 	// Edge case - if there are no transactions, set the block's transactions
 	// to nil and return.
 	if len(unconfirmedTransactions) == 0 {
-		m.unsolvedBlock.Transactions = nil
+		m.persist.UnsolvedBlock.Transactions = nil
 		return
 	}
 
@@ -61,5 +63,5 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []
 			break
 		}
 	}
-	m.unsolvedBlock.Transactions = unconfirmedTransactions[0 : i+1]
+	m.persist.UnsolvedBlock.Transactions = unconfirmedTransactions[:i+1]
 }

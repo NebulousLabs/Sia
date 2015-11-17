@@ -3,25 +3,42 @@ package modules
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
+	// ConsensusDir is the name of the directory used for all of the consensus
+	// persistence files.
 	ConsensusDir = "consensus"
 
-	// DiffApply and DiffRevert are the names given to the variables
-	// corresponding to applying and reverting diffs.
-	DiffApply  DiffDirection = true
+	// DiffApply indicates that a diff is being applied to the consensus set.
+	DiffApply DiffDirection = true
+
+	// DiffRevert indicates that a diff is being reverted from the consensus
+	// set.
 	DiffRevert DiffDirection = false
 )
 
 var (
-	ErrBlockKnown        = errors.New("block already present in database")
-	ErrBlockUnsolved     = errors.New("block does not meet target")
+	// ErrBlockKnown is an error indicating that a block is already in the
+	// database.
+	ErrBlockKnown = errors.New("block already present in database")
+
+	// ErrBlockUnsolved indicates that a block did not meet the required POW
+	// target.
+	ErrBlockUnsolved = errors.New("block does not meet target")
+
+	// ErrNonExtendingBlock indicates that a block is valid but does not result
+	// in a fork that is the heaviest known fork - the consensus set has not
+	// changed as a result of seeing the block.
 	ErrNonExtendingBlock = errors.New("block does not extend the longest fork")
 )
 
 type (
+	// ConsensusChangeID is the id of a consensus change.
+	ConsensusChangeID crypto.Hash
+
 	// A DiffDirection indicates the "direction" of a diff, either applied or
 	// reverted. A bool is used to restrict the value to these two possibilities.
 	DiffDirection bool
@@ -36,20 +53,12 @@ type (
 		ProcessConsensusChange(ConsensusChange)
 	}
 
-	// ConsensusSetDigestSubscriber receives digests about changes to the
-	// consensus set in the form of a list of ids of blocks that got reverted
-	// and a list of ids of blocks that got applied. The IDs are given in the
-	// order in which they were processed. Reverted blocks are always processed
-	// before applied blocks.
-	ConsensusSetDigestSubscriber interface {
-		// ProcessConsensusDigest sends a list of reverted blocks and applied
-		// blocks to the module. There may not be any reverted blocks, but
-		// there will always be applied blocks.
-		ProcessConsensusDigest(revertedBlocks []types.BlockID, appliedBlocks []types.BlockID)
-	}
-
 	// A ConsensusChange enumerates a set of changes that occured to the consensus set.
 	ConsensusChange struct {
+		// ID is a unique id for the consensus change derived from the reverted
+		// and applied blocks.
+		ID ConsensusChangeID
+
 		// RevertedBlocks is the list of blocks that were reverted by the change.
 		// The reverted blocks were always all reverted before the applied blocks
 		// were applied. The revered blocks are presented in the order that they
@@ -166,24 +175,30 @@ type (
 		// This is a thread-safe way of managing updates.
 		ConsensusSetSubscribe(ConsensusSetSubscriber)
 
-		// ConsensusSetDigestSubscribe subscribes a module to a digest of the
-		// changes in the consensus set. Immediately upon subscription, a
-		// digest containing the list of blocks from the starting id to the
-		// current block is presented to the subscriber.
-		ConsensusSetDigestSubscribe(ConsensusSetDigestSubscriber)
+		// ConsensusSetPersistentSubscribe adds a subscriber to the list of
+		// subscribers, and gives them every consensus change that has occured
+		// since the change with the provided id.
+		ConsensusSetPersistentSubscribe(ConsensusSetSubscriber, ConsensusChangeID) error
+
+		// CurrentBlock returns the latest block in the heaviest known
+		// blockchain.
+		CurrentBlock() types.Block
+
+		// GenesisBlock returns the genesis block.
+		GenesisBlock() types.Block
+
+		// Height returns the current height of consensus.
+		Height() types.BlockHeight
+
+		// InCurrentPath returns true if the block id presented is found in the
+		// current path, false otherwise.
+		InCurrentPath(types.BlockID) bool
 
 		// MinimumValidChildTimestamp returns the earliest timestamp that is
 		// valid on the current longest fork according to the consensus set. This is
 		// a required piece of information for the miner, who could otherwise be at
 		// risk of mining invalid blocks.
 		MinimumValidChildTimestamp(types.BlockID) (types.Timestamp, bool)
-
-		// GenesisBlock returns the genesis block.
-		GenesisBlock() types.Block
-
-		// InCurrentPath returns true if the block id presented is found in the
-		// current path, false otherwise.
-		InCurrentPath(types.BlockID) bool
 
 		// StorageProofSegment returns the segment to be used in the storage proof for
 		// a given file contract.

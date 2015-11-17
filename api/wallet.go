@@ -554,7 +554,7 @@ func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Re
 	}
 
 	// Only a GET call is allowed at this point.
-	if req.Method != "GET" && req.Method != "" {
+	if req.Method != "" && req.Method != "GET" {
 		writeError(w, "unrecognized method call to /wallet/transactions", http.StatusBadRequest)
 		return
 	}

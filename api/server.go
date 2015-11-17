@@ -10,7 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Server is essentially a collection of modules and an API server to talk
@@ -24,10 +23,6 @@ type Server struct {
 	tpool    modules.TransactionPool
 	wallet   modules.Wallet
 	explorer modules.Explorer
-
-	// Consensus set variables.
-	blockchainHeight types.BlockHeight
-	currentBlock     types.Block
 
 	listener  net.Listener
 	apiServer *graceful.Server
@@ -56,11 +51,6 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
-	srv.blockchainHeight-- // Underflow the blockchain height so the genesis block sets the height to 0.
-
-	// Set the genesis block and start listening to the consensus package.
-	srv.currentBlock = srv.cs.GenesisBlock()
-	srv.cs.ConsensusSetSubscribe(srv)
 
 	// Register API handlers
 	srv.initAPI()
