@@ -24,15 +24,15 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+	cs, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
 	if err != nil {
 		return err
 	}
-	explorer, err := explorer.New(state, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
+	explorer, err := explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, nil, nil, nil, nil, nil, explorer)
+	srv, err := api.NewServer(config.Siad.APIaddr, cs, gateway, nil, nil, nil, nil, nil, explorer)
 	if err != nil {
 		return err
 	}
