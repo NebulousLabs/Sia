@@ -70,7 +70,7 @@ func (srv *Server) initAPI() {
 	// Explorer API Calls
 	if srv.explorer != nil {
 		srv.handleHTTPRequest(mux, "/explorer", srv.explorerHandler)            // GET
-		srv.handleHTTPRequest(mux, "/explorer/hash", srv.explorerHashHandler)   // GET
+		srv.handleHTTPRequest(mux, "/explorer/", srv.explorerHandler)           // $(hash) GET
 		srv.handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler) // GET
 	}
 

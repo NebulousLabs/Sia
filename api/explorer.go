@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
@@ -160,47 +161,6 @@ func buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlo
 	}
 }
 
-// explorerHandlerGET handles GET requests to /explorer.
-func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) {
-	stats := srv.explorer.Statistics()
-	writeJSON(w, ExplorerGET{
-		Height:            stats.Height,
-		CurrentBlock:      stats.CurrentBlock,
-		Target:            stats.Target,
-		Difficulty:        stats.Difficulty,
-		MaturityTimestamp: stats.MaturityTimestamp,
-		TotalCoins:        stats.TotalCoins,
-
-		MinerPayoutCount:          stats.MinerPayoutCount,
-		TransactionCount:          stats.TransactionCount,
-		SiacoinInputCount:         stats.SiacoinInputCount,
-		SiacoinOutputCount:        stats.SiacoinOutputCount,
-		FileContractCount:         stats.FileContractCount,
-		FileContractRevisionCount: stats.FileContractRevisionCount,
-		StorageProofCount:         stats.StorageProofCount,
-		SiafundInputCount:         stats.SiafundInputCount,
-		SiafundOutputCount:        stats.SiafundOutputCount,
-		MinerFeeCount:             stats.MinerFeeCount,
-		ArbitraryDataCount:        stats.ArbitraryDataCount,
-		TransactionSignatureCount: stats.TransactionSignatureCount,
-
-		ActiveContractCount: stats.ActiveContractCount,
-		ActiveContractCost:  stats.ActiveContractCost,
-		ActiveContractSize:  stats.ActiveContractSize,
-		TotalContractCost:   stats.TotalContractCost,
-		TotalContractSize:   stats.TotalContractSize,
-	})
-}
-
-// explorerHandler handles API calls to /explorer.
-func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.explorerHandlerGET(w, req)
-		return
-	}
-	writeError(w, "unrecognized method when calling /explorer", http.StatusBadRequest)
-}
-
 // explorerBlockHandlerGET handles GET requests to /explorer/block.
 func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Request) {
 	// Parse the height that's being requested.
@@ -255,17 +215,40 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 	return txns, blocks
 }
 
-// explorerHashHandlerGET handles GET requests to /explorer/hash.
-func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Request) {
-	// The hash is scanned as an address, because an address can be typecast to
-	// all other necessary types, and will correclty decode hashes whether or
-	// not they have a checksum.
-	hash, err := scanAddress(req.FormValue("hash"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+// explorerHandlerGET handles GET requests to /explorer.
+func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) {
+	stats := srv.explorer.Statistics()
+	writeJSON(w, ExplorerGET{
+		Height:            stats.Height,
+		CurrentBlock:      stats.CurrentBlock,
+		Target:            stats.Target,
+		Difficulty:        stats.Difficulty,
+		MaturityTimestamp: stats.MaturityTimestamp,
+		TotalCoins:        stats.TotalCoins,
 
+		MinerPayoutCount:          stats.MinerPayoutCount,
+		TransactionCount:          stats.TransactionCount,
+		SiacoinInputCount:         stats.SiacoinInputCount,
+		SiacoinOutputCount:        stats.SiacoinOutputCount,
+		FileContractCount:         stats.FileContractCount,
+		FileContractRevisionCount: stats.FileContractRevisionCount,
+		StorageProofCount:         stats.StorageProofCount,
+		SiafundInputCount:         stats.SiafundInputCount,
+		SiafundOutputCount:        stats.SiafundOutputCount,
+		MinerFeeCount:             stats.MinerFeeCount,
+		ArbitraryDataCount:        stats.ArbitraryDataCount,
+		TransactionSignatureCount: stats.TransactionSignatureCount,
+
+		ActiveContractCount: stats.ActiveContractCount,
+		ActiveContractCost:  stats.ActiveContractCost,
+		ActiveContractSize:  stats.ActiveContractSize,
+		TotalContractCost:   stats.TotalContractCost,
+		TotalContractSize:   stats.TotalContractSize,
+	})
+}
+
+// explorerHandlerGEThash handles GET requests to /explorer/$(hash).
+func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Request, hash types.UnlockHash) {
 	// Try the hash as a block id.
 	block, height, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
@@ -344,11 +327,29 @@ func (srv *Server) explorerHashHandlerGET(w http.ResponseWriter, req *http.Reque
 	writeError(w, "unrecognized hash used as input to /explorer/hash", http.StatusBadRequest)
 }
 
-// explorerHashHandler handles API calls to /explorer/hash.
-func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.explorerHashHandlerGET(w, req)
+// explorerHandler handles API calls to /explorer and /explorer/
+func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path == "/explorer" && (req.Method == "" || req.Method == "GET") {
+		srv.explorerHandlerGET(w, req)
 		return
 	}
-	writeError(w, "unrecognized method when calling /explorer/hash", http.StatusBadRequest)
+
+	// only a GET call is allowed at this point.
+	if req.Method != "" && req.Method != "GET" {
+		writeError(w, "unrecognized call to /explorer/", http.StatusBadRequest)
+		return
+	}
+
+	// Only call remaining is /explore/$(hash) - parse the hash.
+	//
+	// The hash is scanned as an address, because an address can be typecast to
+	// all other necessary types, and will correclty decode hashes whether or
+	// not they have a checksum.
+	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/")
+	hash, err := scanAddress(encodedHash)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	srv.explorerHandlerGEThash(w, req, hash)
 }
