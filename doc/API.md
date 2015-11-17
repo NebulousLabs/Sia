@@ -82,9 +82,9 @@ Explorer
 Queries:
 
 * /explorer
-* /explorer/hash
+* /explorer/$(hash)
 
-### /explorer
+#### /explorer
 
 Function: Returns the status of the blockchain and some
 statistics. All Siacoin amounts are given in Hastings
@@ -121,7 +121,7 @@ struct {
 }
 ```
 
-### /explorer/block
+#### /explorer/block
 
 Function: Return a block at a given height.
 
@@ -137,18 +137,15 @@ struct {
 }
 ```
 
-### /explorer/hash
+#### /explorer/$(hash)
 
 Function: Return information about an unknown hash.
 
-Parameters:
-```
-hash string
-```
-`hash` is a hash that is relevant to the Sia network. It can be a block id,
-transacton id, address, unlock hash, siacoin output id, file contract id, or
-siafund output id. The daemon will determine which type of hash was presented
-(if the hash is known at all).
+Parameters: $(hash) is a url parameter specifying the hash that is being looked
+up. The hash can be an unlock hash, a wallet address, a block id, a transaction
+id, siacoin output id, file contract id, siafund output id, or any of the
+derivatives of siacoin output ids (such as miner payout ids and file contract
+payout ids).
 
 Response:
 ```
@@ -505,7 +502,8 @@ the coins. The last transaction contains the output headed to the
 
 Function: Get the transaction associated with a specific transaction id.
 
-Parameters: none
+Parameters: $(id) is a url parameter specifying the id of the transaction that
+should be returned.
 
 Response:
 ```
@@ -635,7 +633,9 @@ height 'startheight' and height 'endheight' (inclusive).
 
 Function: Return all of the transaction related to a specific address.
 
-Parameters: none
+Parameters: $(addr) is a url parameter specifiy the unlock hash or wallet
+address that is being looked up. All transactions related to that address will
+be returned.
 
 Response:
 ```
