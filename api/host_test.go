@@ -76,7 +76,6 @@ func TestIntegrationHosting(t *testing.T) {
 	st.getAPI("/host/status", &hi)
 	expProfit := "382129999999997570526"
 	if hi.Profit.String() != expProfit {
-		t.Log(hi)
 		t.Fatalf("host's profit was not affected: expected %v, got %v", expProfit, hi.Profit)
 	}
 }
