@@ -2,14 +2,15 @@ package api
 
 import (
 	"testing"
+	"time"
 )
 
-// TestMinerGET checks the GET call to the /miner endpoint.
-func (srv *Server) TestMinerGET(t *testing.T) {
+// TestIntegrationMinerGET checks the GET call to the /miner endpoint.
+func (srv *Server) TestIntegrationMinerGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestMinerGET")
+	st, err := createServerTester("TestIntegrationMinerGET")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,5 +37,69 @@ func (srv *Server) TestMinerGET(t *testing.T) {
 	}
 	if mg.CPUMining != st.server.miner.CPUMining() {
 		t.Error("mismatched cpu miner status")
+	}
+}
+
+// TestIntegrationMinerStartStop checks that the miner start and miner stop api endpoints
+// toggle the cpu miner.
+func (srv *Server) TestIntegrationMinerStartStop(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestIntegrationMinerStartStop")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start the cpu miner, give time for the first hashrate readings to
+	// appear.
+	err = st.stdGetAPI("/miner/start")
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(250 * time.Millisecond)
+	if st.server.miner.CPUHashrate() == 0 {
+		t.Error("cpu miner is reporting no hashrate")
+	}
+	if !st.server.miner.CPUMining() {
+		t.Error("cpu miner is reporting that it is not on")
+	}
+
+	// Check the numbers through the status api call.
+	var mg MinerGET
+	err = st.getAPI("/miner", &mg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mg.CPUHashrate == 0 {
+		t.Error("cpu hashrate is reported at zero")
+	}
+	if !mg.CPUMining {
+		t.Error("cpu is not reporting through the api that it is mining.")
+	}
+
+	// Stop the cpu miner and wait for the stop call to go through.
+	err = st.stdGetAPI("/miner/stop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(250 * time.Millisecond)
+	if st.server.miner.CPUHashrate() != 0 {
+		t.Error("cpu miner is reporting no hashrate")
+	}
+	if st.server.miner.CPUMining() {
+		t.Error("cpu miner is reporting that it is not on")
+	}
+
+	// Check the numbers through the status api call.
+	err = st.getAPI("/miner", &mg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mg.CPUHashrate != 0 {
+		t.Error("cpu hashrate is reported at zero")
+	}
+	if mg.CPUMining {
+		t.Error("cpu is not reporting through the api that it is mining.")
 	}
 }
