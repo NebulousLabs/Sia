@@ -12,10 +12,10 @@ type (
 	// MinerGET contains the information that is returned after a GET request
 	// to /miner.
 	MinerGET struct {
-		BlocksMined int `json:"blocksmined"`
-		CPUHashrate int `json:"cpuhashrate"`
-		CPUMining bool `json:"cpumining"`
-		StaleBlocksMined int `json:"staleblocksmined"`
+		BlocksMined      int  `json:"blocksmined"`
+		CPUHashrate      int  `json:"cpuhashrate"`
+		CPUMining        bool `json:"cpumining"`
+		StaleBlocksMined int  `json:"staleblocksmined"`
 	}
 )
 
