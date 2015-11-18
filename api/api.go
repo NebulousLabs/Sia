@@ -94,13 +94,14 @@ func (srv *Server) initAPI() {
 		srv.handleHTTPRequest(mux, "/hostdb/hosts/all", srv.renterHostsAllHandler)
 	}
 
-	// Miner API Calls - Unfinished
+	// Miner API Calls
 	if srv.miner != nil {
+		srv.handleHTTPRequest(mux, "/miner", srv.minerHandler)
+		srv.handleHTTPRequest(mux, "/miner/header", srv.minerHeaderHandler)
 		srv.handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
-		srv.handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
 		srv.handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
-		srv.handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
-		srv.handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
+		srv.handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler) // COMPATv0.4.8
+		srv.handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)   // COMPATv0.4.8
 	}
 
 	// Renter API Calls - Unfinished

@@ -48,8 +48,8 @@ func minerstartcmd() {
 }
 
 func minerstatuscmd() {
-	status := new(api.MinerStatus)
-	err := getAPI("/miner/status", status)
+	status := new(api.MinerGET)
+	err := getAPI("/miner", status)
 	if err != nil {
 		fmt.Println("Could not get miner status:", err)
 		return

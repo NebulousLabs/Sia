@@ -185,9 +185,9 @@ Parameters: none
 Response:
 ```
 struct {
-	cpumining        bool
-	cpuhashrate      int
 	blocksmined      int
+	cpuhashrate      int
+	cpumining        bool
 	staleblocksmined int
 }
 ```
