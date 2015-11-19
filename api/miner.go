@@ -34,10 +34,10 @@ func (srv *Server) minerHandlerGET(w http.ResponseWriter, req *http.Request) {
 // minerHandler handles the API call that queries the miner's status.
 func (srv *Server) minerHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
-		srv.walletHandlerGET(w, req)
+		srv.minerHandlerGET(w, req)
 		return
 	}
-	writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
+	writeError(w, "unrecognized method when calling /miner", http.StatusBadRequest)
 }
 
 // minerStartHandler handles the API call that starts the miner.

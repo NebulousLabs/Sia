@@ -62,7 +62,7 @@ func (m *Miner) CPUHashrate() int {
 func (m *Miner) CPUMining() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.mining
+	return m.miningOn
 }
 
 // StartCPUMining will start a single threaded cpu miner. If the miner is
