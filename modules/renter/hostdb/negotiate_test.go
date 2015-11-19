@@ -1,4 +1,4 @@
-package renter
+package hostdb
 
 import (
 	"testing"

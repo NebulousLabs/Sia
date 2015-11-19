@@ -1,4 +1,4 @@
-package renter
+package hostdb
 
 import (
 	"github.com/NebulousLabs/Sia/encoding"
@@ -39,16 +39,16 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings)
 
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change in the blockchain. Updates will always be called in order.
-func (r *Renter) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
-	r.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
-	r.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
+func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	hdb.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
+	hdb.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 
 	// Add hosts announced in blocks that were applied.
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
-			r.hostDB.InsertHost(host)
+			hdb.insertHost(host)
 		}
 	}
 }

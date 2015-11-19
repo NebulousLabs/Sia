@@ -5,8 +5,13 @@
 package hostdb
 
 import (
+	"crypto/rand"
+	"errors"
+	"log"
+	"sync"
+
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -16,10 +21,32 @@ const (
 	scanPoolSize = 1000
 )
 
+var (
+	errNilCS     = errors.New("cannot create renter with nil consensus set")
+	errNilWallet = errors.New("cannot create renter with nil wallet")
+	errNilTpool  = errors.New("cannot create renter with nil transaction pool")
+)
+
 // The HostDB is a database of potential hosts. It assigns a weight to each
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
+	// modules
+	wallet modules.Wallet
+	tpool  modules.TransactionPool
+
+	// resources
+	log *log.Logger
+
+	// variables
+	blockHeight   types.BlockHeight
+	contracts     map[types.FileContractID]hostContract
+	cachedAddress types.UnlockHash // to prevent excessive address creation
+
+	// constants
+	entropy    [32]byte
+	persistDir string
+
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
 	// random. 'activeHosts' provides a lookup from hostname to the the
@@ -38,18 +65,50 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
-	mu *sync.RWMutex
+	mu sync.RWMutex
+}
+
+// a hostContract includes the original contract made with a host, along with
+// the most recent revision.
+type hostContract struct {
+	ID              types.FileContractID
+	FileContract    types.FileContract
+	LastRevisionTxn types.Transaction
+
+	// revisions must happen in serial
+	mu sync.RWMutex // TODO: consider `json:"-"`
 }
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New() *HostDB {
+func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*HostDB, error) {
+	if cs == nil {
+		return nil, errNilCS
+	}
+	if wallet == nil {
+		return nil, errNilWallet
+	}
+	if tpool == nil {
+		return nil, errNilTpool
+	}
+
 	hdb := &HostDB{
+		wallet: wallet,
+		tpool:  tpool,
+
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+	}
+	_, err := rand.Read(hdb.entropy[:])
+	if err != nil {
+		return nil, err
+	}
+	err = hdb.initPersist()
+	if err != nil {
+		return nil, err
 	}
 
 	// Begin listening to consensus and looking for hosts.
@@ -58,5 +117,7 @@ func New() *HostDB {
 	}
 	go hdb.threadedScan()
 
-	return hdb
+	cs.ConsensusSetSubscribe(hdb)
+
+	return hdb, nil
 }
