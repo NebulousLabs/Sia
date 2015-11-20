@@ -55,11 +55,13 @@ func (srv *Server) initAPI() {
 	srv.handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
 
 	// Daemon API Calls - Unfinished
-	srv.handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
-	srv.handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
-	srv.handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
-	srv.handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
-	srv.handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	if srv.explorer != nil && srv.wallet == nil {
+		srv.handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
+		srv.handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
+		srv.handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
+		srv.handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
+		srv.handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	}
 
 	// Consensus API Calls
 	if srv.cs != nil {
