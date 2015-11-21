@@ -143,8 +143,6 @@ func TestIntegrationMinerHeader(t *testing.T) {
 	defer resp.Body.Close()
 	time.Sleep(500 * time.Millisecond)
 	if st.cs.Height() != startingHeight+1 {
-		println(st.cs.Height())
-		println(startingHeight + 1)
-		t.Error("block height did not increase after trying to mine a block through the api")
+		t.Errorf("block height did not increase after trying to mine a block through the api, started at %v and ended at %v", startingHeight, st.cs.Height())
 	}
 }
