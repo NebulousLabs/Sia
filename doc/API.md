@@ -74,17 +74,17 @@ struct {
 	block types.Block
 }
 ```
-'block' is a block. The struct is defined in types/block.go.
 
 Explorer
 --------
 
 Queries:
 
-* /explorer
-* /explorer/$(hash)
+* /explorer         [GET]
+* /explorer/block   [GET]
+* /explorer/$(hash) [GET]
 
-#### /explorer
+#### /explorer [GET]
 
 Function: Returns the status of the blockchain and some
 statistics. All Siacoin amounts are given in Hastings
@@ -121,7 +121,7 @@ struct {
 }
 ```
 
-#### /explorer/block
+#### /explorer/block [GET]
 
 Function: Return a block at a given height.
 
@@ -137,7 +137,7 @@ struct {
 }
 ```
 
-#### /explorer/$(hash)
+#### /explorer/$(hash) [GET]
 
 Function: Return information about an unknown hash.
 
@@ -164,6 +164,88 @@ filled out. If the object is a transaction, only the 'transaction' field will
 be filled out. For all other types, the 'blocks' and 'transactions' fields will
 be filled out, returning all of the blocks and transactions that feature the
 provided hash.
+
+Miner
+-----
+
+Queries:
+
+* /miner        [GET]
+* /miner/start  [GET]
+* /miner/stop   [GET]
+* /miner/header [GET]
+* /miner/header [POST]
+
+#### /miner [GET]
+
+Function: Return the status of the miner.
+
+Parameters: none
+
+Response:
+```
+struct {
+	blocksmined      int
+	cpuhashrate      int
+	cpumining        bool
+	staleblocksmined int
+}
+```
+`cpumining` indicates whether the cpu miner is active or not.
+
+`cpuhashrate` indicates how fast the cpu is hashing, in hashes per second.
+
+`blocksmined` indicates how many blocks have been mined, this value is remembered after restarting.
+
+`staleblocksmined` indicates how many stale blocks have been mined, this value is remembered after restarting.
+
+#### /miner/start [GET]
+
+Function: Starts a single threaded cpu miner. Does nothing if the cpu miner is
+already running.
+
+Parameters: none
+
+Response: standard
+
+#### /miner/stop [GET]
+
+Function: Stops the cpu miner. Does nothing if the cpu miner is not running.
+
+Parameters: none
+
+Response: standard
+
+#### /miner/header [GET]
+
+Function: Provide a block header that is ready to be grinded on for work.
+
+Parameters: none
+
+Response:
+```
+[]byte
+```
+The response is a byte array containing a target followed by a block header
+followed by a block. The target is the first 32 bytes. The block header is the
+following 80 bytes, and the nonce is bytes 32-39 (inclusive) of the header
+(bytes 64-71 of the whole array).
+
+Layout:
+
+0-31: target
+
+32-111: header
+
+#### /miner/header [POST]
+
+Function: Submit a header that has passed the POW.
+
+Parameters:
+```
+[]byte
+```
+The input byte array should be 80 bytes that form the solved block header.
 
 Wallet
 ------
@@ -907,115 +989,6 @@ struct {
 	Hosts []HostSettings
 }
 ```
-
-Miner
------
-
-Queries:
-
-* /miner/blockforwork
-* /miner/start
-* /miner/status
-* /miner/stop
-* /miner/submitblock
-
-#### /miner/blockforwork
-
-Function: Provides a block that is ready for the blockchain except for having
-an invalid target. An external miner is expected to try nonces until a block
-with a valid target is found. Every block returned by this call will have a
-unique hash - miners can start at nonce 0 without worrying about trying the
-same block twice.
-
-Parameters: none
-
-Response:
-```
-[]byte
-```
-The response is a byte array containing a target followed by a block header
-followed by a block. The target is the first 32 bytes. The block header is the
-following 80 bytes, and the nonce is bytes 32-39 (inclusive) of the header
-(bytes 64-71 of the whole array). The remaining bytes are the block. Hashing
-the header will result in the block id, which must be lower than the target.
-When submitting a solved block, you need to update the nonce in the block. The
-nonce is at bytes 32-39 (inclusive) of the block, or bytes 144-151 of the whole
-field. When submitting the block to /miner/submitblock, only submit the block
-and not the target or header.
-
-Layout:
-
-0-31: target
-
-32-111: header
-
-112+: block
-
-32-39 of header: header nonce
-
-32-39 of block: block nonce
-
-When submitting the block, update the nonce and submit only the block (bytes
-112+).
-
-#### /miner/start
-
-Function: Tells the miner to begin mining on `threads` threads.
-
-Parameters:
-```
-threads int
-```
-
-Response: standard
-
-#### /miner/status
-
-Parameters: none
-
-Response:
-```
-struct {
-	Mining         bool
-	State          string
-	Threads        int
-	RunningThreads int
-	Address        [32]byte
-}
-```
-If the `Mining` flag is set, the miner is currently mining. Otherwise it is
-not.
-
-`State` gives a more nuanced description of the miner, including
-transitional states.
-
-`Threads` indicates the number of desired threads, while
-`RunningThreads` is the number of currently active threads. If the miner finds
-a block,
-
-`Address` is the address that will receive the coinbase.
-
-#### /miner/stop
-
-Function: Stops the miner.
-
-Parameters: none
-
-Response: standard
-
-#### /miner/submitblock
-
-Function: Submits a block to the miner. The block is submitted as an encoded
-byte slice. The block does not need to be modified from the block provided by
-/miner/blockforwork except that the nonce must be updated. The nonce can be
-found at bytes 32-39 (inclusive) of the block.
-
-Parameters:
-```
-[]byte
-```
-
-Response: standard
 
 Renter
 ------
