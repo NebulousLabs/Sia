@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 )
 
@@ -16,38 +15,43 @@ import (
 // to them all.
 type Server struct {
 	cs       modules.ConsensusSet
+	explorer modules.Explorer
 	gateway  modules.Gateway
 	host     modules.Host
 	miner    modules.Miner
 	renter   modules.Renter
 	tpool    modules.TransactionPool
 	wallet   modules.Wallet
-	explorer modules.Explorer
 
-	listener  net.Listener
-	apiServer *graceful.Server
+	apiServer         *graceful.Server
+	daemonExposed     bool
+	limitedAPI        bool
+	listener          net.Listener
+	requiredUserAgent string
 
 	mu *sync.RWMutex
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, explorer modules.Explorer) (*Server, error) {
+func NewServer(APIaddr string, requiredUserAgent string, limitedAPI bool, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
 	l, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
 	}
 
 	srv := &Server{
-		cs:       s,
+		cs:       cs,
+		explorer: e,
 		gateway:  g,
 		host:     h,
 		miner:    m,
 		renter:   r,
 		tpool:    tp,
 		wallet:   w,
-		explorer: explorer,
 
-		listener: l,
+		limitedAPI:        limitedAPI,
+		listener:          l,
+		requiredUserAgent: requiredUserAgent,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}

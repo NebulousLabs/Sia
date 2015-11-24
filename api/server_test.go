@@ -87,7 +87,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", cs, g, h, m, r, tp, w, e)
+	srv, err := NewServer(":0", "Sia-Agent", false, cs, e, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}

@@ -18,16 +18,18 @@ var (
 // compatible with gcfg.
 type Config struct {
 	Siad struct {
-		NoBootstrap bool
-
 		APIaddr  string
 		RPCaddr  string
 		HostAddr string
 
-		SiaDir string
+		Explorer          bool
+		LimitedAPI        bool
+		NoBootstrap       bool
+		RequiredUserAgent string
 
 		Profile    bool
 		ProfileDir string
+		SiaDir string
 	}
 }
 
@@ -53,13 +55,16 @@ func main() {
 	})
 
 	// Set default values, which have the lowest priority.
-	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
-	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.RequiredUserAgent, "agent", "A", "Sia-Agent", "required substring for the user agent")
+	root.PersistentFlags().BoolVarP(&config.Siad.Explorer, "explorer", "E", false, "whether or not to run an explorer in the daemon")
 	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
-	root.PersistentFlags().BoolVarP(&config.Siad.Profile, "profile", "p", false, "enable profiling")
+	root.PersistentFlags().BoolVarP(&config.Siad.LimitedAPI, "limited-api", "L", false, "whether or not private information is provided through the api")
 	root.PersistentFlags().StringVarP(&config.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
+	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
+	root.PersistentFlags().BoolVarP(&config.Siad.Profile, "profile", "p", false, "enable profiling")
+	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.
