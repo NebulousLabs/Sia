@@ -29,7 +29,7 @@ type Config struct {
 
 		Profile    bool
 		ProfileDir string
-		SiaDir string
+		SiaDir     string
 	}
 }
 
