@@ -43,22 +43,25 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	blockHeight         types.BlockHeight
+	// File management.
+	fileCounter         int
 	obligationsByID     map[types.FileContractID]*contractObligation
 	obligationsByHeight map[types.BlockHeight][]*contractObligation
-	spaceRemaining      int64
-	fileCounter         int
 	profit              types.Currency
+	spaceRemaining      int64
+
+	// Persistent settings.
+	blockHeight types.BlockHeight
+	netAddr     modules.NetAddress
+	secretKey   crypto.SecretKey
+	publicKey   types.SiaPublicKey
 	modules.HostSettings
 
-	myAddr     modules.NetAddress
+	// Utilities.
+	listener   net.Listener
+	log        *log.Logger
+	mu         sync.RWMutex
 	persistDir string
-	secretKey  crypto.SecretKey
-	publicKey  types.SiaPublicKey
-
-	listener net.Listener
-	log      *log.Logger
-	mu       sync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -117,10 +120,10 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	if err != nil {
 		return nil, err
 	}
-	h.myAddr = modules.NetAddress(h.listener.Addr().String())
+	h.netAddr = modules.NetAddress(h.listener.Addr().String())
 
 	// Forward the hosting port, if possible.
-	go h.forwardPort(h.myAddr.Port())
+	go h.forwardPort(h.netAddr.Port())
 
 	// Learn our external IP.
 	go h.learnHostname()
@@ -152,14 +155,14 @@ func (h *Host) Settings() modules.HostSettings {
 func (h *Host) Address() modules.NetAddress {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.myAddr
+	return h.netAddr
 }
 
 func (h *Host) Info() modules.HostInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
+	h.HostSettings.IPAddress = h.netAddr // needs to be updated manually
 	info := modules.HostInfo{
 		HostSettings: h.HostSettings,
 
@@ -185,7 +188,7 @@ func (h *Host) Close() error {
 	}
 	h.mu.RUnlock()
 	// clear the port mapping (no effect if UPnP not supported)
-	h.clearPort(h.myAddr.Port())
+	h.clearPort(h.netAddr.Port())
 	// shut down the listener
 	return h.listener.Close()
 }
