@@ -20,7 +20,7 @@ func (h *Host) listen() {
 	}
 }
 
-// TODO: maintain compatibility
+// handleConn handles an incoming connection to the host, typically an RPC.
 func (h *Host) handleConn(conn net.Conn) {
 	defer conn.Close()
 	// Set an initial duration that is generous, but finite. RPCs can extend
@@ -50,6 +50,7 @@ func (h *Host) handleConn(conn net.Conn) {
 	}
 }
 
+// rpcSettings is an rpc that returns the host's settings.
 func (h *Host) rpcSettings(conn net.Conn) error {
 	return encoding.WriteObject(conn, h.Settings())
 }
