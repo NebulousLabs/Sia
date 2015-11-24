@@ -34,7 +34,7 @@ run = Test
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/renter/hostdb \
        ./modules/miner ./modules/renter ./modules/transactionpool ./modules/wallet \
-       ./persist ./siac ./siae ./sync ./types
+       ./persist ./siac ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -61,8 +61,7 @@ release-std: REBUILD
 xc: dependencies test test-long REBUILD
 	goxc -arch="386 amd64 arm" -bc="darwin linux windows" -d=release \
 	     -pv=v0.4.8 -br=beta -include=LICENSE,README.md,doc/API.md   \
-	     -main-dirs-exclude=siae -tasks-=deb,deb-dev,deb-source,go-test \
-	     -n=Sia
+	     -tasks-=deb,deb-dev,deb-source,go-test -n=Sia
 
 # clean removes all directories that get automatically created during
 # development.

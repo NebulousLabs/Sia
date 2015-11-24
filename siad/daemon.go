@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/explorer"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
@@ -42,6 +43,13 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
+	var e *explorer.Explorer
+	if config.Siad.Explorer {
+		e, err = explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
+		if err != nil {
+			return err
+		}
+	}
 	tpool, err := transactionpool.New(cs, gateway)
 	if err != nil {
 		return err
@@ -62,7 +70,19 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, cs, gateway, host, miner, renter, tpool, wallet, nil)
+	srv, err := api.NewServer(
+		config.Siad.APIaddr,
+		config.Siad.RequiredUserAgent,
+		config.Siad.LimitedAPI,
+		cs,
+		e,
+		gateway,
+		host,
+		miner,
+		renter,
+		tpool,
+		wallet,
+	)
 	if err != nil {
 		return err
 	}
