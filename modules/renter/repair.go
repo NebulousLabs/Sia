@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -137,16 +138,19 @@ func (f *file) offlineChunks() repairMap {
 
 // repair attempts to repair a file by uploading missing pieces to more hosts.
 func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
+	// create host set
+	hosts := hdb.UniqueHosts(f.erasureCode.NumPieces(), nil)
+	if len(hosts) == 0 {
+		return errors.New("no available hosts")
+	}
+	for _, h := range hosts {
+		defer h.Close()
+	}
+
 	// For each chunk with missing pieces, re-encode the chunk and upload each
 	// missing piece.
 	var wg sync.WaitGroup
 	for chunkIndex, missingPieces := range pieceMap {
-		hosts := hdb.UniqueHosts(len(missingPieces), nil)
-		if len(hosts) == 0 {
-			// TODO: consider repairing one chunk at a time
-			continue
-		}
-
 		// read chunk data and encode
 		chunk := make([]byte, f.chunkSize())
 		_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
@@ -170,6 +174,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
 		wg.Add(len(hosts))
 		for i, host := range hosts {
 			go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
+				defer wg.Done()
 				offset, err := host.Upload(piece)
 				if err != nil {
 					return
@@ -194,8 +199,6 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
 					Offset: offset,
 				})
 				f.contracts[host.ContractID()] = contract
-
-				wg.Done()
 			}(host, uint64(i), pieces[missingPieces[i]])
 		}
 		wg.Wait()

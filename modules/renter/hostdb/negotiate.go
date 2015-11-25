@@ -440,27 +440,29 @@ func (hdb *HostDB) newHostUploader(settings modules.HostSettings) (*hostUploader
 // UniqueHosts will return up to 'n' unique hosts that are not in 'old'. Note
 // that this is a blocking call that performs network I/O.
 func (hdb *HostDB) UniqueHosts(n int, old []Uploader) (hosts []Uploader) {
-	// TODO: locking
-
-	// first use existing relationships
-	// TODO: what if new hosts are cheaper?
-	// for _, h := range hdb.contracts {
-	// 	if h.isFull || h.isIn(old) {
-	// 		continue
-	// 	}
-	// 	hosts = append(hdb.oldHostUploader(h))
-	// 	if len(hosts) >= n {
-	// 		return
-	// 	}
-	// }
-
-	// next form new relationships
+	// remove old hosts from tree
+	hdb.mu.Lock()
+	var oldEntries []*hostEntry
+	for _, host := range old {
+		node, exists := hdb.activeHosts[host.Address()]
+		if !exists {
+			continue
+		}
+		node.removeNode()
+		delete(hdb.activeHosts, host.Address()) // probably unnecessary
+		oldEntries = append(oldEntries, node.hostEntry)
+	}
+	// select random hosts from remaining set
 	randHosts := hdb.randomHosts(n)
-	for _, h := range randHosts {
-		// if h.isIn(old) {
-		// 	continue
-		// }
-		hostUploader, err := hdb.newHostUploader(h)
+	// replace removed hosts
+	for _, entry := range oldEntries {
+		hdb.insertNode(entry)
+	}
+	hdb.mu.Unlock()
+
+	// negotiate contracts with each host
+	for _, host := range randHosts {
+		hostUploader, err := hdb.newHostUploader(host)
 		if err != nil {
 			continue
 		}
