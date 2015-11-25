@@ -73,9 +73,13 @@ type (
 		AnnounceAddress(NetAddress) error
 
 		// Capacity returns the amount of storage still available on the
-		// machine, as well as the number of unresolved file contracts the host
-		// is responsible for. The amount of space remaining can be negative.
-		Capacity() (spaceRemaining int64, openContracts uint64)
+		// machine. The amount can be negative if the total capacity was
+		// reduced to below the active capacity.
+		Capacity() int64
+
+		// Contracts returns the number of unresolved file contracts that the
+		// host is responsible for.
+		Contracts() uint64
 
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress

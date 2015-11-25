@@ -32,7 +32,6 @@ type (
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request) {
 	settings := srv.host.Settings()
 	upcomingRevenue, revenue := srv.host.Revenue()
-	storageRemaining, numContracts := srv.host.Capacity()
 	hg := HostGET{
 		Collateral:   settings.Collateral,
 		IPAddress:    settings.IPAddress,
@@ -43,9 +42,9 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request) {
 		UnlockHash:   settings.UnlockHash,
 		WindowSize:   settings.WindowSize,
 
-		NumContracts:     numContracts,
+		NumContracts:     srv.host.Contracts(),
 		Revenue:          revenue,
-		StorageRemaining: storageRemaining,
+		StorageRemaining: srv.host.Capacity(),
 		UpcomingRevenue:  upcomingRevenue,
 	}
 	writeJSON(w, hg)

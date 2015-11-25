@@ -136,13 +136,21 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return h, nil
 }
 
-// Capacity returns the amount of storage still available on the machine, as
-// well as the number of unresolved file contracts the host is responsible for.
-// The amount of space remaining can be negative.
-func (h *Host) Capacity() (spaceRemaining int64, openContracts uint64) {
+// Capacity returns the amount of storage still available on the machine. The
+// amount can be negative if the total capacity was reduced to below the active
+// capacity.
+func (h *Host) Capacity() int64 {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.spaceRemaining, uint64(len(h.obligationsByID))
+	return h.spaceRemaining
+}
+
+// Contracts returns the number of unresolved file contracts that the host is
+// responsible for.
+func (h *Host) Contracts() uint64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return uint64(len(h.obligationsByID))
 }
 
 // NetAddress returns the address at which the host can be reached.
