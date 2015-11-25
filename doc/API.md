@@ -165,6 +165,125 @@ be filled out. For all other types, the 'blocks' and 'transactions' fields will
 be filled out, returning all of the blocks and transactions that feature the
 provided hash.
 
+Host
+----
+
+Queries:
+
+* /host          [GET]
+* /host          [POST]
+* /host/announce [POST]
+
+#### /host [GET]
+
+Function: Fetches status information about the host.
+
+Parameters: none
+
+Response:
+```
+struct {
+	collateral   types.Currency     (string)
+	ipaddress    modules.NetAddress (string)
+	maxduration  types.BlockHeight  (uint64)
+	minduration  types.BlockHeight  (uint64)
+	price        types.Currency     (string)
+	totalstorage int64
+	unlockhash   types.UnlockHash  (string)
+	windowsize   types.BlockHeight (uint64)
+
+	numCcntracts     int
+	profit           types.Currency (string)
+	storageremaining int64
+	upcomingprofit   types.Currency (string)
+}
+```
+`collateral` is the number of hastings per byte per block that are put up as
+collateral when making file contracts.
+
+`ipaddress` is the network address of the host.
+
+`maxduration` is the maximum allowed duration of a file contract.
+
+`minduration` is the minimum allowed duration of a file contract.
+
+`price` is the number of hastings per byte per block that the host is charging
+when making file contracts.
+
+`totalstorage` is the total amount of storage that has been allocated to the
+host.
+
+`unlockhash` is the address that hosting profits will be sent to.
+
+`windowsize` is the minimum required window that must be given to the host to
+prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
+downtime, 40 blocks is recommended as an absolute minimum. The current network
+default is 288 blocks. The current software will break entirely below 20
+blocks, though in theory something as low as 6 blocks could be safe.
+
+
+`numcontracts` is the number of active contracts that the host is engaged in.
+
+`profit` is the total number of Hastings earned from hosting.
+
+`storageremaining` is `TotalStorage` minus the number of bytes currently being
+stored.
+
+`upcomingprofit` is the value of the contracts that have been created but not
+fulfilled.
+
+#### /host [POST]
+
+Function: Configures hosting parameters. All parameters are optional;
+unspecified parameters will be left unchanged.
+
+Parameters:
+```
+collateral   int
+maxduration  int
+minduration  int
+price        int
+totalstorage int
+windowsize   int
+```
+`collateral` is the number of hastings per byte per block that are put up as
+collateral when making file contracts.
+
+`maxduration` is the maximum allowed duration of a file contract.
+
+`minduration` is the minimum allowed duration of a file contract.
+
+`price` is the number of hastings per byte per block that the host is charging
+when making file contracts.
+
+`totalstorage` is the total amount of storage that has been allocated to the
+host.
+
+`windowsize` is the minimum required window that must be given to the host to
+prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
+downtime, 40 blocks is recommended as an absolute minimum. The current network
+default is 288 blocks. The current software will break entirely below 20
+blocks, though in theory something as low as 6 blocks could be safe.
+`totalstorage` is how much storage (in bytes) the host will rent to the
+network.
+
+Response: standard
+
+#### /host/announce [POST]
+
+Function: The host will announce itself to the network as a source of storage.
+Generally only needs to be called once.
+
+Parameters:
+```
+netaddress string
+```
+`netaddress` is an optional parameter that specifies the address to be
+announced. Supplying this parameters will also override standard connectivity
+checks.
+
+Response: standard
+
 Miner
 -----
 
@@ -852,110 +971,6 @@ address string
 "a.b.c.d:xxxx".
 
 Response: standard
-
-Host
-----
-
-Queries:
-
-* /host/announce
-* /host/configure
-* /host/status
-
-#### /host/announce
-
-Function: The host will announce itself to the network as a source of storage.
-Generally only needs to be called once.
-
-Parameters:
-```
-address string
-```
-`address` is an optional parameter that specifies the address to be announced.
-Supplying this parameters will also override standard connectivity checks.
-
-Response: standard
-
-#### /host/configure
-
-Function: Configures hosting parameters. All parameters are optional;
-unspecified parameters will be left unchanged.
-
-Parameters:
-```
-totalstorage int
-minfilesize  int
-maxfilesize  int
-minduration  int
-maxduration  int
-windowsize   int
-price        int
-collateral   int
-```
-`totalstorage` is how much storage (in bytes) the host will rent to the
-network.
-
-`minfilesize` is the minimum allowed file size.
-
-`maxfilesize` is the maximum allowed file size.
-
-`minduration` is the minimum amount of time a contract is allowed to last.
-
-`maxduration` is the maximum amount of time a contract is allowed to last.
-
-`windowsize` is the number of blocks a host has to prove they are holding the
-file.
-
-`price` is the cost (in Hastings per byte) of data stored.
-
-`collateral` is the amount of collateral the host will offer (in Hastings per
-byte per block) for losing files on the network.
-
-Response: standard
-
-#### /host/status
-
-Function: Queries the host for its configuration values, as well as the amount
-of storage remaining and the number of contracts formed.
-
-Parameters: none
-
-Response:
-```
-struct {
-	TotalStorage     int64
-	MinFilesize      uint64
-	MaxFilesize      uint64
-	MinDuration      types.BlockHeight (uint64)
-	MaxDuration      types.BlockHeight (uint64)
-	WindowSize       types.BlockHeight (uint64)
-	Price            types.Currency (string)
-	Collateral       types.Currency (string)
-	UnlockHash       types.UnlockHash (string)
-	StorageRemaining int64
-	NumContracts     int
-	Profit           types.Currency (string)
-	PotentialProfit  types.Currency (string)
-	Competition      types.Currency (string)
-	IPAddress        modules.NetAddress (string)
-}
-```
-
-`StorageRemaining` is `TotalStorage` minus the number of bytes currently being stored.
-
-`NumContracts` is the number of active contracts that the host is engaged in.
-
-`Profit` is the total number of Hastings earned from hosting.
-
-`PotentialProfit` is `Profit` plus the value of the current active contracts.
-
-`Competition` is the average price of storage on the network.
-
-`UnlockHash` is the address that hosting profits will be sent to.
-
-`IPAddress` is the network address of the host.
-
-Other fields are documented in `/host/configure`.
 
 HostDB
 ------
