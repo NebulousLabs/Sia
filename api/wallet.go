@@ -191,7 +191,7 @@ func (srv *Server) walletBackupHandlerPOST(w http.ResponseWriter, req *http.Requ
 
 // walletBackupHandler handles API calls to /wallet/backup.
 func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "POST" {
+	if req.Method == "" || req.Method == "GET" {
 		srv.walletBackupHandlerPOST(w, req)
 		return
 	}

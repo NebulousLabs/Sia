@@ -171,8 +171,8 @@ Miner
 Queries:
 
 * /miner        [GET]
-* /miner/start  [GET]
-* /miner/stop   [GET]
+* /miner/start  [POST]
+* /miner/stop   [POST]
 * /miner/header [GET]
 * /miner/header [POST]
 
@@ -199,7 +199,7 @@ struct {
 
 `staleblocksmined` indicates how many stale blocks have been mined, this value is remembered after restarting.
 
-#### /miner/start [GET]
+#### /miner/start [POST]
 
 Function: Starts a single threaded cpu miner. Does nothing if the cpu miner is
 already running.
@@ -208,7 +208,7 @@ Parameters: none
 
 Response: standard
 
-#### /miner/stop [GET]
+#### /miner/stop [POST]
 
 Function: Stops the cpu miner. Does nothing if the cpu miner is not running.
 
@@ -255,7 +255,7 @@ Queries:
 * /wallet                      [GET]
 * /wallet/address              [GET]
 * /wallet/addresses            [GET]
-* /wallet/backup               [POST]
+* /wallet/backup               [GET]
 * /wallet/init                 [POST]
 * /wallet/load/033x            [POST]
 * /wallet/load/seed            [POST]
@@ -367,7 +367,7 @@ struct {
 A struct is used to allow future fields such as a list of transactions or a set
 of balances to be provided without breaking JSON compatibility.
 
-#### /wallet/backup [POST]
+#### /wallet/backup [GET]
 
 Function: Create a backup of the wallet settings file. Though this can easily
 be done manually, the settings file is often in an unknown or difficult to find

@@ -42,14 +42,22 @@ func (srv *Server) minerHandler(w http.ResponseWriter, req *http.Request) {
 
 // minerStartHandler handles the API call that starts the miner.
 func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request) {
-	srv.miner.StartCPUMining()
-	writeSuccess(w)
+	if req.Method == "POST" {
+		srv.miner.StartCPUMining()
+		writeSuccess(w)
+		return
+	}
+	writeError(w, "unrecognized method when calling /miner/start", http.StatusBadRequest)
 }
 
 // minerStopHandler handles the API call to stop the miner.
 func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
-	srv.miner.StopCPUMining()
-	writeSuccess(w)
+	if req.Method == "POST" {
+		srv.miner.StopCPUMining()
+		writeSuccess(w)
+		return
+	}
+	writeError(w, "unrecognized method when calling /miner/stop", http.StatusBadRequest)
 }
 
 // minerHeaderforworkHandler handles the API call that retrieves a block header
