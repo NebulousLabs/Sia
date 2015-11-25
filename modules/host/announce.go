@@ -65,6 +65,6 @@ func (h *Host) Announce() error {
 }
 
 // ForceAnnounce announces using the provided address.
-func (h *Host) ForceAnnounce(addr modules.NetAddress) error {
+func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	return h.announce(addr)
 }

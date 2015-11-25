@@ -14,7 +14,7 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request)
 	// user can override this check by manually specifying the address.
 	var err error
 	if addr := req.FormValue("address"); addr != "" {
-		err = srv.host.ForceAnnounce(modules.NetAddress(addr))
+		err = srv.host.AnnounceAddress(modules.NetAddress(addr))
 	} else {
 		err = srv.host.Announce()
 	}
@@ -28,7 +28,7 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request)
 // hostConfigureHandler handles the API call to set the host configuration.
 func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
-	config := srv.host.Info().HostSettings
+	config := srv.host.Settings()
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
@@ -65,5 +65,5 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 
 // hostStatusHandler handles the API call that queries the host status.
 func (srv *Server) hostStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, srv.host.Info())
+	writeError(w, "this call is not implemented", http.StatusBadRequest)
 }

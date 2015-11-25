@@ -25,12 +25,12 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 
 	// announce the host
-	err = st.stdGetAPI("/host/announce?address=" + string(st.host.Address()))
+	err = st.stdGetAPI("/host/announce?address=" + string(st.host.NetAddress()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// we need to announce twice, or the renter will complain about not having enough hosts
-	loopAddr := "127.0.0.1:" + st.host.Address().Port()
+	loopAddr := "127.0.0.1:" + st.host.NetAddress().Port()
 	err = st.stdGetAPI("/host/announce?address=" + loopAddr)
 	if err != nil {
 		t.Fatal(err)

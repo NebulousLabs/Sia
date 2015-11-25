@@ -136,7 +136,35 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return h, nil
 }
 
-// SetConfig updates the host's internal HostSettings object.
+// Capacity returns the amount of storage still available on the machine, as
+// well as the number of unresolved file contracts the host is responsible for.
+// The amount of space remaining can be negative.
+func (h *Host) Capacity() (spaceRemaining int64, openContracts uint64) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.spaceRemaining, uint64(len(h.obligationsByID))
+}
+
+// NetAddress returns the address at which the host can be reached.
+func (h *Host) NetAddress() modules.NetAddress {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.netAddr
+}
+
+// Revenue returns the amount of revenue that the host has lined up, as well as
+// the amount of revenue that the host has successfully captured.
+func (h *Host) Revenue() (unresolved, resolved types.Currency) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, obligation := range h.obligationsByID {
+		fc := obligation.FileContract
+		unresolved = unresolved.Add(types.PostTax(h.blockHeight, fc.Payout))
+	}
+	return unresolved, h.profit
+}
+
+// SetSettings updates the host's internal HostSettings object.
 func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -147,36 +175,9 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 
 // Settings returns the settings of a host.
 func (h *Host) Settings() modules.HostSettings {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.HostSettings
-}
-
-func (h *Host) Address() modules.NetAddress {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.netAddr
-}
-
-func (h *Host) Info() modules.HostInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
-	h.HostSettings.IPAddress = h.netAddr // needs to be updated manually
-	info := modules.HostInfo{
-		HostSettings: h.HostSettings,
-
-		StorageRemaining: h.spaceRemaining,
-		NumContracts:     len(h.obligationsByID),
-		Profit:           h.profit,
-	}
-	// sum up the current obligations to calculate PotentialProfit
-	for _, obligation := range h.obligationsByID {
-		fc := obligation.FileContract
-		info.PotentialProfit = info.PotentialProfit.Add(types.PostTax(h.blockHeight, fc.Payout))
-	}
-
-	return info
+	return h.HostSettings
 }
 
 // Close saves the state of the Gateway and stops its listener process.

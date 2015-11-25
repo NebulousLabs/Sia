@@ -61,43 +61,35 @@ type (
 		UnlockHash   types.UnlockHash
 	}
 
-	// HostInfo contains HostSettings and details pertinent to the host's understanding
-	// of their offered services
-	HostInfo struct {
-		HostSettings
-
-		StorageRemaining int64
-		NumContracts     int
-		Profit           types.Currency
-		PotentialProfit  types.Currency
-
-		Competition types.Currency
-	}
-
 	// Host can take storage from disk and offer it to the network, managing things
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// Address returns the host's network address
-		Address() NetAddress
-
 		// Announce announces the host on the blockchain, returning an error if the
-		// host cannot reach itself or if the external ip address is unknown.
+		// external ip address is unknown.
 		Announce() error
 
-		// ForceAnnounce announces the specified address on the blockchain,
-		// regardless of connectivity.
-		ForceAnnounce(NetAddress) error
+		// AnnounceAddress announces the specified address on the blockchain.
+		AnnounceAddress(NetAddress) error
+
+		// Capacity returns the amount of storage still available on the
+		// machine, as well as the number of unresolved file contracts the host
+		// is responsible for. The amount of space remaining can be negative.
+		Capacity() (spaceRemaining int64, openContracts uint64)
+
+		// NetAddress returns the host's network address
+		NetAddress() NetAddress
+
+		// Revenue returns the amount of revenue that the host has lined up, as
+		// well as the amount of revenue that the host has successfully
+		// captured.
+		Revenue() (unresolved, resolved types.Currency)
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings)
 
 		// Settings returns the host's settings.
 		Settings() HostSettings
-
-		// Info returns info about the host, including its hosting parameters, the
-		// amount of storage remaining, and the number of active contracts.
-		Info() HostInfo
 
 		// Close saves the state of the host and stops its listener process.
 		Close() error
