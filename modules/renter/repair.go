@@ -171,8 +171,9 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
 		}
 
 		// upload one piece per host
-		wg.Add(len(hosts))
-		for i, host := range hosts {
+		wg.Add(len(missingPieces))
+		for i, pieceIndex := range missingPieces {
+			host := hosts[i%len(hosts)]
 			go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
 				defer wg.Done()
 				offset, err := host.Upload(piece)
@@ -199,7 +200,7 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
 					Offset: offset,
 				})
 				f.contracts[host.ContractID()] = contract
-			}(host, uint64(i), pieces[missingPieces[i]])
+			}(host, uint64(i), pieces[pieceIndex])
 		}
 		wg.Wait()
 	}
