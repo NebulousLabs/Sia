@@ -192,10 +192,10 @@ struct {
 	unlockhash   types.UnlockHash  (string)
 	windowsize   types.BlockHeight (uint64)
 
-	numCcntracts     int
-	profit           types.Currency (string)
-	storageremaining int64
-	upcomingprofit   types.Currency (string)
+	numCcntracts      uint64
+	revenue           types.Currency (string)
+	storageremaining  int64
+	upcomingrevenue   types.Currency (string)
 }
 ```
 `collateral` is the number of hastings per byte per block that are put up as
@@ -213,7 +213,7 @@ when making file contracts.
 `totalstorage` is the total amount of storage that has been allocated to the
 host.
 
-`unlockhash` is the address that hosting profits will be sent to.
+`unlockhash` is the address that hosting revenues will be sent to.
 
 `windowsize` is the minimum required window that must be given to the host to
 prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
@@ -224,12 +224,12 @@ blocks, though in theory something as low as 6 blocks could be safe.
 
 `numcontracts` is the number of active contracts that the host is engaged in.
 
-`profit` is the total number of Hastings earned from hosting.
+`revenue` is the total number of Hastings earned from hosting.
 
 `storageremaining` is `TotalStorage` minus the number of bytes currently being
 stored.
 
-`upcomingprofit` is the value of the contracts that have been created but not
+`upcomingrevenue` is the value of the contracts that have been created but not
 fulfilled.
 
 #### /host [POST]
@@ -900,7 +900,7 @@ struct {
 #### /daemon/updates/apply:
 
 Function: Applies the update specified by `version`.
-
+                
 Parameters:
 ```
 version string

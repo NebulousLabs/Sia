@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -97,22 +97,21 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 }
 
 func hoststatuscmd() {
-	info := new(modules.HostInfo)
-	err := getAPI("/host/status", info)
+	hg := new(api.HostGET)
+	err := getAPI("/host/status", &hg)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)
 		return
 	}
 	// convert price to SC/GB/mo
-	price := new(big.Rat).SetInt(info.Price.Big())
+	price := new(big.Rat).SetInt(hg.Price.Big())
 	price.Mul(price, big.NewRat(4320, 1e24/1e9))
 	fmt.Printf(`Host settings:
 Storage:      %v (%v used)
 Price:        %v SC per GB per month
 Collateral:   %v
-Max Filesize: %v
 Max Duration: %v
 Contracts:    %v
-`, filesizeUnits(info.TotalStorage), filesizeUnits(info.TotalStorage-info.StorageRemaining),
-		price.FloatString(3), info.Collateral, info.MaxFilesize, info.MaxDuration, info.NumContracts)
+`, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
+		price.FloatString(3), hg.Collateral, hg.MaxDuration, hg.NumContracts)
 }

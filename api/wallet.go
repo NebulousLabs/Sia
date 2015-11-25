@@ -64,7 +64,7 @@ type (
 		TransactionIDs []types.TransactionID `json:"transactionids"`
 	}
 
-	// WalletSeedGet contains the seeds used by the wallet.
+	// WalletSeedsGET contains the seeds used by the wallet.
 	WalletSeedsGET struct {
 		PrimarySeed        string   `json:"primaryseed"`
 		AddressesRemaining int      `json:"addressesremaining"`
