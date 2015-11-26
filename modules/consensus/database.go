@@ -5,6 +5,8 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -21,7 +23,7 @@ var (
 	errNonEmptyBucket = errors.New("cannot remove a map with objects still in it")
 
 	dbMetadata = persist.Metadata{
-		Version: "0.4.3",
+		Version: "0.5.0",
 		Header:  "Consensus Set Database",
 	}
 )
@@ -51,10 +53,34 @@ func (b boltTxWrapper) Bucket(name []byte) dbBucket {
 	return b.tx.Bucket(name)
 }
 
+// replaceDatabase backs up the existing database and creates a new one.
+func (cs *ConsensusSet) replaceDatabase(filename string) error {
+	// Rename the existing database and create a new one.
+	fmt.Println("Outdated consensus database... backing up and replacing")
+	err := os.Rename(filename, filename+".bck")
+	if err != nil {
+		return errors.New("error while backing up consensus database: " + err.Error())
+	}
+
+	// Try again to create a new database, this time without checking for an
+	// outdated database error.
+	cs.db, err = persist.OpenDatabase(dbMetadata, filename)
+	if err != nil {
+		return errors.New("error opening consensus database: " + err.Error())
+	}
+	return nil
+}
+
 // openDB loads the set database and populates it with the necessary buckets
 func (cs *ConsensusSet) openDB(filename string) (err error) {
 	cs.db, err = persist.OpenDatabase(dbMetadata, filename)
-	return err
+	if err == persist.ErrBadVersion {
+		return cs.replaceDatabase(filename)
+	}
+	if err != nil {
+		return errors.New("error opening consensus database: " + err.Error())
+	}
+	return nil
 }
 
 // dbInitialized returns true if the database appears to be initialized, false
