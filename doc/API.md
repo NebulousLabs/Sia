@@ -821,14 +821,14 @@ up to and including the most recent block will be provided.
 Response:
 ```
 struct {
-	confirmedhistory   []modules.ProcessedTransaction
-	unconfirmedhistory []modules.ProcessedTransaction
+	confirmedtransactions   []modules.ProcessedTransaction
+	unconfirmedtransactions []modules.ProcessedTransaction
 }
 ```
-'confirmedhistory' lists all of the confirmed transactions appearing between
+'confirmedtransactions' lists all of the confirmed transactions appearing between
 height 'startheight' and height 'endheight' (inclusive).
 
-'unconfirmedhistory' lists all of the unconfirmed transactions.
+'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
 #### /wallet/transactions/$(addr) [GET]
 
