@@ -2,6 +2,7 @@ package api
 
 import (
 	"io/ioutil"
+	"net/url"
 	"testing"
 	"time"
 
@@ -18,8 +19,6 @@ func TestIntegrationMinerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// TODO: Mine some stale blocks.
 
 	// Get the api returned fields of the miner.
 	var mg MinerGET
@@ -57,7 +56,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 
 	// Start the cpu miner, give time for the first hashrate readings to
 	// appear.
-	err = st.stdGetAPI("/miner/start")
+	err = st.stdPostAPI("/miner/start", url.Values{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +76,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 	}
 
 	// Stop the cpu miner and wait for the stop call to go through.
-	err = st.stdGetAPI("/miner/stop")
+	err = st.stdPostAPI("/miner/stop", url.Values{})
 	if err != nil {
 		t.Fatal(err)
 	}

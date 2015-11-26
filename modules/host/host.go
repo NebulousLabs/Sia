@@ -38,31 +38,30 @@ type contractObligation struct {
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	// modules
+	// Module dependencies.
 	cs     modules.ConsensusSet
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// resources
-	listener net.Listener
-	log      *log.Logger
-
-	// variables
-	blockHeight         types.BlockHeight
+	// File management.
+	fileCounter         int
 	obligationsByID     map[types.FileContractID]*contractObligation
 	obligationsByHeight map[types.BlockHeight][]*contractObligation
-	spaceRemaining      int64
-	fileCounter         int
 	profit              types.Currency
+	spaceRemaining      int64
+
+	// Persistent settings.
+	blockHeight types.BlockHeight
+	netAddr     modules.NetAddress
+	secretKey   crypto.SecretKey
+	publicKey   types.SiaPublicKey
 	modules.HostSettings
 
-	// constants
-	myAddr     modules.NetAddress
+	// Utilities.
+	listener   net.Listener
+	log        *log.Logger
+	mu         sync.RWMutex
 	persistDir string
-	secretKey  crypto.SecretKey
-	publicKey  types.SiaPublicKey
-
-	mu sync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -121,10 +120,10 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	if err != nil {
 		return nil, err
 	}
-	h.myAddr = modules.NetAddress(h.listener.Addr().String())
+	h.netAddr = modules.NetAddress(h.listener.Addr().String())
 
 	// Forward the hosting port, if possible.
-	go h.forwardPort(h.myAddr.Port())
+	go h.forwardPort(h.netAddr.Port())
 
 	// Learn our external IP.
 	go h.learnHostname()
@@ -137,7 +136,43 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return h, nil
 }
 
-// SetConfig updates the host's internal HostSettings object.
+// Capacity returns the amount of storage still available on the machine. The
+// amount can be negative if the total capacity was reduced to below the active
+// capacity.
+func (h *Host) Capacity() int64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.spaceRemaining
+}
+
+// Contracts returns the number of unresolved file contracts that the host is
+// responsible for.
+func (h *Host) Contracts() uint64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return uint64(len(h.obligationsByID))
+}
+
+// NetAddress returns the address at which the host can be reached.
+func (h *Host) NetAddress() modules.NetAddress {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.netAddr
+}
+
+// Revenue returns the amount of revenue that the host has lined up, as well as
+// the amount of revenue that the host has successfully captured.
+func (h *Host) Revenue() (unresolved, resolved types.Currency) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, obligation := range h.obligationsByID {
+		fc := obligation.FileContract
+		unresolved = unresolved.Add(types.PostTax(h.blockHeight, fc.Payout))
+	}
+	return unresolved, h.profit
+}
+
+// SetSettings updates the host's internal HostSettings object.
 func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -148,36 +183,9 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 
 // Settings returns the settings of a host.
 func (h *Host) Settings() modules.HostSettings {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.HostSettings
-}
-
-func (h *Host) Address() modules.NetAddress {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.myAddr
-}
-
-func (h *Host) Info() modules.HostInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
-	h.HostSettings.IPAddress = h.myAddr // needs to be updated manually
-	info := modules.HostInfo{
-		HostSettings: h.HostSettings,
-
-		StorageRemaining: h.spaceRemaining,
-		NumContracts:     len(h.obligationsByID),
-		Profit:           h.profit,
-	}
-	// sum up the current obligations to calculate PotentialProfit
-	for _, obligation := range h.obligationsByID {
-		fc := obligation.FileContract
-		info.PotentialProfit = info.PotentialProfit.Add(types.PostTax(h.blockHeight, fc.Payout))
-	}
-
-	return info
+	return h.HostSettings
 }
 
 // Close saves the state of the Gateway and stops its listener process.
@@ -189,7 +197,7 @@ func (h *Host) Close() error {
 	}
 	h.mu.RUnlock()
 	// clear the port mapping (no effect if UPnP not supported)
-	h.clearPort(h.myAddr.Port())
+	h.clearPort(h.netAddr.Port())
 	// shut down the listener
 	return h.listener.Close()
 }

@@ -2,13 +2,13 @@ package api
 
 import (
 	"io/ioutil"
+	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -24,14 +24,19 @@ func TestIntegrationHosting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// announce the host
-	err = st.stdGetAPI("/host/announce?address=" + string(st.host.Address()))
+	// Announce the host.
+	announceValues := url.Values{}
+	announceValues.Set("address", string(st.host.NetAddress()))
+	err = st.stdPostAPI("/host/announce", announceValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// we need to announce twice, or the renter will complain about not having enough hosts
-	loopAddr := "127.0.0.1:" + st.host.Address().Port()
-	err = st.stdGetAPI("/host/announce?address=" + loopAddr)
+	// Announce twice, otherwise the renter will throw a 'not enough hosts'
+	// error.
+	loopAddr := "127.0.0.1:" + st.host.NetAddress().Port()
+	announceValues = url.Values{}
+	announceValues.Set("address", loopAddr)
+	err = st.stdPostAPI("/host/announce", announceValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,10 +77,13 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 
 	// check profit
-	var hi modules.HostInfo
-	st.getAPI("/host/status", &hi)
-	expProfit := "382129999999997570526"
-	if hi.Profit.String() != expProfit {
-		t.Fatalf("host's profit was not affected: expected %v, got %v", expProfit, hi.Profit)
+	var hg HostGET
+	err = st.getAPI("/host", &hg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expRevenue := "382129999999997570526"
+	if hg.Revenue.String() != expRevenue {
+		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
 	}
 }

@@ -22,8 +22,6 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 
 // threadedCreateStorageProof creates a storage proof for a file contract
 // obligation and submits it to the blockchain.
-//
-// TODO: The printlns here should be logging messages.
 func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 	defer h.threadedDeleteObligation(obligation)
 

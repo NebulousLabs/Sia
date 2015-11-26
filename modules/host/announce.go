@@ -53,7 +53,7 @@ func (h *Host) Announce() error {
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
 	h.mu.RLock()
-	addr := h.myAddr
+	addr := h.netAddr
 	h.mu.RUnlock()
 
 	// Check that the host's ip address is known.
@@ -65,6 +65,6 @@ func (h *Host) Announce() error {
 }
 
 // ForceAnnounce announces using the provided address.
-func (h *Host) ForceAnnounce(addr modules.NetAddress) error {
+func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	return h.announce(addr)
 }

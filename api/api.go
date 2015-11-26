@@ -83,11 +83,10 @@ func (srv *Server) initAPI() {
 		srv.handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
 	}
 
-	// Host API Calls - Unfinished
+	// Host API Calls
 	if srv.host != nil && !srv.limitedAPI {
-		srv.handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
-		srv.handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
-		srv.handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
+		srv.handleHTTPRequest(mux, "/host", srv.hostHandler)                  // GET, POST
+		srv.handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler) // POST
 	}
 
 	// HostDB API Calls - DEPRECATED
@@ -98,10 +97,10 @@ func (srv *Server) initAPI() {
 
 	// Miner API Calls
 	if srv.miner != nil && !srv.limitedAPI {
-		srv.handleHTTPRequest(mux, "/miner", srv.minerHandler)
-		srv.handleHTTPRequest(mux, "/miner/header", srv.minerHeaderHandler)
-		srv.handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
-		srv.handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
+		srv.handleHTTPRequest(mux, "/miner", srv.minerHandler)                            // GET
+		srv.handleHTTPRequest(mux, "/miner/header", srv.minerHeaderHandler)               // GET, POST
+		srv.handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)                 // POST
+		srv.handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)                   // POST
 		srv.handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler) // COMPATv0.4.8
 		srv.handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)   // COMPATv0.4.8
 	}
@@ -131,7 +130,7 @@ func (srv *Server) initAPI() {
 		srv.handleHTTPRequest(mux, "/wallet", srv.walletHandler)                           // GET
 		srv.handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
 		srv.handleHTTPRequest(mux, "/wallet/addresses", srv.walletAddressesHandler)        // GET
-		srv.handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // POST
+		srv.handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // GET
 		srv.handleHTTPRequest(mux, "/wallet/encrypt", srv.walletEncryptHandler)            // POST - COMPATv0.4.0
 		srv.handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
 		srv.handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
