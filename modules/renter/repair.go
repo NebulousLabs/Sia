@@ -151,6 +151,8 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
 	// missing piece.
 	var wg sync.WaitGroup
 	for chunkIndex, missingPieces := range pieceMap {
+		//hosts = newHostSet(hosts, currentPieceHosts)
+
 		// read chunk data and encode
 		chunk := make([]byte, f.chunkSize())
 		_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))

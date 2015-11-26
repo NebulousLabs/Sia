@@ -6,7 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestFileAvailable probes the Available method of the file type.
+// TestFileAvailable probes the available method of the file type.
 func TestFileAvailable(t *testing.T) {
 	rsc, _ := NewRSCode(1, 10)
 	f := &file{
@@ -15,7 +15,7 @@ func TestFileAvailable(t *testing.T) {
 		pieceSize:   100,
 	}
 
-	if f.Available() {
+	if f.available() {
 		t.Error("file should not be available")
 	}
 
@@ -25,26 +25,18 @@ func TestFileAvailable(t *testing.T) {
 	}
 	f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
 
-	if !f.Available() {
+	if !f.available() {
 		t.Error("file should be available")
 	}
 }
 
-// TestFileNickname probes the Nickname method of the file type.
-func TestFileNickname(t *testing.T) {
-	f := file{name: "name"}
-	if f.Nickname() != "name" {
-		t.Error("got the wrong nickname for a file")
-	}
-}
-
-// TestFileExpiration probes the Expiration method of the file type.
+// TestFileExpiration probes the expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
 	f := &file{
 		contracts: make(map[types.FileContractID]fileContract),
 	}
 
-	if f.Expiration() != 0 {
+	if f.expiration() != 0 {
 		t.Error("file with no pieces should report as having no time remaining")
 	}
 
@@ -52,21 +44,21 @@ func TestFileExpiration(t *testing.T) {
 	fc := fileContract{}
 	fc.WindowStart = 100
 	f.contracts[types.FileContractID{0}] = fc
-	if f.Expiration() != 100 {
+	if f.expiration() != 100 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a lower WindowStart.
 	fc.WindowStart = 50
 	f.contracts[types.FileContractID{1}] = fc
-	if f.Expiration() != 50 {
+	if f.expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 
 	// Add a contract with a higher WindowStart.
 	fc.WindowStart = 75
 	f.contracts[types.FileContractID{2}] = fc
-	if f.Expiration() != 50 {
+	if f.expiration() != 50 {
 		t.Error("file did not report lowest WindowStart")
 	}
 }
@@ -142,28 +134,33 @@ func TestRenterFileList(t *testing.T) {
 	}
 
 	// Put a file in the renter.
+	rsc, _ := NewRSCode(1, 1)
 	rt.renter.files["1"] = &file{
-		name: "one",
+		name:        "one",
+		erasureCode: rsc,
+		pieceSize:   1,
 	}
 	if len(rt.renter.FileList()) != 1 {
 		t.Error("FileList is not returning the only file in the renter")
 	}
-	if rt.renter.FileList()[0].Nickname() != "one" {
+	if rt.renter.FileList()[0].Nickname != "one" {
 		t.Error("FileList is not returning the correct filename for the only file")
 	}
 
 	// Put multiple files in the renter.
 	rt.renter.files["2"] = &file{
-		name: "two",
+		name:        "two",
+		erasureCode: rsc,
+		pieceSize:   1,
 	}
 	if len(rt.renter.FileList()) != 2 {
 		t.Error("FileList is not returning both files in the renter")
 	}
 	files := rt.renter.FileList()
-	if !((files[0].Nickname() == "one" || files[0].Nickname() == "two") &&
-		(files[1].Nickname() == "one" || files[1].Nickname() == "two") &&
-		(files[0].Nickname() != files[1].Nickname())) {
-		t.Error("FileList is returning wrong names for the files:", files[0].Nickname(), files[1].Nickname())
+	if !((files[0].Nickname == "one" || files[0].Nickname == "two") &&
+		(files[1].Nickname == "one" || files[1].Nickname == "two") &&
+		(files[0].Nickname != files[1].Nickname)) {
+		t.Error("FileList is returning wrong names for the files:", files[0].Nickname, files[1].Nickname)
 	}
 }
 
@@ -195,7 +192,7 @@ func TestRenterRenameFile(t *testing.T) {
 	if len(rt.renter.FileList()) != 1 {
 		t.Fatal("FileList has unexpected number of files:", len(rt.renter.FileList()))
 	}
-	if files[0].Nickname() != "1a" {
+	if files[0].Nickname != "1a" {
 		t.Error("RenameFile failed, new file nickname is not what is expected.")
 	}
 
@@ -207,8 +204,8 @@ func TestRenterRenameFile(t *testing.T) {
 	if err != ErrNicknameOverload {
 		t.Error("Expecting ErrNicknameOverload:", err)
 	}
-	if files[0].Nickname() != "1a" {
-		t.Error("Side effect occured during rename:", files[0].Nickname())
+	if files[0].Nickname != "1a" {
+		t.Error("Side effect occured during rename:", files[0].Nickname)
 	}
 
 	// Rename a file to the same name.
@@ -216,7 +213,7 @@ func TestRenterRenameFile(t *testing.T) {
 	if err != ErrNicknameOverload {
 		t.Error("Expecting ErrNicknameOverload:", err)
 	}
-	if files[0].Nickname() != "1a" {
-		t.Error("Side effect occured during rename:", files[0].Nickname())
+	if files[0].Nickname != "1a" {
+		t.Error("Side effect occured during rename:", files[0].Nickname)
 	}
 }

@@ -3,16 +3,41 @@ package renter
 import (
 	"bytes"
 	"crypto/rand"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
-// addPiece adds a piece to the testHost. It randomly fails according to the
+// a testHost simulates a host. It implements the hostdb.Uploader interface.
+type testHost struct {
+	ip   modules.NetAddress
+	data []byte
+
+	// used to simulate real-world conditions
+	delay    time.Duration // transfers will take this long
+	failRate int           // transfers will randomly fail with probability 1/failRate
+
+	sync.Mutex
+}
+
+func (h *testHost) Address() modules.NetAddress  { return h.ip }
+func (h *testHost) EndHeight() types.BlockHeight { return 0 }
+func (h *testHost) Close() error                 { return nil }
+
+func (h *testHost) ContractID() types.FileContractID {
+	var fcid types.FileContractID
+	copy(fcid[:], h.ip)
+	return fcid
+}
+
+// Upload adds a piece to the testHost. It randomly fails according to the
 // testHost's parameters.
-func (h *testHost) addPiece(p uploadPiece) error {
+func (h *testHost) Upload(data []byte) (offset uint64, err error) {
 	// simulate I/O delay
 	time.Sleep(h.delay)
 
@@ -21,31 +46,11 @@ func (h *testHost) addPiece(p uploadPiece) error {
 
 	// randomly fail
 	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
-		return crypto.ErrNilInput
+		return 0, crypto.ErrNilInput
 	}
 
-	h.pieceMap[p.chunkIndex] = append(h.pieceMap[p.chunkIndex], pieceData{
-		p.chunkIndex,
-		p.pieceIndex,
-		uint64(len(h.data)),
-	})
-	h.data = append(h.data, p.data...)
-	return nil
-}
-
-// fileContract returns the file contract that would have been created if
-// testHost were a real host.
-func (h *testHost) fileContract() fileContract {
-	var fc fileContract
-	for _, ps := range h.pieceMap {
-		fc.Pieces = append(fc.Pieces, ps...)
-	}
-	fc.IP = h.ip
-	return fc
-}
-
-func (h *testHost) addr() modules.NetAddress {
-	return h.ip
+	h.data = append(h.data, data...)
+	return uint64(len(h.data) - len(data)), nil
 }
 
 // TestErasureUpload tests parallel uploading of erasure-coded data.
@@ -67,37 +72,50 @@ func TestErasureUpload(t *testing.T) {
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]uploader, rsc.NumPieces())
+	hosts := make([]*testHost, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
-			pieceMap:  make(map[uint64][]pieceData),
-			pieceSize: pieceSize,
-			delay:     time.Duration(i) * time.Millisecond,
-			failRate:  5, // 20% failure rate
+			ip:       modules.NetAddress(strconv.Itoa(i)),
+			delay:    time.Duration(i) * time.Millisecond,
+			failRate: 5, // 20% failure rate
 		}
 	}
 	// make one host really slow
-	hosts[0].(*testHost).delay = 100 * time.Millisecond
+	hosts[0].delay = 100 * time.Millisecond
 	// make one host always fail
-	hosts[1].(*testHost).failRate = 1
+	hosts[1].failRate = 1
+
+	// create hostdb
+	hdb := &mockHostDB{hosts: hosts}
 
 	// upload data to hosts
 	f := newFile("foo", rsc, pieceSize, dataSize)
-	err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hosts)
+	err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hdb)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// download data
-	buf := new(bytes.Buffer)
+	chunks := make([][][]byte, f.numChunks())
 	for i := uint64(0); i < f.numChunks(); i++ {
-		chunk := make([][]byte, rsc.NumPieces())
-		for _, h := range hosts {
-			host := h.(*testHost)
-			for _, p := range host.pieceMap[i] {
-				chunk[p.Piece] = host.data[p.Offset : p.Offset+pieceSize]
-			}
+		chunks[i] = make([][]byte, rsc.NumPieces())
+	}
+	for _, h := range hosts {
+		contract, exists := f.contracts[h.ContractID()]
+		if !exists {
+			continue
 		}
+		for _, p := range contract.Pieces {
+			encPiece := h.data[p.Offset : p.Offset+pieceSize+crypto.TwofishOverhead]
+			piece, err := deriveKey(f.masterKey, p.Chunk, p.Piece).DecryptBytes(encPiece)
+			if err != nil {
+				t.Fatal(err)
+			}
+			chunks[p.Chunk][p.Piece] = piece
+		}
+	}
+	buf := new(bytes.Buffer)
+	for _, chunk := range chunks {
 		err = rsc.Recover(chunk, f.chunkSize(), buf)
 		if err != nil {
 			t.Fatal(err)

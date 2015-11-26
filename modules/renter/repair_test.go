@@ -8,8 +8,26 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// mockHostDB mocks the functions of the HostDB.
+// TODO: might be unnecessary if we implement a per-chunk repair fn
+type mockHostDB struct {
+	hosts []*testHost
+}
+
+func (hdb *mockHostDB) ActiveHosts() []modules.HostSettings { return nil }
+func (hdb *mockHostDB) AllHosts() []modules.HostSettings    { return nil }
+func (hdb *mockHostDB) AveragePrice() types.Currency        { return types.NewCurrency64(0) }
+
+func (hdb *mockHostDB) UniqueHosts(n int, old []hostdb.Uploader) (ups []hostdb.Uploader) {
+	for i := 0; i < n && i < len(hdb.hosts); i++ {
+		ups = append(ups, hdb.hosts[i])
+	}
+	return
+}
 
 // TestRepair tests that the repair method can repeatedly improve the
 // redundancy of an unavailable file until it becomes available.
@@ -20,66 +38,51 @@ func TestRepair(t *testing.T) {
 	rand.Read(data)
 
 	// create Reed-Solomon encoder
-	rsc, err := NewRSCode(4, 6)
+	rsc, err := NewRSCode(8, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]uploader, rsc.NumPieces())
+	hosts := make([]*testHost, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
-			ip:        modules.NetAddress(strconv.Itoa(i)),
-			pieceMap:  make(map[uint64][]pieceData),
-			pieceSize: pieceSize,
-			failRate:  3, // 33% failure rate
+			ip:       modules.NetAddress(strconv.Itoa(i)),
+			failRate: 2, // 50% failure rate
 		}
 	}
 	// make one host always fail
-	hosts[0].(*testHost).failRate = 1
+	hosts[0].failRate = 1
+
+	// create hostdb
+	hdb := &mockHostDB{hosts: hosts}
 
 	// upload data to hosts
 	f := newFile("foo", rsc, pieceSize, dataSize)
-	err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hosts)
+	err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hdb)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// download data (should fail)
-	dhosts := make([]fetcher, len(hosts))
-	for i := range dhosts {
-		dhosts[i] = hosts[i].(*testHost)
-	}
-	d := f.newDownload(dhosts, "")
-	buf := new(bytes.Buffer)
-	err = d.run(buf)
-	if err != errInsufficientPieces {
-		t.Fatalf("download should not have succeeded: expected %v, got %v", errInsufficientPieces, err)
+	// file should not be available after first pass
+	if f.available() {
+		t.Fatalf("file should not be available: %v%%", f.uploadProgress())
 	}
 
 	// repair until file becomes available
 	const maxAttempts = 20
 	for i := 0; i < maxAttempts; i++ {
-		err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hosts)
+		err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hdb)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		buf.Reset()
-		err = d.run(buf)
-		if err == nil {
+		if f.available() {
 			break
 		}
 	}
-	if err != nil {
-		t.Fatalf("file not repaired after %v attempts: %v", maxAttempts, err)
-	}
-
-	// check data integrity
-	buf.Truncate(dataSize)
-	if !bytes.Equal(buf.Bytes(), data) {
-		t.Fatal("recovered data does not match original")
+	if !f.available() {
+		t.Fatalf("file not repaired to availability after %v attempts: %v", maxAttempts, err)
 	}
 }
 
