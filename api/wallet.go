@@ -129,9 +129,9 @@ func (srv *Server) walletHandlerGET(w http.ResponseWriter, req *http.Request) {
 func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.walletHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
 }
 
 // walletAddressHandlerGET handles a GET request to /wallet/address.
@@ -150,9 +150,9 @@ func (srv *Server) walletAddressHandlerGET(w http.ResponseWriter, req *http.Requ
 func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.walletAddressHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/address", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/address", http.StatusBadRequest)
 }
 
 // walletAddressesHandlerGET handles a GET request to /wallet/addresses.
@@ -174,9 +174,9 @@ func (srv *Server) walletAddressesHandlerGET(w http.ResponseWriter, req *http.Re
 func (srv *Server) walletAddressesHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.walletAddressesHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/addresses", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/addresses", http.StatusBadRequest)
 }
 
 // walletBackupHandlerPOST handles a POST call to /wallet/backup
@@ -193,9 +193,9 @@ func (srv *Server) walletBackupHandlerPOST(w http.ResponseWriter, req *http.Requ
 func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.walletBackupHandlerPOST(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/backup", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/backup", http.StatusBadRequest)
 }
 
 // walletInitHandlerPOST handles a POST call to /wallet/init.
@@ -228,9 +228,9 @@ func (srv *Server) walletInitHandlerPOST(w http.ResponseWriter, req *http.Reques
 func (srv *Server) walletInitHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.walletInitHandlerPOST(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/init", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/init", http.StatusBadRequest)
 }
 
 // walletEncryptHandler is a legacy alias for walletInitHandler.
@@ -266,9 +266,9 @@ func (srv *Server) walletLoad033xHandlerPOST(w http.ResponseWriter, req *http.Re
 func (srv *Server) walletLoad033xHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.walletLoad033xHandlerPOST(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/load/033x", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/load/033x", http.StatusBadRequest)
 }
 
 // walletLoadSeedHandlerPOST handles a POST request to /wallet/load/seed.
@@ -298,10 +298,9 @@ func (srv *Server) walletLoadSeedHandlerPOST(w http.ResponseWriter, req *http.Re
 
 // walletLoadSeedHandler handles API calls to /wallet/load/seed.
 func (srv *Server) walletLoadSeedHandler(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case "POST":
+	if req.Method == "POST" {
 		srv.walletLoadSeedHandlerPOST(w, req)
-	default:
+	} else {
 		writeError(w, "unrecognized method when calling /wallet/load/seed", http.StatusBadRequest)
 	}
 }
@@ -327,10 +326,9 @@ func (srv *Server) walletLoadSiagHandlerPOST(w http.ResponseWriter, req *http.Re
 
 // walletLoadSiagHandler handles API calls to /wallet/load/seed.
 func (srv *Server) walletLoadSiagHandler(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case "POST":
+	if req.Method == "POST" {
 		srv.walletLoadSiagHandlerPOST(w, req)
-	default:
+	} else {
 		writeError(w, "unrecognized method when calling /wallet/load/siag", http.StatusBadRequest)
 	}
 }
@@ -349,9 +347,9 @@ func (srv *Server) walletLockHandlerPOST(w http.ResponseWriter, req *http.Reques
 func (srv *Server) walletLockHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.walletLockHandlerPOST(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/lock", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/lock", http.StatusBadRequest)
 }
 
 // walletSeedsHandlerGET handles a GET request to /wallet/seeds.
@@ -397,10 +395,9 @@ func (srv *Server) walletSeedsHandlerGET(w http.ResponseWriter, req *http.Reques
 
 // walletSeedHandler handles API calls to /wallet/seed.
 func (srv *Server) walletSeedsHandler(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case "GET", "":
+	if req.Method == "" || req.Method == "GET" {
 		srv.walletSeedsHandlerGET(w, req)
-	default:
+	} else {
 		writeError(w, "unrecognized method when calling /wallet/seeds", http.StatusBadRequest)
 	}
 }
@@ -436,9 +433,9 @@ func (srv *Server) walletSiacoinsHandlerPOST(w http.ResponseWriter, req *http.Re
 func (srv *Server) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.walletSiacoinsHandlerPOST(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/siacoins", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/siacoins", http.StatusBadRequest)
 }
 
 // walletSiafundsHandlerPOST handles a POST request to /wallet/siafunds.
@@ -479,7 +476,16 @@ func (srv *Server) walletSiafundsHandler(w http.ResponseWriter, req *http.Reques
 
 // walletTransactionHandlerGETid handles a GET call to
 // /wallet/transaction/$(id).
-func (srv *Server) walletTransactionHandlerGETid(w http.ResponseWriter, req *http.Request, id types.TransactionID) {
+func (srv *Server) walletTransactionHandlerGETid(w http.ResponseWriter, req *http.Request) {
+	// Parse the id from the url.
+	var id types.TransactionID
+	jsonID := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/transaction/") + "\""
+	err := id.UnmarshalJSON([]byte(jsonID))
+	if err != nil {
+		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	txn, ok := srv.wallet.Transaction(id)
 	if !ok {
 		writeError(w, "error when calling /wallet/transaction/$(id): transaction not found", http.StatusBadRequest)
@@ -492,21 +498,11 @@ func (srv *Server) walletTransactionHandlerGETid(w http.ResponseWriter, req *htt
 
 // walletTransactionHandler handles API calls to /wallet/transaction.
 func (srv *Server) walletTransactionHandler(w http.ResponseWriter, req *http.Request) {
-	// GET is the only supported method.
-	if req.Method != "" && req.Method != "GET" {
+	if strings.HasPrefix(req.URL.Path, "/wallet/transaction/") && (req.Method == "" || req.Method == "GET") {
+		srv.walletTransactionHandlerGETid(w, req)
+	} else {
 		writeError(w, "unrecognized method when calling /wallet/transaction", http.StatusBadRequest)
-		return
 	}
-
-	// Parse the id from the url.
-	var id types.TransactionID
-	jsonID := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/transaction/") + "\""
-	err := id.UnmarshalJSON([]byte(jsonID))
-	if err != nil {
-		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	srv.walletTransactionHandlerGETid(w, req, id)
 }
 
 // walletTransactionsHandlerGET handles a GET call to /wallet/transactions.
@@ -537,7 +533,16 @@ func (srv *Server) walletTransactionsHandlerGET(w http.ResponseWriter, req *http
 
 // walletTransactionsHandlerGETaddr handles a GET request to
 // /wallet/transactions/$(addr).
-func (srv *Server) walletTransactionsHandlerGETaddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
+func (srv *Server) walletTransactionsHandlerGETaddr(w http.ResponseWriter, req *http.Request) {
+	// Parse the address being input.
+	jsonAddr := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/transactions/") + "\""
+	var addr types.UnlockHash
+	err := addr.UnmarshalJSON([]byte(jsonAddr))
+	if err != nil {
+		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	confirmedATs := srv.wallet.AddressTransactions(addr)
 	unconfirmedATs := srv.wallet.AddressUnconfirmedTransactions(addr)
 	writeJSON(w, WalletTransactionsGETaddr{
@@ -550,25 +555,11 @@ func (srv *Server) walletTransactionsHandlerGETaddr(w http.ResponseWriter, req *
 func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/wallet/transactions" && (req.Method == "" || req.Method == "GET") {
 		srv.walletTransactionsHandlerGET(w, req)
-		return
-	}
-
-	// Only a GET call is allowed at this point.
-	if req.Method != "" && req.Method != "GET" {
+	} else if strings.HasPrefix(req.URL.Path, "/wallet/transactions/") && (req.Method == "" || req.Method == "GET") {
+		srv.walletTransactionsHandlerGETaddr(w, req)
+	} else {
 		writeError(w, "unrecognized method call to /wallet/transactions", http.StatusBadRequest)
-		return
 	}
-
-	// The only call remaining is /wallet/transactions/$(addr) - parse the
-	// address.
-	jsonAddr := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/transactions/") + "\""
-	var addr types.UnlockHash
-	err := addr.UnmarshalJSON([]byte(jsonAddr))
-	if err != nil {
-		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	srv.walletTransactionsHandlerGETaddr(w, req, addr)
 }
 
 // walletUnlockHandlerPOST handles a POST call to /wallet/unlock.
@@ -592,7 +583,7 @@ func (srv *Server) walletUnlockHandlerPOST(w http.ResponseWriter, req *http.Requ
 func (srv *Server) walletUnlockHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.walletUnlockHandlerPOST(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/unlock", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /wallet/unlock", http.StatusBadRequest)
 }

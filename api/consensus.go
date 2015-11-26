@@ -38,9 +38,9 @@ func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request)
 func (srv *Server) consensusHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.consensusHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /consensus", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /consensus", http.StatusBadRequest)
 }
 
 // consensusBlockHandlerGET handles a GET request to /consensus/block.
@@ -65,7 +65,7 @@ func (srv *Server) consensusBlockHandlerGET(w http.ResponseWriter, req *http.Req
 func (srv *Server) consensusBlockHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.consensusBlockHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /consensus/block", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /consensus/block", http.StatusBadRequest)
 }

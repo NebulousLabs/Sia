@@ -35,9 +35,9 @@ func (srv *Server) minerHandlerGET(w http.ResponseWriter, req *http.Request) {
 func (srv *Server) minerHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.minerHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /miner", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /miner", http.StatusBadRequest)
 }
 
 // minerStartHandler handles the API call that starts the miner.
@@ -45,9 +45,9 @@ func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.miner.StartCPUMining()
 		writeSuccess(w)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /miner/start", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /miner/start", http.StatusBadRequest)
 }
 
 // minerStopHandler handles the API call to stop the miner.
@@ -55,9 +55,9 @@ func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		srv.miner.StopCPUMining()
 		writeSuccess(w)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /miner/stop", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /miner/stop", http.StatusBadRequest)
 }
 
 // minerHeaderforworkHandler handles the API call that retrieves a block header
@@ -97,9 +97,9 @@ func (srv *Server) minerSubmitheaderHandler(w http.ResponseWriter, req *http.Req
 func (srv *Server) minerHeaderHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.minerHeaderforworkHandler(w, req)
-		return
 	} else if req.Method == "POST" {
 		srv.minerSubmitheaderHandler(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /miner/header", http.StatusBadRequest)
 	}
 }

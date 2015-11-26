@@ -186,9 +186,9 @@ func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Requ
 func (srv *Server) explorerBlockHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "" || req.Method == "GET" {
 		srv.explorerBlockHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /explorer/block", http.StatusBadRequest)
 	}
-	writeError(w, "unrecognized method when calling /explorer/block", http.StatusBadRequest)
 }
 
 // buildTransactionSet returns the blocks and transactions that are associated
@@ -248,7 +248,17 @@ func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) 
 }
 
 // explorerHandlerGEThash handles GET requests to /explorer/$(hash).
-func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Request, hash types.UnlockHash) {
+func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Request) {
+	// The hash is scanned as an address, because an address can be typecast to
+	// all other necessary types, and will correclty decode hashes whether or
+	// not they have a checksum.
+	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/")
+	hash, err := scanAddress(encodedHash)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Try the hash as a block id.
 	block, height, exists := srv.explorer.Block(types.BlockID(hash))
 	if exists {
@@ -331,25 +341,9 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/explorer" && (req.Method == "" || req.Method == "GET") {
 		srv.explorerHandlerGET(w, req)
-		return
+	} else if strings.HasPrefix(req.URL.Path, "/explorer/") && (req.Method == "" || req.Method == "GET") {
+		srv.explorerHandlerGEThash(w, req)
+	} else {
+		writeError(w, "unrecognized call to /explorer", http.StatusBadRequest)
 	}
-
-	// only a GET call is allowed at this point.
-	if req.Method != "" && req.Method != "GET" {
-		writeError(w, "unrecognized call to /explorer/", http.StatusBadRequest)
-		return
-	}
-
-	// Only call remaining is /explore/$(hash) - parse the hash.
-	//
-	// The hash is scanned as an address, because an address can be typecast to
-	// all other necessary types, and will correclty decode hashes whether or
-	// not they have a checksum.
-	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/")
-	hash, err := scanAddress(encodedHash)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	srv.explorerHandlerGEThash(w, req, hash)
 }
