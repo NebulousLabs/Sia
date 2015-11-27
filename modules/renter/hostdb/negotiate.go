@@ -72,6 +72,8 @@ func (hu *hostUploader) ContractID() types.FileContractID {
 }
 
 func (hu *hostUploader) EndHeight() types.BlockHeight {
+	hu.revisionLock.Lock()
+	defer hu.revisionLock.Unlock()
 	return hu.lastTxn.FileContractRevisions[0].NewWindowStart
 }
 

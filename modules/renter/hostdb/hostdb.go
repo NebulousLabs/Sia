@@ -96,6 +96,7 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 		wallet: wallet,
 		tpool:  tpool,
 
+		contracts:   make(map[types.FileContractID]hostContract),
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
