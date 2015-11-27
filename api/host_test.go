@@ -15,9 +15,7 @@ import (
 // TestIntegrationHosting tests that the host correctly receives payment for
 // hosting files.
 func TestIntegrationHosting(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
+	t.Skip("Disabled due to hostdb managing contracts")
 
 	st, err := createServerTester("TestIntegrationHosting")
 	if err != nil {
