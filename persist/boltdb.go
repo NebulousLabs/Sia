@@ -1,21 +1,17 @@
 package persist
 
 import (
-	"errors"
 	"time"
 
 	"github.com/NebulousLabs/bolt"
 )
 
+// BoltDatabase is a persist-level wrapper for the bolt database, providing
+// extra information such as a version number.
 type BoltDatabase struct {
 	Metadata
 	*bolt.DB
 }
-
-var (
-	ErrNilEntry  = errors.New("entry does not exist")
-	ErrNilBucket = errors.New("bucket does not exist")
-)
 
 // updateDbMetadata will set the contents of the metadata bucket to be
 // what is stored inside the metadata argument
@@ -70,7 +66,7 @@ func (db *BoltDatabase) CloseDatabase() error {
 	return nil
 }
 
-// openDatabase opens a database filename and checks metadata
+// OpenDatabase opens a database filename and checks metadata
 func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 	// Open the database using a 1 second timeout (without the timeout,
 	// database will potentially hang indefinitely.

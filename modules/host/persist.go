@@ -63,8 +63,11 @@ func (h *Host) load() error {
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
+
 		// update spaceRemaining
-		h.spaceRemaining -= int64(obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize)
+		if len(obligation.LastRevisionTxn.FileContractRevisions) > 0 { // COMPATv0.4.8
+			h.spaceRemaining -= int64(obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize)
+		}
 	}
 	h.secretKey = sHost.SecretKey
 	h.publicKey = sHost.PublicKey

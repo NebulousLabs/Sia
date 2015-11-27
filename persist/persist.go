@@ -8,8 +8,13 @@ import (
 )
 
 var (
+	// ErrBadVersion indicates that the version number of the file is not
+	// compatible with the current codebase.
 	ErrBadVersion = errors.New("incompatible version")
-	ErrBadHeader  = errors.New("wrong header")
+
+	// ErrBadHeader indicates that the file opened is not the file that was
+	// expected.
+	ErrBadHeader = errors.New("wrong header")
 )
 
 // Metadata contains the header and version of the data being stored.
@@ -42,6 +47,8 @@ func (sf *safeFile) Commit() error {
 	return os.Rename(sf.finalName+"_temp", sf.finalName)
 }
 
+// NewSafeFile returns a file that can atomically be written to disk,
+// minimizing the risk of corruption.
 func NewSafeFile(filename string) (*safeFile, error) {
 	file, err := os.Create(filename + "_temp")
 	if err != nil {
