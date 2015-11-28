@@ -15,6 +15,7 @@ var saveMetadata = persist.Metadata{
 	Version: "0.5",
 }
 
+// save saves the hostdb persistence data to disk.
 func (hdb *HostDB) save() error {
 	var data struct {
 		Contracts []hostContract
@@ -26,12 +27,13 @@ func (hdb *HostDB) save() error {
 			ID:              hc.ID,
 			FileContract:    hc.FileContract,
 			LastRevisionTxn: hc.LastRevisionTxn,
+			SecretKey:       hc.SecretKey,
 		})
 	}
 	return persist.SaveFile(saveMetadata, data, filepath.Join(hdb.persistDir, persistFilename))
-
 }
 
+// load loads the hostdb persistence data from disk.
 func (hdb *HostDB) load() error {
 	var data struct {
 		Contracts []hostContract

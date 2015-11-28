@@ -119,9 +119,11 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return errors.New("couldn't read host's public key: " + err.Error())
 	}
 
-	// create our own key by combining the renter entropy with the host key
-	entropy := crypto.HashAll(hu.hdb.entropy, hostPublicKey)
-	ourSK, ourPK := crypto.StdKeyGen.GenerateDeterministic(entropy)
+	// create our key
+	ourSK, ourPK, err := crypto.StdKeyGen.Generate()
+	if err != nil {
+		return errors.New("failed to generate keypair: " + err.Error())
+	}
 	ourPublicKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       ourPK[:],
@@ -266,7 +268,9 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 			// first revision is empty
 			FileContractRevisions: []types.FileContractRevision{{}},
 		},
+		SecretKey: ourSK,
 	}
+	hu.hdb.save()
 	hu.hdb.mu.Unlock()
 
 	return nil

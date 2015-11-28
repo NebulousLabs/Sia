@@ -5,11 +5,11 @@
 package hostdb
 
 import (
-	"crypto/rand"
 	"errors"
 	"log"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -35,18 +35,6 @@ type HostDB struct {
 	wallet modules.Wallet
 	tpool  modules.TransactionPool
 
-	// resources
-	log *log.Logger
-
-	// variables
-	blockHeight   types.BlockHeight
-	contracts     map[types.FileContractID]hostContract
-	cachedAddress types.UnlockHash // to prevent excessive address creation
-
-	// constants
-	entropy    [32]byte
-	persistDir string
-
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
 	// random. 'activeHosts' provides a lookup from hostname to the the
@@ -65,7 +53,14 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
-	mu sync.RWMutex
+	blockHeight   types.BlockHeight
+	contracts     map[types.FileContractID]hostContract
+	cachedAddress types.UnlockHash // to prevent excessive address creation
+
+	persistDir string
+
+	log *log.Logger
+	mu  sync.RWMutex
 }
 
 // a hostContract includes the original contract made with a host, along with
@@ -74,9 +69,10 @@ type hostContract struct {
 	ID              types.FileContractID
 	FileContract    types.FileContract
 	LastRevisionTxn types.Transaction
+	SecretKey       crypto.SecretKey
 
 	// revisions must happen in serial
-	mu sync.RWMutex // TODO: consider `json:"-"`
+	mu sync.RWMutex
 }
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
@@ -103,11 +99,7 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 
 		persistDir: persistDir,
 	}
-	_, err := rand.Read(hdb.entropy[:])
-	if err != nil {
-		return nil, err
-	}
-	err = hdb.initPersist()
+	err := hdb.initPersist()
 	if err != nil {
 		return nil, err
 	}
