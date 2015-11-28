@@ -417,8 +417,8 @@ func (hdb *HostDB) newHostUploader(settings modules.HostSettings) (*hostUploader
 		hdb.cachedAddress = uc.UnlockHash()
 	}
 
-	const filesize = 1 << 32 // 4 GiB
-	const duration = 6000    // 6 weeks
+	const filesize = 1e9  // 1 GB
+	const duration = 4320 // 30 days
 
 	err := hu.negotiateContract(filesize, duration, hdb.cachedAddress)
 	if err != nil {
