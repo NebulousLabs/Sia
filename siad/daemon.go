@@ -23,22 +23,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// preprocessConfig checks the configuration values and performs cleanup on
+// processNetAddr adds a ':' to a bare integer, so that it is a proper port
+// number.
+func processNetAddr(addr string) string {
+	_, err := strconv.Atoi(addr)
+	if err == nil {
+		return ":" + addr
+	}
+	return addr
+}
+
+// processConfig checks the configuration values and performs cleanup on
 // incorrect-but-allowed values.
-func preprocessConfig() {
-	// If the port numbers decode as an integer, prepend ":".
-	_, err := strconv.Atoi(config.Siad.RPCaddr)
-	if err == nil {
-		config.Siad.RPCaddr = ":" + config.Siad.RPCaddr
-	}
-	_, err = strconv.Atoi(config.Siad.HostAddr)
-	if err == nil {
-		config.Siad.HostAddr = ":" + config.Siad.HostAddr
-	}
+func processConfig() {
+	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
+	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
+	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
 }
 
 // startDaemonCmd uses the config parameters to start siad.
 func startDaemon() error {
+	// Clean up the configuration input.
+	processConfig()
+
 	// Establish multithreading.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -48,9 +55,6 @@ func startDaemon() error {
 	// second.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
-
-	// Clean up the configuration input.
-	preprocessConfig()
 
 	// Create all of the modules.
 	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
