@@ -1,17 +1,108 @@
-package renter
+package hostdb
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// hostdbTester contains all of the modules that are used while testing the hostdb.
+type hostdbTester struct {
+	cs        modules.ConsensusSet
+	gateway   modules.Gateway
+	miner     modules.TestMiner
+	tpool     modules.TransactionPool
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
+
+	hostdb *HostDB
+}
+
+// Close shuts down the hostdb tester.
+func (rt *hostdbTester) Close() error {
+	rt.wallet.Lock()
+	rt.cs.Close()
+	rt.gateway.Close()
+	return nil
+}
+
+// newHostDBTester creates a ready-to-use hostdb tester with money in the
+// wallet.
+func newHostDBTester(name string) (*hostdbTester, error) {
+	// Create the modules.
+	testdir := build.TempDir("hostdb", name)
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		return nil, err
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		return nil, err
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		return nil, err
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		return nil, err
+	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return nil, err
+	}
+	_, err = w.Encrypt(key)
+	if err != nil {
+		return nil, err
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return nil, err
+	}
+	hdb, err := New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	if err != nil {
+		return nil, err
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
+	if err != nil {
+		return nil, err
+	}
+
+	// Assemble all pieces into a hostdb tester.
+	ht := &hostdbTester{
+		cs:      cs,
+		gateway: g,
+		miner:   m,
+		tpool:   tp,
+		wallet:  w,
+
+		hostdb: hdb,
+	}
+
+	// Mine blocks until there is money in the wallet.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ht, nil
+}
 
 func TestNegotiateContract(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestNegotiateContract")
+	ht, err := newHostDBTester("TestNegotiateContract")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,20 +116,20 @@ func TestNegotiateContract(t *testing.T) {
 		WindowEnd:      1000,
 		Payout:         payout,
 		ValidProofOutputs: []types.SiacoinOutput{
-			{Value: types.PostTax(rt.renter.blockHeight, payout), UnlockHash: types.UnlockHash{}},
+			{Value: types.PostTax(ht.hostdb.blockHeight, payout), UnlockHash: types.UnlockHash{}},
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// same as above
-			{Value: types.PostTax(rt.renter.blockHeight, payout), UnlockHash: types.UnlockHash{}},
-			// goes to the void, not the renter
+			{Value: types.PostTax(ht.hostdb.blockHeight, payout), UnlockHash: types.UnlockHash{}},
+			// goes to the void, not the hostdb
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 		UnlockHash:     types.UnlockHash{},
 		RevisionNumber: 0,
 	}
 
-	txnBuilder := rt.wallet.StartTransaction()
+	txnBuilder := ht.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +140,7 @@ func TestNegotiateContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = rt.tpool.AcceptTransactionSet(signedTxnSet)
+	err = ht.tpool.AcceptTransactionSet(signedTxnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,13 +151,13 @@ func TestReviseContract(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestNegotiateContract")
+	ht, err := newHostDBTester("TestNegotiateContract")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// get an address
-	ourAddr, err := rt.wallet.NextAddress()
+	ourAddr, err := ht.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,17 +191,17 @@ func TestReviseContract(t *testing.T) {
 	}
 	// outputs need account for tax
 	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: types.PostTax(rt.renter.blockHeight, payout), UnlockHash: ourAddr.UnlockHash()},
+		{Value: types.PostTax(ht.hostdb.blockHeight, payout), UnlockHash: ourAddr.UnlockHash()},
 		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}}, // no collateral
 	}
 	fc.MissedProofOutputs = []types.SiacoinOutput{
 		// same as above
 		fc.ValidProofOutputs[0],
-		// goes to the void, not the renter
+		// goes to the void, not the hostdb
 		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 	}
 
-	txnBuilder := rt.wallet.StartTransaction()
+	txnBuilder := ht.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +213,7 @@ func TestReviseContract(t *testing.T) {
 	}
 
 	// submit contract
-	err = rt.tpool.AcceptTransactionSet(signedTxnSet)
+	err = ht.tpool.AcceptTransactionSet(signedTxnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +237,7 @@ func TestReviseContract(t *testing.T) {
 		TransactionSignatures: []types.TransactionSignature{{
 			ParentID:       crypto.Hash(fcid),
 			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
-			PublicKeyIndex: 0, // renter key is always first -- see negotiateContract
+			PublicKeyIndex: 0, // hostdb key is always first -- see negotiateContract
 		}},
 	}
 
@@ -157,13 +248,13 @@ func TestReviseContract(t *testing.T) {
 	}
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
-	err = signedTxn.StandaloneValid(rt.renter.blockHeight)
+	err = signedTxn.StandaloneValid(ht.hostdb.blockHeight)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// submit revision
-	err = rt.tpool.AcceptTransactionSet([]types.Transaction{signedTxn})
+	err = ht.tpool.AcceptTransactionSet([]types.Transaction{signedTxn})
 	if err != nil {
 		t.Fatal(err)
 	}

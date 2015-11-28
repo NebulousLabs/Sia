@@ -22,26 +22,6 @@ const (
 	smallPieceSize   = 1<<16 - crypto.TwofishOverhead // 64 KiB
 )
 
-type uploadPiece struct {
-	data       []byte
-	chunkIndex uint64
-	pieceIndex uint64
-}
-
-// An uploader uploads pieces to a host. This interface exists to facilitate
-// easy testing.
-type uploader interface {
-	// addPiece uploads a piece to the uploader.
-	addPiece(uploadPiece) error
-
-	// fileContract returns the fileContract containing the metadata of all
-	// previously added pieces.
-	fileContract() fileContract
-
-	// addr returns the IP address of the uploader.
-	addr() modules.NetAddress
-}
-
 // checkWalletBalance looks at an upload and determines if there is enough
 // money in the wallet to support such an upload. An error is returned if it is
 // determined that there is not enough money.
@@ -53,16 +33,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	}
 	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
 
-	var averagePrice types.Currency
-	sampleSize := up.ErasureCode.NumPieces() * 3 / 2
-	hosts := r.hostDB.RandomHosts(sampleSize)
-	for _, host := range hosts {
-		averagePrice = averagePrice.Add(host.Price)
-	}
-	if len(hosts) == 0 {
-		return errors.New("no hosts!")
-	}
-	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
+	averagePrice := r.hostDB.AveragePrice()
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
 	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
 
@@ -119,7 +90,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.files[up.Nickname] = f
 	r.tracking[up.Nickname] = trackedFile{
 		RepairPath: up.Filename,
-		EndHeight:  r.blockHeight + up.Duration,
+		EndHeight:  r.cs.Height() + up.Duration,
 	}
 	r.save()
 	r.mu.Unlock(lockID)

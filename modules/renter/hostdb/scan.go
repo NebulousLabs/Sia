@@ -96,11 +96,11 @@ func (hdb *HostDB) threadedProbeHosts() {
 
 		// Now that network communication is done, lock the hostdb to modify the
 		// host entry.
-		id := hdb.mu.Lock()
+		hdb.mu.Lock()
 		{
 			if err != nil {
 				hdb.decrementReliability(hostEntry.IPAddress, UnreachablePenalty)
-				hdb.mu.Unlock(id)
+				hdb.mu.Unlock()
 				continue
 			}
 
@@ -119,7 +119,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 				hdb.insertNode(hostEntry)
 			}
 		}
-		hdb.mu.Unlock(id)
+		hdb.mu.Unlock()
 	}
 }
 
@@ -130,7 +130,7 @@ func (hdb *HostDB) threadedScan() {
 		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.
-		id := hdb.mu.Lock()
+		hdb.mu.Lock()
 		{
 			// Scan all active hosts.
 			for _, host := range hdb.activeHosts {
@@ -180,7 +180,7 @@ func (hdb *HostDB) threadedScan() {
 				hdb.scanHostEntry(random[i])
 			}
 		}
-		hdb.mu.Unlock(id)
+		hdb.mu.Unlock()
 
 		// Sleep for a random amount of time before doing another round of
 		// scanning. The minimums and maximums keep the scan time reasonable,

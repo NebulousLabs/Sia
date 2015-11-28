@@ -149,14 +149,11 @@ func (hn *hostNode) removeNode() {
 	}
 }
 
-// RandomHosts will pull up to 'num' random hosts from the hostdb. There will
+// randomHosts will pull up to 'num' random hosts from the hostdb. There will
 // be no repeats, but the length of the slice returned may be less than 'num',
 // and may even be 0. The hosts that get returned first have the higher
 // priority.
-func (hdb *HostDB) RandomHosts(count int) (hosts []modules.HostSettings) {
-	id := hdb.mu.Lock()
-	defer hdb.mu.Unlock(id)
-
+func (hdb *HostDB) randomHosts(count int) (hosts []modules.HostSettings) {
 	var removedEntries []*hostEntry
 	for len(hosts) < count {
 		if hdb.hostTree == nil || hdb.hostTree.weight.IsZero() {

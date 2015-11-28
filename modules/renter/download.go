@@ -125,8 +125,7 @@ func checkHosts(hosts []fetcher, minPieces int, numChunks uint64) error {
 	return nil
 }
 
-// A download is a file download that has been queued by the renter. It
-// implements the modules.DownloadInfo interface.
+// A download is a file download that has been queued by the renter.
 type download struct {
 	// NOTE: received is the first field to ensure 64-bit alignment, which is
 	// required for atomic operations.
@@ -140,31 +139,6 @@ type download struct {
 	chunkSize   uint64
 	fileSize    uint64
 	hosts       []fetcher
-}
-
-// StartTime is when the download was initiated.
-func (d *download) StartTime() time.Time {
-	return d.startTime
-}
-
-// Filesize is the size of the file being downloaded.
-func (d *download) Filesize() uint64 {
-	return d.fileSize
-}
-
-// Received is the number of bytes downloaded so far.
-func (d *download) Received() uint64 {
-	return atomic.LoadUint64(&d.received)
-}
-
-// Destination is the filepath that the file was downloaded into.
-func (d *download) Destination() string {
-	return d.destination
-}
-
-// Nickname is the identifier assigned to the file when it was uploaded.
-func (d *download) Nickname() string {
-	return d.nickname
 }
 
 // getPiece locates and downloads a specific piece.
@@ -306,7 +280,14 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	// order from most recent to least recent
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
-		downloads[i] = r.downloadQueue[len(r.downloadQueue)-i-1]
+		d := r.downloadQueue[len(r.downloadQueue)-i-1]
+		downloads[i] = modules.DownloadInfo{
+			Nickname:    d.nickname,
+			Destination: d.destination,
+			Filesize:    d.fileSize,
+			Received:    atomic.LoadUint64(&d.received),
+			StartTime:   d.startTime,
+		}
 	}
 	return downloads
 }

@@ -1,15 +1,15 @@
 package renter
 
 import (
+	"errors"
 	"io"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -137,30 +137,21 @@ func (f *file) offlineChunks() repairMap {
 }
 
 // repair attempts to repair a file by uploading missing pieces to more hosts.
-func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hosts []uploader) error {
+func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
+	// create host set
+	hosts := hdb.UniqueHosts(f.erasureCode.NumPieces(), nil)
+	if len(hosts) == 0 {
+		return errors.New("no available hosts")
+	}
+	for _, h := range hosts {
+		defer h.Close()
+	}
+
 	// For each chunk with missing pieces, re-encode the chunk and upload each
 	// missing piece.
 	var wg sync.WaitGroup
 	for chunkIndex, missingPieces := range pieceMap {
-		// can only upload to hosts that aren't already storing this chunk
-		// TODO: what if we're renewing?
-		// 	curHosts := f.chunkHosts(chunkIndex)
-		// 	var newHosts []uploader
-		// outer:
-		// 	for _, h := range hosts {
-		// 		for _, ip := range curHosts {
-		// 			if ip == h.addr() {
-
-		// 				continue outer
-		// 			}
-		// 		}
-		// 		newHosts = append(newHosts, h)
-		// 	}
-		newHosts := hosts
-		// don't bother encoding if there aren't any hosts to upload to
-		if len(newHosts) == 0 {
-			newHosts = hosts
-		}
+		//hosts = newHostSet(hosts, currentPieceHosts)
 
 		// read chunk data and encode
 		chunk := make([]byte, f.chunkSize())
@@ -172,23 +163,46 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hosts []uploader) error
 		if err != nil {
 			return err
 		}
+		// encrypt pieces
+		for i := range pieces {
+			key := deriveKey(f.masterKey, chunkIndex, uint64(i))
+			pieces[i], err = key.EncryptBytes(pieces[i])
+			if err != nil {
+				return err
+			}
+		}
 
-		// upload pieces, split evenly among hosts
+		// upload one piece per host
 		wg.Add(len(missingPieces))
-		for j, pieceIndex := range missingPieces {
-			host := newHosts[j%len(newHosts)]
-			up := uploadPiece{pieces[pieceIndex], chunkIndex, pieceIndex}
-			go func(host uploader, up uploadPiece) {
-				err := host.addPiece(up)
-				if err == nil {
-					// update contract
-					f.mu.Lock()
-					contract := host.fileContract()
-					f.contracts[contract.ID] = contract
-					f.mu.Unlock()
+		for i, pieceIndex := range missingPieces {
+			host := hosts[i%len(hosts)]
+			go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
+				defer wg.Done()
+				offset, err := host.Upload(piece)
+				if err != nil {
+					return
 				}
-				wg.Done()
-			}(host, up)
+
+				// create contract entry, if necessary
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				contract, ok := f.contracts[host.ContractID()]
+				if !ok {
+					contract = fileContract{
+						ID:          host.ContractID(),
+						IP:          host.Address(),
+						WindowStart: host.EndHeight(),
+					}
+				}
+
+				// update contract
+				contract.Pieces = append(contract.Pieces, pieceData{
+					Chunk:  chunkIndex,
+					Piece:  pieceIndex,
+					Offset: offset,
+				})
+				f.contracts[host.ContractID()] = contract
+			}(host, uint64(i), pieces[pieceIndex])
 		}
 		wg.Wait()
 	}
@@ -200,11 +214,6 @@ func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hosts []uploader) error
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairUploads() {
-	// a primitive blacklist is used to augment the hostdb's weights. Each
-	// negotiation failure increments the integer, and the probability of
-	// selecting the host for upload is 1/n.
-	blacklist := make(map[modules.NetAddress]int)
-
 	for {
 		time.Sleep(5 * time.Second)
 
@@ -224,7 +233,6 @@ func (r *Renter) threadedRepairUploads() {
 			// retrieve file object and get current height
 			id = r.mu.RLock()
 			f, ok := r.files[name]
-			height := r.blockHeight
 			r.mu.RUnlock(id)
 			if !ok {
 				r.log.Printf("failed to repair %v: no longer tracking that file", name)
@@ -234,13 +242,9 @@ func (r *Renter) threadedRepairUploads() {
 				continue
 			}
 
-			// calculate duration
-			var duration types.BlockHeight
-			if meta.EndHeight == 0 {
-				duration = defaultDuration
-			} else if meta.EndHeight > height {
-				duration = meta.EndHeight - height
-			} else {
+			// check for expiration
+			height := r.cs.Height()
+			if meta.EndHeight != 0 && meta.EndHeight < height {
 				r.log.Printf("removing %v from repair set: storage period has ended", name)
 				id = r.mu.Lock()
 				delete(r.tracking, name)
@@ -269,59 +273,22 @@ func (r *Renter) threadedRepairUploads() {
 
 			r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
 
-			// defer is really convenient for cleaning up resources, so an
-			// inline function is justified
-			err := func() error {
-				// open file handle
-				handle, err := os.Open(meta.RepairPath)
-				if err != nil {
-					return err
-				}
-				defer handle.Close()
-
-				// build host list
-				bytesPerHost := f.pieceSize * f.numChunks() * 2 // 2x buffer to prevent running out of money
-				var hosts []uploader
-				randHosts := r.hostDB.RandomHosts(f.erasureCode.NumPieces() * 2)
-				for _, h := range randHosts {
-					// probabilistically filter out known bad hosts
-					// unresponsive hosts will be selected with probability 1/(1+nFailures)
-					nFailures, ok := blacklist[h.IPAddress]
-					if n, _ := crypto.RandIntn(1 + nFailures); ok && n != 0 {
-						continue
-					}
-
-					hostUploader, err := r.newHostUploader(h, bytesPerHost, duration, f.masterKey)
-					if err != nil {
-						// penalize unresponsive hosts
-						if strings.Contains(err.Error(), "timeout") {
-							blacklist[h.IPAddress]++
-						}
-						continue
-					}
-					defer hostUploader.Close()
-
-					hosts = append(hosts, hostUploader)
-					if len(hosts) >= f.erasureCode.NumPieces() {
-						break
-					}
-				}
-
-				if len(hosts) < f.erasureCode.MinPieces() {
-					// don't return an error in this case, since the file
-					// should not be removed from the repair set
-					r.log.Printf("failed to repair %v: not enough hosts", name)
-					return nil
-				}
-
-				return f.repair(handle, badChunks, hosts)
-			}()
-
+			// open file handle
+			handle, err := os.Open(meta.RepairPath)
 			if err != nil {
-				r.log.Printf("%v cannot be repaired: %v", name, err)
+				r.log.Printf("could not open %v for repair: %v", name, err)
 				id = r.mu.Lock()
 				delete(r.tracking, name)
 				r.mu.Unlock(id)
+				continue
+			}
+
+			err = f.repair(handle, badChunks, r.hostDB)
+			handle.Close()
+			if err != nil {
+				// not fatal
+				r.log.Printf("error while repairing %v: %v", name, err)
+				continue
 			}
 
 			// save the repaired file data

@@ -2,7 +2,6 @@ package renter
 
 import (
 	"path/filepath"
-	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -96,36 +95,4 @@ func newRenterTester(name string) (*renterTester, error) {
 		}
 	}
 	return rt, nil
-}
-
-// TestNilInputs tries supplying the renter with nil inputs and checks for
-// correct rejection.
-func TestNilInputs(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	rt, err := newRenterTester("TestNilInputs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = New(rt.cs, rt.wallet, rt.tpool, rt.renter.persistDir+"1")
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = New(nil, nil, nil, rt.renter.persistDir+"2")
-	if err == nil {
-		t.Error("no error returned for nil inputs")
-	}
-	_, err = New(nil, rt.wallet, rt.tpool, rt.renter.persistDir+"3")
-	if err != ErrNilCS {
-		t.Error(err)
-	}
-	_, err = New(rt.cs, nil, rt.tpool, rt.renter.persistDir+"6")
-	if err != ErrNilWallet {
-		t.Error(err)
-	}
-	_, err = New(rt.cs, rt.wallet, nil, rt.renter.persistDir+"6")
-	if err != ErrNilTpool {
-		t.Error(err)
-	}
 }

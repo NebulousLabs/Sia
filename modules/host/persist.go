@@ -39,7 +39,7 @@ func (h *Host) save() error {
 	for _, ob := range h.obligationsByID {
 		// to avoid race conditions involving the obligation's mutex, copy it
 		// manually into a new object
-		obcopy := contractObligation{ID: ob.ID, FileContract: ob.FileContract, LastRevisionTxn: ob.LastRevisionTxn}
+		obcopy := contractObligation{ID: ob.ID, FileContract: ob.FileContract, LastRevisionTxn: ob.LastRevisionTxn, Path: ob.Path}
 		sHost.Obligations = append(sHost.Obligations, obcopy)
 	}
 

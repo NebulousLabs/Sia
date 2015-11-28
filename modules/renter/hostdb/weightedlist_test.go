@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -42,7 +41,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 		selectionMap := make(map[modules.NetAddress]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
-			entries := hdb.RandomHosts(1)
+			entries := hdb.randomHosts(1)
 			if len(entries) == 0 {
 				return errors.New("no hosts!")
 			}
@@ -97,8 +96,6 @@ func TestWeightedList(t *testing.T) {
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Create a bunch of host entries of equal weight.
@@ -135,7 +132,7 @@ func TestWeightedList(t *testing.T) {
 		}
 
 		// Remove the entry and add it to the list of removed entries
-		err := hdb.RemoveHost(fakeAddr(randInt))
+		err := hdb.removeHost(fakeAddr(randInt))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,8 +168,6 @@ func TestVariedWeights(t *testing.T) {
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
@@ -194,7 +189,7 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry := hdb.RandomHosts(1)
+		randEntry := hdb.randomHosts(1)
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
@@ -232,8 +227,6 @@ func TestRepeatInsert(t *testing.T) {
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	entry1 := hostEntry{
@@ -250,7 +243,7 @@ func TestRepeatInsert(t *testing.T) {
 	}
 }
 
-// TestRandomHosts probles the RandomHosts function.
+// TestRandomHosts probles the randomHosts function.
 func TestRandomHosts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -259,8 +252,6 @@ func TestRandomHosts(t *testing.T) {
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Insert 3 hosts to be selected.
@@ -289,7 +280,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 1 random host.
-	randHosts := hdb.RandomHosts(1)
+	randHosts := hdb.randomHosts(1)
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
@@ -301,7 +292,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 2 random hosts.
-	randHosts = hdb.RandomHosts(2)
+	randHosts = hdb.randomHosts(2)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
 	}
@@ -316,7 +307,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 3 random hosts.
-	randHosts = hdb.RandomHosts(3)
+	randHosts = hdb.randomHosts(3)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -331,7 +322,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts = hdb.RandomHosts(4)
+	randHosts = hdb.randomHosts(4)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}

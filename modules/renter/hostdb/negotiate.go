@@ -1,4 +1,4 @@
-package renter
+package hostdb
 
 import (
 	"bytes"
@@ -14,28 +14,46 @@ import (
 )
 
 var (
-	// the renter will not form contracts above this price
+	// the hostdb will not form contracts above this price
 	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
 
 	errTooExpensive = errors.New("host price was too high")
 )
 
+// An Uploader uploads data to a host.
+type Uploader interface {
+	// Upload revises the underlying contract to store the new data. It
+	// returns the offset of the data in the stored file.
+	Upload(data []byte) (offset uint64, err error)
+
+	// Address returns the address of the host.
+	Address() modules.NetAddress
+
+	// ContractID returns the FileContractID of the contract.
+	ContractID() types.FileContractID
+
+	// EndHeight returns the height at which the contract ends.
+	EndHeight() types.BlockHeight
+
+	// Close terminates the connection to the uploader.
+	Close() error
+}
+
 // A hostUploader uploads pieces to a host. It implements the uploader interface.
 type hostUploader struct {
 	// constants
 	settings         modules.HostSettings
-	masterKey        crypto.TwofishKey
 	unlockConditions types.UnlockConditions
 	secretKey        crypto.SecretKey
+	fcid             types.FileContractID
 
 	// resources
-	conn   net.Conn
-	renter *Renter
+	conn net.Conn
+	hdb  *HostDB
 
 	// these are updated after each revision
-	contract fileContract
-	tree     crypto.MerkleTree
-	lastTxn  types.Transaction
+	tree    crypto.MerkleTree
+	lastTxn types.Transaction
 
 	// revisions need to be serialized; if two threads are revising the same
 	// contract at the same time, a race condition could cause inconsistency
@@ -43,14 +61,20 @@ type hostUploader struct {
 	revisionLock sync.Mutex
 }
 
-func (hu *hostUploader) fileContract() fileContract {
-	hu.revisionLock.Lock()
-	defer hu.revisionLock.Unlock()
-	return hu.contract
+func (hu *hostUploader) Address() modules.NetAddress {
+	return hu.settings.IPAddress
 }
 
-func (hu *hostUploader) addr() modules.NetAddress {
-	return hu.settings.IPAddress
+func (hu *hostUploader) ContractID() types.FileContractID {
+	hu.revisionLock.Lock()
+	defer hu.revisionLock.Unlock()
+	return hu.fcid
+}
+
+func (hu *hostUploader) EndHeight() types.BlockHeight {
+	hu.revisionLock.Lock()
+	defer hu.revisionLock.Unlock()
+	return hu.lastTxn.FileContractRevisions[0].NewWindowStart
 }
 
 func (hu *hostUploader) Close() error {
@@ -58,7 +82,7 @@ func (hu *hostUploader) Close() error {
 	encoding.WriteObject(hu.conn, types.Transaction{})
 	hu.conn.Close()
 	// submit the most recent revision to the blockchain
-	err := hu.renter.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+	err := hu.hdb.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
 	if err != nil {
 	}
 	return err
@@ -75,9 +99,9 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// inital calculations before connecting to host
-	lockID := hu.renter.mu.RLock()
-	height := hu.renter.blockHeight
-	hu.renter.mu.RUnlock(lockID)
+	hu.hdb.mu.RLock()
+	height := hu.hdb.blockHeight
+	hu.hdb.mu.RUnlock()
 
 	renterCost := hu.settings.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
@@ -95,9 +119,11 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return errors.New("couldn't read host's public key: " + err.Error())
 	}
 
-	// create our own key by combining the renter entropy with the host key
-	entropy := crypto.HashAll(hu.renter.entropy, hostPublicKey)
-	ourSK, ourPK := crypto.StdKeyGen.GenerateDeterministic(entropy)
+	// create our key
+	ourSK, ourPK, err := crypto.StdKeyGen.Generate()
+	if err != nil {
+		return errors.New("failed to generate keypair: " + err.Error())
+	}
 	ourPublicKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       ourPK[:],
@@ -127,7 +153,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 	// outputs need account for tax
 	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: renterCost.Sub(types.Tax(hu.renter.blockHeight, fc.Payout)), UnlockHash: renterAddress},
+		{Value: renterCost.Sub(types.Tax(hu.hdb.blockHeight, fc.Payout)), UnlockHash: renterAddress},
 		{Value: types.ZeroCurrency, UnlockHash: hu.settings.UnlockHash}, // no collateral
 	}
 	fc.MissedProofOutputs = []types.SiacoinOutput{
@@ -138,7 +164,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 
 	// build transaction containing fc
-	txnBuilder := hu.renter.wallet.StartTransaction()
+	txnBuilder := hu.hdb.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		return err
@@ -209,7 +235,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 	}
 
 	// submit to blockchain
-	err = hu.renter.tpool.AcceptTransactionSet(signedHostTxnSet)
+	err = hu.hdb.tpool.AcceptTransactionSet(signedHostTxnSet)
 	if err == modules.ErrDuplicateTransactionSet {
 		// this can happen if the renter is uploading to itself
 		err = nil
@@ -219,12 +245,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		return err
 	}
 
-	// create initial fileContract object
-	hu.contract = fileContract{
-		ID:          fcid,
-		IP:          hu.settings.IPAddress,
-		WindowStart: fc.WindowStart,
-	}
+	hu.fcid = fcid
 	// create initial revision
 	hu.lastTxn.FileContractRevisions = []types.FileContractRevision{{
 		ParentID:              fcid,
@@ -239,58 +260,54 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		NewUnlockHash:         fc.UnlockHash,
 	}}
 
-	lockID = hu.renter.mu.Lock()
-	hu.renter.contracts[fcid] = fc
-	hu.renter.mu.Unlock(lockID)
+	hu.hdb.mu.Lock()
+	hu.hdb.contracts[fcid] = hostContract{
+		ID:           fcid,
+		FileContract: fc,
+		LastRevisionTxn: types.Transaction{
+			// first revision is empty
+			FileContractRevisions: []types.FileContractRevision{{}},
+		},
+		SecretKey: ourSK,
+	}
+	hu.hdb.save()
+	hu.hdb.mu.Unlock()
 
 	return nil
 }
 
-// addPiece revises an existing file contract with a host, and then uploads a
+// Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
-func (hu *hostUploader) addPiece(p uploadPiece) error {
+func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	// only one revision can happen at a time
 	hu.revisionLock.Lock()
 	defer hu.revisionLock.Unlock()
 
 	// get old file contract from renter
-	lockID := hu.renter.mu.RLock()
-	fc, exists := hu.renter.contracts[hu.contract.ID]
-	height := hu.renter.blockHeight
-	hu.renter.mu.RUnlock(lockID)
+	hu.hdb.mu.RLock()
+	fc, exists := hu.hdb.contracts[hu.fcid]
+	height := hu.hdb.blockHeight
+	hu.hdb.mu.RUnlock()
 	if !exists {
-		return errors.New("no record of contract to revise")
+		return 0, errors.New("no record of contract to revise")
 	}
 
-	// encrypt piece data
-	key := deriveKey(hu.masterKey, p.chunkIndex, p.pieceIndex)
-	encPiece, err := key.EncryptBytes(p.data)
-	if err != nil {
-		return err
-	}
+	// offset is old filesize
+	offset := hu.lastTxn.FileContractRevisions[0].NewFileSize
 
 	// revise the file contract
-	err = hu.revise(hu.lastTxn.FileContractRevisions[0], encPiece, height)
+	err := hu.revise(hu.lastTxn.FileContractRevisions[0], data, height)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	// update fileContract
-	hu.contract.Pieces = append(hu.contract.Pieces, pieceData{
-		Chunk:  p.chunkIndex,
-		Piece:  p.pieceIndex,
-		Offset: fc.FileSize, // end of old file
-	})
-
 	// update file contract in renter
-	fc.RevisionNumber++
-	fc.FileSize += uint64(len(encPiece))
-	lockID = hu.renter.mu.Lock()
-	hu.renter.contracts[hu.contract.ID] = fc
-	hu.renter.save()
-	hu.renter.mu.Unlock(lockID)
+	hu.hdb.mu.Lock()
+	hu.hdb.contracts[hu.fcid] = fc
+	hu.hdb.save()
+	hu.hdb.mu.Unlock()
 
-	return nil
+	return offset, nil
 }
 
 // revise revises the previous revision to cover piece and uploads both the
@@ -327,7 +344,7 @@ func (hu *hostUploader) revise(rev types.FileContractRevision, piece []byte, hei
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
 		TransactionSignatures: []types.TransactionSignature{{
-			ParentID:       crypto.Hash(hu.contract.ID),
+			ParentID:       crypto.Hash(hu.fcid),
 			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
 			PublicKeyIndex: 0, // renter key is always first -- see negotiateContract
 		}},
@@ -377,38 +394,39 @@ func (hu *hostUploader) revise(rev types.FileContractRevision, piece []byte, hei
 }
 
 // newHostUploader negotiates an initial file contract with the specified host
-// and returns a hostUploader, which satisfies the uploader interface.
-func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64, duration types.BlockHeight, masterKey crypto.TwofishKey) (*hostUploader, error) {
+// and returns a hostUploader, which satisfies the Uploader interface.
+func (hdb *HostDB) newHostUploader(settings modules.HostSettings) (*hostUploader, error) {
 	// reject hosts that are too expensive
 	if settings.Price.Cmp(maxPrice) > 0 {
 		return nil, errTooExpensive
 	}
 
 	hu := &hostUploader{
-		settings:  settings,
-		masterKey: masterKey,
-		tree:      crypto.NewTree(),
-		renter:    r,
+		settings: settings,
+		tree:     crypto.NewTree(),
+		hdb:      hdb,
 	}
 
 	// get an address to use for negotiation
 	// TODO: use more than one shared address
-	if r.cachedAddress == (types.UnlockHash{}) {
-		uc, err := r.wallet.NextAddress()
+	if hdb.cachedAddress == (types.UnlockHash{}) {
+		uc, err := hdb.wallet.NextAddress()
 		if err != nil {
 			return nil, err
 		}
-		r.cachedAddress = uc.UnlockHash()
+		hdb.cachedAddress = uc.UnlockHash()
 	}
 
-	// TODO: check for existing contract?
-	err := hu.negotiateContract(filesize, duration, r.cachedAddress)
+	const filesize = 1e9  // 1 GB
+	const duration = 4320 // 30 days
+
+	err := hu.negotiateContract(filesize, duration, hdb.cachedAddress)
 	if err != nil {
 		return nil, err
 	}
 
 	// if negotiation was sucessful, clear the cached address
-	r.cachedAddress = types.UnlockHash{}
+	hdb.cachedAddress = types.UnlockHash{}
 
 	// initiate the revision loop
 	hu.conn, err = net.DialTimeout("tcp", string(hu.settings.IPAddress), 15*time.Second)
@@ -418,9 +436,43 @@ func (r *Renter) newHostUploader(settings modules.HostSettings, filesize uint64,
 	if err := encoding.WriteObject(hu.conn, modules.RPCRevise); err != nil {
 		return nil, err
 	}
-	if err := encoding.WriteObject(hu.conn, hu.contract.ID); err != nil {
+	if err := encoding.WriteObject(hu.conn, hu.fcid); err != nil {
 		return nil, err
 	}
 
 	return hu, nil
+}
+
+// UniqueHosts will return up to 'n' unique hosts that are not in 'old'. Note
+// that this is a blocking call that performs network I/O.
+func (hdb *HostDB) UniqueHosts(n int, old []Uploader) (hosts []Uploader) {
+	// remove old hosts from tree
+	hdb.mu.Lock()
+	var oldEntries []*hostEntry
+	for _, host := range old {
+		node, exists := hdb.activeHosts[host.Address()]
+		if !exists {
+			continue
+		}
+		node.removeNode()
+		delete(hdb.activeHosts, host.Address()) // probably unnecessary
+		oldEntries = append(oldEntries, node.hostEntry)
+	}
+	// select random hosts from remaining set
+	randHosts := hdb.randomHosts(n)
+	// replace removed hosts
+	for _, entry := range oldEntries {
+		hdb.insertNode(entry)
+	}
+	hdb.mu.Unlock()
+
+	// negotiate contracts with each host
+	for _, host := range randHosts {
+		hostUploader, err := hdb.newHostUploader(host)
+		if err != nil {
+			continue
+		}
+		hosts = append(hosts, hostUploader)
+	}
+	return hosts
 }

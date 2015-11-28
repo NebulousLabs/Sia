@@ -4,42 +4,39 @@ import (
 	"bytes"
 	"crypto/rand"
 	"io"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 )
 
-type testHost struct {
-	ip        modules.NetAddress
+// a testFetcher simulates a host. It implements the fetcher interface.
+type testFetcher struct {
 	data      []byte
-	pieceMap  map[uint64][]pieceData // key is chunkIndex
+	pieceMap  map[uint64][]pieceData
 	pieceSize uint64
-	nAttempt  int // total number of download attempts
-	nFetch    int // number of successful download attempts
+
+	nAttempt int // total number of download attempts
+	nFetch   int // number of successful download attempts
 
 	// used to simulate real-world conditions
 	delay    time.Duration // transfers will take this long
 	failRate int           // transfers will randomly fail with probability 1/failRate
-
-	sync.Mutex
 }
 
-func (h *testHost) pieces(chunkIndex uint64) []pieceData {
-	return h.pieceMap[chunkIndex]
+func (f *testFetcher) pieces(chunkIndex uint64) []pieceData {
+	return f.pieceMap[chunkIndex]
 }
 
-func (h *testHost) fetch(p pieceData) ([]byte, error) {
-	h.nAttempt++
-	time.Sleep(h.delay)
+func (f *testFetcher) fetch(p pieceData) ([]byte, error) {
+	f.nAttempt++
+	time.Sleep(f.delay)
 	// randomly fail
-	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
+	if n, _ := crypto.RandIntn(f.failRate); n == 0 {
 		return nil, io.EOF
 	}
-	h.nFetch++
-	return h.data[p.Offset : p.Offset+h.pieceSize], nil
+	f.nFetch++
+	return f.data[p.Offset : p.Offset+f.pieceSize], nil
 }
 
 // TestErasureDownload tests parallel downloading of erasure-coded data.
@@ -63,7 +60,7 @@ func TestErasureDownload(t *testing.T) {
 	const pieceSize = 10
 	hosts := make([]fetcher, rsc.NumPieces())
 	for i := range hosts {
-		hosts[i] = &testHost{
+		hosts[i] = &testFetcher{
 			pieceMap:  make(map[uint64][]pieceData),
 			pieceSize: pieceSize,
 
@@ -72,9 +69,9 @@ func TestErasureDownload(t *testing.T) {
 		}
 	}
 	// make one host really slow
-	hosts[0].(*testHost).delay = 100 * time.Millisecond
+	hosts[0].(*testFetcher).delay = 100 * time.Millisecond
 	// make one host always fail
-	hosts[1].(*testHost).failRate = 1
+	hosts[1].(*testFetcher).failRate = 1
 
 	// upload data to hosts
 	r := bytes.NewReader(data) // makes chunking easier
@@ -92,7 +89,7 @@ func TestErasureDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for j, p := range pieces {
-			host := hosts[j%len(hosts)].(*testHost) // distribute evenly
+			host := hosts[j%len(hosts)].(*testFetcher) // distribute evenly
 			host.pieceMap[i] = append(host.pieceMap[i], pieceData{
 				uint64(i),
 				uint64(j),
