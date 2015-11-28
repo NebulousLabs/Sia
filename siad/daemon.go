@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -22,6 +23,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// preprocessConfig checks the configuration values and performs cleanup on
+// incorrect-but-allowed values.
+func preprocessConfig() {
+	// If the port numbers decode as an integer, prepend ":".
+	_, err := strconv.Atoi(config.Siad.RPCaddr)
+	if err == nil {
+		config.Siad.RPCaddr = ":" + config.Siad.RPCaddr
+	}
+	_, err = strconv.Atoi(config.Siad.HostAddr)
+	if err == nil {
+		config.Siad.HostAddr = ":" + config.Siad.HostAddr
+	}
+}
+
 // startDaemonCmd uses the config parameters to start siad.
 func startDaemon() error {
 	// Establish multithreading.
@@ -33,6 +48,9 @@ func startDaemon() error {
 	// second.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
+
+	// Clean up the configuration input.
+	preprocessConfig()
 
 	// Create all of the modules.
 	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
