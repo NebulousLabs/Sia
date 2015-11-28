@@ -57,11 +57,9 @@ func (srv *Server) initAPI() {
 	// Daemon API Calls - Unfinished
 	srv.handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
 	srv.handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
-	if !srv.limitedAPI {
-		srv.handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
-		srv.handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
-		srv.handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
-	}
+	srv.handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
+	srv.handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
+	srv.handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {
@@ -77,14 +75,14 @@ func (srv *Server) initAPI() {
 	}
 
 	// Gateway API Calls - Unfinished
-	if srv.gateway != nil && !srv.limitedAPI {
+	if srv.gateway != nil {
 		srv.handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
 		srv.handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
 		srv.handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
 	}
 
 	// Host API Calls
-	if srv.host != nil && !srv.limitedAPI {
+	if srv.host != nil {
 		srv.handleHTTPRequest(mux, "/host", srv.hostHandler)                  // GET, POST
 		srv.handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler) // POST
 	}
@@ -96,7 +94,7 @@ func (srv *Server) initAPI() {
 	}
 
 	// Miner API Calls
-	if srv.miner != nil && !srv.limitedAPI {
+	if srv.miner != nil {
 		srv.handleHTTPRequest(mux, "/miner", srv.minerHandler)                            // GET
 		srv.handleHTTPRequest(mux, "/miner/header", srv.minerHeaderHandler)               // GET, POST
 		srv.handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)                 // POST
@@ -106,7 +104,7 @@ func (srv *Server) initAPI() {
 	}
 
 	// Renter API Calls - Unfinished
-	if srv.renter != nil && !srv.limitedAPI {
+	if srv.renter != nil {
 		srv.handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
 		srv.handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
 		srv.handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
@@ -121,12 +119,12 @@ func (srv *Server) initAPI() {
 	}
 
 	// TransactionPool API Calls - Unfinished
-	if srv.tpool != nil && !srv.limitedAPI {
+	if srv.tpool != nil {
 		srv.handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls
-	if srv.wallet != nil && !srv.limitedAPI {
+	if srv.wallet != nil {
 		srv.handleHTTPRequest(mux, "/wallet", srv.walletHandler)                           // GET
 		srv.handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
 		srv.handleHTTPRequest(mux, "/wallet/addresses", srv.walletAddressesHandler)        // GET

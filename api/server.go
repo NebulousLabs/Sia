@@ -25,7 +25,6 @@ type Server struct {
 
 	apiServer         *graceful.Server
 	daemonExposed     bool
-	limitedAPI        bool
 	listener          net.Listener
 	requiredUserAgent string
 
@@ -33,7 +32,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, requiredUserAgent string, limitedAPI bool, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
+func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
 	l, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
@@ -49,7 +48,6 @@ func NewServer(APIaddr string, requiredUserAgent string, limitedAPI bool, cs mod
 		tpool:    tp,
 		wallet:   w,
 
-		limitedAPI:        limitedAPI,
 		listener:          l,
 		requiredUserAgent: requiredUserAgent,
 

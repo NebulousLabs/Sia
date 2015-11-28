@@ -87,7 +87,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", "Sia-Agent", false, cs, e, g, h, m, r, tp, w)
+	srv, err := NewServer(":0", "Sia-Agent", cs, e, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +120,8 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 }
 
 // assembleExplorerServerTester creates all the explorer dependencies and
-// explorer module without creating any directories. limitedAPI is set to true,
-// and the user agent requirement is removed.
+// explorer module without creating any directories. The user agent requirement
+// is disabled.
 func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	// Create the modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
@@ -136,7 +136,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", "", true, cs, e, g, nil, nil, nil, nil, nil)
+	srv, err := NewServer(":0", "", cs, e, g, nil, nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
