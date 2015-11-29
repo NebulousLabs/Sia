@@ -15,12 +15,6 @@ func TestExplorerPreset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Try calling an illegal api endpoint.
-	err = st.stdGetAPI("/daemon/stop")
-	if err == nil {
-		t.Fatal("/daemon/stop should be protected")
-	}
-
 	// Try calling a legal endpoint without a user agent.
 	err = st.stdGetAPIUA("/explorer", "")
 	if err != nil {

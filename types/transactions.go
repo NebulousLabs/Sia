@@ -75,7 +75,7 @@ type (
 		SiafundInputs         []SiafundInput         `json:"siafundinputs"`
 		SiafundOutputs        []SiafundOutput        `json:"siafundoutputs"`
 		MinerFees             []Currency             `json:"minerfees"`
-		ArbitraryData         [][]byte               `json:"arbitarydata"`
+		ArbitraryData         [][]byte               `json:"arbitrarydata"`
 		TransactionSignatures []TransactionSignature `json:"transactionsignatures"`
 	}
 

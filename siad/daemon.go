@@ -86,7 +86,6 @@ func startDaemon(config Config) error {
 	srv, err := api.NewServer(
 		config.Siad.APIaddr,
 		config.Siad.RequiredUserAgent,
-		config.Siad.LimitedAPI,
 		cs,
 		e,
 		gateway,

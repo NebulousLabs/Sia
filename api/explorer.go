@@ -16,8 +16,8 @@ type (
 	ExplorerBlock struct {
 		ID             types.BlockID           `json:"id"`
 		Height         types.BlockHeight       `json:"height"`
-		Transactions   []ExplorerTransaction   `json:"transactions"`
 		MinerPayoutIDs []types.SiacoinOutputID `json:"minerpayoutids"`
+		Transactions   []ExplorerTransaction   `json:"transactions"`
 		RawBlock       types.Block             `json:"rawblock"`
 	}
 

@@ -24,7 +24,6 @@ type Config struct {
 		HostAddr string
 
 		Explorer          bool
-		LimitedAPI        bool
 		NoBootstrap       bool
 		RequiredUserAgent string
 
@@ -59,7 +58,6 @@ func main() {
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.RequiredUserAgent, "agent", "A", "Sia-Agent", "required substring for the user agent")
 	root.PersistentFlags().BoolVarP(&globalConfig.Siad.Explorer, "explorer", "E", false, "whether or not to run an explorer in the daemon")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
-	root.PersistentFlags().BoolVarP(&globalConfig.Siad.LimitedAPI, "limited-api", "L", false, "whether or not private information is provided through the api")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
