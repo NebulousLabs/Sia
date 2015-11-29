@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -22,15 +22,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// startDaemonCmd uses the config parameters to start siad.
-func startDaemon() error {
-	// Establish multithreading.
-	runtime.GOMAXPROCS(runtime.NumCPU())
+// processNetAddr adds a ':' to a bare integer, so that it is a proper port
+// number.
+func processNetAddr(addr string) string {
+	_, err := strconv.Atoi(addr)
+	if err == nil {
+		return ":" + addr
+	}
+	return addr
+}
 
+// processConfig checks the configuration values and performs cleanup on
+// incorrect-but-allowed values.
+func processConfig(config Config) Config {
+	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
+	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
+	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
+	return config
+}
+
+// startDaemonCmd uses the config parameters to start siad.
+func startDaemon(config Config) error {
 	// Print a startup message.
-	//
-	// TODO: This message can be removed once the api starts up in under 1/2
-	// second.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
 
@@ -97,9 +110,6 @@ func startDaemon() error {
 	}
 
 	// Print a 'startup complete' message.
-	//
-	// TODO: This message can be removed once the api starts up in under 1/2
-	// second.
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
@@ -114,12 +124,15 @@ func startDaemon() error {
 // startDaemonCmd is a passthrough function for startDaemon.
 func startDaemonCmd(*cobra.Command, []string) {
 	// Create the profiling directory if profiling is enabled.
-	if config.Siad.Profile {
-		go profile.StartContinuousProfile(config.Siad.ProfileDir)
+	if globalConfig.Siad.Profile {
+		go profile.StartContinuousProfile(globalConfig.Siad.ProfileDir)
 	}
 
+	// Process the config variables after they are parsed by cobra.
+	config := processConfig(globalConfig)
+
 	// Start siad. startDaemon will only return when it is shutting down.
-	err := startDaemon()
+	err := startDaemon(config)
 	if err != nil {
 		fmt.Println(err)
 	}
