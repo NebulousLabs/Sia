@@ -285,20 +285,8 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	// Try the hash as an unlock hash.
-	txids := srv.explorer.UnlockHash(types.UnlockHash(hash))
-	if len(txids) != 0 {
-		txns, blocks := srv.buildTransactionSet(txids)
-		writeJSON(w, ExplorerHashGET{
-			HashType:     "unlockhash",
-			Blocks:       blocks,
-			Transactions: txns,
-		})
-		return
-	}
-
 	// Try the hash as a siacoin output id.
-	txids = srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
+	txids := srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
 	if len(txids) != 0 {
 		txns, blocks := srv.buildTransactionSet(txids)
 		writeJSON(w, ExplorerHashGET{
@@ -327,6 +315,25 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 		txns, blocks := srv.buildTransactionSet(txids)
 		writeJSON(w, ExplorerHashGET{
 			HashType:     "siafundoutputid",
+			Blocks:       blocks,
+			Transactions: txns,
+		})
+		return
+	}
+
+	// Try the hash as an unlock hash. Unlock hash is checked last because
+	// unlock hashes do not have collision-free guarantees. Someone can create
+	// an unlock hash that collides with another object id. They will not be
+	// able to use the unlock hash, but they can disrupt the explorer. This is
+	// handled by checking the unlock hash last. Anyone intentionally creating
+	// a colliding unlock hash (such a collision can only happen if done
+	// intentionally) will be unable to find their unlock hash in the
+	// blockchain through the explorer hash lookup.
+	txids = srv.explorer.UnlockHash(types.UnlockHash(hash))
+	if len(txids) != 0 {
+		txns, blocks := srv.buildTransactionSet(txids)
+		writeJSON(w, ExplorerHashGET{
+			HashType:     "unlockhash",
 			Blocks:       blocks,
 			Transactions: txns,
 		})
