@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"errors"
 	"io"
 	"net"
 	"os"
@@ -65,20 +64,11 @@ func (r repairMap) subtract(m repairMap) repairMap {
 
 // incompleteChunks returns a map of chunks containing pieces that have not
 // been uploaded.
-func (f *file) incompleteChunks() repairMap {
-	present := make([][]bool, f.numChunks())
-	for i := range present {
-		present[i] = make([]bool, f.erasureCode.NumPieces())
-	}
-	for _, fc := range f.contracts {
-		for _, p := range fc.Pieces {
-			present[p.Chunk][p.Piece] = true
-		}
-	}
+func incompleteChunks(chunks [][]*types.FileContractID) repairMap {
 	incomplete := make(repairMap)
-	for chunkIndex, pieceBools := range present {
-		for pieceIndex, ok := range pieceBools {
-			if !ok {
+	for chunkIndex, pieces := range chunks {
+		for pieceIndex, id := range pieces {
+			if id == nil {
 				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
 			}
 		}
@@ -136,84 +126,81 @@ func (f *file) offlineChunks() repairMap {
 	return offline.subtract(online)
 }
 
-// repair attempts to repair a file by uploading missing pieces to more hosts.
-func (f *file) repair(r io.ReaderAt, pieceMap repairMap, hdb hostDB) error {
-	// create host set
-	hosts := hdb.UniqueHosts(f.erasureCode.NumPieces(), nil)
-	if len(hosts) == 0 {
-		return errors.New("no available hosts")
+// repair attempts to repair a chunk of f by uploading its pieces to more hosts.
+func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []hostdb.Uploader) error {
+	// read chunk data and encode
+	chunk := make([]byte, f.chunkSize())
+	_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return err
 	}
-	for _, h := range hosts {
-		defer h.Close()
+	pieces, err := f.erasureCode.Encode(chunk)
+	if err != nil {
+		return err
 	}
-
-	// For each chunk with missing pieces, re-encode the chunk and upload each
-	// missing piece.
-	var wg sync.WaitGroup
-	for chunkIndex, missingPieces := range pieceMap {
-		//hosts = newHostSet(hosts, currentPieceHosts)
-
-		// read chunk data and encode
-		chunk := make([]byte, f.chunkSize())
-		_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
-		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-			return err
-		}
-		pieces, err := f.erasureCode.Encode(chunk)
+	// encrypt pieces
+	for i := range pieces {
+		key := deriveKey(f.masterKey, chunkIndex, uint64(i))
+		pieces[i], err = key.EncryptBytes(pieces[i])
 		if err != nil {
 			return err
 		}
-		// encrypt pieces
-		for i := range pieces {
-			key := deriveKey(f.masterKey, chunkIndex, uint64(i))
-			pieces[i], err = key.EncryptBytes(pieces[i])
-			if err != nil {
-				return err
-			}
-		}
-
-		// upload one piece per host
-		wg.Add(len(missingPieces))
-		for i, pieceIndex := range missingPieces {
-			host := hosts[i%len(hosts)]
-			go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
-				defer wg.Done()
-				offset, err := host.Upload(piece)
-				if err != nil {
-					return
-				}
-
-				// create contract entry, if necessary
-				f.mu.Lock()
-				defer f.mu.Unlock()
-				contract, ok := f.contracts[host.ContractID()]
-				if !ok {
-					contract = fileContract{
-						ID:          host.ContractID(),
-						IP:          host.Address(),
-						WindowStart: host.EndHeight(),
-					}
-				}
-
-				// update contract
-				contract.Pieces = append(contract.Pieces, pieceData{
-					Chunk:  chunkIndex,
-					Piece:  pieceIndex,
-					Offset: offset,
-				})
-				f.contracts[host.ContractID()] = contract
-			}(host, uint64(i), pieces[pieceIndex])
-		}
-		wg.Wait()
 	}
+
+	// upload one piece per host
+	var wg sync.WaitGroup
+	wg.Add(len(missingPieces))
+	for i, pieceIndex := range missingPieces {
+		go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
+			defer wg.Done()
+			offset, err := host.Upload(piece)
+			if err != nil {
+				return
+			}
+
+			// create contract entry, if necessary
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			contract, ok := f.contracts[host.ContractID()]
+			if !ok {
+				contract = fileContract{
+					ID:          host.ContractID(),
+					IP:          host.Address(),
+					WindowStart: host.EndHeight(),
+				}
+			}
+
+			// update contract
+			contract.Pieces = append(contract.Pieces, pieceData{
+				Chunk:  chunkIndex,
+				Piece:  pieceIndex,
+				Offset: offset,
+			})
+			f.contracts[host.ContractID()] = contract
+		}(hosts[i%len(hosts)], uint64(i), pieces[pieceIndex])
+	}
+	wg.Wait()
 
 	return nil
 }
 
-// threadedRepairUploads improves the health of files tracked by the renter by
+func (f *file) chunkFormat() [][]*types.FileContractID {
+	ids := make([][]*types.FileContractID, f.numChunks())
+	for i := range ids {
+		ids[i] = make([]*types.FileContractID, f.erasureCode.NumPieces())
+	}
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			ids[p.Chunk][p.Piece] = &fc.ID
+		}
+	}
+	return ids
+}
+
+// threadedRepairLoop improves the health of files tracked by the renter by
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
-func (r *Renter) threadedRepairUploads() {
+func (r *Renter) threadedRepairLoop() {
 	for {
 		time.Sleep(5 * time.Second)
 
@@ -230,74 +217,92 @@ func (r *Renter) threadedRepairUploads() {
 		r.mu.RUnlock(id)
 
 		for name, meta := range repairing {
-			// retrieve file object and get current height
-			id = r.mu.RLock()
-			f, ok := r.files[name]
-			r.mu.RUnlock(id)
-			if !ok {
-				r.log.Printf("failed to repair %v: no longer tracking that file", name)
-				id = r.mu.Lock()
-				delete(r.tracking, name)
-				r.mu.Unlock(id)
-				continue
-			}
-
-			// check for expiration
-			height := r.cs.Height()
-			if meta.EndHeight != 0 && meta.EndHeight < height {
-				r.log.Printf("removing %v from repair set: storage period has ended", name)
-				id = r.mu.Lock()
-				delete(r.tracking, name)
-				r.mu.Unlock(id)
-				continue
-			}
-
-			// check for un-uploaded pieces
-			badChunks := f.incompleteChunks()
-			if len(badChunks) == 0 {
-				// check for expiring contracts
-				if meta.EndHeight == 0 {
-					// if auto-renewing, mark any chunks expiring soon
-					badChunks = f.chunksBelow(height + renewThreshold)
-				} else {
-					// otherwise mark any chunks expiring before desired end
-					badChunks = f.chunksBelow(meta.EndHeight)
-				}
-				if len(badChunks) == 0 {
-					// check for offline hosts (slow)
-					// TODO: reenable
-					//badChunks = f.offlineChunks()
-					continue
-				}
-			}
-
-			r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
-
-			// open file handle
-			handle, err := os.Open(meta.RepairPath)
-			if err != nil {
-				r.log.Printf("could not open %v for repair: %v", name, err)
-				id = r.mu.Lock()
-				delete(r.tracking, name)
-				r.mu.Unlock(id)
-				continue
-			}
-
-			err = f.repair(handle, badChunks, r.hostDB)
-			handle.Close()
-			if err != nil {
-				// not fatal
-				r.log.Printf("error while repairing %v: %v", name, err)
-				continue
-			}
-
-			// save the repaired file data
-			err = r.saveFile(f)
-			if err != nil {
-				// definitely bad, but we probably shouldn't delete from the
-				// repair set if this happens
-				r.log.Printf("failed to save repaired file %v: %v", name, err)
-			}
+			r.threadedRepairFile(name, meta)
 		}
+	}
+}
+
+// threadedRepairFile repairs and saves an individual file.
+func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
+	// helper function
+	logAndRemove := func(fmt string, args ...interface{}) {
+		r.log.Printf(fmt, args...)
+		id := r.mu.Lock()
+		delete(r.tracking, name)
+		r.mu.Unlock(id)
+	}
+
+	id := r.mu.RLock()
+	f, ok := r.files[name]
+	r.mu.RUnlock(id)
+	if !ok {
+		logAndRemove("removing %v from repair set: no longer tracking that file", name)
+		return
+	}
+
+	// check for expiration
+	height := r.cs.Height()
+	if meta.EndHeight != 0 && meta.EndHeight < height {
+		logAndRemove("removing %v from repair set: storage period has ended", name)
+		return
+	}
+
+	// open file handle
+	handle, err := os.Open(meta.RepairPath)
+	if err != nil {
+		logAndRemove("removing %v from repair set: %v", name, err)
+		return
+	}
+	defer handle.Close()
+
+	// convert memory layout
+	chunkIDs := f.chunkFormat()
+
+	// check for un-uploaded pieces
+	badChunks := incompleteChunks(chunkIDs)
+	if len(badChunks) == 0 {
+		return
+		/*
+			// check for expiring contracts
+			if meta.EndHeight == 0 {
+				// if auto-renewing, mark any chunks expiring soon
+				badChunks = f.chunksBelow(height + renewThreshold)
+			} else {
+				// otherwise mark any chunks expiring before desired end
+				badChunks = f.chunksBelow(meta.EndHeight)
+			}
+			if len(badChunks) == 0 {
+				// check for offline hosts (slow)
+				badChunks = f.offlineChunks()
+			}
+		*/
+	}
+
+	r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
+
+	// create host set
+	hosts := r.hostDB.UniqueHosts(f.erasureCode.NumPieces(), nil)
+	if len(hosts) == 0 {
+		r.log.Printf("failed to repair %v: not enough hosts", name)
+		return
+	}
+	for _, h := range hosts {
+		defer h.Close()
+	}
+
+	for chunk, pieces := range badChunks {
+		err = f.repair(chunk, pieces, handle, hosts)
+		if err != nil {
+			// not fatal
+			r.log.Printf("error while repairing chunk %v of %v: %v", chunk, name, err)
+		}
+	}
+
+	// save the repaired file data
+	err = r.saveFile(f)
+	if err != nil {
+		// definitely bad, but we probably shouldn't delete from the
+		// repair set if this happens
+		r.log.Printf("failed to save repaired file %v: %v", name, err)
 	}
 }

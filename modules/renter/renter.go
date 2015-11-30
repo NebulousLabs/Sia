@@ -83,7 +83,7 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 		return nil, err
 	}
 
-	go r.threadedRepairUploads()
+	go r.threadedRepairLoop()
 
 	return r, nil
 }
