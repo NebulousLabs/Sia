@@ -60,6 +60,43 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 	return block, height, true
 }
 
+// BlockFacts returns a set of statistics about the blockchain as they appeared
+// at a given block height, and a bool indicating whether facts exist for the
+// given height.
+func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
+	if height >= types.BlockHeight(len(e.historicFacts)) {
+		return modules.BlockFacts{}, false
+	}
+
+	bf := e.historicFacts[height]
+	return modules.BlockFacts{
+		BlockID: bf.currentBlock,
+		Height:  bf.blockchainHeight,
+
+		// Transaction type counts.
+		MinerPayoutCount:          bf.minerPayoutCount,
+		TransactionCount:          bf.transactionCount,
+		SiacoinInputCount:         bf.siacoinInputCount,
+		SiacoinOutputCount:        bf.siacoinOutputCount,
+		FileContractCount:         bf.fileContractCount,
+		FileContractRevisionCount: bf.fileContractRevisionCount,
+		StorageProofCount:         bf.storageProofCount,
+		SiafundInputCount:         bf.siafundInputCount,
+		SiafundOutputCount:        bf.siafundOutputCount,
+		MinerFeeCount:             bf.minerFeeCount,
+		ArbitraryDataCount:        bf.arbitraryDataCount,
+		TransactionSignatureCount: bf.transactionSignatureCount,
+
+		// Factoids about file contracts.
+		ActiveContractCost:  bf.activeContractCost,
+		ActiveContractCount: bf.activeContractCount,
+		ActiveContractSize:  bf.activeContractSize,
+		TotalContractCost:   bf.totalContractCost,
+		TotalContractSize:   bf.totalContractSize,
+		TotalRevisionVolume: bf.totalRevisionVolume,
+	}, true
+}
+
 // Transaction takes a transaction id and finds the block containing the
 // transaction. Because of the miner payouts, the transaction id might be a
 // block id. To find the transaction, iterate through the block.

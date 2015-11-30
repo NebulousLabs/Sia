@@ -14,9 +14,13 @@ var (
 	errNilCS = errors.New("explorer cannot use a nil consensus set")
 )
 
-// Basic structure to store the blockchain. Metadata may also be
-// stored here in the future
-type Explorer struct {
+// blockFacts contians a set of facts about the consensus set related to a
+// certain block.
+type blockFacts struct {
+	// Block information.
+	blockchainHeight types.BlockHeight
+	currentBlock     types.BlockID
+
 	// Transaction type counts.
 	minerPayoutCount          uint64
 	transactionCount          uint64
@@ -38,11 +42,11 @@ type Explorer struct {
 	totalContractCost   types.Currency
 	totalContractSize   types.Currency
 	totalRevisionVolume types.Currency
+}
 
-	// Other factoids.
-	blockchainHeight types.BlockHeight
-	currentBlock     types.BlockID
-
+// Basic structure to store the blockchain. Metadata may also be
+// stored here in the future
+type Explorer struct {
 	// Hash lookups.
 	blockHashes       map[types.BlockID]types.BlockHeight
 	transactionHashes map[types.TransactionID]types.BlockHeight
@@ -55,6 +59,10 @@ type Explorer struct {
 	cs         modules.ConsensusSet
 	persistDir string
 	mu         sync.RWMutex
+
+	// Factoids about the current block.
+	historicFacts []blockFacts
+	blockFacts
 }
 
 // New creates the internal data structures, and subscribes to

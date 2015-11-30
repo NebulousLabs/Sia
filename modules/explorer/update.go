@@ -108,6 +108,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 	}
+	// Delete all of the block facts for the reverted blocks.
+	e.historicFacts = e.historicFacts[:len(e.historicFacts)-len(cc.RevertedBlocks)]
 
 	// Update cumulative stats for applied blocks.
 	for _, block := range cc.AppliedBlocks {
@@ -320,9 +322,16 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				e.transactionSignatureCount++
 			}
 		}
+
+		// Set the current block and copy over the historic facts.
+		e.currentBlock = block.ID()
+		e.historicFacts = append(e.historicFacts, e.blockFacts)
 	}
 
-	// Compute the changes in the active set.
+	// Compute the changes in the active set. Note, because this is calculated
+	// at the end instead of in a loop, the historic facts may contain
+	// inaccuracies about the active set. This should not be a problem except
+	// for large reorgs.
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
 			e.activeContractCount += 1
@@ -334,7 +343,4 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			e.activeContractSize = e.activeContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 		}
 	}
-
-	// Set the id of the current block.
-	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 }

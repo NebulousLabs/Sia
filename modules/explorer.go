@@ -44,6 +44,35 @@ type (
 		TotalContractSize   types.Currency
 	}
 
+	// BlockFacts returns a bunch of statistics about the consensus set asa
+	// they were at a specific block.
+	BlockFacts struct {
+		BlockID types.BlockID
+		Height  types.BlockHeight
+
+		// Transaction type counts.
+		MinerPayoutCount          uint64
+		TransactionCount          uint64
+		SiacoinInputCount         uint64
+		SiacoinOutputCount        uint64
+		FileContractCount         uint64
+		FileContractRevisionCount uint64
+		StorageProofCount         uint64
+		SiafundInputCount         uint64
+		SiafundOutputCount        uint64
+		MinerFeeCount             uint64
+		ArbitraryDataCount        uint64
+		TransactionSignatureCount uint64
+
+		// Factoids about file contracts.
+		ActiveContractCost  types.Currency
+		ActiveContractCount uint64
+		ActiveContractSize  types.Currency
+		TotalContractCost   types.Currency
+		TotalContractSize   types.Currency
+		TotalRevisionVolume types.Currency
+	}
+
 	// Explorer tracks the blockchain and provides tools for gathering
 	// statistics and finding objects or patterns within the blockchain.
 	Explorer interface {
@@ -53,6 +82,10 @@ type (
 		// Block returns the block that matches the input block id. The bool
 		// indicates whether the block appears in the blockchain.
 		Block(types.BlockID) (types.Block, types.BlockHeight, bool)
+
+		// BlockFacts returns a set of statistics about the blockchain as they
+		// appeared at a given block.
+		BlockFacts(types.BlockHeight) (BlockFacts, bool)
 
 		// Transaction returns the block that contains the input transaction
 		// id. The transaction itself is either the block (indicating the miner
