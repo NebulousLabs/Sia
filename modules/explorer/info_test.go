@@ -34,3 +34,28 @@ func TestBlock(t *testing.T) {
 		t.Error("call to 'Block' inside explorer failed")
 	}
 }
+
+// TestBlockFacts checks that the correct block facts are returned for a query.
+func TestBlockFacts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	et, err := createExplorerTester("TestStatistics")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gb := et.cs.GenesisBlock()
+	bf, exists := et.explorer.BlockFacts(0)
+	if !exists || bf.BlockID != gb.ID() || bf.Height != 0 {
+		t.Error("call to 'BlockFacts' inside explorer failed")
+		t.Error("Expecting true ->", exists)
+		t.Error("Expecting", gb.ID(), "->", bf.BlockID)
+		t.Error("Expecting 0 ->", bf.Height)
+	}
+
+	bf, exists = et.explorer.BlockFacts(1)
+	if !exists || bf.Height != 1 {
+		t.Error("call to 'BlockFacts' has failed")
+	}
+}
