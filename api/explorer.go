@@ -19,6 +19,28 @@ type (
 		MinerPayoutIDs []types.SiacoinOutputID `json:"minerpayoutids"`
 		Transactions   []ExplorerTransaction   `json:"transactions"`
 		RawBlock       types.Block             `json:"rawblock"`
+
+		// Transaction type counts.
+		MinerPayoutCount          uint64
+		TransactionCount          uint64
+		SiacoinInputCount         uint64
+		SiacoinOutputCount        uint64
+		FileContractCount         uint64
+		FileContractRevisionCount uint64
+		StorageProofCount         uint64
+		SiafundInputCount         uint64
+		SiafundOutputCount        uint64
+		MinerFeeCount             uint64
+		ArbitraryDataCount        uint64
+		TransactionSignatureCount uint64
+
+		// Factoids about file contracts.
+		ActiveContractCost  types.Currency
+		ActiveContractCount uint64
+		ActiveContractSize  types.Currency
+		TotalContractCost   types.Currency
+		TotalContractSize   types.Currency
+		TotalRevisionVolume types.Currency
 	}
 
 	// ExplorerTransaction is a transcation with some extra information such as
@@ -143,7 +165,7 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 
 // buildExplorerBlock takes a block and its height and uses it to construct an
 // explorer block.
-func buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
+func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
 	var mpoids []types.SiacoinOutputID
 	var etxns []ExplorerTransaction
 	for i := range block.MinerPayouts {
@@ -152,12 +174,38 @@ func buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlo
 	for _, txn := range block.Transactions {
 		etxns = append(etxns, buildExplorerTransaction(height, block.ID(), txn))
 	}
+	facts, exists := srv.explorer.BlockFacts(height)
+	if build.DEBUG && !exists {
+		panic("incorrect request to buildExplorerBlock - block does not exist")
+	}
 	return ExplorerBlock{
 		ID:             block.ID(),
 		Height:         height,
 		Transactions:   etxns,
 		MinerPayoutIDs: mpoids,
 		RawBlock:       block,
+
+		// Transaction type counts.
+		MinerPayoutCount:          facts.MinerPayoutCount,
+		TransactionCount:          facts.TransactionCount,
+		SiacoinInputCount:         facts.SiacoinInputCount,
+		SiacoinOutputCount:        facts.SiacoinOutputCount,
+		FileContractCount:         facts.FileContractCount,
+		FileContractRevisionCount: facts.FileContractRevisionCount,
+		StorageProofCount:         facts.StorageProofCount,
+		SiafundInputCount:         facts.SiafundInputCount,
+		SiafundOutputCount:        facts.SiafundOutputCount,
+		MinerFeeCount:             facts.MinerFeeCount,
+		ArbitraryDataCount:        facts.ArbitraryDataCount,
+		TransactionSignatureCount: facts.TransactionSignatureCount,
+
+		// Factoids about file contracts.
+		ActiveContractCost:  facts.ActiveContractCost,
+		ActiveContractCount: facts.ActiveContractCount,
+		ActiveContractSize:  facts.ActiveContractSize,
+		TotalContractCost:   facts.TotalContractCost,
+		TotalContractSize:   facts.TotalContractSize,
+		TotalRevisionVolume: facts.TotalRevisionVolume,
 	}
 }
 
@@ -178,7 +226,7 @@ func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Requ
 		return
 	}
 	writeJSON(w, ExplorerBlockGET{
-		Block: buildExplorerBlock(height, block),
+		Block: srv.buildExplorerBlock(height, block),
 	})
 }
 
@@ -200,7 +248,7 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 			panic("explorer pointing to nonexistant txn")
 		}
 		if types.TransactionID(block.ID()) == txid {
-			blocks = append(blocks, buildExplorerBlock(height, block))
+			blocks = append(blocks, srv.buildExplorerBlock(height, block))
 		} else {
 			var txn types.Transaction
 			for _, t := range block.Transactions {
@@ -264,7 +312,7 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 	if exists {
 		writeJSON(w, ExplorerHashGET{
 			HashType: "blockid",
-			Block:    buildExplorerBlock(height, block),
+			Block:    srv.buildExplorerBlock(height, block),
 		})
 		return
 	}
