@@ -41,7 +41,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 		selectionMap := make(map[modules.NetAddress]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
-			entries := hdb.randomHosts(1)
+			entries := hdb.randomHosts(1, nil)
 			if len(entries) == 0 {
 				return errors.New("no hosts!")
 			}
@@ -189,7 +189,7 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry := hdb.randomHosts(1)
+		randEntry := hdb.randomHosts(1, nil)
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
@@ -280,7 +280,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 1 random host.
-	randHosts := hdb.randomHosts(1)
+	randHosts := hdb.randomHosts(1, nil)
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
@@ -292,7 +292,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 2 random hosts.
-	randHosts = hdb.randomHosts(2)
+	randHosts = hdb.randomHosts(2, nil)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
 	}
@@ -307,7 +307,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 3 random hosts.
-	randHosts = hdb.randomHosts(3)
+	randHosts = hdb.randomHosts(3, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -322,7 +322,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts = hdb.randomHosts(4)
+	randHosts = hdb.randomHosts(4, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -334,5 +334,16 @@ func TestRandomHosts(t *testing.T) {
 	}
 	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {
 		t.Error("doubled up")
+	}
+
+	// Ask for 3 hosts that are not in randHosts. No hosts should be
+	// returned.
+	uniqueHosts := hdb.randomHosts(3, []modules.NetAddress{
+		randHosts[0].IPAddress,
+		randHosts[1].IPAddress,
+		randHosts[2].IPAddress,
+	})
+	if len(uniqueHosts) != 0 {
+		t.Error("didn't get 0 hosts")
 	}
 }

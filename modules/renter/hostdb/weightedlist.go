@@ -149,16 +149,37 @@ func (hn *hostNode) removeNode() {
 	}
 }
 
-// randomHosts will pull up to 'num' random hosts from the hostdb. There will
-// be no repeats, but the length of the slice returned may be less than 'num',
+// isEmpty returns whether the hostTree contains no entries.
+func (hdb *HostDB) isEmpty() bool {
+	return hdb.hostTree == nil || hdb.hostTree.weight.IsZero()
+}
+
+// randomHosts will pull up to 'n' random hosts from the hostdb. There will
+// be no repeats, but the length of the slice returned may be less than 'n',
 // and may even be 0. The hosts that get returned first have the higher
-// priority.
-func (hdb *HostDB) randomHosts(count int) (hosts []modules.HostSettings) {
+// priority. Additionally, hosts specified in 'ignore' will not be considered.
+func (hdb *HostDB) randomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostSettings) {
+	if hdb.isEmpty() {
+		return
+	}
+
+	// These will be restored after selection is finished.
 	var removedEntries []*hostEntry
-	for len(hosts) < count {
-		if hdb.hostTree == nil || hdb.hostTree.weight.IsZero() {
-			break
+
+	// Remove hosts that we want to ignore.
+	for _, addr := range ignore {
+		node, exists := hdb.activeHosts[addr]
+		if !exists {
+			continue
 		}
+		node.removeNode()
+		delete(hdb.activeHosts, addr)
+		removedEntries = append(removedEntries, node.hostEntry)
+	}
+
+	// Pick a host, remove it from the tree, and repeat until we have n hosts
+	// or the tree is empty.
+	for len(hosts) < n && !hdb.isEmpty() {
 		randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
 		if err != nil {
 			break
@@ -168,11 +189,9 @@ func (hdb *HostDB) randomHosts(count int) (hosts []modules.HostSettings) {
 			break
 		}
 		hosts = append(hosts, node.hostEntry.HostSettings)
+
 		node.removeNode()
 		delete(hdb.activeHosts, node.hostEntry.IPAddress)
-
-		// remove the entry from the hostdb so it won't be selected as a
-		// repeat.
 		removedEntries = append(removedEntries, node.hostEntry)
 	}
 
