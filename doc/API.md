@@ -758,7 +758,7 @@ struct modules.ProcessedInput {
 ```
 
 'fundtype' indicates what type of fund is represented by the input. Inputs can
-be of type 'SiacoinInput', and 'SiafundInput'.
+be of type 'siacoin input', and 'siafund input'.
 
 'walletaddress' indicates whether the address is owned by the wallet.
  
@@ -782,10 +782,10 @@ struct modules.ProcessedOutput {
 ```
 
 'fundtype' indicates what type of fund is represented by the output. Outputs
-can be of type 'SiacoinOutput', 'SiafundOutput', and 'ClaimOutput'. Siacoin
+can be of type 'siacoin output', 'siafund output', and 'claim output'. Siacoin
 outputs and claim outputs both relate to siacoins. Siafund outputs relate to
-siafunds. Another output type, 'MinerFee', points to siacoins that have been
-spent on a miner fee. Because the destination of the miner fee is determined by
+siafunds. Another output type, 'miner payout', points to siacoins that have been
+spent on a miner payout. Because the destination of the miner payout is determined by
 the block and not the transaction, the data 'maturityheight', 'walletaddress',
 and 'relatedaddress' are left blank.
 
