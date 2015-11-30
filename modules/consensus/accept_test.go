@@ -10,10 +10,97 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// mockDbBucket is an implementation of dbBucket for unit testing.
-type mockDbBucket struct {
-	values map[string][]byte
-}
+var (
+	// validateBlockParamsGot stores the parameters passed to the most recent call
+	// to mockBlockValidator.ValidateBlock.
+	validateBlockParamsGot validateBlockParams
+
+	mockValidBlock = types.Block{
+		Timestamp: 100,
+		ParentID:  mockParentID(),
+	}
+	mockInvalidBlock = types.Block{
+		Timestamp: 500,
+		ParentID:  mockParentID(),
+	}
+	// parentBlockSerialized is a mock serialized form of a processedBlock.
+	parentBlockSerialized = []byte{3, 2, 1}
+
+	parentBlockUnmarshaler = mockBlockMarshaler{
+		[]predefinedBlockUnmarshal{
+			{parentBlockSerialized, mockParent(), nil},
+		},
+	}
+
+	unmarshalFailedErr = errors.New("mock unmarshal failed")
+
+	failingBlockUnmarshaler = mockBlockMarshaler{
+		[]predefinedBlockUnmarshal{
+			{parentBlockSerialized, processedBlock{}, unmarshalFailedErr},
+		},
+	}
+
+	serializedParentBlockMap = []blockMapPair{
+		{mockValidBlock.ParentID[:], parentBlockSerialized},
+	}
+)
+
+type (
+	// mockDbBucket is an implementation of dbBucket for unit testing.
+	mockDbBucket struct {
+		values map[string][]byte
+	}
+
+	// mockDbTx is an implementation of dbTx for unit testing. It uses an
+	// in-memory key/value store to mock a database.
+	mockDbTx struct {
+		buckets map[string]dbBucket
+	}
+
+	// predefinedBlockUnmarshal is a predefined response from mockBlockMarshaler.
+	// It defines the unmarshaled processedBlock and error code that
+	// mockBlockMarshaler should return in response to an input serialized byte
+	// slice.
+	predefinedBlockUnmarshal struct {
+		serialized  []byte
+		unmarshaled processedBlock
+		err         error
+	}
+
+	// mockBlockMarshaler is an implementation of the encoding.GenericMarshaler
+	// interface for unit testing. It allows clients to specify mappings of
+	// serialized bytes into unmarshaled blocks.
+	mockBlockMarshaler struct {
+		p []predefinedBlockUnmarshal
+	}
+
+	// mockBlockRuleHelper is an implementation of the blockRuleHelper interface
+	// for unit testing.
+	mockBlockRuleHelper struct {
+		minTimestamp types.Timestamp
+	}
+
+	// mockBlockValidator is an implementation of the blockValidator interface for
+	// unit testing.
+	mockBlockValidator struct {
+		err error
+	}
+
+	// validateBlockParams stores the set of parameters passed to ValidateBlock.
+	validateBlockParams struct {
+		called       bool
+		b            types.Block
+		minTimestamp types.Timestamp
+		target       types.Target
+		height       types.BlockHeight
+	}
+
+	// blockMapPair represents a key-value pair in the mock block map.
+	blockMapPair struct {
+		key []byte
+		val []byte
+	}
+)
 
 // Get returns the value associated with a given key.
 func (bucket mockDbBucket) Get(key []byte) []byte {
@@ -25,31 +112,9 @@ func (bucket mockDbBucket) Set(key []byte, value []byte) {
 	bucket.values[string(key)] = value
 }
 
-// mockDbTx is an implementation of dbTx for unit testing. It uses an in-memory
-// key/value store to mock a database.
-type mockDbTx struct {
-	buckets map[string]dbBucket
-}
-
 // Bucket returns a mock dbBucket object associated with the given bucket name.
 func (db mockDbTx) Bucket(name []byte) dbBucket {
 	return db.buckets[string(name)]
-}
-
-// predefinedBlockUnmarshal is a predefined response from mockBlockMarshaler. It
-// defines the unmarshaled processedBlock and error code that mockBlockMarshaler
-// should return in response to an input serialized byte slice.
-type predefinedBlockUnmarshal struct {
-	serialized  []byte
-	unmarshaled processedBlock
-	err         error
-}
-
-// mockBlockMarshaler is an implementation of the encoding.GenericMarshaler
-// interface for unit testing. It allows clients to specify mappings of
-// serialized bytes into unmarshaled blocks.
-type mockBlockMarshaler struct {
-	p []predefinedBlockUnmarshal
 }
 
 // Marshal is not implemented and panics if called.
@@ -78,36 +143,11 @@ func (m *mockBlockMarshaler) AddPredefinedUnmarshal(u predefinedBlockUnmarshal) 
 	m.p = append(m.p, u)
 }
 
-// mockBlockRuleHelper is an implementation of the blockRuleHelper interface for
-// unit testing.
-type mockBlockRuleHelper struct {
-	minTimestamp types.Timestamp
-}
-
 // minimumValidChildTimestamp returns the minimum timestamp of pb that can be
 // considered a valid block.
 func (brh mockBlockRuleHelper) minimumValidChildTimestamp(blockMap dbBucket, pb *processedBlock) types.Timestamp {
 	return brh.minTimestamp
 }
-
-// mockBlockValidator is an implementation of the blockValidator interface for
-// unit testing.
-type mockBlockValidator struct {
-	err error
-}
-
-// validateBlockParams stores the set of parameters passed to ValidateBlock
-type validateBlockParams struct {
-	called       bool
-	b            types.Block
-	minTimestamp types.Timestamp
-	target       types.Target
-	height       types.BlockHeight
-}
-
-// validateBlockParamsGot stores the parameters passed to the most recent call
-// to mockBlockValidator.ValidateBlock.
-var validateBlockParamsGot validateBlockParams
 
 // ValidateBlock stores the parameters it receives and returns the mock error
 // defined by mockBlockValidator.err.
@@ -131,41 +171,6 @@ func mockParent() (parent processedBlock) {
 	return parent
 }
 
-var (
-	validBlock = types.Block{
-		Timestamp: 100,
-		ParentID:  mockParentID(),
-	}
-	invalidBlock = types.Block{
-		Timestamp: 500,
-		ParentID:  mockParentID(),
-	}
-	// parentBlockSerialized is a mock serialized form of a processedBlock.
-	parentBlockSerialized = []byte{3, 2, 1}
-	// emptyDosBlocks is a dosBlocks map where no block is marked bad.
-	emptyDosBlocks         = map[types.BlockID]struct{}{}
-	parentBlockUnmarshaler = mockBlockMarshaler{
-		[]predefinedBlockUnmarshal{
-			{parentBlockSerialized, mockParent(), nil},
-		},
-	}
-	unmarshalFailedErr      = errors.New("mock unmarshal failed")
-	failingBlockUnmarshaler = mockBlockMarshaler{
-		[]predefinedBlockUnmarshal{
-			{parentBlockSerialized, processedBlock{}, unmarshalFailedErr},
-		},
-	}
-	serializedParentBlockMap = []blockMapPair{
-		{validBlock.ParentID[:], parentBlockSerialized},
-	}
-)
-
-// blockMapPair represents a key-value pair in the mock block map.
-type blockMapPair struct {
-	key []byte
-	val []byte
-}
-
 // TestUnitValidateHeader runs a series of unit tests for validateHeader.
 func TestUnitValidateHeader(t *testing.T) {
 	var tests = []struct {
@@ -180,59 +185,59 @@ func TestUnitValidateHeader(t *testing.T) {
 		msg                    string
 	}{
 		{
-			block:                  validBlock,
-			dosBlocks:              emptyDosBlocks,
+			block:                  mockValidBlock,
+			dosBlocks:              make(map[types.BlockID]struct{}),
 			useNilBlockMap:         true,
-			earliestValidTimestamp: validBlock.Timestamp,
+			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                errNoBlockMap,
 			msg:                    "validateHeader should fail when no block map is found in the database",
 		},
 		{
-			block: validBlock,
-			// Create a dosBlocks map where validBlock is marked as a bad block.
+			block: mockValidBlock,
+			// Create a dosBlocks map where mockValidBlock is marked as a bad block.
 			dosBlocks: map[types.BlockID]struct{}{
-				validBlock.ID(): struct{}{},
+				mockValidBlock.ID(): struct{}{},
 			},
-			earliestValidTimestamp: validBlock.Timestamp,
+			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                errDoSBlock,
 			msg:                    "validateHeader should reject known bad blocks",
 		},
 		{
-			block:                  validBlock,
-			dosBlocks:              emptyDosBlocks,
-			earliestValidTimestamp: validBlock.Timestamp,
+			block:                  mockValidBlock,
+			dosBlocks:              make(map[types.BlockID]struct{}),
+			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                errOrphan,
 			msg:                    "validateHeader should reject a block if its parent block does not appear in the block database",
 		},
 		{
-			block:                  validBlock,
-			dosBlocks:              emptyDosBlocks,
+			block:                  mockValidBlock,
+			dosBlocks:              make(map[types.BlockID]struct{}),
 			blockMapPairs:          serializedParentBlockMap,
-			earliestValidTimestamp: validBlock.Timestamp,
+			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              failingBlockUnmarshaler,
 			errWant:                unmarshalFailedErr,
 			msg:                    "validateHeader should fail when unmarshaling the parent block fails",
 		},
 		{
-			block:     invalidBlock,
-			dosBlocks: emptyDosBlocks,
+			block:     mockInvalidBlock,
+			dosBlocks: make(map[types.BlockID]struct{}),
 			blockMapPairs: []blockMapPair{
-				{invalidBlock.ParentID[:], parentBlockSerialized},
+				{mockInvalidBlock.ParentID[:], parentBlockSerialized},
 			},
-			earliestValidTimestamp: invalidBlock.Timestamp,
+			earliestValidTimestamp: mockInvalidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			validateBlockErr:       errBadMinerPayouts,
 			errWant:                errBadMinerPayouts,
 			msg:                    "validateHeader should reject a block if ValidateBlock returns an error for the block",
 		},
 		{
-			block:                  validBlock,
-			dosBlocks:              emptyDosBlocks,
+			block:                  mockValidBlock,
+			dosBlocks:              make(map[types.BlockID]struct{}),
 			blockMapPairs:          serializedParentBlockMap,
-			earliestValidTimestamp: validBlock.Timestamp,
+			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                nil,
 			msg:                    "validateHeader should accept a valid block",
