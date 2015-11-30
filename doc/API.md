@@ -725,8 +725,8 @@ struct modules.ProcessedTransaction {
 	confirmationheight    types.BlockHeight   (int)
 	confirmationtimestamp types.Timestamp     (uint64)
 
-	processedinputs  []modules.ProcessedInput
-	processedoutputs []modules.ProcessedOutput
+	inputs  []modules.ProcessedInput
+	outputs []modules.ProcessedOutput
 }
 ```
 'transaction' is a types.Transaction, and is defined in types.transaction.go
@@ -741,10 +741,10 @@ height will be set to 'uint64max' if the transaction has not been confirmed.
 timestamp is an unsigned 64bit unix timestamp, and will be set to 'uint64max'
 if the transaction is unconfirmed.
 
-'processedinputs' is an array of processed inputs detailing the inputs to the
+'inputs' is an array of processed inputs detailing the inputs to the
 transaction. More information below.
 
-'processedoutputs' is an array of processed outputs detailing the outputs of
+'outputs' is an array of processed outputs detailing the outputs of
 the transaction. Outputs related to file contracts are excluded.
 
 A modules.ProcessedInput takes the following form:
