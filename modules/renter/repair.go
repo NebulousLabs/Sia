@@ -2,14 +2,11 @@ package renter
 
 import (
 	"io"
-	"net"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -19,112 +16,6 @@ const (
 
 	hostTimeout = 15 * time.Second
 )
-
-// chunkHosts returns the IPs of the hosts storing a given chunk.
-func (f *file) chunkHosts(index uint64) []modules.NetAddress {
-	var hosts []modules.NetAddress
-	for _, fc := range f.contracts {
-		for _, p := range fc.Pieces {
-			if p.Chunk == index {
-				hosts = append(hosts, fc.IP)
-				break
-			}
-		}
-	}
-	return hosts
-}
-
-// A repairMap is a mapping of chunks to pieces that need repair.
-type repairMap map[uint64][]uint64
-
-// subtract deletes the pieces in r that also appear in m, and returns r. If a
-// key contains no pieces, it is removed from the map.
-func (r repairMap) subtract(m repairMap) repairMap {
-	for chunk, mPieces := range m {
-		if _, ok := r[chunk]; !ok {
-			continue
-		}
-		for _, mPieceIndex := range mPieces {
-			for i, rPieceIndex := range r[chunk] {
-				if rPieceIndex == mPieceIndex {
-					// remove i'th element
-					r[chunk] = append(r[chunk][:i], r[chunk][i+1:]...)
-					break
-				}
-			}
-			// delete empty keys
-			if len(r[chunk]) == 0 {
-				delete(r, chunk)
-				break
-			}
-		}
-	}
-	return r
-}
-
-// incompleteChunks returns a map of chunks containing pieces that have not
-// been uploaded.
-func incompleteChunks(chunks [][]*types.FileContractID) repairMap {
-	incomplete := make(repairMap)
-	for chunkIndex, pieces := range chunks {
-		for pieceIndex, id := range pieces {
-			if id == nil {
-				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
-			}
-		}
-	}
-	return incomplete
-}
-
-// chunksBelow returns a map of chunks whose pieces will expire before the
-// desired endHeight. Importantly, it will not return pieces that have
-// non-expiring duplicates; this prevents the renter from repairing the same
-// chunks over and over.
-func (f *file) chunksBelow(endHeight types.BlockHeight) repairMap {
-	expiring := make(repairMap)
-	nonexpiring := make(repairMap)
-	for _, fc := range f.contracts {
-		// mark every piece in the chunk
-		for _, p := range fc.Pieces {
-			if fc.WindowStart < endHeight {
-				expiring[p.Chunk] = append(expiring[p.Chunk], p.Piece)
-			} else {
-				nonexpiring[p.Chunk] = append(nonexpiring[p.Chunk], p.Piece)
-			}
-		}
-	}
-	return expiring.subtract(nonexpiring)
-}
-
-// offlineChunks returns a map of chunks whose pieces are not
-// immediately available for download.
-func (f *file) offlineChunks() repairMap {
-	offline := make(repairMap)
-	online := make(repairMap)
-	var mapLock sync.Mutex
-	var wg sync.WaitGroup
-	wg.Add(len(f.contracts))
-	for _, fc := range f.contracts {
-		go func(fc fileContract) {
-			defer wg.Done()
-			conn, err := net.DialTimeout("tcp", string(fc.IP), hostTimeout)
-			if err == nil {
-				conn.Close()
-			}
-			mapLock.Lock()
-			for _, p := range fc.Pieces {
-				if err == nil {
-					online[p.Chunk] = append(online[p.Chunk], p.Piece)
-				} else {
-					offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
-				}
-			}
-			mapLock.Unlock()
-		}(fc)
-	}
-	wg.Wait()
-	return offline.subtract(online)
-}
 
 // repair attempts to repair a chunk of f by uploading its pieces to more hosts.
 func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []hostdb.Uploader) error {
@@ -184,19 +75,6 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	return nil
 }
 
-func (f *file) chunkFormat() [][]*types.FileContractID {
-	ids := make([][]*types.FileContractID, f.numChunks())
-	for i := range ids {
-		ids[i] = make([]*types.FileContractID, f.erasureCode.NumPieces())
-	}
-	for _, fc := range f.contracts {
-		for _, p := range fc.Pieces {
-			ids[p.Chunk][p.Piece] = &fc.ID
-		}
-	}
-	return ids
-}
-
 // threadedRepairLoop improves the health of files tracked by the renter by
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
@@ -220,6 +98,29 @@ func (r *Renter) threadedRepairLoop() {
 			r.threadedRepairFile(name, meta)
 		}
 	}
+}
+
+// incompleteChunks returns a map of chunks containing pieces that have not
+// been uploaded.
+func (f *file) incompleteChunks() map[uint64][]uint64 {
+	present := make([][]bool, f.numChunks())
+	for i := range present {
+		present[i] = make([]bool, f.erasureCode.NumPieces())
+	}
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			present[p.Chunk][p.Piece] = true
+		}
+	}
+	incomplete := make(map[uint64][]uint64)
+	for chunkIndex, pieceBools := range present {
+		for pieceIndex, ok := range pieceBools {
+			if !ok {
+				incomplete[uint64(chunkIndex)] = append(incomplete[uint64(chunkIndex)], uint64(pieceIndex))
+			}
+		}
+	}
+	return incomplete
 }
 
 // threadedRepairFile repairs and saves an individual file.
@@ -255,27 +156,10 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	}
 	defer handle.Close()
 
-	// convert memory layout
-	chunkIDs := f.chunkFormat()
-
 	// check for un-uploaded pieces
-	badChunks := incompleteChunks(chunkIDs)
+	badChunks := f.incompleteChunks()
 	if len(badChunks) == 0 {
 		return
-		/*
-			// check for expiring contracts
-			if meta.EndHeight == 0 {
-				// if auto-renewing, mark any chunks expiring soon
-				badChunks = f.chunksBelow(height + renewThreshold)
-			} else {
-				// otherwise mark any chunks expiring before desired end
-				badChunks = f.chunksBelow(meta.EndHeight)
-			}
-			if len(badChunks) == 0 {
-				// check for offline hosts (slow)
-				badChunks = f.offlineChunks()
-			}
-		*/
 	}
 
 	r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
