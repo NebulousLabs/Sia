@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 )
 
@@ -103,6 +104,9 @@ func (r *Renter) threadedRepairLoop() {
 // incompleteChunks returns a map of chunks containing pieces that have not
 // been uploaded.
 func (f *file) incompleteChunks() map[uint64][]uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	present := make([][]bool, f.numChunks())
 	for i := range present {
 		present[i] = make([]bool, f.erasureCode.NumPieces())
@@ -112,6 +116,7 @@ func (f *file) incompleteChunks() map[uint64][]uint64 {
 			present[p.Chunk][p.Piece] = true
 		}
 	}
+
 	incomplete := make(map[uint64][]uint64)
 	for chunkIndex, pieceBools := range present {
 		for pieceIndex, ok := range pieceBools {
@@ -121,6 +126,23 @@ func (f *file) incompleteChunks() map[uint64][]uint64 {
 		}
 	}
 	return incomplete
+}
+
+// chunkHosts returns the hosts storing the given chunk.
+func (f *file) chunkHosts(chunk uint64) []modules.NetAddress {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	var old []modules.NetAddress
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			if p.Chunk == chunk {
+				old = append(old, fc.IP)
+				break
+			}
+		}
+	}
+	return old
 }
 
 // threadedRepairFile repairs and saves an individual file.
@@ -164,21 +186,23 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 
 	r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
 
-	// create host set
-	hosts := r.hostDB.UniqueHosts(f.erasureCode.NumPieces(), nil)
-	if len(hosts) == 0 {
-		r.log.Printf("failed to repair %v: not enough hosts", name)
+	// create host pool
+	pool, err := r.hostDB.NewPool()
+	if err != nil {
+		r.log.Printf("failed to repair %v: %v", name, err)
 		return
 	}
-	for _, h := range hosts {
-		defer h.Close()
-	}
+	defer pool.Close() // heh
 
 	for chunk, pieces := range badChunks {
+		// determine host set
+		old := f.chunkHosts(chunk)
+		hosts := pool.UniqueHosts(f.erasureCode.NumPieces()-len(old), old)
+		// upload to new hosts
 		err = f.repair(chunk, pieces, handle, hosts)
 		if err != nil {
-			// not fatal
-			r.log.Printf("error while repairing chunk %v of %v: %v", chunk, name, err)
+			r.log.Printf("aborting repair of %v: %v", name, err)
+			break
 		}
 	}
 

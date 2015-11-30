@@ -443,36 +443,65 @@ func (hdb *HostDB) newHostUploader(settings modules.HostSettings) (*hostUploader
 	return hu, nil
 }
 
-// UniqueHosts will return up to 'n' unique hosts that are not in 'old'. Note
-// that this is a blocking call that performs network I/O.
-func (hdb *HostDB) UniqueHosts(n int, old []Uploader) (hosts []Uploader) {
-	// remove old hosts from tree
-	hdb.mu.Lock()
-	var oldEntries []*hostEntry
-	for _, host := range old {
-		node, exists := hdb.activeHosts[host.Address()]
-		if !exists {
-			continue
-		}
-		node.removeNode()
-		delete(hdb.activeHosts, host.Address()) // probably unnecessary
-		oldEntries = append(oldEntries, node.hostEntry)
-	}
-	// select random hosts from remaining set
-	randHosts := hdb.randomHosts(n)
-	// replace removed hosts
-	for _, entry := range oldEntries {
-		hdb.insertNode(entry)
-	}
-	hdb.mu.Unlock()
+// A HostPool is a collection of hosts used to upload a file.
+type HostPool interface {
+	// UniqueHosts will return up to 'n' unique hosts that are not in 'old'.
+	UniqueHosts(n int, old []modules.NetAddress) []Uploader
 
-	// negotiate contracts with each host
+	// Close terminates all connections in the host pool.
+	Close() error
+}
+
+type pool struct {
+	hosts []*hostUploader
+	hdb   *HostDB
+}
+
+func (p *pool) Close() error {
+	for _, h := range p.hosts {
+		h.Close()
+	}
+	return nil
+}
+
+// UniqueHosts will return up to 'n' unique hosts that are not in 'old'. Note
+// that this may require negotiating new contracts.
+func (p *pool) UniqueHosts(n int, old []modules.NetAddress) (hosts []Uploader) {
+	// first reuse existing connections
+outer:
+	for _, h := range p.hosts {
+		for _, ip := range old {
+			if h.Address() == ip {
+				continue outer
+			}
+		}
+		hosts = append(hosts, h)
+	}
+
+	// TODO: revise old, unfilled contracts
+
+	// form new contracts from randomly-picked nodes
+	p.hdb.mu.Lock()
+	randHosts := p.hdb.randomHosts(n, old)
+	p.hdb.mu.Unlock()
 	for _, host := range randHosts {
-		hostUploader, err := hdb.newHostUploader(host)
+		h, err := p.hdb.newHostUploader(host)
 		if err != nil {
 			continue
 		}
-		hosts = append(hosts, hostUploader)
+		hosts = append(hosts, h)
+		p.hosts = append(p.hosts, h)
 	}
 	return hosts
+}
+
+// NewPool returns an empty HostPool, unless the HostDB contains no hosts at
+// all.
+func (hdb *HostDB) NewPool() (HostPool, error) {
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
+	if hdb.isEmpty() {
+		return nil, errors.New("HostDB is empty")
+	}
+	return &pool{}, nil
 }

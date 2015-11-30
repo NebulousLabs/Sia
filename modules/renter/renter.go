@@ -22,8 +22,8 @@ type hostDB interface {
 	// AveragePrice returns the average price of a host.
 	AveragePrice() types.Currency
 
-	// UniqueHosts will return up to 'n' unique hosts that are not in 'old'.
-	UniqueHosts(n int, old []hostdb.Uploader) []hostdb.Uploader
+	// NewPool returns a new HostPool.
+	NewPool() (hostdb.HostPool, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
