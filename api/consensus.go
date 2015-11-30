@@ -22,9 +22,6 @@ type ConsensusBlockGET struct {
 
 // consensusHandlerGET handles a GET request to /consensus.
 func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request) {
-	id := srv.mu.RLock()
-	defer srv.mu.RUnlock(id)
-
 	cbid := srv.cs.CurrentBlock().ID()
 	currentTarget, _ := srv.cs.ChildTarget(cbid)
 	writeJSON(w, ConsensusGET{

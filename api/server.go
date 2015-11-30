@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 )
 
 // A Server is essentially a collection of modules and an API server to talk
@@ -27,8 +26,6 @@ type Server struct {
 	daemonExposed     bool
 	listener          net.Listener
 	requiredUserAgent string
-
-	mu *sync.RWMutex
 }
 
 // NewServer creates a new API server from the provided modules.
@@ -50,8 +47,6 @@ func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet
 
 		listener:          l,
 		requiredUserAgent: requiredUserAgent,
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Register API handlers
