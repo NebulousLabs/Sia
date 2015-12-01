@@ -29,6 +29,8 @@ type (
 		ID                                       types.TransactionID       `json:"id"`
 		Height                                   types.BlockHeight         `json:"height"`
 		Parent                                   types.BlockID             `json:"parent"`
+		RawTransaction                           types.Transaction         `json:"rawtransaction"`
+
 		SiacoinInputOutputs                      []types.SiacoinOutput     `json:"siacoininputoutputs"` // the outputs being spent
 		SiacoinOutputIDs                         []types.SiacoinOutputID   `json:"siacoinoutputids"`
 		FileContractIDs                          []types.FileContractID    `json:"filecontractids"`
@@ -41,7 +43,6 @@ type (
 		SiafundInputOutputs                      []types.SiafundOutput     `json:"siafundinputoutputs"`                      // the outputs being spent
 		SiafundOutputIDs                         []types.SiafundOutputID   `json:"siafundoutputids"`
 		SiaClaimOutputIDs                        []types.SiacoinOutputID   `json:"siafundclaimoutputids"`
-		RawTransaction                           types.Transaction         `json:"rawtransaction"`
 	}
 
 	// ExplorerGET is the object returned as a response to a GET request to
@@ -76,11 +77,13 @@ type (
 // buildExplorerTransaction takes a transaction and the height + id of the
 // block it appears in an uses that to build an explorer transaction.
 func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
+	// Get the header information for the transaction.
 	et.ID = txn.ID()
 	et.Height = height
 	et.Parent = parent
 	et.RawTransaction = txn
 
+	// Add the siacoin outputs that correspond with each siacoin input.
 	for _, sci := range txn.SiacoinInputs {
 		sco, exists := srv.explorer.SiacoinOutput(sci.ParentID)
 		if build.DEBUG && !exists {
@@ -88,9 +91,13 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 		}
 		et.SiacoinInputOutputs = append(et.SiacoinInputOutputs, sco)
 	}
+
 	for i := range txn.SiacoinOutputs {
 		et.SiacoinOutputIDs = append(et.SiacoinOutputIDs, txn.SiacoinOutputID(uint64(i)))
 	}
+
+	// Add all of the valid and missed proof ids as extra data to the file
+	// contracts.
 	for i, fc := range txn.FileContracts {
 		fcid := txn.FileContractID(uint64(i))
 		var fcvpoids []types.SiacoinOutputID
@@ -105,6 +112,9 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcvpoids)
 		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcmpoids)
 	}
+
+	// Add all of the valid and missed proof ids as extra data to the file
+	// contract revisions.
 	for _, fcr := range txn.FileContractRevisions {
 		var fcrvpoids []types.SiacoinOutputID
 		var fcrmpoids []types.SiacoinOutputID
@@ -117,6 +127,9 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcrvpoids)
 		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcrmpoids)
 	}
+
+	// Add all of the output ids and outputs corresponding with each storage
+	// proof.
 	for _, sp := range txn.StorageProofs {
 		fileContract, fileContractRevisions, _, fileContractExists, _, _ := srv.explorer.FileContractHistory(sp.ParentID)
 		if !fileContractExists && build.DEBUG {
@@ -135,6 +148,8 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 		et.StorageProofOutputIDs = append(et.StorageProofOutputIDs, storageProofOutputIDs)
 		et.StorageProofOutputs = append(et.StorageProofOutputs, storageProofOutputs)
 	}
+
+	// Add the siafund outputs that correspond to each siacoin input.
 	for _, sci := range txn.SiafundInputs {
 		sco, exists := srv.explorer.SiafundOutput(sci.ParentID)
 		if build.DEBUG && !exists {
@@ -142,9 +157,11 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 		}
 		et.SiafundInputOutputs = append(et.SiafundInputOutputs, sco)
 	}
+
 	for i := range txn.SiafundOutputs {
 		et.SiafundOutputIDs = append(et.SiafundOutputIDs, txn.SiafundOutputID(uint64(i)))
 	}
+
 	for _, sfi := range txn.SiafundInputs {
 		et.SiaClaimOutputIDs = append(et.SiaClaimOutputIDs, sfi.ParentID.SiaClaimOutputID())
 	}
@@ -155,17 +172,20 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 // explorer block.
 func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
 	var mpoids []types.SiacoinOutputID
-	var etxns []ExplorerTransaction
 	for i := range block.MinerPayouts {
 		mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
 	}
+
+	var etxns []ExplorerTransaction
 	for _, txn := range block.Transactions {
 		etxns = append(etxns, srv.buildExplorerTransaction(height, block.ID(), txn))
 	}
+
 	facts, exists := srv.explorer.BlockFacts(height)
 	if build.DEBUG && !exists {
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
+
 	return ExplorerBlock{
 		MinerPayoutIDs: mpoids,
 		Transactions:   etxns,
@@ -209,21 +229,24 @@ func (srv *Server) explorerBlockHandler(w http.ResponseWriter, req *http.Request
 // with a set of transaction ids.
 func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []ExplorerTransaction, blocks []ExplorerBlock) {
 	for _, txid := range txids {
+		// Get the block containing the transaction - in the case of miner
+		// payouts, the block might be the transaction.
 		block, height, exists := srv.explorer.Transaction(txid)
 		if !exists && build.DEBUG {
 			panic("explorer pointing to nonexistant txn")
 		}
+
+		// Check if the block is the transaction.
 		if types.TransactionID(block.ID()) == txid {
 			blocks = append(blocks, srv.buildExplorerBlock(height, block))
 		} else {
-			var txn types.Transaction
+			// Find the transaction within the block with the correct id.
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txn = t
+					txns = append(txns, srv.buildExplorerTransaction(height, block.ID(), t))
 					break
 				}
 			}
-			txns = append(txns, srv.buildExplorerTransaction(height, block.ID(), txn))
 		}
 	}
 	return txns, blocks
