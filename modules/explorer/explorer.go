@@ -18,8 +18,12 @@ var (
 // certain block.
 type blockFacts struct {
 	// Block information.
-	blockchainHeight types.BlockHeight
-	currentBlock     types.BlockID
+	currentBlock      types.BlockID
+	blockchainHeight  types.BlockHeight
+	target            types.Target
+	maturityTimestamp types.Timestamp
+	estimatedHashrate types.Currency
+	totalCoins        types.Currency
 
 	// Transaction type counts.
 	minerPayoutCount          uint64

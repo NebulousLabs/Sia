@@ -1,50 +1,9 @@
 package explorer
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// Returns many pieces of readily available information
-func (e *Explorer) Statistics() modules.ExplorerStatistics {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	target, _ := e.cs.ChildTarget(e.currentBlock)
-	difficulty := types.NewCurrency(types.RootTarget.Int()).Div(types.NewCurrency(target.Int()))
-	currentBlock, exists := e.cs.BlockAtHeight(e.blockchainHeight)
-	if build.DEBUG && !exists {
-		panic("current block not found in consensus set")
-	}
-	return modules.ExplorerStatistics{
-		Height:            e.blockchainHeight,
-		CurrentBlock:      e.currentBlock,
-		Target:            target,
-		Difficulty:        difficulty,
-		MaturityTimestamp: currentBlock.Timestamp,
-		TotalCoins:        types.CalculateNumSiacoins(e.blockchainHeight),
-
-		MinerPayoutCount:          e.minerPayoutCount,
-		TransactionCount:          e.transactionCount,
-		SiacoinInputCount:         e.siacoinInputCount,
-		SiacoinOutputCount:        e.siacoinOutputCount,
-		FileContractCount:         e.fileContractCount,
-		FileContractRevisionCount: e.fileContractRevisionCount,
-		StorageProofCount:         e.storageProofCount,
-		SiafundInputCount:         e.siafundInputCount,
-		SiafundOutputCount:        e.siafundOutputCount,
-		MinerFeeCount:             e.minerFeeCount,
-		ArbitraryDataCount:        e.arbitraryDataCount,
-		TransactionSignatureCount: e.transactionSignatureCount,
-
-		ActiveContractCount: e.activeContractCount,
-		ActiveContractCost:  e.activeContractCost,
-		ActiveContractSize:  e.activeContractSize,
-		TotalContractCost:   e.totalContractCost,
-		TotalContractSize:   e.totalContractSize,
-	}
-}
 
 // Block takes a block id and finds the corresponding block, provided that the
 // block is in the consensus set.

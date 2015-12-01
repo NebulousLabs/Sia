@@ -11,74 +11,43 @@ const (
 )
 
 type (
-	// ExplorerStatistics returns a bunch of statistics about the explorer at
-	// the current height.
-	ExplorerStatistics struct {
-		// General consensus information.
-		Height            types.BlockHeight
-		CurrentBlock      types.BlockID
-		Target            types.Target
-		Difficulty        types.Currency
-		MaturityTimestamp types.Timestamp
-		TotalCoins        types.Currency
-
-		// Information about transaction type usage.
-		MinerPayoutCount          uint64
-		TransactionCount          uint64
-		SiacoinInputCount         uint64
-		SiacoinOutputCount        uint64
-		FileContractCount         uint64
-		FileContractRevisionCount uint64
-		StorageProofCount         uint64
-		SiafundInputCount         uint64
-		SiafundOutputCount        uint64
-		MinerFeeCount             uint64
-		ArbitraryDataCount        uint64
-		TransactionSignatureCount uint64
-
-		// Information about file contracts and file contract revisions.
-		ActiveContractCount uint64
-		ActiveContractCost  types.Currency
-		ActiveContractSize  types.Currency
-		TotalContractCost   types.Currency
-		TotalContractSize   types.Currency
-	}
-
-	// BlockFacts returns a bunch of statistics about the consensus set asa
-	// they were at a specific block.
+	// BlockFacts returns a bunch of statistics about the consensus set as they
+	// were at a specific block.
 	BlockFacts struct {
-		BlockID types.BlockID
-		Height  types.BlockHeight
+		BlockID           types.BlockID     `json:"blockid"`
+		Height            types.BlockHeight `json:"height"`
+		Target            types.Target      `json:"target"`
+		MaturityTimestamp types.Timestamp   `json:"maturitytimestamp"`
+		Difficutly        types.Currency    `json:"difficulty"`
+		EstimatedHashrate types.Currency    `json:"estimatedhashrate"`
+		TotalCoins        types.Currency    `json:"totalcoins"`
 
 		// Transaction type counts.
-		MinerPayoutCount          uint64
-		TransactionCount          uint64
-		SiacoinInputCount         uint64
-		SiacoinOutputCount        uint64
-		FileContractCount         uint64
-		FileContractRevisionCount uint64
-		StorageProofCount         uint64
-		SiafundInputCount         uint64
-		SiafundOutputCount        uint64
-		MinerFeeCount             uint64
-		ArbitraryDataCount        uint64
-		TransactionSignatureCount uint64
+		MinerPayoutCount          uint64 `json:"minerpayoutcount"`
+		TransactionCount          uint64 `json:"transactioncount"`
+		SiacoinInputCount         uint64 `json:"siacoininputcount"`
+		SiacoinOutputCount        uint64 `json:"siacoinoutputcount"`
+		FileContractCount         uint64 `json:"filecontractcount"`
+		FileContractRevisionCount uint64 `json:"filecontractrevisioncount"`
+		StorageProofCount         uint64 `json:"storageproofcount"`
+		SiafundInputCount         uint64 `json:"siafundinputcount"`
+		SiafundOutputCount        uint64 `json:"siafundoutputcount"`
+		MinerFeeCount             uint64 `json:"minerfeecount"`
+		ArbitraryDataCount        uint64 `json:"arbitrarydatacount"`
+		TransactionSignatureCount uint64 `json:"transactionsignaturecount"`
 
 		// Factoids about file contracts.
-		ActiveContractCost  types.Currency
-		ActiveContractCount uint64
-		ActiveContractSize  types.Currency
-		TotalContractCost   types.Currency
-		TotalContractSize   types.Currency
-		TotalRevisionVolume types.Currency
+		ActiveContractCost  types.Currency `json:"activecontractcost"`
+		ActiveContractCount uint64         `json:"activecontractcount"`
+		ActiveContractSize  types.Currency `json:"activecontractsize"`
+		TotalContractCost   types.Currency `json:"totalcontractcost"`
+		TotalContractSize   types.Currency `json:"totalcontractsize"`
+		TotalRevisionVolume types.Currency `json:"totalrevisionvolume"`
 	}
 
 	// Explorer tracks the blockchain and provides tools for gathering
 	// statistics and finding objects or patterns within the blockchain.
 	Explorer interface {
-		// Statistics provides general statistics about the blockchain.
-		Statistics() ExplorerStatistics
-
 		// Block returns the block that matches the input block id. The bool
 		// indicates whether the block appears in the blockchain.
 		Block(types.BlockID) (types.Block, types.BlockHeight, bool)

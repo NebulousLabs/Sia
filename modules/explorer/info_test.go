@@ -4,15 +4,18 @@ import (
 	"testing"
 )
 
-// TestStatistics grabs the statistics object from the block explorer and
-// verifies that the data has been filled out.
-func TestStatistics(t *testing.T) {
-	et, err := createExplorerTester("TestStatistics")
+// TestImmediateBlockFacts grabs the block facts object from the block explorer
+// at the current height and verifies that the data has been filled out.
+func TestImmedieateBlockFacts(t *testing.T) {
+	et, err := createExplorerTester("TestImmediateBlockFacts")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stats := et.explorer.Statistics()
+	stats, exists := et.explorer.BlockFacts(et.cs.Height())
+	if !exists {
+		t.Fatal("could not find block facts for current height")
+	}
 	if stats.Height != et.explorer.blockchainHeight || et.explorer.blockchainHeight == 0 {
 		t.Error("wrong height reported in stats object")
 	}
@@ -23,7 +26,7 @@ func TestStatistics(t *testing.T) {
 
 // TestBlock probes the Block function of the explorer.
 func TestBlock(t *testing.T) {
-	et, err := createExplorerTester("TestStatistics")
+	et, err := createExplorerTester("TestBlock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +43,7 @@ func TestBlockFacts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	et, err := createExplorerTester("TestStatistics")
+	et, err := createExplorerTester("TestBlockFacts")
 	if err != nil {
 		t.Fatal(err)
 	}

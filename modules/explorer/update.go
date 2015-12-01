@@ -18,6 +18,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
 		e.blockchainHeight -= 1
+		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
+		e.currentBlock = block.ID()
 		delete(e.blockHashes, bid)
 		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
@@ -117,6 +119,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
 		e.blockchainHeight++
+		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
+		e.currentBlock = block.ID()
 		e.blockHashes[bid] = e.blockchainHeight
 		e.transactionHashes[tbid] = e.blockchainHeight // Miner payouts are a transaciton.
 
@@ -324,7 +328,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 
 		// Set the current block and copy over the historic facts.
-		e.currentBlock = block.ID()
 		e.historicFacts = append(e.historicFacts, e.blockFacts)
 	}
 
