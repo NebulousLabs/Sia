@@ -14,9 +14,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update cumulative stats for reverted blocks.
 	for _, block := range cc.RevertedBlocks {
-		// Delete the block from the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
+
+		// Update all of the explorer statistics.
 		e.currentBlock = block.ID()
 		e.blockchainHeight -= 1
 		e.target = e.blockTargets[block.ID()]
@@ -24,8 +25,15 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		if e.blockchainHeight > types.MaturityDelay {
 			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
 		}
-		// TODO: estimatedHashrate
+		e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.target)
+		if e.blockchainHeight > hashrateEstimationBlocks {
+			e.blocksDifficulty = e.blocksDifficulty.AddDifficulties(e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].target)
+			secondsPassed := e.timestamp - e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].timestamp
+			e.estimatedHashrate = e.blocksDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
+		}
 		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
+
+		// Delete the block from the list of active blocks.
 		delete(e.blockHashes, bid)
 		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
@@ -137,7 +145,12 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		if e.blockchainHeight > types.MaturityDelay {
 			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
 		}
-		// TODO: estimatedHashrate
+		e.blocksDifficulty = e.blocksDifficulty.AddDifficulties(e.target)
+		if e.blockchainHeight > hashrateEstimationBlocks {
+			e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].target)
+			secondsPassed := e.timestamp - e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].timestamp
+			e.estimatedHashrate = e.blocksDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
+		}
 		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
 
 		e.blockHashes[bid] = e.blockchainHeight

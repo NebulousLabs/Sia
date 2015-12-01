@@ -10,6 +10,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// hashrateEstimationBlocks is the number of blocks that are used to
+	// estimate the current hashrate.
+	hashrateEstimationBlocks = 72 // 12 hours
+)
+
 var (
 	errNilCS = errors.New("explorer cannot use a nil consensus set")
 )
@@ -63,6 +69,7 @@ type (
 	// stored here in the future
 	Explorer struct {
 		// Hash lookups.
+		blocksDifficulty      types.Target // cumulative difficulty from the past hashrateEstimationDepth blocks.
 		blockHashes           map[types.BlockID]types.BlockHeight
 		blockTargets          map[types.BlockID]types.Target
 		transactionHashes     map[types.TransactionID]types.BlockHeight
@@ -95,6 +102,7 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
+		blocksDifficulty:      types.RootDepth,
 		blockHashes:           make(map[types.BlockID]types.BlockHeight),
 		blockTargets:          make(map[types.BlockID]types.Target),
 		transactionHashes:     make(map[types.TransactionID]types.BlockHeight),
