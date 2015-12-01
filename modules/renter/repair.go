@@ -40,9 +40,13 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	}
 
 	// upload one piece per host
+	numPieces := len(missingPieces)
+	if len(hosts) < numPieces {
+		numPieces = len(hosts)
+	}
 	var wg sync.WaitGroup
-	wg.Add(len(missingPieces))
-	for i, pieceIndex := range missingPieces {
+	wg.Add(numPieces)
+	for i := 0; i < numPieces; i++ {
 		go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
 			defer wg.Done()
 			offset, err := host.Upload(piece)
@@ -69,7 +73,7 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 				Offset: offset,
 			})
 			f.contracts[host.ContractID()] = contract
-		}(hosts[i%len(hosts)], uint64(i), pieces[pieceIndex])
+		}(hosts[i], uint64(i), pieces[missingPieces[i]])
 	}
 	wg.Wait()
 
@@ -198,6 +202,10 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		// determine host set
 		old := f.chunkHosts(chunk)
 		hosts := pool.UniqueHosts(f.erasureCode.NumPieces()-len(old), old)
+		if len(hosts) == 0 {
+			r.log.Printf("aborting repair of %v: not enough hosts", name)
+			break
+		}
 		// upload to new hosts
 		err = f.repair(chunk, pieces, handle, hosts)
 		if err != nil {
