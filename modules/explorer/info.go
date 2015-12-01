@@ -30,9 +30,18 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 
 	// Grab the stats and return the facts.
 	bf := e.historicFacts[height]
+	var maturityTimestamp types.Timestamp
+	if height > types.MaturityDelay {
+		maturityTimestamp = e.historicFacts[height-types.MaturityDelay].timestamp
+	}
 	return modules.BlockFacts{
-		BlockID: bf.currentBlock,
-		Height:  bf.blockchainHeight,
+		BlockID:           bf.currentBlock,
+		Difficulty:        bf.target.Difficulty(),
+		EstimatedHashrate: bf.estimatedHashrate,
+		Height:            bf.blockchainHeight,
+		MaturityTimestamp: maturityTimestamp,
+		Target:            bf.target,
+		TotalCoins:        bf.totalCoins,
 
 		// Transaction type counts.
 		MinerPayoutCount:          bf.minerPayoutCount,

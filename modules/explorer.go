@@ -15,11 +15,11 @@ type (
 	// were at a specific block.
 	BlockFacts struct {
 		BlockID           types.BlockID     `json:"blockid"`
-		Height            types.BlockHeight `json:"height"`
-		Target            types.Target      `json:"target"`
-		MaturityTimestamp types.Timestamp   `json:"maturitytimestamp"`
-		Difficutly        types.Currency    `json:"difficulty"`
+		Difficulty        types.Currency    `json:"difficulty"`
 		EstimatedHashrate types.Currency    `json:"estimatedhashrate"`
+		Height            types.BlockHeight `json:"height"`
+		MaturityTimestamp types.Timestamp   `json:"maturitytimestamp"`
+		Target            types.Target      `json:"target"`
 		TotalCoins        types.Currency    `json:"totalcoins"`
 
 		// Transaction type counts.

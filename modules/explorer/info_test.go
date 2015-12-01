@@ -2,6 +2,8 @@ package explorer
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestImmediateBlockFacts grabs the block facts object from the block explorer
@@ -12,15 +14,18 @@ func TestImmedieateBlockFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stats, exists := et.explorer.BlockFacts(et.cs.Height())
+	facts, exists := et.explorer.BlockFacts(et.cs.Height())
 	if !exists {
 		t.Fatal("could not find block facts for current height")
 	}
-	if stats.Height != et.explorer.blockchainHeight || et.explorer.blockchainHeight == 0 {
-		t.Error("wrong height reported in stats object")
+	if facts.Height != et.explorer.blockchainHeight || et.explorer.blockchainHeight == 0 {
+		t.Error("wrong height reported in facts object")
 	}
-	if stats.TransactionCount != et.explorer.transactionCount || et.explorer.transactionCount == 0 {
-		t.Error("wrong transaction count reported in stats object")
+	if facts.TransactionCount != et.explorer.transactionCount || et.explorer.transactionCount == 0 {
+		t.Error("wrong transaction count reported in facts object")
+	}
+	if facts.TotalCoins.Cmp(types.CalculateNumSiacoins(et.cs.Height())) != 0 {
+		t.Error("wrong number of total coins:", facts.TotalCoins, et.cs.Height())
 	}
 }
 
