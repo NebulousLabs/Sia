@@ -17,9 +17,15 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Delete the block from the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
-		e.blockchainHeight -= 1
-		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
 		e.currentBlock = block.ID()
+		e.blockchainHeight -= 1
+		e.target = e.blockTargets[block.ID()]
+		e.timestamp = block.Timestamp
+		if e.blockchainHeight > types.MaturityDelay {
+			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
+		}
+		// TODO: estimatedHashrate
+		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
 		delete(e.blockHashes, bid)
 		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
@@ -120,11 +126,23 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Add the block to the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
-		e.blockchainHeight++
-		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
 		e.currentBlock = block.ID()
+		e.blockchainHeight++
+		var exists bool
+		e.target, exists = e.cs.ChildTarget(block.ParentID)
+		if !exists {
+			e.target = types.RootTarget
+		}
+		e.timestamp = block.Timestamp
+		if e.blockchainHeight > types.MaturityDelay {
+			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
+		}
+		// TODO: estimatedHashrate
+		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
+
 		e.blockHashes[bid] = e.blockchainHeight
 		e.transactionHashes[tbid] = e.blockchainHeight // Miner payouts are a transaciton.
+		e.blockTargets[bid] = e.target
 
 		// Catalog the new miner payouts.
 		for j, payout := range block.MinerPayouts {

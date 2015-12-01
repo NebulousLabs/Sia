@@ -26,10 +26,10 @@ type (
 	// the parent block. This information is provided for programs that may not
 	// be complex enough to compute the extra information on their own.
 	ExplorerTransaction struct {
-		ID                                       types.TransactionID       `json:"id"`
-		Height                                   types.BlockHeight         `json:"height"`
-		Parent                                   types.BlockID             `json:"parent"`
-		RawTransaction                           types.Transaction         `json:"rawtransaction"`
+		ID             types.TransactionID `json:"id"`
+		Height         types.BlockHeight   `json:"height"`
+		Parent         types.BlockID       `json:"parent"`
+		RawTransaction types.Transaction   `json:"rawtransaction"`
 
 		SiacoinInputOutputs                      []types.SiacoinOutput     `json:"siacoininputoutputs"` // the outputs being spent
 		SiacoinOutputIDs                         []types.SiacoinOutputID   `json:"siacoinoutputids"`

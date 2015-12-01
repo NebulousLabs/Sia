@@ -31,6 +31,7 @@ type (
 		currentBlock      types.BlockID
 		blockchainHeight  types.BlockHeight
 		target            types.Target
+		timestamp         types.Timestamp
 		maturityTimestamp types.Timestamp
 		estimatedHashrate types.Currency
 		totalCoins        types.Currency
@@ -62,17 +63,15 @@ type (
 	// stored here in the future
 	Explorer struct {
 		// Hash lookups.
-		blockHashes       map[types.BlockID]types.BlockHeight
-		transactionHashes map[types.TransactionID]types.BlockHeight
-		unlockHashes      map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
-		siacoinOutputIDs  map[types.SiacoinOutputID]map[types.TransactionID]struct{}
-		fileContractIDs   map[types.FileContractID]map[types.TransactionID]struct{}
-		siafundOutputIDs  map[types.SiafundOutputID]map[types.TransactionID]struct{}
-
-		// A list from ids to the assets the represent. Useful for quickly finding
-		// the siacoin output that got spent by a siacoin input, for example.
+		blockHashes           map[types.BlockID]types.BlockHeight
+		blockTargets          map[types.BlockID]types.Target
+		transactionHashes     map[types.TransactionID]types.BlockHeight
+		unlockHashes          map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
+		siacoinOutputIDs      map[types.SiacoinOutputID]map[types.TransactionID]struct{}
 		siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
+		fileContractIDs       map[types.FileContractID]map[types.TransactionID]struct{}
 		fileContractHistories map[types.FileContractID]*fileContractHistory
+		siafundOutputIDs      map[types.SiafundOutputID]map[types.TransactionID]struct{}
 		siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 
 		// Utilities.
@@ -96,15 +95,15 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
-		blockHashes:       make(map[types.BlockID]types.BlockHeight),
-		transactionHashes: make(map[types.TransactionID]types.BlockHeight),
-		unlockHashes:      make(map[types.UnlockHash]map[types.TransactionID]struct{}),
-		siacoinOutputIDs:  make(map[types.SiacoinOutputID]map[types.TransactionID]struct{}),
-		fileContractIDs:   make(map[types.FileContractID]map[types.TransactionID]struct{}),
-		siafundOutputIDs:  make(map[types.SiafundOutputID]map[types.TransactionID]struct{}),
-
+		blockHashes:           make(map[types.BlockID]types.BlockHeight),
+		blockTargets:          make(map[types.BlockID]types.Target),
+		transactionHashes:     make(map[types.TransactionID]types.BlockHeight),
+		unlockHashes:          make(map[types.UnlockHash]map[types.TransactionID]struct{}),
+		siacoinOutputIDs:      make(map[types.SiacoinOutputID]map[types.TransactionID]struct{}),
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		fileContractIDs:       make(map[types.FileContractID]map[types.TransactionID]struct{}),
 		fileContractHistories: make(map[types.FileContractID]*fileContractHistory),
+		siafundOutputIDs:      make(map[types.SiafundOutputID]map[types.TransactionID]struct{}),
 		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 
 		cs:         cs,
