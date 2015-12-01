@@ -31,7 +31,10 @@ type (
 	}
 
 	// blockFacts contians a set of facts about the consensus set related to a
-	// certain block.
+	// certain block. The explorer needs some additional information in the
+	// history so that it can calculate certain values, which is one of the
+	// reasons that the explorer uses a separate struct instead of
+	// modules.BlockFacts.
 	blockFacts struct {
 		// Block information.
 		currentBlock      types.BlockID
@@ -68,7 +71,7 @@ type (
 	// Basic structure to store the blockchain. Metadata may also be
 	// stored here in the future
 	Explorer struct {
-		// Hash lookups.
+		// Stat tracking information.
 		blocksDifficulty      types.Target // cumulative difficulty from the past hashrateEstimationDepth blocks.
 		blockHashes           map[types.BlockID]types.BlockHeight
 		blockTargets          map[types.BlockID]types.Target

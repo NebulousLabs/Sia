@@ -23,10 +23,12 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 // at a given block height, and a bool indicating whether facts exist for the
 // given height.
 func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
+	// Check that a block exists at the given height.
 	if height >= types.BlockHeight(len(e.historicFacts)) {
 		return modules.BlockFacts{}, false
 	}
 
+	// Grab the stats and return the facts.
 	bf := e.historicFacts[height]
 	return modules.BlockFacts{
 		BlockID: bf.currentBlock,
