@@ -29,7 +29,7 @@ type (
 		ID                                       types.TransactionID       `json:"id"`
 		Height                                   types.BlockHeight         `json:"height"`
 		Parent                                   types.BlockID             `json:"parent"`
-		SiacoinInputOutput                       []types.SiacoinOutput     `json:"siacoininputoutputs"` // the outputs being spent
+		SiacoinInputOutputs                      []types.SiacoinOutput     `json:"siacoininputoutputs"` // the outputs being spent
 		SiacoinOutputIDs                         []types.SiacoinOutputID   `json:"siacoinoutputids"`
 		FileContractIDs                          []types.FileContractID    `json:"filecontractids"`
 		FileContractValidProofOutputIDs          [][]types.SiacoinOutputID `json:"filecontractvalidproofoutputids"`          // outer array is per-contract
@@ -81,7 +81,13 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 	et.Parent = parent
 	et.RawTransaction = txn
 
-	// TODO: Fill out the siacoin input outputs.
+	for _, sci := range txn.SiacoinInputs {
+		sco, exists := srv.explorer.SiacoinOutput(sci.ParentID)
+		if build.DEBUG && !exists {
+			panic("could not find corresponding siacoin output")
+		}
+		et.SiacoinInputOutputs = append(et.SiacoinInputOutputs, sco)
+	}
 	for i := range txn.SiacoinOutputs {
 		et.SiacoinOutputIDs = append(et.SiacoinOutputIDs, txn.SiacoinOutputID(uint64(i)))
 	}
@@ -111,9 +117,31 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcrvpoids)
 		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcrmpoids)
 	}
-	// TODO: Fill out the storage proof output ids
-	// TODO: Fill out the storage proof outputs
-	// TODO: Fill out the siafund input outputs.
+	for _, sp := range txn.StorageProofs {
+		fileContract, fileContractRevisions, _, fileContractExists, _, _ := srv.explorer.FileContractHistory(sp.ParentID)
+		if !fileContractExists && build.DEBUG {
+			panic("could not find a file contract connected with a storage proof")
+		}
+		var storageProofOutputs []types.SiacoinOutput
+		if len(fileContractRevisions) > 0 {
+			storageProofOutputs = fileContractRevisions[len(fileContractRevisions)-1].NewValidProofOutputs
+		} else {
+			storageProofOutputs = fileContract.ValidProofOutputs
+		}
+		var storageProofOutputIDs []types.SiacoinOutputID
+		for i := range storageProofOutputs {
+			storageProofOutputIDs = append(storageProofOutputIDs, sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i)))
+		}
+		et.StorageProofOutputIDs = append(et.StorageProofOutputIDs, storageProofOutputIDs)
+		et.StorageProofOutputs = append(et.StorageProofOutputs, storageProofOutputs)
+	}
+	for _, sci := range txn.SiafundInputs {
+		sco, exists := srv.explorer.SiafundOutput(sci.ParentID)
+		if build.DEBUG && !exists {
+			panic("could not find corresponding siafund output")
+		}
+		et.SiafundInputOutputs = append(et.SiafundInputOutputs, sco)
+	}
 	for i := range txn.SiafundOutputs {
 		et.SiafundOutputIDs = append(et.SiafundOutputIDs, txn.SiafundOutputID(uint64(i)))
 	}

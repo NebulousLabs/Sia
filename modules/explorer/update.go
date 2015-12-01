@@ -69,6 +69,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				delete(e.fileContractIDs[fcr.ParentID], txid)
 				delete(e.unlockHashes[fcr.UnlockConditions.UnlockHash()], txid)
 				delete(e.unlockHashes[fcr.NewUnlockHash], txid)
+				// Remove the file contract revision from the revision chain.
+				e.fileContractHistories[fcr.ParentID].revisions = e.fileContractHistories[fcr.ParentID].revisions[:len(e.fileContractHistories[fcr.ParentID].revisions)-1]
 				for l, sco := range fcr.NewValidProofOutputs {
 					scoid := fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(l))
 					delete(e.siacoinOutputIDs[scoid], txid)
@@ -176,6 +178,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.unlockHashes[sco.UnlockHash] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[sco.UnlockHash][txn.ID()] = struct{}{}
+				e.siacoinOutputs[scoid] = sco
 				e.siacoinOutputCount++
 			}
 			for k, fc := range txn.FileContracts {
@@ -190,6 +193,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.unlockHashes[fc.UnlockHash] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[fc.UnlockHash][txid] = struct{}{}
+				e.fileContractHistories[fcid] = &fileContractHistory{contract: fc}
 				for l, sco := range fc.ValidProofOutputs {
 					scoid := fcid.StorageProofOutputID(types.ProofValid, uint64(l))
 					_, exists = e.siacoinOutputIDs[scoid]
@@ -269,6 +273,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				e.fileContractRevisionCount++
 				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
 				e.totalRevisionVolume = e.totalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
+				e.fileContractHistories[fcr.ParentID].revisions = append(e.fileContractHistories[fcr.ParentID].revisions, fcr)
 			}
 			for _, sp := range txn.StorageProofs {
 				_, exists := e.fileContractIDs[sp.ParentID]
@@ -278,6 +283,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.fileContractIDs[sp.ParentID] = make(map[types.TransactionID]struct{})
 				}
 				e.fileContractIDs[sp.ParentID][txid] = struct{}{}
+				e.fileContractHistories[sp.ParentID].storageProof = sp
 				e.storageProofCount++
 			}
 			for _, sfi := range txn.SiafundInputs {
@@ -314,6 +320,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.unlockHashes[sfo.UnlockHash] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[sfo.UnlockHash][txid] = struct{}{}
+				e.siafundOutputs[sfoid] = sfo
 				e.siafundOutputCount++
 			}
 			for _ = range txn.MinerFees {

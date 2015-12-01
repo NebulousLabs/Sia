@@ -14,60 +14,77 @@ var (
 	errNilCS = errors.New("explorer cannot use a nil consensus set")
 )
 
-// blockFacts contians a set of facts about the consensus set related to a
-// certain block.
-type blockFacts struct {
-	// Block information.
-	currentBlock      types.BlockID
-	blockchainHeight  types.BlockHeight
-	target            types.Target
-	maturityTimestamp types.Timestamp
-	estimatedHashrate types.Currency
-	totalCoins        types.Currency
+type (
+	// fileContractHistory stores the original file contract and the chain of
+	// revisions that have affected a file contract through the life of the
+	// blockchain.
+	fileContractHistory struct {
+		contract     types.FileContract
+		revisions    []types.FileContractRevision
+		storageProof types.StorageProof
+	}
 
-	// Transaction type counts.
-	minerPayoutCount          uint64
-	transactionCount          uint64
-	siacoinInputCount         uint64
-	siacoinOutputCount        uint64
-	fileContractCount         uint64
-	fileContractRevisionCount uint64
-	storageProofCount         uint64
-	siafundInputCount         uint64
-	siafundOutputCount        uint64
-	minerFeeCount             uint64
-	arbitraryDataCount        uint64
-	transactionSignatureCount uint64
+	// blockFacts contians a set of facts about the consensus set related to a
+	// certain block.
+	blockFacts struct {
+		// Block information.
+		currentBlock      types.BlockID
+		blockchainHeight  types.BlockHeight
+		target            types.Target
+		maturityTimestamp types.Timestamp
+		estimatedHashrate types.Currency
+		totalCoins        types.Currency
 
-	// Factoids about file contracts.
-	activeContractCost  types.Currency
-	activeContractCount uint64
-	activeContractSize  types.Currency
-	totalContractCost   types.Currency
-	totalContractSize   types.Currency
-	totalRevisionVolume types.Currency
-}
+		// Transaction type counts.
+		minerPayoutCount          uint64
+		transactionCount          uint64
+		siacoinInputCount         uint64
+		siacoinOutputCount        uint64
+		fileContractCount         uint64
+		fileContractRevisionCount uint64
+		storageProofCount         uint64
+		siafundInputCount         uint64
+		siafundOutputCount        uint64
+		minerFeeCount             uint64
+		arbitraryDataCount        uint64
+		transactionSignatureCount uint64
 
-// Basic structure to store the blockchain. Metadata may also be
-// stored here in the future
-type Explorer struct {
-	// Hash lookups.
-	blockHashes       map[types.BlockID]types.BlockHeight
-	transactionHashes map[types.TransactionID]types.BlockHeight
-	unlockHashes      map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
-	siacoinOutputIDs  map[types.SiacoinOutputID]map[types.TransactionID]struct{}
-	fileContractIDs   map[types.FileContractID]map[types.TransactionID]struct{}
-	siafundOutputIDs  map[types.SiafundOutputID]map[types.TransactionID]struct{}
+		// Factoids about file contracts.
+		activeContractCost  types.Currency
+		activeContractCount uint64
+		activeContractSize  types.Currency
+		totalContractCost   types.Currency
+		totalContractSize   types.Currency
+		totalRevisionVolume types.Currency
+	}
 
-	// Utilities.
-	cs         modules.ConsensusSet
-	persistDir string
-	mu         sync.RWMutex
+	// Basic structure to store the blockchain. Metadata may also be
+	// stored here in the future
+	Explorer struct {
+		// Hash lookups.
+		blockHashes       map[types.BlockID]types.BlockHeight
+		transactionHashes map[types.TransactionID]types.BlockHeight
+		unlockHashes      map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
+		siacoinOutputIDs  map[types.SiacoinOutputID]map[types.TransactionID]struct{}
+		fileContractIDs   map[types.FileContractID]map[types.TransactionID]struct{}
+		siafundOutputIDs  map[types.SiafundOutputID]map[types.TransactionID]struct{}
 
-	// Factoids about the current block.
-	historicFacts []blockFacts
-	blockFacts
-}
+		// A list from ids to the assets the represent. Useful for quickly finding
+		// the siacoin output that got spent by a siacoin input, for example.
+		siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
+		fileContractHistories map[types.FileContractID]*fileContractHistory
+		siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
+
+		// Utilities.
+		cs         modules.ConsensusSet
+		persistDir string
+		mu         sync.RWMutex
+
+		// Factoids about the current block.
+		historicFacts []blockFacts
+		blockFacts
+	}
+)
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
@@ -85,6 +102,10 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		siacoinOutputIDs:  make(map[types.SiacoinOutputID]map[types.TransactionID]struct{}),
 		fileContractIDs:   make(map[types.FileContractID]map[types.TransactionID]struct{}),
 		siafundOutputIDs:  make(map[types.SiafundOutputID]map[types.TransactionID]struct{}),
+
+		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		fileContractHistories: make(map[types.FileContractID]*fileContractHistory),
+		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 
 		cs:         cs,
 		persistDir: persistDir,

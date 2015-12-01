@@ -86,6 +86,12 @@ func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
 	return ids
 }
 
+// SiacoinOutput will return the siacoin output associated with the input id.
+func (e *Explorer) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool) {
+	sco, exists := e.siacoinOutputs[id]
+	return sco, exists
+}
+
 // SiacoinOutputID returns all of the transactions that contain the input
 // siacoin output id. An empty set indicates that the siacoin output id does
 // not appear in the blockchain.
@@ -101,6 +107,27 @@ func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.Transaction
 	return ids
 }
 
+// FileContractHistory returns the history associated with a file contract.
+// History is broken in to 3 elements, and a bool is returned indicating
+// whether history exists as a part of each element. If the file contract
+// itself does not exist, no other type of history will exist either.
+func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, sp types.StorageProof, fcE bool, fcrsE bool, spE bool) {
+	fch, fcE := e.fileContractHistories[id]
+	if !fcE {
+		return
+	}
+	fc = fch.contract
+	if len(fch.revisions) > 0 {
+		fcrsE = true
+		fcrs = fch.revisions
+	}
+	if fch.storageProof.ParentID == id {
+		spE = true
+		sp = fch.storageProof
+	}
+	return
+}
+
 // FileContractIDs returns all of the transactions that contain the input file
 // contract id. An empty set indicates that the file contract id does not
 // appear in the blockchain.
@@ -114,6 +141,12 @@ func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID
 		ids = append(ids, txid)
 	}
 	return ids
+}
+
+// SiafundOutput will return the siafund output associated with the input id.
+func (e *Explorer) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool) {
+	sco, exists := e.siafundOutputs[id]
+	return sco, exists
 }
 
 // SiafundOutputID returns all of the transactions that contain the input

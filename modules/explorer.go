@@ -67,13 +67,28 @@ type (
 		// provided unlock hash.
 		UnlockHash(types.UnlockHash) []types.TransactionID
 
+		// SiacoinOutput will return the siacoin output associated with the
+		// input id.
+		SiacoinOutput(types.SiacoinOutputID) (types.SiacoinOutput, bool)
+
 		// SiacoinOutputID returns all of the transaction ids associated with
 		// the provided siacoin output id.
 		SiacoinOutputID(types.SiacoinOutputID) []types.TransactionID
 
+		// FileContractHistory returns the history associated with a file
+		// contract.  History is broken in to 3 elements, and a bool is
+		// returned indicating whether history exists as a part of each
+		// element. If the file contract itself does not exist, no other type
+		// of history will exist either.
+		FileContractHistory(types.FileContractID) (types.FileContract, []types.FileContractRevision, types.StorageProof, bool, bool, bool)
+
 		// FileContractID returns all of the transaction ids associated with
 		// the provided file contract id.
 		FileContractID(types.FileContractID) []types.TransactionID
+
+		// SiafundOutput will return the siafund output associated with the
+		// input id.
+		SiafundOutput(types.SiafundOutputID) (types.SiafundOutput, bool)
 
 		// SiafundOutputID returns all of the transaction ids associated with
 		// the provided siafund output id.
