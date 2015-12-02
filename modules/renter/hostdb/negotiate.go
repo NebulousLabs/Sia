@@ -503,5 +503,5 @@ func (hdb *HostDB) NewPool() (HostPool, error) {
 	if hdb.isEmpty() {
 		return nil, errors.New("HostDB is empty")
 	}
-	return &pool{}, nil
+	return &pool{hdb: hdb}, nil
 }
