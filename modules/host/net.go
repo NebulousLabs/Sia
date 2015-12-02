@@ -37,6 +37,8 @@ func (h *Host) handleConn(conn net.Conn) {
 		err = h.rpcSettings(conn)
 	case modules.RPCUpload:
 		err = h.rpcUpload(conn)
+	case modules.RPCRenew:
+		err = h.rpcRenew(conn)
 	case modules.RPCRevise:
 		err = h.rpcRevise(conn)
 	case modules.RPCDownload:
