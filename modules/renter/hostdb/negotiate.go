@@ -313,7 +313,7 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 // revise revises the previous revision to cover piece and uploads both the
 // revision and the piece data to the host.
 func (hu *hostUploader) revise(rev types.FileContractRevision, piece []byte, height types.BlockHeight) error {
-	hu.conn.SetDeadline(time.Now().Add(5 * time.Second)) // sufficient to transfer 4 MB over 100 kbps
+	hu.conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
 	defer hu.conn.SetDeadline(time.Time{})               // reset timeout after each revision
 
 	// calculate new merkle root
