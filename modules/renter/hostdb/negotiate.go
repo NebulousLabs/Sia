@@ -467,6 +467,10 @@ func (p *pool) Close() error {
 // UniqueHosts will return up to 'n' unique hosts that are not in 'old'. Note
 // that this may require negotiating new contracts.
 func (p *pool) UniqueHosts(n int, old []modules.NetAddress) (hosts []Uploader) {
+	if n == 0 {
+		return
+	}
+
 	// first reuse existing connections
 outer:
 	for _, h := range p.hosts {
@@ -476,13 +480,16 @@ outer:
 			}
 		}
 		hosts = append(hosts, h)
+		if len(hosts) >= n {
+			return hosts
+		}
 	}
 
 	// TODO: revise old, unfilled contracts
 
 	// form new contracts from randomly-picked nodes
 	p.hdb.mu.Lock()
-	randHosts := p.hdb.randomHosts(n, old)
+	randHosts := p.hdb.randomHosts(n*2, old)
 	p.hdb.mu.Unlock()
 	for _, host := range randHosts {
 		h, err := p.hdb.newHostUploader(host)
@@ -491,6 +498,9 @@ outer:
 		}
 		hosts = append(hosts, h)
 		p.hosts = append(p.hosts, h)
+		if len(hosts) >= n {
+			break
+		}
 	}
 	return hosts
 }
