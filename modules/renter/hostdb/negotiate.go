@@ -295,7 +295,6 @@ func newRevision(rev types.FileContractRevision, pieceLen uint64, merkleRoot cry
 		// probably not enough money, but the host might accept it anyway
 		piecePrice = rev.NewValidProofOutputs[0].Value
 	}
-
 	return types.FileContractRevision{
 		ParentID:          rev.ParentID,
 		UnlockConditions:  rev.UnlockConditions,
@@ -318,4 +317,188 @@ func newRevision(rev types.FileContractRevision, pieceLen uint64, merkleRoot cry
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}
+}
+
+// Renew negotiates a new contract for data already stored with a host. It
+// returns the ID of the new contract. This is a blocking call that performs
+// network I/O.
+func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
+	hdb.mu.RLock()
+	height := hdb.blockHeight
+	hc, ok := hdb.contracts[fcid]
+	host, eok := hdb.allHosts[hc.IP] // or activeHosts?
+	hdb.mu.RUnlock()
+	if !ok {
+		return types.FileContractID{}, errors.New("no record of that contract")
+	} else if !eok {
+		return types.FileContractID{}, errors.New("no record of that host")
+	} else if newEndHeight < height {
+		return types.FileContractID{}, errors.New("cannot renew below current height")
+	}
+
+	conn, err := net.DialTimeout("tcp", string(hc.IP), 15*time.Second)
+	if err != nil {
+		return types.FileContractID{}, err
+	}
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
+
+	// write rpcID
+	if err := encoding.WriteObject(conn, modules.RPCRenew); err != nil {
+		return types.FileContractID{}, errors.New("couldn't initiate RPC: " + err.Error())
+	}
+
+	// write fcid
+	if err := encoding.WriteObject(conn, fcid); err != nil {
+		return types.FileContractID{}, errors.New("couldn't send contract ID: " + err.Error())
+	}
+
+	// rest of protocol is identical to negotiateContract
+	renterCost := host.Price.Mul(types.NewCurrency64(hc.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
+	payout := renterCost                   // no collateral
+
+	// read host key
+	var hostPublicKey types.SiaPublicKey
+	if err := encoding.ReadObject(conn, &hostPublicKey, 256); err != nil {
+		return types.FileContractID{}, errors.New("couldn't read host's public key: " + err.Error())
+	}
+
+	// create our key
+	ourSK, ourPK, err := crypto.StdKeyGen.Generate()
+	if err != nil {
+		return types.FileContractID{}, errors.New("failed to generate keypair: " + err.Error())
+	}
+	ourPublicKey := types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       ourPK[:],
+	}
+
+	// send our public key
+	if err := encoding.WriteObject(conn, ourPublicKey); err != nil {
+		return types.FileContractID{}, errors.New("couldn't send our public key: " + err.Error())
+	}
+
+	// create unlock conditions
+	uc := types.UnlockConditions{
+		PublicKeys:         []types.SiaPublicKey{ourPublicKey, hostPublicKey},
+		SignaturesRequired: 2,
+	}
+
+	// create file contract
+	fc := types.FileContract{
+		FileSize:       hc.LastRevision.NewFileSize,
+		FileMerkleRoot: hc.LastRevision.NewFileMerkleRoot,
+		WindowStart:    newEndHeight,
+		WindowEnd:      newEndHeight + host.WindowSize,
+		Payout:         payout,
+		UnlockHash:     uc.UnlockHash(),
+		// TODO: are these correct?
+		RevisionNumber:     0,
+		ValidProofOutputs:  hc.LastRevision.NewValidProofOutputs,
+		MissedProofOutputs: hc.LastRevision.NewMissedProofOutputs,
+	}
+
+	// build transaction containing fc
+	txnBuilder := hdb.wallet.StartTransaction()
+	err = txnBuilder.FundSiacoins(fc.Payout)
+	if err != nil {
+		return types.FileContractID{}, err
+	}
+	txnBuilder.AddFileContract(fc)
+	txn, parents := txnBuilder.View()
+	txnSet := append(parents, txn)
+
+	// calculate new contract ID
+	newContractID := txn.FileContractID(0)
+
+	// if an error occurs at any point here, we need to drop the txn
+	err = func() error {
+		// send txn
+		if err := encoding.WriteObject(conn, txnSet); err != nil {
+			return errors.New("couldn't send our proposed contract: " + err.Error())
+		}
+
+		// read back acceptance
+		var response string
+		if err := encoding.ReadObject(conn, &response, 128); err != nil {
+			return errors.New("couldn't read the host's response to our proposed contract: " + err.Error())
+		}
+		if response != modules.AcceptResponse {
+			return errors.New("host rejected proposed contract: " + response)
+		}
+
+		// read back txn with host collateral.
+		var hostTxnSet []types.Transaction
+		if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
+			return errors.New("couldn't read the host's updated contract: " + err.Error())
+		}
+
+		// check that txn is okay. For now, no collateral will be added, so the
+		// transaction sets should be identical.
+		if len(hostTxnSet) != len(txnSet) {
+			return errors.New("host sent bad collateral transaction")
+		}
+		for i := range hostTxnSet {
+			if hostTxnSet[i].ID() != txnSet[i].ID() {
+				return errors.New("host sent bad collateral transaction")
+			}
+		}
+
+		// sign the txn and resend
+		// NOTE: for now, we are assuming that the transaction has not changed
+		// since we sent it. Otherwise, the txnBuilder would have to be updated
+		// with whatever fields were added by the host.
+		signedTxnSet, err := txnBuilder.Sign(true)
+		if err != nil {
+			return err
+		}
+		if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
+			return errors.New("couldn't send the contract signed by us: " + err.Error())
+		}
+
+		// read signed txn from host
+		var signedHostTxnSet []types.Transaction
+		if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
+			return errors.New("couldn't read the contract signed by the host: " + err.Error())
+		}
+
+		// submit to blockchain
+		err = hdb.tpool.AcceptTransactionSet(signedHostTxnSet)
+		if err == modules.ErrDuplicateTransactionSet {
+			// this can happen if the renter is uploading to itself
+			err = nil
+		}
+		return err
+	}()
+	if err != nil {
+		txnBuilder.Drop()
+		return types.FileContractID{}, err
+	}
+
+	// update host contract
+	hdb.mu.Lock()
+	hdb.contracts[fcid] = hostContract{
+		IP: hc.IP,
+		ID: newContractID,
+		LastRevision: types.FileContractRevision{
+			ParentID:              newContractID,
+			UnlockConditions:      uc,
+			NewRevisionNumber:     fc.RevisionNumber,
+			NewFileSize:           fc.FileSize,
+			NewFileMerkleRoot:     fc.FileMerkleRoot,
+			NewWindowStart:        fc.WindowStart,
+			NewWindowEnd:          fc.WindowEnd,
+			NewValidProofOutputs:  []types.SiacoinOutput{fc.ValidProofOutputs[0], fc.ValidProofOutputs[1]},
+			NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1]},
+			NewUnlockHash:         fc.UnlockHash,
+		},
+		LastRevisionTxn: types.Transaction{},
+		SecretKey:       ourSK,
+	}
+	hdb.save()
+	hdb.mu.Unlock()
+
+	return newContractID, nil
 }
