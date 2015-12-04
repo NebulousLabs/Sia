@@ -266,8 +266,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 		ID:           fcid,
 		FileContract: fc,
 		LastRevisionTxn: types.Transaction{
-			// first revision is empty
-			FileContractRevisions: []types.FileContractRevision{{}},
+			FileContractRevisions: []types.FileContractRevision{hu.lastTxn.FileContractRevisions[0]},
 		},
 		SecretKey: ourSK,
 	}
