@@ -284,9 +284,9 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	hu.revisionLock.Lock()
 	defer hu.revisionLock.Unlock()
 
-	// get old file contract from renter
+	// get old host contract from renter
 	hu.hdb.mu.RLock()
-	fc, exists := hu.hdb.contracts[hu.fcid]
+	hc, exists := hu.hdb.contracts[hu.fcid]
 	height := hu.hdb.blockHeight
 	hu.hdb.mu.RUnlock()
 	if !exists {
@@ -302,9 +302,10 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 		return 0, err
 	}
 
-	// update file contract in renter
+	// update host contract
 	hu.hdb.mu.Lock()
-	hu.hdb.contracts[hu.fcid] = fc
+	hc.LastRevisionTxn = hu.lastTxn
+	hu.hdb.contracts[hu.fcid] = hc
 	hu.hdb.save()
 	hu.hdb.mu.Unlock()
 
