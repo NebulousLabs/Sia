@@ -262,6 +262,7 @@ func (hu *hostUploader) negotiateContract(filesize uint64, duration types.BlockH
 
 	hu.hdb.mu.Lock()
 	hu.hdb.contracts[fcid] = hostContract{
+		IP:           hu.settings.IPAddress,
 		ID:           fcid,
 		FileContract: fc,
 		LastRevisionTxn: types.Transaction{

@@ -24,6 +24,7 @@ func (hdb *HostDB) save() error {
 		// to avoid race conditions involving the contract's mutex, copy it
 		// manually into a new object
 		data.Contracts = append(data.Contracts, hostContract{
+			IP:              hc.IP,
 			ID:              hc.ID,
 			FileContract:    hc.FileContract,
 			LastRevisionTxn: hc.LastRevisionTxn,

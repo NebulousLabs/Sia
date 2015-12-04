@@ -66,6 +66,7 @@ type HostDB struct {
 // a hostContract includes the original contract made with a host, along with
 // the most recent revision.
 type hostContract struct {
+	IP              modules.NetAddress
 	ID              types.FileContractID
 	FileContract    types.FileContract
 	LastRevisionTxn types.Transaction
