@@ -71,9 +71,6 @@ type hostContract struct {
 	FileContract    types.FileContract
 	LastRevisionTxn types.Transaction
 	SecretKey       crypto.SecretKey
-
-	// revisions must happen in serial
-	mu sync.RWMutex
 }
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
