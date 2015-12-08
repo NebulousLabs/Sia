@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"bytes"
 	"errors"
 	"net"
 	"time"
@@ -42,32 +43,27 @@ type Uploader interface {
 // in serial.
 type hostUploader struct {
 	// constants
-	// TODO: consider replacing these with a hostContract
-	addr      modules.NetAddress
-	fcid      types.FileContractID
-	price     types.Currency
-	endHeight types.BlockHeight
-	secretKey crypto.SecretKey
+	price types.Currency
 
-	// these are updated after each revision
-	tree    crypto.MerkleTree
-	lastTxn types.Transaction
+	// updated after each revision
+	tree     crypto.MerkleTree
+	contract hostContract // only lastTxn is updated
 
 	// resources
 	conn net.Conn
 	hdb  *HostDB
 }
 
-func (hu *hostUploader) Address() modules.NetAddress      { return hu.addr }
-func (hu *hostUploader) ContractID() types.FileContractID { return hu.fcid }
-func (hu *hostUploader) EndHeight() types.BlockHeight     { return hu.endHeight }
+func (hu *hostUploader) Address() modules.NetAddress      { return hu.contract.IP }
+func (hu *hostUploader) ContractID() types.FileContractID { return hu.contract.ID }
+func (hu *hostUploader) EndHeight() types.BlockHeight     { return hu.contract.FileContract.WindowStart }
 
 func (hu *hostUploader) Close() error {
 	// send an empty revision to indicate that we are finished
 	encoding.WriteObject(hu.conn, types.Transaction{})
 	hu.conn.Close()
 	// submit the most recent revision to the blockchain
-	err := hu.hdb.tpool.AcceptTransactionSet([]types.Transaction{hu.lastTxn})
+	err := hu.hdb.tpool.AcceptTransactionSet([]types.Transaction{hu.contract.LastRevisionTxn})
 	if err != nil && err != modules.ErrDuplicateTransactionSet {
 		hu.hdb.log.Println("WARN: transaction pool rejected revision transaction:", err)
 	}
@@ -77,32 +73,38 @@ func (hu *hostUploader) Close() error {
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
 func (hu *hostUploader) Upload(data []byte) (uint64, error) {
-	// get old host contract from renter
+	rev := hu.contract.LastRevisionTxn.FileContractRevisions[0]
+
+	// calculate price
 	hu.hdb.mu.RLock()
-	hc, exists := hu.hdb.contracts[hu.fcid]
 	height := hu.hdb.blockHeight
 	hu.hdb.mu.RUnlock()
-	if !exists {
-		return 0, errors.New("no record of contract to revise")
+	if height > rev.NewWindowStart {
+		return 0, errors.New("contract has already ended")
 	}
+	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(rev.NewWindowStart - height))).Mul(hu.price)
 
-	// offset is old filesize
-	offset := hu.lastTxn.FileContractRevisions[0].NewFileSize
+	// calculate new merkle root (no error possible with bytes.Reader)
+	_ = hu.tree.ReadSegments(bytes.NewReader(data))
+	merkleRoot := hu.tree.Root()
 
 	// revise the file contract
-	err := hu.reviseContract(hu.lastTxn.FileContractRevisions[0], data, height)
+	newRev := newRevision(rev, uint64(len(data)), merkleRoot, piecePrice)
+	signedTxn, err := negotiateRevision(hu.conn, newRev, data, hu.contract.SecretKey)
 	if err != nil {
 		return 0, err
 	}
 
+	hu.contract.LastRevisionTxn = signedTxn
+
 	// update host contract
 	hu.hdb.mu.Lock()
-	hc.LastRevisionTxn = hu.lastTxn
-	hu.hdb.contracts[hu.fcid] = hc
+	hu.hdb.contracts[hu.contract.ID] = hu.contract
 	hu.hdb.save()
 	hu.hdb.mu.Unlock()
 
-	return offset, nil
+	// offset is old filesize
+	return rev.NewFileSize, nil
 }
 
 // newHostUploader initiates the contract revision process with a host, and
@@ -116,6 +118,7 @@ func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
 	}
 	// TODO: check for excessive price again?
 
+	// initiate revision loop
 	conn, err := net.DialTimeout("tcp", string(hc.IP), 15*time.Second)
 	if err != nil {
 		return nil, err
@@ -130,11 +133,8 @@ func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
 	// uploader will actually work. Maybe send the Merkle root?
 
 	hu := &hostUploader{
-		addr:      hc.IP,
-		fcid:      hc.ID,
-		price:     settings.Price,
-		endHeight: hc.FileContract.WindowStart,
-		secretKey: hc.SecretKey,
+		contract: hc,
+		price:    settings.Price,
 
 		tree: crypto.NewTree(),
 
