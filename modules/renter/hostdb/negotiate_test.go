@@ -259,3 +259,34 @@ func TestReviseContract(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestUniqueHosts tests the UniqueHosts method of the pool type.
+// TODO: make pool safer to test, using real or mocked hostdb
+func TestUniqueHosts(t *testing.T) {
+	// create hosts
+	h1, h2, h3 := new(hostUploader), new(hostUploader), new(hostUploader)
+	h1.settings.IPAddress = fakeAddr(1)
+	h2.settings.IPAddress = fakeAddr(2)
+	h3.settings.IPAddress = fakeAddr(3)
+
+	p := &pool{hosts: []*hostUploader{h1, h2, h3}}
+
+	tests := []struct {
+		n      int
+		hosts  []modules.NetAddress
+		expLen int
+	}{
+		{0, nil, 0},
+		{3, nil, 3},
+		{2, []modules.NetAddress{fakeAddr(1)}, 2},
+		// TODO: these tests cause panics
+		//{4, nil, 3},
+		//{1, []modules.NetAddress{fakeAddr(1), fakeAddr(2), fakeAddr(3)}, 0},
+	}
+	for i, test := range tests {
+		hosts := p.UniqueHosts(test.n, test.hosts)
+		if len(hosts) != test.expLen {
+			t.Errorf("test %v failed: expected %v hosts, got %v", i, test.expLen, len(hosts))
+		}
+	}
+}

@@ -82,7 +82,7 @@ func (hdb *HostDB) AveragePrice() types.Currency {
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
-	hosts := hdb.randomHosts(sampleSize)
+	hosts := hdb.randomHosts(sampleSize, nil)
 	if len(hosts) == 0 {
 		return totalPrice
 	}

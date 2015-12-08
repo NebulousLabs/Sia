@@ -10,6 +10,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -72,7 +73,7 @@ func TestErasureUpload(t *testing.T) {
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]*testHost, rsc.NumPieces())
+	hosts := make([]hostdb.Uploader, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
 			ip:       modules.NetAddress(strconv.Itoa(i)),
@@ -81,18 +82,18 @@ func TestErasureUpload(t *testing.T) {
 		}
 	}
 	// make one host really slow
-	hosts[0].delay = 100 * time.Millisecond
+	hosts[0].(*testHost).delay = 100 * time.Millisecond
 	// make one host always fail
-	hosts[1].failRate = 1
-
-	// create hostdb
-	hdb := &mockHostDB{hosts: hosts}
+	hosts[1].(*testHost).failRate = 1
 
 	// upload data to hosts
 	f := newFile("foo", rsc, pieceSize, dataSize)
-	err = f.repair(bytes.NewReader(data), f.incompleteChunks(), hdb)
-	if err != nil {
-		t.Fatal(err)
+	r := bytes.NewReader(data)
+	for chunk, pieces := range f.incompleteChunks() {
+		err = f.repair(chunk, pieces, r, hosts)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// download data
@@ -106,7 +107,7 @@ func TestErasureUpload(t *testing.T) {
 			continue
 		}
 		for _, p := range contract.Pieces {
-			encPiece := h.data[p.Offset : p.Offset+pieceSize+crypto.TwofishOverhead]
+			encPiece := h.(*testHost).data[p.Offset : p.Offset+pieceSize+crypto.TwofishOverhead]
 			piece, err := deriveKey(f.masterKey, p.Chunk, p.Piece).DecryptBytes(encPiece)
 			if err != nil {
 				t.Fatal(err)
