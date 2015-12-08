@@ -18,7 +18,8 @@ const (
 	hostTimeout = 15 * time.Second
 )
 
-// repair attempts to repair a chunk of f by uploading its pieces to more hosts.
+// repair attempts to repair a file chunk by uploading its pieces to more
+// hosts.
 func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []hostdb.Uploader) error {
 	// read chunk data and encode
 	chunk := make([]byte, f.chunkSize())

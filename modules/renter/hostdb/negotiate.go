@@ -452,11 +452,16 @@ type HostPool interface {
 	Close() error
 }
 
+// A pool is a collection of hostUploaders that satisfies the HostPool
+// interface. New hosts are drawn from a HostDB, and contracts are negotiated
+// with them on demand.
 type pool struct {
 	hosts []*hostUploader
 	hdb   *HostDB
 }
 
+// Close closes all of the pool's open host connections, and submits their
+// respective contract revisions to the transaction pool.
 func (p *pool) Close() error {
 	for _, h := range p.hosts {
 		h.Close()
@@ -464,9 +469,12 @@ func (p *pool) Close() error {
 	return nil
 }
 
-// UniqueHosts will return up to 'n' unique hosts that are not in 'old'. Note
-// that this may require negotiating new contracts.
-func (p *pool) UniqueHosts(n int, old []modules.NetAddress) (hosts []Uploader) {
+// UniqueHosts will return up to 'n' unique hosts that are not in 'exclude'.
+// The pool draws from its set of active connections first, and then negotiates
+// new contracts if more hosts are required. Note that this latter case
+// requires network I/O, so the caller should always assume that UniqueHosts
+// will block.
+func (p *pool) UniqueHosts(n int, exclude []modules.NetAddress) (hosts []Uploader) {
 	if n == 0 {
 		return
 	}
@@ -474,7 +482,7 @@ func (p *pool) UniqueHosts(n int, old []modules.NetAddress) (hosts []Uploader) {
 	// first reuse existing connections
 outer:
 	for _, h := range p.hosts {
-		for _, ip := range old {
+		for _, ip := range exclude {
 			if h.Address() == ip {
 				continue outer
 			}
@@ -485,19 +493,17 @@ outer:
 		}
 	}
 
-	// TODO: revise old, unfilled contracts
-
 	// form new contracts from randomly-picked nodes
 	p.hdb.mu.Lock()
-	randHosts := p.hdb.randomHosts(n*2, old)
+	randHosts := p.hdb.randomHosts(n*2, exclude)
 	p.hdb.mu.Unlock()
 	for _, host := range randHosts {
-		h, err := p.hdb.newHostUploader(host)
+		hu, err := p.hdb.newHostUploader(host)
 		if err != nil {
 			continue
 		}
-		hosts = append(hosts, h)
-		p.hosts = append(p.hosts, h)
+		hosts = append(hosts, hu)
+		p.hosts = append(p.hosts, hu)
 		if len(hosts) >= n {
 			break
 		}
