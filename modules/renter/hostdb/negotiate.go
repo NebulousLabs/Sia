@@ -11,6 +11,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	// the hostdb will not form contracts above this price
+	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(1000)) // 1000 SC / GB / Month
+
+	errTooExpensive = errors.New("host price was too high")
+)
+
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
 func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilder modules.TransactionBuilder, tpool modules.TransactionPool) (hostContract, error) {

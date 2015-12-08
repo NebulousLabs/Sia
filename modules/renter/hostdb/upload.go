@@ -12,13 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-var (
-	// the hostdb will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
-
-	errTooExpensive = errors.New("host price was too high")
-)
-
 // An Uploader uploads data to a host.
 type Uploader interface {
 	// Upload revises the underlying contract to store the new data. It
