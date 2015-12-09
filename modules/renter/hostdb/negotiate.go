@@ -13,7 +13,7 @@ import (
 
 var (
 	// the hostdb will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(1000)) // 1000 SC / GB / Month
+	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
 
 	errTooExpensive = errors.New("host price was too high")
 )
@@ -177,7 +177,6 @@ func (hdb *HostDB) newContract(host modules.HostSettings) (hostContract, error) 
 	}
 
 	// get an address to use for negotiation
-	// TODO: use more than one shared address
 	hdb.mu.Lock()
 	if hdb.cachedAddress == (types.UnlockHash{}) {
 		uc, err := hdb.wallet.NextAddress()
