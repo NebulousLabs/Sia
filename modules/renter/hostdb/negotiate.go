@@ -149,21 +149,20 @@ func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilde
 		IP:           addr,
 		ID:           fcid,
 		FileContract: fc,
-		LastRevisionTxn: types.Transaction{
-			FileContractRevisions: []types.FileContractRevision{{
-				ParentID:              fcid,
-				UnlockConditions:      uc,
-				NewRevisionNumber:     fc.RevisionNumber,
-				NewFileSize:           fc.FileSize,
-				NewFileMerkleRoot:     fc.FileMerkleRoot,
-				NewWindowStart:        fc.WindowStart,
-				NewWindowEnd:          fc.WindowEnd,
-				NewValidProofOutputs:  []types.SiacoinOutput{fc.ValidProofOutputs[0], fc.ValidProofOutputs[1]},
-				NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1]},
-				NewUnlockHash:         fc.UnlockHash,
-			}},
+		LastRevision: types.FileContractRevision{
+			ParentID:              fcid,
+			UnlockConditions:      uc,
+			NewRevisionNumber:     fc.RevisionNumber,
+			NewFileSize:           fc.FileSize,
+			NewFileMerkleRoot:     fc.FileMerkleRoot,
+			NewWindowStart:        fc.WindowStart,
+			NewWindowEnd:          fc.WindowEnd,
+			NewValidProofOutputs:  []types.SiacoinOutput{fc.ValidProofOutputs[0], fc.ValidProofOutputs[1]},
+			NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1]},
+			NewUnlockHash:         fc.UnlockHash,
 		},
-		SecretKey: ourSK,
+		LastRevisionTxn: types.Transaction{},
+		SecretKey:       ourSK,
 	}
 
 	return hc, nil

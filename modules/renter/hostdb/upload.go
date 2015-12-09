@@ -66,38 +66,38 @@ func (hu *hostUploader) Close() error {
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
 func (hu *hostUploader) Upload(data []byte) (uint64, error) {
-	rev := hu.contract.LastRevisionTxn.FileContractRevisions[0]
+	// offset is old filesize
+	offset := hu.contract.LastRevision.NewFileSize
 
 	// calculate price
 	hu.hdb.mu.RLock()
 	height := hu.hdb.blockHeight
 	hu.hdb.mu.RUnlock()
-	if height > rev.NewWindowStart {
+	if height > hu.contract.FileContract.WindowStart {
 		return 0, errors.New("contract has already ended")
 	}
-	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(rev.NewWindowStart - height))).Mul(hu.price)
+	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(hu.contract.FileContract.WindowStart - height))).Mul(hu.price)
 
 	// calculate new merkle root (no error possible with bytes.Reader)
 	_ = hu.tree.ReadSegments(bytes.NewReader(data))
 	merkleRoot := hu.tree.Root()
 
 	// revise the file contract
-	newRev := newRevision(rev, uint64(len(data)), merkleRoot, piecePrice)
-	signedTxn, err := negotiateRevision(hu.conn, newRev, data, hu.contract.SecretKey)
+	rev := newRevision(hu.contract.LastRevision, uint64(len(data)), merkleRoot, piecePrice)
+	signedTxn, err := negotiateRevision(hu.conn, rev, data, hu.contract.SecretKey)
 	if err != nil {
 		return 0, err
 	}
 
-	hu.contract.LastRevisionTxn = signedTxn
-
 	// update host contract
+	hu.contract.LastRevision = rev
+	hu.contract.LastRevisionTxn = signedTxn
 	hu.hdb.mu.Lock()
 	hu.hdb.contracts[hu.contract.ID] = hu.contract
 	hu.hdb.save()
 	hu.hdb.mu.Unlock()
 
-	// offset is old filesize
-	return rev.NewFileSize, nil
+	return offset, nil
 }
 
 // newHostUploader initiates the contract revision process with a host, and
