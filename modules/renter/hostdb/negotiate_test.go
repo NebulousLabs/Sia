@@ -265,9 +265,9 @@ func TestReviseContract(t *testing.T) {
 func TestUniqueHosts(t *testing.T) {
 	// create hosts
 	h1, h2, h3 := new(hostUploader), new(hostUploader), new(hostUploader)
-	h1.settings.IPAddress = fakeAddr(1)
-	h2.settings.IPAddress = fakeAddr(2)
-	h3.settings.IPAddress = fakeAddr(3)
+	h1.contract.IP = fakeAddr(1)
+	h2.contract.IP = fakeAddr(2)
+	h3.contract.IP = fakeAddr(3)
 
 	p := &pool{hosts: []*hostUploader{h1, h2, h3}}
 
