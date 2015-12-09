@@ -288,10 +288,6 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, piece []by
 	if signedHostTxn.ID() != signedTxn.ID() {
 		return types.Transaction{}, errors.New("host sent bad signed transaction")
 	}
-	// TODO: is this necessary?
-	// if err := signedHostTxn.StandaloneValid(height); err != nil {
-	// 	return types.Transaction{}, err
-	// }
 
 	return signedHostTxn, nil
 }
