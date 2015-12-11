@@ -159,6 +159,10 @@ type HostPool interface {
 // interface. New hosts are drawn from a HostDB, and contracts are negotiated
 // with them on demand.
 type pool struct {
+	// details of the contracts to be formed
+	filesize uint64
+	duration types.BlockHeight
+
 	hosts []*hostUploader
 	hdb   *HostDB
 }
@@ -201,7 +205,7 @@ outer:
 	randHosts := p.hdb.randomHosts(n*2, exclude)
 	p.hdb.mu.Unlock()
 	for _, host := range randHosts {
-		contract, err := p.hdb.newContract(host)
+		contract, err := p.hdb.newContract(host, p.filesize, p.duration)
 		if err != nil {
 			continue
 		}
@@ -220,11 +224,15 @@ outer:
 
 // NewPool returns an empty HostPool, unless the HostDB contains no hosts at
 // all.
-func (hdb *HostDB) NewPool() (HostPool, error) {
+func (hdb *HostDB) NewPool(filesize uint64, duration types.BlockHeight) (HostPool, error) {
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
 	if hdb.isEmpty() {
 		return nil, errors.New("HostDB is empty")
 	}
-	return &pool{hdb: hdb}, nil
+	return &pool{
+		filesize: filesize,
+		duration: duration,
+		hdb:      hdb,
+	}, nil
 }
