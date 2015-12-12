@@ -1,4 +1,4 @@
-// package hostdb provides a HostDB object that implements the renter.hostDB
+// Package hostdb provides a HostDB object that implements the renter.hostDB
 // interface. The blockchain is scanned for host announcements and hosts that
 // are found get added to the host database. The database continually scans the
 // set of hosts it has found and updates who is online.

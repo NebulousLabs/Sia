@@ -47,10 +47,18 @@ type hostUploader struct {
 	hdb  *HostDB
 }
 
-func (hu *hostUploader) Address() modules.NetAddress      { return hu.contract.IP }
-func (hu *hostUploader) ContractID() types.FileContractID { return hu.contract.ID }
-func (hu *hostUploader) EndHeight() types.BlockHeight     { return hu.contract.FileContract.WindowStart }
+// Address returns the NetAddress of the host.
+func (hu *hostUploader) Address() modules.NetAddress { return hu.contract.IP }
 
+// ContractID returns the ID of the contract being revised.
+func (hu *hostUploader) ContractID() types.FileContractID { return hu.contract.ID }
+
+// EndHeight returns the height at which the host is no longer obligated to
+// store the file.
+func (hu *hostUploader) EndHeight() types.BlockHeight { return hu.contract.FileContract.WindowStart }
+
+// Close cleanly ends the revision process with the host, closes the
+// connection, and submits the last revision to the transaction pool.
 func (hu *hostUploader) Close() error {
 	// send an empty revision to indicate that we are finished
 	encoding.WriteObject(hu.conn, types.Transaction{})
