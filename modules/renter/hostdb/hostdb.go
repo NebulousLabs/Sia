@@ -1,4 +1,4 @@
-// package hostdb provides a HostDB object that implements the renter.hostDB
+// Package hostdb provides a HostDB object that implements the renter.hostDB
 // interface. The blockchain is scanned for host announcements and hosts that
 // are found get added to the host database. The database continually scans the
 // set of hosts it has found and updates who is online.
@@ -66,13 +66,12 @@ type HostDB struct {
 // a hostContract includes the original contract made with a host, along with
 // the most recent revision.
 type hostContract struct {
+	IP              modules.NetAddress
 	ID              types.FileContractID
 	FileContract    types.FileContract
+	LastRevision    types.FileContractRevision
 	LastRevisionTxn types.Transaction
 	SecretKey       crypto.SecretKey
-
-	// revisions must happen in serial
-	mu sync.RWMutex
 }
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not

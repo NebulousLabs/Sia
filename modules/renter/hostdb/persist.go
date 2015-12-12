@@ -21,14 +21,7 @@ func (hdb *HostDB) save() error {
 		Contracts []hostContract
 	}
 	for _, hc := range hdb.contracts {
-		// to avoid race conditions involving the contract's mutex, copy it
-		// manually into a new object
-		data.Contracts = append(data.Contracts, hostContract{
-			ID:              hc.ID,
-			FileContract:    hc.FileContract,
-			LastRevisionTxn: hc.LastRevisionTxn,
-			SecretKey:       hc.SecretKey,
-		})
+		data.Contracts = append(data.Contracts, hc)
 	}
 	return persist.SaveFile(saveMetadata, data, filepath.Join(hdb.persistDir, persistFilename))
 }
