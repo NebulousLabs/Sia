@@ -26,6 +26,9 @@ type hostDB interface {
 	// hosts. The size and duration of these contracts are supplied as
 	// arguments.
 	NewPool(filesize uint64, duration types.BlockHeight) (hostdb.HostPool, error)
+
+	// Renew renews a file contract, returning the new contract ID.
+	Renew(id types.FileContractID, newHeight types.BlockHeight) (types.FileContractID, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.

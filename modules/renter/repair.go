@@ -8,11 +8,12 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	// When a file contract is within this many blocks of expiring, the renter
-	// will attempt to reupload the data covered by the contract.
+	// will attempt to renew the contract.
 	renewThreshold = 2000
 
 	hostTimeout = 15 * time.Second
@@ -150,6 +151,21 @@ func (f *file) chunkHosts(chunk uint64) []modules.NetAddress {
 	return old
 }
 
+// expiringContracts returns the contracts that will expire soon.
+// TODO: what if contract has fully expired?
+func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	var expiring []fileContract
+	for _, fc := range f.contracts {
+		if height > fc.WindowStart-renewThreshold {
+			expiring = append(expiring, fc)
+		}
+	}
+	return expiring
+}
+
 // threadedRepairFile repairs and saves an individual file.
 func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// helper function
@@ -213,6 +229,32 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		if err != nil {
 			r.log.Printf("aborting repair of %v: %v", name, err)
 			break
+		}
+	}
+
+	// renew expiring contracts
+	if meta.EndHeight == 0 {
+		var expiringContracts []fileContract
+		expiringContracts = f.expiringContracts(height)
+		r.log.Printf("renewing %v contracts of %v", len(expiringContracts), name)
+		for _, c := range expiringContracts {
+			newHeight := height + defaultDuration
+			newID, err := r.hostDB.Renew(c.ID, newHeight)
+			if err != nil {
+				r.log.Printf("failed to renew contract %v: %v", c.ID, err)
+				continue
+			}
+			f.mu.Lock()
+			f.contracts[newID] = fileContract{
+				ID:          newID,
+				IP:          c.IP,
+				Pieces:      c.Pieces,
+				WindowStart: newHeight,
+			}
+			// need to delete the old contract; otherwise f.expiringContracts
+			// will continue to return it
+			delete(f.contracts, c.ID)
+			f.mu.Unlock()
 		}
 	}
 
