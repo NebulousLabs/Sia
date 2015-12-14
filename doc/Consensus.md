@@ -107,7 +107,7 @@ hashed. The following rules are used for hashing:
    There is only one way to encode each struct.
  - The Currency type (an infinite precision integer) is encoded in big endian
    using as many bytes as necessary to represent the underlying number. As it
-   is a variable length type, it is prefixed by 8 bytes containing the lenght.
+   is a variable length type, it is prefixed by 8 bytes containing the length.
 
 Block Size
 ----------
@@ -277,7 +277,7 @@ revision, though the destination upon a successful or unsuccessful storage
 proof can be changed.
 
 The greatest application for file contract revisions is file-diff channels - a
-file contract can be edited many tiems off-blockchain as a user uploads new or
+file contract can be edited many times off-blockchain as a user uploads new or
 different content to the host. This improves the overall scalability of Sia.
 
 Storage Proofs
