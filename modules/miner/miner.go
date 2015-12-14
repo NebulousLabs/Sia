@@ -101,7 +101,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 		persistDir: persistDir,
 	}
-	m.persist.Height--
 
 	err := m.initPersist()
 	if err != nil {

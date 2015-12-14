@@ -12,9 +12,17 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Adjust the height of the miner.
-	m.persist.Height -= types.BlockHeight(len(cc.RevertedBlocks))
-	m.persist.Height += types.BlockHeight(len(cc.AppliedBlocks))
+	// Adjust the height of the miner. The miner height is initialized to zero,
+	// but the genesis block is actually height zero. For the genesis block
+	// only, the height will be left at zero.
+	//
+	// Checking the height here eliminates the need to initialize the miner to
+	// an underflowed types.BlockHeight, which was deemed the worse of the two
+	// evils.
+	if m.persist.Height != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != m.cs.GenesisBlock().ID() {
+		m.persist.Height -= types.BlockHeight(len(cc.RevertedBlocks))
+		m.persist.Height += types.BlockHeight(len(cc.AppliedBlocks))
+	}
 
 	// Update the unsolved block.
 	var exists1, exists2 bool
