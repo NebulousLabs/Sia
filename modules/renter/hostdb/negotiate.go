@@ -170,7 +170,7 @@ func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilde
 
 // newContract negotiates an initial file contract with the specified host
 // and returns a hostContract. The contract is also saved by the HostDB.
-func (hdb *HostDB) newContract(host modules.HostSettings) (hostContract, error) {
+func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, duration types.BlockHeight) (hostContract, error) {
 	// reject hosts that are too expensive
 	if host.Price.Cmp(maxPrice) > 0 {
 		return hostContract{}, errTooExpensive
@@ -190,9 +190,7 @@ func (hdb *HostDB) newContract(host modules.HostSettings) (hostContract, error) 
 	hdb.mu.Unlock()
 
 	// create file contract
-	const filesize = 1e9  // 1 GB
-	const duration = 4320 // 30 days
-	renterCost := host.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(duration))
+	renterCost := host.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
 

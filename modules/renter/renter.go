@@ -22,8 +22,10 @@ type hostDB interface {
 	// AveragePrice returns the average price of a host.
 	AveragePrice() types.Currency
 
-	// NewPool returns a new HostPool.
-	NewPool() (hostdb.HostPool, error)
+	// NewPool returns a new HostPool, which can negotiate contracts with
+	// hosts. The size and duration of these contracts are supplied as
+	// arguments.
+	NewPool(filesize uint64, duration types.BlockHeight) (hostdb.HostPool, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
