@@ -3,7 +3,7 @@ Sia 0.4.8
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
 
-Binaries can be found at [our website](http://siacoin.com).
+Binaries can be found at [our website](http://siacoin.com). Code for the graphical front-end can be found at the [Sia-UI](https://github.com/NebulousLabs/Sia-UI) repo.
 
 Sia is a new decentralized cloud storage platform aimed at giving users control
 of their data. Data is split into hundreds of erasure coded pieces and
@@ -185,48 +185,3 @@ v0.4.0: Second stable currency release.
 - Files are erasure-coded and transferred in parallel
 - The blockchain is now fully on-disk
 - Added UPnP support
-
-June 2015:
-
-v0.3.3.3 (patch)
-- Host announcements can be "forced"
-- Wallets can be merged
-- Unresponsive addresses are pruned from the node list
-
-v0.3.3.2 (patch)
-- Siafunds can be loaded and sent
-- Added block explorer
-- Patched two critical security vulnerabilities
-
-v0.3.3.1 (hotfix)
-- Mining API sends headers instead of entire blocks
-- Slashed default hosting price
-
-v0.3.3: First stable currency release.
-- Set release target
-- Added progress bars to uploads
-- Rigorous testing of consensus code
-
-May 2015:
-
-v0.3.2: Fourth open beta release.
-- Switched encryption from block cipher to stream cipher
-- Updates are now signed
-- Added API calls to support external miners
-
-v0.3.1: Third open beta release.
-- Blocks are now stored on-disk in a database
-- Files can be shared via .sia files or ASCII-encoded data
-- RPCs are now multiplexed over one physical connection
-
-March 2015:
-
-v0.3.0: Second open beta release.
-
-Jan 2015:
-
-v0.2.0: First open beta release.
-
-Dec 2014:
-
-v0.1.0: Closed beta release.
