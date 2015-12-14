@@ -104,9 +104,29 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 	err := m.initPersist()
 	if err != nil {
-		return nil, err
+		return nil, errors.New("miner persistence startup failed: " + err.Error())
 	}
-	m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
+
+	err = m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		// If the change id is not recognized, it means that the consensus set
+		// has somehow reset or otherwise changed, and a rescan must be
+		// performed.
+		m.log.Println("Inconsistency found between the miner and the consensus set, fixing...")
+
+		// Perform the rescan and block until rescanning is complete. Rescan
+		// does need access to a lock, but no lock is held during startup
+		// anyway, so blocking until the channel returns an error is safe.
+		c := make(chan error)
+		m.threadedConsensusRescan(c)
+		err = <-c
+		if err != nil {
+			return nil, errors.New("miner startup failed - rescanning failed: " + err.Error())
+		}
+	} else if err != nil {
+		return nil, errors.New("miner subscription failed: " + err.Error())
+	}
+
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
 }
