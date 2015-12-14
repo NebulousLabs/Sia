@@ -107,25 +107,22 @@ func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.Transaction
 	return ids
 }
 
-// FileContractHistory returns the history associated with a file contract.
-// History is broken in to 3 elements, and a bool is returned indicating
-// whether history exists as a part of each element. If the file contract
-// itself does not exist, no other type of history will exist either.
-func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, sp types.StorageProof, fcE bool, fcrsE bool, spE bool) {
+// FileContractHistory returns the history associated with a file contract,
+// which includes the file contract itself and all of the revisions that have
+// been submitted to the blockchain. The first bool indicates whether the file
+// contract exists, and the second bool indicates whether a storage proof was
+// successfully submitted for the file contract.
+func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, fcE bool, spE bool) {
 	fch, fcE := e.fileContractHistories[id]
 	if !fcE {
-		return
+		return types.FileContract{}, nil, false, false
 	}
 	fc = fch.contract
-	if len(fch.revisions) > 0 {
-		fcrsE = true
-		fcrs = fch.revisions
-	}
+	fcrs = fch.revisions
 	if fch.storageProof.ParentID == id {
 		spE = true
-		sp = fch.storageProof
 	}
-	return
+	return fc, fcrs, fcE, spE
 }
 
 // FileContractIDs returns all of the transactions that contain the input file

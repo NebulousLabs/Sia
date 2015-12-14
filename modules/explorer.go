@@ -76,11 +76,12 @@ type (
 		SiacoinOutputID(types.SiacoinOutputID) []types.TransactionID
 
 		// FileContractHistory returns the history associated with a file
-		// contract.  History is broken in to 3 elements, and a bool is
-		// returned indicating whether history exists as a part of each
-		// element. If the file contract itself does not exist, no other type
-		// of history will exist either.
-		FileContractHistory(types.FileContractID) (types.FileContract, []types.FileContractRevision, types.StorageProof, bool, bool, bool)
+		// contract, which includes the file contract itself and all of the
+		// revisions that have been submitted to the blockchain. The first bool
+		// indicates whether the file contract exists, and the second bool
+		// indicates whether a storage proof was successfully submitted for the
+		// file contract.
+		FileContractHistory(types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, fcExists bool, storageProofExists bool)
 
 		// FileContractID returns all of the transaction ids associated with
 		// the provided file contract id.

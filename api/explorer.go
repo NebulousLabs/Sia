@@ -131,7 +131,7 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 	// Add all of the output ids and outputs corresponding with each storage
 	// proof.
 	for _, sp := range txn.StorageProofs {
-		fileContract, fileContractRevisions, _, fileContractExists, _, _ := srv.explorer.FileContractHistory(sp.ParentID)
+		fileContract, fileContractRevisions, fileContractExists, _ := srv.explorer.FileContractHistory(sp.ParentID)
 		if !fileContractExists && build.DEBUG {
 			panic("could not find a file contract connected with a storage proof")
 		}
