@@ -165,7 +165,11 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	return nil
 }
 
-func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash) error {
+// negotiateContract negotiates an initial file contract with a renter, and
+// adds the metadata to the host's obligation set. The merkleRoot and filename
+// arguments are provided to make negotiateContract usable with both rpcUpload
+// and rpcRenew.
+func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash, filename string) error {
 	// allow 5 minutes for contract negotiation
 	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
@@ -241,13 +245,12 @@ func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash) error {
 	}
 
 	// Add this contract to the host's list of obligations.
-	// TODO: is there a race condition here?
 	h.mu.Lock()
 	h.fileCounter++
 	co := &contractObligation{
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
-		Path:         filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter)),
+		Path:         filename,
 	}
 	// first revision is empty
 	co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
@@ -273,8 +276,12 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 		return errors.New("host needs an address; have you properly announced?")
 	}
 
+	h.mu.RLock()
+	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter+1))
+	h.mu.RUnlock()
+
 	// negotiate expecting empty Merkle root
-	return h.negotiateContract(conn, crypto.Hash{})
+	return h.negotiateContract(conn, crypto.Hash{}, filename)
 }
 
 // rpcRevise is an RPC that allows a renter to revise a file contract. It will
@@ -433,10 +440,10 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 	}
 
 	// need to protect against simultaneous renewals of the same contract
-	// TODO: do we?
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
 	merkleRoot := obligation.LastRevisionTxn.FileContractRevisions[0].NewFileMerkleRoot
 
-	return h.negotiateContract(conn, merkleRoot)
+	// reuse old obligation path
+	return h.negotiateContract(conn, merkleRoot, obligation.Path)
 }
