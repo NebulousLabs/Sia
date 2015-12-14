@@ -44,7 +44,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Save the new consensus information.
 	err := m.save()
 	if err != nil {
-		m.log.Println("ERROR:", err)
+		m.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
 	}
 }
 
