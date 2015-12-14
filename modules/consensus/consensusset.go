@@ -178,6 +178,10 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 
 // GenesisBlock returns the genesis block.
 func (cs *ConsensusSet) GenesisBlock() types.Block {
+	// GenesisBlock is called fairly frequently, and should not have to do any
+	// I/O as a lookup.
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
 	return cs.blockRoot.Block
 }
 
