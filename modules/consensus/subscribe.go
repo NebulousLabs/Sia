@@ -200,3 +200,20 @@ func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.Conse
 	}
 	return nil
 }
+
+// Unsubscribe removes a subscriber from the list of subscribers, allowing for
+// garbage collection and rescanning. If the subscriber is not found in the
+// subscriber database, no action is taken.
+func (cs *ConsensusSet) Unsubscribe(subscriber modules.ConsensusSetSubscriber) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	// Search for the subscriber in the list of subscribers and remove it if
+	// found.
+	for i := range cs.subscribers {
+		if cs.subscribers[i] == subscriber {
+			cs.subscribers = append(cs.subscribers[0:i], cs.subscribers[i+1:]...)
+			break
+		}
+	}
+}

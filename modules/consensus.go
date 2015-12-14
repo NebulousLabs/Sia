@@ -216,6 +216,11 @@ type (
 		// detailing the diffs that would result from the application of the
 		// transaction.
 		TryTransactionSet([]types.Transaction) (ConsensusChange, error)
+
+		// Unsubscribe removes a subscriber from the list of subscribers,
+		// allowing for garbage collection and rescanning. If the subscriber is
+		// not found in the subscriber database, no action is taken.
+		Unsubscribe(ConsensusSetSubscriber)
 	}
 )
 
