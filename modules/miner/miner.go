@@ -137,6 +137,12 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	return m, nil
 }
 
+// Close terminates all portions of the
+func (m *Miner) Close() error {
+	m.cs.Unsubscribe(m)
+	return m.log.Close()
+}
+
 // checkAddress checks that the miner has an address, fetching an address from
 // the wallet if not.
 func (m *Miner) checkAddress() error {
