@@ -246,7 +246,6 @@ func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash, filename
 
 	// Add this contract to the host's list of obligations.
 	h.mu.Lock()
-	h.fileCounter++
 	co := &contractObligation{
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
@@ -277,7 +276,8 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	}
 
 	h.mu.RLock()
-	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter+1))
+	h.fileCounter++
+	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter))
 	h.mu.RUnlock()
 
 	// negotiate expecting empty Merkle root
@@ -444,6 +444,24 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 	defer obligation.mu.Unlock()
 	merkleRoot := obligation.LastRevisionTxn.FileContractRevisions[0].NewFileMerkleRoot
 
-	// reuse old obligation path
-	return h.negotiateContract(conn, merkleRoot, obligation.Path)
+	// copy over old file data
+	h.mu.RLock()
+	h.fileCounter++
+	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter))
+	h.mu.RUnlock()
+
+	old, err := os.Open(obligation.Path)
+	if err != nil {
+		return err
+	}
+	renewed, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(renewed, old)
+	if err != nil {
+		return err
+	}
+
+	return h.negotiateContract(conn, merkleRoot, filename)
 }
