@@ -10,7 +10,8 @@ import (
 // threadedConsensusRescan resets all of the miner consensus variables and
 // scans the blockchain starting from the genesis block. This function is
 // typically only needed if an error during startup indicates that the miner
-// has desyncrhonized from the consensus set.
+// has desyncrhonized from the consensus set. An error will be sent down the
+// input error channel only after the function has completed.
 func (m *Miner) threadedConsensusRescan(c chan error) {
 	// Unsubscribe the miner from the consensus set. Though typically
 	// miner.consensusRescan will only be called if the miner is not yet
