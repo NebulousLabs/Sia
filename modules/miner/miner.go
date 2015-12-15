@@ -2,12 +2,12 @@ package miner
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -69,7 +69,7 @@ type Miner struct {
 	// Utils
 	persistDir string
 	persist    persistence
-	log        *log.Logger
+	log        *persist.FileLogger
 	mu         sync.RWMutex
 }
 

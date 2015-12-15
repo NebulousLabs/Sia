@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
@@ -46,21 +45,18 @@ func (m *Miner) initSettings() error {
 
 // initPersist initializes the persistence of the miner.
 func (m *Miner) initPersist() error {
-	// Create the miner dir.
+	// Create the miner directory.
 	err := os.MkdirAll(m.persistDir, 0700)
 	if err != nil {
 		return err
 	}
 
-	// Initialize the logger.
-	logFile, err := os.OpenFile(filepath.Join(m.persistDir, logFile), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+	// Add a logger.
+	m.log, err = persist.CreateFileLogger(filepath.Join(m.persistDir, logFile))
 	if err != nil {
 		return err
 	}
-	m.log = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
-	m.log.Println("STARTUP: Miner logger opened, logging has started.")
 
-	// Initalize the settings file.
 	return m.initSettings()
 }
 
