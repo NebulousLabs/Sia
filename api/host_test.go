@@ -15,8 +15,6 @@ import (
 // TestIntegrationHosting tests that the host correctly receives payment for
 // hosting files.
 func TestIntegrationHosting(t *testing.T) {
-	t.Skip("Disabled due to hostdb managing contracts")
-
 	st, err := createServerTester("TestIntegrationHosting")
 	if err != nil {
 		t.Fatal(err)
@@ -25,15 +23,6 @@ func TestIntegrationHosting(t *testing.T) {
 	// Announce the host.
 	announceValues := url.Values{}
 	announceValues.Set("address", string(st.host.NetAddress()))
-	err = st.stdPostAPI("/host/announce", announceValues)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Announce twice, otherwise the renter will throw a 'not enough hosts'
-	// error.
-	loopAddr := "127.0.0.1:" + st.host.NetAddress().Port()
-	announceValues = url.Values{}
-	announceValues.Set("address", loopAddr)
 	err = st.stdPostAPI("/host/announce", announceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -63,8 +52,9 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// only one piece will be uploaded (10% at current redundancy)
 	var fi []FileInfo
-	for len(fi) != 1 || fi[0].UploadProgress != 100 {
+	for len(fi) != 1 || fi[0].UploadProgress != 10 {
 		st.getAPI("/renter/files/list", &fi)
 		time.Sleep(3 * time.Second)
 	}
@@ -80,7 +70,7 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expRevenue := "382129999999997570526"
+	expRevenue := "31844166666666464210"
 	if hg.Revenue.String() != expRevenue {
 		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
 	}
