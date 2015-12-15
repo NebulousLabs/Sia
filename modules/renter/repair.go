@@ -209,7 +209,11 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 
 	// create host pool
 	contractSize := f.pieceSize * f.numChunks() // each host gets one piece of each chunk
-	pool, err := r.hostDB.NewPool(contractSize, defaultDuration)
+	var duration types.BlockHeight = defaultDuration
+	if meta.EndHeight != 0 {
+		duration = meta.EndHeight - height
+	}
+	pool, err := r.hostDB.NewPool(contractSize, duration)
 	if err != nil {
 		r.log.Printf("failed to repair %v: %v", name, err)
 		return
