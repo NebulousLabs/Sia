@@ -14,10 +14,26 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update cumulative stats for reverted blocks.
 	for _, block := range cc.RevertedBlocks {
-		// Delete the block from the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
+
+		// Update all of the explorer statistics.
+		e.currentBlock = block.ID()
 		e.blockchainHeight -= 1
+		e.target = e.blockTargets[block.ID()]
+		e.timestamp = block.Timestamp
+		if e.blockchainHeight > types.MaturityDelay {
+			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
+		}
+		e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.target)
+		if e.blockchainHeight > hashrateEstimationBlocks {
+			e.blocksDifficulty = e.blocksDifficulty.AddDifficulties(e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].target)
+			secondsPassed := e.timestamp - e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].timestamp
+			e.estimatedHashrate = e.blocksDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
+		}
+		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
+
+		// Delete the block from the list of active blocks.
 		delete(e.blockHashes, bid)
 		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
@@ -67,6 +83,8 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				delete(e.fileContractIDs[fcr.ParentID], txid)
 				delete(e.unlockHashes[fcr.UnlockConditions.UnlockHash()], txid)
 				delete(e.unlockHashes[fcr.NewUnlockHash], txid)
+				// Remove the file contract revision from the revision chain.
+				e.fileContractHistories[fcr.ParentID].revisions = e.fileContractHistories[fcr.ParentID].revisions[:len(e.fileContractHistories[fcr.ParentID].revisions)-1]
 				for l, sco := range fcr.NewValidProofOutputs {
 					scoid := fcr.ParentID.StorageProofOutputID(types.ProofValid, uint64(l))
 					delete(e.siacoinOutputIDs[scoid], txid)
@@ -116,9 +134,28 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Add the block to the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
+		e.currentBlock = block.ID()
 		e.blockchainHeight++
+		var exists bool
+		e.target, exists = e.cs.ChildTarget(block.ParentID)
+		if !exists {
+			e.target = types.RootTarget
+		}
+		e.timestamp = block.Timestamp
+		if e.blockchainHeight > types.MaturityDelay {
+			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
+		}
+		e.blocksDifficulty = e.blocksDifficulty.AddDifficulties(e.target)
+		if e.blockchainHeight > hashrateEstimationBlocks {
+			e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].target)
+			secondsPassed := e.timestamp - e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].timestamp
+			e.estimatedHashrate = e.blocksDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
+		}
+		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
+
 		e.blockHashes[bid] = e.blockchainHeight
 		e.transactionHashes[tbid] = e.blockchainHeight // Miner payouts are a transaciton.
+		e.blockTargets[bid] = e.target
 
 		// Catalog the new miner payouts.
 		for j, payout := range block.MinerPayouts {
@@ -172,6 +209,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.unlockHashes[sco.UnlockHash] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[sco.UnlockHash][txn.ID()] = struct{}{}
+				e.siacoinOutputs[scoid] = sco
 				e.siacoinOutputCount++
 			}
 			for k, fc := range txn.FileContracts {
@@ -186,6 +224,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.unlockHashes[fc.UnlockHash] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[fc.UnlockHash][txid] = struct{}{}
+				e.fileContractHistories[fcid] = &fileContractHistory{contract: fc}
 				for l, sco := range fc.ValidProofOutputs {
 					scoid := fcid.StorageProofOutputID(types.ProofValid, uint64(l))
 					_, exists = e.siacoinOutputIDs[scoid]
@@ -265,6 +304,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 				e.fileContractRevisionCount++
 				e.totalContractSize = e.totalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
 				e.totalRevisionVolume = e.totalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
+				e.fileContractHistories[fcr.ParentID].revisions = append(e.fileContractHistories[fcr.ParentID].revisions, fcr)
 			}
 			for _, sp := range txn.StorageProofs {
 				_, exists := e.fileContractIDs[sp.ParentID]
@@ -274,6 +314,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.fileContractIDs[sp.ParentID] = make(map[types.TransactionID]struct{})
 				}
 				e.fileContractIDs[sp.ParentID][txid] = struct{}{}
+				e.fileContractHistories[sp.ParentID].storageProof = sp
 				e.storageProofCount++
 			}
 			for _, sfi := range txn.SiafundInputs {
@@ -310,6 +351,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 					e.unlockHashes[sfo.UnlockHash] = make(map[types.TransactionID]struct{})
 				}
 				e.unlockHashes[sfo.UnlockHash][txid] = struct{}{}
+				e.siafundOutputs[sfoid] = sfo
 				e.siafundOutputCount++
 			}
 			for _ = range txn.MinerFees {
@@ -324,7 +366,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 
 		// Set the current block and copy over the historic facts.
-		e.currentBlock = block.ID()
 		e.historicFacts = append(e.historicFacts, e.blockFacts)
 	}
 

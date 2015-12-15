@@ -24,9 +24,9 @@ var (
 	ErrNegativeTarget = errors.New("negative value used when converting to target")
 )
 
-// Add returns the resulting target with the difficulty of 'x' and 'y' are
-// added together. Note that the difficulty is the inverse of the target. The
-// sum is defined by:
+// AddDifficulties returns the resulting target with the difficulty of 'x' and
+// 'y' are added together. Note that the difficulty is the inverse of the
+// target. The sum is defined by:
 //		sum(x, y) = 1/(1/x + 1/y)
 func (x Target) AddDifficulties(y Target) (t Target) {
 	sumDifficulty := new(big.Rat).Add(x.Inverse(), y.Inverse())
@@ -40,6 +40,11 @@ func (x Target) AddDifficulties(y Target) (t Target) {
 //		+1 if x >  y
 func (x Target) Cmp(y Target) int {
 	return x.Int().Cmp(y.Int())
+}
+
+// Difficulty returns the difficulty associated with a given target.
+func (t Target) Difficulty() Currency {
+	return NewCurrency(new(big.Int).Div(RootDepth.Int(), t.Int()))
 }
 
 // Int converts a Target to a big.Int.
@@ -95,4 +100,13 @@ func RatToTarget(r *big.Rat) (t Target) {
 		t = IntToTarget(i)
 	}
 	return
+}
+
+// SubtractDifficulties returns the resulting target with the difficulty of 'x'
+// is subtracted from the target with difficulty 'y'. Note that the difficulty
+// is the inverse of the target. The difference is defined by:
+//		sum(x, y) = 1/(1/x - 1/y)
+func (x Target) SubtractDifficulties(y Target) (t Target) {
+	sumDifficulty := new(big.Rat).Sub(x.Inverse(), y.Inverse())
+	return RatToTarget(new(big.Rat).Inv(sumDifficulty))
 }

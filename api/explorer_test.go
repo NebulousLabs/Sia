@@ -42,10 +42,10 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ebg.Block.ID != ebg.Block.RawBlock.ID() {
+	if ebg.Block.BlockID != ebg.Block.RawBlock.ID() {
 		t.Error("block id and block do not match up from api call")
 	}
-	if st.server.cs.GenesisBlock().ID() != ebg.Block.ID {
+	if st.server.cs.GenesisBlock().ID() != ebg.Block.BlockID {
 		t.Error("wrong block returned by /explorer/block?height=0")
 	}
 }
@@ -69,7 +69,7 @@ func TestIntegrationExplorerGEThash(t *testing.T) {
 	if ehg.HashType != "blockid" {
 		t.Error("wrong hash type returned when requesting block hash")
 	}
-	if ehg.Block.ID != gb.ID() {
+	if ehg.Block.BlockID != gb.ID() {
 		t.Error("wrong block type returned")
 	}
 }

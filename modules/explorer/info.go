@@ -1,50 +1,9 @@
 package explorer
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// Returns many pieces of readily available information
-func (e *Explorer) Statistics() modules.ExplorerStatistics {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	target, _ := e.cs.ChildTarget(e.currentBlock)
-	difficulty := types.NewCurrency(types.RootTarget.Int()).Div(types.NewCurrency(target.Int()))
-	currentBlock, exists := e.cs.BlockAtHeight(e.blockchainHeight)
-	if build.DEBUG && !exists {
-		panic("current block not found in consensus set")
-	}
-	return modules.ExplorerStatistics{
-		Height:            e.blockchainHeight,
-		CurrentBlock:      e.currentBlock,
-		Target:            target,
-		Difficulty:        difficulty,
-		MaturityTimestamp: currentBlock.Timestamp,
-		TotalCoins:        types.CalculateNumSiacoins(e.blockchainHeight),
-
-		MinerPayoutCount:          e.minerPayoutCount,
-		TransactionCount:          e.transactionCount,
-		SiacoinInputCount:         e.siacoinInputCount,
-		SiacoinOutputCount:        e.siacoinOutputCount,
-		FileContractCount:         e.fileContractCount,
-		FileContractRevisionCount: e.fileContractRevisionCount,
-		StorageProofCount:         e.storageProofCount,
-		SiafundInputCount:         e.siafundInputCount,
-		SiafundOutputCount:        e.siafundOutputCount,
-		MinerFeeCount:             e.minerFeeCount,
-		ArbitraryDataCount:        e.arbitraryDataCount,
-		TransactionSignatureCount: e.transactionSignatureCount,
-
-		ActiveContractCount: e.activeContractCount,
-		ActiveContractCost:  e.activeContractCost,
-		ActiveContractSize:  e.activeContractSize,
-		TotalContractCost:   e.totalContractCost,
-		TotalContractSize:   e.totalContractSize,
-	}
-}
 
 // Block takes a block id and finds the corresponding block, provided that the
 // block is in the consensus set.
@@ -64,14 +23,25 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 // at a given block height, and a bool indicating whether facts exist for the
 // given height.
 func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
+	// Check that a block exists at the given height.
 	if height >= types.BlockHeight(len(e.historicFacts)) {
 		return modules.BlockFacts{}, false
 	}
 
+	// Grab the stats and return the facts.
 	bf := e.historicFacts[height]
+	var maturityTimestamp types.Timestamp
+	if height > types.MaturityDelay {
+		maturityTimestamp = e.historicFacts[height-types.MaturityDelay].timestamp
+	}
 	return modules.BlockFacts{
-		BlockID: bf.currentBlock,
-		Height:  bf.blockchainHeight,
+		BlockID:           bf.currentBlock,
+		Difficulty:        bf.target.Difficulty(),
+		EstimatedHashrate: bf.estimatedHashrate,
+		Height:            bf.blockchainHeight,
+		MaturityTimestamp: maturityTimestamp,
+		Target:            bf.target,
+		TotalCoins:        bf.totalCoins,
 
 		// Transaction type counts.
 		MinerPayoutCount:          bf.minerPayoutCount,
@@ -127,6 +97,12 @@ func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
 	return ids
 }
 
+// SiacoinOutput will return the siacoin output associated with the input id.
+func (e *Explorer) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool) {
+	sco, exists := e.siacoinOutputs[id]
+	return sco, exists
+}
+
 // SiacoinOutputID returns all of the transactions that contain the input
 // siacoin output id. An empty set indicates that the siacoin output id does
 // not appear in the blockchain.
@@ -142,6 +118,24 @@ func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.Transaction
 	return ids
 }
 
+// FileContractHistory returns the history associated with a file contract,
+// which includes the file contract itself and all of the revisions that have
+// been submitted to the blockchain. The first bool indicates whether the file
+// contract exists, and the second bool indicates whether a storage proof was
+// successfully submitted for the file contract.
+func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, fcE bool, spE bool) {
+	fch, fcE := e.fileContractHistories[id]
+	if !fcE {
+		return types.FileContract{}, nil, false, false
+	}
+	fc = fch.contract
+	fcrs = fch.revisions
+	if fch.storageProof.ParentID == id {
+		spE = true
+	}
+	return fc, fcrs, fcE, spE
+}
+
 // FileContractIDs returns all of the transactions that contain the input file
 // contract id. An empty set indicates that the file contract id does not
 // appear in the blockchain.
@@ -155,6 +149,12 @@ func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID
 		ids = append(ids, txid)
 	}
 	return ids
+}
+
+// SiafundOutput will return the siafund output associated with the input id.
+func (e *Explorer) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool) {
+	sco, exists := e.siafundOutputs[id]
+	return sco, exists
 }
 
 // SiafundOutputID returns all of the transactions that contain the input

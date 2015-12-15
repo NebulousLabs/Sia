@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -14,84 +15,40 @@ type (
 	// height. This information is provided for programs that may not be
 	// complex enough to compute the ID on their own.
 	ExplorerBlock struct {
-		ID             types.BlockID           `json:"id"`
-		Height         types.BlockHeight       `json:"height"`
 		MinerPayoutIDs []types.SiacoinOutputID `json:"minerpayoutids"`
 		Transactions   []ExplorerTransaction   `json:"transactions"`
 		RawBlock       types.Block             `json:"rawblock"`
 
-		// Transaction type counts.
-		MinerPayoutCount          uint64
-		TransactionCount          uint64
-		SiacoinInputCount         uint64
-		SiacoinOutputCount        uint64
-		FileContractCount         uint64
-		FileContractRevisionCount uint64
-		StorageProofCount         uint64
-		SiafundInputCount         uint64
-		SiafundOutputCount        uint64
-		MinerFeeCount             uint64
-		ArbitraryDataCount        uint64
-		TransactionSignatureCount uint64
-
-		// Factoids about file contracts.
-		ActiveContractCost  types.Currency
-		ActiveContractCount uint64
-		ActiveContractSize  types.Currency
-		TotalContractCost   types.Currency
-		TotalContractSize   types.Currency
-		TotalRevisionVolume types.Currency
+		modules.BlockFacts
 	}
 
 	// ExplorerTransaction is a transcation with some extra information such as
 	// the parent block. This information is provided for programs that may not
 	// be complex enough to compute the extra information on their own.
 	ExplorerTransaction struct {
-		ID                                       types.TransactionID       `json:"id"`
-		Height                                   types.BlockHeight         `json:"height"`
-		Parent                                   types.BlockID             `json:"parent"`
+		ID             types.TransactionID `json:"id"`
+		Height         types.BlockHeight   `json:"height"`
+		Parent         types.BlockID       `json:"parent"`
+		RawTransaction types.Transaction   `json:"rawtransaction"`
+
+		SiacoinInputOutputs                      []types.SiacoinOutput     `json:"siacoininputoutputs"` // the outputs being spent
 		SiacoinOutputIDs                         []types.SiacoinOutputID   `json:"siacoinoutputids"`
 		FileContractIDs                          []types.FileContractID    `json:"filecontractids"`
 		FileContractValidProofOutputIDs          [][]types.SiacoinOutputID `json:"filecontractvalidproofoutputids"`          // outer array is per-contract
 		FileContractMissedProofOutputIDs         [][]types.SiacoinOutputID `json:"filecontractmissedproofoutputids"`         // outer array is per-contract
 		FileContractRevisionValidProofOutputIDs  [][]types.SiacoinOutputID `json:"filecontractrevisionvalidproofoutputids"`  // outer array is per-revision
 		FileContractRevisionMissedProofOutputIDs [][]types.SiacoinOutputID `json:"filecontractrevisionmissedproofoutputids"` // outer array is per-revision
+		StorageProofOutputIDs                    [][]types.SiacoinOutputID `json:"storageproofoutputids"`                    // outer array is per-payout
+		StorageProofOutputs                      [][]types.SiacoinOutput   `json:"storageproofoutputs"`                      // outer array is per-payout
+		SiafundInputOutputs                      []types.SiafundOutput     `json:"siafundinputoutputs"`                      // the outputs being spent
 		SiafundOutputIDs                         []types.SiafundOutputID   `json:"siafundoutputids"`
 		SiaClaimOutputIDs                        []types.SiacoinOutputID   `json:"siafundclaimoutputids"`
-		RawTransaction                           types.Transaction         `json:"rawtransaction"`
 	}
 
 	// ExplorerGET is the object returned as a response to a GET request to
 	// /explorer.
 	ExplorerGET struct {
-		// General consensus information.
-		Height            types.BlockHeight `json:"height"`
-		CurrentBlock      types.BlockID     `json:"currentblock"`
-		Target            types.Target      `json:"target"`
-		Difficulty        types.Currency    `json:"difficulty"`
-		MaturityTimestamp types.Timestamp   `json:"maturitytimestamp"`
-		TotalCoins        types.Currency    `json:"totalcoins"`
-
-		// Information about transaction type usage.
-		MinerPayoutCount          uint64 `json:"minerpayoutcount"`
-		TransactionCount          uint64 `json:"transactioncount"`
-		SiacoinInputCount         uint64 `json:"siacoininputcount"`
-		SiacoinOutputCount        uint64 `json:"siacoinoutputcount"`
-		FileContractCount         uint64 `json:"filecontractcount"`
-		FileContractRevisionCount uint64 `json:"filecontractrevisioncount"`
-		StorageProofCount         uint64 `json:"storageproofcount"`
-		SiafundInputCount         uint64 `json:"siafundinputcount"`
-		SiafundOutputCount        uint64 `json:"siafundoutputcount"`
-		MinerFeeCount             uint64 `json:"minerfeecount"`
-		ArbitraryDataCount        uint64 `json:"arbitrarydatacount"`
-		TransactionSignatureCount uint64 `json:"transactionsignaturecount"`
-
-		// Information about file contracts and file contract revisions.
-		ActiveContractCount uint64         `json:"activecontractcount"`
-		ActiveContractCost  types.Currency `json:"activecontractcost"`
-		ActiveContractSize  types.Currency `json:"activecontractsize"`
-		TotalContractCost   types.Currency `json:"totalcontractcost"`
-		TotalContractSize   types.Currency `json:"totalcontractsize"`
+		modules.BlockFacts
 	}
 
 	// ExplorerBlockGET is the object returned by a GET request to
@@ -119,15 +76,28 @@ type (
 
 // buildExplorerTransaction takes a transaction and the height + id of the
 // block it appears in an uses that to build an explorer transaction.
-func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
+func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
+	// Get the header information for the transaction.
 	et.ID = txn.ID()
 	et.Height = height
 	et.Parent = parent
 	et.RawTransaction = txn
 
+	// Add the siacoin outputs that correspond with each siacoin input.
+	for _, sci := range txn.SiacoinInputs {
+		sco, exists := srv.explorer.SiacoinOutput(sci.ParentID)
+		if build.DEBUG && !exists {
+			panic("could not find corresponding siacoin output")
+		}
+		et.SiacoinInputOutputs = append(et.SiacoinInputOutputs, sco)
+	}
+
 	for i := range txn.SiacoinOutputs {
 		et.SiacoinOutputIDs = append(et.SiacoinOutputIDs, txn.SiacoinOutputID(uint64(i)))
 	}
+
+	// Add all of the valid and missed proof ids as extra data to the file
+	// contracts.
 	for i, fc := range txn.FileContracts {
 		fcid := txn.FileContractID(uint64(i))
 		var fcvpoids []types.SiacoinOutputID
@@ -142,6 +112,9 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcvpoids)
 		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcmpoids)
 	}
+
+	// Add all of the valid and missed proof ids as extra data to the file
+	// contract revisions.
 	for _, fcr := range txn.FileContractRevisions {
 		var fcrvpoids []types.SiacoinOutputID
 		var fcrmpoids []types.SiacoinOutputID
@@ -154,9 +127,41 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 		et.FileContractValidProofOutputIDs = append(et.FileContractValidProofOutputIDs, fcrvpoids)
 		et.FileContractMissedProofOutputIDs = append(et.FileContractMissedProofOutputIDs, fcrmpoids)
 	}
+
+	// Add all of the output ids and outputs corresponding with each storage
+	// proof.
+	for _, sp := range txn.StorageProofs {
+		fileContract, fileContractRevisions, fileContractExists, _ := srv.explorer.FileContractHistory(sp.ParentID)
+		if !fileContractExists && build.DEBUG {
+			panic("could not find a file contract connected with a storage proof")
+		}
+		var storageProofOutputs []types.SiacoinOutput
+		if len(fileContractRevisions) > 0 {
+			storageProofOutputs = fileContractRevisions[len(fileContractRevisions)-1].NewValidProofOutputs
+		} else {
+			storageProofOutputs = fileContract.ValidProofOutputs
+		}
+		var storageProofOutputIDs []types.SiacoinOutputID
+		for i := range storageProofOutputs {
+			storageProofOutputIDs = append(storageProofOutputIDs, sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i)))
+		}
+		et.StorageProofOutputIDs = append(et.StorageProofOutputIDs, storageProofOutputIDs)
+		et.StorageProofOutputs = append(et.StorageProofOutputs, storageProofOutputs)
+	}
+
+	// Add the siafund outputs that correspond to each siacoin input.
+	for _, sci := range txn.SiafundInputs {
+		sco, exists := srv.explorer.SiafundOutput(sci.ParentID)
+		if build.DEBUG && !exists {
+			panic("could not find corresponding siafund output")
+		}
+		et.SiafundInputOutputs = append(et.SiafundInputOutputs, sco)
+	}
+
 	for i := range txn.SiafundOutputs {
 		et.SiafundOutputIDs = append(et.SiafundOutputIDs, txn.SiafundOutputID(uint64(i)))
 	}
+
 	for _, sfi := range txn.SiafundInputs {
 		et.SiaClaimOutputIDs = append(et.SiaClaimOutputIDs, sfi.ParentID.SiaClaimOutputID())
 	}
@@ -167,45 +172,26 @@ func buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, tx
 // explorer block.
 func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
 	var mpoids []types.SiacoinOutputID
-	var etxns []ExplorerTransaction
 	for i := range block.MinerPayouts {
 		mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
 	}
+
+	var etxns []ExplorerTransaction
 	for _, txn := range block.Transactions {
-		etxns = append(etxns, buildExplorerTransaction(height, block.ID(), txn))
+		etxns = append(etxns, srv.buildExplorerTransaction(height, block.ID(), txn))
 	}
+
 	facts, exists := srv.explorer.BlockFacts(height)
 	if build.DEBUG && !exists {
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
+
 	return ExplorerBlock{
-		ID:             block.ID(),
-		Height:         height,
-		Transactions:   etxns,
 		MinerPayoutIDs: mpoids,
+		Transactions:   etxns,
 		RawBlock:       block,
 
-		// Transaction type counts.
-		MinerPayoutCount:          facts.MinerPayoutCount,
-		TransactionCount:          facts.TransactionCount,
-		SiacoinInputCount:         facts.SiacoinInputCount,
-		SiacoinOutputCount:        facts.SiacoinOutputCount,
-		FileContractCount:         facts.FileContractCount,
-		FileContractRevisionCount: facts.FileContractRevisionCount,
-		StorageProofCount:         facts.StorageProofCount,
-		SiafundInputCount:         facts.SiafundInputCount,
-		SiafundOutputCount:        facts.SiafundOutputCount,
-		MinerFeeCount:             facts.MinerFeeCount,
-		ArbitraryDataCount:        facts.ArbitraryDataCount,
-		TransactionSignatureCount: facts.TransactionSignatureCount,
-
-		// Factoids about file contracts.
-		ActiveContractCost:  facts.ActiveContractCost,
-		ActiveContractCount: facts.ActiveContractCount,
-		ActiveContractSize:  facts.ActiveContractSize,
-		TotalContractCost:   facts.TotalContractCost,
-		TotalContractSize:   facts.TotalContractSize,
-		TotalRevisionVolume: facts.TotalRevisionVolume,
+		BlockFacts: facts,
 	}
 }
 
@@ -243,21 +229,24 @@ func (srv *Server) explorerBlockHandler(w http.ResponseWriter, req *http.Request
 // with a set of transaction ids.
 func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []ExplorerTransaction, blocks []ExplorerBlock) {
 	for _, txid := range txids {
+		// Get the block containing the transaction - in the case of miner
+		// payouts, the block might be the transaction.
 		block, height, exists := srv.explorer.Transaction(txid)
 		if !exists && build.DEBUG {
 			panic("explorer pointing to nonexistant txn")
 		}
+
+		// Check if the block is the transaction.
 		if types.TransactionID(block.ID()) == txid {
 			blocks = append(blocks, srv.buildExplorerBlock(height, block))
 		} else {
-			var txn types.Transaction
+			// Find the transaction within the block with the correct id.
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txn = t
+					txns = append(txns, srv.buildExplorerTransaction(height, block.ID(), t))
 					break
 				}
 			}
-			txns = append(txns, buildExplorerTransaction(height, block.ID(), txn))
 		}
 	}
 	return txns, blocks
@@ -265,33 +254,13 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 
 // explorerHandlerGET handles GET requests to /explorer.
 func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) {
-	stats := srv.explorer.Statistics()
+	height := srv.cs.Height()
+	facts, exists := srv.explorer.BlockFacts(height)
+	if !exists && build.DEBUG {
+		panic("stats for the most recent block do not exist")
+	}
 	writeJSON(w, ExplorerGET{
-		Height:            stats.Height,
-		CurrentBlock:      stats.CurrentBlock,
-		Target:            stats.Target,
-		Difficulty:        stats.Difficulty,
-		MaturityTimestamp: stats.MaturityTimestamp,
-		TotalCoins:        stats.TotalCoins,
-
-		MinerPayoutCount:          stats.MinerPayoutCount,
-		TransactionCount:          stats.TransactionCount,
-		SiacoinInputCount:         stats.SiacoinInputCount,
-		SiacoinOutputCount:        stats.SiacoinOutputCount,
-		FileContractCount:         stats.FileContractCount,
-		FileContractRevisionCount: stats.FileContractRevisionCount,
-		StorageProofCount:         stats.StorageProofCount,
-		SiafundInputCount:         stats.SiafundInputCount,
-		SiafundOutputCount:        stats.SiafundOutputCount,
-		MinerFeeCount:             stats.MinerFeeCount,
-		ArbitraryDataCount:        stats.ArbitraryDataCount,
-		TransactionSignatureCount: stats.TransactionSignatureCount,
-
-		ActiveContractCount: stats.ActiveContractCount,
-		ActiveContractCost:  stats.ActiveContractCost,
-		ActiveContractSize:  stats.ActiveContractSize,
-		TotalContractCost:   stats.TotalContractCost,
-		TotalContractSize:   stats.TotalContractSize,
+		BlockFacts: facts,
 	})
 }
 
@@ -328,7 +297,7 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 		}
 		writeJSON(w, ExplorerHashGET{
 			HashType:    "transactionid",
-			Transaction: buildExplorerTransaction(height, block.ID(), txn),
+			Transaction: srv.buildExplorerTransaction(height, block.ID(), txn),
 		})
 		return
 	}
