@@ -23,7 +23,6 @@ var (
 func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder modules.TransactionBuilder, tpool modules.TransactionPool) (hostContract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
-	defer conn.Close()
 
 	// read host key
 	var hostPublicKey types.SiaPublicKey
@@ -210,12 +209,12 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 	if err != nil {
 		return hostContract{}, err
 	}
+	defer conn.Close()
 	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
 		return hostContract{}, err
 	}
 
 	// execute negotiation protocol
-	// NOTE: negotiateContract is reponsible for closing the connection.
 	contract, err := negotiateContract(conn, host.IPAddress, fc, txnBuilder, hdb.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
@@ -356,6 +355,7 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	if err != nil {
 		return types.FileContractID{}, err
 	}
+	defer conn.Close()
 	if err := encoding.WriteObject(conn, modules.RPCRenew); err != nil {
 		return types.FileContractID{}, errors.New("couldn't initiate RPC: " + err.Error())
 	}
@@ -364,7 +364,6 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	}
 
 	// execute negotiation protocol
-	// NOTE: negotiateContract is responsible for closing the connection.
 	newContract, err := negotiateContract(conn, hc.IP, fc, txnBuilder, hdb.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
