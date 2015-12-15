@@ -73,9 +73,9 @@ type Miner struct {
 	mu         sync.RWMutex
 }
 
-// handleErrInvalidConsensusChangeID manages the rescanning in the event that a
-// subscription during startup fails.
-func (m *Miner) handleErrInvalidConsensusChangeID() error {
+// newHandleErrInvalidConsensusChangeID manages the rescanning in the event
+// that a subscription during startup fails.
+func (m *Miner) newHandleErrInvalidConsensusChangeID() error {
 	// If the change id is not recognized, it means that the consensus set
 	// has somehow reset or otherwise changed, and a rescan must be
 	// performed.
@@ -125,7 +125,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 	err = m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		err = m.handleErrInvalidConsensusChangeID()
+		err = m.newHandleErrInvalidConsensusChangeID()
 		if err != nil {
 			return nil, errors.New("miner startup failed - rescanning failed: " + err.Error())
 		}
