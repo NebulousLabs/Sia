@@ -141,9 +141,6 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	m.persist.BlocksFound = append(m.persist.BlocksFound, b.ID())
 	var uc types.UnlockConditions
 	uc, err = m.wallet.NextAddress()
-	if err == nil { // Only update the address if there was no error.
-		m.persist.Address = uc.UnlockHash()
-	}
 	if err != nil {
 		err2 := m.save()
 		if err2 != nil {
@@ -151,6 +148,7 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 		}
 		return err
 	}
+	m.persist.Address = uc.UnlockHash()
 	return m.save()
 }
 
