@@ -156,7 +156,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 		return errors.New("revision outputs do not sum to original payout")
 
 	// outputs should have been adjusted proportional to the new filesize
-	case rev.NewValidProofOutputs[1].Value.Cmp(minHostPrice) <= 0:
+	case rev.NewValidProofOutputs[1].Value.Cmp(minHostPrice) < 0:
 		return errors.New("revision price is too small")
 	case rev.NewMissedProofOutputs[0].Value.Cmp(rev.NewValidProofOutputs[0].Value) != 0:
 		return errors.New("revision missed renter payout does not match valid payout")
