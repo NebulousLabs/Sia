@@ -77,7 +77,7 @@ func init() {
 		// environments than a humand can interact with.
 		BlockFrequency = 1 // As fast as possible
 		MaturityDelay = 3
-		GenesisTimestamp = CurrentTimestamp()
+		GenesisTimestamp = CurrentTimestamp() - 1e6
 		RootTarget = Target{128} // Takes an expected 2 hashes; very fast for testing but still probes 'bad hash' code.
 
 		// A restrictive difficulty clamp prevents the difficulty from climbing
