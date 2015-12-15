@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"testing"
+
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -29,4 +31,25 @@ func (ms *mockSubscriber) copySub() (cms mockSubscriber) {
 	cms.updates = make([]modules.ConsensusChange, len(ms.updates))
 	copy(cms.updates, ms.updates)
 	return cms
+}
+
+// TestUnitInvalidConsensusChangeSubscription checks that the consensus set
+// returns modules.ErrInvalidConsensusChangeID in the event of a subscriber
+// using an unrecognized id.
+func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	cst, err := createConsensusSetTester("TestUnitInvalidConsensusChangeSubscription")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+
+	ms := newMockSubscriber()
+	badCCID := modules.ConsensusChangeID{1}
+	err = cst.cs.ConsensusSetPersistentSubscribe(&ms, badCCID)
+	if err != modules.ErrInvalidConsensusChangeID {
+		t.Error("consensus set returning the wrong error during an invalid subscription:", err)
+	}
 }
