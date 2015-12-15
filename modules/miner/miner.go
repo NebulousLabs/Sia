@@ -73,6 +73,22 @@ type Miner struct {
 	mu         sync.RWMutex
 }
 
+// handleErrInvalidConsensusChangeID manages the rescanning in the event that a
+// subscription during startup fails.
+func (m *Miner) handleErrInvalidConsensusChangeID() error {
+	// If the change id is not recognized, it means that the consensus set
+	// has somehow reset or otherwise changed, and a rescan must be
+	// performed.
+	m.log.Println("Inconsistency found between the miner and the consensus set, fixing...")
+
+	// Perform the rescan and block until rescanning is complete. Rescan
+	// does need access to a lock, but no lock is held during startup
+	// anyway, so blocking until the channel returns an error is safe.
+	c := make(chan error)
+	m.threadedConsensusRescan(c)
+	return <-c
+}
+
 // New returns a ready-to-go miner that is not mining.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
 	// Create the miner and its dependencies.
@@ -109,17 +125,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 	err = m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		// If the change id is not recognized, it means that the consensus set
-		// has somehow reset or otherwise changed, and a rescan must be
-		// performed.
-		m.log.Println("Inconsistency found between the miner and the consensus set, fixing...")
-
-		// Perform the rescan and block until rescanning is complete. Rescan
-		// does need access to a lock, but no lock is held during startup
-		// anyway, so blocking until the channel returns an error is safe.
-		c := make(chan error)
-		m.threadedConsensusRescan(c)
-		err = <-c
+		err = m.handleErrInvalidConsensusChangeID()
 		if err != nil {
 			return nil, errors.New("miner startup failed - rescanning failed: " + err.Error())
 		}
