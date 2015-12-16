@@ -84,7 +84,7 @@ func (m *Miner) newHandleErrInvalidConsensusChangeID() error {
 	// Perform the rescan and block until rescanning is complete. Rescan
 	// does need access to a lock, but no lock is held during startup
 	// anyway, so blocking until the channel returns an error is safe.
-	c := make(chan error)
+	c := make(chan error, 1)
 	m.threadedConsensusRescan(c)
 	return <-c
 }

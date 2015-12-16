@@ -42,12 +42,7 @@ func (m *Miner) threadedConsensusRescan(c chan error) {
 
 	// ConsensusSetPerscribe is a blocking call that will not return until
 	// rescanning is complete.
-	err = m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
-	if err != nil {
-		c <- err
-		return
-	}
-	c <- nil
+	c <- m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
 	return
 }
 
