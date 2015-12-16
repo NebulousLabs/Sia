@@ -24,6 +24,7 @@ func CreateFileLogger(logFilename string) (*FileLogger, error) {
 }
 
 // Close terminates the Logger.
-func (l *FileLogger) Close() error {
-	return l.logFile.Close()
+func (fl *FileLogger) Close() error {
+	fl.Println("SHUTDOWN: Logging has terminated.")
+	return fl.logFile.Close()
 }
