@@ -25,6 +25,8 @@ type minerTester struct {
 	walletKey crypto.TwofishKey
 
 	miner *Miner
+
+	persistDir string
 }
 
 // createMinerTester creates a minerTester that's ready for use.
@@ -75,6 +77,8 @@ func createMinerTester(name string) (*minerTester, error) {
 		walletKey: key,
 
 		miner: m,
+
+		persistDir: testdir,
 	}
 
 	// Mine until the wallet has money.
