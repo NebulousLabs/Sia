@@ -11,8 +11,11 @@ import (
 // TestIntegrationRandomSuffix checks that the random suffix creator creates
 // valid files.
 func TestIntegrationRandomSuffix(t *testing.T) {
-	tmpDir := build.TempDir("persist", "TestIntegrationRandomSuffix")
-	os.MkdirAll(tmpDir, 0700)
+	tmpDir := build.TempDir(persistDir, "TestIntegrationRandomSuffix")
+	err := os.MkdirAll(tmpDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 100; i++ {
 		suffix := RandomSuffix()
 		filename := filepath.Join(tmpDir, "test file - "+suffix+".nil")
