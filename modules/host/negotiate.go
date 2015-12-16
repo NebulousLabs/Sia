@@ -272,7 +272,7 @@ func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash, filename
 func (h *Host) rpcUpload(conn net.Conn) error {
 	// Check that the host has grabbed an address from the wallet.
 	if h.UnlockHash == (types.UnlockHash{}) {
-		return errors.New("host needs an address; have you properly announced?")
+		return errors.New("couldn't negotiate contract: host does not have an address")
 	}
 
 	h.mu.RLock()
