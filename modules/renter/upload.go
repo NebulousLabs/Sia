@@ -60,6 +60,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if err != nil {
 		return err
 	}
+	if up.Duration == 0 {
+		up.Duration = defaultDuration
+	}
+	endHeight := r.cs.Height() + up.Duration
 	if up.ErasureCode == nil {
 		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
 	}
@@ -69,15 +73,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		} else {
 			up.PieceSize = smallPieceSize
 		}
-	}
-	// calculate end height
-	// TODO: using 0 as a special value is kind of hacky. Should probably have
-	// an explicit "renew" field.
-	var endHeight types.BlockHeight
-	if up.Duration == 0 {
-		endHeight = 0
-	} else {
-		endHeight = r.cs.Height() + up.Duration
 	}
 
 	// Check that we have enough money to finance the upload.
@@ -96,6 +91,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.tracking[up.Nickname] = trackedFile{
 		RepairPath: up.Filename,
 		EndHeight:  endHeight,
+		Renew:      up.Renew,
 	}
 	r.save()
 	r.mu.Unlock(lockID)

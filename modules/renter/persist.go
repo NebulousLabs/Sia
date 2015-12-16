@@ -238,7 +238,7 @@ func (r *Renter) load() error {
 		// COMPATv0.4.8
 		for nick, path := range data.Repairing {
 			// these files will be renewed indefinitely
-			r.tracking[nick] = trackedFile{RepairPath: path, EndHeight: 0}
+			r.tracking[nick] = trackedFile{RepairPath: path, Renew: true}
 		}
 	}
 

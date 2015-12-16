@@ -192,7 +192,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 
 	// check for expiration
 	height := r.cs.Height()
-	if meta.EndHeight != 0 && meta.EndHeight < height {
+	if !meta.Renew && meta.EndHeight < height {
 		logAndRemove("removing %v from repair set: storage period has ended", name)
 		return
 	}
