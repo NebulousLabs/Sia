@@ -202,3 +202,52 @@ func TestIntegrationBlocksMined(t *testing.T) {
 		t.Error("expecting 1 stale block, got", staleBlocks)
 	}
 }
+
+// TestIntegrationNewInvalidConsensusChangeID triggers
+// newHandleErrInvalidConsensusChangeID during a call to miner.New and verifies
+// that the rescanning happens correctly.
+func TestIntegrationNewInvalidConsensusChangeID(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	mt, err := createMinerTester("TestIntegrationNewInvalidConsensusChangeID")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = mt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the persist data of the current miner.
+	oldChange := mt.miner.persist.RecentChange
+	oldHeight := mt.miner.persist.Height
+	oldTarget := mt.miner.persist.Target
+
+	// Corrupt the miner, close the miner, and make a new one from the same
+	// directory.
+	mt.miner.persist.RecentChange[0]++
+	mt.miner.persist.Height += 1e5
+	mt.miner.persist.Target[0]++
+	mt.miner.Close()
+	err = mt.miner.save()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that rescanning resolved the corruption in the miner.
+	m, err := New(mt.cs, mt.tpool, mt.wallet, filepath.Join(mt.persistDir, modules.MinerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that after rescanning, the values have returned to the usual values.
+	if m.persist.RecentChange != oldChange {
+		t.Error("rescan failed, ended up on the wrong change")
+	}
+	if m.persist.Height != oldHeight {
+		t.Error("rescan failed, ended up at the wrong height")
+	}
+	if m.persist.Target != oldTarget {
+		t.Error("rescan failed, ended up at the wrong target")
+	}
+}
