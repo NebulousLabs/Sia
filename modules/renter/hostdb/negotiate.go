@@ -319,7 +319,7 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	hdb.mu.RLock()
 	height := hdb.blockHeight
 	hc, ok := hdb.contracts[fcid]
-	host, eok := hdb.allHosts[hc.IP] // or activeHosts?
+	host, eok := hdb.allHosts[hc.IP]
 	hdb.mu.RUnlock()
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that contract")
@@ -373,8 +373,11 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	// update host contract
 	hdb.mu.Lock()
 	hdb.contracts[newContract.ID] = newContract
-	hdb.save()
+	err = hdb.save()
 	hdb.mu.Unlock()
+	if err != nil {
+		hdb.log.Println("WARN: failed to save the hostdb:", err)
+	}
 
 	return newContract.ID, nil
 }
