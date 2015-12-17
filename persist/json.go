@@ -51,9 +51,9 @@ func Load(meta Metadata, data interface{}, r io.Reader) error {
 	return nil
 }
 
-// SaveFile saves json data to a file.
+// SaveFile atomically saves json data to a file.
 func SaveFile(meta Metadata, data interface{}, filename string) error {
-	file, err := os.Create(filename)
+	file, err := NewSafeFile(filename)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func SaveFile(meta Metadata, data interface{}, filename string) error {
 	if err != nil {
 		return errors.New("error saving " + filename + ": " + err.Error())
 	}
-	return nil
+	return file.Commit()
 }
 
 // LoadFile loads json data from a file.
