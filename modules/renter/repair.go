@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/types"
@@ -212,7 +213,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
 
 	// create host pool
-	contractSize := f.pieceSize * f.numChunks() // each host gets one piece of each chunk
+	contractSize := (f.pieceSize + crypto.TwofishOverhead) * f.numChunks() // each host gets one piece of each chunk
 	var duration types.BlockHeight = defaultDuration
 	if meta.EndHeight != 0 {
 		duration = meta.EndHeight - height
