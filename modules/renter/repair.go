@@ -49,9 +49,13 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	var wg sync.WaitGroup
 	wg.Add(numPieces)
 	for i := 0; i < numPieces; i++ {
-		go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
+		go func(i int) {
 			defer wg.Done()
-			offset, err := host.Upload(piece)
+			host := hosts[i]
+			pieceIndex := missingPieces[i]
+
+			// upload data to host
+			offset, err := host.Upload(pieces[pieceIndex])
 			if err != nil {
 				return
 			}
@@ -75,7 +79,7 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 				Offset: offset,
 			})
 			f.contracts[host.ContractID()] = contract
-		}(hosts[i], uint64(i), pieces[missingPieces[i]])
+		}(i)
 	}
 	wg.Wait()
 
