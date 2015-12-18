@@ -137,7 +137,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	return m, nil
 }
 
-// Close terminates all portions of the
+// Close terminates all ongoing processes involving the miner, enabling garbage
+// collection.
 func (m *Miner) Close() error {
 	m.cs.Unsubscribe(m)
 	return m.log.Close()
