@@ -29,6 +29,13 @@ var (
 	// target.
 	ErrBlockUnsolved = errors.New("block does not meet target")
 
+	// ErrInvalidConsensusChangeID indicates that ConsensusSetPersistSubscribe
+	// was called with a consensus change id that is not recognized. Most
+	// commonly, this means that the consensus set was deleted or replaced and
+	// now the module attempting the subscription has desynchonized. This error
+	// should be handled by the module, and not reported to the user.
+	ErrInvalidConsensusChangeID = errors.New("consensus subscription has invalid id - files are inconsistent")
+
 	// ErrNonExtendingBlock indicates that a block is valid but does not result
 	// in a fork that is the heaviest known fork - the consensus set has not
 	// changed as a result of seeing the block.
@@ -209,6 +216,11 @@ type (
 		// detailing the diffs that would result from the application of the
 		// transaction.
 		TryTransactionSet([]types.Transaction) (ConsensusChange, error)
+
+		// Unsubscribe removes a subscriber from the list of subscribers,
+		// allowing for garbage collection and rescanning. If the subscriber is
+		// not found in the subscriber database, no action is taken.
+		Unsubscribe(ConsensusSetSubscriber)
 	}
 )
 

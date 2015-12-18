@@ -7,6 +7,12 @@ import (
 	"os"
 )
 
+const (
+	// persistDir defines the folder that is used for testing the persist
+	// package.
+	persistDir = "persist"
+)
+
 var (
 	// ErrBadVersion indicates that the version number of the file is not
 	// compatible with the current codebase.

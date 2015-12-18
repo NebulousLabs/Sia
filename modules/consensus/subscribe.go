@@ -155,21 +155,36 @@ func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.Conse
 	defer cs.mu.DemotedUnlock()
 
 	err := cs.db.View(func(tx *bolt.Tx) error {
+		// 'exists' and 'entry' are going to be pointed to the first entry that
+		// has not yet been seen by subscriber.
 		var exists bool
 		var entry changeEntry
-		// Special case: if 'start' is blank, create an initial node pointing to
-		// the genesis block.
+
 		if start == (modules.ConsensusChangeID{}) {
+			// Special case: if 'start' is blank, create an initial node
+			// pointing to the genesis block. The subscriber will recieve the
+			// diffs for all blocks in the consensus set, including the genesis
+			// block.
 			entry = cs.genesisEntry()
 			exists = true
 		} else {
+			// The subscriber has provided an existing consensus change.
+			// Because the subscriber already has this consensus change,
+			// 'entry' and 'exists' need to be pointed at the next consensus
+			// change.
 			entry, exists = getEntry(tx, start)
 			if !exists {
-				return errChangeEntryNotFound
+				// modules.ErrInvalidConsensusChangeID is a named error that
+				// signals a break in synchronization between the consensus set
+				// persistence and the subscriber persistence. Typically,
+				// receiving this error means that the subscriber needs to
+				// perform a rescan of the consensus set.
+				return modules.ErrInvalidConsensusChangeID
 			}
 			entry, exists = entry.NextEntry(tx)
 		}
 
+		// Send all remaining consensus changes to the subscriber.
 		for exists {
 			cc, err := cs.computeConsensusChange(tx, entry)
 			if err != nil {
@@ -184,4 +199,21 @@ func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.Conse
 		return err
 	}
 	return nil
+}
+
+// Unsubscribe removes a subscriber from the list of subscribers, allowing for
+// garbage collection and rescanning. If the subscriber is not found in the
+// subscriber database, no action is taken.
+func (cs *ConsensusSet) Unsubscribe(subscriber modules.ConsensusSetSubscriber) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	// Search for the subscriber in the list of subscribers and remove it if
+	// found.
+	for i := range cs.subscribers {
+		if cs.subscribers[i] == subscriber {
+			cs.subscribers = append(cs.subscribers[0:i], cs.subscribers[i+1:]...)
+			break
+		}
+	}
 }

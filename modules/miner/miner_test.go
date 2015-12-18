@@ -25,6 +25,8 @@ type minerTester struct {
 	walletKey crypto.TwofishKey
 
 	miner *Miner
+
+	persistDir string
 }
 
 // createMinerTester creates a minerTester that's ready for use.
@@ -75,6 +77,8 @@ func createMinerTester(name string) (*minerTester, error) {
 		walletKey: key,
 
 		miner: m,
+
+		persistDir: testdir,
 	}
 
 	// Mine until the wallet has money.
@@ -196,5 +200,96 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	if staleBlocks != 1 {
 		t.Error(len(mt.miner.persist.BlocksFound))
 		t.Error("expecting 1 stale block, got", staleBlocks)
+	}
+}
+
+// TestIntegrationNewInvalidConsensusChangeID triggers
+// newHandleErrInvalidConsensusChangeID during a call to miner.New and verifies
+// that the rescanning happens correctly.
+func TestIntegrationNewInvalidConsensusChangeID(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	mt, err := createMinerTester("TestIntegrationNewInvalidConsensusChangeID")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = mt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the persist data of the current miner.
+	oldChange := mt.miner.persist.RecentChange
+	oldHeight := mt.miner.persist.Height
+	oldTarget := mt.miner.persist.Target
+
+	// Corrupt the miner, close the miner, and make a new one from the same
+	// directory.
+	mt.miner.persist.RecentChange[0]++
+	mt.miner.persist.Height += 1e5
+	mt.miner.persist.Target[0]++
+	mt.miner.Close()
+	err = mt.miner.save()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that rescanning resolved the corruption in the miner.
+	m, err := New(mt.cs, mt.tpool, mt.wallet, filepath.Join(mt.persistDir, modules.MinerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that after rescanning, the values have returned to the usual values.
+	if m.persist.RecentChange != oldChange {
+		t.Error("rescan failed, ended up on the wrong change")
+	}
+	if m.persist.Height != oldHeight {
+		t.Error("rescan failed, ended up at the wrong height")
+	}
+	if m.persist.Target != oldTarget {
+		t.Error("rescan failed, ended up at the wrong target")
+	}
+}
+
+// TestIntegrationStartupRescan probes the startupRescan function, checking
+// that it works in the naive case.
+func TestIntegrationStartupRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	mt, err := createMinerTester("TestIntegrationStartupRescan")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the miner's persist variables have been initialized to the
+	// first few blocks.
+	if mt.miner.persist.RecentChange == (modules.ConsensusChangeID{}) || mt.miner.persist.Height == 0 || mt.miner.persist.Target == (types.Target{}) {
+		t.Fatal("miner persist variables not initialized")
+	}
+	oldChange := mt.miner.persist.RecentChange
+	oldHeight := mt.miner.persist.Height
+	oldTarget := mt.miner.persist.Target
+
+	// Corrupt the miner, the corruption should be fixed by the rescan.
+	mt.miner.persist.RecentChange[0]++
+	mt.miner.persist.Height += 500
+	mt.miner.persist.Target[0]++
+
+	// Call rescan and block until the scan is complete.
+	err = mt.miner.startupRescan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that after rescanning, the values have returned to the usual values.
+	if mt.miner.persist.RecentChange != oldChange {
+		t.Error("rescan failed, ended up on the wrong change")
+	}
+	if mt.miner.persist.Height != oldHeight {
+		t.Error("rescan failed, ended up at the wrong height")
+	}
+	if mt.miner.persist.Target != oldTarget {
+		t.Error("rescan failed, ended up at the wrong target")
 	}
 }

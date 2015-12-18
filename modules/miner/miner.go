@@ -2,12 +2,12 @@ package miner
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -69,8 +69,44 @@ type Miner struct {
 	// Utils
 	persistDir string
 	persist    persistence
-	log        *log.Logger
+	log        *persist.Logger
 	mu         sync.RWMutex
+}
+
+// startupRescan will rescan the blockchain in the event that the miner
+// persistance layer has become desynchronized from the consensus persistance
+// layer. This might happen if a user replaces any of the folders with backups
+// or deletes any of the folders.
+func (m *Miner) startupRescan() error {
+	// Unsubscribe the miner from the consensus set. Though typically
+	// miner.consensusRescan will only be called if the miner is not yet
+	// subscribed successfully to the consensus set, the function is allowed to
+	// be used in other ways.
+	m.cs.Unsubscribe(m)
+
+	// Reset all of the variables that have relevance to the consensus set. The
+	// operations are wrapped by an anonymous function so that the locking can
+	// be handled using a defer statement.
+	err := func() error {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		m.persist.RecentChange = modules.ConsensusChangeID{}
+		m.persist.Height = 0
+		m.persist.Target = types.Target{}
+		err := m.save()
+		if err != nil {
+			return err
+		}
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	// ConsensusSetPerscribe is a blocking call that will not return until
+	// rescanning is complete.
+	return m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -101,15 +137,34 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 		persistDir: persistDir,
 	}
-	m.persist.Height--
 
 	err := m.initPersist()
 	if err != nil {
-		return nil, err
+		return nil, errors.New("miner persistence startup failed: " + err.Error())
 	}
-	m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
+
+	err = m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		// Perform a rescan of the consensus set if the change id is not found.
+		// The id will only be not found if there has been desynchronization
+		// between the miner and the consensus package.
+		err = m.startupRescan()
+		if err != nil {
+			return nil, errors.New("miner startup failed - rescanning failed: " + err.Error())
+		}
+	} else if err != nil {
+		return nil, errors.New("miner subscription failed: " + err.Error())
+	}
+
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
+}
+
+// Close terminates all ongoing processes involving the miner, enabling garbage
+// collection.
+func (m *Miner) Close() error {
+	m.cs.Unsubscribe(m)
+	return m.log.Close()
 }
 
 // checkAddress checks that the miner has an address, fetching an address from

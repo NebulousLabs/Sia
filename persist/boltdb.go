@@ -61,9 +61,8 @@ func (db *BoltDatabase) checkMetadata(md Metadata) error {
 }
 
 // CloseDatabase saves the bolt database to a file, and updates metadata
-func (db *BoltDatabase) CloseDatabase() error {
-	db.Close()
-	return nil
+func (db *BoltDatabase) Close() error {
+	return db.DB.Close()
 }
 
 // OpenDatabase opens a database filename and checks metadata
