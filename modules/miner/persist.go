@@ -52,7 +52,7 @@ func (m *Miner) initPersist() error {
 	}
 
 	// Add a logger.
-	m.log, err = persist.CreateFileLogger(filepath.Join(m.persistDir, logFile))
+	m.log, err = persist.NewLogger(filepath.Join(m.persistDir, logFile))
 	if err != nil {
 		return err
 	}

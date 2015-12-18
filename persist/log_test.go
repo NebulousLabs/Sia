@@ -10,11 +10,11 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
-// TestFileLogger checks that the basic functions of the file logger work as
+// TestLogger checks that the basic functions of the file logger work as
 // designed.
-func TestFileLogger(t *testing.T) {
+func TestLogger(t *testing.T) {
 	// Create a folder for the log file.
-	testdir := build.TempDir(persistDir, "TestFileLogger")
+	testdir := build.TempDir(persistDir, "TestLogger")
 	err := os.MkdirAll(testdir, 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -22,7 +22,7 @@ func TestFileLogger(t *testing.T) {
 
 	// Create the logger.
 	logFilename := filepath.Join(testdir, "test.log")
-	fl, err := CreateFileLogger(logFilename)
+	fl, err := NewLogger(logFilename)
 	if err != nil {
 		t.Fatal(err)
 	}
