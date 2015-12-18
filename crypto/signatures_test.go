@@ -42,10 +42,10 @@ func TestUnitGenerateRandomKeyPair(t *testing.T) {
 	kd := mockKeyDeriver{sk: sk, pk: pk}
 
 	// Create a SignatureKeyGenerator using mocks.
-	g := stdGenerator{entropyReader, &kd}
+	g := sigKeyGen{entropyReader, &kd}
 
 	// Create key pair.
-	skActual, pkActual, err := g.Generate()
+	skActual, pkActual, err := g.generate()
 
 	// Verify that we got back the expected results.
 	if err != nil {
@@ -80,8 +80,8 @@ func (fr failingReader) Read([]byte) (int, error) {
 // Test that the Generate method fails if the call to entropy source fails
 func TestUnitGenerateRandomKeyPairFailsWhenRandFails(t *testing.T) {
 	fr := failingReader{err: errors.New("mock error from entropy reader")}
-	g := stdGenerator{entropySource: &fr}
-	if _, _, err := g.Generate(); err == nil {
+	g := sigKeyGen{entropySource: &fr}
+	if _, _, err := g.generate(); err == nil {
 		t.Error("Generate should fail when entropy source fails.")
 	}
 }
@@ -101,10 +101,10 @@ func TestUnitGenerateDeterministicKeyPair(t *testing.T) {
 	pk := ed25519.PublicKey(&[PublicKeySize]byte{})
 	pk[0] = sk[32]
 	kd := mockKeyDeriver{sk: sk, pk: pk}
-	g := stdGenerator{kd: &kd}
+	g := sigKeyGen{keyDeriver: &kd}
 
 	// Create key pair.
-	skActual, pkActual := g.GenerateDeterministic(mockEntropy)
+	skActual, pkActual := g.generateDeterministic(mockEntropy)
 
 	// Verify that we got back the right results.
 	if *sk != skActual {
@@ -184,7 +184,7 @@ func TestSigning(t *testing.T) {
 		var entropy [EntropySize]byte
 		entropy[0] = 5
 		entropy[1] = 8
-		sk, pk := StdKeyGen.GenerateDeterministic(entropy)
+		sk, pk := stdKeyGen.generateDeterministic(entropy)
 
 		// Generate and sign the data.
 		var randData Hash
@@ -203,7 +203,7 @@ func TestSigning(t *testing.T) {
 		// Attempt to verify after the data has been altered.
 		randData[0] += 1
 		err = VerifyHash(randData, pk, sig)
-		if err != ErrInvalidSignature {
+		if err != errInvalidSignature {
 			t.Fatal(err)
 		}
 
@@ -217,7 +217,7 @@ func TestSigning(t *testing.T) {
 		// Attempt to verify after the signature has been altered.
 		sig[0] += 1
 		err = VerifyHash(randData, pk, sig)
-		if err != ErrInvalidSignature {
+		if err != errInvalidSignature {
 			t.Fatal(err)
 		}
 	}

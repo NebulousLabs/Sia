@@ -99,7 +99,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	h.spaceRemaining = h.TotalStorage
 
 	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.StdKeyGen.Generate()
+	sk, pk, err := crypto.GenerateKeyPair()
 	if err != nil {
 		return nil, err
 	}
