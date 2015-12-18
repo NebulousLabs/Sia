@@ -77,9 +77,6 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	case len(fc.MissedProofOutputs) != 2:
 		return errors.New("bad file contract missed proof outputs")
 
-	case !fc.ValidProofOutputs[1].Value.IsZero(), !fc.MissedProofOutputs[1].Value.IsZero():
-		return errors.New("file contract collateral is not zero")
-
 	case fc.ValidProofOutputs[1].UnlockHash != h.UnlockHash:
 		return errors.New("file contract valid proof output not sent to host")
 	case fc.MissedProofOutputs[1].UnlockHash != voidAddress:
