@@ -15,7 +15,10 @@ const (
 )
 
 var (
-	settingsMetadata = persist.Metadata{"Miner Settings", "0.5.0"}
+	settingsMetadata = persist.Metadata{
+		Header:  "Miner Settings",
+		Version: "0.5.0",
+	}
 )
 
 type (

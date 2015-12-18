@@ -48,7 +48,10 @@ func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
 	hf.conn.SetDeadline(time.Now().Add(2 * time.Minute)) // sufficient to transfer 4 MB over 250 kbps
 	defer hf.conn.SetDeadline(time.Time{})
 	// request piece
-	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, hf.pieceSize})
+	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{
+		Offset: p.Offset,
+		Length: hf.pieceSize,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +72,7 @@ func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
 
 func (hf *hostFetcher) Close() error {
 	// ignore error; we'll need to close conn anyway
-	encoding.WriteObject(hf.conn, modules.DownloadRequest{0, 0})
+	encoding.WriteObject(hf.conn, modules.DownloadRequest{Offset: 0, Length: 0})
 	return hf.conn.Close()
 }
 

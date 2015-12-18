@@ -20,8 +20,14 @@ const (
 )
 
 var (
-	settingsMetadata = persist.Metadata{"Wallet Settings", "0.4.0"}
-	seedMetadata     = persist.Metadata{"Wallet Seed", "0.4.0"}
+	settingsMetadata = persist.Metadata{
+		Header:  "Wallet Settings",
+		Version: "0.4.0",
+	}
+	seedMetadata = persist.Metadata{
+		Header:  "Wallet Seed",
+		Version: "0.4.0",
+	}
 )
 
 // SpendableKeyFile stores an encrypted spendable key on disk.

@@ -9,7 +9,7 @@ import (
 )
 
 // threadedDeleteObligation deletes a file obligation.
-func (h *Host) threadedDeleteObligation(obligation contractObligation) {
+func (h *Host) threadedDeleteObligation(obligation *contractObligation) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	err := h.deallocate(obligation.Path)
@@ -22,7 +22,7 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 
 // threadedCreateStorageProof creates a storage proof for a file contract
 // obligation and submits it to the blockchain.
-func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
+func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
 	defer h.threadedDeleteObligation(obligation)
 
 	file, err := os.Open(obligation.Path)
@@ -42,7 +42,10 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation) {
 		h.log.Printf("ERROR: could not construct storage proof for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
-	sp := types.StorageProof{obligation.ID, [crypto.SegmentSize]byte{}, hashSet}
+	sp := types.StorageProof{
+		ParentID: obligation.ID,
+		HashSet:  hashSet,
+	}
 	copy(sp.Segment[:], base)
 
 	// Create and send the transaction.
@@ -78,10 +81,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// ready for storage proofs.
 	for _ = range cc.AppliedBlocks {
 		for _, ob := range h.obligationsByHeight[h.blockHeight] {
-			// to avoid race conditions involving the obligation's mutex, copy it
-			// manually into a new object
-			obcopy := contractObligation{ID: ob.ID, FileContract: ob.FileContract, LastRevisionTxn: ob.LastRevisionTxn, Path: ob.Path}
-			go h.threadedCreateStorageProof(obcopy)
+			go h.threadedCreateStorageProof(ob)
 		}
 		// TODO: If something happens while the storage proofs are being
 		// created, those files will never get cleared from the host.

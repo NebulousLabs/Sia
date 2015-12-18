@@ -98,7 +98,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 // considerRevision checks that the provided file contract revision is still
 // acceptable to the host.
 // TODO: should take a txn and check that is only contains the single revision
-func (h *Host) considerRevision(txn types.Transaction, obligation contractObligation) error {
+func (h *Host) considerRevision(txn types.Transaction, obligation *contractObligation) error {
 	// Check that there is only one revision.
 	// TODO: check that the txn is empty except for the revision?
 	if len(txn.FileContractRevisions) != 1 {
@@ -342,7 +342,7 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 
 			// check revision against original file contract
 			h.mu.RLock()
-			err := h.considerRevision(revTxn, *obligation)
+			err := h.considerRevision(revTxn, obligation)
 			h.mu.RUnlock()
 			if err != nil {
 				encoding.WriteObject(conn, err.Error())
