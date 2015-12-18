@@ -42,7 +42,10 @@ func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
 		h.log.Printf("ERROR: could not construct storage proof for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
-	sp := types.StorageProof{obligation.ID, [crypto.SegmentSize]byte{}, hashSet}
+	sp := types.StorageProof{
+		ParentID: obligation.ID,
+		HashSet:  hashSet,
+	}
 	copy(sp.Segment[:], base)
 
 	// Create and send the transaction.
