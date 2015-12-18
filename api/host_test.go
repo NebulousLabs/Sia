@@ -15,6 +15,10 @@ import (
 // TestIntegrationHosting tests that the host correctly receives payment for
 // hosting files.
 func TestIntegrationHosting(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	st, err := createServerTester("TestIntegrationHosting")
 	if err != nil {
 		t.Fatal(err)
@@ -28,9 +32,10 @@ func TestIntegrationHosting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// wait for announcement to register
+	// mine block and wait for announcement to register
 	st.miner.AddBlock()
 	var hosts ActiveHosts
+	time.Sleep(1 * time.Second)
 	st.getAPI("/hostdb/hosts/active", &hosts)
 	if len(hosts.Hosts) == 0 {
 		t.Fatal("host announcement not seen")
@@ -70,7 +75,7 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expRevenue := "31844166666666464210"
+	expRevenue := "31857777777777575235"
 	if hg.Revenue.String() != expRevenue {
 		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
 	}

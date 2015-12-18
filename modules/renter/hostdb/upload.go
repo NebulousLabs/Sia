@@ -85,6 +85,7 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 		return 0, errors.New("contract has already ended")
 	}
 	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(hu.contract.FileContract.WindowStart - height))).Mul(hu.price)
+	piecePrice = piecePrice.MulFloat(1.02) // COMPATv0.4.8 -- hosts reject exact prices
 
 	// calculate new merkle root (no error possible with bytes.Reader)
 	_ = hu.tree.ReadSegments(bytes.NewReader(data))
