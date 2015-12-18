@@ -188,14 +188,14 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
-			// outputs need account for tax
-			{Value: renterCost.Sub(types.Tax(height, payout)), UnlockHash: ourAddress},
+			// outputs need to account for tax
+			{Value: types.PostTax(height, renterCost), UnlockHash: ourAddress},
 			// no collateral
 			{Value: types.ZeroCurrency, UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// same as above
-			{Value: renterCost.Sub(types.Tax(height, payout)), UnlockHash: ourAddress},
+			{Value: types.PostTax(height, renterCost), UnlockHash: ourAddress},
 			// goes to the void, not the renter
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
@@ -329,6 +329,19 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 		return types.FileContractID{}, errors.New("cannot renew below current height")
 	}
 
+	// get an address to use for negotiation
+	hdb.mu.Lock()
+	if hdb.cachedAddress == (types.UnlockHash{}) {
+		uc, err := hdb.wallet.NextAddress()
+		if err != nil {
+			hdb.mu.Unlock()
+			return types.FileContractID{}, err
+		}
+		hdb.cachedAddress = uc.UnlockHash()
+	}
+	ourAddress := hdb.cachedAddress
+	hdb.mu.Unlock()
+
 	renterCost := host.Price.Mul(types.NewCurrency64(hc.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
@@ -341,10 +354,17 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 		WindowEnd:      newEndHeight + host.WindowSize,
 		Payout:         payout,
 		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
-		// TODO: are these correct?
-		RevisionNumber:     0,
-		ValidProofOutputs:  hc.LastRevision.NewValidProofOutputs,
-		MissedProofOutputs: hc.LastRevision.NewMissedProofOutputs,
+		RevisionNumber: 0,
+		ValidProofOutputs: []types.SiacoinOutput{
+			// nothing returned to us; everything goes to the host
+			{Value: types.ZeroCurrency, UnlockHash: ourAddress},
+			{Value: types.PostTax(height, renterCost), UnlockHash: host.UnlockHash},
+		},
+		MissedProofOutputs: []types.SiacoinOutput{
+			// nothing returned to us; everything goes to the void
+			{Value: types.ZeroCurrency, UnlockHash: ourAddress},
+			{Value: types.PostTax(height, renterCost), UnlockHash: types.UnlockHash{}},
+		},
 	}
 
 	// create transaction builder
@@ -373,6 +393,7 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	// update host contract
 	hdb.mu.Lock()
 	hdb.contracts[newContract.ID] = newContract
+	hdb.cachedAddress = types.UnlockHash{} // clear cachedAddress
 	err = hdb.save()
 	hdb.mu.Unlock()
 	if err != nil {
