@@ -7,45 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// threadedConsensusRescan resets all of the miner consensus variables and
-// scans the blockchain starting from the genesis block. This function is
-// typically only needed if an error during startup indicates that the miner
-// has desynchronized from the consensus set. An error will be sent down the
-// input error channel only after the function has completed.
-func (m *Miner) threadedConsensusRescan(c chan error) {
-	// Unsubscribe the miner from the consensus set. Though typically
-	// miner.consensusRescan will only be called if the miner is not yet
-	// subscribed successfully to the consensus set, the function is allowed to
-	// be used in other ways.
-	m.cs.Unsubscribe(m)
-
-	// Reset all of the variables that have relevance to the consensus set. The
-	// operations are wrapped by an anonymous function so that the locking can
-	// be handled using a defer statement.
-	err := func() error {
-		m.mu.Lock()
-		defer m.mu.Unlock()
-
-		m.persist.RecentChange = modules.ConsensusChangeID{}
-		m.persist.Height = 0
-		m.persist.Target = types.Target{}
-		err := m.save()
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
-	if err != nil {
-		c <- err
-		return
-	}
-
-	// ConsensusSetPerscribe is a blocking call that will not return until
-	// rescanning is complete.
-	c <- m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
-	return
-}
-
 // ProcessConsensusDigest will update the miner's most recent block.
 func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()

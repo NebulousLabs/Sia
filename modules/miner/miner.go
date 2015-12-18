@@ -73,20 +73,40 @@ type Miner struct {
 	mu         sync.RWMutex
 }
 
-// newHandleErrInvalidConsensusChangeID manages the rescanning in the event
-// that a subscription during startup fails.
-func (m *Miner) newHandleErrInvalidConsensusChangeID() error {
-	// If the change id is not recognized, it means that the consensus set
-	// has somehow reset or otherwise changed, and a rescan must be
-	// performed.
-	m.log.Println("Inconsistency found between the miner and the consensus set, fixing...")
+// startupRescan will rescan the blockchain in the event that the miner
+// persistance layer has become desynchronized from the consensus persistance
+// layer. This might happen if a user replaces any of the folders with backups
+// or deletes any of the folders.
+func (m *Miner) startupRescan() error {
+	// Unsubscribe the miner from the consensus set. Though typically
+	// miner.consensusRescan will only be called if the miner is not yet
+	// subscribed successfully to the consensus set, the function is allowed to
+	// be used in other ways.
+	m.cs.Unsubscribe(m)
 
-	// Perform the rescan and block until rescanning is complete. Rescan
-	// does need access to a lock, but no lock is held during startup
-	// anyway, so blocking until the channel returns an error is safe.
-	c := make(chan error)
-	go m.threadedConsensusRescan(c)
-	return <-c
+	// Reset all of the variables that have relevance to the consensus set. The
+	// operations are wrapped by an anonymous function so that the locking can
+	// be handled using a defer statement.
+	err := func() error {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		m.persist.RecentChange = modules.ConsensusChangeID{}
+		m.persist.Height = 0
+		m.persist.Target = types.Target{}
+		err := m.save()
+		if err != nil {
+			return err
+		}
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	// ConsensusSetPerscribe is a blocking call that will not return until
+	// rescanning is complete.
+	return m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -125,7 +145,10 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 	err = m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		err = m.newHandleErrInvalidConsensusChangeID()
+		// Perform a rescan of the consensus set if the change id is not found.
+		// The id will only be not found if there has been desynchronization
+		// between the miner and the consensus package.
+		err = m.startupRescan()
 		if err != nil {
 			return nil, errors.New("miner startup failed - rescanning failed: " + err.Error())
 		}
