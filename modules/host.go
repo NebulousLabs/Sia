@@ -19,6 +19,9 @@ var (
 	// RPCUpload is the specifier for initiating an upload with the host.
 	RPCUpload = types.Specifier{'U', 'p', 'l', 'o', 'a', 'd'}
 
+	// RPCRenew is the specifier to renewing an existing contract.
+	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w'}
+
 	// RPCRevise is the specifier for revising an existing file contract.
 	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e'}
 

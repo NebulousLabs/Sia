@@ -20,20 +20,11 @@ var (
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilder modules.TransactionBuilder, tpool modules.TransactionPool) (hostContract, error) {
-	// initiate connection
-	conn, err := net.DialTimeout("tcp", string(addr), 15*time.Second)
-	if err != nil {
-		return hostContract{}, err
-	}
-	defer conn.Close()
+func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder modules.TransactionBuilder, tpool modules.TransactionPool) (hostContract, error) {
+	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
-	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
-		return hostContract{}, err
-	}
 
 	// read host key
-	// TODO: need to save this?
 	var hostPublicKey types.SiaPublicKey
 	if err := encoding.ReadObject(conn, &hostPublicKey, 256); err != nil {
 		return hostContract{}, errors.New("couldn't read host's public key: " + err.Error())
@@ -77,37 +68,31 @@ func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilde
 
 	// send txn
 	if err := encoding.WriteObject(conn, txnSet); err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("couldn't send our proposed contract: " + err.Error())
 	}
 
 	// read back acceptance
 	var response string
 	if err := encoding.ReadObject(conn, &response, 128); err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("couldn't read the host's response to our proposed contract: " + err.Error())
 	}
 	if response != modules.AcceptResponse {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("host rejected proposed contract: " + response)
 	}
 
 	// read back txn with host collateral.
 	var hostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("couldn't read the host's updated contract: " + err.Error())
 	}
 
 	// check that txn is okay. For now, no collateral will be added, so the
 	// transaction sets should be identical.
 	if len(hostTxnSet) != len(txnSet) {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("host sent bad collateral transaction")
 	}
 	for i := range hostTxnSet {
 		if hostTxnSet[i].ID() != txnSet[i].ID() {
-			txnBuilder.Drop()
 			return hostContract{}, errors.New("host sent bad collateral transaction")
 		}
 	}
@@ -118,18 +103,15 @@ func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilde
 	// with whatever fields were added by the host.
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, err
 	}
 	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
 	}
 
 	// read signed txn from host
 	var signedHostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, errors.New("couldn't read the contract signed by the host: " + err.Error())
 	}
 
@@ -140,7 +122,6 @@ func negotiateContract(addr modules.NetAddress, fc types.FileContract, txnBuilde
 		err = nil
 	}
 	if err != nil {
-		txnBuilder.Drop()
 		return hostContract{}, err
 	}
 
@@ -206,25 +187,37 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 		Payout:         payout,
 		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
 		RevisionNumber: 0,
-	}
-	// outputs need account for tax
-	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: renterCost.Sub(types.Tax(height, fc.Payout)), UnlockHash: ourAddress},
-		{Value: types.ZeroCurrency, UnlockHash: host.UnlockHash}, // no collateral
-	}
-	fc.MissedProofOutputs = []types.SiacoinOutput{
-		// same as above
-		fc.ValidProofOutputs[0],
-		// goes to the void, not the renter
-		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
+		ValidProofOutputs: []types.SiacoinOutput{
+			// outputs need to account for tax
+			{Value: types.PostTax(height, renterCost), UnlockHash: ourAddress},
+			// no collateral
+			{Value: types.ZeroCurrency, UnlockHash: host.UnlockHash},
+		},
+		MissedProofOutputs: []types.SiacoinOutput{
+			// same as above
+			{Value: types.PostTax(height, renterCost), UnlockHash: ourAddress},
+			// goes to the void, not the renter
+			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
+		},
 	}
 
 	// create transaction builder
 	txnBuilder := hdb.wallet.StartTransaction()
 
-	// execute negotiation protocol
-	contract, err := negotiateContract(host.IPAddress, fc, txnBuilder, hdb.tpool)
+	// initiate connection
+	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 15*time.Second)
 	if err != nil {
+		return hostContract{}, err
+	}
+	defer conn.Close()
+	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
+		return hostContract{}, err
+	}
+
+	// execute negotiation protocol
+	contract, err := negotiateContract(conn, host.IPAddress, fc, txnBuilder, hdb.tpool)
+	if err != nil {
+		txnBuilder.Drop() // return unused outputs to wallet
 		return hostContract{}, err
 	}
 
@@ -295,7 +288,6 @@ func newRevision(rev types.FileContractRevision, pieceLen uint64, merkleRoot cry
 		// probably not enough money, but the host might accept it anyway
 		piecePrice = rev.NewValidProofOutputs[0].Value
 	}
-
 	return types.FileContractRevision{
 		ParentID:          rev.ParentID,
 		UnlockConditions:  rev.UnlockConditions,
@@ -318,4 +310,95 @@ func newRevision(rev types.FileContractRevision, pieceLen uint64, merkleRoot cry
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}
+}
+
+// Renew negotiates a new contract for data already stored with a host. It
+// returns the ID of the new contract. This is a blocking call that performs
+// network I/O.
+func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
+	hdb.mu.RLock()
+	height := hdb.blockHeight
+	hc, ok := hdb.contracts[fcid]
+	host, eok := hdb.allHosts[hc.IP]
+	hdb.mu.RUnlock()
+	if !ok {
+		return types.FileContractID{}, errors.New("no record of that contract")
+	} else if !eok {
+		return types.FileContractID{}, errors.New("no record of that host")
+	} else if newEndHeight < height {
+		return types.FileContractID{}, errors.New("cannot renew below current height")
+	}
+
+	// get an address to use for negotiation
+	hdb.mu.Lock()
+	if hdb.cachedAddress == (types.UnlockHash{}) {
+		uc, err := hdb.wallet.NextAddress()
+		if err != nil {
+			hdb.mu.Unlock()
+			return types.FileContractID{}, err
+		}
+		hdb.cachedAddress = uc.UnlockHash()
+	}
+	ourAddress := hdb.cachedAddress
+	hdb.mu.Unlock()
+
+	renterCost := host.Price.Mul(types.NewCurrency64(hc.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
+	payout := renterCost                   // no collateral
+
+	// create file contract
+	fc := types.FileContract{
+		FileSize:       hc.LastRevision.NewFileSize,
+		FileMerkleRoot: hc.LastRevision.NewFileMerkleRoot,
+		WindowStart:    newEndHeight,
+		WindowEnd:      newEndHeight + host.WindowSize,
+		Payout:         payout,
+		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
+		RevisionNumber: 0,
+		ValidProofOutputs: []types.SiacoinOutput{
+			// nothing returned to us; everything goes to the host
+			{Value: types.ZeroCurrency, UnlockHash: ourAddress},
+			{Value: types.PostTax(height, renterCost), UnlockHash: host.UnlockHash},
+		},
+		MissedProofOutputs: []types.SiacoinOutput{
+			// nothing returned to us; everything goes to the void
+			{Value: types.ZeroCurrency, UnlockHash: ourAddress},
+			{Value: types.PostTax(height, renterCost), UnlockHash: types.UnlockHash{}},
+		},
+	}
+
+	// create transaction builder
+	txnBuilder := hdb.wallet.StartTransaction()
+
+	// initiate connection
+	conn, err := net.DialTimeout("tcp", string(hc.IP), 15*time.Second)
+	if err != nil {
+		return types.FileContractID{}, err
+	}
+	defer conn.Close()
+	if err := encoding.WriteObject(conn, modules.RPCRenew); err != nil {
+		return types.FileContractID{}, errors.New("couldn't initiate RPC: " + err.Error())
+	}
+	if err := encoding.WriteObject(conn, fcid); err != nil {
+		return types.FileContractID{}, errors.New("couldn't send contract ID: " + err.Error())
+	}
+
+	// execute negotiation protocol
+	newContract, err := negotiateContract(conn, hc.IP, fc, txnBuilder, hdb.tpool)
+	if err != nil {
+		txnBuilder.Drop() // return unused outputs to wallet
+		return types.FileContractID{}, err
+	}
+
+	// update host contract
+	hdb.mu.Lock()
+	hdb.contracts[newContract.ID] = newContract
+	hdb.cachedAddress = types.UnlockHash{} // clear cachedAddress
+	err = hdb.save()
+	hdb.mu.Unlock()
+	if err != nil {
+		hdb.log.Println("WARN: failed to save the hostdb:", err)
+	}
+
+	return newContract.ID, nil
 }

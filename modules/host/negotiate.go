@@ -37,7 +37,7 @@ func (h *Host) deallocate(path string) error {
 
 // considerContract checks that the provided transaction matches the host's
 // terms, and doesn't contain any flagrant errors.
-func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublicKey) error {
+func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublicKey, merkleRoot crypto.Hash) error {
 	// Check that there is only one file contract.
 	// TODO: check that the txn is empty except for the contract?
 	if len(txn.FileContracts) != 1 {
@@ -65,7 +65,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	case fc.WindowEnd-fc.WindowStart < h.WindowSize:
 		return errors.New("challenge window is not large enough")
 
-	case fc.FileMerkleRoot != crypto.Hash{}:
+	case fc.FileMerkleRoot != merkleRoot:
 		return errors.New("bad file contract Merkle root")
 
 	case fc.Payout.IsZero():
@@ -76,9 +76,6 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 
 	case len(fc.MissedProofOutputs) != 2:
 		return errors.New("bad file contract missed proof outputs")
-
-	case !fc.ValidProofOutputs[1].Value.IsZero(), !fc.MissedProofOutputs[1].Value.IsZero():
-		return errors.New("file contract collateral is not zero")
 
 	case fc.ValidProofOutputs[1].UnlockHash != h.UnlockHash:
 		return errors.New("file contract valid proof output not sent to host")
@@ -156,7 +153,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 		return errors.New("revision outputs do not sum to original payout")
 
 	// outputs should have been adjusted proportional to the new filesize
-	case rev.NewValidProofOutputs[1].Value.Cmp(minHostPrice) <= 0:
+	case rev.NewValidProofOutputs[1].Value.Cmp(minHostPrice) < 0:
 		return errors.New("revision price is too small")
 	case rev.NewMissedProofOutputs[0].Value.Cmp(rev.NewValidProofOutputs[0].Value) != 0:
 		return errors.New("revision missed renter payout does not match valid payout")
@@ -165,16 +162,13 @@ func (h *Host) considerRevision(txn types.Transaction, obligation contractObliga
 	return nil
 }
 
-// rpcUpload is an RPC that negotiates a file contract. Under the new scheme,
-// file contracts should not initially hold any data.
-func (h *Host) rpcUpload(conn net.Conn) error {
-	// Check that the host has grabbed an address from the wallet.
-	if h.UnlockHash == (types.UnlockHash{}) {
-		return errors.New("host needs an address; have you properly announced?")
-	}
-
-	// allow 1 minute for contract negotiation
-	conn.SetDeadline(time.Now().Add(1 * time.Minute))
+// negotiateContract negotiates an initial file contract with a renter, and
+// adds the metadata to the host's obligation set. The merkleRoot and filename
+// arguments are provided to make negotiateContract usable with both rpcUpload
+// and rpcRenew.
+func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash, filename string) error {
+	// allow 5 minutes for contract negotiation
+	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
 	// perform key exchange
 	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
@@ -190,11 +184,14 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	if err := encoding.ReadObject(conn, &unsignedTxnSet, maxContractLen); err != nil {
 		return errors.New("couldn't read the initial transaction set: " + err.Error())
 	}
+	if len(unsignedTxnSet) == 0 {
+		return errors.New("initial transaction set was empty")
+	}
 
 	// check the contract transaction, which should be the last txn in the set.
 	contractTxn := unsignedTxnSet[len(unsignedTxnSet)-1]
 	h.mu.RLock()
-	err := h.considerContract(contractTxn, renterKey)
+	err := h.considerContract(contractTxn, renterKey, merkleRoot)
 	h.mu.RUnlock()
 	if err != nil {
 		encoding.WriteObject(conn, err.Error())
@@ -238,9 +235,6 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	err = h.tpool.AcceptTransactionSet(signedTxnSet)
 	if err == modules.ErrDuplicateTransactionSet {
 		// this can happen if the host is uploading to itself
-		//
-		// TODO: is it possible for renter to cause a collision, overwriting a
-		// previous file contract?
 		err = nil
 	}
 	if err != nil {
@@ -248,13 +242,11 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	}
 
 	// Add this contract to the host's list of obligations.
-	// TODO: is there a race condition here?
 	h.mu.Lock()
-	h.fileCounter++
 	co := &contractObligation{
 		ID:           contractTxn.FileContractID(0),
 		FileContract: contractTxn.FileContracts[0],
-		Path:         filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter)),
+		Path:         filename,
 	}
 	// first revision is empty
 	co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
@@ -270,6 +262,23 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	}
 
 	return nil
+}
+
+// rpcUpload is an RPC that negotiates a file contract. Under the new scheme,
+// file contracts should not initially hold any data.
+func (h *Host) rpcUpload(conn net.Conn) error {
+	// Check that the host has grabbed an address from the wallet.
+	if h.UnlockHash == (types.UnlockHash{}) {
+		return errors.New("couldn't negotiate contract: host does not have an address")
+	}
+
+	h.mu.RLock()
+	h.fileCounter++
+	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter))
+	h.mu.RUnlock()
+
+	// negotiate expecting empty Merkle root
+	return h.negotiateContract(conn, crypto.Hash{}, filename)
 }
 
 // rpcRevise is an RPC that allows a renter to revise a file contract. It will
@@ -408,4 +417,48 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	}
 
 	return revisionErr
+}
+
+// rpcRenew is an RPC that allows a renter to renew a file contract. The
+// protocol is identical to standard contract negotiation, except that the
+// Merkle root is copied over from the old contract.
+func (h *Host) rpcRenew(conn net.Conn) error {
+	// read ID of contract to be renewed
+	var fcid types.FileContractID
+	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
+		return errors.New("couldn't read contract ID: " + err.Error())
+	}
+
+	h.mu.RLock()
+	obligation, exists := h.obligationsByID[fcid]
+	h.mu.RUnlock()
+	if !exists {
+		return errors.New("no record of that contract")
+	}
+
+	// need to protect against simultaneous renewals of the same contract
+	obligation.mu.Lock()
+	defer obligation.mu.Unlock()
+	merkleRoot := obligation.LastRevisionTxn.FileContractRevisions[0].NewFileMerkleRoot
+
+	// copy over old file data
+	h.mu.RLock()
+	h.fileCounter++
+	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter))
+	h.mu.RUnlock()
+
+	old, err := os.Open(obligation.Path)
+	if err != nil {
+		return err
+	}
+	renewed, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(renewed, old)
+	if err != nil {
+		return err
+	}
+
+	return h.negotiateContract(conn, merkleRoot, filename)
 }
