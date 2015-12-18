@@ -50,13 +50,14 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	var wg sync.WaitGroup
 	wg.Add(numPieces)
 	for i := 0; i < numPieces; i++ {
-		go func(i int) {
+		// each goroutine gets a different host, index, and piece, so there
+		// are no data race concerns
+		pIndex := missingPieces[i]
+		go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
 			defer wg.Done()
-			host := hosts[i]
-			pieceIndex := missingPieces[i]
 
 			// upload data to host
-			offset, err := host.Upload(pieces[pieceIndex])
+			offset, err := host.Upload(piece)
 			if err != nil {
 				return
 			}
@@ -80,7 +81,7 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 				Offset: offset,
 			})
 			f.contracts[host.ContractID()] = contract
-		}(i)
+		}(hosts[i], pIndex, pieces[pIndex])
 	}
 	wg.Wait()
 
