@@ -31,7 +31,7 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 	}
 
 	// create our key
-	ourSK, ourPK, err := crypto.StdKeyGen.Generate()
+	ourSK, ourPK, err := crypto.GenerateKeyPair()
 	if err != nil {
 		return hostContract{}, errors.New("failed to generate keypair: " + err.Error())
 	}

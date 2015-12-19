@@ -3,6 +3,7 @@ package renter
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"strconv"
 	"sync"
 	"testing"
@@ -47,7 +48,7 @@ func (h *testHost) Upload(data []byte) (offset uint64, err error) {
 
 	// randomly fail
 	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
-		return 0, crypto.ErrNilInput
+		return 0, errors.New("no data")
 	}
 
 	h.data = append(h.data, data...)

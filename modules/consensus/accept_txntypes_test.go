@@ -429,7 +429,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	file.Seek(0, 0)
 
 	// Create a spendable unlock hash for the file contract.
-	sk, pk, err := crypto.StdKeyGen.Generate()
+	sk, pk, err := crypto.GenerateKeyPair()
 	if err != nil {
 		panic(err)
 	}
