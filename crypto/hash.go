@@ -8,9 +8,9 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"hash"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -74,19 +74,21 @@ func (h Hash) MarshalJSON() ([]byte, error) {
 
 // String prints the hash in hex.
 func (h Hash) String() string {
-	return fmt.Sprintf("%x", h[:])
+	return hex.EncodeToString(h[:])
 }
 
 // UnmarshalJSON decodes the json hex string of the hash.
 func (h *Hash) UnmarshalJSON(b []byte) error {
+	// *2 because there are 2 hex characters per byte.
+	// +2 because the encoded JSON string has a `"` added at the beginning and end.
 	if len(b) != HashSize*2+2 {
 		return ErrHashWrongLen
 	}
 
-	var hBytes []byte
-	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &hBytes)
+	// b[1 : len(b)-1] cuts off the leading and trailing `"` in the JSON string.
+	hBytes, err := hex.DecodeString(string(b[1 : len(b)-1]))
 	if err != nil {
-		return errors.New("could not unmarshal crypto.Hash: " + err.Error())
+		return err
 	}
 	copy(h[:], hBytes)
 	return nil
