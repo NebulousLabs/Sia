@@ -16,7 +16,7 @@ func TestTreeBuilder(t *testing.T) {
 	bytes := [][]byte{{1}, {2}}
 	_ = MerkleRoot(bytes)
 
-	// correctness is assumed, as it's tested by the merkletree package. This
+	// Correctness is assumed, as it's tested by the merkletree package. This
 	// function is really for code coverage.
 }
 
@@ -44,7 +44,7 @@ func TestCalculateLeaves(t *testing.T) {
 // TestStorageProof builds a storage proof and checks that it verifies
 // correctly.
 func TestStorageProof(t *testing.T) {
-	// generate proof data
+	// Generate proof data.
 	numSegments := uint64(7)
 	data := make([]byte, numSegments*SegmentSize)
 	rand.Read(data)
@@ -53,7 +53,7 @@ func TestStorageProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create and verify proofs for all indices
+	// Create and verify proofs for all indices.
 	for i := uint64(0); i < numSegments; i++ {
 		baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), i)
 		if err != nil {
@@ -75,10 +75,10 @@ func TestStorageProof(t *testing.T) {
 	}
 }
 
-// TestPaddedStorageProof builds a storage proof that has padding in the last
-// segment, and then requests a proof on the padded segment.
-func TestPaddedStorageProof(t *testing.T) {
-	// generate proof data
+// TestNonMultipleNumberOfSegmentsStorageProof builds a storage proof that has
+// a last leaf of size less than SegmentSize.
+func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
+	// Generate proof data.
 	data := make([]byte, (2*SegmentSize)+10)
 	rand.Read(data)
 	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data))
@@ -86,7 +86,7 @@ func TestPaddedStorageProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create and verify a proof for the last index.
+	// Create and verify a proof for the last index.
 	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 2)
 	if err != nil {
 		t.Error(err)
@@ -113,24 +113,24 @@ func TestReadSegments(t *testing.T) {
 	}
 	rootHash := m.Root()
 
-	// Generate merkle tree root using ReaderMerkleRoot
+	// Generate merkle tree root using ReaderMerkleRoot.
 	expectedHash, err := ReaderMerkleRoot(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Compare roots
+	// Compare roots.
 	if rootHash != expectedHash {
 		t.Errorf("root hashes not consistent: expected %s, got %s\n", expectedHash, rootHash)
 	}
 }
 
-// TestPartialLastLeafReadSegments tests MerkleTree.ReadSements for data that
-// doesn't fit evently into a whole number of leaves. It does so by building a
-// MerkleTree with MerkleTree.ReadSegments and comparing its root with the root
-// returned from ReaderMerkleRoot.
-func TestPartialLastLeafReadSegments(t *testing.T) {
-	// Generate leaf data that doesn't fit evenly into n leaves.
+// TestNonMultipleNumberOfSegmentsReadSegments tests MerkleTree.ReadSements for
+// data that doesn't fit evently into a whole number of leaves. It does so by
+// building a MerkleTree with MerkleTree.ReadSegments and comparing its root
+// with the root returned from ReaderMerkleRoot.
+func TestNonMultipleNumberOfSegmentsReadSegments(t *testing.T) {
+	// Generate leaf data that doesn't fit evenly into leaves.
 	numSegments := 2.5
 	data := make([]byte, int(numSegments*SegmentSize))
 	rand.Read(data)
@@ -144,13 +144,13 @@ func TestPartialLastLeafReadSegments(t *testing.T) {
 	}
 	rootHash := m.Root()
 
-	// Generate merkle tree root using ReaderMerkleRoot
+	// Generate merkle tree root using ReaderMerkleRoot.
 	expectedHash, err := ReaderMerkleRoot(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Compare roots
+	// Compare roots.
 	if rootHash != expectedHash {
 		t.Errorf("root hashes not consistent: expected %s, got %s\n", expectedHash, rootHash)
 	}
