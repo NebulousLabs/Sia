@@ -15,7 +15,10 @@ func TestStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht := CreateHostTester("TestStorageProof", t)
+	ht, err := newHostTester("TestStorageProof")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create a file contract
 	fc := types.FileContract{
@@ -27,7 +30,7 @@ func TestStorageProof(t *testing.T) {
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(1)}},
 	}
 	txnBuilder := ht.wallet.StartTransaction()
-	err := txnBuilder.FundSiacoins(fc.Payout)
+	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)
 	}
