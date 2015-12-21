@@ -33,11 +33,7 @@ func (t MerkleTree) PushObject(obj interface{}) {
 // to the tree.  No error is returned unless err != io.EOF && err !=
 // io.errUnexpectedEOF
 func (t MerkleTree) ReadSegments(r io.Reader) error {
-	err := t.ReadAll(r, SegmentSize)
-	if err != nil {
-		return err
-	}
-	return nil
+	return t.ReadAll(r, SegmentSize)
 }
 
 // Root returns the Merkle root of all the objects pushed to the tree.
