@@ -88,7 +88,7 @@ func (h *Hash) UnmarshalJSON(b []byte) error {
 	// b[1 : len(b)-1] cuts off the leading and trailing `"` in the JSON string.
 	hBytes, err := hex.DecodeString(string(b[1 : len(b)-1]))
 	if err != nil {
-		return err
+		return errors.New("could not unmarshal crypto.Hash: " + err.Error())
 	}
 	copy(h[:], hBytes)
 	return nil
