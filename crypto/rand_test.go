@@ -4,9 +4,7 @@ import (
 	"testing"
 )
 
-// TestRandIntnPanics tests that RandIntn panics if n <= 0. The crypto/rand
-// package guarantees that rand.Int will panic if n <= 0, but other random
-// packages might not.
+// TestRandIntnPanics tests that RandIntn panics if n <= 0.
 func TestRandIntnPanics(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
