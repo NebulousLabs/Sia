@@ -7,17 +7,6 @@ import (
 	"testing"
 )
 
-var (
-	ciphertextMarshallingTests = []struct {
-		ct        Ciphertext
-		jsonBytes []byte
-	}{
-		{ct: Ciphertext(nil), jsonBytes: []byte("null")},
-		{ct: Ciphertext(""), jsonBytes: []byte(`""`)},
-		{ct: Ciphertext("a ciphertext"), jsonBytes: []byte(`"YSBjaXBoZXJ0ZXh0"`) /* base64 encoding of the Ciphertext */},
-	}
-)
-
 // TestTwofishEncryption checks that encryption and decryption works correctly.
 func TestTwofishEncryption(t *testing.T) {
 	// Get a key for encryption.
@@ -153,27 +142,8 @@ func TestTwofishEntropy(t *testing.T) {
 	}
 }
 
-// TestUnitCiphertextMarshalJSON tests that Ciphertext.MarshalJSON never fails,
-// because json.Marshal should nevef fail to encode a byte slice.
-func TestUnitCiphertextMarshalJSON(t *testing.T) {
-	for _, test := range ciphertextMarshallingTests {
-		ct := test.ct
-		expectedJSONBytes := test.jsonBytes
-
-		jsonBytes, err := ct.MarshalJSON()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(jsonBytes, expectedJSONBytes) {
-			t.Errorf("cipher text %#v encoded incorrectly: expected %q, got %q\n", ct, expectedJSONBytes, jsonBytes)
-		}
-	}
-}
-
-// TestUnitCiphertextUnmarshalJSON tests that Ciphertext.UnmarshalJSON correctly
-// fails on invalid JSON marshalled Ciphertext and doesn't fail on valid JSON
-// marshalled Ciphertext. Also tests that valid JSON marshalled Ciphertext
-// decodes to the correct JSON.
+// TestUnitCiphertextUnmarshalJSON tests that Ciphertext.UnmarshalJSON
+// correctly fails on invalid JSON marshalled Ciphertext.
 func TestUnitCiphertextUnmarshalJSON(t *testing.T) {
 	// Test unmarshalling invalid JSON.
 	invalidJSONBytes := [][]byte{
@@ -188,30 +158,27 @@ func TestUnitCiphertextUnmarshalJSON(t *testing.T) {
 			t.Errorf("expected unmarshall to fail on the invalid JSON: %q\n", jsonBytes)
 		}
 	}
-
-	// Test unmarshalling valid JSON.
-	for _, test := range ciphertextMarshallingTests {
-		expectedCt := test.ct
-		jsonBytes := test.jsonBytes
-
-		var ct Ciphertext
-		err := ct.UnmarshalJSON(jsonBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if expectedCt == nil && ct != nil || expectedCt != nil && ct == nil || !bytes.Equal(expectedCt, ct) {
-			t.Errorf("JSON %q decoded incorrectly: expected %#v, got %#v\n", jsonBytes, expectedCt, ct)
-		}
-	}
 }
 
-// TestCiphertextMarshalling tests that marshalling Ciphertexts to JSON and
-// back results in the same Ciphertext.
+// TestCiphertextMarshalling tests that marshalling Ciphertexts to JSON results
+// in the expected JSON. Also tests that marshalling that JSON back to
+// Ciphertext results in the original Ciphertext.
 func TestCiphertextMarshalling(t *testing.T) {
+	// Ciphertexts and corresponding JSONs to test marshalling and unmarshalling.
+	ciphertextMarshallingTests := []struct {
+		ct        Ciphertext
+		jsonBytes []byte
+	}{
+		{ct: Ciphertext(nil), jsonBytes: []byte("null")},
+		{ct: Ciphertext(""), jsonBytes: []byte(`""`)},
+		{ct: Ciphertext("a ciphertext"), jsonBytes: []byte(`"YSBjaXBoZXJ0ZXh0"`) /* base64 encoding of the Ciphertext */},
+	}
 	for _, test := range ciphertextMarshallingTests {
 		expectedCt := test.ct
-		// Create a copy of expectedCt so Unmarshalling does not modify
-		// it (we need it later for comparison).
+		expectedJSONBytes := test.jsonBytes
+
+		// Create a copy of expectedCt so Unmarshalling does not modify it, as
+		// we need it later for comparison.
 		var ct Ciphertext
 		if expectedCt == nil {
 			ct = nil
@@ -225,14 +192,18 @@ func TestCiphertextMarshalling(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// And then back to Ciphertext.
+		if !bytes.Equal(jsonBytes, expectedJSONBytes) {
+			t.Fatalf("Ciphertext %#v marshalled incorrectly: expected %q, got %q\n", ct, expectedJSONBytes, jsonBytes)
+		}
+
+		// Unmarshal back to Ciphertext.
 		err = ct.UnmarshalJSON(jsonBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Compare original Ciphertext (expectedCt) with resulting Ciphertext (ct).
 		if expectedCt == nil && ct != nil || expectedCt != nil && ct == nil || !bytes.Equal(expectedCt, ct) {
-			t.Errorf("Ciphertext %#v marshalled incorrectly: got %#v\n", expectedCt, ct)
+			t.Errorf("Ciphertext %#v unmarshalled incorrectly: got %#v\n", expectedCt, ct)
 		}
 	}
 }
