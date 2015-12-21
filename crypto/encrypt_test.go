@@ -141,3 +141,74 @@ func TestTwofishEntropy(t *testing.T) {
 		t.Error("supposedly high entropy ciphertext has been compressed!")
 	}
 }
+
+// TestUnitCiphertextUnmarshalInvalidJSON tests that Ciphertext.UnmarshalJSON
+// correctly fails on invalid JSON marshalled Ciphertext.
+func TestUnitCiphertextUnmarshalInvalidJSON(t *testing.T) {
+	// Test unmarshalling invalid JSON.
+	invalidJSONBytes := [][]byte{
+		nil,
+		[]byte{},
+		[]byte("\""),
+	}
+	for _, jsonBytes := range invalidJSONBytes {
+		var ct Ciphertext
+		err := ct.UnmarshalJSON(jsonBytes)
+		if err == nil {
+			t.Errorf("expected unmarshall to fail on the invalid JSON: %q\n", jsonBytes)
+		}
+	}
+}
+
+// TestCiphertextMarshalling tests that marshalling Ciphertexts to JSON results
+// in the expected JSON. Also tests that marshalling that JSON back to
+// Ciphertext results in the original Ciphertext.
+func TestCiphertextMarshalling(t *testing.T) {
+	// Ciphertexts and corresponding JSONs to test marshalling and
+	// unmarshalling.
+	ciphertextMarshallingTests := []struct {
+		ct        Ciphertext
+		jsonBytes []byte
+	}{
+		{ct: Ciphertext(nil), jsonBytes: []byte("null")},
+		{ct: Ciphertext(""), jsonBytes: []byte(`""`)},
+		{ct: Ciphertext("a ciphertext"), jsonBytes: []byte(`"YSBjaXBoZXJ0ZXh0"`) /* base64 encoding of the Ciphertext */},
+	}
+	for _, test := range ciphertextMarshallingTests {
+		expectedCt := test.ct
+		expectedJSONBytes := test.jsonBytes
+
+		// Create a copy of expectedCt so Unmarshalling does not modify it, as
+		// we need it later for comparison.
+		var ct Ciphertext
+		if expectedCt == nil {
+			ct = nil
+		} else {
+			ct = make(Ciphertext, len(expectedCt))
+			copy(ct, expectedCt)
+		}
+
+		// Marshal Ciphertext to JSON.
+		jsonBytes, err := ct.MarshalJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(jsonBytes, expectedJSONBytes) {
+			// Use %#v instead of %v because %v prints Ciphertexts constructed
+			// with nil and []byte{} identically.
+			t.Fatalf("Ciphertext %#v marshalled incorrectly: expected %q, got %q\n", ct, expectedJSONBytes, jsonBytes)
+		}
+
+		// Unmarshal back to Ciphertext.
+		err = ct.UnmarshalJSON(jsonBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Compare resulting Ciphertext with expected Ciphertext.
+		if expectedCt == nil && ct != nil || expectedCt != nil && ct == nil || !bytes.Equal(expectedCt, ct) {
+			// Use %#v instead of %v because %v prints Ciphertexts constructed
+			// with nil and []byte{} identically.
+			t.Errorf("Ciphertext %#v unmarshalled incorrectly: got %#v\n", expectedCt, ct)
+		}
+	}
+}

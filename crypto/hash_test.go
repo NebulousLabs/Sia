@@ -1,22 +1,26 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"sort"
+	"strings"
 	"testing"
 )
 
-// TestObject is a struct that's used for testing HashAll and HashObject. The
-// fields have to be exported so the encoder can read them.
-type TestObject struct {
-	A int
-	B byte
-	C bool
-	D string
-}
+type (
+	// TestObject is a struct that's used for testing HashAll and HashObject. The
+	// fields have to be exported so the encoder can read them.
+	TestObject struct {
+		A int
+		B byte
+		C bool
+		D string
+	}
+)
 
-// testHashing uses each of the functions in hash.go and verifies that the
+// TestHashing uses each of the functions in hash.go and verifies that the
 // results are as expected.
 func TestHashing(t *testing.T) {
 	// Create a test object.
@@ -80,6 +84,59 @@ func TestHashSorting(t *testing.T) {
 	}
 	if hashes[4][0] != 14 {
 		t.Error("bad sort")
+	}
+}
+
+// TestUnitHashMarshalJSON tests that Hashes are correctly marshalled to JSON.
+func TestUnitHashMarshalJSON(t *testing.T) {
+	h := HashObject("an object")
+	jsonBytes, err := h.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(jsonBytes, []byte(`"`+h.String()+`"`)) {
+		t.Errorf("hash %s encoded incorrectly: got %s\n", h, jsonBytes)
+	}
+}
+
+// TestUnitHashUnmarshalJSON tests that unmarshalling invalid JSON will result
+// in an error.
+func TestUnitHashUnmarshalJSON(t *testing.T) {
+	// Test unmarshalling invalid data.
+	invalidJSONBytes := [][]byte{
+		// Invalid JSON.
+		nil,
+		[]byte{},
+		[]byte("\""),
+		// JSON of wrong length.
+		[]byte(""),
+		[]byte(`"` + strings.Repeat("a", HashSize*2-1) + `"`),
+		[]byte(`"` + strings.Repeat("a", HashSize*2+1) + `"`),
+		// JSON of right length but invalid Hashes.
+		[]byte(`"` + strings.Repeat("z", HashSize*2) + `"`),
+		[]byte(`"` + strings.Repeat(".", HashSize*2) + `"`),
+		[]byte(`"` + strings.Repeat("\n", HashSize*2) + `"`),
+	}
+
+	for _, jsonBytes := range invalidJSONBytes {
+		var h Hash
+		err := h.UnmarshalJSON(jsonBytes)
+		if err == nil {
+			t.Errorf("expected unmarshall to fail on the invalid JSON: %q\n", jsonBytes)
+		}
+	}
+
+	// Test unmarshalling valid data.
+	expectedH := HashObject("an object")
+	jsonBytes := []byte(`"` + expectedH.String() + `"`)
+
+	var h Hash
+	err := h.UnmarshalJSON(jsonBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(h[:], expectedH[:]) {
+		t.Errorf("Hash %s marshalled incorrectly: got %s\n", expectedH, h)
 	}
 }
 

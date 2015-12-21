@@ -12,8 +12,8 @@ func RandBytes(n int) ([]byte, error) {
 	return b, err
 }
 
-// RandIntn returns a non-negative random integer in the range [0,n). It
-// panics if n <= 0.
+// RandIntn returns a non-negative random integer in the range [0,n). It panics
+// if n <= 0.
 func RandIntn(n int) (int, error) {
 	r, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
 	return int(r.Int64()), err
