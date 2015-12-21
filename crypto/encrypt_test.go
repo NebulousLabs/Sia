@@ -142,9 +142,9 @@ func TestTwofishEntropy(t *testing.T) {
 	}
 }
 
-// TestUnitCiphertextUnmarshalJSON tests that Ciphertext.UnmarshalJSON
+// TestUnitCiphertextUnmarshalInvalidJSON tests that Ciphertext.UnmarshalJSON
 // correctly fails on invalid JSON marshalled Ciphertext.
-func TestUnitCiphertextUnmarshalJSON(t *testing.T) {
+func TestUnitCiphertextUnmarshalInvalidJSON(t *testing.T) {
 	// Test unmarshalling invalid JSON.
 	invalidJSONBytes := [][]byte{
 		nil,
@@ -164,7 +164,8 @@ func TestUnitCiphertextUnmarshalJSON(t *testing.T) {
 // in the expected JSON. Also tests that marshalling that JSON back to
 // Ciphertext results in the original Ciphertext.
 func TestCiphertextMarshalling(t *testing.T) {
-	// Ciphertexts and corresponding JSONs to test marshalling and unmarshalling.
+	// Ciphertexts and corresponding JSONs to test marshalling and
+	// unmarshalling.
 	ciphertextMarshallingTests := []struct {
 		ct        Ciphertext
 		jsonBytes []byte
@@ -187,12 +188,14 @@ func TestCiphertextMarshalling(t *testing.T) {
 			copy(ct, expectedCt)
 		}
 
-		// Marshal ct to JSON.
+		// Marshal Ciphertext to JSON.
 		jsonBytes, err := ct.MarshalJSON()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !bytes.Equal(jsonBytes, expectedJSONBytes) {
+			// Use %#v instead of %v because %v prints Ciphertexts constructed
+			// with nil and []byte{} identically.
 			t.Fatalf("Ciphertext %#v marshalled incorrectly: expected %q, got %q\n", ct, expectedJSONBytes, jsonBytes)
 		}
 
@@ -201,8 +204,10 @@ func TestCiphertextMarshalling(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Compare original Ciphertext (expectedCt) with resulting Ciphertext (ct).
+		// Compare resulting Ciphertext with expected Ciphertext.
 		if expectedCt == nil && ct != nil || expectedCt != nil && ct == nil || !bytes.Equal(expectedCt, ct) {
+			// Use %#v instead of %v because %v prints Ciphertexts constructed
+			// with nil and []byte{} identically.
 			t.Errorf("Ciphertext %#v unmarshalled incorrectly: got %#v\n", expectedCt, ct)
 		}
 	}
