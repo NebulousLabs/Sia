@@ -29,18 +29,13 @@ func (t MerkleTree) PushObject(obj interface{}) {
 }
 
 // ReadSegments reads segments from r into the tree. If EOF is encountered
-// mid-segment, the zero-padded segment is added to the tree and no error is
-// returned.
+// mid-segment, the leaf is resized to the number of bytes read and then added
+// to the tree.  No error is returned unless err != io.EOF && err !=
+// io.errUnexpectedEOF
 func (t MerkleTree) ReadSegments(r io.Reader) error {
-	buf := make([]byte, SegmentSize)
-	for {
-		_, err := io.ReadFull(r, buf)
-		if err == io.EOF {
-			break
-		} else if err != nil && err != io.ErrUnexpectedEOF {
-			return err
-		}
-		t.Push(buf)
+	err := t.ReadAll(r, SegmentSize)
+	if err != nil {
+		return err
 	}
 	return nil
 }
