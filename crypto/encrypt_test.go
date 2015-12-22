@@ -69,9 +69,15 @@ func TestTwofishEncryption(t *testing.T) {
 		t.Error("Expecting ErrInsufficientLen:", err)
 	}
 
-	// Try to trigger a panic with nil values.
-	key.EncryptBytes(nil)
-	key.DecryptBytes(nil)
+	// Try to trigger a panic or error with nil values.
+	_, err = key.EncryptBytes(nil)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = key.DecryptBytes(nil)
+	if err != ErrInsufficientLen {
+		t.Error("Expecting ErrInsufficientLen:", err)
+	}
 }
 
 // TestReaderWriter probes the NewReader and NewWriter methods of the key type.
