@@ -36,6 +36,7 @@ func GenerateTwofishKey() (key TwofishKey, err error) {
 // NewCipher creates a new Twofish cipher from the key.
 func (key TwofishKey) NewCipher() cipher.Block {
 	// NOTE: NewCipher only returns an error if len(key) != 16, 24, or 32.
+	//       Assumption tested in TestTwofishNewCipherAssumption.
 	cipher, _ := twofish.NewCipher(key[:])
 	return cipher
 }
@@ -45,6 +46,7 @@ func (key TwofishKey) NewCipher() cipher.Block {
 func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
 	// Create the cipher.
 	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	//       Assumption tested in TestCipherNewGCMAssumption.
 	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Create the nonce.
@@ -63,6 +65,7 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
 func (key TwofishKey) DecryptBytes(ct Ciphertext) ([]byte, error) {
 	// Create the cipher.
 	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	//       Assumption tested in TestCipherNewGCMAssumption.
 	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Check for a nonce.
