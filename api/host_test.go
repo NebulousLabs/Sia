@@ -60,8 +60,8 @@ func TestIntegrationHosting(t *testing.T) {
 	// only one piece will be uploaded (10% at current redundancy)
 	var fi []FileInfo
 	for len(fi) != 1 || fi[0].UploadProgress != 10 {
-		st.getAPI("/renter/files/list", &fi)
 		time.Sleep(3 * time.Second)
+		st.getAPI("/renter/files/list", &fi)
 	}
 
 	// mine blocks until storage proof is complete
