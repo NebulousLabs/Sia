@@ -42,8 +42,11 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings)
 func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
-	hdb.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-	hdb.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+
+	if hdb.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != hdb.cs.GenesisBlock().ID() {
+		hdb.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
+		hdb.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	}
 
 	// Add hosts announced in blocks that were applied.
 	for _, block := range cc.AppliedBlocks {
