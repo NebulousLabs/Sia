@@ -102,7 +102,10 @@ func startDaemon(config Config) error {
 	// Bootstrap to the network.
 	if !config.Siad.NoBootstrap {
 		// connect to 3 random bootstrap nodes
-		perm := crypto.Perm(len(modules.BootstrapPeers))
+		perm, err := crypto.Perm(len(modules.BootstrapPeers))
+		if err != nil {
+			return err
+		}
 		for _, i := range perm[:3] {
 			go gateway.Connect(modules.BootstrapPeers[i])
 		}

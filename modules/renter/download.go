@@ -170,7 +170,11 @@ func (d *download) run(w io.Writer) error {
 		chunk := make([][]byte, d.erasureCode.NumPieces())
 		left := d.erasureCode.MinPieces()
 		// pick hosts at random
-		for _, j := range crypto.Perm(len(chunk)) {
+		chunkOrder, err := crypto.Perm(len(chunk))
+		if err != nil {
+			return err
+		}
+		for _, j := range chunkOrder {
 			chunk[j] = d.getPiece(i, uint64(j))
 			if chunk[j] != nil {
 				left--
@@ -189,7 +193,7 @@ func (d *download) run(w io.Writer) error {
 		if n > d.fileSize-received {
 			n = d.fileSize - received
 		}
-		err := d.erasureCode.Recover(chunk, uint64(n), w)
+		err = d.erasureCode.Recover(chunk, uint64(n), w)
 		if err != nil {
 			return err
 		}
