@@ -49,11 +49,12 @@ type Host struct {
 	wallet modules.Wallet
 
 	// Host Context.
-	blockHeight types.BlockHeight
-	netAddress  modules.NetAddress
-	publicKey   types.SiaPublicKey
-	secretKey   crypto.SecretKey
-	settings    modules.HostSettings
+	blockHeight       types.BlockHeight
+	consensusChangeID modules.ConsensusChangeID
+	netAddress        modules.NetAddress
+	publicKey         types.SiaPublicKey
+	secretKey         crypto.SecretKey
+	settings          modules.HostSettings
 
 	// File management.
 	fileCounter         int64
@@ -148,7 +149,7 @@ func (h *Host) Close() error {
 		return err
 	}
 
-	h.cs.Unsubscribe(h) // no error
+	h.cs.Unsubscribe(h)
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -19,68 +20,98 @@ const (
 // has been saved to disk.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Host",
-	Version: "0.4",
+	Version: "0.5",
 }
 
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
-	BlockHeight    types.BlockHeight
-	FileCounter    int64
-	HostSettings   modules.HostSettings
-	Profit         types.Currency
-	SpaceRemaining int64
-	Obligations    []contractObligation
-	SecretKey      crypto.SecretKey
-	PublicKey      types.SiaPublicKey
+	// Host Context.
+	BlockHeight       types.BlockHeight
+	ConsensusChangeID modules.ConsensusChangeID
+	PublicKey         types.SiaPublicKey
+	SecretKey         crypto.SecretKey
+	Settings          modules.HostSettings
+
+	// File Management.
+	FileCounter int64
+	Obligations []contractObligation
+
+	// Statistics.
+	Profit types.Currency
 }
 
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
-	sHost := persistence{
-		SpaceRemaining: h.spaceRemaining,
-		FileCounter:    h.fileCounter,
-		Profit:         h.profit,
-		HostSettings:   h.settings,
-		Obligations:    make([]contractObligation, 0, len(h.obligationsByID)),
-		SecretKey:      h.secretKey,
-		PublicKey:      h.publicKey,
+	p := persistence{
+		BlockHeight:       h.blockHeight,
+		ConsensusChangeID: h.consensusChangeID,
+		PublicKey:         h.publicKey,
+		SecretKey:         h.secretKey,
+		Settings:          h.settings,
+
+		FileCounter: h.fileCounter,
+		Obligations: make([]contractObligation, 0, len(h.obligationsByID)),
+
+		Profit: h.profit,
 	}
+	// Fill out the obligations using the host obligations map.
 	for _, ob := range h.obligationsByID {
-		// to avoid race conditions involving the obligation's mutex, copy it
-		// manually into a new object
-		obcopy := contractObligation{ID: ob.ID, FileContract: ob.FileContract, LastRevisionTxn: ob.LastRevisionTxn, Path: ob.Path}
-		sHost.Obligations = append(sHost.Obligations, obcopy)
+		ob.mu.Lock()
+		p.Obligations = append(p.Obligations, contractObligation{
+			ID:              ob.ID,
+			FileContract:    ob.FileContract,
+			LastRevisionTxn: ob.LastRevisionTxn,
+			Path:            ob.Path,
+		})
+		ob.mu.Unlock()
 	}
 
-	return persist.SaveFile(persistMetadata, sHost, filepath.Join(h.persistDir, "settings.json"))
+	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
 }
 
 // load extrats the save data from disk and populates the host.
 func (h *Host) load() error {
-	var sHost persistence
-	err := persist.LoadFile(persistMetadata, &sHost, filepath.Join(h.persistDir, "settings.json"))
+	var p persistence
+	err := persist.LoadFile(persistMetadata, &p, filepath.Join(h.persistDir, "settings.json"))
 	if err != nil {
 		return err
 	}
 
-	h.spaceRemaining = sHost.HostSettings.TotalStorage
-	h.fileCounter = sHost.FileCounter
-	h.settings = sHost.HostSettings
-	h.profit = sHost.Profit
-	// recreate maps
-	for i := range sHost.Obligations {
-		obligation := &sHost.Obligations[i] // both maps should use same pointer
+	// Copy over the host context.
+	h.blockHeight = p.BlockHeight
+	h.consensusChangeID = p.ConsensusChangeID
+	h.publicKey = p.PublicKey
+	h.secretKey = p.SecretKey
+	h.settings = p.Settings
+
+	// Copy over the file management. The space remaining is recalculated from
+	// disk instead of being saved.
+	h.fileCounter = p.FileCounter
+	h.spaceRemaining = p.Settings.TotalStorage
+	for i := range p.Obligations {
+		obligation := &p.Obligations[i] // both maps should use same pointer
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
+		// Sanity check - if the height is below the current height, then set
+		// the height to current height + 3. This makes sure that all file
+		// contracts will eventually be hit or garbage collected by the host,
+		// even if a bug means that they aren't acted upon at the right moment.
+		if build.DEBUG && height < h.blockHeight {
+			panic("host settings file is inconsistent")
+		} else {
+			height = h.blockHeight + 3
+		}
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
 
-		// update spaceRemaining
-		if len(obligation.LastRevisionTxn.FileContractRevisions) > 0 { // COMPATv0.4.8
+		// update spaceRemaining to account for the storage held by this
+		// obligation.
+		if len(obligation.LastRevisionTxn.FileContractRevisions) > 0 {
 			h.spaceRemaining -= int64(obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize)
 		}
 	}
-	h.secretKey = sHost.SecretKey
-	h.publicKey = sHost.PublicKey
+
+	// Copy over statistics.
+	h.profit = p.Profit
 
 	return nil
 }
