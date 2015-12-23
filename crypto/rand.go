@@ -21,12 +21,16 @@ func RandIntn(n int) (int, error) {
 
 // Perm returns, as a slice of n ints, a random permutation of the integers
 // [0,n).
-func Perm(n int) []int {
+func Perm(n int) ([]int, error) {
 	m := make([]int, n)
 	for i := 0; i < n; i++ {
-		j, _ := RandIntn(i + 1)
+		j, err := RandIntn(i + 1)
+		if err != nil {
+			return nil, err
+		}
+
 		m[i] = m[j]
 		m[j] = i
 	}
-	return m
+	return m, nil
 }

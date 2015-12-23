@@ -69,9 +69,15 @@ func TestTwofishEncryption(t *testing.T) {
 		t.Error("Expecting ErrInsufficientLen:", err)
 	}
 
-	// Try to trigger a panic with nil values.
-	key.EncryptBytes(nil)
-	key.DecryptBytes(nil)
+	// Try to trigger a panic or error with nil values.
+	_, err = key.EncryptBytes(nil)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = key.DecryptBytes(nil)
+	if err != ErrInsufficientLen {
+		t.Error("Expecting ErrInsufficientLen:", err)
+	}
 }
 
 // TestReaderWriter probes the NewReader and NewWriter methods of the key type.
@@ -210,5 +216,36 @@ func TestCiphertextMarshalling(t *testing.T) {
 			// with nil and []byte{} identically.
 			t.Errorf("Ciphertext %#v unmarshalled incorrectly: got %#v\n", expectedCt, ct)
 		}
+	}
+}
+
+// TestTwofishNewCipherAssumption tests that the length of a TwofishKey is 16,
+// 24, or 32 as these are the only cases where twofish.NewCipher(key[:])
+// doesn't return an error.
+func TestTwofishNewCipherAssumption(t *testing.T) {
+	// Generate key.
+	key, err := GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test key length.
+	keyLen := len(key)
+	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+		t.Errorf("TwofishKey must have length 16, 24, or 32, but generated key has length %d\n", keyLen)
+	}
+}
+
+// TestCipherNewGCMAssumption tests that the BlockSize of a cipher block is 16,
+// as this is the only case where cipher.NewGCM(block) doesn't return an error.
+func TestCipherNewGCMAssumption(t *testing.T) {
+	// Generate a key and then cipher block from key.
+	key, err := GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test block size.
+	block := key.NewCipher()
+	if block.BlockSize() != 16 {
+		t.Errorf("cipher must have BlockSize 16, but generated cipher has BlockSize %d\n", block.BlockSize())
 	}
 }
