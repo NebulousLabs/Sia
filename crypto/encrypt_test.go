@@ -229,9 +229,9 @@ func TestTwofishNewCipherAssumption(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Test key length.
-	len := len(key)
-	if len != 16 && len != 24 && len != 32 {
-		t.Errorf("TwofishKey must have length 16, 24, or 32, but generated key has length %d\n", len)
+	keyLen := len(key)
+	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+		t.Errorf("TwofishKey must have length 16, 24, or 32, but generated key has length %d\n", keyLen)
 	}
 }
 
