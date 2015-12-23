@@ -163,6 +163,16 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 // Close terminates all ongoing processes involving the miner, enabling garbage
 // collection.
 func (m *Miner) Close() error {
+	// Save the latest miner state.
+	err := func() error {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return m.save()
+	}()
+	if err != nil {
+		return err
+	}
+
 	m.cs.Unsubscribe(m)
 	return m.log.Close()
 }
