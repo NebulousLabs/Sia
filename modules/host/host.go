@@ -49,12 +49,12 @@ type Host struct {
 	wallet modules.Wallet
 
 	// Host Context.
-	blockHeight       types.BlockHeight
-	consensusChangeID modules.ConsensusChangeID
-	netAddress        modules.NetAddress
-	publicKey         types.SiaPublicKey
-	secretKey         crypto.SecretKey
-	settings          modules.HostSettings
+	blockHeight  types.BlockHeight
+	recentChange modules.ConsensusChangeID
+	netAddress   modules.NetAddress
+	publicKey    types.SiaPublicKey
+	secretKey    crypto.SecretKey
+	settings     modules.HostSettings
 
 	// File management.
 	fileCounter         int64
@@ -70,6 +70,28 @@ type Host struct {
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
+}
+
+// startupRescan will rescan the blockchain in the event that the host has
+// become desynchronized with the consensus set. This typically only happens if
+// the user is messing around with the files in sia folder.
+func (h *Host) startupRescan() error {
+	// Reset all of the variables that have relevance to the consensus set. For
+	// the host, this is just the block height.
+	err := func() error {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
+		h.blockHeight = 0
+		return h.save()
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Subscribe to the consensus set. This is a blocking call that will not
+	// return until the host has fully caught up to the current block.
+	return h.cs.ConsensusSetPersistentSubscribe(h, modules.ConsensusChangeID{})
 }
 
 // New returns an initialized Host.
@@ -107,7 +129,19 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		return nil, err
 	}
 
-	h.cs.ConsensusSetSubscribe(h)
+	err = h.cs.ConsensusSetPersistentSubscribe(h, h.recentChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		// Perform a rescan of the consensus set if the change id that the host
+		// has is unrecognized by the consensus set. This will typically only
+		// happen if the user has been replacing files inside the folder
+		// structure.
+		err = h.startupRescan()
+		if err != nil {
+			return nil, errors.New("host rescan failed: " + err.Error())
+		}
+	} else if err != nil {
+		return nil, errors.New("host consensus subscription failed: " + err.Error())
+	}
 
 	return h, nil
 }

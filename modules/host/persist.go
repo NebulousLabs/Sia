@@ -26,11 +26,11 @@ var persistMetadata = persist.Metadata{
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
 	// Host Context.
-	BlockHeight       types.BlockHeight
-	ConsensusChangeID modules.ConsensusChangeID
-	PublicKey         types.SiaPublicKey
-	SecretKey         crypto.SecretKey
-	Settings          modules.HostSettings
+	BlockHeight  types.BlockHeight
+	RecentChange modules.ConsensusChangeID
+	PublicKey    types.SiaPublicKey
+	SecretKey    crypto.SecretKey
+	Settings     modules.HostSettings
 
 	// File Management.
 	FileCounter int64
@@ -43,11 +43,11 @@ type persistence struct {
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
 	p := persistence{
-		BlockHeight:       h.blockHeight,
-		ConsensusChangeID: h.consensusChangeID,
-		PublicKey:         h.publicKey,
-		SecretKey:         h.secretKey,
-		Settings:          h.settings,
+		BlockHeight:  h.blockHeight,
+		RecentChange: h.recentChange,
+		PublicKey:    h.publicKey,
+		SecretKey:    h.secretKey,
+		Settings:     h.settings,
 
 		FileCounter: h.fileCounter,
 		Obligations: make([]contractObligation, 0, len(h.obligationsByID)),
@@ -79,7 +79,7 @@ func (h *Host) load() error {
 
 	// Copy over the host context.
 	h.blockHeight = p.BlockHeight
-	h.consensusChangeID = p.ConsensusChangeID
+	h.recentChange = p.RecentChange
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
 	h.settings = p.Settings
