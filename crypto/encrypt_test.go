@@ -219,29 +219,32 @@ func TestCiphertextMarshalling(t *testing.T) {
 	}
 }
 
+// TestTwofishNewCipherAssumption tests that the length of a TwofishKey is 16,
+// 24, or 32 as these are the only cases where twofish.NewCipher(key[:])
+// doesn't return an error.
 func TestTwofishNewCipherAssumption(t *testing.T) {
 	// Generate key.
 	key, err := GenerateTwofishKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Test that len(key) is 16, 24, or 32 as these are the only cases
-	// where twofish.NewCipher(key[:]) doesn't return an error.
+	// Test key length.
 	len := len(key)
 	if len != 16 && len != 24 && len != 32 {
 		t.Errorf("TwofishKey must have length 16, 24, or 32, but generated key has length %d\n", len)
 	}
 }
 
+// TestCipherNewGCMAssumption tests that the BlockSize of a cipher block is 16,
+// as this is the only case where cipher.NewGCM(block) doesn't return an error.
 func TestCipherNewGCMAssumption(t *testing.T) {
-	// Generate a key and cipher block.
+	// Generate a key and then cipher block from key.
 	key, err := GenerateTwofishKey()
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Test block size.
 	block := key.NewCipher()
-	// Test that block.BlockSize() is 16, as this is the only case where
-	// cipher.NewGCM(block) doesn't return an error.
 	if block.BlockSize() != 16 {
 		t.Errorf("cipher must have BlockSize 16, but generated cipher has BlockSize %d\n", block.BlockSize())
 	}
