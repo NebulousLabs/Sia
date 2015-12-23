@@ -4,21 +4,24 @@ import (
 	"testing"
 )
 
+// panics returns true if the function fn panicked.
+func panics(fn func()) (panicked bool) {
+	defer func() {
+		panicked = (recover() != nil)
+	}()
+	fn()
+	return
+}
+
 // TestRandIntnPanics tests that RandIntn panics if n <= 0.
 func TestRandIntnPanics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for n <= 0")
-		}
-	}()
-
-	_, err := RandIntn(0)
-	if err != nil {
-		t.Error("expected panic on n <= 0, not error")
+	// Test n = 0.
+	if !panics(func() { RandIntn(0) }) {
+		t.Error("expected panic for n <= 0")
 	}
 
-	_, err = RandIntn(-1)
-	if err != nil {
-		t.Error("expected panic on n <= 0, not error")
+	// Test n < 0.
+	if !panics(func() { RandIntn(-1) }) {
+		t.Error("expected panic for n <= 0")
 	}
 }
