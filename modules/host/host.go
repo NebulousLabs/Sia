@@ -120,6 +120,38 @@ func (h *Host) Capacity() int64 {
 	return h.spaceRemaining
 }
 
+// Close shuts down the host, preparing it for garbage collection.
+func (h *Host) Close() error {
+	// The order in which things are closed has been explicitly chosen to
+	// minimize turbulence in the event of an error.
+
+	// Save the latest host state.
+	err := func() error {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return h.save()
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Clean up networking processes.
+	h.clearPort(h.netAddress.Port())
+	err = h.listener.Close()
+	if err != nil {
+		return err
+	}
+
+	// Close the logger.
+	err = h.log.Close()
+	if err != nil {
+		return err
+	}
+
+	h.cs.Unsubscribe(h) // no error
+	return nil
+}
+
 // Contracts returns the number of unresolved file contracts that the host is
 // responsible for.
 func (h *Host) Contracts() uint64 {
@@ -161,18 +193,4 @@ func (h *Host) Settings() modules.HostSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.settings
-}
-
-// Close saves the state of the Gateway and stops its listener process.
-func (h *Host) Close() error {
-	h.mu.RLock()
-	// save the latest host state
-	if err := h.save(); err != nil {
-		return err
-	}
-	h.mu.RUnlock()
-	// clear the port mapping (no effect if UPnP not supported)
-	h.clearPort(h.netAddress.Port())
-	// shut down the listener
-	return h.listener.Close()
 }

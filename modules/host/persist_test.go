@@ -1,9 +1,11 @@
 package host
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -47,5 +49,36 @@ func TestEarlySaving(t *testing.T) {
 	}
 	if ht.host.profit.Cmp(oldProfit) != 0 {
 		t.Error("profit not loaded correctly")
+	}
+}
+
+// TestIntegrationValuePersistence verifies that changes made to the host persist between
+// loads.
+func TestIntegrationValuePersistence(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := blankHostTester("TestIntegrationValuePersistence")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Change one of the features of the host persistence and save.
+	ht.host.fileCounter += 1500
+	oldFileCounter := ht.host.fileCounter
+	err = ht.host.save()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Close the current host and create a new host pointing to the same file.
+	ht.host.Close()
+	newHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the adjusted value has persisted.
+	if newHost.fileCounter != oldFileCounter {
+		t.Fatal(err)
 	}
 }

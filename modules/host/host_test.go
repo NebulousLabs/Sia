@@ -26,6 +26,8 @@ type hostTester struct {
 	walletKey crypto.TwofishKey
 
 	host *Host
+
+	persistDir string
 }
 
 // initWallet creates a wallet key, initializes the host wallet, unlocks it,
@@ -89,6 +91,8 @@ func blankHostTester(name string) (*hostTester, error) {
 		wallet:  w,
 
 		host: h,
+
+		persistDir: testdir,
 	}
 
 	return ht, nil
