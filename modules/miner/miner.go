@@ -67,10 +67,10 @@ type Miner struct {
 	hashRate int64 // indicates hashes per second
 
 	// Utils
-	persistDir string
-	persist    persistence
 	log        *persist.Logger
 	mu         sync.RWMutex
+	persist    persistence
+	persistDir string
 }
 
 // startupRescan will rescan the blockchain in the event that the miner

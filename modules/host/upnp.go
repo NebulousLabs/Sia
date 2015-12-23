@@ -55,8 +55,8 @@ func (h *Host) learnHostname() {
 	}
 
 	h.mu.Lock()
-	h.netAddr = modules.NetAddress(net.JoinHostPort(host, h.netAddr.Port()))
-	h.HostSettings.IPAddress = h.netAddr
+	h.netAddress = modules.NetAddress(net.JoinHostPort(host, h.netAddress.Port()))
+	h.settings.IPAddress = h.netAddress
 	h.save()
 	h.mu.Unlock()
 }
