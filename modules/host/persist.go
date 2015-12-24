@@ -40,6 +40,23 @@ type persistence struct {
 	Profit types.Currency
 }
 
+// saveObligations returns a slice containing all of the contract obligations
+// currently being tracked by the host.
+func (h *Host) saveObligations() []contractObligation {
+	cos := make([]contractObligation, 0, len(h.obligationsByID))
+	for _, ob := range h.obligationsByID {
+		ob.mu.Lock()
+		cos = append(cos, contractObligation{
+			ID:              ob.ID,
+			FileContract:    ob.FileContract,
+			LastRevisionTxn: ob.LastRevisionTxn,
+			Path:            ob.Path,
+		})
+		ob.mu.Unlock()
+	}
+	return cos
+}
+
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
 	p := persistence{
@@ -50,46 +67,18 @@ func (h *Host) save() error {
 		Settings:     h.settings,
 
 		FileCounter: h.fileCounter,
-		Obligations: make([]contractObligation, 0, len(h.obligationsByID)),
+		Obligations: h.saveObligations(),
 
 		Profit: h.profit,
 	}
-	// Fill out the obligations using the host obligations map.
-	for _, ob := range h.obligationsByID {
-		ob.mu.Lock()
-		p.Obligations = append(p.Obligations, contractObligation{
-			ID:              ob.ID,
-			FileContract:    ob.FileContract,
-			LastRevisionTxn: ob.LastRevisionTxn,
-			Path:            ob.Path,
-		})
-		ob.mu.Unlock()
-	}
-
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
 }
 
-// load extrats the save data from disk and populates the host.
-func (h *Host) load() error {
-	var p persistence
-	err := persist.LoadFile(persistMetadata, &p, filepath.Join(h.persistDir, "settings.json"))
-	if err != nil {
-		return err
-	}
-
-	// Copy over the host context.
-	h.blockHeight = p.BlockHeight
-	h.recentChange = p.RecentChange
-	h.publicKey = p.PublicKey
-	h.secretKey = p.SecretKey
-	h.settings = p.Settings
-
-	// Copy over the file management. The space remaining is recalculated from
-	// disk instead of being saved.
-	h.fileCounter = p.FileCounter
-	h.spaceRemaining = p.Settings.TotalStorage
-	for i := range p.Obligations {
-		obligation := &p.Obligations[i] // both maps should use same pointer
+// loadObligations loads file contract obligations from the persistent file
+// into the host.
+func (h *Host) loadObligations(cos []contractObligation) {
+	for i := range cos {
+		obligation := &cos[i] // both maps should use same pointer
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
 		// Sanity check - if the height is below the current height, then set
 		// the height to current height + 3. This makes sure that all file
@@ -109,6 +98,28 @@ func (h *Host) load() error {
 			h.spaceRemaining -= int64(obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize)
 		}
 	}
+}
+
+// load extrats the save data from disk and populates the host.
+func (h *Host) load() error {
+	p := new(persistence)
+	err := persist.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
+	if err != nil {
+		return err
+	}
+
+	// Copy over the host context.
+	h.blockHeight = p.BlockHeight
+	h.recentChange = p.RecentChange
+	h.publicKey = p.PublicKey
+	h.secretKey = p.SecretKey
+	h.settings = p.Settings
+
+	// Copy over the file management. The space remaining is recalculated from
+	// disk instead of being saved.
+	h.fileCounter = p.FileCounter
+	h.spaceRemaining = p.Settings.TotalStorage
+	h.loadObligations(p.Obligations)
 
 	// Copy over statistics.
 	h.profit = p.Profit
