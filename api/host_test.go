@@ -18,7 +18,6 @@ func TestIntegrationHosting(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	st, err := createServerTester("TestIntegrationHosting")
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +75,7 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expRevenue := "31857777777777575235"
+	expRevenue := "15928888888855757473"
 	if hg.Revenue.String() != expRevenue {
 		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
 	}
