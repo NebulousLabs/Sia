@@ -229,8 +229,7 @@ func TestIntegrationAutoRescan(t *testing.T) {
 	mt.miner.persist.RecentChange[0]++
 	mt.miner.persist.Height += 1e5
 	mt.miner.persist.Target[0]++
-	mt.miner.Close()
-	err = mt.miner.save()
+	err = mt.miner.Close() // miner saves when it closes.
 	if err != nil {
 		t.Fatal(err)
 	}
