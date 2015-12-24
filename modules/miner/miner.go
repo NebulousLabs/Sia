@@ -78,12 +78,6 @@ type Miner struct {
 // layer. This might happen if a user replaces any of the folders with backups
 // or deletes any of the folders.
 func (m *Miner) startupRescan() error {
-	// Unsubscribe the miner from the consensus set. Though typically
-	// miner.consensusRescan will only be called if the miner is not yet
-	// subscribed successfully to the consensus set, the function is allowed to
-	// be used in other ways.
-	m.cs.Unsubscribe(m)
-
 	// Reset all of the variables that have relevance to the consensus set. The
 	// operations are wrapped by an anonymous function so that the locking can
 	// be handled using a defer statement.
@@ -94,18 +88,14 @@ func (m *Miner) startupRescan() error {
 		m.persist.RecentChange = modules.ConsensusChangeID{}
 		m.persist.Height = 0
 		m.persist.Target = types.Target{}
-		err := m.save()
-		if err != nil {
-			return err
-		}
-		return nil
+		return m.save()
 	}()
 	if err != nil {
 		return err
 	}
 
-	// ConsensusSetPerscribe is a blocking call that will not return until
-	// rescanning is complete.
+	// Subscribe to the consensus set. This is a blocking call that will not
+	// return until the miner has fully caught up to the current block.
 	return m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
 }
 
