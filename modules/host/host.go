@@ -36,7 +36,10 @@ type contractObligation struct {
 	LastRevisionTxn types.Transaction
 	Path            string // Where on disk the file is stored.
 
-	// revisions must happen in serial
+	// The mutex ensures that revisions are happening in serial. The actual
+	// data under the obligations is being protected by the host's mutex.
+	// Grabbing 'mu' is not sufficient to guarantee modification safety of the
+	// struct, the host mutex must also be grabbed.
 	mu sync.Mutex
 }
 

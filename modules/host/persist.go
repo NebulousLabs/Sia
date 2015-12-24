@@ -40,19 +40,17 @@ type persistence struct {
 	Profit types.Currency
 }
 
-// saveObligations returns a slice containing all of the contract obligations
+// getObligations returns a slice containing all of the contract obligations
 // currently being tracked by the host.
-func (h *Host) saveObligations() []contractObligation {
+func (h *Host) getObligations() []contractObligation {
 	cos := make([]contractObligation, 0, len(h.obligationsByID))
 	for _, ob := range h.obligationsByID {
-		ob.mu.Lock()
 		cos = append(cos, contractObligation{
 			ID:              ob.ID,
 			FileContract:    ob.FileContract,
 			LastRevisionTxn: ob.LastRevisionTxn,
 			Path:            ob.Path,
 		})
-		ob.mu.Unlock()
 	}
 	return cos
 }
@@ -67,7 +65,7 @@ func (h *Host) save() error {
 		Settings:     h.settings,
 
 		FileCounter: h.fileCounter,
-		Obligations: h.saveObligations(),
+		Obligations: h.getObligations(),
 
 		Profit: h.profit,
 	}
@@ -77,6 +75,7 @@ func (h *Host) save() error {
 // loadObligations loads file contract obligations from the persistent file
 // into the host.
 func (h *Host) loadObligations(cos []contractObligation) {
+	// Clear the existing obligations maps.
 	for i := range cos {
 		obligation := &cos[i] // both maps should use same pointer
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
@@ -86,7 +85,7 @@ func (h *Host) loadObligations(cos []contractObligation) {
 		// even if a bug means that they aren't acted upon at the right moment.
 		if build.DEBUG && height < h.blockHeight {
 			panic("host settings file is inconsistent")
-		} else {
+		} else if height < h.blockHeight {
 			height = h.blockHeight + 3
 		}
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
@@ -116,7 +115,8 @@ func (h *Host) load() error {
 	h.settings = p.Settings
 
 	// Copy over the file management. The space remaining is recalculated from
-	// disk instead of being saved.
+	// disk instead of being saved, to maximize the potential usefulness of
+	// restarting Sia as a means of eliminating unkonwn errors.
 	h.fileCounter = p.FileCounter
 	h.spaceRemaining = p.Settings.TotalStorage
 	h.loadObligations(p.Obligations)
