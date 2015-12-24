@@ -12,6 +12,7 @@ import (
 func (h *Host) threadedDeleteObligation(obligation *contractObligation) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
 	err := h.deallocate(obligation.Path)
 	if err != nil {
 		h.log.Printf("WARN: failed to deallocate %v: %v", obligation.Path, err)
@@ -74,17 +75,29 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	h.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-	h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	// Adjust the height of the host. The host height is initialized to zero,
+	// but the genesis block is actually height zero. For the genesis block
+	// only, the height will be left at zero.
+	//
+	// Checking the height here eliminates the need to initialize the host to
+	// and underflowed types.BlockHeight.
+	oldHeight := h.blockHeight
+	if h.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != h.cs.GenesisBlock().ID() {
+		h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+		h.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
+	}
 
-	// Check the applied blocks and see if any of the contracts we have are
-	// ready for storage proofs.
-	for _ = range cc.AppliedBlocks {
-		for _, ob := range h.obligationsByHeight[h.blockHeight] {
+	// Check the range of heights between the previous height and the current
+	// height for storage proof obligations. There is no mechanism for
+	// re-submitting a storage proof in the event of a deep reorg, but the host
+	// waits StorageProofReorgDepth confirmations before submitting a storage
+	// proof. Reorgs deeper than that are assumed to be rare enough that it's
+	// okay for the host to eat losses under those circumstances.
+	for oldHeight < h.blockHeight {
+		oldHeight++
+		for _, ob := range h.obligationsByHeight[oldHeight] {
 			go h.threadedCreateStorageProof(ob)
 		}
-		// TODO: If something happens while the storage proofs are being
-		// created, those files will never get cleared from the host.
-		delete(h.obligationsByHeight, h.blockHeight)
+		delete(h.obligationsByHeight, oldHeight)
 	}
 }

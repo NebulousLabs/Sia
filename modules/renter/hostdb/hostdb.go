@@ -32,6 +32,7 @@ var (
 // for uploading files.
 type HostDB struct {
 	// modules
+	cs     modules.ConsensusSet
 	wallet modules.Wallet
 	tpool  modules.TransactionPool
 
@@ -88,6 +89,7 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 	}
 
 	hdb := &HostDB{
+		cs:     cs,
 		wallet: wallet,
 		tpool:  tpool,
 

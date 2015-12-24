@@ -504,7 +504,17 @@ func TestFutureTimestampHandling(t *testing.T) {
 	time.Sleep(time.Second * 3) // 3 seconds, as the block was originally 2 seconds too far into the future.
 	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
 	if err == errNilItem {
-		t.Fatalf("future block was not added to the consensus set after waiting the appropriate amount of time")
+		t.Errorf("future block was not added to the consensus set after waiting the appropriate amount of time")
+	}
+	time.Sleep(time.Second * 3)
+	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
+	if err == errNilItem {
+		t.Errorf("Future block not added to consensus set.\nCurrent Timestamp %v\nFutureThreshold: %v\nBlock Timestamp %v\n", types.CurrentTimestamp(), types.FutureThreshold, block.Timestamp)
+		time.Sleep(time.Second * 3)
+		_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
+		if err == errNilItem {
+			t.Error("waiting double long did not help.")
+		}
 	}
 }
 

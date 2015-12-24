@@ -14,10 +14,13 @@ func TestAnnouncement(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht := CreateHostTester("TestAnnouncement", t)
+	ht, err := newHostTester("TestAnnouncement")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Place the announcement.
-	err := ht.host.AnnounceAddress("foo")
+	err = ht.host.AnnounceAddress("foo")
 	if err != nil {
 		t.Fatal(err)
 	}

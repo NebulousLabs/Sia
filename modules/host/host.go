@@ -20,6 +20,9 @@ const (
 )
 
 var (
+	// defaultPrice defines the starting price for hosts selling storage. We
+	// try to match a number that is both reasonably profitable and reasonably
+	// competitive.
 	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9 / 200)) // 200 SC / GB / Month
 )
 
