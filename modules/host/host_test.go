@@ -180,3 +180,41 @@ func TestStartupRescan(t *testing.T) {
 		t.Error("consensus tracking variables were not reset correctly after rescan")
 	}
 }
+
+// TestIntegrationAutoRescan checks that a rescan is triggered during New if
+// the consensus set becomes desynchronized.
+func TestIntegrationAutoRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestIntegrationAutoRescan")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the host's persistent variables have incorporated the first
+	// few blocks.
+	if ht.host.recentChange == (modules.ConsensusChangeID{}) || ht.host.blockHeight == 0 {
+		t.Fatal("host variables do not indicate that the host is tracking the consensus set correctly")
+	}
+	oldChange := ht.host.recentChange
+	oldHeight := ht.host.blockHeight
+
+	// Corrupt the variables, then close the host.
+	ht.host.recentChange[0]++
+	ht.host.blockHeight += 100e3
+	err = ht.host.Close() // host saves upon closing
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a new host and check that the persist variables have correctly
+	// reset.
+	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", ht.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oldChange != h.recentChange || oldHeight != h.blockHeight {
+		t.Error("consensus tracking variables were not reset correctly after rescan")
+	}
+}
