@@ -147,3 +147,36 @@ func TestHostInitialization(t *testing.T) {
 		t.Fatal("block height did not increase correctly after first block mined")
 	}
 }
+
+// TestStartupRescan probes the startupRescan function, verifying that it
+// works in the naive case. The rescan is triggered manually.
+func TestStartupRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestStartupRescan")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the host's persistent variables have incorporated the first
+	// few blocks.
+	if ht.host.recentChange == (modules.ConsensusChangeID{}) || ht.host.blockHeight == 0 {
+		t.Fatal("host variables do not indicate that the host is tracking the consensus set correctly")
+	}
+	oldChange := ht.host.recentChange
+	oldHeight := ht.host.blockHeight
+
+	// Corrupt the variables and perform a rescan to see if they reset
+	// correctly.
+	ht.host.recentChange[0]++
+	ht.host.blockHeight += 100e3
+	ht.cs.Unsubscribe(ht.host)
+	err = ht.host.startupRescan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oldChange != ht.host.recentChange || oldHeight != ht.host.blockHeight {
+		t.Error("consensus tracking variables were not reset correctly after rescan")
+	}
+}

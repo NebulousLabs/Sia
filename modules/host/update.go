@@ -100,4 +100,14 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 		delete(h.obligationsByHeight, oldHeight)
 	}
+
+	// Update the host's recent change pointer to point to the most recent
+	// change.
+	h.recentChange = cc.ID
+
+	// Save the host.
+	err := h.save()
+	if err != nil {
+		h.log.Println("ERROR: could not save during ProcessConsnesusChange:", err)
+	}
 }
