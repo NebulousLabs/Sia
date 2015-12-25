@@ -54,8 +54,6 @@ type (
 	HostSettings struct {
 		IPAddress    NetAddress
 		TotalStorage int64  // Can go negative.
-		MinFilesize  uint64 // DEPRECATED.
-		MaxFilesize  uint64 // DEPRECATED.
 		MinDuration  types.BlockHeight
 		MaxDuration  types.BlockHeight
 		WindowSize   types.BlockHeight

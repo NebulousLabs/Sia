@@ -140,7 +140,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	case rev.NewRevisionNumber <= lastRev.NewRevisionNumber:
 		return errors.New("revision must have higher revision number")
 
-	case rev.NewFileSize > uint64(h.spaceRemaining) || rev.NewFileSize > h.settings.MaxFilesize:
+	case rev.NewFileSize > uint64(h.spaceRemaining):
 		return errors.New("revision file size is too large")
 	case rev.NewFileSize <= lastRev.NewFileSize:
 		return errors.New("revision must add data")
