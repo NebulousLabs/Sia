@@ -132,12 +132,11 @@ func (h *Host) load() error {
 func (h *Host) establishDefaults() error {
 	// Configure the settings object.
 	h.settings = modules.HostSettings{
-		TotalStorage: 10e9,     // 10 GB
-		MaxFilesize:  100e9,    // 100 GB - deprecated field
-		MaxDuration:  144 * 60, // 60 days
-		WindowSize:   288,      // 48 hours
+		TotalStorage: defaultTotalStorage,
+		MaxDuration:  defaultMaxDuration,
+		WindowSize:   defaultWindowSize,
 		Price:        defaultPrice,
-		Collateral:   types.NewCurrency64(0),
+		Collateral:   defaultCollateral,
 	}
 	h.spaceRemaining = h.settings.TotalStorage
 
