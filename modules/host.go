@@ -53,7 +53,7 @@ type (
 	// database.
 	HostSettings struct {
 		IPAddress    NetAddress
-		TotalStorage int64  // Can go negative.
+		TotalStorage int64 // Can go negative.
 		MinDuration  types.BlockHeight
 		MaxDuration  types.BlockHeight
 		WindowSize   types.BlockHeight

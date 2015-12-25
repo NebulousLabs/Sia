@@ -210,11 +210,138 @@ func TestIntegrationAutoRescan(t *testing.T) {
 
 	// Create a new host and check that the persist variables have correctly
 	// reset.
-	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", ht.persistDir)
+	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if oldChange != h.recentChange || oldHeight != h.blockHeight {
 		t.Error("consensus tracking variables were not reset correctly after rescan")
+	}
+}
+
+// TestSetAndGetSettings checks that the functions for interacting with the
+// hosts settings object are working as expected.
+func TestSetAndGetSettings(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestSetAndGetSettings")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the default settings get returned at first call.
+	settings := ht.host.Settings()
+	if settings.TotalStorage != defaultTotalStorage {
+		t.Error("settings GET did not return default value")
+	}
+	if settings.MaxDuration != defaultMaxDuration {
+		t.Error("settings GET did not return default value")
+	}
+	if settings.WindowSize != defaultWindowSize {
+		t.Error("settings GET did not return default value")
+	}
+	if settings.Price.Cmp(defaultPrice) != 0 {
+		t.Error("settings GET did not return default value")
+	}
+	if settings.Collateral.Cmp(defaultCollateral) != 0 {
+		t.Error("settings GET did not return default value")
+	}
+
+	// Submit updated settings and check that the changes stuck.
+	settings.TotalStorage += 15
+	settings.MaxDuration += 16
+	settings.WindowSize += 17
+	settings.Price = settings.Price.Add(types.NewCurrency64(18))
+	settings.Collateral = settings.Collateral.Add(types.NewCurrency64(19))
+	err = ht.host.SetSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newSettings := ht.host.Settings()
+	if settings.TotalStorage != newSettings.TotalStorage {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.MaxDuration != newSettings.MaxDuration {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.WindowSize != newSettings.WindowSize {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.Price.Cmp(newSettings.Price) != 0 {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.Collateral.Cmp(newSettings.Collateral) != 0 {
+		t.Error("settings GET did not return updated value")
+	}
+}
+
+// TestSetUnlockHash tries setting the unlock hash using SetSettings, an error
+// should be returned.
+func TestSetUnlockHash(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestSetAndGetSettings")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the settings and try changing the unlock hash.
+	settings := ht.host.Settings()
+	settings.UnlockHash[0]++
+	err = ht.host.SetSettings(settings)
+	if err != errChangedUnlockHash {
+		t.Error("unlock hash was changed by SetSettings")
+	}
+}
+
+// TestPersistentSettings checks that settings persist between instances of the
+// host.
+func TestPersistentSettings(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestSetAndGetSettings")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Submit updated settings.
+	settings := ht.host.Settings()
+	settings.TotalStorage += 25
+	settings.MaxDuration += 36
+	settings.WindowSize += 47
+	settings.Price = settings.Price.Add(types.NewCurrency64(38))
+	settings.Collateral = settings.Collateral.Add(types.NewCurrency64(99))
+	err = ht.host.SetSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reboot the host and verify that the new settings stuck.
+	err = ht.host.Close() // host saves upon closing
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	newSettings := h.Settings()
+	if settings.TotalStorage != newSettings.TotalStorage {
+		t.Error("settings GET did not return updated value:", settings.TotalStorage, "vs", newSettings.TotalStorage)
+	}
+	if settings.MaxDuration != newSettings.MaxDuration {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.WindowSize != newSettings.WindowSize {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.Price.Cmp(newSettings.Price) != 0 {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.Collateral.Cmp(newSettings.Collateral) != 0 {
+		t.Error("settings GET did not return updated value")
 	}
 }

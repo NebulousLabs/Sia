@@ -234,7 +234,16 @@ func (h *Host) Revenue() (unresolved, resolved types.Currency) {
 func (h *Host) SetSettings(settings modules.HostSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	// Check that the unlock hash was not changed.
+	if settings.UnlockHash != h.settings.UnlockHash {
+		return errChangedUnlockHash
+	}
+
+	// Update the amount of space remaining to reflect the new volume of total
+	// storage.
 	h.spaceRemaining += settings.TotalStorage - h.settings.TotalStorage
+
 	h.settings = settings
 	return h.save()
 }
