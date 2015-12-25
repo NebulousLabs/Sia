@@ -91,7 +91,7 @@ type (
 		Revenue() (unresolved, resolved types.Currency)
 
 		// SetConfig sets the hosting parameters of the host.
-		SetSettings(HostSettings)
+		SetSettings(HostSettings) error
 
 		// Settings returns the host's settings.
 		Settings() HostSettings

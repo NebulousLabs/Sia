@@ -218,12 +218,12 @@ func (h *Host) Revenue() (unresolved, resolved types.Currency) {
 }
 
 // SetSettings updates the host's internal HostSettings object.
-func (h *Host) SetSettings(settings modules.HostSettings) {
+func (h *Host) SetSettings(settings modules.HostSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.spaceRemaining += settings.TotalStorage - h.settings.TotalStorage
 	h.settings = settings
-	h.save()
+	return h.save()
 }
 
 // Settings returns the settings of a host.
