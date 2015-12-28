@@ -39,6 +39,11 @@ var (
 	// errChangedUnlockHash is returned by SetSettings if the unlock hash has
 	// changed, an illegal operation.
 	errChangedUnlockHash = errors.New("cannot change the unlock hash in SetSettings")
+
+	// Nil dependency errors.
+	errNilCS     = errors.New("host cannot use a nil state")
+	errNilTpool  = errors.New("host cannot use a nil transaction pool")
+	errNilWallet = errors.New("host cannot use a nil wallet")
 )
 
 // A contractObligation tracks a file contract that the host is obligated to
@@ -113,13 +118,13 @@ func (h *Host) startupRescan() error {
 // New returns an initialized Host.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
 	if cs == nil {
-		return nil, errors.New("host cannot use a nil state")
+		return nil, errNilCS
 	}
 	if tpool == nil {
-		return nil, errors.New("host cannot use a nil tpool")
+		return nil, errNilTpool
 	}
 	if wallet == nil {
-		return nil, errors.New("host cannot use a nil wallet")
+		return nil, errNilWallet
 	}
 
 	h := &Host{

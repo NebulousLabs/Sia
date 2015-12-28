@@ -148,6 +148,31 @@ func TestHostInitialization(t *testing.T) {
 	}
 }
 
+// TestNilValues tries initializing the host with nil values.
+func TestNilValues(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := blankHostTester("TestStartupRescan")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hostDir := filepath.Join(ht.persistDir, modules.HostDir)
+	_, err = New(nil, ht.tpool, ht.wallet, ":0", hostDir)
+	if err != errNilCS {
+		t.Fatal("could not trigger errNilCS")
+	}
+	_, err = New(ht.cs, nil, ht.wallet, ":0", hostDir)
+	if err != errNilTpool {
+		t.Fatal("could not trigger errNilTpool")
+	}
+	_, err = New(ht.cs, ht.tpool, nil, ":0", hostDir)
+	if err != errNilWallet {
+		t.Fatal("Could not trigger errNilWallet")
+	}
+}
+
 // TestStartupRescan probes the startupRescan function, verifying that it
 // works in the naive case. The rescan is triggered manually.
 func TestStartupRescan(t *testing.T) {
