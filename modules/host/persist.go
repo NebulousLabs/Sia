@@ -159,17 +159,11 @@ func (h *Host) establishDefaults() error {
 	return nil
 }
 
-// initPersist handles all of the persistence initialization, such as creating
-// the persistance directory and starting the logger.
+// initPersist loads all of the saved host state into the host object. If there
+// is no saved state, suitable defaults are chosen instead.
 func (h *Host) initPersist() error {
 	// Create the perist directory if it does not yet exist.
 	err := os.MkdirAll(h.persistDir, 0700)
-	if err != nil {
-		return err
-	}
-
-	// Initialize the logger.
-	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return err
 	}

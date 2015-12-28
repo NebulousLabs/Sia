@@ -5,6 +5,7 @@ package host
 import (
 	"errors"
 	"net"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -69,54 +70,35 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// Host Context.
+	// Consensus Tracking
 	blockHeight  types.BlockHeight
 	recentChange modules.ConsensusChangeID
-	netAddress   modules.NetAddress
-	publicKey    types.SiaPublicKey
-	secretKey    crypto.SecretKey
-	settings     modules.HostSettings
 
-	// File management.
-	fileCounter         int64
-	spaceRemaining      int64
+	// Host Identity
+	netAddress modules.NetAddress
+	publicKey  types.SiaPublicKey
+	secretKey  crypto.SecretKey
+
+	// File Management.
 	obligationsByID     map[types.FileContractID]*contractObligation
 	obligationsByHeight map[types.BlockHeight][]*contractObligation
 
 	// Statistics
-	profit types.Currency
+	profit         types.Currency
+	fileCounter    int64
+	spaceRemaining int64
 
 	// Utilities.
 	listener   net.Listener
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
-}
-
-// startupRescan will rescan the blockchain in the event that the host has
-// become desynchronized with the consensus set. This typically only happens if
-// the user is messing around with the files in sia folder.
-func (h *Host) startupRescan() error {
-	// Reset all of the variables that have relevance to the consensus set. For
-	// the host, this is just the block height.
-	err := func() error {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-
-		h.blockHeight = 0
-		return h.save()
-	}()
-	if err != nil {
-		return err
-	}
-
-	// Subscribe to the consensus set. This is a blocking call that will not
-	// return until the host has fully caught up to the current block.
-	return h.cs.ConsensusSetPersistentSubscribe(h, modules.ConsensusChangeID{})
+	settings   modules.HostSettings
 }
 
 // New returns an initialized Host.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -127,19 +109,32 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		return nil, errNilWallet
 	}
 
+	// Create the host object.
 	h := &Host{
 		cs:     cs,
 		tpool:  tpool,
 		wallet: wallet,
 
-		persistDir: persistDir,
-
 		obligationsByID:     make(map[types.FileContractID]*contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]*contractObligation),
+
+		persistDir: persistDir,
 	}
 
-	// Load the old host data and initialize the logger.
+	// Load all of the saved host state into the host.
 	err := h.initPersist()
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize the logger.
+	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
+	if err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the consensus set.
+	err = h.initConsensusSubscription()
 	if err != nil {
 		return nil, err
 	}
@@ -148,20 +143,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	err = h.initNetworking(address)
 	if err != nil {
 		return nil, err
-	}
-
-	err = h.cs.ConsensusSetPersistentSubscribe(h, h.recentChange)
-	if err == modules.ErrInvalidConsensusChangeID {
-		// Perform a rescan of the consensus set if the change id that the host
-		// has is unrecognized by the consensus set. This will typically only
-		// happen if the user has been replacing files inside the folder
-		// structure.
-		err = h.startupRescan()
-		if err != nil {
-			return nil, errors.New("host rescan failed: " + err.Error())
-		}
-	} else if err != nil {
-		return nil, errors.New("host consensus subscription failed: " + err.Error())
 	}
 
 	return h, nil

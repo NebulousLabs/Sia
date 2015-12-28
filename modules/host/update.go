@@ -8,6 +8,42 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// initRescan is a helper funtion of initConsensusSubscribe, and is called when
+// the host and the consensus set have become desynchronized. Desynchronization
+// typically happens if the user is replacing or altering the persistent files
+// in the consensus set or the host.
+func (h *Host) initRescan() error {
+	// Reset all of the variables that have relevance to the consensus set. For
+	// the host, this is just the block height.
+	err := func() error {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
+		h.blockHeight = 0
+		return h.save()
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Subscribe to the consensus set. This is a blocking call that will not
+	// return until the host has fully caught up to the current block.
+	return h.cs.ConsensusSetPersistentSubscribe(h, modules.ConsensusChangeID{})
+}
+
+// initConsensusSubscription subscribes the host to the consensus set.
+func (h *Host) initConsensusSubscription() error {
+	err := h.cs.ConsensusSetPersistentSubscribe(h, h.recentChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		// Perform a rescan of the consensus set if the change id that the host
+		// has is unrecognized by the consensus set. This will typically only
+		// happen if the user has been replacing files inside the folder
+		// structure.
+		return h.initRescan()
+	}
+	return err
+}
+
 // threadedDeleteObligation deletes a file obligation.
 func (h *Host) threadedDeleteObligation(obligation *contractObligation) {
 	h.mu.Lock()
