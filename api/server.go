@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -77,7 +76,6 @@ func (srv *Server) Serve() error {
 		srv.wallet.Lock()
 	}
 
-	fmt.Println("\rCaught stop signal, quitting.")
 	return nil
 }
 
