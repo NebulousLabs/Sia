@@ -17,6 +17,7 @@ func TestIntegrationConsensusGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	var cg ConsensusGET
 	err = st.getAPI("/consensus", &cg)
 	if err != nil {
@@ -44,6 +45,7 @@ func TestIntegrationConsensusBlockGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	var cbg ConsensusBlockGET
 	err = st.getAPI("/consensus/block?height=1", &cbg)
 	if err != nil {

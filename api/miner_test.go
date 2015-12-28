@@ -19,6 +19,7 @@ func TestIntegrationMinerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// Get the api returned fields of the miner.
 	var mg MinerGET
@@ -53,6 +54,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// Start the cpu miner, give time for the first hashrate readings to
 	// appear.
@@ -105,6 +107,7 @@ func TestIntegrationMinerHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	startingHeight := st.cs.Height()
 
 	// Get a header that can be used for mining.

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/inconshreveable/go-update"
 	"github.com/kardianos/osext"
@@ -177,8 +176,7 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	// can't write after we stop the server, so lie a bit.
 	writeSuccess(w)
 
-	// send stop signal
-	srv.apiServer.Stop(time.Second)
+	srv.Close()
 }
 
 // daemonVersionHandler handles the API call that requests the daemon's version.

@@ -60,6 +60,7 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 			t.Fatal("API server quit:", listenErr)
 		}
 	}()
+	defer st.server.Close()
 
 	var wg WalletGET
 	err = st.getAPI("/wallet", &wg)
@@ -117,6 +118,7 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 			panic(listenErr)
 		}
 	}()
+	defer st.server.Close()
 
 	// Make a call to /wallet/encrypt and get the seed. Provide no encryption
 	// key so that the encryption key is the seed that gets returned.
@@ -148,6 +150,7 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// Check the intial wallet is encrypted, unlocked, and has the siacoins
 	// that got mined.
@@ -241,6 +244,7 @@ func TestIntegrationWalletTransactionGETid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// Mining blocks should have created transactions for the wallet containing
 	// miner payouts. Get the list of transactions.

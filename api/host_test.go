@@ -23,6 +23,7 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// Announce the host.
 	announceValues := url.Values{}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/stretchr/graceful"
 
@@ -77,5 +78,11 @@ func (srv *Server) Serve() error {
 	}
 
 	fmt.Println("\rCaught stop signal, quitting.")
+	return nil
+}
+
+func (srv *Server) Close() error {
+	// give graceful 1 second to shutdown
+	srv.apiServer.Stop(time.Second)
 	return nil
 }
