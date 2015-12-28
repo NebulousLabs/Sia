@@ -61,8 +61,8 @@ func TestIntegrationHosting(t *testing.T) {
 	// only one piece will be uploaded (10% at current redundancy)
 	var fi []FileInfo
 	for len(fi) != 1 || fi[0].UploadProgress != 10 {
-		time.Sleep(3 * time.Second)
 		st.getAPI("/renter/files/list", &fi)
+		time.Sleep(1 * time.Second)
 	}
 
 	// mine blocks until storage proof is complete
@@ -131,8 +131,8 @@ func TestIntegrationRenewing(t *testing.T) {
 	// only one piece will be uploaded (10% at current redundancy)
 	var fi []FileInfo
 	for len(fi) != 1 || fi[0].UploadProgress != 10 {
+		time.Sleep(1 * time.Second)
 		st.getAPI("/renter/files/list", &fi)
-		time.Sleep(3 * time.Second)
 	}
 	// default expiration is 60 blocks
 	expExpiration := st.cs.Height() + 60
@@ -148,7 +148,7 @@ func TestIntegrationRenewing(t *testing.T) {
 	// renter should now renew the contract for another 60 blocks
 	newExpiration := st.cs.Height() + 60
 	for fi[0].Expiration != newExpiration {
+		time.Sleep(1 * time.Second)
 		st.getAPI("/renter/files/list", &fi)
-		time.Sleep(3 * time.Second)
 	}
 }
