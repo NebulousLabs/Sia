@@ -5,6 +5,7 @@ import (
 	"encoding/base32"
 	"errors"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -60,5 +61,14 @@ func NewSafeFile(filename string) (*safeFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &safeFile{file, filename}, nil
+
+	// Get the absolute path of the filename so that calling os.Chdir in
+	// between calling NewSafeFile and calling safeFile.Commit does not change
+	// the final file path.
+	absFilename, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return &safeFile{file, absFilename}, nil
 }
