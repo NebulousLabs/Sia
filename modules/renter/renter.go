@@ -106,7 +106,7 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	// Calculate the average cost of a file.
 	averagePrice := r.hostDB.AveragePrice()
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(defaultDuration)).Mul(types.NewCurrency64(1e9)).Mul(types.NewCurrency64(defaultParityPieces + defaultDataPieces))
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(defaultDuration))).Mul(types.NewCurrency64(1e9)).Mul(types.NewCurrency64(defaultParityPieces + defaultDataPieces))
 	// this also accounts for the buffering in the contract negotiation
 	bufferedCost := estimatedCost.Mul(types.NewCurrency64(5)).Div(types.NewCurrency64(2))
 	ri.Price = bufferedCost

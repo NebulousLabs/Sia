@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
@@ -13,12 +14,21 @@ import (
 )
 
 const (
-	// When a file contract is within this many blocks of expiring, the renter
-	// will attempt to renew the contract.
-	renewThreshold = 2000
-
 	hostTimeout = 15 * time.Second
 )
+
+// When a file contract is within 'renewThreshold' blocks of expiring, the renter
+// will attempt to renew the contract.
+var renewThreshold = func() types.BlockHeight {
+	switch build.Release {
+	case "testing":
+		return 20
+	case "dev":
+		return 200
+	default:
+		return 2000
+	}
+}()
 
 // repair attempts to repair a file chunk by uploading its pieces to more
 // hosts.

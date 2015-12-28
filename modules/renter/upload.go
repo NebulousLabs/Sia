@@ -4,15 +4,15 @@ import (
 	"errors"
 	"os"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	defaultDuration     = 6000 // Duration that hosts will hold onto the file
-	defaultDataPieces   = 2    // Data pieces per erasure-coded chunk
-	defaultParityPieces = 8    // Parity pieces per erasure-coded chunk
+	defaultDataPieces   = 2 // Data pieces per erasure-coded chunk
+	defaultParityPieces = 8 // Parity pieces per erasure-coded chunk
 
 	// piece sizes
 	// NOTE: The encryption overhead is subtracted so that encrypted piece
@@ -21,6 +21,19 @@ const (
 	defaultPieceSize = 1<<22 - crypto.TwofishOverhead // 4 MiB
 	smallPieceSize   = 1<<16 - crypto.TwofishOverhead // 64 KiB
 )
+
+// defaultDuration is the contract length that the renter will use when the
+// uploader does not specify a duration.
+var defaultDuration = func() types.BlockHeight {
+	switch build.Release {
+	case "testing":
+		return 60
+	case "dev":
+		return 600
+	default:
+		return 6000
+	}
+}()
 
 // checkWalletBalance looks at an upload and determines if there is enough
 // money in the wallet to support such an upload. An error is returned if it is
