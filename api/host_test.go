@@ -141,7 +141,7 @@ func TestIntegrationRenewing(t *testing.T) {
 	}
 
 	// mine blocks until we hit the renew threshold (default 20 blocks)
-	for st.cs.Height() <= expExpiration-20 {
+	for st.cs.Height() < expExpiration-20 {
 		st.miner.AddBlock()
 	}
 

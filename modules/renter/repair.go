@@ -175,7 +175,7 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 
 	var expiring []fileContract
 	for _, fc := range f.contracts {
-		if height > fc.WindowStart-renewThreshold {
+		if height >= fc.WindowStart-renewThreshold {
 			expiring = append(expiring, fc)
 		}
 	}
