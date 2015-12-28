@@ -45,50 +45,52 @@ func TestUnitNewSafeFile(t *testing.T) {
 	}
 }
 
-// testSafeFileWithPath tests creating and committing safe files with a
-// specified path.
-func testSafeFileWithPath(filename string, t *testing.T) {
-	// Create safe file.
-	sf, err := NewSafeFile(filename)
+// TestSafeFile tests creating and committing safe files with both relative and
+// absolute paths.
+func TestSafeFile(t *testing.T) {
+	// Generate absolute path filename.
+	absPath := filepath.Join(os.TempDir(), "NewSafeFile test file"+RandomSuffix())
+	// Get relative path filename from absolute path.
+	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// These two defers seem redundant but are not. If sf.Commit() fails to
-	// move the file then the first defer is necessary. Otherwise the second
-	// defer is necessary.
-	defer os.Remove(sf.Name())
-	defer os.Remove(sf.finalName)
-
-	// Check that the name of the file is not equal to the final name of the
-	// file.
-	if sf.Name() == sf.finalName {
-		t.Errorf("safeFile temporary filename and finalName are equivalent: %s\n", sf.Name())
-	}
-
-	sf.Close()
-	err = sf.Commit()
+	relPath, err := filepath.Rel(wd, absPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check that commiting moved the file to the originally specified path.
-	_, err = os.Stat(filename)
-	if err != nil {
-		t.Fatal("safeFile not committed correctly.")
+	// Test creating and committing a safe file with each filename.
+	filenames := []string{absPath, relPath}
+	for _, filename := range filenames {
+		// Create safe file.
+		sf, err := NewSafeFile(filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// These two defers seem redundant but are not. If sf.Commit() fails to
+		// move the file then the first defer is necessary. Otherwise the second
+		// defer is necessary.
+		defer os.Remove(sf.Name())
+		defer os.Remove(sf.finalName)
+
+		// Check that the name of the file is not equal to the final name of the
+		// file.
+		if sf.Name() == sf.finalName {
+			t.Errorf("safeFile created with filename: %s has temporary filename that is equivalent to finalName: %s\n", filename, sf.Name())
+		}
+
+		// Check that committing doesn't return an error.
+		sf.Close()
+		err = sf.Commit()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check that commiting moved the file to the originally specified path.
+		_, err = os.Stat(filename)
+		if err != nil {
+			t.Fatalf("safeFile created with filename: %s not committed correctly to: %s\n", filename, sf.finalName)
+		}
 	}
-}
-
-// TestAbsolutePathSafeFile tests that safe files created with an absolute path
-// are created and committed correctly.
-func TestAbsolutePathSafeFile(t *testing.T) {
-	filename := filepath.Join(os.TempDir(), "NewSafeFile test file"+RandomSuffix())
-	absFilename, _ := filepath.Abs(filename)
-	testSafeFileWithPath(absFilename, t)
-}
-
-// TestRelativePathSafeFile tests that safe files created with a relative path
-// are created and committed correctly.
-func TestRelativePathSafeFile(t *testing.T) {
-	filename := filepath.Join(os.TempDir(), "NewSafeFile test file"+RandomSuffix())
-	testSafeFileWithPath(filename, t)
 }
