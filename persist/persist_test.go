@@ -1,6 +1,8 @@
 package persist
 
 import (
+	"bytes"
+	"crypto/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,70 +29,122 @@ func TestIntegrationRandomSuffix(t *testing.T) {
 	}
 }
 
-// TestUnitNewSafeFile checks that a new file is created and that its name is
-// different than the finalName of the new safeFile.
-func TestUnitNewSafeFile(t *testing.T) {
-	// Create safe file.
-	sf, err := NewSafeFile("NewSafeFile test file" + RandomSuffix())
+// TestAbsolutePathSafeFile tests creating and committing safe files with
+// absolute paths.
+func TestAbsolutePathSafeFile(t *testing.T) {
+	tmpDir := build.TempDir(persistDir, "TestAbsolutePathSafeFile")
+	err := os.MkdirAll(tmpDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(sf.Name())
+	absPath := filepath.Join(tmpDir, "test")
+
+	// Create safe file.
+	sf, err := NewSafeFile(absPath)
 	defer sf.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Check that the name of the file is not equal to the final name of the
 	// file.
-	if sf.Name() == sf.finalName {
-		t.Errorf("safeFile temporary filename and finalName are equivalent: %s\n", sf.Name())
+	if sf.Name() == absPath {
+		t.Errorf("safeFile created with filename: %s has temporary filename that is equivalent to finalName: %s\n", absPath, sf.Name())
+	}
+
+	// Write random data to the file and commit.
+	data := make([]byte, 10)
+	rand.Read(data)
+	_, err = sf.Write(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = sf.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the file exists and has same data that was written to it.
+	f, err := os.Open(absPath)
+	defer f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataRead := make([]byte, 11)
+	n, err := f.Read(dataRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataRead = dataRead[:n]
+	if !bytes.Equal(data, dataRead) {
+		t.Fatalf("Committed file has different data than was written to it: expected %v, got %v\n", data, dataRead)
 	}
 }
 
-// TestSafeFile tests creating and committing safe files with both relative and
-// absolute paths.
-func TestSafeFile(t *testing.T) {
-	// Generate absolute path filename.
-	absPath := filepath.Join(os.TempDir(), "NewSafeFile test file"+RandomSuffix())
-	// Get relative path filename from absolute path.
+// TestRelativePathSafeFile tests creating and committing safe files with
+// relative paths. Relative paths are testing to test that calling os.Chdir
+// inbetween creating and committing a safe file doesn't affect the safe file's
+// final path. The relative path tested is relative to the working directory.
+func TestRelativePathSafeFile(t *testing.T) {
+	tmpDir := build.TempDir(persistDir, "TestRelativePathSafeFile")
+	err := os.MkdirAll(tmpDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	absPath := filepath.Join(tmpDir, "test")
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
 	relPath, err := filepath.Rel(wd, absPath)
+
+	// Create safe file.
+	sf, err := NewSafeFile(relPath)
+	defer sf.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Test creating and committing a safe file with each filename.
-	filenames := []string{absPath, relPath}
-	for _, filename := range filenames {
-		// Create safe file.
-		sf, err := NewSafeFile(filename)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// These two defers seem redundant but are not. If sf.Commit() fails to
-		// move the file then the first defer is necessary. Otherwise the second
-		// defer is necessary.
-		defer os.Remove(sf.Name())
-		defer os.Remove(sf.finalName)
+	// Check that the path of the file is not equal to the final path of the
+	// file.
+	if sf.Name() == absPath {
+		t.Errorf("safeFile created with filename: %s has temporary filename that is equivalent to finalName: %s\n", absPath, sf.Name())
+	}
 
-		// Check that the name of the file is not equal to the final name of the
-		// file.
-		if sf.Name() == sf.finalName {
-			t.Errorf("safeFile created with filename: %s has temporary filename that is equivalent to finalName: %s\n", filename, sf.Name())
-		}
+	// Write random data to the file.
+	data := make([]byte, 10)
+	rand.Read(data)
+	_, err = sf.Write(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		// Check that committing doesn't return an error.
-		err = sf.Commit()
-		if err != nil {
-			t.Fatal(err)
-		}
-		sf.Close()
+	// Change directories and commit.
+	tmpChdir := build.TempDir(persistDir, "TestRelativePathSafeFileTmpChdir")
+	err = os.MkdirAll(tmpChdir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(tmpChdir)
+	defer os.Chdir(wd)
+	err = sf.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		// Check that commiting moved the file to the originally specified path.
-		_, err = os.Stat(filename)
-		if err != nil {
-			t.Fatalf("safeFile created with filename: %s not committed correctly to: %s\n", filename, sf.finalName)
-		}
+	// Check that the file exists and has same data that was written to it.
+	f, err := os.Open(absPath)
+	defer f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataRead := make([]byte, 11)
+	n, err := f.Read(dataRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataRead = dataRead[:n]
+	if !bytes.Equal(data, dataRead) {
+		t.Fatalf("Committed file has different data than was written to it: expected %v, got %v\n", data, dataRead)
 	}
 }
