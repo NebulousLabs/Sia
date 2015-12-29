@@ -81,11 +81,11 @@ func TestSafeFile(t *testing.T) {
 		}
 
 		// Check that committing doesn't return an error.
-		sf.Close()
 		err = sf.Commit()
 		if err != nil {
 			t.Fatal(err)
 		}
+		sf.Close()
 
 		// Check that commiting moved the file to the originally specified path.
 		_, err = os.Stat(filename)
