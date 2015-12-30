@@ -121,7 +121,7 @@ func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
 	// TODO: check for excessive price again?
 
 	// initiate revision loop
-	conn, err := net.DialTimeout("tcp", string(hc.IP), 15*time.Second)
+	conn, err := hdb.dialer.DialTimeout(hc.IP, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}

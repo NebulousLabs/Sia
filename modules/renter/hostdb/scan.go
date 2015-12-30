@@ -7,7 +7,6 @@ package hostdb
 import (
 	"crypto/rand"
 	"math/big"
-	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -99,7 +98,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 		// Request settings from the queued host entry.
 		var settings modules.HostSettings
 		err := func() error {
-			conn, err := net.DialTimeout("tcp", string(hostEntry.NetAddress), hostRequestTimeout)
+			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
 			if err != nil {
 				return err
 			}
