@@ -144,6 +144,6 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Save the host.
 	err := h.save()
 	if err != nil {
-		h.log.Println("ERROR: could not save during ProcessConsnesusChange:", err)
+		h.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
 	}
 }

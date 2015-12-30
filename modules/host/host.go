@@ -163,11 +163,9 @@ func (h *Host) Close() error {
 	// minimize turbulence in the event of an error.
 
 	// Save the latest host state.
-	err := func() error {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		return h.save()
-	}()
+	h.mu.Lock()
+	err := h.save()
+	h.mu.Unlock()
 	if err != nil {
 		return err
 	}

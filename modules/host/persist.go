@@ -45,6 +45,8 @@ type persistence struct {
 func (h *Host) getObligations() []contractObligation {
 	cos := make([]contractObligation, 0, len(h.obligationsByID))
 	for _, ob := range h.obligationsByID {
+		// Explicit copies of the object are made so that the mutex is not
+		// touched - it is contested whether this is necessary.
 		cos = append(cos, contractObligation{
 			ID:              ob.ID,
 			FileContract:    ob.FileContract,
