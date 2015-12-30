@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
@@ -13,12 +14,21 @@ import (
 )
 
 const (
-	// When a file contract is within this many blocks of expiring, the renter
-	// will attempt to renew the contract.
-	renewThreshold = 2000
-
 	hostTimeout = 15 * time.Second
 )
+
+// When a file contract is within 'renewThreshold' blocks of expiring, the renter
+// will attempt to renew the contract.
+var renewThreshold = func() types.BlockHeight {
+	switch build.Release {
+	case "testing":
+		return 20
+	case "dev":
+		return 200
+	default:
+		return 2000
+	}
+}()
 
 // repair attempts to repair a file chunk by uploading its pieces to more
 // hosts.
@@ -165,7 +175,7 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 
 	var expiring []fileContract
 	for _, fc := range f.contracts {
-		if height > fc.WindowStart-renewThreshold {
+		if height >= fc.WindowStart-renewThreshold {
 			expiring = append(expiring, fc)
 		}
 	}
@@ -192,7 +202,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 
 	// check for expiration
 	height := r.cs.Height()
-	if meta.EndHeight != 0 && meta.EndHeight < height {
+	if !meta.Renew && meta.EndHeight < height {
 		logAndRemove("removing %v from repair set: storage period has ended", name)
 		return
 	}
@@ -205,66 +215,24 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	}
 	defer handle.Close()
 
-	// check for un-uploaded pieces
-	badChunks := f.incompleteChunks()
-	if len(badChunks) == 0 {
-		return
-	}
-
-	r.log.Printf("repairing %v chunks of %v", len(badChunks), name)
-
-	// create host pool
-	contractSize := (f.pieceSize + crypto.TwofishOverhead) * f.numChunks() // each host gets one piece of each chunk
-	var duration types.BlockHeight = defaultDuration
-	if meta.EndHeight != 0 {
-		duration = meta.EndHeight - height
-	}
-	pool, err := r.hostDB.NewPool(contractSize, duration)
-	if err != nil {
-		r.log.Printf("failed to repair %v: %v", name, err)
-		return
-	}
-	defer pool.Close() // heh
-
-	for chunk, pieces := range badChunks {
-		// determine host set
-		old := f.chunkHosts(chunk)
-		hosts := pool.UniqueHosts(f.erasureCode.NumPieces()-len(old), old)
-		if len(hosts) == 0 {
-			r.log.Printf("aborting repair of %v: not enough hosts", name)
-			break
+	// repair incomplete chunks
+	if badChunks := f.incompleteChunks(); len(badChunks) != 0 {
+		r.log.Printf("repairing %v chunks of %v", len(badChunks), f.name)
+		var duration types.BlockHeight
+		if meta.Renew {
+			duration = defaultDuration
+		} else {
+			duration = meta.EndHeight - height
 		}
-		// upload to new hosts
-		err = f.repair(chunk, pieces, handle, hosts)
-		if err != nil {
-			r.log.Printf("aborting repair of %v: %v", name, err)
-			break
-		}
+		r.repairChunks(f, handle, badChunks, duration)
 	}
 
 	// renew expiring contracts
-	if meta.EndHeight == 0 {
-		var expiringContracts []fileContract
-		expiringContracts = f.expiringContracts(height)
-		r.log.Printf("renewing %v contracts of %v", len(expiringContracts), name)
-		for _, c := range expiringContracts {
+	if meta.Renew {
+		if badContracts := f.expiringContracts(height); len(badContracts) != 0 {
+			r.log.Printf("renewing %v contracts of %v", len(badContracts), f.name)
 			newHeight := height + defaultDuration
-			newID, err := r.hostDB.Renew(c.ID, newHeight)
-			if err != nil {
-				r.log.Printf("failed to renew contract %v: %v", c.ID, err)
-				continue
-			}
-			f.mu.Lock()
-			f.contracts[newID] = fileContract{
-				ID:          newID,
-				IP:          c.IP,
-				Pieces:      c.Pieces,
-				WindowStart: newHeight,
-			}
-			// need to delete the old contract; otherwise f.expiringContracts
-			// will continue to return it
-			delete(f.contracts, c.ID)
-			f.mu.Unlock()
+			r.renewContracts(f, badContracts, newHeight)
 		}
 	}
 
@@ -274,5 +242,56 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		// definitely bad, but we probably shouldn't delete from the
 		// repair set if this happens
 		r.log.Printf("failed to save repaired file %v: %v", name, err)
+	}
+}
+
+// repairChunks uploads missing chunks of f to new hosts.
+func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, duration types.BlockHeight) {
+	// create host pool
+	contractSize := (f.pieceSize + crypto.TwofishOverhead) * f.numChunks() // each host gets one piece of each chunk
+	pool, err := r.hostDB.NewPool(contractSize, duration)
+	if err != nil {
+		r.log.Printf("failed to repair %v: %v", f.name, err)
+		return
+	}
+	defer pool.Close() // heh
+
+	for chunk, pieces := range chunks {
+		// determine host set
+		old := f.chunkHosts(chunk)
+		hosts := pool.UniqueHosts(f.erasureCode.NumPieces()-len(old), old)
+		if len(hosts) == 0 {
+			r.log.Printf("aborting repair of %v: not enough hosts", f.name)
+			return
+		}
+		// upload to new hosts
+		err = f.repair(chunk, pieces, handle, hosts)
+		if err != nil {
+			r.log.Printf("aborting repair of %v: %v", f.name, err)
+			return
+		}
+	}
+}
+
+// renewContracts renews each of the supplied contracts, replacing their entry
+// in f with the new contract.
+func (r *Renter) renewContracts(f *file, contracts []fileContract, newHeight types.BlockHeight) {
+	for _, c := range contracts {
+		newID, err := r.hostDB.Renew(c.ID, newHeight)
+		if err != nil {
+			r.log.Printf("failed to renew contract %v: %v", c.ID, err)
+			continue
+		}
+		f.mu.Lock()
+		f.contracts[newID] = fileContract{
+			ID:          newID,
+			IP:          c.IP,
+			Pieces:      c.Pieces,
+			WindowStart: newHeight,
+		}
+		// need to delete the old contract; otherwise f.expiringContracts
+		// will continue to return it
+		delete(f.contracts, c.ID)
+		f.mu.Unlock()
 	}
 }

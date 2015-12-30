@@ -37,8 +37,9 @@ type ErasureCoder interface {
 // file.
 type FileUploadParams struct {
 	Filename    string
-	Duration    types.BlockHeight
 	Nickname    string
+	Duration    types.BlockHeight
+	Renew       bool
 	ErasureCode ErasureCoder
 	PieceSize   uint64
 }

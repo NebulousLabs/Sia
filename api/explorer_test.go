@@ -13,6 +13,7 @@ func TestIntegrationExplorerGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	var eg ExplorerGET
 	err = st.getAPI("/explorer", &eg)
@@ -36,6 +37,7 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	var ebg ExplorerBlockGET
 	err = st.getAPI("/explorer/block?height=0", &ebg)
@@ -59,6 +61,7 @@ func TestIntegrationExplorerGEThash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	var ehg ExplorerHashGET
 	gb := st.server.cs.GenesisBlock()

@@ -14,6 +14,7 @@ func TestExplorerPreset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// Try calling a legal endpoint without a user agent.
 	err = st.stdGetAPIUA("/explorer", "")
@@ -37,6 +38,7 @@ func TestReloading(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	rst, err := st.reloadedServerTester()
 	if err != nil {
 		t.Fatal(err)

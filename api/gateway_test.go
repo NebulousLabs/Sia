@@ -7,26 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
-// addPeer creates a new serverTester and bootstraps it to st. It returns the
-// new peer.
-func (st *serverTester) addPeer(name string) (*serverTester, error) {
-	_, err := st.miner.AddBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a new peer and bootstrap it to st.
-	newPeer, err := createServerTester(name)
-	if err != nil {
-		return nil, err
-	}
-	err = newPeer.server.gateway.Connect(st.netAddress())
-	if err != nil {
-		return nil, err
-	}
-	return newPeer, nil
-}
-
 func TestGatewayStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -35,6 +15,7 @@ func TestGatewayStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	var info GatewayInfo
 	st.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 0 {
@@ -50,6 +31,7 @@ func TestGatewayPeerAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	peer, err := gateway.New(":0", build.TempDir("api", "TestGatewayPeerAdd", "gateway"))
 	if err != nil {
 		t.Fatal(err)
@@ -71,6 +53,7 @@ func TestGatewayPeerRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	peer, err := gateway.New(":0", build.TempDir("api", "TestGatewayPeerRemove", "gateway"))
 	if err != nil {
 		t.Fatal(err)

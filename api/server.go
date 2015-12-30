@@ -1,9 +1,9 @@
 package api
 
 import (
-	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/stretchr/graceful"
 
@@ -76,6 +76,13 @@ func (srv *Server) Serve() error {
 		srv.wallet.Lock()
 	}
 
-	fmt.Println("\rCaught stop signal, quitting.")
+	return nil
+}
+
+// Close sends the stop signal to the API server, giving it a grace period to
+// shut down cleanly before forcibly terminating it.
+func (srv *Server) Close() error {
+	// give graceful 1 second to shutdown
+	srv.apiServer.Stop(time.Second)
 	return nil
 }

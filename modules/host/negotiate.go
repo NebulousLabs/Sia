@@ -37,7 +37,7 @@ func (h *Host) deallocate(path string) error {
 
 // considerContract checks that the provided transaction matches the host's
 // terms, and doesn't contain any flagrant errors.
-func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublicKey, merkleRoot crypto.Hash) error {
+func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublicKey, filesize uint64, merkleRoot crypto.Hash) error {
 	// Check that there is only one file contract.
 	// TODO: check that the txn is empty except for the contract?
 	if len(txn.FileContracts) != 1 {
@@ -50,8 +50,8 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 
 	// check contract fields for sanity and acceptability
 	switch {
-	case fc.FileSize != 0:
-		return errors.New("initial file size must be 0")
+	case fc.FileSize != filesize:
+		return errors.New("bad initial file size")
 
 	case fc.WindowStart <= h.blockHeight:
 		return errors.New("window start cannot be in the past")
@@ -162,11 +162,11 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	return nil
 }
 
-// negotiateContract negotiates an initial file contract with a renter, and
-// adds the metadata to the host's obligation set. The merkleRoot and filename
-// arguments are provided to make negotiateContract usable with both rpcUpload
-// and rpcRenew.
-func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash, filename string) error {
+// negotiateContract negotiates a file contract with a renter, and adds the
+// metadata to the host's obligation set. The filesize, merkleRoot, and
+// filename arguments are provided to make negotiateContract usable with both
+// rpcUpload and rpcRenew.
+func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot crypto.Hash, filename string) error {
 	// allow 5 minutes for contract negotiation
 	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
@@ -191,7 +191,7 @@ func (h *Host) negotiateContract(conn net.Conn, merkleRoot crypto.Hash, filename
 	// check the contract transaction, which should be the last txn in the set.
 	contractTxn := unsignedTxnSet[len(unsignedTxnSet)-1]
 	h.mu.RLock()
-	err := h.considerContract(contractTxn, renterKey, merkleRoot)
+	err := h.considerContract(contractTxn, renterKey, filesize, merkleRoot)
 	h.mu.RUnlock()
 	if err != nil {
 		encoding.WriteObject(conn, err.Error())
@@ -278,7 +278,7 @@ func (h *Host) rpcUpload(conn net.Conn) error {
 	h.mu.RUnlock()
 
 	// negotiate expecting empty Merkle root
-	return h.negotiateContract(conn, crypto.Hash{}, filename)
+	return h.negotiateContract(conn, 0, crypto.Hash{}, filename)
 }
 
 // rpcRevise is an RPC that allows a renter to revise a file contract. It will
@@ -439,6 +439,7 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 	// need to protect against simultaneous renewals of the same contract
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
+	filesize := obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize
 	merkleRoot := obligation.LastRevisionTxn.FileContractRevisions[0].NewFileMerkleRoot
 
 	// copy over old file data
@@ -460,5 +461,5 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 		return err
 	}
 
-	return h.negotiateContract(conn, merkleRoot, filename)
+	return h.negotiateContract(conn, filesize, merkleRoot, filename)
 }

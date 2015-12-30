@@ -38,9 +38,10 @@ type hostDB interface {
 type trackedFile struct {
 	// location of original file on disk
 	RepairPath string
-	// height at which file contracts should end. If EndHeight is 0, the file's
-	// contracts will be renewed indefinitely.
+	// height at which file contracts should end
 	EndHeight types.BlockHeight
+	// whether the file should be renewed (overrides EndHeight if true)
+	Renew bool
 }
 
 // A Renter is responsible for tracking all of the files that a user has
@@ -105,7 +106,7 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	// Calculate the average cost of a file.
 	averagePrice := r.hostDB.AveragePrice()
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(defaultDuration)).Mul(types.NewCurrency64(1e9)).Mul(types.NewCurrency64(defaultParityPieces + defaultDataPieces))
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(defaultDuration))).Mul(types.NewCurrency64(1e9)).Mul(types.NewCurrency64(defaultParityPieces + defaultDataPieces))
 	// this also accounts for the buffering in the contract negotiation
 	bufferedCost := estimatedCost.Mul(types.NewCurrency64(5)).Div(types.NewCurrency64(2))
 	ri.Price = bufferedCost

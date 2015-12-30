@@ -35,6 +35,7 @@ func TestSignedUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 
 	// to test the update process, we need to spoof the update server
 	uh := new(updateHandler)
@@ -81,6 +82,7 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer st.server.Close()
 	var version string
 	st.getAPI("/daemon/version", &version)
 	if version != build.Version {

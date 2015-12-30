@@ -172,10 +172,12 @@ func (srv *Server) renterFilesUploadHandler(w http.ResponseWriter, req *http.Req
 			return
 		}
 	}
+	renew := req.FormValue("renew") == "true"
 	err := srv.renter.Upload(modules.FileUploadParams{
 		Filename: req.FormValue("source"),
 		Nickname: req.FormValue("nickname"),
 		Duration: duration,
+		Renew:    renew,
 		// let the renter decide these values; eventually they will be configurable
 		ErasureCode: nil,
 		PieceSize:   0,
