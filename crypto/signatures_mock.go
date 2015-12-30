@@ -32,7 +32,7 @@ type sigKeyGen struct {
 // dependencies.
 func (skg sigKeyGen) generate() (sk SecretKey, pk PublicKey, err error) {
 	var entropy [EntropySize]byte
-	_, err = skg.entropySource.Read(entropy[:])
+	_, err = io.ReadFull(skg.entropySource, entropy[:])
 	if err != nil {
 		return
 	}
