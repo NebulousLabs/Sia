@@ -1,13 +1,16 @@
+// host is an implementation of the host module, and is responsible for storing
+// data and advertising available storage to the network.
 package host
 
 import (
 	"errors"
-	"log"
 	"net"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -17,13 +20,31 @@ const (
 	// of a reorg.
 	StorageProofReorgDepth = 10
 	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
+
+	defaultTotalStorage = 10e9      // 10 GB.
+	defaultMaxDuration  = 144 * 120 // 120 days.
+	defaultWindowSize   = 144 * 2   // 2 days.
 )
 
 var (
 	// defaultPrice defines the starting price for hosts selling storage. We
 	// try to match a number that is both reasonably profitable and reasonably
 	// competitive.
-	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9 / 200)) // 200 SC / GB / Month
+	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(100)) // 100 SC / GB / Month
+
+	// defaultCollateral defines the amount of money that the host puts up as
+	// collateral per-byte by default. Set to zero currently because neither of
+	// the negotiation protocols have logic to deal with non-zero collateral.
+	defaultCollateral = types.NewCurrency64(0)
+
+	// errChangedUnlockHash is returned by SetSettings if the unlock hash has
+	// changed, an illegal operation.
+	errChangedUnlockHash = errors.New("cannot change the unlock hash in SetSettings")
+
+	// Nil dependency errors.
+	errNilCS     = errors.New("host cannot use a nil state")
+	errNilTpool  = errors.New("host cannot use a nil transaction pool")
+	errNilWallet = errors.New("host cannot use a nil wallet")
 )
 
 // A contractObligation tracks a file contract that the host is obligated to
@@ -34,7 +55,10 @@ type contractObligation struct {
 	LastRevisionTxn types.Transaction
 	Path            string // Where on disk the file is stored.
 
-	// revisions must happen in serial
+	// The mutex ensures that revisions are happening in serial. The actual
+	// data under the obligations is being protected by the host's mutex.
+	// Grabbing 'mu' is not sufficient to guarantee modification safety of the
+	// struct, the host mutex must also be grabbed.
 	mu sync.Mutex
 }
 
@@ -46,95 +70,80 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// File management.
-	fileCounter         int
+	// Consensus Tracking
+	blockHeight  types.BlockHeight
+	recentChange modules.ConsensusChangeID
+
+	// Host Identity
+	netAddress modules.NetAddress
+	publicKey  types.SiaPublicKey
+	secretKey  crypto.SecretKey
+
+	// File Management.
 	obligationsByID     map[types.FileContractID]*contractObligation
 	obligationsByHeight map[types.BlockHeight][]*contractObligation
-	profit              types.Currency
-	spaceRemaining      int64
 
-	// Persistent settings.
-	blockHeight types.BlockHeight
-	netAddr     modules.NetAddress
-	secretKey   crypto.SecretKey
-	publicKey   types.SiaPublicKey
-	modules.HostSettings
+	// Statistics
+	profit         types.Currency
+	fileCounter    int64
+	spaceRemaining int64
 
 	// Utilities.
 	listener   net.Listener
-	log        *log.Logger
+	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
+	settings   modules.HostSettings
 }
 
 // New returns an initialized Host.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, addr string, persistDir string) (*Host, error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+	// Check that all the dependencies were provided.
 	if cs == nil {
-		return nil, errors.New("host cannot use a nil state")
+		return nil, errNilCS
 	}
 	if tpool == nil {
-		return nil, errors.New("host cannot use a nil tpool")
+		return nil, errNilTpool
 	}
 	if wallet == nil {
-		return nil, errors.New("host cannot use a nil wallet")
+		return nil, errNilWallet
 	}
 
+	// Create the host object.
 	h := &Host{
 		cs:     cs,
 		tpool:  tpool,
 		wallet: wallet,
 
-		// default host settings
-		HostSettings: modules.HostSettings{
-			TotalStorage: 10e9,         // 10 GB
-			MaxFilesize:  100e9,        // 100 GB
-			MaxDuration:  144 * 60,     // 60 days
-			WindowSize:   288,          // 48 hours
-			Price:        defaultPrice, // 200 SC / GB / Month
-			Collateral:   types.NewCurrency64(0),
-		},
-
-		persistDir: persistDir,
-
 		obligationsByID:     make(map[types.FileContractID]*contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]*contractObligation),
-	}
-	h.spaceRemaining = h.TotalStorage
 
-	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return nil, err
-	}
-	h.secretKey = sk
-	h.publicKey = types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       pk[:],
+		persistDir: persistDir,
 	}
 
-	// Load the old host data and initialize the logger.
-	err = h.initPersist()
+	// Load all of the saved host state into the host.
+	err := h.initPersist()
 	if err != nil {
 		return nil, err
 	}
 
-	// Create listener and set address.
-	h.listener, err = net.Listen("tcp", addr)
+	// Initialize the logger.
+	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
-	h.netAddr = modules.NetAddress(h.listener.Addr().String())
 
-	// Forward the hosting port, if possible.
-	go h.forwardPort(h.netAddr.Port())
+	// Subscribe to the consensus set.
+	err = h.initConsensusSubscription()
+	if err != nil {
+		return nil, err
+	}
 
-	// Learn our external IP.
-	go h.learnHostname()
-
-	// spawn listener
-	go h.listen()
-
-	h.cs.ConsensusSetSubscribe(h)
+	// Get the host established on the network.
+	err = h.initNetworking(address)
+	if err != nil {
+		return nil, err
+	}
 
 	return h, nil
 }
@@ -146,6 +155,36 @@ func (h *Host) Capacity() int64 {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.spaceRemaining
+}
+
+// Close shuts down the host, preparing it for garbage collection.
+func (h *Host) Close() error {
+	// The order in which things are closed has been explicitly chosen to
+	// minimize turbulence in the event of an error.
+
+	// Save the latest host state.
+	h.mu.Lock()
+	err := h.save()
+	h.mu.Unlock()
+	if err != nil {
+		return err
+	}
+
+	// Clean up networking processes.
+	h.clearPort(h.netAddress.Port())
+	err = h.listener.Close()
+	if err != nil {
+		return err
+	}
+
+	// Close the logger.
+	err = h.log.Close()
+	if err != nil {
+		return err
+	}
+
+	h.cs.Unsubscribe(h)
+	return nil
 }
 
 // Contracts returns the number of unresolved file contracts that the host is
@@ -160,7 +199,7 @@ func (h *Host) Contracts() uint64 {
 func (h *Host) NetAddress() modules.NetAddress {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.netAddr
+	return h.netAddress
 }
 
 // Revenue returns the amount of revenue that the host has lined up, as well as
@@ -176,31 +215,26 @@ func (h *Host) Revenue() (unresolved, resolved types.Currency) {
 }
 
 // SetSettings updates the host's internal HostSettings object.
-func (h *Host) SetSettings(settings modules.HostSettings) {
+func (h *Host) SetSettings(settings modules.HostSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.spaceRemaining += settings.TotalStorage - h.TotalStorage
-	h.HostSettings = settings
-	h.save()
+
+	// Check that the unlock hash was not changed.
+	if settings.UnlockHash != h.settings.UnlockHash {
+		return errChangedUnlockHash
+	}
+
+	// Update the amount of space remaining to reflect the new volume of total
+	// storage.
+	h.spaceRemaining += settings.TotalStorage - h.settings.TotalStorage
+
+	h.settings = settings
+	return h.save()
 }
 
 // Settings returns the settings of a host.
 func (h *Host) Settings() modules.HostSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.HostSettings
-}
-
-// Close saves the state of the Gateway and stops its listener process.
-func (h *Host) Close() error {
-	h.mu.RLock()
-	// save the latest host state
-	if err := h.save(); err != nil {
-		return err
-	}
-	h.mu.RUnlock()
-	// clear the port mapping (no effect if UPnP not supported)
-	h.clearPort(h.netAddr.Port())
-	// shut down the listener
-	return h.listener.Close()
+	return h.settings
 }

@@ -203,14 +203,14 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	}
 }
 
-// TestIntegrationNewInvalidConsensusChangeID triggers
-// newHandleErrInvalidConsensusChangeID during a call to miner.New and verifies
-// that the rescanning happens correctly.
-func TestIntegrationNewInvalidConsensusChangeID(t *testing.T) {
+// TestIntegrationAutoRescan triggers a rescan during a call to New and
+// verifies that the rescanning happens correctly. The rerscan is triggered by
+// a call to New, instead of getting called directly.
+func TestIntegrationAutoRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegrationNewInvalidConsensusChangeID")
+	mt, err := createMinerTester("TestIntegrationAutoRescan")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,8 +229,7 @@ func TestIntegrationNewInvalidConsensusChangeID(t *testing.T) {
 	mt.miner.persist.RecentChange[0]++
 	mt.miner.persist.Height += 1e5
 	mt.miner.persist.Target[0]++
-	mt.miner.Close()
-	err = mt.miner.save()
+	err = mt.miner.Close() // miner saves when it closes.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +252,7 @@ func TestIntegrationNewInvalidConsensusChangeID(t *testing.T) {
 }
 
 // TestIntegrationStartupRescan probes the startupRescan function, checking
-// that it works in the naive case.
+// that it works in the naive case. Rescan is called directly.
 func TestIntegrationStartupRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -272,17 +271,15 @@ func TestIntegrationStartupRescan(t *testing.T) {
 	oldHeight := mt.miner.persist.Height
 	oldTarget := mt.miner.persist.Target
 
-	// Corrupt the miner, the corruption should be fixed by the rescan.
+	// Corrupt the miner and verify that a rescan repairs the corruption.
 	mt.miner.persist.RecentChange[0]++
 	mt.miner.persist.Height += 500
 	mt.miner.persist.Target[0]++
-
-	// Call rescan and block until the scan is complete.
+	mt.cs.Unsubscribe(mt.miner)
 	err = mt.miner.startupRescan()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Check that after rescanning, the values have returned to the usual values.
 	if mt.miner.persist.RecentChange != oldChange {
 		t.Error("rescan failed, ended up on the wrong change")
 	}

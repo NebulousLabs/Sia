@@ -56,13 +56,13 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	case fc.WindowStart <= h.blockHeight:
 		return errors.New("window start cannot be in the past")
 
-	case duration < h.MinDuration || duration > h.MaxDuration:
+	case duration < h.settings.MinDuration || duration > h.settings.MaxDuration:
 		return errors.New("duration is out of bounds")
 
 	case fc.WindowEnd <= fc.WindowStart:
 		return errors.New("window cannot end before it starts")
 
-	case fc.WindowEnd-fc.WindowStart < h.WindowSize:
+	case fc.WindowEnd-fc.WindowStart < h.settings.WindowSize:
 		return errors.New("challenge window is not large enough")
 
 	case fc.FileMerkleRoot != merkleRoot:
@@ -77,7 +77,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	case len(fc.MissedProofOutputs) != 2:
 		return errors.New("bad file contract missed proof outputs")
 
-	case fc.ValidProofOutputs[1].UnlockHash != h.UnlockHash:
+	case fc.ValidProofOutputs[1].UnlockHash != h.settings.UnlockHash:
 		return errors.New("file contract valid proof output not sent to host")
 	case fc.MissedProofOutputs[1].UnlockHash != voidAddress:
 		return errors.New("file contract missed proof output not sent to void")
@@ -114,7 +114,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	lastRev := obligation.LastRevisionTxn.FileContractRevisions[0]
 	fc := obligation.FileContract
 	duration := types.NewCurrency64(uint64(fc.WindowStart - h.blockHeight))
-	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.Price)
+	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.settings.Price)
 	expectedPayout := types.PostTax(h.blockHeight, fc.Payout)
 
 	switch {
@@ -140,7 +140,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	case rev.NewRevisionNumber <= lastRev.NewRevisionNumber:
 		return errors.New("revision must have higher revision number")
 
-	case rev.NewFileSize > uint64(h.spaceRemaining) || rev.NewFileSize > h.MaxFilesize:
+	case rev.NewFileSize > uint64(h.spaceRemaining):
 		return errors.New("revision file size is too large")
 	case rev.NewFileSize <= lastRev.NewFileSize:
 		return errors.New("revision must add data")
@@ -268,13 +268,13 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 // file contracts should not initially hold any data.
 func (h *Host) rpcUpload(conn net.Conn) error {
 	// Check that the host has grabbed an address from the wallet.
-	if h.UnlockHash == (types.UnlockHash{}) {
+	if h.settings.UnlockHash == (types.UnlockHash{}) {
 		return errors.New("couldn't negotiate contract: host does not have an address")
 	}
 
 	h.mu.RLock()
 	h.fileCounter++
-	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter))
+	filename := filepath.Join(h.persistDir, strconv.Itoa(int(h.fileCounter)))
 	h.mu.RUnlock()
 
 	// negotiate expecting empty Merkle root
@@ -445,7 +445,7 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 	// copy over old file data
 	h.mu.RLock()
 	h.fileCounter++
-	filename := filepath.Join(h.persistDir, strconv.Itoa(h.fileCounter))
+	filename := filepath.Join(h.persistDir, strconv.Itoa(int(h.fileCounter)))
 	h.mu.RUnlock()
 
 	old, err := os.Open(obligation.Path)

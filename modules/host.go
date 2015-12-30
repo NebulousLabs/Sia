@@ -53,9 +53,7 @@ type (
 	// database.
 	HostSettings struct {
 		IPAddress    NetAddress
-		TotalStorage int64  // Can go negative.
-		MinFilesize  uint64 // DEPRECATED.
-		MaxFilesize  uint64 // DEPRECATED.
+		TotalStorage int64 // Can go negative.
 		MinDuration  types.BlockHeight
 		MaxDuration  types.BlockHeight
 		WindowSize   types.BlockHeight
@@ -93,7 +91,7 @@ type (
 		Revenue() (unresolved, resolved types.Currency)
 
 		// SetConfig sets the hosting parameters of the host.
-		SetSettings(HostSettings)
+		SetSettings(HostSettings) error
 
 		// Settings returns the host's settings.
 		Settings() HostSettings

@@ -11,12 +11,12 @@ import (
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
 	// Generate an unlock hash, if necessary.
-	if h.UnlockHash == (types.UnlockHash{}) {
+	if h.settings.UnlockHash == (types.UnlockHash{}) {
 		uc, err := h.wallet.NextAddress()
 		if err != nil {
 			return err
 		}
-		h.UnlockHash = uc.UnlockHash()
+		h.settings.UnlockHash = uc.UnlockHash()
 		err = h.save()
 		if err != nil {
 			return err
@@ -53,7 +53,7 @@ func (h *Host) Announce() error {
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
 	h.mu.RLock()
-	addr := h.netAddr
+	addr := h.netAddress
 	h.mu.RUnlock()
 
 	// Check that the host's ip address is known.
