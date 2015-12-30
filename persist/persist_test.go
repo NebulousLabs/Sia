@@ -3,6 +3,7 @@ package persist
 import (
 	"bytes"
 	"crypto/rand"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,17 +66,10 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 	}
 
 	// Check that the file exists and has same data that was written to it.
-	f, err := os.Open(absPath)
-	defer f.Close()
+	dataRead, err := ioutil.ReadFile(absPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dataRead := make([]byte, 11)
-	n, err := f.Read(dataRead)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dataRead = dataRead[:n]
 	if !bytes.Equal(data, dataRead) {
 		t.Fatalf("Committed file has different data than was written to it: expected %v, got %v\n", data, dataRead)
 	}
@@ -133,17 +127,10 @@ func TestRelativePathSafeFile(t *testing.T) {
 	}
 
 	// Check that the file exists and has same data that was written to it.
-	f, err := os.Open(absPath)
-	defer f.Close()
+	dataRead, err := ioutil.ReadFile(absPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dataRead := make([]byte, 11)
-	n, err := f.Read(dataRead)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dataRead = dataRead[:n]
 	if !bytes.Equal(data, dataRead) {
 		t.Fatalf("Committed file has different data than was written to it: expected %v, got %v\n", data, dataRead)
 	}
