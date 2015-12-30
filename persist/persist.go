@@ -5,6 +5,7 @@ import (
 	"encoding/base32"
 	"errors"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -48,8 +49,17 @@ type safeFile struct {
 	finalName string
 }
 
-// Commit renames the file to the intended final filename.
+// Commit syncs the file and then renames it to the intended final filename.
+// Writing to the file after calling Commit will succeed but will write to the
+// final file location (sf.Name() will deceptively still point to the old file
+// location).  Therefore it is recommended that the file handle be closed
+// immediately after calling Commit. Note that the file must not be closed
+// before calling commit as this will cause the sync to fail.
 func (sf *safeFile) Commit() error {
+	err := sf.Sync()
+	if err != nil {
+		return err
+	}
 	return os.Rename(sf.finalName+"_temp", sf.finalName)
 }
 
@@ -60,5 +70,14 @@ func NewSafeFile(filename string) (*safeFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &safeFile{file, filename}, nil
+
+	// Get the absolute path of the filename so that calling os.Chdir in
+	// between calling NewSafeFile and calling safeFile.Commit does not change
+	// the final file path.
+	absFilename, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return &safeFile{file, absFilename}, nil
 }
