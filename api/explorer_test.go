@@ -2,6 +2,8 @@ package api
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestIntegrationExplorerGET probes the GET call to /explorer.
@@ -47,7 +49,7 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	if ebg.Block.BlockID != ebg.Block.RawBlock.ID() {
 		t.Error("block id and block do not match up from api call")
 	}
-	if st.server.cs.GenesisBlock().ID() != ebg.Block.BlockID {
+	if ebg.Block.BlockID != types.GenesisBlock.ID() {
 		t.Error("wrong block returned by /explorer/block?height=0")
 	}
 }
@@ -64,7 +66,7 @@ func TestIntegrationExplorerGEThash(t *testing.T) {
 	defer st.server.Close()
 
 	var ehg ExplorerHashGET
-	gb := st.server.cs.GenesisBlock()
+	gb := types.GenesisBlock
 	err = st.getAPI("/explorer/"+gb.ID().String(), &ehg)
 	if err != nil {
 		t.Fatal(err)

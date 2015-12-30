@@ -60,8 +60,7 @@ func TestIntegrationConsensusBlockGET(t *testing.T) {
 	}
 
 	// Sanity check - BlockAtHeight should be working.
-	gb := st.cs.GenesisBlock()
-	if block1.ParentID != gb.ID() {
+	if block1.ParentID != types.GenesisBlock.ID() {
 		t.Fatal("genesis block and block1 mismatch")
 	}
 }

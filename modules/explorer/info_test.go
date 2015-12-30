@@ -36,7 +36,7 @@ func TestBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gb := et.cs.GenesisBlock()
+	gb := types.GenesisBlock
 	gbFetch, height, exists := et.explorer.Block(gb.ID())
 	if !exists || height != 0 || gbFetch.ID() != gb.ID() {
 		t.Error("call to 'Block' inside explorer failed")
@@ -53,7 +53,7 @@ func TestBlockFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gb := et.cs.GenesisBlock()
+	gb := types.GenesisBlock
 	bf, exists := et.explorer.BlockFacts(0)
 	if !exists || bf.BlockID != gb.ID() || bf.Height != 0 {
 		t.Error("call to 'BlockFacts' inside explorer failed")

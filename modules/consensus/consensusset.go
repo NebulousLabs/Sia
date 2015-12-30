@@ -73,20 +73,12 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		return nil, errNilGateway
 	}
 
-	// Create the genesis block.
-	genesisBlock := types.Block{
-		Timestamp: types.GenesisTimestamp,
-		Transactions: []types.Transaction{
-			{SiafundOutputs: types.GenesisSiafundAllocation},
-		},
-	}
-
 	// Create the ConsensusSet object.
 	cs := &ConsensusSet{
 		gateway: gateway,
 
 		blockRoot: processedBlock{
-			Block:       genesisBlock,
+			Block:       types.GenesisBlock,
 			ChildTarget: types.RootTarget,
 			Depth:       types.RootDepth,
 
@@ -103,8 +95,8 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	}
 
 	// Create the diffs for the genesis siafund outputs.
-	for i, siafundOutput := range genesisBlock.Transactions[0].SiafundOutputs {
-		sfid := genesisBlock.Transactions[0].SiafundOutputID(uint64(i))
+	for i, siafundOutput := range types.GenesisBlock.Transactions[0].SiafundOutputs {
+		sfid := types.GenesisBlock.Transactions[0].SiafundOutputID(uint64(i))
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfid,
@@ -174,15 +166,6 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 		return nil
 	})
 	return block
-}
-
-// GenesisBlock returns the genesis block.
-func (cs *ConsensusSet) GenesisBlock() types.Block {
-	// GenesisBlock is called fairly frequently, and should not have to do any
-	// I/O as a lookup.
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-	return cs.blockRoot.Block
 }
 
 // Height returns the height of the consensus set.

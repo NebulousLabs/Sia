@@ -34,6 +34,7 @@ var (
 	MinimumCoinbase  uint64
 
 	GenesisSiafundAllocation []SiafundOutput
+	GenesisBlock             Block
 )
 
 // init checks which build constant is in place and initializes the variables
@@ -359,5 +360,13 @@ func init() {
 				UnlockHash: UnlockHash{125, 12, 68, 247, 102, 78, 45, 52, 229, 62, 253, 224, 102, 26, 111, 98, 142, 201, 38, 71, 133, 174, 142, 60, 215, 201, 115, 232, 209, 144, 195, 201},
 			},
 		}
+	}
+
+	// Create the genesis block.
+	GenesisBlock = Block{
+		Timestamp: GenesisTimestamp,
+		Transactions: []Transaction{
+			{SiafundOutputs: GenesisSiafundAllocation},
+		},
 	}
 }
