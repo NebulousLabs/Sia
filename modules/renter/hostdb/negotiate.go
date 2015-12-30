@@ -20,7 +20,7 @@ var (
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder modules.TransactionBuilder, tpool modules.TransactionPool) (hostContract, error) {
+func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder hdbTransactionBuilder, tpool hdbTransactionPool) (hostContract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 

@@ -22,19 +22,50 @@ const (
 )
 
 var (
-	errNilCS     = errors.New("cannot create renter with nil consensus set")
-	errNilWallet = errors.New("cannot create renter with nil wallet")
-	errNilTpool  = errors.New("cannot create renter with nil transaction pool")
+	errNilCS     = errors.New("cannot create hostdb with nil consensus set")
+	errNilWallet = errors.New("cannot create hostdb with nil wallet")
+	errNilTpool  = errors.New("cannot create hostdb with nil transaction pool")
 )
+
+// These interfaces define the HostDB's dependencies. Using the smallest
+// interface possible makes it easier to mock these dependencies in testing.
+type (
+	hdbConsensusSet interface {
+		ConsensusSetSubscribe(modules.ConsensusSetSubscriber)
+	}
+	hdbTransactionBuilder interface {
+		AddArbitraryData([]byte) uint64
+		AddFileContract(types.FileContract) uint64
+		Drop()
+		FundSiacoins(types.Currency) error
+		Sign(bool) ([]types.Transaction, error)
+		View() (types.Transaction, []types.Transaction)
+	}
+	hdbWallet interface {
+		NextAddress() (types.UnlockConditions, error)
+		StartTransaction() hdbTransactionBuilder
+	}
+	hdbTransactionPool interface {
+		AcceptTransactionSet([]types.Transaction) error
+	}
+)
+
+// because hdbWallet is not directly compatible with modules.Wallet (differing
+// type signatures for StartTransaction), we must provide a shim type.
+type hdbWalletShim struct {
+	w modules.Wallet
+}
+
+func (ws *hdbWalletShim) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
+func (ws *hdbWalletShim) StartTransaction() hdbTransactionBuilder      { return ws.w.StartTransaction() }
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
 	// modules
-	cs     modules.ConsensusSet
-	wallet modules.Wallet
-	tpool  modules.TransactionPool
+	wallet hdbWallet
+	tpool  hdbTransactionPool
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -77,7 +108,7 @@ type hostContract struct {
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*HostDB, error) {
+func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, persistDir string) (*HostDB, error) {
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -88,19 +119,11 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 		return nil, errNilTpool
 	}
 
-	hdb := &HostDB{
-		cs:     cs,
-		wallet: wallet,
-		tpool:  tpool,
-
-		contracts:   make(map[types.FileContractID]hostContract),
-		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
-		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		persistDir: persistDir,
+	hdb, err := newHostDB(&hdbWalletShim{w: wallet}, tpool, persistDir)
+	if err != nil {
+		return nil, err
 	}
-	err := hdb.initPersist()
+	err = hdb.initPersist()
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +135,25 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 	go hdb.threadedScan()
 
 	cs.ConsensusSetSubscribe(hdb)
+
+	return hdb, nil
+}
+
+// newHostDB creates a HostDB using the provided dependencies. It does not
+// have any side effects (i.e. it does not spawn background threads, perform
+// I/O, or call stateful methods of its dependencies.)
+func newHostDB(wallet hdbWallet, tpool hdbTransactionPool, persistDir string) (*HostDB, error) {
+	hdb := &HostDB{
+		wallet: wallet,
+		tpool:  tpool,
+
+		contracts:   make(map[types.FileContractID]hostContract),
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		persistDir: persistDir,
+	}
 
 	return hdb, nil
 }
