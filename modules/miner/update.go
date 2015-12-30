@@ -19,7 +19,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Checking the height here eliminates the need to initialize the miner to
 	// an underflowed types.BlockHeight, which was deemed the worse of the two
 	// evils.
-	if m.persist.Height != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != m.cs.GenesisBlock().ID() {
+	if m.persist.Height != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisBlock.ID() {
 		m.persist.Height -= types.BlockHeight(len(cc.RevertedBlocks))
 		m.persist.Height += types.BlockHeight(len(cc.AppliedBlocks))
 	}

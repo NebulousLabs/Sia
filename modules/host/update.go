@@ -118,7 +118,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Checking the height here eliminates the need to initialize the host to
 	// and underflowed types.BlockHeight.
 	oldHeight := h.blockHeight
-	if h.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != h.cs.GenesisBlock().ID() {
+	if h.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisBlock.ID() {
 		h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 		h.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
 	}

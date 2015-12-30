@@ -191,9 +191,6 @@ type (
 		// blockchain.
 		CurrentBlock() types.Block
 
-		// GenesisBlock returns the genesis block.
-		GenesisBlock() types.Block
-
 		// Height returns the current height of consensus.
 		Height() types.BlockHeight
 
