@@ -28,6 +28,10 @@ func (lfw *logFileWrapper) Close() error {
 	if build.DEBUG && lfw.closed {
 		panic("cannot close the logger after it has been closed")
 	}
+	// Ensure that all data has actually hit the disk.
+	if err := lfw.file.Sync(); err != nil {
+		return err
+	}
 	lfw.closed = true
 	return lfw.file.Close()
 }
