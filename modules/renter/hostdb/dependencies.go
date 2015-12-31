@@ -59,16 +59,21 @@ type hdbWalletShim struct {
 func (ws *hdbWalletShim) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
 func (ws *hdbWalletShim) StartTransaction() hdbTransactionBuilder      { return ws.w.StartTransaction() }
 
+// stdDialer implements the hdbDialer interface via net.DialTimeout.
 type stdDialer struct{}
 
 func (d stdDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("tcp", string(addr), timeout)
 }
 
+// stdSleeper implements the hdbSleeper interface via time.Sleep.
 type stdSleeper struct{}
 
 func (s stdSleeper) Sleep(d time.Duration) { time.Sleep(d) }
 
+// stdPersist implements the hdbPersister interface via persist.SaveFile and
+// persist.LoadFile. The metadata and filename required by these functions is
+// internal to stdPersist.
 type stdPersist struct {
 	meta     persist.Metadata
 	filename string
@@ -92,6 +97,7 @@ func newPersist(dir string) *stdPersist {
 	}
 }
 
+// newLogger creates a persist.Logger with the standard filename.
 func newLogger(dir string) (*persist.Logger, error) {
 	return persist.NewLogger(filepath.Join(dir, "hostdb.log"))
 }
