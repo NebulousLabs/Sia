@@ -2,9 +2,11 @@ package hostdb
 
 import (
 	"net"
+	"path/filepath"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -37,6 +39,11 @@ type (
 	hdbSleeper interface {
 		Sleep(time.Duration)
 	}
+
+	hdbPersister interface {
+		save(hdbPersist) error
+		load(*hdbPersist) error
+	}
 )
 
 // because hdbWallet is not directly compatible with modules.Wallet (wrong
@@ -57,3 +64,26 @@ func (d stdDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (
 type stdSleeper struct{}
 
 func (s stdSleeper) Sleep(d time.Duration) { time.Sleep(d) }
+
+type stdPersist struct {
+	meta     persist.Metadata
+	filename string
+}
+
+func (p *stdPersist) save(data hdbPersist) error {
+	return persist.SaveFile(p.meta, data, p.filename)
+}
+
+func (p *stdPersist) load(data *hdbPersist) error {
+	return persist.LoadFile(p.meta, data, p.filename)
+}
+
+func newPersist(dir string) *stdPersist {
+	return &stdPersist{
+		meta: persist.Metadata{
+			Header:  "HostDB Persistence",
+			Version: "0.5",
+		},
+		filename: filepath.Join(dir, "hostdb.json"),
+	}
+}

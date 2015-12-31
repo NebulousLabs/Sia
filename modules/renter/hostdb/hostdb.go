@@ -36,6 +36,7 @@ type HostDB struct {
 	tpool   hdbTransactionPool
 	dialer  hdbDialer
 	sleeper hdbSleeper
+	persist hdbPersister
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -58,8 +59,6 @@ type HostDB struct {
 	blockHeight   types.BlockHeight
 	contracts     map[types.FileContractID]hostContract
 	cachedAddress types.UnlockHash // to prevent excessive address creation
-
-	persistDir string
 
 	log *log.Logger
 	mu  sync.RWMutex
@@ -89,11 +88,11 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 		return nil, errNilTpool
 	}
 
-	hdb, err := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, stdSleeper{}, persistDir)
+	hdb, err := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir))
 	if err != nil {
 		return nil, err
 	}
-	err = hdb.initPersist()
+	err = hdb.initPersist(persistDir)
 	if err != nil {
 		return nil, err
 	}
@@ -112,19 +111,18 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 // newHostDB creates a HostDB using the provided dependencies. It does not
 // have any side effects (i.e. it does not spawn background threads, perform
 // I/O, or call stateful methods of its dependencies.)
-func newHostDB(w hdbWallet, tpool hdbTransactionPool, d hdbDialer, s hdbSleeper, persistDir string) (*HostDB, error) {
+func newHostDB(w hdbWallet, tpool hdbTransactionPool, d hdbDialer, s hdbSleeper, p hdbPersister) (*HostDB, error) {
 	hdb := &HostDB{
 		wallet:  w,
 		tpool:   tpool,
 		dialer:  d,
 		sleeper: s,
+		persist: p,
 
 		contracts:   make(map[types.FileContractID]hostContract),
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		persistDir: persistDir,
 	}
 
 	return hdb, nil

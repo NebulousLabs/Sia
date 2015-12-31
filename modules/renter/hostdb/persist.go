@@ -4,34 +4,25 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-
-	"github.com/NebulousLabs/Sia/persist"
 )
 
-const persistFilename = "hostdb.json"
-
-var saveMetadata = persist.Metadata{
-	Header:  "HostDB Persistence",
-	Version: "0.5",
+type hdbPersist struct {
+	Contracts []hostContract
 }
 
 // save saves the hostdb persistence data to disk.
 func (hdb *HostDB) save() error {
-	var data struct {
-		Contracts []hostContract
-	}
+	var data hdbPersist
 	for _, hc := range hdb.contracts {
 		data.Contracts = append(data.Contracts, hc)
 	}
-	return persist.SaveFile(saveMetadata, data, filepath.Join(hdb.persistDir, persistFilename))
+	return hdb.persist.save(data)
 }
 
 // load loads the hostdb persistence data from disk.
 func (hdb *HostDB) load() error {
-	var data struct {
-		Contracts []hostContract
-	}
-	err := persist.LoadFile(saveMetadata, &data, filepath.Join(hdb.persistDir, persistFilename))
+	var data hdbPersist
+	err := hdb.persist.load(&data)
 	if err != nil {
 		return err
 	}
@@ -43,15 +34,15 @@ func (hdb *HostDB) load() error {
 
 // initPersist handles all of the persistence initialization, such as creating
 // the persistance directory and starting the logger.
-func (hdb *HostDB) initPersist() error {
+func (hdb *HostDB) initPersist(dir string) error {
 	// Create the perist directory if it does not yet exist.
-	err := os.MkdirAll(hdb.persistDir, 0700)
+	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		return err
 	}
 
 	// Initialize the logger.
-	logFile, err := os.OpenFile(filepath.Join(hdb.persistDir, "hostdb.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+	logFile, err := os.OpenFile(filepath.Join(dir, "hostdb.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
 	if err != nil {
 		return err
 	}
