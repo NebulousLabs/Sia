@@ -33,6 +33,10 @@ type (
 	hdbDialer interface {
 		DialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
 	}
+
+	hdbSleeper interface {
+		Sleep(time.Duration)
+	}
 )
 
 // because hdbWallet is not directly compatible with modules.Wallet (wrong
@@ -49,3 +53,7 @@ type stdDialer struct{}
 func (d stdDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("tcp", string(addr), timeout)
 }
+
+type stdSleeper struct{}
+
+func (s stdSleeper) Sleep(d time.Duration) { time.Sleep(d) }

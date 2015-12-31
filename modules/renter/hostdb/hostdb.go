@@ -32,9 +32,10 @@ var (
 // for uploading files.
 type HostDB struct {
 	// dependencies
-	wallet hdbWallet
-	tpool  hdbTransactionPool
-	dialer hdbDialer
+	wallet  hdbWallet
+	tpool   hdbTransactionPool
+	dialer  hdbDialer
+	sleeper hdbSleeper
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -88,7 +89,7 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 		return nil, errNilTpool
 	}
 
-	hdb, err := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, persistDir)
+	hdb, err := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, stdSleeper{}, persistDir)
 	if err != nil {
 		return nil, err
 	}
@@ -111,11 +112,12 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 // newHostDB creates a HostDB using the provided dependencies. It does not
 // have any side effects (i.e. it does not spawn background threads, perform
 // I/O, or call stateful methods of its dependencies.)
-func newHostDB(w hdbWallet, tpool hdbTransactionPool, d hdbDialer, persistDir string) (*HostDB, error) {
+func newHostDB(w hdbWallet, tpool hdbTransactionPool, d hdbDialer, s hdbSleeper, persistDir string) (*HostDB, error) {
 	hdb := &HostDB{
-		wallet: w,
-		tpool:  tpool,
-		dialer: d,
+		wallet:  w,
+		tpool:   tpool,
+		dialer:  d,
+		sleeper: s,
 
 		contracts:   make(map[types.FileContractID]hostContract),
 		activeHosts: make(map[modules.NetAddress]*hostNode),

@@ -240,12 +240,11 @@ func (hdb *HostDB) threadedScan() {
 		if err != nil {
 			if build.DEBUG {
 				panic(err)
-			} else {
-				// If there's an error, sleep for the default amount of time.
-				defaultBig := big.NewInt(int64(DefaultScanSleep))
-				randSleep = defaultBig.Sub(defaultBig, minBig)
 			}
+			// If there's an error, sleep for the default amount of time.
+			defaultBig := big.NewInt(int64(DefaultScanSleep))
+			randSleep = defaultBig.Sub(defaultBig, minBig)
 		}
-		time.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep) // this means the MaxScanSleep is actual Max+Min.
+		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep) // this means the MaxScanSleep is actual Max+Min.
 	}
 }
