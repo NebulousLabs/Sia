@@ -3,6 +3,7 @@ package host
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -57,7 +58,7 @@ func (h *Host) Announce() error {
 	h.mu.RUnlock()
 
 	// Check that the host's ip address is known.
-	if addr.IsLoopback() {
+	if addr.IsLoopback() && build.Release != "testing" {
 		return errors.New("can't announce without knowing external IP")
 	}
 

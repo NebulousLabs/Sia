@@ -37,7 +37,7 @@ type persistence struct {
 	Obligations []contractObligation
 
 	// Statistics.
-	Profit types.Currency
+	Revenue types.Currency
 }
 
 // getObligations returns a slice containing all of the contract obligations
@@ -69,7 +69,7 @@ func (h *Host) save() error {
 		FileCounter: h.fileCounter,
 		Obligations: h.getObligations(),
 
-		Profit: h.profit,
+		Revenue: h.revenue,
 	}
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
 }
@@ -124,7 +124,7 @@ func (h *Host) load() error {
 	h.loadObligations(p.Obligations)
 
 	// Copy over statistics.
-	h.profit = p.Profit
+	h.revenue = p.Revenue
 
 	return nil
 }

@@ -84,9 +84,11 @@ type Host struct {
 	obligationsByHeight map[types.BlockHeight][]*contractObligation
 
 	// Statistics
-	profit         types.Currency
-	fileCounter    int64
-	spaceRemaining int64
+	revenue            types.Currency
+	anticipatedRevenue types.Currency
+	lostRevenue        types.Currency
+	fileCounter        int64
+	spaceRemaining     int64
 
 	// Utilities.
 	listener   net.Listener
@@ -211,7 +213,7 @@ func (h *Host) Revenue() (unresolved, resolved types.Currency) {
 		fc := obligation.FileContract
 		unresolved = unresolved.Add(types.PostTax(h.blockHeight, fc.Payout))
 	}
-	return unresolved, h.profit
+	return unresolved, h.revenue
 }
 
 // SetSettings updates the host's internal HostSettings object.

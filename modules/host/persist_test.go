@@ -25,13 +25,13 @@ func TestEarlySaving(t *testing.T) {
 	copy(oldSK[:], ht.host.secretKey[:])
 	oldFileCounter := ht.host.fileCounter
 	oldSpaceRemaining := ht.host.spaceRemaining
-	oldProfit := ht.host.profit
+	oldRevenue := ht.host.revenue
 
 	// Corrupt the fields.
 	ht.host.secretKey[0]++
 	ht.host.fileCounter += 7e6
 	ht.host.spaceRemaining += 25e9
-	ht.host.profit = ht.host.profit.Add(types.NewCurrency64(91e3))
+	ht.host.revenue = ht.host.revenue.Add(types.NewCurrency64(91e3))
 
 	// Load the host and see that the fields are reset correctly.
 	err = ht.host.load()
@@ -47,7 +47,7 @@ func TestEarlySaving(t *testing.T) {
 	if ht.host.spaceRemaining != oldSpaceRemaining {
 		t.Error("space remaining not loaded correctly")
 	}
-	if ht.host.profit.Cmp(oldProfit) != 0 {
+	if ht.host.revenue.Cmp(oldRevenue) != 0 {
 		t.Error("profit not loaded correctly")
 	}
 }

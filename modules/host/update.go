@@ -101,7 +101,7 @@ func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
 
 	// Storage proof was successful, so increment profit tracking
 	h.mu.Lock()
-	h.profit = h.profit.Add(obligation.FileContract.Payout)
+	h.revenue = h.revenue.Add(obligation.FileContract.Payout)
 	h.mu.Unlock()
 }
 

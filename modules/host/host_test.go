@@ -1,8 +1,10 @@
 package host
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -10,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -21,6 +24,7 @@ type hostTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	miner     modules.TestMiner
+	renter    modules.Renter
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
@@ -46,6 +50,43 @@ func (ht *hostTester) initWallet() error {
 	err = ht.wallet.Unlock(key)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// initRenting prepares the host tester for uploads and downloads by announcing
+// the host to the network and performing other preparational tasks.
+// initRenting takes a while because the renter needs to process the host
+// announcement, requiring asynchronous network communication between the
+// renter and host.
+func (ht *hostTester) initRenting() error {
+	// Because the renting test takes a long time, it will fail if
+	// testing.Short.
+	if testing.Short() {
+		return errors.New("cannot call initRenting in short tests")
+	}
+
+	// Announce the host.
+	err := ht.host.Announce()
+	if err != nil {
+		return err
+	}
+
+	// Mine a block to get the announcement into the blockchain.
+	_, err = ht.miner.AddBlock()
+	if err != nil {
+		return err
+	}
+
+	// Wait for the renter to see the host announcement.
+	for i := 0; i < 50; i++ {
+		time.Sleep(time.Millisecond * 100)
+		if len(ht.renter.ActiveHosts()) != 0 {
+			break
+		}
+	}
+	if len(ht.renter.ActiveHosts()) == 0 {
+		return errors.New("could not start renting in the host tester")
 	}
 	return nil
 }
@@ -81,12 +122,17 @@ func blankHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	if err != nil {
+		return nil, err
+	}
 
 	// Assemble all objects into a hostTester
 	ht := &hostTester{
 		cs:      cs,
 		gateway: g,
 		miner:   m,
+		renter:  r,
 		tpool:   tp,
 		wallet:  w,
 
