@@ -6,7 +6,7 @@ package hostdb
 
 import (
 	"errors"
-	"log"
+	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -37,6 +37,7 @@ type HostDB struct {
 	dialer  hdbDialer
 	sleeper hdbSleeper
 	persist hdbPersister
+	log     hdbLogger
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -60,8 +61,7 @@ type HostDB struct {
 	contracts     map[types.FileContractID]hostContract
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 
-	log *log.Logger
-	mu  sync.RWMutex
+	mu sync.RWMutex
 }
 
 // a hostContract includes the original contract made with a host, along with
@@ -88,12 +88,24 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 		return nil, errNilTpool
 	}
 
-	hdb, err := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir))
+	// Create the persist directory if it does not yet exist.
+	err := os.MkdirAll(persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
-	err = hdb.initPersist(persistDir)
+	// Create the logger.
+	logger, err := newLogger(persistDir)
 	if err != nil {
+		return nil, err
+	}
+
+	// Create the HostDB using the supplied modules and standard
+	// implementations of each dependency.
+	hdb := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+
+	// Load the prior persistance structures.
+	err = hdb.load()
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 
@@ -108,22 +120,21 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 	return hdb, nil
 }
 
-// newHostDB creates a HostDB using the provided dependencies. It does not
-// have any side effects (i.e. it does not spawn background threads, perform
-// I/O, or call stateful methods of its dependencies.)
-func newHostDB(w hdbWallet, tpool hdbTransactionPool, d hdbDialer, s hdbSleeper, p hdbPersister) (*HostDB, error) {
-	hdb := &HostDB{
+// newHostDB creates a HostDB using the provided dependencies. Unlike New, it
+// does not have any side effects (i.e. it does not spawn background threads,
+// perform I/O, or call stateful methods of its dependencies.)
+func newHostDB(w hdbWallet, tp hdbTransactionPool, d hdbDialer, s hdbSleeper, p hdbPersister, l hdbLogger) *HostDB {
+	return &HostDB{
 		wallet:  w,
-		tpool:   tpool,
+		tpool:   tp,
 		dialer:  d,
 		sleeper: s,
 		persist: p,
+		log:     l,
 
 		contracts:   make(map[types.FileContractID]hostContract),
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
-
-	return hdb, nil
 }

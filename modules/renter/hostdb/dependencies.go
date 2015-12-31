@@ -44,6 +44,10 @@ type (
 		save(hdbPersist) error
 		load(*hdbPersist) error
 	}
+
+	hdbLogger interface {
+		Println(...interface{})
+	}
 )
 
 // because hdbWallet is not directly compatible with modules.Wallet (wrong
@@ -86,4 +90,8 @@ func newPersist(dir string) *stdPersist {
 		},
 		filename: filepath.Join(dir, "hostdb.json"),
 	}
+}
+
+func newLogger(dir string) (*persist.Logger, error) {
+	return persist.NewLogger(filepath.Join(dir, "hostdb.log"))
 }
