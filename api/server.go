@@ -1,11 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"net"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
-	"time"
-
-	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -22,7 +23,7 @@ type Server struct {
 	tpool    modules.TransactionPool
 	wallet   modules.Wallet
 
-	apiServer         *graceful.Server
+	apiServer         *http.Server
 	daemonExposed     bool
 	listener          net.Listener
 	requiredUserAgent string
@@ -57,10 +58,19 @@ func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet
 
 // Serve listens for and handles API calls. It a blocking function.
 func (srv *Server) Serve() error {
-	// graceful will run until it catches a signal.
-	// It can also be stopped manually by stopHandler.
+	// stop the server if a kill signal is caught
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, os.Interrupt, os.Kill)
+	go func() {
+		<-sigChan
+		fmt.Println("\rCaught stop signal, quitting...")
+		srv.listener.Close()
+	}()
+
+	// The server will run until an error is encountered or the listener is
+	// closed, via either the Close method or the signal handling above.
+	// Closing the listener will result in the benign error handled below.
 	err := srv.apiServer.Serve(srv.listener)
-	// despite its name, graceful still propogates this benign error
 	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
 		return err
 	}
@@ -79,10 +89,7 @@ func (srv *Server) Serve() error {
 	return nil
 }
 
-// Close sends the stop signal to the API server, giving it a grace period to
-// shut down cleanly before forcibly terminating it.
+// Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *Server) Close() error {
-	// give graceful 1 second to shutdown
-	srv.apiServer.Stop(time.Second)
-	return nil
+	return srv.listener.Close()
 }

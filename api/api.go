@@ -5,13 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
-
-	"github.com/stretchr/graceful"
-)
-
-const (
-	apiTimeout = 5 * time.Second
 )
 
 // HttpGET is a utility function for making http get requests to sia with a whitelisted user-agent
@@ -144,12 +137,9 @@ func (srv *Server) initAPI() {
 		mux.HandleFunc("/wallet/unlock", srv.walletUnlockHandler)              // POST
 	}
 
-	// Create graceful HTTP server
+	// Apply UserAgent middleware and create HTTP server
 	uaMux := requireUserAgent(mux, srv.requiredUserAgent)
-	srv.apiServer = &graceful.Server{
-		Timeout: apiTimeout,
-		Server:  &http.Server{Handler: uaMux},
-	}
+	srv.apiServer = &http.Server{Handler: uaMux}
 }
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
