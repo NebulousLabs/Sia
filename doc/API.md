@@ -192,7 +192,7 @@ struct {
 	unlockhash   types.UnlockHash  (string)
 	windowsize   types.BlockHeight (uint64)
 
-	numCcntracts      uint64
+	numcontracts      uint64
 	revenue           types.Currency (string)
 	storageremaining  int64
 	upcomingrevenue   types.Currency (string)
@@ -264,8 +264,6 @@ prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
 downtime, 40 blocks is recommended as an absolute minimum. The current network
 default is 288 blocks. The current software will break entirely below 20
 blocks, though in theory something as low as 6 blocks could be safe.
-`totalstorage` is how much storage (in bytes) the host will rent to the
-network.
 
 Response: standard
 
@@ -1087,7 +1085,7 @@ Response:
 	UploadProgress float32
 	Nickname       string
 	Filesize       uint64
-	TimeRemaining  types.BlockHeight (uint64)
+	Expiration     types.BlockHeight (uint64)
 }
 ```
 Each uploaded file is represented by the above struct.
@@ -1102,7 +1100,7 @@ UploadProgress == 100.
 
 `Filesize` is the size of the file in bytes.
 
-`TimeRemaining` indicates how many blocks the file will be available for.
+`Expiration` is the block height at which the file ceases availability.
 
 #### /renter/files/load
 
