@@ -42,7 +42,7 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	defer st.server.Close()
 
 	var ebg ExplorerBlockGET
-	err = st.getAPI("/explorer/block?height=0", &ebg)
+	err = st.getAPI("/explorer/block/0", &ebg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,8 +54,8 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	}
 }
 
-// TestIntegrationExplorerGEThash probes the GET call to /explorer/$(hash).
-func TestIntegrationExplorerGEThash(t *testing.T) {
+// TestIntegrationExplorerHashGet probes the GET call to /explorer/hash/:hash.
+func TestIntegrationExplorerHashGet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -67,7 +67,7 @@ func TestIntegrationExplorerGEThash(t *testing.T) {
 
 	var ehg ExplorerHashGET
 	gb := types.GenesisBlock
-	err = st.getAPI("/explorer/"+gb.ID().String(), &ehg)
+	err = st.getAPI("/explorer/hash/"+gb.ID().String(), &ehg)
 	if err != nil {
 		t.Fatal(err)
 	}

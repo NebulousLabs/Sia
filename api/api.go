@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 // HttpGET is a utility function for making http get requests to sia with a whitelisted user-agent
@@ -42,99 +44,99 @@ func requireUserAgent(h http.Handler, ua string) http.Handler {
 
 // initAPI determines which functions handle each API call.
 func (srv *Server) initAPI() {
-	mux := http.NewServeMux()
-
-	// 404 Calls
-	mux.HandleFunc("/", srv.unrecognizedCallHandler)
+	mux := httprouter.New()
+	mux.NotFound = http.HandlerFunc(srv.unrecognizedCallHandler) // custom 404
 
 	// Daemon API Calls - Unfinished
-	mux.HandleFunc("/daemon/constants", srv.daemonConstantsHandler)
-	mux.HandleFunc("/daemon/version", srv.daemonVersionHandler)
-	mux.HandleFunc("/daemon/stop", srv.daemonStopHandler)
-	mux.HandleFunc("/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
-	mux.HandleFunc("/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	mux.HandlerFunc("GET", "/daemon/constants", srv.daemonConstantsHandler)
+	mux.HandlerFunc("GET", "/daemon/version", srv.daemonVersionHandler)
+	mux.HandlerFunc("GET", "/daemon/stop", srv.daemonStopHandler)
+	mux.HandlerFunc("GET", "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
+	mux.HandlerFunc("GET", "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {
-		mux.HandleFunc("/consensus", srv.consensusHandler)            // GET
-		mux.HandleFunc("/consensus/block", srv.consensusBlockHandler) // GET
+		mux.HandlerFunc("GET", "/consensus", srv.consensusHandler)
+		mux.HandlerFunc("GET", "/consensus/block", srv.consensusBlockHandler)
 	}
 
 	// Explorer API Calls
 	if srv.explorer != nil {
-		mux.HandleFunc("/explorer", srv.explorerHandler)            // GET
-		mux.HandleFunc("/explorer/", srv.explorerHandler)           // $(hash) GET
-		mux.HandleFunc("/explorer/block", srv.explorerBlockHandler) // GET
+		mux.HandlerFunc("GET", "/explorer", srv.explorerHandler)
+		mux.HandlerFunc("GET", "/explorer/hash/:hash", srv.explorerHashHandler)
+		mux.HandlerFunc("GET", "/explorer/block/:height", srv.explorerBlockHandler)
 	}
 
 	// Gateway API Calls - Unfinished
 	if srv.gateway != nil {
-		mux.HandleFunc("/gateway/status", srv.gatewayStatusHandler)
-		mux.HandleFunc("/gateway/peers/add", srv.gatewayPeersAddHandler)
-		mux.HandleFunc("/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+		mux.HandlerFunc("GET", "/gateway/status", srv.gatewayStatusHandler)
+		mux.HandlerFunc("GET", "/gateway/peers/add", srv.gatewayPeersAddHandler)
+		mux.HandlerFunc("GET", "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
 	}
 
 	// Host API Calls
 	if srv.host != nil {
-		mux.HandleFunc("/host", srv.hostHandler)                  // GET, POST
-		mux.HandleFunc("/host/announce", srv.hostAnnounceHandler) // POST
+		mux.HandlerFunc("GET", "/host", srv.hostHandler)
+		mux.HandlerFunc("POST", "/host", srv.hostHandler)
+		mux.HandlerFunc("POST", "/host/announce", srv.hostAnnounceHandler)
 	}
 
 	// HostDB API Calls - DEPRECATED
 	if srv.renter != nil {
-		mux.HandleFunc("/hostdb/hosts/active", srv.renterHostsActiveHandler)
-		mux.HandleFunc("/hostdb/hosts/all", srv.renterHostsAllHandler)
+		mux.HandlerFunc("GET", "/hostdb/hosts/active", srv.renterHostsActiveHandler)
+		mux.HandlerFunc("GET", "/hostdb/hosts/all", srv.renterHostsAllHandler)
 	}
 
 	// Miner API Calls
 	if srv.miner != nil {
-		mux.HandleFunc("/miner", srv.minerHandler)                            // GET
-		mux.HandleFunc("/miner/header", srv.minerHeaderHandler)               // GET, POST
-		mux.HandleFunc("/miner/start", srv.minerStartHandler)                 // POST
-		mux.HandleFunc("/miner/stop", srv.minerStopHandler)                   // POST
-		mux.HandleFunc("/miner/headerforwork", srv.minerHeaderforworkHandler) // COMPATv0.4.8
-		mux.HandleFunc("/miner/submitheader", srv.minerSubmitheaderHandler)   // COMPATv0.4.8
+		mux.HandlerFunc("GET", "/miner", srv.minerHandler)
+		mux.HandlerFunc("GET", "/miner/header", srv.minerHeaderHandler)
+		mux.HandlerFunc("POST", "/miner/header", srv.minerHeaderHandler)
+		mux.HandlerFunc("POST", "/miner/start", srv.minerStartHandler)
+		mux.HandlerFunc("POST", "/miner/stop", srv.minerStopHandler)
+		mux.HandlerFunc("GET", "/miner/headerforwork", srv.minerHeaderforworkHandler) // COMPATv0.4.8
+		mux.HandlerFunc("GET", "/miner/submitheader", srv.minerSubmitheaderHandler)   // COMPATv0.4.8
 	}
 
 	// Renter API Calls - Unfinished
 	if srv.renter != nil {
-		mux.HandleFunc("/renter/downloadqueue", srv.renterDownloadqueueHandler)
-		mux.HandleFunc("/renter/files/delete", srv.renterFilesDeleteHandler)
-		mux.HandleFunc("/renter/files/download", srv.renterFilesDownloadHandler)
-		mux.HandleFunc("/renter/files/list", srv.renterFilesListHandler)
-		mux.HandleFunc("/renter/files/load", srv.renterFilesLoadHandler)
-		mux.HandleFunc("/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
-		mux.HandleFunc("/renter/files/rename", srv.renterFilesRenameHandler)
-		mux.HandleFunc("/renter/files/share", srv.renterFilesShareHandler)
-		mux.HandleFunc("/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
-		mux.HandleFunc("/renter/files/upload", srv.renterFilesUploadHandler)
-		mux.HandleFunc("/renter/status", srv.renterStatusHandler)
+		mux.HandlerFunc("GET", "/renter/downloadqueue", srv.renterDownloadqueueHandler)
+		mux.HandlerFunc("GET", "/renter/files/delete", srv.renterFilesDeleteHandler)
+		mux.HandlerFunc("GET", "/renter/files/download", srv.renterFilesDownloadHandler)
+		mux.HandlerFunc("GET", "/renter/files/list", srv.renterFilesListHandler)
+		mux.HandlerFunc("GET", "/renter/files/load", srv.renterFilesLoadHandler)
+		mux.HandlerFunc("GET", "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
+		mux.HandlerFunc("GET", "/renter/files/rename", srv.renterFilesRenameHandler)
+		mux.HandlerFunc("GET", "/renter/files/share", srv.renterFilesShareHandler)
+		mux.HandlerFunc("GET", "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
+		mux.HandlerFunc("GET", "/renter/files/upload", srv.renterFilesUploadHandler)
+		mux.HandlerFunc("GET", "/renter/status", srv.renterStatusHandler)
 	}
 
 	// TransactionPool API Calls - Unfinished
 	if srv.tpool != nil {
-		mux.HandleFunc("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+		mux.HandlerFunc("GET", "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls
 	if srv.wallet != nil {
-		mux.HandleFunc("/wallet", srv.walletHandler)                           // GET
-		mux.HandleFunc("/wallet/address", srv.walletAddressHandler)            // GET
-		mux.HandleFunc("/wallet/addresses", srv.walletAddressesHandler)        // GET
-		mux.HandleFunc("/wallet/backup", srv.walletBackupHandler)              // GET
-		mux.HandleFunc("/wallet/encrypt", srv.walletEncryptHandler)            // POST - COMPATv0.4.0
-		mux.HandleFunc("/wallet/init", srv.walletInitHandler)                  // POST
-		mux.HandleFunc("/wallet/load/033x", srv.walletLoad033xHandler)         // POST
-		mux.HandleFunc("/wallet/load/seed", srv.walletLoadSeedHandler)         // POST
-		mux.HandleFunc("/wallet/load/siag", srv.walletLoadSiagHandler)         // POST
-		mux.HandleFunc("/wallet/lock", srv.walletLockHandler)                  // POST
-		mux.HandleFunc("/wallet/seeds", srv.walletSeedsHandler)                // GET
-		mux.HandleFunc("/wallet/siacoins", srv.walletSiacoinsHandler)          // POST
-		mux.HandleFunc("/wallet/siafunds", srv.walletSiafundsHandler)          // POST
-		mux.HandleFunc("/wallet/transaction/", srv.walletTransactionHandler)   // $(id) GET
-		mux.HandleFunc("/wallet/transactions", srv.walletTransactionsHandler)  // GET
-		mux.HandleFunc("/wallet/transactions/", srv.walletTransactionsHandler) // $(addr) GET
-		mux.HandleFunc("/wallet/unlock", srv.walletUnlockHandler)              // POST
+		mux.HandlerFunc("GET", "/wallet", srv.walletHandler)
+		mux.HandlerFunc("GET", "/wallet/address", srv.walletAddressHandler)
+		mux.HandlerFunc("GET", "/wallet/addresses", srv.walletAddressesHandler)
+		mux.HandlerFunc("GET", "/wallet/backup", srv.walletBackupHandler)
+		mux.HandlerFunc("POST", "/wallet/encrypt", srv.walletEncryptHandler) // COMPATv0.4.0
+		mux.HandlerFunc("POST", "/wallet/init", srv.walletInitHandler)
+		mux.HandlerFunc("POST", "/wallet/load/033x", srv.walletLoad033xHandler)
+		mux.HandlerFunc("POST", "/wallet/load/seed", srv.walletLoadSeedHandler)
+		mux.HandlerFunc("POST", "/wallet/load/siag", srv.walletLoadSiagHandler)
+		mux.HandlerFunc("POST", "/wallet/lock", srv.walletLockHandler)
+		mux.HandlerFunc("GET", "/wallet/seeds", srv.walletSeedsHandler)
+		mux.HandlerFunc("POST", "/wallet/siacoins", srv.walletSiacoinsHandler)
+		mux.HandlerFunc("POST", "/wallet/siafunds", srv.walletSiafundsHandler)
+		mux.HandlerFunc("GET", "/wallet/transaction/:id", srv.walletTransactionHandler)
+		mux.HandlerFunc("GET", "/wallet/transactions", srv.walletTransactionsHandler)
+		mux.HandlerFunc("GET", "/wallet/transactions/:addr", srv.walletTransactionsHandler)
+		mux.HandlerFunc("POST", "/wallet/unlock", srv.walletUnlockHandler)
 	}
 
 	// Apply UserAgent middleware and create HTTP server

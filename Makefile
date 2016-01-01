@@ -19,6 +19,7 @@ dependencies:
 	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/kardianos/osext
 	go get -u github.com/klauspost/reedsolomon
+	go get -u github.com/julienschmidt/httprouter
 	# Frontend Dependencies
 	go get -u github.com/bgentry/speakeasy
 	go get -u github.com/spf13/cobra

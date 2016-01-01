@@ -199,7 +199,7 @@ func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Bloc
 func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Request) {
 	// Parse the height that's being requested.
 	var height types.BlockHeight
-	_, err := fmt.Sscan(req.FormValue("height"), &height)
+	_, err := fmt.Sscan(strings.TrimPrefix(req.URL.Path, "/explorer/block/"), &height)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -264,12 +264,12 @@ func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) 
 	})
 }
 
-// explorerHandlerGEThash handles GET requests to /explorer/$(hash).
-func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Request) {
+// explorerHashHandler handles GET requests to /explorer/hash/:hash.
+func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request) {
 	// The hash is scanned as an address, because an address can be typecast to
-	// all other necessary types, and will correclty decode hashes whether or
+	// all other necessary types, and will correctly decode hashes whether or
 	// not they have a checksum.
-	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/")
+	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/hash/")
 	hash, err := scanAddress(encodedHash)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -365,8 +365,6 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/explorer" && (req.Method == "" || req.Method == "GET") {
 		srv.explorerHandlerGET(w, req)
-	} else if strings.HasPrefix(req.URL.Path, "/explorer/") && (req.Method == "" || req.Method == "GET") {
-		srv.explorerHandlerGEThash(w, req)
 	} else {
 		writeError(w, "unrecognized call to /explorer", http.StatusBadRequest)
 	}
