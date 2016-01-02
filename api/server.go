@@ -61,6 +61,7 @@ func (srv *Server) Serve() error {
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
+	defer signal.Reset(os.Interrupt, os.Kill)
 	go func() {
 		<-sigChan
 		fmt.Println("\rCaught stop signal, quitting...")
