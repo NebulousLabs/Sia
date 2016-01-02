@@ -76,9 +76,9 @@ func (srv *Server) initAPI() {
 
 	// Host API Calls
 	if srv.host != nil {
-		mux.HandlerFunc("GET", "/host", srv.hostHandler)
-		mux.HandlerFunc("POST", "/host", srv.hostHandler)
-		mux.HandlerFunc("POST", "/host/announce", srv.hostAnnounceHandler)
+		mux.GET("/host", srv.hostHandlerGET)
+		mux.POST("/host", srv.hostHandlerPOST)
+		mux.POST("/host/announce", srv.hostAnnounceHandler)
 	}
 
 	// HostDB API Calls - DEPRECATED
@@ -89,13 +89,13 @@ func (srv *Server) initAPI() {
 
 	// Miner API Calls
 	if srv.miner != nil {
-		mux.HandlerFunc("GET", "/miner", srv.minerHandler)
-		mux.HandlerFunc("GET", "/miner/header", srv.minerHeaderHandler)
-		mux.HandlerFunc("POST", "/miner/header", srv.minerHeaderHandler)
-		mux.HandlerFunc("POST", "/miner/start", srv.minerStartHandler)
-		mux.HandlerFunc("POST", "/miner/stop", srv.minerStopHandler)
-		mux.HandlerFunc("GET", "/miner/headerforwork", srv.minerHeaderforworkHandler) // COMPATv0.4.8
-		mux.HandlerFunc("GET", "/miner/submitheader", srv.minerSubmitheaderHandler)   // COMPATv0.4.8
+		mux.GET("/miner", srv.minerHandler)
+		mux.GET("/miner/header", srv.minerHeaderHandlerGET)
+		mux.POST("/miner/header", srv.minerHeaderHandlerPOST)
+		mux.POST("/miner/start", srv.minerStartHandler)
+		mux.POST("/miner/stop", srv.minerStopHandler)
+		mux.GET("/miner/headerforwork", srv.minerHeaderHandlerGET) // COMPATv0.4.8
+		mux.GET("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
 	}
 
 	// Renter API Calls - Unfinished
@@ -115,7 +115,7 @@ func (srv *Server) initAPI() {
 
 	// TransactionPool API Calls - Unfinished
 	if srv.tpool != nil {
-		mux.HandlerFunc("GET", "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+		mux.GET("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls
