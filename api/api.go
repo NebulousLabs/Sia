@@ -100,17 +100,17 @@ func (srv *Server) initAPI() {
 
 	// Renter API Calls - Unfinished
 	if srv.renter != nil {
-		mux.HandlerFunc("GET", "/renter/downloadqueue", srv.renterDownloadqueueHandler)
-		mux.HandlerFunc("GET", "/renter/files/delete", srv.renterFilesDeleteHandler)
-		mux.HandlerFunc("GET", "/renter/files/download", srv.renterFilesDownloadHandler)
-		mux.HandlerFunc("GET", "/renter/files/list", srv.renterFilesListHandler)
-		mux.HandlerFunc("GET", "/renter/files/load", srv.renterFilesLoadHandler)
-		mux.HandlerFunc("GET", "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
-		mux.HandlerFunc("GET", "/renter/files/rename", srv.renterFilesRenameHandler)
-		mux.HandlerFunc("GET", "/renter/files/share", srv.renterFilesShareHandler)
-		mux.HandlerFunc("GET", "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
-		mux.HandlerFunc("GET", "/renter/files/upload", srv.renterFilesUploadHandler)
-		mux.HandlerFunc("GET", "/renter/status", srv.renterStatusHandler)
+		mux.GET("/renter", srv.renterHandler)
+		mux.GET("/renter/downloadqueue", srv.renterDownloadqueueHandler)
+		mux.POST("/renter/load", srv.renterLoadHandler)
+		mux.POST("/renter/loadascii", srv.renterLoadAsciiHandler)
+		mux.POST("/renter/rename", srv.renterRenameHandler)
+		mux.GET("/renter/files", srv.renterFilesHandler)
+		mux.POST("/renter/delete/*path", srv.renterDeleteHandler)
+		mux.GET("/renter/download/*path", srv.renterDownloadHandler)
+		mux.GET("/renter/share/*path", srv.renterShareHandler)
+		mux.GET("/renter/shareascii/*path", srv.renterShareAsciiHandler)
+		mux.POST("/renter/upload/*path", srv.renterUploadHandler)
 	}
 
 	// TransactionPool API Calls - Unfinished

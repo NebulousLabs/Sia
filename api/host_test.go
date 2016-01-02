@@ -53,14 +53,17 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 
 	// upload to host
-	err = st.stdGetAPI("/renter/files/upload?nickname=test&duration=10&source=" + path)
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("duration", "10")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var fi []FileInfo
 	for len(fi) != 1 || fi[0].UploadProgress != 10 {
-		st.getAPI("/renter/files/list", &fi)
+		st.getAPI("/renter/files", &fi)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -123,7 +126,10 @@ func TestIntegrationRenewing(t *testing.T) {
 	}
 
 	// upload to host, specifying that the file should be renewed
-	err = st.stdGetAPI("/renter/files/upload?nickname=test&renew=true&source=" + path)
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +137,7 @@ func TestIntegrationRenewing(t *testing.T) {
 	var fi []FileInfo
 	for len(fi) != 1 || fi[0].UploadProgress != 10 {
 		time.Sleep(1 * time.Second)
-		st.getAPI("/renter/files/list", &fi)
+		st.getAPI("/renter/files", &fi)
 	}
 	// default expiration is 60 blocks
 	expExpiration := st.cs.Height() + 60
@@ -148,6 +154,6 @@ func TestIntegrationRenewing(t *testing.T) {
 	newExpiration := st.cs.Height() + 60
 	for fi[0].Expiration != newExpiration {
 		time.Sleep(1 * time.Second)
-		st.getAPI("/renter/files/list", &fi)
+		st.getAPI("/renter/files", &fi)
 	}
 }
