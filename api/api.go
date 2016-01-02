@@ -56,22 +56,22 @@ func (srv *Server) initAPI() {
 
 	// Consensus API Calls
 	if srv.cs != nil {
-		mux.HandlerFunc("GET", "/consensus", srv.consensusHandler)
-		mux.HandlerFunc("GET", "/consensus/block", srv.consensusBlockHandler)
+		mux.GET("/consensus", srv.consensusHandler)
+		mux.GET("/consensus/blocks/:height", srv.consensusBlocksHandler)
 	}
 
 	// Explorer API Calls
 	if srv.explorer != nil {
-		mux.HandlerFunc("GET", "/explorer", srv.explorerHandler)
-		mux.HandlerFunc("GET", "/explorer/hash/:hash", srv.explorerHashHandler)
-		mux.HandlerFunc("GET", "/explorer/block/:height", srv.explorerBlockHandler)
+		mux.GET("/explorer", srv.explorerHandler)
+		mux.GET("/explorer/hash/:hash", srv.explorerHashHandler)
+		mux.GET("/explorer/blocks/:height", srv.explorerBlocksHandler)
 	}
 
 	// Gateway API Calls - Unfinished
 	if srv.gateway != nil {
-		mux.HandlerFunc("GET", "/gateway/status", srv.gatewayStatusHandler)
-		mux.HandlerFunc("GET", "/gateway/peers/add", srv.gatewayPeersAddHandler)
-		mux.HandlerFunc("GET", "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+		mux.GET("/gateway/status", srv.gatewayStatusHandler)
+		mux.POST("/gateway/peers/add/:addr", srv.gatewayPeersAddHandler)
+		mux.POST("/gateway/peers/remove/:addr", srv.gatewayPeersRemoveHandler)
 	}
 
 	// Host API Calls

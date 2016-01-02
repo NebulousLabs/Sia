@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 // ConsensusGET contains general information about the consensus set, with tags
@@ -20,8 +22,8 @@ type ConsensusBlockGET struct {
 	Block types.Block `json:"block"`
 }
 
-// consensusHandlerGET handles a GET request to /consensus.
-func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request) {
+// consensusHandler handles the API calls to /consensus.
+func (srv *Server) consensusHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	cbid := srv.cs.CurrentBlock().ID()
 	currentTarget, _ := srv.cs.ChildTarget(cbid)
 	writeJSON(w, ConsensusGET{
@@ -31,19 +33,10 @@ func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request)
 	})
 }
 
-// consensusHandler handles the API calls to /consensus.
-func (srv *Server) consensusHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.consensusHandlerGET(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /consensus", http.StatusBadRequest)
-	}
-}
-
-// consensusBlockHandlerGET handles a GET request to /consensus/block.
-func (srv *Server) consensusBlockHandlerGET(w http.ResponseWriter, req *http.Request) {
+// consensusBlockHandler handles the API calls to /consensus/blocks/:height.
+func (srv *Server) consensusBlocksHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	var height types.BlockHeight
-	_, err := fmt.Sscan(req.FormValue("height"), &height)
+	_, err := fmt.Sscan(ps.ByName("height"), &height)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -56,13 +49,4 @@ func (srv *Server) consensusBlockHandlerGET(w http.ResponseWriter, req *http.Req
 	writeJSON(w, ConsensusBlockGET{
 		Block: block,
 	})
-}
-
-// consensusBlockHandler handles the API calls to /consensus/block.
-func (srv *Server) consensusBlockHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.consensusBlockHandlerGET(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /consensus/block", http.StatusBadRequest)
-	}
 }

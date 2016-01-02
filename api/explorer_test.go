@@ -42,7 +42,7 @@ func TestIntegrationExplorerBlockGET(t *testing.T) {
 	defer st.server.Close()
 
 	var ebg ExplorerBlockGET
-	err = st.getAPI("/explorer/block/0", &ebg)
+	err = st.getAPI("/explorer/blocks/0", &ebg)
 	if err != nil {
 		t.Fatal(err)
 	}
