@@ -25,6 +25,7 @@ type hostTester struct {
 	gateway   modules.Gateway
 	miner     modules.TestMiner
 	renter    modules.Renter
+	renting   bool
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
@@ -60,6 +61,10 @@ func (ht *hostTester) initWallet() error {
 // announcement, requiring asynchronous network communication between the
 // renter and host.
 func (ht *hostTester) initRenting() error {
+	if ht.renting {
+		return nil
+	}
+
 	// Because the renting test takes a long time, it will fail if
 	// testing.Short.
 	if testing.Short() {
@@ -88,6 +93,7 @@ func (ht *hostTester) initRenting() error {
 	if len(ht.renter.ActiveHosts()) == 0 {
 		return errors.New("could not start renting in the host tester")
 	}
+	ht.renting = true
 	return nil
 }
 
