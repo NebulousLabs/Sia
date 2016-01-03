@@ -99,10 +99,10 @@ func (srv *Server) initAPI() {
 	// Renter API Calls - Unfinished
 	if srv.renter != nil {
 		mux.GET("/renter/downloadqueue", srv.renterDownloadqueueHandler)
+		mux.GET("/renter/files", srv.renterFilesHandler)
 		mux.POST("/renter/load", srv.renterLoadHandler)
 		mux.POST("/renter/loadascii", srv.renterLoadAsciiHandler)
 		mux.POST("/renter/rename", srv.renterRenameHandler)
-		mux.GET("/renter/files", srv.renterFilesHandler)
 		mux.POST("/renter/delete/*path", srv.renterDeleteHandler)
 		mux.GET("/renter/download/*path", srv.renterDownloadHandler)
 		mux.GET("/renter/share/*path", srv.renterShareHandler)

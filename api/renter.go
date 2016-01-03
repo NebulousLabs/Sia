@@ -133,7 +133,7 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 // shares a file.
 // TODO: allow sharing of multiple files.
 func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.ShareFiles([]string{ps.ByName("path")}, req.FormValue("filepath"))
+	err := srv.renter.ShareFiles([]string{ps.ByName("path")}, req.FormValue("destination"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return

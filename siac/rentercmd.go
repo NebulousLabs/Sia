@@ -78,7 +78,7 @@ var (
 	}
 
 	renterFilesShareCmd = &cobra.Command{
-		Use:   "share [nickname] [filepath]",
+		Use:   "share [nickname] [destination]",
 		Short: "Export a file to a .sia for sharing",
 		Long:  "Export a file to a .sia for sharing.",
 		Run:   wrap(renterfilessharecmd),
@@ -203,7 +203,7 @@ func renterfilesrenamecmd(nickname, newname string) {
 }
 
 func renterfilessharecmd(nickname, destination string) {
-	err := get(fmt.Sprintf("/renter/share/%s?filepath=%s", nickname, abs(destination)))
+	err := get(fmt.Sprintf("/renter/share/%s?destination=%s", nickname, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
