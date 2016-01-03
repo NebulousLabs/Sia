@@ -46,21 +46,21 @@ type FileUploadParams struct {
 
 // FileInfo provides information about a file.
 type FileInfo struct {
-	Nickname       string
-	Filesize       uint64
-	Available      bool    // whether file can be downloaded
-	UploadProgress float32 // percentage of full redundancy
-	Expiration     types.BlockHeight
+	Nickname       string            `json:"nickname"`
+	Filesize       uint64            `json:"filesize"`
+	Available      bool              `json:"available"`
+	UploadProgress float32           `json:"uploadprogress"`
+	Expiration     types.BlockHeight `json:"expiration"`
 }
 
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	Nickname    string
-	Destination string
-	Filesize    uint64
-	Received    uint64 // bytes
-	StartTime   time.Time
+	Nickname    string    `json:"nickname"`
+	Destination string    `json:"destination"`
+	Filesize    uint64    `json:"filesize"`
+	Received    uint64    `json:"received"`
+	StartTime   time.Time `json:"starttime"`
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the

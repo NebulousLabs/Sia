@@ -10,26 +10,29 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// DownloadInfo is a helper struct for the downloadqueue API call.
-type DownloadInfo struct {
-	modules.DownloadInfo
+// DownloadQueue contains the renter's download queue.
+type RenterDownloadQueue struct {
+	Downloads []modules.DownloadInfo `json:"downloads"`
 }
 
-// FileInfo is a helper struct for the files API call.
-type FileInfo struct {
-	modules.FileInfo
+// RenterFiles lists the files known to the renter.
+type RenterFiles struct {
+	Files []modules.FileInfo `json:"files"`
 }
 
-// LoadedFiles lists files that were loaded into the renter.
-type RenterFilesLoadResponse struct {
-	FilesAdded []string
+// RenterLoad lists files that were loaded into the renter.
+type RenterLoad struct {
+	FilesAdded []string `json:"filesadded"`
 }
 
-// ActiveHosts is the struct that pads the response to the renter module call
-// "ActiveHosts". The padding is used so that the return value can have an
-// explicit name, which makes adding or removing fields easier in the future.
+// RenterShareASCII contains an ASCII-encoded .sia file.
+type RenterShareASCII struct {
+	File string `json:"file"`
+}
+
+// ActiveHosts lists active hosts on the network.
 type ActiveHosts struct {
-	Hosts []modules.HostSettings
+	Hosts []modules.HostSettings `json:"hosts"`
 }
 
 // renterHostsActiveHandler handes the API call asking for the list of active
@@ -52,13 +55,9 @@ func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Reques
 // renterDownloadqueueHandler handles the API call to request the download
 // queue.
 func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	downloads := srv.renter.DownloadQueue()
-	downloadSet := make([]DownloadInfo, len(downloads))
-	for i, dl := range downloads {
-		downloadSet[i] = DownloadInfo{dl}
-	}
-
-	writeJSON(w, downloadSet)
+	writeJSON(w, RenterDownloadQueue{
+		Downloads: srv.renter.DownloadQueue(),
+	})
 }
 
 // renterLoadHandler handles the API call to load a '.sia' file.
@@ -69,7 +68,7 @@ func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _
 		return
 	}
 
-	writeJSON(w, RenterFilesLoadResponse{FilesAdded: files})
+	writeJSON(w, RenterLoad{FilesAdded: files})
 }
 
 // renterLoadAsciiHandler handles the API call to load a '.sia' file
@@ -81,7 +80,7 @@ func (srv *Server) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	writeJSON(w, RenterFilesLoadResponse{FilesAdded: files})
+	writeJSON(w, RenterLoad{FilesAdded: files})
 }
 
 // renterRenameHandler handles the API call to rename a file entry in the
@@ -102,13 +101,9 @@ func (srv *Server) renterRenameHandler(w http.ResponseWriter, req *http.Request,
 
 // renterFilesHandler handles the API call to list all of the files.
 func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	files := srv.renter.FileList()
-	fileSet := make([]FileInfo, len(files))
-	for i, file := range files {
-		fileSet[i] = FileInfo{file}
-	}
-
-	writeJSON(w, fileSet)
+	writeJSON(w, RenterFiles{
+		Files: srv.renter.FileList(),
+	})
 }
 
 // renterDeleteHander handles the API call to delete a file entry from the
@@ -155,8 +150,9 @@ func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Requ
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	writeJSON(w, struct{ File string }{ascii})
+	writeJSON(w, RenterShareASCII{
+		File: ascii,
+	})
 }
 
 // renterUploadHandler handles the API call to upload a file.
