@@ -61,8 +61,8 @@ func (srv *Server) initAPI() {
 	// Explorer API Calls
 	if srv.explorer != nil {
 		mux.GET("/explorer", srv.explorerHandler)
-		mux.GET("/explorer/hash/:hash", srv.explorerHashHandler)
 		mux.GET("/explorer/blocks/:height", srv.explorerBlocksHandler)
+		mux.GET("/explorer/hash/:hash", srv.explorerHashHandler)
 	}
 
 	// Gateway API Calls - Unfinished
@@ -98,7 +98,6 @@ func (srv *Server) initAPI() {
 
 	// Renter API Calls - Unfinished
 	if srv.renter != nil {
-		mux.GET("/renter", srv.renterHandler)
 		mux.GET("/renter/downloadqueue", srv.renterDownloadqueueHandler)
 		mux.POST("/renter/load", srv.renterLoadHandler)
 		mux.POST("/renter/loadascii", srv.renterLoadAsciiHandler)

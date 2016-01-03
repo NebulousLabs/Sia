@@ -63,13 +63,6 @@ type DownloadInfo struct {
 	StartTime   time.Time
 }
 
-// RentInfo contains a list of all files by nickname. (deprecated)
-type RentInfo struct {
-	Files      []string
-	Price      types.Currency
-	KnownHosts int
-}
-
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
@@ -91,9 +84,6 @@ type Renter interface {
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
-
-	// Info returns the list of all files by nickname. (deprecated)
-	Info() RentInfo
 
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The nicknames of the added files are returned.

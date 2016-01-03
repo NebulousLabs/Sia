@@ -49,11 +49,6 @@ func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Reques
 	writeJSON(w, ah)
 }
 
-// renterHandler handles the API call querying the renter's status.
-func (srv *Server) renterHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, srv.renter.Info())
-}
-
 // renterDownloadqueueHandler handles the API call to request the download
 // queue.
 func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
