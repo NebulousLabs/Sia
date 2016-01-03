@@ -38,6 +38,15 @@ type persistence struct {
 
 	// Statistics.
 	Revenue types.Currency
+
+	// RPC Tracking.
+	ErroredCalls   uint64
+	MalformedCalls uint64
+	DownloadCalls  uint64
+	RenewCalls     uint64
+	ReviseCalls    uint64
+	SettingsCalls  uint64
+	UploadCalls    uint64
 }
 
 // getObligations returns a slice containing all of the contract obligations
@@ -70,6 +79,14 @@ func (h *Host) save() error {
 		Obligations: h.getObligations(),
 
 		Revenue: h.revenue,
+
+		ErroredCalls:   h.erroredCalls,
+		MalformedCalls: h.malformedCalls,
+		DownloadCalls:  h.downloadCalls,
+		RenewCalls:     h.renewCalls,
+		ReviseCalls:    h.reviseCalls,
+		SettingsCalls:  h.settingsCalls,
+		UploadCalls:    h.uploadCalls,
 	}
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
 }
@@ -125,6 +142,15 @@ func (h *Host) load() error {
 
 	// Copy over statistics.
 	h.revenue = p.Revenue
+
+	// Copy over rpc tracking.
+	h.erroredCalls = p.ErroredCalls
+	h.malformedCalls = p.MalformedCalls
+	h.downloadCalls = p.DownloadCalls
+	h.renewCalls = p.RenewCalls
+	h.reviseCalls = p.ReviseCalls
+	h.settingsCalls = p.SettingsCalls
+	h.uploadCalls = p.UploadCalls
 
 	return nil
 }

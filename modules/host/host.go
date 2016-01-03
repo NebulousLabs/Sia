@@ -90,6 +90,15 @@ type Host struct {
 	fileCounter        int64
 	spaceRemaining     int64
 
+	// RPC Tracking
+	erroredCalls   uint64
+	malformedCalls uint64
+	downloadCalls  uint64
+	renewCalls     uint64
+	reviseCalls    uint64
+	settingsCalls  uint64
+	uploadCalls    uint64
+
 	// Utilities.
 	listener   net.Listener
 	log        *persist.Logger

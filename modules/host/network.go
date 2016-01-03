@@ -2,6 +2,7 @@ package host
 
 import (
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -27,6 +28,49 @@ func (h *Host) initNetworking(address string) error {
 	return nil
 }
 
+// handleConn handles an incoming connection to the host, typically an RPC.
+func (h *Host) handleConn(conn net.Conn) {
+	// Set an initial duration that is generous, but finite. RPCs can extend
+	// this if so desired.
+	conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	defer conn.Close()
+
+	// Read a specifier indicating which action is beeing called.
+	var id types.Specifier
+	if err := encoding.ReadObject(conn, &id, 16); err != nil {
+		atomic.AddUint64(&h.malformedCalls, 1)
+		h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
+		return
+	}
+
+	var err error
+	switch id {
+	case modules.RPCDownload:
+		atomic.AddUint64(&h.downloadCalls, 1)
+		err = h.rpcDownload(conn)
+	case modules.RPCRenew:
+		atomic.AddUint64(&h.renewCalls, 1)
+		err = h.rpcRenew(conn)
+	case modules.RPCRevise:
+		atomic.AddUint64(&h.reviseCalls, 1)
+		err = h.rpcRevise(conn)
+	case modules.RPCSettings:
+		atomic.AddUint64(&h.settingsCalls, 1)
+		err = h.rpcSettings(conn)
+	case modules.RPCUpload:
+		atomic.AddUint64(&h.uploadCalls, 1)
+		err = h.rpcUpload(conn)
+	default:
+		atomic.AddUint64(&h.erroredCalls, 1)
+		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		return
+	}
+	if err != nil {
+		atomic.AddUint64(&h.erroredCalls, 1)
+		h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+	}
+}
+
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
 func (h *Host) listen() {
 	for {
@@ -35,38 +79,6 @@ func (h *Host) listen() {
 			return
 		}
 		go h.handleConn(conn)
-	}
-}
-
-// handleConn handles an incoming connection to the host, typically an RPC.
-func (h *Host) handleConn(conn net.Conn) {
-	defer conn.Close()
-	// Set an initial duration that is generous, but finite. RPCs can extend
-	// this if so desired.
-	conn.SetDeadline(time.Now().Add(5 * time.Minute))
-
-	var id types.Specifier
-	if err := encoding.ReadObject(conn, &id, 16); err != nil {
-		return
-	}
-	var err error
-	switch id {
-	case modules.RPCSettings:
-		err = h.rpcSettings(conn)
-	case modules.RPCUpload:
-		err = h.rpcUpload(conn)
-	case modules.RPCRenew:
-		err = h.rpcRenew(conn)
-	case modules.RPCRevise:
-		err = h.rpcRevise(conn)
-	case modules.RPCDownload:
-		err = h.rpcDownload(conn)
-	default:
-		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
-		return
-	}
-	if err != nil {
-		h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
 }
 
