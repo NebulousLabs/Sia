@@ -59,7 +59,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		err = h.rpcSettings(conn)
 	case modules.RPCUpload:
 		atomic.AddUint64(&h.uploadCalls, 1)
-		err = h.rpcUpload(conn)
+		err = h.threadedRPCUpload(conn)
 	default:
 		atomic.AddUint64(&h.erroredCalls, 1)
 		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)

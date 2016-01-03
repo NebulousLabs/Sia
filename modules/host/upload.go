@@ -22,6 +22,8 @@ const (
 )
 
 var (
+	// HostCapacityErr indicates that a host does not have enough room on disk
+	// to accept more files.
 	HostCapacityErr = errors.New("host is at capacity and cannot take more files")
 )
 
@@ -39,10 +41,10 @@ func (h *Host) deallocate(path string) error {
 // terms, and doesn't contain any flagrant errors.
 func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublicKey, filesize uint64, merkleRoot crypto.Hash) error {
 	// Check that there is only one file contract.
-	// TODO: check that the txn is empty except for the contract?
 	if len(txn.FileContracts) != 1 {
 		return errors.New("transaction should have only one file contract")
 	}
+
 	// convenience variables
 	fc := txn.FileContracts[0]
 	duration := fc.WindowStart - h.blockHeight
@@ -79,6 +81,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 
 	case fc.ValidProofOutputs[1].UnlockHash != h.settings.UnlockHash:
 		return errors.New("file contract valid proof output not sent to host")
+
 	case fc.MissedProofOutputs[1].UnlockHash != voidAddress:
 		return errors.New("file contract missed proof output not sent to void")
 	}
@@ -162,15 +165,18 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	return nil
 }
 
-// negotiateContract negotiates a file contract with a renter, and adds the
-// metadata to the host's obligation set. The filesize, merkleRoot, and
-// filename arguments are provided to make negotiateContract usable with both
-// rpcUpload and rpcRenew.
-func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot crypto.Hash, filename string) error {
+// threadedNegotiateContract negotiates a file contract with a renter, and adds
+// the metadata to the host's obligation set. The filesize, merkleRoot, and
+// filename arguments are provided to make threadedNegotiateContract usable
+// with both rpcUpload and rpcRenew.
+func (h *Host) threadedNegotiateContract(conn net.Conn, filesize uint64, merkleRoot crypto.Hash, filename string) error {
 	// allow 5 minutes for contract negotiation
 	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
-	// perform key exchange
+	// Exchange keys between the renter and the host.
+	//
+	// TODO: This is vulnerable to MITM attacks, the renter should be getting
+	// the host's key from the blockchain.
 	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
 		return errors.New("couldn't write our public key: " + err.Error())
 	}
@@ -179,7 +185,8 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 		return errors.New("couldn't read the renter's public key: " + err.Error())
 	}
 
-	// read initial transaction set
+	// Read the initial transaction set, which will contain a file contract and
+	// any required parent transactions.
 	var unsignedTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &unsignedTxnSet, maxContractLen); err != nil {
 		return errors.New("couldn't read the initial transaction set: " + err.Error())
@@ -188,7 +195,9 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 		return errors.New("initial transaction set was empty")
 	}
 
-	// check the contract transaction, which should be the last txn in the set.
+	// The transaction with the file contract should be the last transaction in
+	// the set. Verify that the terms of the contract are favorable to the
+	// host, then accept the contract.
 	contractTxn := unsignedTxnSet[len(unsignedTxnSet)-1]
 	h.mu.RLock()
 	err := h.considerContract(contractTxn, renterKey, filesize, merkleRoot)
@@ -197,25 +206,25 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 		encoding.WriteObject(conn, err.Error())
 		return errors.New("rejected file contract: " + err.Error())
 	}
-
-	// send acceptance
 	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
 		return errors.New("couldn't write acceptance: " + err.Error())
 	}
 
-	// add collateral to txn and send. For now, we never add collateral, so no
-	// changes are made.
+	// Add collateral to the transaction and send the new transaction.
+	// Currently, collateral is not supported, so the unchanged transaction set
+	// is returned.
 	if err := encoding.WriteObject(conn, unsignedTxnSet); err != nil {
 		return errors.New("couldn't write collateral transaction set: " + err.Error())
 	}
 
-	// read signed transaction set
+	// The renter will sign the transaction set, agreeing to pay the host.
 	var signedTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &signedTxnSet, maxContractLen); err != nil {
 		return errors.New("couldn't read signed transaction set:" + err.Error())
 	}
 
-	// check that transaction set was not modified
+	// The host will verify that the signed transaction set provided by the
+	// renter is the same transaction set that the host considered previously.
 	if len(signedTxnSet) != len(unsignedTxnSet) {
 		return errors.New("renter sent bad signed transaction set")
 	}
@@ -225,7 +234,8 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 		}
 	}
 
-	// sign and submit to blockchain
+	// The host now signs the transaction set, confirming the collateral, and
+	// then submits the transaction set to the blockchain.
 	signedTxn, parents := signedTxnSet[len(signedTxnSet)-1], signedTxnSet[:len(signedTxnSet)-1]
 	txnBuilder := h.wallet.RegisterTransaction(signedTxn, parents)
 	signedTxnSet, err = txnBuilder.Sign(true)
@@ -234,7 +244,7 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 	}
 	err = h.tpool.AcceptTransactionSet(signedTxnSet)
 	if err == modules.ErrDuplicateTransactionSet {
-		// this can happen if the host is uploading to itself
+		// This can happen if the host is uploading to itself.
 		err = nil
 	}
 	if err != nil {
@@ -242,21 +252,27 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 	}
 
 	// Add this contract to the host's list of obligations.
-	h.mu.Lock()
-	co := &contractObligation{
-		ID:           contractTxn.FileContractID(0),
-		FileContract: contractTxn.FileContracts[0],
-		Path:         filename,
-	}
-	// first revision is empty
-	co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
-	proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
-	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
-	h.obligationsByID[co.ID] = co
-	h.save()
-	h.mu.Unlock()
+	err = func() error {
+		h.mu.Lock()
+		defer h.mu.Unlock()
 
-	// send doubly-signed transaction set
+		co := &contractObligation{
+			ID:           contractTxn.FileContractID(0),
+			FileContract: contractTxn.FileContracts[0],
+			Path:         filename,
+		}
+		// first revision is empty
+		co.LastRevisionTxn.FileContractRevisions = []types.FileContractRevision{{}}
+		proofHeight := co.FileContract.WindowStart + StorageProofReorgDepth
+		h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
+		h.obligationsByID[co.ID] = co
+		return h.save()
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Send the fully signed and valid transaction set back to the renter.
 	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
 		return errors.New("couldn't write signed transaction set: " + err.Error())
 	}
@@ -264,21 +280,22 @@ func (h *Host) negotiateContract(conn net.Conn, filesize uint64, merkleRoot cryp
 	return nil
 }
 
-// rpcUpload is an RPC that negotiates a file contract. Under the new scheme,
-// file contracts should not initially hold any data.
-func (h *Host) rpcUpload(conn net.Conn) error {
+// threadedRPCUpload is an RPC that negotiates a file contract. Under the new
+// scheme, file contracts should not initially hold any data.
+func (h *Host) threadedRPCUpload(conn net.Conn) error {
 	// Check that the host has grabbed an address from the wallet.
-	if h.settings.UnlockHash == (types.UnlockHash{}) {
-		return errors.New("couldn't negotiate contract: host does not have an address")
-	}
-
 	h.mu.RLock()
-	h.fileCounter++
+	uh := h.settings.UnlockHash
+	h.fileCounter++ // Harmless to increment the file counter in the event of an error.
 	filename := filepath.Join(h.persistDir, strconv.Itoa(int(h.fileCounter)))
 	h.mu.RUnlock()
 
+	if uh == (types.UnlockHash{}) {
+		return errors.New("couldn't negotiate contract: host does not have an address")
+	}
+
 	// negotiate expecting empty Merkle root
-	return h.negotiateContract(conn, 0, crypto.Hash{}, filename)
+	return h.threadedNegotiateContract(conn, 0, crypto.Hash{}, filename)
 }
 
 // rpcRevise is an RPC that allows a renter to revise a file contract. It will
@@ -461,5 +478,5 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 		return err
 	}
 
-	return h.negotiateContract(conn, filesize, merkleRoot, filename)
+	return h.threadedNegotiateContract(conn, filesize, merkleRoot, filename)
 }
