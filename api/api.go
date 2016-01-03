@@ -50,7 +50,7 @@ func (srv *Server) initAPI() {
 	// Daemon API Calls - Unfinished
 	mux.GET("/daemon/constants", srv.daemonConstantsHandler)
 	mux.GET("/daemon/version", srv.daemonVersionHandler)
-	mux.POST("/daemon/stop", srv.daemonStopHandler)
+	mux.GET("/daemon/stop", srv.daemonStopHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {

@@ -33,7 +33,7 @@ Daemon
 Queries:
 
 * /daemon/constants [GET]
-* /daemon/stop      [POST]
+* /daemon/stop      [GET]
 * /daemon/version   [GET]
 
 #### /daemon/constants [GET]
@@ -107,7 +107,7 @@ and the new difficulty.
 
 'siacoinprecision' is the number of Hastings in one siacoin.
 
-#### /daemon/stop [POST]
+#### /daemon/stop [GET]
 
 Function: Cleanly shuts down the daemon. May take a few seconds.
 

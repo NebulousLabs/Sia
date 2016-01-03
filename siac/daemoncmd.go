@@ -16,7 +16,7 @@ var (
 )
 
 func stopcmd() {
-	err := post("/daemon/stop", "")
+	err := get("/daemon/stop")
 	if err != nil {
 		fmt.Println("Could not stop daemon:", err)
 		return
