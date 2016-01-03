@@ -48,11 +48,9 @@ func (srv *Server) initAPI() {
 	mux.NotFound = http.HandlerFunc(srv.unrecognizedCallHandler) // custom 404
 
 	// Daemon API Calls - Unfinished
-	mux.HandlerFunc("GET", "/daemon/constants", srv.daemonConstantsHandler)
-	mux.HandlerFunc("GET", "/daemon/version", srv.daemonVersionHandler)
-	mux.HandlerFunc("GET", "/daemon/stop", srv.daemonStopHandler)
-	mux.HandlerFunc("GET", "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
-	mux.HandlerFunc("GET", "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	mux.GET("/daemon/constants", srv.daemonConstantsHandler)
+	mux.GET("/daemon/version", srv.daemonVersionHandler)
+	mux.POST("/daemon/stop", srv.daemonStopHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {

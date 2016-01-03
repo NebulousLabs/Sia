@@ -162,6 +162,8 @@ func main() {
 		Run:   version,
 	})
 
+	root.AddCommand(stopCmd)
+
 	root.AddCommand(hostCmd)
 	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
 
@@ -187,12 +189,7 @@ func main() {
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)
 
-	root.AddCommand(updateCmd)
-	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
-
-	// consensus cmds have no leading qualifier
 	root.AddCommand(consensusStatusCmd)
-	root.AddCommand(stopCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")

@@ -1,22 +1,18 @@
 package api
 
 import (
-	"errors"
-	"io/ioutil"
 	"math/big"
 	"net/http"
-	"path/filepath"
-	"runtime"
-	"strings"
-
-	"github.com/inconshreveable/go-update"
-	"github.com/kardianos/osext"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 const (
+	// The developer key is used to sign updates and other important Sia-
+	// related information.
 	developerKey = `-----BEGIN PUBLIC KEY-----
 MIIEIjANBgkqhkiG9w0BAQEFAAOCBA8AMIIECgKCBAEAsoQHOEU6s/EqMDtw5HvA
 YPTUaBgnviMFbG3bMsRqSCD8ug4XJYh+Ik6WP0xgq+OPDehPiaXK8ghAtBiW1EJK
@@ -43,15 +39,6 @@ t+JydcdJLbIG+kb3jB9QIIu5A4TlSGlHV6ewtxIWLS1473jEkITiVTt0Y5k+VLfW
 bwIDAQAB
 -----END PUBLIC KEY-----`
 )
-
-// Updates work like this: each version is stored in a folder on a Linode
-// server operated by the developers. The most recent version is stored in
-// current/. The folder contains the files changed by the update, as well as a
-// MANIFEST file that contains the version number and a file listing. To check
-// for an update, we first read the version number from current/MANIFEST. If
-// the version is newer, we download and apply the files listed in the update
-// manifest.
-var updateURL = "http://23.239.14.98/releases/" + runtime.GOOS + "_" + runtime.GOARCH
 
 // SiaConstants is a struct listing all of the constants in use.
 type SiaConstants struct {
@@ -81,133 +68,12 @@ type SiaConstants struct {
 	SiacoinPrecision types.Currency
 }
 
-type UpdateInfo struct {
-	Available bool
-	Version   string
-}
-
-// getHTTP is a helper function that returns the full response of an HTTP call
-// to the update server.
-func getHTTP(version, filename string) ([]byte, error) {
-	resp, err := http.Get(updateURL + "/" + version + "/" + filename)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(string(data))
-	}
-	return data, err
-}
-
-// fetchManifest requests and parses the update manifest. It returns the
-// manifest (if available) as a slice of lines.
-func fetchManifest(version string) (lines []string, err error) {
-	manifest, err := getHTTP(version, "MANIFEST")
-	if err != nil {
-		return
-	}
-	lines = strings.Split(strings.TrimSpace(string(manifest)), "\n")
-	if len(lines) == 0 {
-		err = errors.New("could not parse MANIFEST file")
-	}
-	return
-}
-
-// checkForUpdate checks a centralized server for a more recent version of
-// Sia. If an update is available, it returns true, along with the newer
-// version.
-func checkForUpdate() (bool, string, error) {
-	manifest, err := fetchManifest("current")
-	if err != nil {
-		return false, "", err
-	}
-	version := manifest[0]
-	return build.VersionCmp(build.Version, version) < 0, version, nil
-}
-
-// applyUpdate downloads and applies an update.
-func applyUpdate(version string) error {
-	manifest, err := fetchManifest(version)
-	if err != nil {
-		return err
-	}
-
-	// Get the executable directory.
-	binDir, err := osext.ExecutableFolder()
-	if err != nil {
-		return err
-	}
-
-	// Configure the update.
-	var opts update.Options
-	opts.SetPublicKeyPEM([]byte(developerKey))
-	// Perform updates as indicated by the manifest.
-	for _, file := range manifest[1:] {
-		// set update path
-		opts.TargetPath = filepath.Join(binDir, file)
-
-		// fetch the signature
-		opts.Signature, err = getHTTP(version, file+".sig")
-		if err != nil {
-			return err
-		}
-
-		// read update body
-		var resp *http.Response
-		resp, err = http.Get(updateURL + "/" + version + "/" + file)
-		if err != nil {
-			return err
-		}
-		err = update.Apply(resp.Body, opts)
-		resp.Body.Close()
-		if err != nil {
-			return err
-		}
-
-	}
-
-	return nil
-}
-
-// daemonStopHandler handles the API call to stop the daemon cleanly.
-func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
-	// can't write after we stop the server, so lie a bit.
-	writeSuccess(w)
-
-	srv.Close()
-}
-
-// daemonVersionHandler handles the API call that requests the daemon's version.
-func (srv *Server) daemonVersionHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, build.Version)
-}
-
-// daemonUpdatesCheckHandler handles the API call to check for daemon updates.
-func (srv *Server) daemonUpdatesCheckHandler(w http.ResponseWriter, req *http.Request) {
-	available, version, err := checkForUpdate()
-	if err != nil {
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	writeJSON(w, UpdateInfo{available, version})
-}
-
-// daemonUpdatesApplyHandler handles the API call to apply daemon updates.
-func (srv *Server) daemonUpdatesApplyHandler(w http.ResponseWriter, req *http.Request) {
-	err := applyUpdate(req.FormValue("version"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	writeSuccess(w)
+type DaemonVersion struct {
+	Version string `json:"version"`
 }
 
 // debugConstantsHandler prints a json file containing all of the constants.
-func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	sc := SiaConstants{
 		GenesisTimestamp:      types.GenesisTimestamp,
 		BlockSizeLimit:        types.BlockSizeLimit,
@@ -231,4 +97,17 @@ func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, req *http.Reque
 	}
 
 	writeJSON(w, sc)
+}
+
+// daemonVersionHandler handles the API call that requests the daemon's version.
+func (srv *Server) daemonVersionHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	writeJSON(w, DaemonVersion{Version: build.Version})
+}
+
+// daemonStopHandler handles the API call to stop the daemon cleanly.
+func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	// can't write after we stop the server, so lie a bit.
+	writeSuccess(w)
+
+	srv.Close()
 }
