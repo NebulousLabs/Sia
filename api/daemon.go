@@ -42,30 +42,26 @@ bwIDAQAB
 
 // SiaConstants is a struct listing all of the constants in use.
 type SiaConstants struct {
-	BlockSizeLimit        uint64
-	BlockFrequency        types.BlockHeight
-	TargetWindow          types.BlockHeight
-	MedianTimestampWindow uint64
-	FutureThreshold       types.Timestamp
-	SiafundCount          types.Currency
-	SiafundPortion        *big.Rat
+	GenesisTimestamp      types.Timestamp   `json:"genesistimestamp"`
+	BlockSizeLimit        uint64            `json:"blocksizelimit"`
+	BlockFrequency        types.BlockHeight `json:"blockfrequency"`
+	TargetWindow          types.BlockHeight `json:"targetwindow"`
+	MedianTimestampWindow uint64            `json:"mediantimestampwindow"`
+	FutureThreshold       types.Timestamp   `json:"futurethreshold"`
+	SiafundCount          types.Currency    `json:"siafundcount"`
+	SiafundPortion        *big.Rat          `json:"siafundportion"`
+	MaturityDelay         types.BlockHeight `json:"maturitydelay"`
 
-	InitialCoinbase uint64
-	MinimumCoinbase uint64
+	InitialCoinbase uint64 `json:"initialcoinbase"`
+	MinimumCoinbase uint64 `json:"minimumcoinbase"`
 
-	MaturityDelay types.BlockHeight
+	RootTarget types.Target `json:"roottarget"`
+	RootDepth  types.Target `json:"rootdepth"`
 
-	GenesisTimestamp         types.Timestamp
-	GenesisSiafundUnlockHash types.UnlockHash
-	GenesisClaimUnlockHash   types.UnlockHash
+	MaxAdjustmentUp   *big.Rat `json:"maxadjustmentup"`
+	MaxAdjustmentDown *big.Rat `json:"maxadjustmentdown"`
 
-	RootTarget types.Target
-	RootDepth  types.Target
-
-	MaxAdjustmentUp   *big.Rat
-	MaxAdjustmentDown *big.Rat
-
-	SiacoinPrecision types.Currency
+	SiacoinPrecision types.Currency `json:"siacoinprecision"`
 }
 
 type DaemonVersion struct {
@@ -82,18 +78,19 @@ func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request
 		MedianTimestampWindow: types.MedianTimestampWindow,
 		FutureThreshold:       types.FutureThreshold,
 		SiafundCount:          types.SiafundCount,
-		MaturityDelay:         types.MaturityDelay,
 		SiafundPortion:        types.SiafundPortion,
+		MaturityDelay:         types.MaturityDelay,
 
-		InitialCoinbase:  types.InitialCoinbase,
-		MinimumCoinbase:  types.MinimumCoinbase,
-		SiacoinPrecision: types.SiacoinPrecision,
+		InitialCoinbase: types.InitialCoinbase,
+		MinimumCoinbase: types.MinimumCoinbase,
 
 		RootTarget: types.RootTarget,
 		RootDepth:  types.RootDepth,
 
 		MaxAdjustmentUp:   types.MaxAdjustmentUp,
 		MaxAdjustmentDown: types.MaxAdjustmentDown,
+
+		SiacoinPrecision: types.SiacoinPrecision,
 	}
 
 	writeJSON(w, sc)
