@@ -90,7 +90,7 @@ type Host struct {
 	fileCounter        int64
 	spaceRemaining     int64
 
-	// RPC Tracking
+	// RPC Tracking - variables are all updated atomically.
 	erroredCalls   uint64
 	malformedCalls uint64
 	downloadCalls  uint64

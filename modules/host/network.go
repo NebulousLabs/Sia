@@ -28,8 +28,8 @@ func (h *Host) initNetworking(address string) error {
 	return nil
 }
 
-// handleConn handles an incoming connection to the host, typically an RPC.
-func (h *Host) handleConn(conn net.Conn) {
+// threadedHandleConn handles an incoming connection to the host, typically an RPC.
+func (h *Host) threadedHandleConn(conn net.Conn) {
 	// Set an initial duration that is generous, but finite. RPCs can extend
 	// this if so desired.
 	conn.SetDeadline(time.Now().Add(5 * time.Minute))
@@ -78,7 +78,7 @@ func (h *Host) listen() {
 		if err != nil {
 			return
 		}
-		go h.handleConn(conn)
+		go h.threadedHandleConn(conn)
 	}
 }
 
