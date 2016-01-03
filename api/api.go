@@ -67,9 +67,9 @@ func (srv *Server) initAPI() {
 
 	// Gateway API Calls - Unfinished
 	if srv.gateway != nil {
-		mux.GET("/gateway/status", srv.gatewayStatusHandler)
-		mux.POST("/gateway/peers/add/:addr", srv.gatewayPeersAddHandler)
-		mux.POST("/gateway/peers/remove/:addr", srv.gatewayPeersRemoveHandler)
+		mux.GET("/gateway", srv.gatewayHandler)
+		mux.POST("/gateway/add/:addr", srv.gatewayAddHandler)
+		mux.POST("/gateway/remove/:addr", srv.gatewayRemoveHandler)
 	}
 
 	// Host API Calls

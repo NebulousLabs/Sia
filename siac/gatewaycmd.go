@@ -39,7 +39,7 @@ var (
 )
 
 func gatewayaddcmd(addr string) {
-	err := post("/gateway/peers/add", "address="+addr)
+	err := post("/gateway/add/"+addr, "")
 	if err != nil {
 		fmt.Println("Could not add peer:", err)
 		return
@@ -48,7 +48,7 @@ func gatewayaddcmd(addr string) {
 }
 
 func gatewayremovecmd(addr string) {
-	err := post("/gateway/peers/remove", "address="+addr)
+	err := post("/gateway/remove/"+addr, "")
 	if err != nil {
 		fmt.Println("Could not remove peer:", err)
 		return
@@ -58,7 +58,7 @@ func gatewayremovecmd(addr string) {
 
 func gatewaystatuscmd() {
 	var info api.GatewayInfo
-	err := getAPI("/gateway/status", &info)
+	err := getAPI("/gateway", &info)
 	if err != nil {
 		fmt.Println("Could not get gateway status:", err)
 		return
