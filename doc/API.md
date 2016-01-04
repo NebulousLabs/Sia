@@ -135,7 +135,6 @@ Consensus
 Queries:
 
 * /consensus                 [GET]
-* /consensus/blocks/<height> [GET]
 
 #### /consensus [GET]
 
@@ -158,24 +157,6 @@ struct {
 
 'target' is the hash that needs to be met by a block for the block to be valid.
 The target is inversely proportional to the difficulty.
-
-#### /consensus/blocks/:height [GET]
-
-Function: Returns the block found at a given height.
-
-Parameters:
-```
-height types.BlockHeight (uint64)
-```
-'height' is the height of the block that is being requested. The genesis block
-is at height 0, its child is at height 1, etc.
-
-Response:
-```
-struct {
-	block types.Block
-}
-```
 
 Explorer
 --------

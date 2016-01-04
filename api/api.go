@@ -55,7 +55,6 @@ func (srv *Server) initAPI() {
 	// Consensus API Calls
 	if srv.cs != nil {
 		mux.GET("/consensus", srv.consensusHandler)
-		mux.GET("/consensus/blocks/:height", srv.consensusBlocksHandler)
 	}
 
 	// Explorer API Calls
