@@ -78,12 +78,6 @@ func (srv *Server) initAPI() {
 		mux.POST("/host/announce", srv.hostAnnounceHandler)
 	}
 
-	// HostDB API Calls - DEPRECATED
-	if srv.renter != nil {
-		mux.HandlerFunc("GET", "/hostdb/hosts/active", srv.renterHostsActiveHandler)
-		mux.HandlerFunc("GET", "/hostdb/hosts/all", srv.renterHostsAllHandler)
-	}
-
 	// Miner API Calls
 	if srv.miner != nil {
 		mux.GET("/miner", srv.minerHandler)
@@ -97,16 +91,21 @@ func (srv *Server) initAPI() {
 
 	// Renter API Calls - Unfinished
 	if srv.renter != nil {
-		mux.GET("/renter/downloadqueue", srv.renterDownloadqueueHandler)
+		mux.GET("/renter/downloads", srv.renterDownloadsHandler)
 		mux.GET("/renter/files", srv.renterFilesHandler)
+
 		mux.POST("/renter/load", srv.renterLoadHandler)
 		mux.POST("/renter/loadascii", srv.renterLoadAsciiHandler)
-		mux.POST("/renter/rename", srv.renterRenameHandler)
+		mux.GET("/renter/share", srv.renterShareHandler)
+		mux.GET("/renter/shareascii", srv.renterShareAsciiHandler)
+
 		mux.POST("/renter/delete/*path", srv.renterDeleteHandler)
 		mux.GET("/renter/download/*path", srv.renterDownloadHandler)
-		mux.GET("/renter/share/*path", srv.renterShareHandler)
-		mux.GET("/renter/shareascii/*path", srv.renterShareAsciiHandler)
+		mux.POST("/renter/rename/*path", srv.renterRenameHandler)
 		mux.POST("/renter/upload/*path", srv.renterUploadHandler)
+
+		mux.GET("/renter/hosts/active", srv.renterHostsActiveHandler)
+		mux.GET("/renter/hosts/all", srv.renterHostsAllHandler)
 	}
 
 	// TransactionPool API Calls - Unfinished

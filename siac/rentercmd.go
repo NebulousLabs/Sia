@@ -112,7 +112,7 @@ func abs(path string) string {
 
 func renterdownloadqueuecmd() {
 	var queue api.RenterDownloadQueue
-	err := getAPI("/renter/downloadqueue", &queue)
+	err := getAPI("/renter/downloads", &queue)
 	if err != nil {
 		fmt.Println("Could not get download queue:", err)
 		return
@@ -193,17 +193,17 @@ func renterfilesloadasciicmd(data string) {
 	}
 }
 
-func renterfilesrenamecmd(nickname, newname string) {
-	err := post("/renter/rename", fmt.Sprintf("nickname=%s&newname=%s", nickname, newname))
+func renterfilesrenamecmd(path, newname string) {
+	err := post("/renter/rename/"+path, "newname="+newname)
 	if err != nil {
 		fmt.Println("Could not rename file:", err)
 		return
 	}
-	fmt.Printf("Renamed %s to %s\n", nickname, newname)
+	fmt.Printf("Renamed %s to %s\n", path, newname)
 }
 
 func renterfilessharecmd(nickname, destination string) {
-	err := get(fmt.Sprintf("/renter/share/%s?destination=%s", nickname, abs(destination)))
+	err := get(fmt.Sprintf("/renter/share?paths=%s&destination=%s", nickname, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
@@ -213,7 +213,7 @@ func renterfilessharecmd(nickname, destination string) {
 
 func renterfilesshareasciicmd(nickname string) {
 	var data api.RenterShareASCII
-	err := getAPI("/renter/shareascii/"+nickname, &data)
+	err := getAPI("/renter/shareascii?paths="+nickname, &data)
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return

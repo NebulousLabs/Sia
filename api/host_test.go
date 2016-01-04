@@ -36,7 +36,7 @@ func TestIntegrationHosting(t *testing.T) {
 	st.miner.AddBlock()
 	var hosts ActiveHosts
 	time.Sleep(1 * time.Second)
-	st.getAPI("/hostdb/hosts/active", &hosts)
+	st.getAPI("/renter/hosts/active", &hosts)
 	if len(hosts.Hosts) == 0 {
 		t.Fatal("host announcement not seen")
 	}
@@ -109,7 +109,7 @@ func TestIntegrationRenewing(t *testing.T) {
 	st.miner.AddBlock()
 	var hosts ActiveHosts
 	time.Sleep(1 * time.Second)
-	st.getAPI("/hostdb/hosts/active", &hosts)
+	st.getAPI("/renter/hosts/active", &hosts)
 	if len(hosts.Hosts) == 0 {
 		t.Fatal("host announcement not seen")
 	}

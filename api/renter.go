@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -35,26 +36,8 @@ type ActiveHosts struct {
 	Hosts []modules.HostSettings `json:"hosts"`
 }
 
-// renterHostsActiveHandler handes the API call asking for the list of active
-// hosts.
-func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request) {
-	ah := ActiveHosts{
-		Hosts: srv.renter.ActiveHosts(),
-	}
-	writeJSON(w, ah)
-}
-
-// renterHostsAllHandler handes the API call asking for the list of all hosts.
-func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Request) {
-	ah := ActiveHosts{
-		Hosts: srv.renter.AllHosts(),
-	}
-	writeJSON(w, ah)
-}
-
-// renterDownloadqueueHandler handles the API call to request the download
-// queue.
-func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// renterDownloadsHandler handles the API call to request the download queue.
+func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterDownloadQueue{
 		Downloads: srv.renter.DownloadQueue(),
 	})
@@ -130,10 +113,9 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 }
 
 // renterShareHandler handles the API call to create a '.sia' file that
-// shares a file.
-// TODO: allow sharing of multiple files.
+// shares a set of file.
 func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.ShareFiles([]string{ps.ByName("path")}, req.FormValue("destination"))
+	err := srv.renter.ShareFiles(strings.Split(req.FormValue("path"), ","), req.FormValue("destination"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -181,4 +163,19 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 	}
 
 	writeSuccess(w)
+}
+
+// renterHostsActiveHandler handes the API call asking for the list of active
+// hosts.
+func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	writeJSON(w, ActiveHosts{
+		Hosts: srv.renter.ActiveHosts(),
+	})
+}
+
+// renterHostsAllHandler handes the API call asking for the list of all hosts.
+func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	writeJSON(w, ActiveHosts{
+		Hosts: srv.renter.AllHosts(),
+	})
 }
