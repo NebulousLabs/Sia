@@ -67,7 +67,7 @@ func TestIntegrationExplorerHashGet(t *testing.T) {
 
 	var ehg ExplorerHashGET
 	gb := types.GenesisBlock
-	err = st.getAPI("/explorer/hash/"+gb.ID().String(), &ehg)
+	err = st.getAPI("/explorer/hashes/"+gb.ID().String(), &ehg)
 	if err != nil {
 		t.Fatal(err)
 	}

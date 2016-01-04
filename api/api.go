@@ -61,7 +61,7 @@ func (srv *Server) initAPI() {
 	if srv.explorer != nil {
 		mux.GET("/explorer", srv.explorerHandler)
 		mux.GET("/explorer/blocks/:height", srv.explorerBlocksHandler)
-		mux.GET("/explorer/hash/:hash", srv.explorerHashHandler)
+		mux.GET("/explorer/hashes/:hash", srv.explorerHashHandler)
 	}
 
 	// Gateway API Calls - Unfinished

@@ -165,7 +165,7 @@ Queries:
 
 * /explorer                 [GET]
 * /explorer/blocks/<height> [GET]
-* /explorer/hash/<hash>     [GET]
+* /explorer/hashes/<hash>   [GET]
 
 #### /explorer [GET]
 
@@ -222,7 +222,7 @@ struct {
 }
 ```
 
-#### /explorer/hash/<hash> [GET]
+#### /explorer/hashes/<hash> [GET]
 
 Function: Returns information about an unknown hash.
 
