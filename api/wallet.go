@@ -189,8 +189,8 @@ func (srv *Server) walletInitHandler(w http.ResponseWriter, req *http.Request, _
 	})
 }
 
-// walletLoad033xHandler handles API calls to /wallet/load/033x.
-func (srv *Server) walletLoad033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// wallet033xHandler handles API calls to /wallet/033x.
+func (srv *Server) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	filepath := req.FormValue("filepath")
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
@@ -200,20 +200,20 @@ func (srv *Server) walletLoad033xHandler(w http.ResponseWriter, req *http.Reques
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, "error when calling /wallet/load/033x: "+err.Error(), http.StatusBadRequest)
+			writeError(w, "error when calling /wallet/033x: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
 	writeError(w, modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
 }
 
-// walletLoadSeedHandler handles API calls to /wallet/load/seed.
-func (srv *Server) walletLoadSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// walletSeedHandler handles API calls to /wallet/seed.
+func (srv *Server) walletSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Get the seed using the ditionary + phrase
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
 	if err != nil {
-		writeError(w, "error when calling /wallet/load/seed: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error when calling /wallet/seed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -225,15 +225,15 @@ func (srv *Server) walletLoadSeedHandler(w http.ResponseWriter, req *http.Reques
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, "error when calling /wallet/load/seed: "+err.Error(), http.StatusBadRequest)
+			writeError(w, "error when calling /wallet/seed: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
-	writeError(w, "error when calling /wallet/load/seed: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
+	writeError(w, "error when calling /wallet/seed: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
 }
 
-// walletLoadSiagHandler handles API calls to /wallet/load/seed.
-func (srv *Server) walletLoadSiagHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// walletSiagkeyHandler handles API calls to /wallet/siagkey.
+func (srv *Server) walletSiagkeyHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Fetch the list of keyfiles from the post body.
 	keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
@@ -244,11 +244,11 @@ func (srv *Server) walletLoadSiagHandler(w http.ResponseWriter, req *http.Reques
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, "error when calling /wallet/load/siag: "+err.Error(), http.StatusBadRequest)
+			writeError(w, "error when calling /wallet/siagkey: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
-	writeError(w, "error when calling /wallet/load/siag: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
+	writeError(w, "error when calling /wallet/siagkey: "+modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
 }
 
 // walletLockHanlder handles API calls to /wallet/lock.

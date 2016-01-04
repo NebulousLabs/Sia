@@ -117,22 +117,22 @@ func (srv *Server) initAPI() {
 	// Wallet API Calls
 	if srv.wallet != nil {
 		mux.GET("/wallet", srv.walletHandler)
+		mux.POST("/wallet/033x", srv.wallet033xHandler)
 		mux.GET("/wallet/address", srv.walletAddressHandler)
 		mux.GET("/wallet/addresses", srv.walletAddressesHandler)
 		mux.GET("/wallet/backup", srv.walletBackupHandler)
-		mux.POST("/wallet/encrypt", srv.walletInitHandler) // COMPATv0.4.0
 		mux.POST("/wallet/init", srv.walletInitHandler)
-		mux.POST("/wallet/load/033x", srv.walletLoad033xHandler)
-		mux.POST("/wallet/load/seed", srv.walletLoadSeedHandler)
-		mux.POST("/wallet/load/siag", srv.walletLoadSiagHandler)
 		mux.POST("/wallet/lock", srv.walletLockHandler)
+		mux.POST("/wallet/seed", srv.walletSeedHandler)
 		mux.GET("/wallet/seeds", srv.walletSeedsHandler)
 		mux.POST("/wallet/siacoins", srv.walletSiacoinsHandler)
 		mux.POST("/wallet/siafunds", srv.walletSiafundsHandler)
+		mux.POST("/wallet/siagkey", srv.walletSiagkeyHandler)
 		mux.GET("/wallet/transaction/:id", srv.walletTransactionHandler)
 		mux.GET("/wallet/transactions", srv.walletTransactionsHandler)
 		mux.GET("/wallet/transactions/:addr", srv.walletTransactionsAddrHandler)
 		mux.POST("/wallet/unlock", srv.walletUnlockHandler)
+		mux.POST("/wallet/encrypt", srv.walletInitHandler) // COMPATv0.4.0
 	}
 
 	// Apply UserAgent middleware and create HTTP server
