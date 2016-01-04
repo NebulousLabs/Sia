@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -47,7 +46,7 @@ func (srv *Server) initAPI() {
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(srv.unrecognizedCallHandler) // custom 404
 
-	// Daemon API Calls - Unfinished
+	// Daemon API Calls
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
 	router.GET("/daemon/stop", srv.daemonStopHandler)
@@ -64,7 +63,7 @@ func (srv *Server) initAPI() {
 		router.GET("/explorer/hashes/:hash", srv.explorerHashHandler)
 	}
 
-	// Gateway API Calls - Unfinished
+	// Gateway API Calls
 	if srv.gateway != nil {
 		router.GET("/gateway", srv.gatewayHandler)
 		router.POST("/gateway/add/:addr", srv.gatewayAddHandler)
@@ -89,7 +88,7 @@ func (srv *Server) initAPI() {
 		router.GET("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
 	}
 
-	// Renter API Calls - Unfinished
+	// Renter API Calls
 	if srv.renter != nil {
 		router.GET("/renter/downloads", srv.renterDownloadsHandler)
 		router.GET("/renter/files", srv.renterFilesHandler)
@@ -108,7 +107,7 @@ func (srv *Server) initAPI() {
 		router.GET("/renter/hosts/all", srv.renterHostsAllHandler)
 	}
 
-	// TransactionPool API Calls - Unfinished
+	// TransactionPool API Calls
 	if srv.tpool != nil {
 		router.GET("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
@@ -141,8 +140,7 @@ func (srv *Server) initAPI() {
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
 func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, "404 - Refer to API.md")
+	http.Error(w, "404 - Refer to API.md", http.StatusNotFound)
 }
 
 // writeError an error to the API caller.
