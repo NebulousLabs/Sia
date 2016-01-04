@@ -431,8 +431,8 @@ Miner
 Queries:
 
 * /miner        [GET]
-* /miner/start  [POST]
-* /miner/stop   [POST]
+* /miner/start  [GET]
+* /miner/stop   [GET]
 * /miner/header [GET]
 * /miner/header [POST]
 
@@ -459,7 +459,7 @@ struct {
 
 'staleblocksmined' indicates how many stale blocks have been mined, this value is remembered after restarting.
 
-#### /miner/start [POST]
+#### /miner/start [GET]
 
 Function: Starts a single threaded cpu miner. Does nothing if the cpu miner is
 already running.
@@ -468,7 +468,7 @@ Parameters: none
 
 Response: standard
 
-#### /miner/stop [POST]
+#### /miner/stop [GET]
 
 Function: Stops the cpu miner. Does nothing if the cpu miner is not running.
 

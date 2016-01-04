@@ -89,8 +89,8 @@ func (srv *Server) initAPI() {
 		mux.GET("/miner", srv.minerHandler)
 		mux.GET("/miner/header", srv.minerHeaderHandlerGET)
 		mux.POST("/miner/header", srv.minerHeaderHandlerPOST)
-		mux.POST("/miner/start", srv.minerStartHandler)
-		mux.POST("/miner/stop", srv.minerStopHandler)
+		mux.GET("/miner/start", srv.minerStartHandler)
+		mux.GET("/miner/stop", srv.minerStopHandler)
 		mux.GET("/miner/headerforwork", srv.minerHeaderHandlerGET) // COMPATv0.4.8
 		mux.GET("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
 	}
