@@ -164,8 +164,8 @@ Explorer
 Queries:
 
 * /explorer                 [GET]
-* /explorer/blocks/<height> [GET]
-* /explorer/hashes/<hash>   [GET]
+* /explorer/blocks/:height: [GET]
+* /explorer/hashes/:hash:   [GET]
 
 #### /explorer [GET]
 
@@ -204,7 +204,7 @@ struct {
 }
 ```
 
-#### /explorer/blocks/<height> [GET]
+#### /explorer/blocks/:height: [GET]
 
 Function: Returns a block at a given height.
 
@@ -222,7 +222,7 @@ struct {
 }
 ```
 
-#### /explorer/hashes/<hash> [GET]
+#### /explorer/hashes/:hash: [GET]
 
 Function: Returns information about an unknown hash.
 
@@ -260,8 +260,8 @@ Gateway
 Queries:
 
 * /gateway               [GET]
-* /gateway/add/<addr>    [POST]
-* /gateway/remove/<addr> [POST]
+* /gateway/add/:addr:    [POST]
+* /gateway/remove/:addr: [POST]
 
 #### /gateway
 
@@ -282,7 +282,7 @@ address and the port Sia is listening on.
 'peers' is a list of the network addresses of peers that the Gateway is
 currently connected to.
 
-#### /gateway/add/<addr> [POST]
+#### /gateway/add/:addr: [POST]
 
 Function: Adds a peer to the gateway.
 
@@ -295,7 +295,7 @@ addr string
 
 Response: standard
 
-#### /gateway/remove/<addr> [POST]
+#### /gateway/remove/:addr: [POST]
 
 Function: Will remove a peer from the gateway.
 
@@ -517,11 +517,11 @@ Queries:
 * /renter/loadascii         [POST]
 * /renter/rename            [POST]
 * /renter/files             [GET]
-* /renter/delete/<path>     [POST]
-* /renter/download/<path>   [GET]
-* /renter/share/<path>      [GET]
-* /renter/shareascii/<path> [GET]
-* /renter/upload/<path>     [POST]
+* /renter/delete/:path:     [POST]
+* /renter/download/:path:   [GET]
+* /renter/share/:path:      [GET]
+* /renter/shareascii/:path: [GET]
+* /renter/upload/:path:     [POST]
 
 #### /renter/downloadqueue [GET]
 
@@ -575,7 +575,7 @@ struct {
 
 'available' indicates whether or not the file can be downloaded immediately.
 
-'uploadProgress' is the current upload percentage of the file, including
+'uploadprogress' is the current upload percentage of the file, including
 redundancy. In general, files will be available for download before
 UploadProgress == 100.
 
@@ -634,7 +634,7 @@ newname  string
 
 Response: standard.
 
-#### /renter/delete/<path> [POST]
+#### /renter/delete/:path: [POST]
 
 Function: Deletes a renter file entry. Does not delete any downloads or
 original files, only the entry in the renter.
@@ -647,7 +647,7 @@ path string
 
 Response: standard
 
-#### /renter/download/<path> [GET]
+#### /renter/download/:path: [GET]
 
 Function: Downloads a file. The call will block until the download completes.
 
@@ -662,7 +662,7 @@ destination string
 
 Response: standard
 
-#### /renter/share/<path> [GET]
+#### /renter/share/:path: [GET]
 
 Function: Create a .sia file that can be shared with other people.
 
@@ -678,7 +678,7 @@ destination string
 
 Response: standard.
 
-#### /renter/shareascii/<path> [GET]
+#### /renter/shareascii/:path: [GET]
 
 Function: Create an ASCII .sia file that can be shared with other people.
 
@@ -696,7 +696,7 @@ struct {
 ```
 'file' is the ASCII-encoded .sia file.
 
-#### /renter/upload/<path> [POST]
+#### /renter/upload/:path: [POST]
 
 Function: Uploads a file.
 
@@ -751,9 +751,9 @@ Queries:
 * /wallet/siacoins             [POST]
 * /wallet/siafunds             [POST]
 * /wallet/siagkey              [POST]
-* /wallet/transaction/<id>     [GET]
+* /wallet/transaction/:id:     [GET]
 * /wallet/transactions         [GET]
-* /wallet/transactions/<addr>  [GET]
+* /wallet/transactions/:addr:  [GET]
 * /wallet/unlock               [POST]
 
 The first time that the wallet is ever created, the wallet will be unencrypted
@@ -1067,7 +1067,7 @@ Parameters: none
 
 Response: standard.
 
-#### /wallet/transaction/<id> [GET]
+#### /wallet/transaction/:id: [GET]
 
 Function: Get the transaction associated with a specific transaction id.
 
@@ -1201,7 +1201,7 @@ height 'startheight' and height 'endheight' (inclusive).
 
 'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
-#### /wallet/transactions/<addr> [GET]
+#### /wallet/transactions/:addr: [GET]
 
 Function: Return all of the transaction related to a specific address.
 
