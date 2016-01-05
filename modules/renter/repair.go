@@ -182,6 +182,42 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 	return expiring
 }
 
+// offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
+// do not meet uptime requirements. Importantly, only chunks missing more than
+// half their redundancy are returned.
+func (f *file) offlineChunks(activeHosts []modules.HostSettings) map[uint64][]uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	// helper function for determining if a host is offline, i.e. not in the
+	// set of active hosts.
+	isOffline := func(addr modules.NetAddress) bool {
+		for _, host := range activeHosts {
+			if host.IPAddress == addr {
+				return false
+			}
+		}
+		return true
+	}
+
+	offline := make(map[uint64][]uint64)
+	for _, fc := range f.contracts {
+		if isOffline(fc.IP) {
+			for _, p := range fc.Pieces {
+				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
+			}
+		}
+	}
+	// only return chunks missing more than half their redundancy
+	filtered := make(map[uint64][]uint64)
+	for chunk, pieces := range offline {
+		if len(pieces) > f.erasureCode.NumPieces()/2 {
+			filtered[chunk] = pieces
+		}
+	}
+	return filtered
+}
+
 // threadedRepairFile repairs and saves an individual file.
 func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// helper function
@@ -218,6 +254,18 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// repair incomplete chunks
 	if badChunks := f.incompleteChunks(); len(badChunks) != 0 {
 		r.log.Printf("repairing %v chunks of %v", len(badChunks), f.name)
+		var duration types.BlockHeight
+		if meta.Renew {
+			duration = defaultDuration
+		} else {
+			duration = meta.EndHeight - height
+		}
+		r.repairChunks(f, handle, badChunks, duration)
+	}
+
+	// repair offline chunks
+	if badChunks := f.offlineChunks(r.hostDB.ActiveHosts()); len(badChunks) != 0 {
+		r.log.Printf("reuploading %v offline chunks of %v", len(badChunks), f.name)
 		var duration types.BlockHeight
 		if meta.Renew {
 			duration = defaultDuration
