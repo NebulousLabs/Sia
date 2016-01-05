@@ -6,6 +6,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type (
@@ -29,7 +31,7 @@ type (
 )
 
 // hostHandlerGET handles GET requests to the /host API endpoint.
-func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings := srv.host.Settings()
 	upcomingRevenue, revenue := srv.host.Revenue()
 	hg := HostGET{
@@ -51,7 +53,7 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request) {
 }
 
 // hostHandlerPOST handles POST request to the /host API endpoint.
-func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Map each query string to a field in the host settings.
 	settings := srv.host.Settings()
 	qsVars := map[string]interface{}{
@@ -78,20 +80,9 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// hostHandler handles the API call that queries the host status.
-func (srv *Server) hostHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.hostHandlerGET(w, req)
-	} else if req.Method == "POST" {
-		srv.hostHandlerPOST(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /host", http.StatusBadRequest)
-	}
-}
-
-// hostAnnounceHandlerPOST handles the API call that triggers a host
-// announcement.
-func (srv *Server) hostAnnounceHandlerPOST(w http.ResponseWriter, req *http.Request) {
+// hostAnnounceHandler handles the API call to get the host to announce itself
+// to the network.
+func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var err error
 	if addr := req.FormValue("address"); addr != "" {
 		err = srv.host.AnnounceAddress(modules.NetAddress(addr))
@@ -103,14 +94,4 @@ func (srv *Server) hostAnnounceHandlerPOST(w http.ResponseWriter, req *http.Requ
 		return
 	}
 	writeSuccess(w)
-}
-
-// hostAnnounceHandler handles the API call to get the host to announce itself
-// to the network.
-func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "POST" {
-		srv.hostAnnounceHandlerPOST(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /host/announce", http.StatusBadRequest)
-	}
 }

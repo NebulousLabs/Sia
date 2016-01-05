@@ -1,11 +1,12 @@
 package api
 
 import (
-	"io/ioutil"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type (
@@ -19,8 +20,8 @@ type (
 	}
 )
 
-// minerHandlerGET handles GET requests to the /miner API endpoint.
-func (srv *Server) minerHandlerGET(w http.ResponseWriter, req *http.Request) {
+// minerHandler handles the API call that queries the miner's status.
+func (srv *Server) minerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	blocksMined, staleMined := srv.miner.BlocksMined()
 	mg := MinerGET{
 		BlocksMined:      blocksMined,
@@ -31,56 +32,34 @@ func (srv *Server) minerHandlerGET(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, mg)
 }
 
-// minerHandler handles the API call that queries the miner's status.
-func (srv *Server) minerHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.minerHandlerGET(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /miner", http.StatusBadRequest)
-	}
-}
-
 // minerStartHandler handles the API call that starts the miner.
-func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "POST" {
-		srv.miner.StartCPUMining()
-		writeSuccess(w)
-	} else {
-		writeError(w, "unrecognized method when calling /miner/start", http.StatusBadRequest)
-	}
+func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	srv.miner.StartCPUMining()
+	writeSuccess(w)
 }
 
 // minerStopHandler handles the API call to stop the miner.
-func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "POST" {
-		srv.miner.StopCPUMining()
-		writeSuccess(w)
-	} else {
-		writeError(w, "unrecognized method when calling /miner/stop", http.StatusBadRequest)
-	}
+func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	srv.miner.StopCPUMining()
+	writeSuccess(w)
 }
 
-// minerHeaderforworkHandler handles the API call that retrieves a block header
+// minerHeaderHandlerGET handles the API call that retrieves a block header
 // for work.
-func (srv *Server) minerHeaderforworkHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) minerHeaderHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	bhfw, target, err := srv.miner.HeaderForWork()
 	if err != nil {
-		writeError(w, "headerforwork operation failed: "+err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	w.Write(encoding.MarshalAll(target, bhfw))
 }
 
-// minerSubmitheaderHandler handles the API call to submit a block header to the
+// minerHeaderHandlerPOST handles the API call to submit a block header to the
 // miner.
-func (srv *Server) minerSubmitheaderHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) minerHeaderHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var bh types.BlockHeader
-	encodedHeader, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	err = encoding.Unmarshal(encodedHeader, &bh)
+	err := encoding.NewDecoder(req.Body).Decode(&bh)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -91,15 +70,4 @@ func (srv *Server) minerSubmitheaderHandler(w http.ResponseWriter, req *http.Req
 		return
 	}
 	writeSuccess(w)
-}
-
-// minerHeaderHandler handles API calls to /miner/header.
-func (srv *Server) minerHeaderHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.minerHeaderforworkHandler(w, req)
-	} else if req.Method == "POST" {
-		srv.minerSubmitheaderHandler(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /miner/header", http.StatusBadRequest)
-	}
 }

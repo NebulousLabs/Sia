@@ -2,16 +2,10 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/stretchr/graceful"
-)
-
-const (
-	apiTimeout = 5 * time.Second
+	"github.com/julienschmidt/httprouter"
 )
 
 // HttpGET is a utility function for making http get requests to sia with a whitelisted user-agent
@@ -35,126 +29,118 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 	return new(http.Client).Do(req)
 }
 
-// handleHTTPRequest is a wrapper function that handles all incoming calls to
-// the API.
-func (srv *Server) handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
-	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), srv.requiredUserAgent) {
+// requireUserAgent is middleware that requires all requests to set a
+// UserAgent that contains the specified string.
+func requireUserAgent(h http.Handler, ua string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.UserAgent(), ua) {
 			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusBadRequest)
 			return
 		}
-		handler(w, req)
+		h.ServeHTTP(w, req)
 	})
 }
 
 // initAPI determines which functions handle each API call.
 func (srv *Server) initAPI() {
-	mux := http.NewServeMux()
+	router := httprouter.New()
+	router.NotFound = http.HandlerFunc(srv.unrecognizedCallHandler) // custom 404
 
-	// 404 Calls
-	srv.handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
-
-	// Daemon API Calls - Unfinished
-	srv.handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
-	srv.handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
-	srv.handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
-	srv.handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
-	srv.handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	// Daemon API Calls
+	router.GET("/daemon/constants", srv.daemonConstantsHandler)
+	router.GET("/daemon/version", srv.daemonVersionHandler)
+	router.GET("/daemon/stop", srv.daemonStopHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {
-		srv.handleHTTPRequest(mux, "/consensus", srv.consensusHandler)            // GET
-		srv.handleHTTPRequest(mux, "/consensus/block", srv.consensusBlockHandler) // GET
+		router.GET("/consensus", srv.consensusHandler)
 	}
 
 	// Explorer API Calls
 	if srv.explorer != nil {
-		srv.handleHTTPRequest(mux, "/explorer", srv.explorerHandler)            // GET
-		srv.handleHTTPRequest(mux, "/explorer/", srv.explorerHandler)           // $(hash) GET
-		srv.handleHTTPRequest(mux, "/explorer/block", srv.explorerBlockHandler) // GET
+		router.GET("/explorer", srv.explorerHandler)
+		router.GET("/explorer/blocks/:height", srv.explorerBlocksHandler)
+		router.GET("/explorer/hashes/:hash", srv.explorerHashHandler)
 	}
 
-	// Gateway API Calls - Unfinished
+	// Gateway API Calls
 	if srv.gateway != nil {
-		srv.handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
-		srv.handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
-		srv.handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+		router.GET("/gateway", srv.gatewayHandler)
+		router.POST("/gateway/add/:addr", srv.gatewayAddHandler)
+		router.POST("/gateway/remove/:addr", srv.gatewayRemoveHandler)
 	}
 
 	// Host API Calls
 	if srv.host != nil {
-		srv.handleHTTPRequest(mux, "/host", srv.hostHandler)                  // GET, POST
-		srv.handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler) // POST
-	}
-
-	// HostDB API Calls - DEPRECATED
-	if srv.renter != nil {
-		srv.handleHTTPRequest(mux, "/hostdb/hosts/active", srv.renterHostsActiveHandler)
-		srv.handleHTTPRequest(mux, "/hostdb/hosts/all", srv.renterHostsAllHandler)
+		router.GET("/host", srv.hostHandlerGET)
+		router.POST("/host", srv.hostHandlerPOST)
+		router.POST("/host/announce", srv.hostAnnounceHandler)
 	}
 
 	// Miner API Calls
 	if srv.miner != nil {
-		srv.handleHTTPRequest(mux, "/miner", srv.minerHandler)                            // GET
-		srv.handleHTTPRequest(mux, "/miner/header", srv.minerHeaderHandler)               // GET, POST
-		srv.handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)                 // POST
-		srv.handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)                   // POST
-		srv.handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler) // COMPATv0.4.8
-		srv.handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)   // COMPATv0.4.8
+		router.GET("/miner", srv.minerHandler)
+		router.GET("/miner/header", srv.minerHeaderHandlerGET)
+		router.POST("/miner/header", srv.minerHeaderHandlerPOST)
+		router.GET("/miner/start", srv.minerStartHandler)
+		router.GET("/miner/stop", srv.minerStopHandler)
+		router.GET("/miner/headerforwork", srv.minerHeaderHandlerGET) // COMPATv0.4.8
+		router.GET("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
 	}
 
-	// Renter API Calls - Unfinished
+	// Renter API Calls
 	if srv.renter != nil {
-		srv.handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/list", srv.renterFilesListHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/load", srv.renterFilesLoadHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/rename", srv.renterFilesRenameHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
-		srv.handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
-		srv.handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
+		router.GET("/renter/downloads", srv.renterDownloadsHandler)
+		router.GET("/renter/files", srv.renterFilesHandler)
+
+		router.POST("/renter/load", srv.renterLoadHandler)
+		router.POST("/renter/loadascii", srv.renterLoadAsciiHandler)
+		router.GET("/renter/share", srv.renterShareHandler)
+		router.GET("/renter/shareascii", srv.renterShareAsciiHandler)
+
+		router.POST("/renter/delete/*path", srv.renterDeleteHandler)
+		router.GET("/renter/download/*path", srv.renterDownloadHandler)
+		router.POST("/renter/rename/*path", srv.renterRenameHandler)
+		router.POST("/renter/upload/*path", srv.renterUploadHandler)
+
+		router.GET("/renter/hosts/active", srv.renterHostsActiveHandler)
+		router.GET("/renter/hosts/all", srv.renterHostsAllHandler)
 	}
 
-	// TransactionPool API Calls - Unfinished
+	// TransactionPool API Calls
 	if srv.tpool != nil {
-		srv.handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+		router.GET("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls
 	if srv.wallet != nil {
-		srv.handleHTTPRequest(mux, "/wallet", srv.walletHandler)                           // GET
-		srv.handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)            // GET
-		srv.handleHTTPRequest(mux, "/wallet/addresses", srv.walletAddressesHandler)        // GET
-		srv.handleHTTPRequest(mux, "/wallet/backup", srv.walletBackupHandler)              // GET
-		srv.handleHTTPRequest(mux, "/wallet/encrypt", srv.walletEncryptHandler)            // POST - COMPATv0.4.0
-		srv.handleHTTPRequest(mux, "/wallet/init", srv.walletInitHandler)                  // POST
-		srv.handleHTTPRequest(mux, "/wallet/load/033x", srv.walletLoad033xHandler)         // POST
-		srv.handleHTTPRequest(mux, "/wallet/load/seed", srv.walletLoadSeedHandler)         // POST
-		srv.handleHTTPRequest(mux, "/wallet/load/siag", srv.walletLoadSiagHandler)         // POST
-		srv.handleHTTPRequest(mux, "/wallet/lock", srv.walletLockHandler)                  // POST
-		srv.handleHTTPRequest(mux, "/wallet/seeds", srv.walletSeedsHandler)                // GET
-		srv.handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)          // POST
-		srv.handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)          // POST
-		srv.handleHTTPRequest(mux, "/wallet/transaction/", srv.walletTransactionHandler)   // $(id) GET
-		srv.handleHTTPRequest(mux, "/wallet/transactions", srv.walletTransactionsHandler)  // GET
-		srv.handleHTTPRequest(mux, "/wallet/transactions/", srv.walletTransactionsHandler) // $(addr) GET
-		srv.handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)              // POST
+		router.GET("/wallet", srv.walletHandler)
+		router.POST("/wallet/033x", srv.wallet033xHandler)
+		router.GET("/wallet/address", srv.walletAddressHandler)
+		router.GET("/wallet/addresses", srv.walletAddressesHandler)
+		router.GET("/wallet/backup", srv.walletBackupHandler)
+		router.POST("/wallet/init", srv.walletInitHandler)
+		router.POST("/wallet/lock", srv.walletLockHandler)
+		router.POST("/wallet/seed", srv.walletSeedHandler)
+		router.GET("/wallet/seeds", srv.walletSeedsHandler)
+		router.POST("/wallet/siacoins", srv.walletSiacoinsHandler)
+		router.POST("/wallet/siafunds", srv.walletSiafundsHandler)
+		router.POST("/wallet/siagkey", srv.walletSiagkeyHandler)
+		router.GET("/wallet/transaction/:id", srv.walletTransactionHandler)
+		router.GET("/wallet/transactions", srv.walletTransactionsHandler)
+		router.GET("/wallet/transactions/:addr", srv.walletTransactionsAddrHandler)
+		router.POST("/wallet/unlock", srv.walletUnlockHandler)
+		router.POST("/wallet/encrypt", srv.walletInitHandler) // COMPATv0.4.0
 	}
 
-	// Create graceful HTTP server
-	srv.apiServer = &graceful.Server{
-		Timeout: apiTimeout,
-		Server:  &http.Server{Handler: mux},
-	}
+	// Apply UserAgent middleware and create HTTP server
+	uaRouter := requireUserAgent(router, srv.requiredUserAgent)
+	srv.apiServer = &http.Server{Handler: uaRouter}
 }
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
 func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, "404 - Refer to API.md")
+	http.Error(w, "404 - Refer to API.md", http.StatusNotFound)
 }
 
 // writeError an error to the API caller.

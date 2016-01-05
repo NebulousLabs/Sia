@@ -94,29 +94,6 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 	return r, nil
 }
 
-// Info returns generic information about the renter and the files that are
-// being rented.
-func (r *Renter) Info() (ri modules.RentInfo) {
-	lockID := r.mu.RLock()
-	// Include the list of files the renter knows about.
-	for filename := range r.files {
-		ri.Files = append(ri.Files, filename)
-	}
-	r.mu.RUnlock(lockID)
-
-	// Calculate the average cost of a file.
-	averagePrice := r.hostDB.AveragePrice()
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(defaultDuration))).Mul(types.NewCurrency64(1e9)).Mul(types.NewCurrency64(defaultParityPieces + defaultDataPieces))
-	// this also accounts for the buffering in the contract negotiation
-	bufferedCost := estimatedCost.Mul(types.NewCurrency64(5)).Div(types.NewCurrency64(2))
-	ri.Price = bufferedCost
-
-	// Report the number of known hosts.
-	ri.KnownHosts = len(r.hostDB.ActiveHosts())
-
-	return
-}
-
 // hostdb passthroughs
 func (r *Renter) ActiveHosts() []modules.HostSettings { return r.hostDB.ActiveHosts() }
 func (r *Renter) AllHosts() []modules.HostSettings    { return r.hostDB.AllHosts() }

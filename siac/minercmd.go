@@ -39,7 +39,7 @@ var (
 )
 
 func minerstartcmd() {
-	err := post("/miner/start", "")
+	err := get("/miner/start")
 	if err != nil {
 		fmt.Println("Could not start miner:", err)
 		return
@@ -67,7 +67,7 @@ Blocks Mined: %d (%d stale)
 }
 
 func minerstopcmd() {
-	err := post("/miner/stop", "")
+	err := get("/miner/stop")
 	if err != nil {
 		fmt.Println("Could not stop miner:", err)
 		return

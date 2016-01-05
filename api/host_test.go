@@ -36,7 +36,7 @@ func TestIntegrationHosting(t *testing.T) {
 	st.miner.AddBlock()
 	var hosts ActiveHosts
 	time.Sleep(1 * time.Second)
-	st.getAPI("/hostdb/hosts/active", &hosts)
+	st.getAPI("/renter/hosts/active", &hosts)
 	if len(hosts.Hosts) == 0 {
 		t.Fatal("host announcement not seen")
 	}
@@ -53,14 +53,17 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 
 	// upload to host
-	err = st.stdGetAPI("/renter/files/upload?nickname=test&duration=10&source=" + path)
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("duration", "10")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// only one piece will be uploaded (10% at current redundancy)
-	var fi []FileInfo
-	for len(fi) != 1 || fi[0].UploadProgress != 10 {
-		st.getAPI("/renter/files/list", &fi)
+	var rf RenterFiles
+	for len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+		st.getAPI("/renter/files", &rf)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -106,7 +109,7 @@ func TestIntegrationRenewing(t *testing.T) {
 	st.miner.AddBlock()
 	var hosts ActiveHosts
 	time.Sleep(1 * time.Second)
-	st.getAPI("/hostdb/hosts/active", &hosts)
+	st.getAPI("/renter/hosts/active", &hosts)
 	if len(hosts.Hosts) == 0 {
 		t.Fatal("host announcement not seen")
 	}
@@ -123,20 +126,23 @@ func TestIntegrationRenewing(t *testing.T) {
 	}
 
 	// upload to host, specifying that the file should be renewed
-	err = st.stdGetAPI("/renter/files/upload?nickname=test&renew=true&source=" + path)
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	uploadValues.Set("renew", "true")
+	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// only one piece will be uploaded (10% at current redundancy)
-	var fi []FileInfo
-	for len(fi) != 1 || fi[0].UploadProgress != 10 {
+	var rf RenterFiles
+	for len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+		st.getAPI("/renter/files", &rf)
 		time.Sleep(1 * time.Second)
-		st.getAPI("/renter/files/list", &fi)
 	}
 	// default expiration is 60 blocks
 	expExpiration := st.cs.Height() + 60
-	if fi[0].Expiration != expExpiration {
-		t.Fatalf("expected expiration of %v, got %v", expExpiration, fi[0].Expiration)
+	if rf.Files[0].Expiration != expExpiration {
+		t.Fatalf("expected expiration of %v, got %v", expExpiration, rf.Files[0].Expiration)
 	}
 
 	// mine blocks until we hit the renew threshold (default 20 blocks)
@@ -146,8 +152,8 @@ func TestIntegrationRenewing(t *testing.T) {
 
 	// renter should now renew the contract for another 60 blocks
 	newExpiration := st.cs.Height() + 60
-	for fi[0].Expiration != newExpiration {
+	for rf.Files[0].Expiration != newExpiration {
 		time.Sleep(1 * time.Second)
-		st.getAPI("/renter/files/list", &fi)
+		st.getAPI("/renter/files", &rf)
 	}
 }

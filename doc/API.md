@@ -19,7 +19,7 @@ Notes:
 - Requests must set their User-Agent string to contain the substring "Sia-Agent".
 - By default, siad listens on "localhost:9980". This can be changed using the '-a'
   flag when running siad.
-- The `types.Currency` object is an arbitrary-precision unsigned integer. In JSON,
+- The types.Currency object is an arbitrary-precision unsigned integer. In JSON,
   it is represented as a base-10 string. You must use a "bignum" library to handle
   these values, or you risk losing precision.
 
@@ -27,13 +27,114 @@ Example GET curl call:  `curl -A "Sia-Agent" /wallet/transactions?startheight=1&
 
 Example POST curl call: `curl -A "Sia-Agent" --data "amount=123&destination=abcd" /wallet/siacoins
 
+Daemon
+------
+
+Queries:
+
+* /daemon/constants [GET]
+* /daemon/stop      [GET]
+* /daemon/version   [GET]
+
+#### /daemon/constants [GET]
+
+Function: Returns the set of constants in use.
+
+Parameters: none
+
+Response:
+```
+struct {
+	genesistimestamp      types.Timestamp (uint64)
+	blocksizelimit        uint64
+	blockfrequency        types.BlockHeight (uint64)
+	targetwindow          types.BlockHeight (uint64)
+	mediantimestampwindow uint64
+	futurethreshold       types.Timestamp   (uint64)
+	siafundcount          types.Currency    (string)
+	siafundportion        *big.Rat          (string)
+	maturitydelay         types.BlockHeight (uint64)
+
+	initialcoinbase uint64
+	minimumcoinbase uint64
+
+	roottarget types.Target (byte array)
+	rootdepth  types.Target (byte array)
+
+	maxadjustmentup   *big.Rat (string)
+	maxadjustmentdown *big.Rat (string)
+
+	siacoinprecision types.Currency (string)
+}
+```
+'genesistimestamp' is the timestamp of the genesis block.
+
+'blocksizelimit' is the maximum size a block can be without being rejected.
+
+'blockfrequency' is the target for how frequently new blocks should be mined.
+
+'targetwindow' is the height of the window used to adjust the difficulty.
+
+'mediantimestampwindow' is the duration of the window used to adjust the
+difficulty.
+
+'futurethreshold' is how far in the future a block can be without being
+rejected.
+
+'siafundcount' is the total number of siafunds.
+
+'siafundportion' is the percentage of each file contract payout given to
+siafund holders.
+
+'maturitydelay' is the number of children a block must have before it is
+considered "mature."
+
+'initialcoinbase' is the number of coins given to the miner of the first
+block.
+
+'minimumcoinbase' is the minimum number of coins paid out to the miner of a
+block (the coinbase decreases with each block).
+
+'roottarget' is the initial target.
+
+'rootdepth' is the initial depth.
+
+'maxadjustmentup' is the largest allowed ratio between the old difficulty and
+the new difficulty.
+
+'maxadjustmentdown' is the smallest allowed ratio between the old difficulty
+and the new difficulty.
+
+'siacoinprecision' is the number of Hastings in one siacoin.
+
+#### /daemon/stop [GET]
+
+Function: Cleanly shuts down the daemon. May take a few seconds.
+
+Parameters: none
+
+Response: standard
+
+#### /daemon/version [GET]
+
+Function: Returns the version of Sia currently running.
+
+Parameters: none
+
+Response:
+```
+struct {
+	version   string
+}
+```
+'version' is the version of the responding Sia daemon.
+
 Consensus
 ---------
 
 Queries:
 
-* /consensus       [GET]
-* /consensus/block [GET]
+* /consensus                 [GET]
 
 #### /consensus [GET]
 
@@ -57,32 +158,14 @@ struct {
 'target' is the hash that needs to be met by a block for the block to be valid.
 The target is inversely proportional to the difficulty.
 
-#### /consensus/block [GET]
-
-Function: Returns the block found at a given height.
-
-Parameters:
-```
-height types.BlockHeight (uint64)
-```
-'height' is the height of the block that is being requested. The genesis block
-is at height 0, it's child is at height 1, etc.
-
-Response:
-```
-struct {
-	block types.Block
-}
-```
-
 Explorer
 --------
 
 Queries:
 
-* /explorer         [GET]
-* /explorer/block   [GET]
-* /explorer/$(hash) [GET]
+* /explorer                 [GET]
+* /explorer/blocks/<height> [GET]
+* /explorer/hashes/<hash>   [GET]
 
 #### /explorer [GET]
 
@@ -121,14 +204,16 @@ struct {
 }
 ```
 
-#### /explorer/block [GET]
+#### /explorer/blocks/<height> [GET]
 
-Function: Return a block at a given height.
+Function: Returns a block at a given height.
 
 Parameters:
 ```
 height types.BlockHeight (uint64)
 ```
+'height' is the height of the block that is being requested. The genesis block
+is at height 0, its child is at height 1, etc.
 
 Response:
 ```
@@ -137,15 +222,18 @@ struct {
 }
 ```
 
-#### /explorer/$(hash) [GET]
+#### /explorer/hashes/<hash> [GET]
 
-Function: Return information about an unknown hash.
+Function: Returns information about an unknown hash.
 
-Parameters: $(hash) is a url parameter specifying the hash that is being looked
-up. The hash can be an unlock hash, a wallet address, a block id, a transaction
-id, siacoin output id, file contract id, siafund output id, or any of the
-derivatives of siacoin output ids (such as miner payout ids and file contract
-payout ids).
+Parameters:
+```
+hash crypto.Hash (string)
+```
+'hash' can be an unlock hash, a wallet address, a block ID, a transaction
+ID, siacoin output ID, file contract ID, siafund output ID, or any of the
+derivatives of siacoin output IDs (such as miner payout IDs and file contract
+payout IDs).
 
 Response:
 ```
@@ -157,13 +245,68 @@ struct {
 	 transactions []api.ExplorerTransaction
 }
 ```
-`hashtype` indicates what type of hash it is. The options are 'blockid',
+'hashtype' indicates what type of hash was supplied. The options are 'blockid',
 'transactionid', 'unlockhash', 'siacoinoutputid', 'filecontractid',
 'siafundoutputid'. If the object is a block, only the 'block' field will be
 filled out. If the object is a transaction, only the 'transaction' field will
 be filled out. For all other types, the 'blocks' and 'transactions' fields will
 be filled out, returning all of the blocks and transactions that feature the
 provided hash.
+
+
+Gateway
+-------
+
+Queries:
+
+* /gateway               [GET]
+* /gateway/add/<addr>    [POST]
+* /gateway/remove/<addr> [POST]
+
+#### /gateway
+
+Function: Returns information about the gateway, including the list of peers.
+
+Parameters: none
+
+Response:
+```
+struct {
+	address string
+	peers   []string
+}
+```
+'address' is the network address of the Gateway, including its external IP
+address and the port Sia is listening on.
+
+'peers' is a list of the network addresses of peers that the Gateway is
+currently connected to.
+
+#### /gateway/add/<addr> [POST]
+
+Function: Adds a peer to the gateway.
+
+Parameters:
+```
+addr string
+```
+'addr' should be a reachable hostname + port number, typically of the form
+"a.b.c.d:xxxx".
+
+Response: standard
+
+#### /gateway/remove/<addr> [POST]
+
+Function: Will remove a peer from the gateway.
+
+Parameters:
+```
+addr string
+```
+'addr' should be a reachable hostname + port number, typically of the form
+"a.b.c.d:xxxx".
+
+Response: standard
 
 Host
 ----
@@ -198,38 +341,38 @@ struct {
 	upcomingrevenue   types.Currency (string)
 }
 ```
-`collateral` is the number of hastings per byte per block that are put up as
+'collateral' is the number of hastings per byte per block that are put up as
 collateral when making file contracts.
 
-`ipaddress` is the network address of the host.
+'ipaddress' is the network address of the host.
 
-`maxduration` is the maximum allowed duration of a file contract.
+'maxduration' is the maximum allowed duration of a file contract.
 
-`minduration` is the minimum allowed duration of a file contract.
+'minduration' is the minimum allowed duration of a file contract.
 
-`price` is the number of hastings per byte per block that the host is charging
+'price' is the number of hastings per byte per block that the host is charging
 when making file contracts.
 
-`totalstorage` is the total amount of storage that has been allocated to the
+'totalstorage' is the total amount of storage that has been allocated to the
 host.
 
-`unlockhash` is the address that hosting revenues will be sent to.
+'unlockhash' is the address that hosting revenues will be sent to.
 
-`windowsize` is the minimum required window that must be given to the host to
+'windowsize' is the minimum required window that must be given to the host to
 prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
 downtime, 40 blocks is recommended as an absolute minimum. The current network
 default is 288 blocks. The current software will break entirely below 20
 blocks, though in theory something as low as 6 blocks could be safe.
 
 
-`numcontracts` is the number of active contracts that the host is engaged in.
+'numcontracts' is the number of active contracts that the host is engaged in.
 
-`revenue` is the total number of Hastings earned from hosting.
+'revenue' is the total number of Hastings earned from hosting.
 
-`storageremaining` is `TotalStorage` minus the number of bytes currently being
+'storageremaining' is 'TotalStorage' minus the number of bytes currently being
 stored.
 
-`upcomingrevenue` is the value of the contracts that have been created but not
+'upcomingrevenue' is the value of the contracts that have been created but not
 fulfilled.
 
 #### /host [POST]
@@ -246,20 +389,20 @@ price        int
 totalstorage int
 windowsize   int
 ```
-`collateral` is the number of hastings per byte per block that are put up as
+'collateral' is the number of hastings per byte per block that are put up as
 collateral when making file contracts.
 
-`maxduration` is the maximum allowed duration of a file contract.
+'maxduration' is the maximum allowed duration of a file contract.
 
-`minduration` is the minimum allowed duration of a file contract.
+'minduration' is the minimum allowed duration of a file contract.
 
-`price` is the number of hastings per byte per block that the host is charging
+'price' is the number of hastings per byte per block that the host is charging
 when making file contracts.
 
-`totalstorage` is the total amount of storage that has been allocated to the
+'totalstorage' is the total amount of storage that has been allocated to the
 host.
 
-`windowsize` is the minimum required window that must be given to the host to
+'windowsize' is the minimum required window that must be given to the host to
 prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
 downtime, 40 blocks is recommended as an absolute minimum. The current network
 default is 288 blocks. The current software will break entirely below 20
@@ -274,9 +417,9 @@ Generally only needs to be called once.
 
 Parameters:
 ```
-netaddress string
+address string
 ```
-`netaddress` is an optional parameter that specifies the address to be
+'address' is an optional parameter that specifies the address to be
 announced. Supplying this parameters will also override standard connectivity
 checks.
 
@@ -288,8 +431,8 @@ Miner
 Queries:
 
 * /miner        [GET]
-* /miner/start  [POST]
-* /miner/stop   [POST]
+* /miner/start  [GET]
+* /miner/stop   [GET]
 * /miner/header [GET]
 * /miner/header [POST]
 
@@ -308,15 +451,15 @@ struct {
 	staleblocksmined int
 }
 ```
-`cpumining` indicates whether the cpu miner is active or not.
+'cpumining' indicates whether the cpu miner is active or not.
 
-`cpuhashrate` indicates how fast the cpu is hashing, in hashes per second.
+'cpuhashrate' indicates how fast the cpu is hashing, in hashes per second.
 
-`blocksmined` indicates how many blocks have been mined, this value is remembered after restarting.
+'blocksmined' indicates how many blocks have been mined, this value is remembered after restarting.
 
-`staleblocksmined` indicates how many stale blocks have been mined, this value is remembered after restarting.
+'staleblocksmined' indicates how many stale blocks have been mined, this value is remembered after restarting.
 
-#### /miner/start [POST]
+#### /miner/start [GET]
 
 Function: Starts a single threaded cpu miner. Does nothing if the cpu miner is
 already running.
@@ -325,7 +468,7 @@ Parameters: none
 
 Response: standard
 
-#### /miner/stop [POST]
+#### /miner/stop [GET]
 
 Function: Stops the cpu miner. Does nothing if the cpu miner is not running.
 
@@ -360,9 +503,236 @@ Function: Submit a header that has passed the POW.
 
 Parameters:
 ```
-[]byte
+input []byte
 ```
-The input byte array should be 80 bytes that form the solved block header.
+The input byte array should be 80 bytes that form the solved block header. *Unlike most API calls, it should be written directly to the request body, not as a query parameter.*
+
+Renter
+------
+
+Queries:
+
+* /renter/downloadqueue     [GET]
+* /renter/load              [POST]
+* /renter/loadascii         [POST]
+* /renter/rename            [POST]
+* /renter/files             [GET]
+* /renter/delete/<path>     [POST]
+* /renter/download/<path>   [GET]
+* /renter/share/<path>      [GET]
+* /renter/shareascii/<path> [GET]
+* /renter/upload/<path>     [POST]
+
+#### /renter/downloadqueue [GET]
+
+Function: Lists all files in the download queue.
+
+Parameters: none
+
+Response:
+```
+struct {
+	downloads []struct {
+		nickname    string
+		destination string
+		filesize    uint64
+		received    uint64
+		starttime   Time (string)
+	}
+}
+```
+'nickname' is the nickname given to the file when it was uploaded.
+
+'destination' is the path that the file was downloaded to.
+
+'filesize' is the size of the file being download.
+
+'received' is the number of bytes downloaded thus far.
+
+'starttime' is the time at which the download was initiated.
+
+#### /renter/files
+
+Function: Lists the status of all files.
+
+Parameters: none
+
+Response:
+```
+struct {
+	files []struct {
+		nickname       string
+		filesize       uint64
+		available      bool
+		uploadprogress float32
+		expiration     types.BlockHeight (uint64)
+	}
+}
+```
+'nickname' is the nickname given to the file when it was uploaded.
+
+'filesize' is the size of the file in bytes.
+
+'available' indicates whether or not the file can be downloaded immediately.
+
+'uploadProgress' is the current upload percentage of the file, including
+redundancy. In general, files will be available for download before
+UploadProgress == 100.
+
+'expiration' is the block height at which the file ceases availability.
+
+#### /renter/load [POST]
+
+Function: Load a .sia file into the renter.
+
+Parameters:
+```
+filename string
+```
+'filename' is the filepath of the .sia file that is being loaded.
+
+Response:
+```
+struct {
+	filesadded []string
+}
+```
+'filesadded' is a list of the nicknames of the files contained in the .sia file
+that was loaded.
+
+
+#### /renter/loadascii [POST]
+
+Function: Load a .sia file into the renter.
+
+Parameters:
+```
+file string
+```
+'file' is the ASCII-encoded .sia file that is being loaded.
+
+Response:
+```
+struct {
+	filesadded []string
+}
+```
+
+#### /renter/rename [POST]
+
+Function: Rename a file. Does not rename any downloads or source files, only
+renames the entry in the renter.
+
+Parameters:
+```
+nickname string
+newname  string
+```
+'nickname' is the current name of the file entry.
+
+'newname' is the new name for the file entry.
+
+Response: standard.
+
+#### /renter/delete/<path> [POST]
+
+Function: Deletes a renter file entry. Does not delete any downloads or
+original files, only the entry in the renter.
+
+Parameters:
+```
+path string
+```
+'path' is the nickname of the file.
+
+Response: standard
+
+#### /renter/download/<path> [GET]
+
+Function: Downloads a file. The call will block until the download completes.
+
+Parameters:
+```
+path        string
+destination string
+```
+'path' is the nickname of the file.
+
+'destination' is the path that the file will be downloaded to.
+
+Response: standard
+
+#### /renter/share/<path> [GET]
+
+Function: Create a .sia file that can be shared with other people.
+
+Parameters:
+```
+path     string
+destination string
+```
+'path' is the nickname of the file that will be shared.
+
+'destination' is the path of the .sia file to be created. It must end in
+'.sia'.
+
+Response: standard.
+
+#### /renter/shareascii/<path> [GET]
+
+Function: Create an ASCII .sia file that can be shared with other people.
+
+Parameters:
+```
+path string
+```
+'path' is the nickname of the file that will be shared.
+
+Response:
+```
+struct {
+	file string
+}
+```
+'file' is the ASCII-encoded .sia file.
+
+#### /renter/upload/<path> [POST]
+
+Function: Uploads a file.
+
+Parameters:
+```
+path     string
+source   string
+```
+'path' is the nickname that will be used to reference the file.
+
+'source' is the path to the file to be uploaded.
+
+Response: standard.
+
+Transaction Pool
+----------------
+
+Queries:
+
+* /transactionpool/transactions [GET]
+
+#### /transactionpool/transactions [GET]
+
+Function: Returns all of the transactions in the transaction pool.
+
+Parameters: none
+
+Response:
+```
+struct {
+	transactions []types.Transaction
+}
+```
+Please see types/transactions.go for a more detailed explanation of
+what a transaction looks like. There are many fields.
+
 
 Wallet
 ------
@@ -370,20 +740,20 @@ Wallet
 Queries:
 
 * /wallet                      [GET]
+* /wallet/033x                 [POST]
 * /wallet/address              [GET]
 * /wallet/addresses            [GET]
 * /wallet/backup               [GET]
 * /wallet/init                 [POST]
-* /wallet/load/033x            [POST]
-* /wallet/load/seed            [POST]
-* /wallet/load/siag            [POST]
 * /wallet/lock                 [POST]
+* /wallet/seed                 [POST]
 * /wallet/seeds                [GET]
 * /wallet/siacoins             [POST]
 * /wallet/siafunds             [POST]
-* /wallet/transaction/$(id)    [GET]
+* /wallet/siagkey              [POST]
+* /wallet/transaction/<id>     [GET]
 * /wallet/transactions         [GET]
-* /wallet/transactions/$(addr) [GET]
+* /wallet/transactions/<addr>  [GET]
 * /wallet/unlock               [POST]
 
 The first time that the wallet is ever created, the wallet will be unencrypted
@@ -446,6 +816,25 @@ of the most recent block in the blockchain.
 siafunds as of the most recent block. Because the claim balance increases every
 time a file contract is created, it is possible that the balance will increase
 before any claim transaction is confirmed.
+
+#### /wallet/033x [POST]
+
+Function: Load a v0.3.3.x wallet into the current wallet, harvesting all of the
+secret keys. All spendable addresses in the loaded wallet will become spendable
+from the current wallet.
+
+Parameters:
+```
+filepath           string
+encryptionpassword string
+```
+'filepath' is the filepath of the v0.3.3.x wallet that is being loaded into the
+current wallet.
+
+'encryptionpassword' is the encryption key of the wallet. An error will be
+returned if the wrong key is provided.
+
+Response: standard.
 
 #### /wallet/address [GET]
 
@@ -527,26 +916,7 @@ struct {
 'primaryseed' is the dictionary encoded seed that is used to generate addresses
 that the wallet is able to spend.
 
-#### /wallet/load/033x [POST]
-
-Function: Load a v0.3.3.x wallet into the current wallet, harvesting all of the
-secret keys. All spendable addresses in the loaded wallet will become spendable
-from the current wallet.
-
-Parameters:
-```
-filepath           string
-encryptionpassword string
-```
-'filepath' is the filepath of the v0.3.3.x wallet that is being loaded into the
-current wallet.
-
-'encryptionpassword' is the encryption key of the wallet. An error will be
-returned if the wrong key is provided.
-
-Response: standard.
-
-#### /wallet/load/seed [POST]
+#### /wallet/seed [POST]
 
 Function: Give the wallet a seed to track when looking for incoming
 transactions. The wallet will be able to spend outputs related to addresses
@@ -570,35 +940,6 @@ the seed. 'english' is the most common choice when picking a dictionary.
 added to the wallet.
 
 Response: standard
-
-#### /wallet/load/siag [POST]
-
-Function: Load a key into the wallet that was generated by siag. Most siafunds
-are currently in addresses created by siag.
-
-Parameters:
-```
-encryptionpassword string
-keyfiles           string
-```
-'encryptionpassword' is the key that is used to encrypt the siag key when it is
-imported to the wallet.
-
-'keyfiles' is a list of filepaths that point to the keyfiles that make up the
-siag key. There should be at least one keyfile per required signature. The
-filenames need to be commna separated (no spaces), which means filepaths that
-contain a comma are not allowed.
-
-#### /wallet/lock [POST]
-
-Function: Locks the wallet, wiping all secret keys. After being locked, the
-keys are encrypted. Queries for the seed, to send siafunds, and related queries
-become unavailable. Queries concerning transaction history and balance are
-still available.
-
-Parameters: none
-
-Response: standard.
 
 #### /wallet/seeds [GET]
 
@@ -697,12 +1038,44 @@ struct {
 the coins. The last transaction contains the output headed to the
 'destination'.
 
-#### /wallet/transaction/$(id) [GET]
+#### /wallet/siagkey [POST]
+
+Function: Load a key into the wallet that was generated by siag. Most siafunds
+are currently in addresses created by siag.
+
+Parameters:
+```
+encryptionpassword string
+keyfiles           string
+```
+'encryptionpassword' is the key that is used to encrypt the siag key when it is
+imported to the wallet.
+
+'keyfiles' is a list of filepaths that point to the keyfiles that make up the
+siag key. There should be at least one keyfile per required signature. The
+filenames need to be commna separated (no spaces), which means filepaths that
+contain a comma are not allowed.
+
+#### /wallet/lock [POST]
+
+Function: Locks the wallet, wiping all secret keys. After being locked, the
+keys are encrypted. Queries for the seed, to send siafunds, and related queries
+become unavailable. Queries concerning transaction history and balance are
+still available.
+
+Parameters: none
+
+Response: standard.
+
+#### /wallet/transaction/<id> [GET]
 
 Function: Get the transaction associated with a specific transaction id.
 
-Parameters: $(id) is a url parameter specifying the id of the transaction that
-should be returned.
+Parameters:
+```
+id string
+```
+'id' is the ID of the transaction being requested.
 
 Response:
 ```
@@ -727,7 +1100,7 @@ struct modules.ProcessedTransaction {
 	outputs []modules.ProcessedOutput
 }
 ```
-'transaction' is a types.Transaction, and is defined in types.transaction.go
+'transaction' is a types.Transaction, and is defined in types/transactions.go
 
 'transactionid' is the id of the transaction from which the wallet transaction
 was derived.
@@ -828,13 +1201,16 @@ height 'startheight' and height 'endheight' (inclusive).
 
 'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
-#### /wallet/transactions/$(addr) [GET]
+#### /wallet/transactions/<addr> [GET]
 
 Function: Return all of the transaction related to a specific address.
 
-Parameters: $(addr) is a url parameter specifiy the unlock hash or wallet
-address that is being looked up. All transactions related to that address will
-be returned.
+Parameters:
+```
+addr types.UnlockHash
+```
+'addr' is the unlock hash (i.e. wallet address) whose transactions are being
+requested.
 
 Response:
 ```
@@ -842,7 +1218,7 @@ struct {
 	transactions []modules.ProcessedTransaction.
 }
 ```
-'transactions' is a list of processed transactions that relate to the input
+'transactions' is a list of processed transactions that relate to the supplied
 address.  See the documentation for '/wallet/transaction' for more information.
 
 #### /wallet/unlock [POST]
@@ -859,116 +1235,7 @@ frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
 
-
-*Routes below this line have not been made RESTful*
-
 ---
-
-Daemon
-------
-
-Queries:
-
-* /daemon/stop
-* /daemon/version
-* /daemon/updates/apply
-* /daemon/updates/check
-
-#### /daemon/stop
-
-Function: Cleanly shuts down the daemon. May take a while.
-
-Parameters: none
-
-Response: standard
-
-#### /daemon/version
-
-Function: Returns the daemon's version
-
-Parameters: none
-
-Response:
-```
-struct {
-	Version   string
-}
-```
-
-#### /daemon/updates/apply:
-
-Function: Applies the update specified by `version`.
-                
-Parameters:
-```
-version string
-```
-
-Response: standard
-
-#### /daemon/updates/check:
-
-Function: Checks for an update, returning a bool indicating whether
-there is an update and a version indicating the version of the update.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Available bool
-	Version   string
-}
-```
-
-Gateway
--------
-
-Queries:
-
-* /gateway/status
-* /gateway/peers/add
-* /gateway/peers/remove
-
-#### /gateway/status
-
-Function: Returns information about the gateway, including the list of peers.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Address NetAddress
-	Peers   []string
-}
-```
-
-#### /gateway/peers/add
-
-Function: Will add a peer to the gateway.
-
-Parameters:
-```
-address string
-```
-`address` should be a reachable hostname + port number, typically of the form
-"a.b.c.d:xxxx".
-
-Response: standard
-
-#### /gateway/peers/remove
-
-Function: Will remove a peer from the gateway.
-
-Parameters:
-```
-address string
-```
-`address` should be a reachable hostname + port number, typically of the form
-"a.b.c.d:xxxx".
-
-Response: standard
 
 HostDB
 ------
@@ -1002,224 +1269,3 @@ struct {
 	Hosts []HostSettings
 }
 ```
-
-Renter
-------
-
-Queries:
-
-* /renter/downloadqueue
-* /renter/files/delete
-* /renter/files/download
-* /renter/files/list
-* /renter/files/load
-* /renter/files/loadascii
-* /renter/files/rename
-* /renter/files/share
-* /renter/files/shareascii
-* /renter/files/upload
-
-#### /renter/downloadqueue
-
-Function: Lists all files in the download queue.
-
-Parameters: none
-
-Response:
-```
-[]struct{
-	Filesize    uint64
-	Received    uint64
-	Destination string
-	Nickname    string
-}
-```
-Each file in the queue is represented by the above struct.
-
-`Filesize` is the size of the file being download.
-
-`Received` is the number of bytes downloaded thus far.
-
-`Destination` is the path that the file was downloaded to.
-
-`Nickname` is the nickname given to the file when it was uploaded.
-
-#### /renter/files/delete
-
-Function: Deletes a renter file entry. Does not delete any downloads or
-original files, only the entry in the renter.
-
-Parameters:
-```
-nickname string
-```
-`nickname` is the nickname of the file that has been uploaded to the network.
-
-Response: standard
-
-#### /renter/files/download
-
-Function: Starts a file download.
-
-Parameters:
-```
-nickname    string
-destination string
-```
-`nickname` is the nickname of the file that has been uploaded to the network.
-
-`destination` is the path that the file will be downloaded to.
-
-Response: standard
-
-#### /renter/files/list
-
-Function: Lists the status of all files.
-
-Parameters: none
-
-Response:
-```
-[]struct {
-	Available      bool
-	UploadProgress float32
-	Nickname       string
-	Filesize       uint64
-	Expiration     types.BlockHeight (uint64)
-}
-```
-Each uploaded file is represented by the above struct.
-
-`Available` indicates whether or not the file can be downloaded immediately.
-
-`UploadProgress` is the current upload percentage of the file, including
-redundancy. In general, files will be available for download before
-UploadProgress == 100.
-
-`Nickname` is the nickname given to the file when it was uploaded.
-
-`Filesize` is the size of the file in bytes.
-
-`Expiration` is the block height at which the file ceases availability.
-
-#### /renter/files/load
-
-Function: Load a '.sia' into the renter.
-
-Parameters:
-```
-filename string
-```
-`filename` is the filepath of the '.sia' that is being loaded.
-
-Response:
-```
-struct {
-	FilesAdded []string
-}
-```
-
-#### /renter/files/loadascii
-
-Function: Load a '.sia' into the renter.
-
-Parameters:
-```
-file string
-```
-`file` is the ASCII representation of the '.sia' file being loaded into the
-renter.
-
-Response:
-```
-struct {
-	FilesAdded []string
-}
-```
-
-#### /renter/files/rename
-
-Function: Rename a file. Does not rename any downloads or source files, only
-renames the entry in the renter.
-
-Parameters:
-```
-nickname string
-newname  string
-```
-`nickname` is the current name of the file entry.
-
-`newname` is the new name for the file entry.
-
-Response: standard.
-
-#### /renter/files/share
-
-Function: Create a '.sia' that can be shared with other people.
-
-Parameters:
-```
-nickname string
-filepath string
-```
-`nickname` is the nickname of the file that will be shared.
-
-`filepath` is the filepath of the '.sia' that will be created to share the
-file. `filepath` must have the suffix '.sia'.
-
-Response: standard.
-
-#### /renter/files/shareascii
-
-Function: Create a '.sia' that can be shared with other people.
-
-Parameters:
-```
-nickname string
-```
-`nickname` is the nickname of the file that will be shared.
-
-Response:
-```
-struct {
-	File string
-}
-```
-`file` is the ASCII representation of the '.sia' that would have been created.
-
-#### /renter/files/upload
-
-Function: Upload a file.
-
-Parameters:
-```
-source   string
-nickname string
-```
-`source` is the path to the file to be uploaded.
-
-`nickname` is the name that will be used to reference the file.
-
-Response: standard.
-
-Transaction Pool
-----------------
-
-Queries:
-
-* /transactionpool/transactions
-
-#### /transactionpool/transactions
-
-Function: Returns all of the transactions in the transaction pool.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Transactions []consensus.Transaction
-}
-```
-Please see consensus/types/transactions.go for a more detailed explanation on
-what a transaction looks like. There are many fields.

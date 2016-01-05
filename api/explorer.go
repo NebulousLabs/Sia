@@ -3,11 +3,12 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type (
@@ -195,11 +196,11 @@ func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Bloc
 	}
 }
 
-// explorerBlockHandlerGET handles GET requests to /explorer/block.
-func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Request) {
+// explorerHandler handles API calls to /explorer/blocks/:height.
+func (srv *Server) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// Parse the height that's being requested.
 	var height types.BlockHeight
-	_, err := fmt.Sscan(req.FormValue("height"), &height)
+	_, err := fmt.Sscan(ps.ByName("height"), &height)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -214,15 +215,6 @@ func (srv *Server) explorerBlockHandlerGET(w http.ResponseWriter, req *http.Requ
 	writeJSON(w, ExplorerBlockGET{
 		Block: srv.buildExplorerBlock(height, block),
 	})
-}
-
-// explorerHandler handles API calls to /explorer/block.
-func (srv *Server) explorerBlockHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
-		srv.explorerBlockHandlerGET(w, req)
-	} else {
-		writeError(w, "unrecognized method when calling /explorer/block", http.StatusBadRequest)
-	}
 }
 
 // buildTransactionSet returns the blocks and transactions that are associated
@@ -252,25 +244,12 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 	return txns, blocks
 }
 
-// explorerHandlerGET handles GET requests to /explorer.
-func (srv *Server) explorerHandlerGET(w http.ResponseWriter, req *http.Request) {
-	height := srv.cs.Height()
-	facts, exists := srv.explorer.BlockFacts(height)
-	if !exists && build.DEBUG {
-		panic("stats for the most recent block do not exist")
-	}
-	writeJSON(w, ExplorerGET{
-		BlockFacts: facts,
-	})
-}
-
-// explorerHandlerGEThash handles GET requests to /explorer/$(hash).
-func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Request) {
+// explorerHashHandler handles GET requests to /explorer/hash/:hash.
+func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// The hash is scanned as an address, because an address can be typecast to
-	// all other necessary types, and will correclty decode hashes whether or
+	// all other necessary types, and will correctly decode hashes whether or
 	// not they have a checksum.
-	encodedHash := strings.TrimPrefix(req.URL.Path, "/explorer/")
-	hash, err := scanAddress(encodedHash)
+	hash, err := scanAddress(ps.ByName("hash"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -361,13 +340,14 @@ func (srv *Server) explorerHandlerGEThash(w http.ResponseWriter, req *http.Reque
 	writeError(w, "unrecognized hash used as input to /explorer/hash", http.StatusBadRequest)
 }
 
-// explorerHandler handles API calls to /explorer and /explorer/
-func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/explorer" && (req.Method == "" || req.Method == "GET") {
-		srv.explorerHandlerGET(w, req)
-	} else if strings.HasPrefix(req.URL.Path, "/explorer/") && (req.Method == "" || req.Method == "GET") {
-		srv.explorerHandlerGEThash(w, req)
-	} else {
-		writeError(w, "unrecognized call to /explorer", http.StatusBadRequest)
+// explorerHandler handles API calls to /explorer
+func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	height := srv.cs.Height()
+	facts, exists := srv.explorer.BlockFacts(height)
+	if !exists && build.DEBUG {
+		panic("stats for the most recent block do not exist")
 	}
+	writeJSON(w, ExplorerGET{
+		BlockFacts: facts,
+	})
 }

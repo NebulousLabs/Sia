@@ -205,7 +205,7 @@ func walletload033xcmd(filepath string) {
 		return
 	}
 	qs := fmt.Sprintf("filepath=%s&encryptionpassword=%s", filepath, password)
-	err = post("/wallet/load/033x", qs)
+	err = post("/wallet/033x", qs)
 	if err != nil {
 		fmt.Println("loading error:", err)
 		return
@@ -226,7 +226,7 @@ func walletloadseedcmd() {
 		return
 	}
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
-	err = post("/wallet/load/seed", qs)
+	err = post("/wallet/seed", qs)
 	if err != nil {
 		fmt.Println("Could not add seed:", err)
 		return
@@ -242,7 +242,7 @@ func walletloadsiagcmd(keyfiles string) {
 		return
 	}
 	qs := fmt.Sprintf("keyfiles=%s&encryptionpassword=%s", keyfiles, password)
-	err = post("/wallet/load/siag", qs)
+	err = post("/wallet/siagkey", qs)
 	if err != nil {
 		fmt.Println("loading error:", err)
 		return
