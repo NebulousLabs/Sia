@@ -185,21 +185,31 @@ func (f *file) expiringContracts(height types.BlockHeight) []fileContract {
 // offlineChunks returns the chunks belonging to "offline" hosts -- hosts that
 // do not meet uptime requirements. Importantly, only chunks missing more than
 // half their redundancy are returned.
-func (f *file) offlineChunks(activeHosts []modules.HostSettings) map[uint64][]uint64 {
+func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	// helper function for determining if a host is offline, i.e. not in the
-	// set of active hosts.
+	// helper function for determining if a host is offline. A host is
+	// considered offline if it is in allHosts but not activeHosts.
+	allHosts, activeHosts := hdb.AllHosts(), hdb.ActiveHosts()
 	isOffline := func(addr modules.NetAddress) bool {
-		for _, host := range activeHosts {
+		for _, host := range allHosts {
 			if host.IPAddress == addr {
-				return false
+				for _, host := range activeHosts {
+					if host.IPAddress == addr {
+						// host in allHosts and activeHosts
+						return false
+					}
+				}
+				// host in allHosts but not activeHosts
+				return true
 			}
 		}
-		return true
+		// host not in allHosts
+		return false
 	}
 
+	// mark all pieces belonging to offline hosts.
 	offline := make(map[uint64][]uint64)
 	for _, fc := range f.contracts {
 		if isOffline(fc.IP) {
@@ -208,7 +218,7 @@ func (f *file) offlineChunks(activeHosts []modules.HostSettings) map[uint64][]ui
 			}
 		}
 	}
-	// only return chunks missing more than half their redundancy
+	// filter out chunks missing less than half of their redundancy
 	filtered := make(map[uint64][]uint64)
 	for chunk, pieces := range offline {
 		if len(pieces) > f.erasureCode.NumPieces()/2 {
@@ -264,7 +274,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	}
 
 	// repair offline chunks
-	if badChunks := f.offlineChunks(r.hostDB.ActiveHosts()); len(badChunks) != 0 {
+	if badChunks := f.offlineChunks(r.hostDB); len(badChunks) != 0 {
 		r.log.Printf("reuploading %v offline chunks of %v", len(badChunks), f.name)
 		var duration types.BlockHeight
 		if meta.Renew {
