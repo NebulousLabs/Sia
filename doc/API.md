@@ -515,10 +515,10 @@ Queries:
 * /renter/downloadqueue     [GET]
 * /renter/load              [POST]
 * /renter/loadascii         [POST]
-* /renter/rename            [POST]
 * /renter/files             [GET]
 * /renter/delete/<path>     [POST]
 * /renter/download/<path>   [GET]
+* /renter/rename/<path>     [POST]
 * /renter/share/<path>      [GET]
 * /renter/shareascii/<path> [GET]
 * /renter/upload/<path>     [POST]
@@ -620,22 +620,6 @@ struct {
 }
 ```
 
-#### /renter/rename [POST]
-
-Function: Rename a file. Does not rename any downloads or source files, only
-renames the entry in the renter.
-
-Parameters:
-```
-nickname string
-newname  string
-```
-'nickname' is the current name of the file entry.
-
-'newname' is the new name for the file entry.
-
-Response: standard.
-
 #### /renter/delete/<path> [POST]
 
 Function: Deletes a renter file entry. Does not delete any downloads or
@@ -663,6 +647,22 @@ destination string
 'destination' is the path that the file will be downloaded to.
 
 Response: standard
+
+#### /renter/rename/<path> [POST]
+
+Function: Rename a file. Does not rename any downloads or source files, only
+renames the entry in the renter.
+
+Parameters:
+```
+nickname string
+newname  string
+```
+'nickname' is the current name of the file entry.
+
+'newname' is the new name for the file entry.
+
+Response: standard.
 
 #### /renter/share/<path> [GET]
 
