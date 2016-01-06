@@ -164,8 +164,8 @@ Explorer
 Queries:
 
 * /explorer                 [GET]
-* /explorer/blocks/<height> [GET]
-* /explorer/hashes/<hash>   [GET]
+* /explorer/blocks/{height} [GET]
+* /explorer/hashes/{hash}   [GET]
 
 #### /explorer [GET]
 
@@ -204,7 +204,7 @@ struct {
 }
 ```
 
-#### /explorer/blocks/<height> [GET]
+#### /explorer/blocks/{height} [GET]
 
 Function: Returns a block at a given height.
 
@@ -222,7 +222,7 @@ struct {
 }
 ```
 
-#### /explorer/hashes/<hash> [GET]
+#### /explorer/hashes/{hash} [GET]
 
 Function: Returns information about an unknown hash.
 
@@ -260,8 +260,8 @@ Gateway
 Queries:
 
 * /gateway               [GET]
-* /gateway/add/<addr>    [POST]
-* /gateway/remove/<addr> [POST]
+* /gateway/add/{addr}    [POST]
+* /gateway/remove/{addr} [POST]
 
 #### /gateway
 
@@ -282,7 +282,7 @@ address and the port Sia is listening on.
 'peers' is a list of the network addresses of peers that the Gateway is
 currently connected to.
 
-#### /gateway/add/<addr> [POST]
+#### /gateway/add/{addr} [POST]
 
 Function: Adds a peer to the gateway.
 
@@ -295,7 +295,7 @@ addr string
 
 Response: standard
 
-#### /gateway/remove/<addr> [POST]
+#### /gateway/remove/{addr} [POST]
 
 Function: Will remove a peer from the gateway.
 
@@ -369,7 +369,7 @@ blocks, though in theory something as low as 6 blocks could be safe.
 
 'revenue' is the total number of Hastings earned from hosting.
 
-'storageremaining' is 'TotalStorage' minus the number of bytes currently being
+'storageremaining' is 'totalstorage' minus the number of bytes currently being
 stored.
 
 'upcomingrevenue' is the value of the contracts that have been created but not
@@ -515,13 +515,15 @@ Queries:
 * /renter/downloadqueue     [GET]
 * /renter/load              [POST]
 * /renter/loadascii         [POST]
-* /renter/rename            [POST]
 * /renter/files             [GET]
-* /renter/delete/<path>     [POST]
-* /renter/download/<path>   [GET]
-* /renter/share/<path>      [GET]
-* /renter/shareascii/<path> [GET]
-* /renter/upload/<path>     [POST]
+* /renter/delete/{path}     [POST]
+* /renter/download/{path}   [GET]
+* /renter/rename/{path}     [POST]
+* /renter/share/{path}      [GET]
+* /renter/shareascii/{path} [GET]
+* /renter/upload/{path}     [POST]
+* /renter/hosts/active      [GET]
+* /renter/hosts/all         [GET]
 
 #### /renter/downloadqueue [GET]
 
@@ -618,7 +620,35 @@ struct {
 }
 ```
 
-#### /renter/rename [POST]
+#### /renter/delete/{path} [POST]
+
+Function: Deletes a renter file entry. Does not delete any downloads or
+original files, only the entry in the renter.
+
+Parameters:
+```
+path string
+```
+'path' is the nickname of the file.
+
+Response: standard
+
+#### /renter/download/{path} [GET]
+
+Function: Downloads a file. The call will block until the download completes.
+
+Parameters:
+```
+path        string
+destination string
+```
+'path' is the nickname of the file.
+
+'destination' is the path that the file will be downloaded to.
+
+Response: standard
+
+#### /renter/rename/{path} [POST]
 
 Function: Rename a file. Does not rename any downloads or source files, only
 renames the entry in the renter.
@@ -634,35 +664,7 @@ newname  string
 
 Response: standard.
 
-#### /renter/delete/<path> [POST]
-
-Function: Deletes a renter file entry. Does not delete any downloads or
-original files, only the entry in the renter.
-
-Parameters:
-```
-path string
-```
-'path' is the nickname of the file.
-
-Response: standard
-
-#### /renter/download/<path> [GET]
-
-Function: Downloads a file. The call will block until the download completes.
-
-Parameters:
-```
-path        string
-destination string
-```
-'path' is the nickname of the file.
-
-'destination' is the path that the file will be downloaded to.
-
-Response: standard
-
-#### /renter/share/<path> [GET]
+#### /renter/share/{path} [GET]
 
 Function: Create a .sia file that can be shared with other people.
 
@@ -678,7 +680,7 @@ destination string
 
 Response: standard.
 
-#### /renter/shareascii/<path> [GET]
+#### /renter/shareascii/{path} [GET]
 
 Function: Create an ASCII .sia file that can be shared with other people.
 
@@ -696,7 +698,7 @@ struct {
 ```
 'file' is the ASCII-encoded .sia file.
 
-#### /renter/upload/<path> [POST]
+#### /renter/upload/{path} [POST]
 
 Function: Uploads a file.
 
@@ -710,6 +712,68 @@ source   string
 'source' is the path to the file to be uploaded.
 
 Response: standard.
+
+#### /renter/hosts/active [GET]
+
+Function: Lists all of the active hosts known to the renter.
+
+Parameters: none
+
+Response:
+```
+struct {
+	hosts []struct {
+		ipaddress    string
+		totalstorage int64
+		minduration  types.BlockHeight (uint64)
+		maxduration  types.BlockHeight (uint64)
+		windowsize   types.BlockHeight (uint64)
+		price        types.Currency    (string)
+		collateral   types.Currency    (string)
+		unlockhash   types.UnlockHash  (string)
+	}
+}
+```
+See /renter/hosts/active for a description of each field.
+
+#### /renter/hosts/all [GET]
+
+Function: Lists all of the hosts known to the renter.
+
+Parameters: none
+
+Response:
+```
+struct {
+	hosts []struct {
+		ipaddress    string
+		totalstorage int64
+		minduration  types.BlockHeight (uint64)
+		maxduration  types.BlockHeight (uint64)
+		windowsize   types.BlockHeight (uint64)
+		price        types.Currency    (string)
+		collateral   types.Currency    (string)
+		unlockhash   types.UnlockHash  (string)
+	}
+}
+```
+'ipaddress' is the IP address of the host.
+
+'totalstorage' is the amount of storage advertised by the host.
+
+'minduration' is the minimum acceptable contract duration required by the host.
+
+'maxduration' is the maximum acceptable contract duration required by the host.
+
+'windowsize' is the minimum acceptable storage proof window size required by
+the host.
+
+'price' is the cost of storing data with the host, in hastings/byte/block.
+
+'collateral' is the collateral supplied by the host when storing data, in
+hastings/byte/block.
+
+'unlockhash' is the coin address of the host.
 
 Transaction Pool
 ----------------
@@ -751,9 +815,9 @@ Queries:
 * /wallet/siacoins             [POST]
 * /wallet/siafunds             [POST]
 * /wallet/siagkey              [POST]
-* /wallet/transaction/<id>     [GET]
+* /wallet/transaction/{id}     [GET]
 * /wallet/transactions         [GET]
-* /wallet/transactions/<addr>  [GET]
+* /wallet/transactions/{addr}  [GET]
 * /wallet/unlock               [POST]
 
 The first time that the wallet is ever created, the wallet will be unencrypted
@@ -1067,7 +1131,7 @@ Parameters: none
 
 Response: standard.
 
-#### /wallet/transaction/<id> [GET]
+#### /wallet/transaction/{id} [GET]
 
 Function: Get the transaction associated with a specific transaction id.
 
@@ -1201,7 +1265,7 @@ height 'startheight' and height 'endheight' (inclusive).
 
 'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
-#### /wallet/transactions/<addr> [GET]
+#### /wallet/transactions/{addr} [GET]
 
 Function: Return all of the transaction related to a specific address.
 
@@ -1234,38 +1298,3 @@ encryptionpassword string
 frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
-
----
-
-HostDB
-------
-
-Queries:
-
-* /hostdb/hosts/active
-* /hostdb/hosts/all
-
-#### /hostdb/hosts/active
-
-Function: Lists all of the active hosts in the hostdb.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Hosts []HostSettings
-```
-
-#### /hostdb/hosts/all
-
-Function: Lists all of the hosts in the hostdb.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Hosts []HostSettings
-}
-```
