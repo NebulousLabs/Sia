@@ -369,7 +369,7 @@ blocks, though in theory something as low as 6 blocks could be safe.
 
 'revenue' is the total number of Hastings earned from hosting.
 
-'storageremaining' is 'TotalStorage' minus the number of bytes currently being
+'storageremaining' is 'totalstorage' minus the number of bytes currently being
 stored.
 
 'upcomingrevenue' is the value of the contracts that have been created but not
@@ -522,6 +522,8 @@ Queries:
 * /renter/share/<path>      [GET]
 * /renter/shareascii/<path> [GET]
 * /renter/upload/<path>     [POST]
+* /renter/hosts/active      [GET]
+* /renter/hosts/all         [GET]
 
 #### /renter/downloadqueue [GET]
 
@@ -710,6 +712,68 @@ source   string
 'source' is the path to the file to be uploaded.
 
 Response: standard.
+
+#### /renter/hosts/active [GET]
+
+Function: Lists all of the active hosts known to the renter.
+
+Parameters: none
+
+Response:
+```
+struct {
+	hosts []struct {
+		ipaddress    string
+		totalstorage int64
+		minduration  types.BlockHeight (uint64)
+		maxduration  types.BlockHeight (uint64)
+		windowsize   types.BlockHeight (uint64)
+		price        types.Currency    (string)
+		collateral   types.Currency    (string)
+		unlockhash   types.UnlockHash  (string)
+	}
+}
+```
+See /renter/hosts/active for a description of each field.
+
+#### /renter/hosts/all [GET]
+
+Function: Lists all of the hosts known to the renter.
+
+Parameters: none
+
+Response:
+```
+struct {
+	hosts []struct {
+		ipaddress    string
+		totalstorage int64
+		minduration  types.BlockHeight (uint64)
+		maxduration  types.BlockHeight (uint64)
+		windowsize   types.BlockHeight (uint64)
+		price        types.Currency    (string)
+		collateral   types.Currency    (string)
+		unlockhash   types.UnlockHash  (string)
+	}
+}
+```
+'ipaddress' is the IP address of the host.
+
+'totalstorage' is the amount of storage advertised by the host.
+
+'minduration' is the minimum acceptable contract duration required by the host.
+
+'maxduration' is the maximum acceptable contract duration required by the host.
+
+'windowsize' is the minimum acceptable storage proof window size required by
+the host.
+
+'price' is the cost of storing data with the host, in hastings/byte/block.
+
+'collateral' is the collateral supplied by the host when storing data, in
+hastings/byte/block.
+
+'unlockhash' is the coin address of the host.
 
 Transaction Pool
 ----------------
@@ -1234,38 +1298,3 @@ encryptionpassword string
 frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
-
----
-
-HostDB
-------
-
-Queries:
-
-* /hostdb/hosts/active
-* /hostdb/hosts/all
-
-#### /hostdb/hosts/active
-
-Function: Lists all of the active hosts in the hostdb.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Hosts []HostSettings
-```
-
-#### /hostdb/hosts/all
-
-Function: Lists all of the hosts in the hostdb.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Hosts []HostSettings
-}
-```

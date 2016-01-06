@@ -52,14 +52,14 @@ type (
 	// values that the renter will request from the host in order to build its
 	// database.
 	HostSettings struct {
-		IPAddress    NetAddress
-		TotalStorage int64 // Can go negative.
-		MinDuration  types.BlockHeight
-		MaxDuration  types.BlockHeight
-		WindowSize   types.BlockHeight
-		Price        types.Currency
-		Collateral   types.Currency
-		UnlockHash   types.UnlockHash
+		IPAddress    NetAddress        `json:"ipaddress"`
+		TotalStorage int64             `json:"totalstorage"`
+		MinDuration  types.BlockHeight `json:"minduration"`
+		MaxDuration  types.BlockHeight `json:"maxduration"`
+		WindowSize   types.BlockHeight `json:"windowsize"`
+		Price        types.Currency    `json:"price"`
+		Collateral   types.Currency    `json:"collateral"`
+		UnlockHash   types.UnlockHash  `json:"unlockhash"`
 	}
 
 	// Host can take storage from disk and offer it to the network, managing things
