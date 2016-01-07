@@ -25,20 +25,9 @@ func TestIntegrationHosting(t *testing.T) {
 	defer st.server.Close()
 
 	// Announce the host.
-	announceValues := url.Values{}
-	announceValues.Set("address", string(st.host.NetAddress()))
-	err = st.stdPostAPI("/host/announce", announceValues)
+	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// mine block and wait for announcement to register
-	st.miner.AddBlock()
-	var hosts ActiveHosts
-	time.Sleep(1 * time.Second)
-	st.getAPI("/renter/hosts/active", &hosts)
-	if len(hosts.Hosts) == 0 {
-		t.Fatal("host announcement not seen")
 	}
 
 	// create a file
@@ -98,20 +87,9 @@ func TestIntegrationRenewing(t *testing.T) {
 	defer st.server.Close()
 
 	// Announce the host.
-	announceValues := url.Values{}
-	announceValues.Set("address", string(st.host.NetAddress()))
-	err = st.stdPostAPI("/host/announce", announceValues)
+	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// mine block and wait for announcement to register
-	st.miner.AddBlock()
-	var hosts ActiveHosts
-	time.Sleep(1 * time.Second)
-	st.getAPI("/renter/hosts/active", &hosts)
-	if len(hosts.Hosts) == 0 {
-		t.Fatal("host announcement not seen")
 	}
 
 	// create a file
