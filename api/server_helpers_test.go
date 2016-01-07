@@ -243,9 +243,13 @@ func (st *serverTester) announceHost() error {
 	}
 	// mine block
 	st.miner.AddBlock()
+	// wait for announcement
 	var hosts ActiveHosts
-	time.Sleep(1 * time.Second)
 	st.getAPI("/renter/hosts/active", &hosts)
+	for i := 0; i < 20 && len(hosts.Hosts) == 0; i++ {
+		time.Sleep(100 * time.Millisecond)
+		st.getAPI("/renter/hosts/active", &hosts)
+	}
 	if len(hosts.Hosts) == 0 {
 		return errors.New("host announcement not seen")
 	}
