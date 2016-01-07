@@ -1,14 +1,12 @@
 package api
 
 import (
-	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -32,11 +30,7 @@ func TestIntegrationHosting(t *testing.T) {
 
 	// create a file
 	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationHosting", "test.dat")
-	data, err := crypto.RandBytes(1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(path, data, 0600)
+	err = createRandFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,11 +88,7 @@ func TestIntegrationRenewing(t *testing.T) {
 
 	// create a file
 	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationRenewing", "test.dat")
-	data, err := crypto.RandBytes(1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(path, data, 0600)
+	err = createRandFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

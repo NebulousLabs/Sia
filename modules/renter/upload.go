@@ -35,6 +35,8 @@ var defaultDuration = func() types.BlockHeight {
 	}
 }()
 
+var ErrDuplicateNickname = errors.New("file with that nickname already exists")
+
 // checkWalletBalance looks at an upload and determines if there is enough
 // money in the wallet to support such an upload. An error is returned if it is
 // determined that there is not enough money.
@@ -65,7 +67,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	_, exists := r.files[up.Nickname]
 	r.mu.RUnlock(lockID)
 	if exists {
-		return errors.New("file with that nickname already exists")
+		return ErrDuplicateNickname
 	}
 
 	// Fill in any missing upload params with sensible defaults.
