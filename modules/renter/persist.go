@@ -202,32 +202,37 @@ func (r *Renter) save() error {
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	// Load all files found in renter directory.
-	dir, err := os.Open(r.persistDir) // TODO: store in a subdir?
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	filenames, err := dir.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-	for _, path := range filenames {
-		// Skip non-sia files.
-		if filepath.Ext(path) != ShareExtension {
-			continue
-		}
-		file, err := os.Open(filepath.Join(r.persistDir, path))
+	// Recursively load all files found in renter directory. Errors
+	// encountered during loading are logged, but are not considered fatal.
+	err := filepath.Walk(r.persistDir, func(path string, info os.FileInfo, err error) error {
+		// These errors should be considered fatal.
 		if err != nil {
-			// maybe just skip?
 			return err
 		}
+
+		// Skip folders and non-sia files.
+		if info.IsDir() || filepath.Ext(path) != ShareExtension {
+			return nil
+		}
+
+		// Open the file.
+		file, err := os.Open(path)
+		if err != nil {
+			r.log.Println("ERROR: could not open .sia file:", err)
+			return nil
+		}
+		defer file.Close()
+
+		// Load the file contents into the renter.
 		_, err = r.loadSharedFiles(file)
-		file.Close() // defer is probably a bad idea
 		if err != nil {
-			// maybe just skip?
-			return err
+			r.log.Println("ERROR: could not load .sia file:", err)
+			return nil
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// Load contracts, repair set, and entropy.
