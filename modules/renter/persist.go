@@ -205,7 +205,8 @@ func (r *Renter) load() error {
 	// Recursively load all files found in renter directory. Errors
 	// encountered during loading are logged, but are not considered fatal.
 	err := filepath.Walk(r.persistDir, func(path string, info os.FileInfo, err error) error {
-		// These errors should be considered fatal.
+		// This error is non-nil if filepath.Walk couldn't stat a file or
+		// folder. This generally indicates a serious error.
 		if err != nil {
 			return err
 		}
