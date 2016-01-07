@@ -127,7 +127,7 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 // renterShareAsciiHandler handles the API call to return a '.sia' file
 // in ascii form.
 func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	ascii, err := srv.renter.ShareFilesAscii([]string{ps.ByName("path")})
+	ascii, err := srv.renter.ShareFilesAscii(strings.Split(req.FormValue("path"), ","))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
