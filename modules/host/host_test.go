@@ -124,6 +124,9 @@ func newHostTester(name string) (*hostTester, error) {
 // TestHostInitialization checks that the host intializes to sensisble default
 // values.
 func TestHostInitialization(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a blank host tester and check that the height is zero.
 	bht, err := blankHostTester("TestHostInitialization")
 	if err != nil {
