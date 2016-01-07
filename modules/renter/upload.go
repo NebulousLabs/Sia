@@ -3,6 +3,7 @@ package renter
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -62,6 +63,11 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // Upload instructs the renter to start tracking a file. The renter will
 // automatically upload and repair tracked files using a background loop.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
+	// Enforce nickname rules.
+	if strings.HasPrefix(up.Nickname, "/") {
+		return errors.New("nicknames cannot begin with /")
+	}
+
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
 	_, exists := r.files[up.Nickname]
