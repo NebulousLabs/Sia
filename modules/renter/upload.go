@@ -68,16 +68,11 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return errors.New("file with that nickname already exists")
 	}
 
-	// Stat the file.
+	// Fill in any missing upload params with sensible defaults.
 	fileInfo, err := os.Stat(up.Filename)
 	if err != nil {
 		return err
 	}
-	if fileInfo.Size() == 0 {
-		return errors.New("cannot upload empty file")
-	}
-
-	// Fill in any missing upload params with sensible defaults.
 	if up.Duration == 0 {
 		up.Duration = defaultDuration
 	}
