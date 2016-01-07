@@ -159,6 +159,13 @@ func (f *file) load(r io.Reader) error {
 
 // saveFile saves a file to the renter directory.
 func (r *Renter) saveFile(f *file) error {
+	// Create directory structure specified in nickname.
+	fullPath := filepath.Join(r.persistDir, f.name+ShareExtension)
+	err := os.MkdirAll(filepath.Dir(fullPath), 0700)
+	if err != nil {
+		return err
+	}
+
 	handle, err := persist.NewSafeFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
 		return err
