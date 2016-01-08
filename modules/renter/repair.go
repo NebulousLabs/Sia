@@ -193,6 +193,9 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	// considered offline if it is in AllHosts but not ActiveHosts. For good
 	// order notation, we covert AllHosts and ActiveHosts to a single map. The
 	// map lookup will return true if the host was in ActiveHosts.
+	//
+	// TODO: once the hostdb is persistent, checking for existence in
+	// ActiveHosts should be sufficient.
 	hostSet := make(map[modules.NetAddress]bool)
 	for _, host := range hdb.AllHosts() {
 		hostSet[host.IPAddress] = false
