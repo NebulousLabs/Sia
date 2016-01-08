@@ -3,11 +3,13 @@ package renter
 import (
 	"bytes"
 	"crypto/rand"
+	"reflect"
 	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestRepair tests that the repair method can repeatedly improve the
@@ -66,5 +68,75 @@ func TestRepair(t *testing.T) {
 	}
 	if !f.available() {
 		t.Fatalf("file not repaired to availability after %v attempts: %v", maxAttempts, err)
+	}
+}
+
+// offlineHostDB is a mocked hostDB, used for testing the offlineChunks method
+// of the file type. It is implemented as a map from NetAddresses to booleans,
+// where the bool indicates whether the host is active.
+type offlineHostDB map[modules.NetAddress]bool
+
+// ActiveHosts returns the set of hosts marked active in the offlineHostDB.
+func (hdb offlineHostDB) ActiveHosts() (hosts []modules.HostSettings) {
+	for addr, active := range hdb {
+		if active {
+			hosts = append(hosts, modules.HostSettings{IPAddress: addr})
+		}
+	}
+	return
+}
+
+// AllHosts returns the entire contents of the offlineHostDB.
+func (hdb offlineHostDB) AllHosts() (hosts []modules.HostSettings) {
+	for addr := range hdb {
+		hosts = append(hosts, modules.HostSettings{IPAddress: addr})
+	}
+	return
+}
+
+// AveragePrice is a stub implementation of the AveragePrice method.
+func (hdb offlineHostDB) AveragePrice() types.Currency {
+	return types.Currency{}
+}
+
+// NewPool is a stub implementation of the NewPool method.
+func (hdb offlineHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) {
+	return nil, nil
+}
+
+// Renew is a stub implementation of the Renew method.
+func (hdb offlineHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
+	return types.FileContractID{}, nil
+}
+
+// TestOfflineChunks tests the offlineChunks method of the file type.
+func TestOfflineChunks(t *testing.T) {
+	// Create a mock hostdb.
+	hdb := &offlineHostDB{
+		"foo": false,
+		"bar": false,
+		"baz": true,
+	}
+	rsc, _ := NewRSCode(1, 1)
+	f := &file{
+		erasureCode: rsc,
+		contracts: map[types.FileContractID]fileContract{
+			{0}: {IP: "foo", Pieces: []pieceData{{0, 0, 0}, {1, 0, 0}}},
+			{1}: {IP: "bar", Pieces: []pieceData{{0, 1, 0}}},
+			{2}: {IP: "baz", Pieces: []pieceData{{1, 1, 0}}},
+		},
+	}
+
+	// pieces 0.0, 0.1, and 1.0 are offline. Since redundancy is 1,
+	// offlineChunks should report only chunk 0 as needing repair.
+	expChunks := map[uint64][]uint64{
+		0: {0, 1},
+	}
+	chunks := f.offlineChunks(hdb)
+	if !reflect.DeepEqual(chunks, expChunks) {
+		// pieces may have been in a different order
+		if !reflect.DeepEqual(chunks, map[uint64][]uint64{0: {1, 0}}) {
+			t.Fatalf("offlineChunks did not return correct chunks: expected %v, got %v", expChunks, chunks)
+		}
 	}
 }
