@@ -148,10 +148,12 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 	delete(r.files, nickname)
 
-	os.Remove(filepath.Join(r.persistDir, f.name+ShareExtension))
+	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+	if err != nil {
+		return err
+	}
 
-	r.save()
-	return nil
+	return r.save()
 }
 
 // FileList returns all of the files that the renter has.
@@ -192,13 +194,25 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Modify the file and save it to disk.
 	file.mu.Lock()
 	file.name = newName
-	r.saveFile(file)
+	err := r.saveFile(file)
 	file.mu.Unlock()
+	if err != nil {
+		return err
+	}
 
 	// Update the entries in the renter.
 	delete(r.files, currentName)
 	r.files[newName] = file
-	r.save()
+	err = r.save()
+	if err != nil {
+		return err
+	}
 
-	return nil
+	// Delete the old .sia file.
+	// NOTE: proper error handling is difficult here. For example, if the
+	// removal fails, should the entry in r.files be preserved? For now we will
+	// keep things simple, but it is important that our approach feels
+	// intuitive/unsurprising and doesn't put the user's data at risk.
+	oldPath := filepath.Join(r.persistDir, currentName+ShareExtension)
+	return os.RemoveAll(oldPath)
 }
