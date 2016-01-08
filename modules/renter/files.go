@@ -176,30 +176,29 @@ func (r *Renter) FileList() []modules.FileInfo {
 // file must exist, and there must not be any file that already has the
 // replacement nickname.
 func (r *Renter) RenameFile(currentName, newName string) error {
-	return errors.New("renaming is disabled")
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
 
-	/*
-		lockID := r.mu.Lock()
-		defer r.mu.Unlock(lockID)
+	// Check that currentName exists and newName doesn't.
+	file, exists := r.files[currentName]
+	if !exists {
+		return ErrUnknownNickname
+	}
+	_, exists = r.files[newName]
+	if exists {
+		return ErrNicknameOverload
+	}
 
-		// Check that the currentName exists and the newName doesn't.
-		file, exists := r.files[currentName]
-		if !exists {
-			return ErrUnknownNickname
-		}
-		_, exists = r.files[newName]
-		if exists {
-			return ErrNicknameOverload
-		}
+	// Modify the file and save it to disk.
+	file.mu.Lock()
+	file.name = newName
+	r.saveFile(file)
+	file.mu.Unlock()
 
-		// Do the renaming.
-		file.name = newName
-		r.saveFile(file)
-		delete(r.files, currentName)
-		r.files[newName] = file
+	// Update the entries in the renter.
+	delete(r.files, currentName)
+	r.files[newName] = file
+	r.save()
 
-		r.save()
-		return nil
-
-	*/
+	return nil
 }
