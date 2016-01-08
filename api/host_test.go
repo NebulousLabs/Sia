@@ -1,14 +1,12 @@
 package api
 
 import (
-	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -25,29 +23,14 @@ func TestIntegrationHosting(t *testing.T) {
 	defer st.server.Close()
 
 	// Announce the host.
-	announceValues := url.Values{}
-	announceValues.Set("address", string(st.host.NetAddress()))
-	err = st.stdPostAPI("/host/announce", announceValues)
+	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// mine block and wait for announcement to register
-	st.miner.AddBlock()
-	var hosts ActiveHosts
-	time.Sleep(1 * time.Second)
-	st.getAPI("/renter/hosts/active", &hosts)
-	if len(hosts.Hosts) == 0 {
-		t.Fatal("host announcement not seen")
 	}
 
 	// create a file
 	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationHosting", "test.dat")
-	data, err := crypto.RandBytes(1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(path, data, 0600)
+	err = createRandFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,29 +81,14 @@ func TestIntegrationRenewing(t *testing.T) {
 	defer st.server.Close()
 
 	// Announce the host.
-	announceValues := url.Values{}
-	announceValues.Set("address", string(st.host.NetAddress()))
-	err = st.stdPostAPI("/host/announce", announceValues)
+	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// mine block and wait for announcement to register
-	st.miner.AddBlock()
-	var hosts ActiveHosts
-	time.Sleep(1 * time.Second)
-	st.getAPI("/renter/hosts/active", &hosts)
-	if len(hosts.Hosts) == 0 {
-		t.Fatal("host announcement not seen")
 	}
 
 	// create a file
 	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationRenewing", "test.dat")
-	data, err := crypto.RandBytes(1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(path, data, 0600)
+	err = createRandFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -229,6 +230,30 @@ func (st *serverTester) coinAddress() string {
 	}
 	st.getAPI("/wallet/address", &addr)
 	return addr.Address
+}
+
+// announceHost announces the host, mines a block, and waits for the
+// announcement to register.
+func (st *serverTester) announceHost() error {
+	announceValues := url.Values{}
+	announceValues.Set("address", string(st.host.NetAddress()))
+	err := st.stdPostAPI("/host/announce", announceValues)
+	if err != nil {
+		return err
+	}
+	// mine block
+	st.miner.AddBlock()
+	// wait for announcement
+	var hosts ActiveHosts
+	st.getAPI("/renter/hosts/active", &hosts)
+	for i := 0; i < 20 && len(hosts.Hosts) == 0; i++ {
+		time.Sleep(100 * time.Millisecond)
+		st.getAPI("/renter/hosts/active", &hosts)
+	}
+	if len(hosts.Hosts) == 0 {
+		return errors.New("host announcement not seen")
+	}
+	return nil
 }
 
 // getAPI makes an API call and decodes the response.

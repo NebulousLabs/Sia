@@ -734,7 +734,7 @@ struct {
 	}
 }
 ```
-See /renter/hosts/active for a description of each field.
+See /renter/hosts/all for a description of each field.
 
 #### /renter/hosts/all [GET]
 

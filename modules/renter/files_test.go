@@ -6,6 +6,33 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestFileNumChunks checks the numChunks method of the file type.
+func TestFileNumChunks(t *testing.T) {
+	tests := []struct {
+		size           uint64
+		pieceSize      uint64
+		piecesPerChunk int
+		expNumChunks   uint64
+	}{
+		{100, 10, 1, 10}, // evenly divides
+		{100, 10, 2, 5},  // evenly divides
+
+		{101, 10, 1, 11}, // padded
+		{101, 10, 2, 6},  // padded
+
+		{10, 100, 1, 1}, // larger piece than file
+		{0, 10, 1, 1},   // 0-length
+	}
+
+	for _, test := range tests {
+		rsc, _ := NewRSCode(test.piecesPerChunk, 1) // can't use 0
+		f := &file{size: test.size, erasureCode: rsc, pieceSize: test.pieceSize}
+		if f.numChunks() != test.expNumChunks {
+			t.Errorf("Test %v: expected %v, got %v", test, test.expNumChunks, f.numChunks())
+		}
+	}
+}
+
 // TestFileAvailable probes the available method of the file type.
 func TestFileAvailable(t *testing.T) {
 	rsc, _ := NewRSCode(1, 10)

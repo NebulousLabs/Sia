@@ -92,7 +92,7 @@ func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request, 
 // renterDeleteHander handles the API call to delete a file entry from the
 // renter.
 func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.DeleteFile(ps.ByName("path"))
+	err := srv.renter.DeleteFile(strings.TrimPrefix(ps.ByName("path"), "/"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -103,7 +103,7 @@ func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request,
 
 // renterDownloadHandler handles the API call to download a file.
 func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.Download(ps.ByName("path"), req.FormValue("destination"))
+	err := srv.renter.Download(strings.TrimPrefix(ps.ByName("path"), "/"), req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -127,7 +127,7 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 // renterShareAsciiHandler handles the API call to return a '.sia' file
 // in ascii form.
 func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	ascii, err := srv.renter.ShareFilesAscii([]string{ps.ByName("path")})
+	ascii, err := srv.renter.ShareFilesAscii(strings.Split(req.FormValue("path"), ","))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -150,7 +150,7 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 	renew := req.FormValue("renew") == "true"
 	err := srv.renter.Upload(modules.FileUploadParams{
 		Filename: req.FormValue("source"),
-		Nickname: ps.ByName("path"),
+		Nickname: strings.TrimPrefix(ps.ByName("path"), "/"),
 		Duration: duration,
 		Renew:    renew,
 		// let the renter decide these values; eventually they will be configurable

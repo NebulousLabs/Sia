@@ -161,3 +161,68 @@ func TestRenterSaveLoad(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+// TestRenterPaths checks that the renter properly handles nicknames
+// containing the path separator ("/").
+func TestRenterPaths(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester("TestRenterPaths")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Create and save some files.
+	// The result of saving these files should be a directory containing:
+	//   foo.sia
+	//   foo/bar.sia
+	//   foo/bar/baz.sia
+	f1 := newTestingFile()
+	f1.name = "foo"
+	f2 := newTestingFile()
+	f2.name = "foo/bar"
+	f3 := newTestingFile()
+	f3.name = "foo/bar/baz"
+	rt.renter.saveFile(f1)
+	rt.renter.saveFile(f2)
+	rt.renter.saveFile(f3)
+
+	// Load the files into the renter.
+	id := rt.renter.mu.Lock()
+	err = rt.renter.load()
+	rt.renter.mu.Unlock(id)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	// Check that the files were loaded properly.
+	if err := equalFiles(f1, rt.renter.files[f1.name]); err != nil {
+		t.Fatal(err)
+	}
+	if err := equalFiles(f2, rt.renter.files[f2.name]); err != nil {
+		t.Fatal(err)
+	}
+	if err := equalFiles(f3, rt.renter.files[f3.name]); err != nil {
+		t.Fatal(err)
+	}
+
+	// To confirm that the file structure was preserved, we walk the renter
+	// folder and emit the name of each .sia file encountered (filepath.Walk
+	// is deterministic; it orders the files lexically).
+	var walkStr string
+	filepath.Walk(rt.renter.persistDir, func(path string, _ os.FileInfo, _ error) error {
+		// capture only .sia files
+		if filepath.Ext(path) != ".sia" {
+			return nil
+		}
+		rel, _ := filepath.Rel(rt.renter.persistDir, path) // strip testdir prefix
+		walkStr += rel
+		return nil
+	})
+	// walk will descend into foo/bar/, reading baz, bar, and finally foo
+	expWalkStr := (f3.name + ".sia") + (f2.name + ".sia") + (f1.name + ".sia")
+	if walkStr != expWalkStr {
+		t.Fatalf("Bad walk string: expected %v, got %v", expWalkStr, walkStr)
+	}
+}

@@ -62,7 +62,12 @@ func (f *file) chunkSize() uint64 {
 
 // numChunks returns the number of chunks that f was split into.
 func (f *file) numChunks() uint64 {
+	// empty files still need at least one chunk
+	if f.size == 0 {
+		return 1
+	}
 	n := f.size / f.chunkSize()
+	// last chunk will be padded, unless chunkSize divides file evenly.
 	if f.size%f.chunkSize() != 0 {
 		n++
 	}
