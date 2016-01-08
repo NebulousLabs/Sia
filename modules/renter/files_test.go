@@ -1,6 +1,8 @@
 package renter
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -140,6 +142,21 @@ func TestRenterDeleteFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// Check that all .sia files have been deleted.
+	var walkStr string
+	filepath.Walk(rt.renter.persistDir, func(path string, _ os.FileInfo, _ error) error {
+		// capture only .sia files
+		if filepath.Ext(path) == ".sia" {
+			rel, _ := filepath.Rel(rt.renter.persistDir, path) // strip testdir prefix
+			walkStr += rel
+		}
+		return nil
+	})
+	expWalkStr := ""
+	if walkStr != expWalkStr {
+		t.Fatalf("Bad walk string: expected %q, got %q", expWalkStr, walkStr)
+	}
 }
 
 // TestRenterFileList probes the FileList method of the renter type.
@@ -227,16 +244,10 @@ func TestRenterRenameFile(t *testing.T) {
 	if err != ErrNicknameOverload {
 		t.Error("Expecting ErrNicknameOverload, got", err)
 	}
-	if files[0].Nickname != "1a" {
-		t.Error("Rename altered another file's memory: expected 1a, got", files[0].Nickname)
-	}
 
 	// Rename a file to the same name.
 	err = rt.renter.RenameFile("1", "1")
 	if err != ErrNicknameOverload {
 		t.Error("Expecting ErrNicknameOverload, got", err)
-	}
-	if files[0].Nickname != "1a" {
-		t.Error("Rename altered another file's memory: expected 1a, got", files[0].Nickname)
 	}
 }
