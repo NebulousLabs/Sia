@@ -68,18 +68,14 @@ func (srv *Server) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Reque
 
 // renterRenameHandler handles the API call to rename a file entry in the
 // renter.
-func (srv *Server) renterRenameHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeError(w, "renaming temporarily disabled", http.StatusBadRequest)
+func (srv *Server) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	err := srv.renter.RenameFile(strings.TrimPrefix(ps.ByName("path"), "/"), req.FormValue("newname"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	/*
-		err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
-		if err != nil {
-			writeError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		writeSuccess(w)
-	*/
+	writeSuccess(w)
 }
 
 // renterFilesHandler handles the API call to list all of the files.

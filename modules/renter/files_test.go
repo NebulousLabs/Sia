@@ -1,6 +1,8 @@
 package renter
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -114,7 +116,7 @@ func TestRenterDeleteFile(t *testing.T) {
 	// Delete a different file.
 	err = rt.renter.DeleteFile("one")
 	if err != ErrUnknownNickname {
-		t.Error("Expected ErrUnknownNickname:", err)
+		t.Error("Expected ErrUnknownNickname, got", err)
 	}
 	// Delete the file.
 	err = rt.renter.DeleteFile("1")
@@ -125,23 +127,36 @@ func TestRenterDeleteFile(t *testing.T) {
 		t.Error("file was deleted, but is still reported in FileList")
 	}
 
-	/*
-		// Put a file in the renter, then rename it.
-		rt.renter.files["1"] = &file{
-			name: "one",
+	// Put a file in the renter, then rename it.
+	f := newTestingFile()
+	f.name = "1"
+	rt.renter.files[f.name] = f
+	rt.renter.RenameFile(f.name, "one")
+	// Call delete on the previous name.
+	err = rt.renter.DeleteFile("1")
+	if err != ErrUnknownNickname {
+		t.Error("Expected ErrUnknownNickname, got", err)
+	}
+	// Call delete on the new name.
+	err = rt.renter.DeleteFile("one")
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Check that all .sia files have been deleted.
+	var walkStr string
+	filepath.Walk(rt.renter.persistDir, func(path string, _ os.FileInfo, _ error) error {
+		// capture only .sia files
+		if filepath.Ext(path) == ".sia" {
+			rel, _ := filepath.Rel(rt.renter.persistDir, path) // strip testdir prefix
+			walkStr += rel
 		}
-		rt.renter.RenameFile("1", "one")
-		// Call delete on the previous name.
-		err = rt.renter.DeleteFile("1")
-		if err != ErrUnknownNickname {
-			t.Error("Expected ErrUnknownNickname:", err)
-		}
-		// Call delete on the new name.
-		err = rt.renter.DeleteFile("one")
-		if err != nil {
-			t.Error(err)
-		}
-	*/
+		return nil
+	})
+	expWalkStr := ""
+	if walkStr != expWalkStr {
+		t.Fatalf("Bad walk string: expected %q, got %q", expWalkStr, walkStr)
+	}
 }
 
 // TestRenterFileList probes the FileList method of the renter type.
@@ -193,8 +208,6 @@ func TestRenterFileList(t *testing.T) {
 
 // TestRenterRenameFile probes the rename method of the renter.
 func TestRenterRenameFile(t *testing.T) {
-	t.Skip("Renaming disabled")
-
 	rt, err := newRenterTester("TestRenterRenameFile")
 	if err != nil {
 		t.Fatal(err)
@@ -208,39 +221,33 @@ func TestRenterRenameFile(t *testing.T) {
 	}
 
 	// Rename a file that does exist.
-	rt.renter.files["1"] = &file{
-		name: "1",
-	}
-	files := rt.renter.FileList()
+	f := newTestingFile()
+	f.name = "1"
+	rt.renter.files["1"] = f
 	err = rt.renter.RenameFile("1", "1a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rt.renter.FileList()) != 1 {
-		t.Fatal("FileList has unexpected number of files:", len(rt.renter.FileList()))
+	files := rt.renter.FileList()
+	if len(files) != 1 {
+		t.Fatal("FileList has unexpected number of files:", len(files))
 	}
 	if files[0].Nickname != "1a" {
-		t.Error("RenameFile failed, new file nickname is not what is expected.")
+		t.Errorf("RenameFile failed: expected 1a, got %v", files[0].Nickname)
 	}
 
 	// Rename a file to an existing name.
-	rt.renter.files["1"] = &file{
-		name: "1",
-	}
+	f2 := newTestingFile()
+	f2.name = "1"
+	rt.renter.files["1"] = f2
 	err = rt.renter.RenameFile("1", "1a")
 	if err != ErrNicknameOverload {
-		t.Error("Expecting ErrNicknameOverload:", err)
-	}
-	if files[0].Nickname != "1a" {
-		t.Error("Side effect occured during rename:", files[0].Nickname)
+		t.Error("Expecting ErrNicknameOverload, got", err)
 	}
 
 	// Rename a file to the same name.
 	err = rt.renter.RenameFile("1", "1")
 	if err != ErrNicknameOverload {
-		t.Error("Expecting ErrNicknameOverload:", err)
-	}
-	if files[0].Nickname != "1a" {
-		t.Error("Side effect occured during rename:", files[0].Nickname)
+		t.Error("Expecting ErrNicknameOverload, got", err)
 	}
 }
