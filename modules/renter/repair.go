@@ -294,7 +294,9 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	}
 
 	// save the repaired file data
+	f.mu.RLock()
 	err = r.saveFile(f)
+	f.mu.RUnlock()
 	if err != nil {
 		// definitely bad, but we probably shouldn't delete from the
 		// repair set if this happens
