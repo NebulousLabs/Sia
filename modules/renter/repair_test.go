@@ -128,6 +128,9 @@ func TestOfflineChunks(t *testing.T) {
 	}
 	chunks := f.offlineChunks(hdb)
 	if !reflect.DeepEqual(chunks, expChunks) {
-		t.Fatalf("offlineChunks did not return correct chunks: expected %v, got %v", expChunks, chunks)
+		// pieces may have been in a different order
+		if !reflect.DeepEqual(chunks, map[uint64][]uint64{0: {1, 0}}) {
+			t.Fatalf("offlineChunks did not return correct chunks: expected %v, got %v", expChunks, chunks)
+		}
 	}
 }
