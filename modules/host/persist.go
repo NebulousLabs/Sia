@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -25,19 +26,22 @@ var persistMetadata = persist.Metadata{
 
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
-	// Host Context.
+	// Consensus Tracking.
 	BlockHeight  types.BlockHeight
 	RecentChange modules.ConsensusChangeID
-	PublicKey    types.SiaPublicKey
-	SecretKey    crypto.SecretKey
-	Settings     modules.HostSettings
+
+	// Host Identity.
+	NetAddress modules.NetAddress
+	PublicKey  types.SiaPublicKey
+	SecretKey  crypto.SecretKey
 
 	// File Management.
-	FileCounter int64
 	Obligations []*contractObligation
 
 	// Statistics.
-	Revenue types.Currency
+	FileCounter int64
+	LostRevenue types.Currency
+	Revenue     types.Currency
 
 	// RPC Tracking.
 	ErroredCalls   uint64
@@ -47,6 +51,9 @@ type persistence struct {
 	ReviseCalls    uint64
 	SettingsCalls  uint64
 	UploadCalls    uint64
+
+	// Utilities.
+	Settings modules.HostSettings
 }
 
 // getObligations returns a slice containing all of the contract obligations
@@ -62,17 +69,24 @@ func (h *Host) getObligations() []*contractObligation {
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
 	p := persistence{
+		// Consensus Tracking.
 		BlockHeight:  h.blockHeight,
 		RecentChange: h.recentChange,
-		PublicKey:    h.publicKey,
-		SecretKey:    h.secretKey,
-		Settings:     h.settings,
 
-		FileCounter: h.fileCounter,
+		// Host Identity.
+		NetAddress: h.netAddress,
+		PublicKey:  h.publicKey,
+		SecretKey:  h.secretKey,
+
+		// File Management.
 		Obligations: h.getObligations(),
 
-		Revenue: h.revenue,
+		// Statistics.
+		FileCounter: h.fileCounter,
+		LostRevenue: h.lostRevenue,
+		Revenue:     h.revenue,
 
+		// RPC Tracking.
 		ErroredCalls:   atomic.LoadUint64(&h.atomicErroredCalls),
 		MalformedCalls: atomic.LoadUint64(&h.atomicMalformedCalls),
 		DownloadCalls:  atomic.LoadUint64(&h.atomicDownloadCalls),
@@ -80,6 +94,9 @@ func (h *Host) save() error {
 		ReviseCalls:    atomic.LoadUint64(&h.atomicReviseCalls),
 		SettingsCalls:  atomic.LoadUint64(&h.atomicSettingsCalls),
 		UploadCalls:    atomic.LoadUint64(&h.atomicUploadCalls),
+
+		// Utilities.
+		Settings: h.settings,
 	}
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
 }
@@ -92,45 +109,13 @@ func (h *Host) loadObligations(cos []*contractObligation) {
 		obligation := cos[i] // all objects should reference the same obligation
 		h.obligationsByID[obligation.ID] = obligation
 
-		// Check which action is relevant, and queue the obligation for
-		// inspection based on what needs to happen next.
-		if !obligation.OriginConfirmed || !obligation.RevisionConfirmed {
-			// The transaction that validates the obligation has not been
-			// sucessfully put on the blockchain. The status should be
-			// rechecked and the transaction resubmitted after 'resbumissionTimeout'
-			// blocks.
-			resubmissionBlock := h.blockHeight + resubmissionTimeout
-			h.actionItems[resubmissionBlock] = append(h.actionItems[resubmissionBlock], obligation)
-		} else if !obligation.ProofConfirmed {
-			// A storage proof for this file contract has not been sucessfully
-			// submitted to the blockchain.
-			originFC := obligation.OriginTxn.FileContracts[0]
-			revs := obligation.RevisionTxn.FileContractRevisions
-			proofHeight := originFC.WindowStart
-			if len(revs) > 0 && revs[0].NewWindowStart > proofHeight {
-				// Use the revision height if there is a revision that triggers
-				// at a later height.
-				proofHeight = revs[0].NewWindowStart
-			}
-			if h.blockHeight > proofHeight {
-				// Use the current height plus 1 if the current height is ahead
-				// of the window start.
-				proofHeight = h.blockHeight + 1
-			}
-			h.actionItems[proofHeight] = append(h.actionItems[proofHeight], obligation)
-		} else {
-			// A storage proof for this file has been sucessfully confirmed -
-			// wait out the confirmation requirement before deleting the
-			// contract.
-			purgeHeight := h.blockHeight + confirmationRequirement
-			h.actionItems[purgeHeight] = append(h.actionItems[purgeHeight], obligation)
-		}
-
-		// update spaceRemaining to account for the storage held by this
+		// Update spaceRemaining to account for the storage held by this
 		// obligation.
-		if len(obligation.RevisionTxn.FileContractRevisions) > 0 {
-			h.spaceRemaining -= int64(obligation.RevisionTxn.FileContractRevisions[0].NewFileSize)
-		}
+		h.spaceRemaining -= int64(obligation.fileSize())
+
+		// Update anticipated revenue to reflect the revenue in this file
+		// contract.
+		h.anticipatedRevenue = h.anticipatedRevenue.Add(obligation.value())
 	}
 }
 
@@ -142,12 +127,14 @@ func (h *Host) load() error {
 		return err
 	}
 
-	// Copy over the host context.
+	// Consensus Tracking.
 	h.blockHeight = p.BlockHeight
 	h.recentChange = p.RecentChange
+
+	// Host Identity.
+	h.netAddress = p.NetAddress
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
-	h.settings = p.Settings
 
 	// Copy over the file management. The space remaining is recalculated from
 	// disk instead of being saved, to maximize the potential usefulness of
@@ -158,6 +145,7 @@ func (h *Host) load() error {
 
 	// Copy over statistics.
 	h.revenue = p.Revenue
+	h.lostRevenue = p.LostRevenue
 
 	// Copy over rpc tracking.
 	atomic.StoreUint64(&h.atomicErroredCalls, p.ErroredCalls)
@@ -167,6 +155,9 @@ func (h *Host) load() error {
 	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)
 	atomic.StoreUint64(&h.atomicSettingsCalls, p.SettingsCalls)
 	atomic.StoreUint64(&h.atomicUploadCalls, p.UploadCalls)
+
+	// Utilities.
+	h.settings = p.Settings
 
 	return nil
 }
@@ -183,6 +174,11 @@ func (h *Host) establishDefaults() error {
 		Collateral:   defaultCollateral,
 	}
 	h.spaceRemaining = h.settings.TotalStorage
+
+	// Reduce the window size when testing.
+	if build.Release == "testing" {
+		h.settings.WindowSize = testingWindowSize
+	}
 
 	// Generate signing key, for revising contracts.
 	sk, pk, err := crypto.GenerateKeyPair()

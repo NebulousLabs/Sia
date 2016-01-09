@@ -130,7 +130,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		h.removeObligation(co, obligationFailed)
 		return
 	}
-	if co.proofConfirmed() && co.windowEnd()+confirmationRequirement < h.blockHeight {
+	if co.proofConfirmed() && co.windowEnd()+confirmationRequirement <= h.blockHeight {
 		// The storage proof has been successful, and has enough confirmations
 		// to be considered stable. Therefore the obligation can be deleted.
 		h.removeObligation(co, obligationSucceeded)

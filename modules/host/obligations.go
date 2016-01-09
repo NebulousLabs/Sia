@@ -11,7 +11,7 @@ import (
 const (
 	// resubmissionTimeout is the number of blocks that the host will wait
 	// before trying to resubmit a transaction to the blockchain.
-	resubmissionTimeout = 3
+	resubmissionTimeout = 2
 
 	// confirmationRequirement is the number of blocks that the host is going
 	// to wait before assuming that a storage proof has successfully been
@@ -224,10 +224,8 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	h.anticipatedRevenue = h.anticipatedRevenue.Sub(obligation.value())
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(revisionTransaction.FileContractRevisions[0].NewValidProofOutputs[1].Value)
 
-	newWindowStart := revisionTransaction.FileContractRevisions[0].NewWindowStart
-	if newWindowStart == obligation.windowStart() {
-		h.actionItems[newWindowStart] = append(h.actionItems[newWindowStart], obligation)
-	}
+	confirmHeight := h.blockHeight + resubmissionTimeout
+	h.actionItems[confirmHeight] = append(h.actionItems[confirmHeight], obligation)
 
 	// Add the revision to the obligation
 	obligation.RevisionTxn = revisionTransaction
@@ -258,6 +256,8 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 	}
 
 	// Update host statistics.
+	println(h.anticipatedRevenue.String())
+	println(co.value().String())
 	h.anticipatedRevenue = h.anticipatedRevenue.Sub(co.value())
 	if successful {
 		h.revenue = h.revenue.Add(co.value())

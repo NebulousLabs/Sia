@@ -23,7 +23,8 @@ const (
 
 	defaultTotalStorage = 10e9      // 10 GB.
 	defaultMaxDuration  = 144 * 120 // 120 days.
-	defaultWindowSize   = 144 * 2   // 2 days.
+	defaultWindowSize   = 36        // 6 hours.
+	testingWindowSize   = 3         // Small to keep testing fast.
 )
 
 var (
@@ -72,10 +73,10 @@ type Host struct {
 	obligationsByID map[types.FileContractID]*contractObligation
 
 	// Statistics
-	revenue            types.Currency
 	anticipatedRevenue types.Currency
-	lostRevenue        types.Currency
 	fileCounter        int64
+	lostRevenue        types.Currency
+	revenue            types.Currency
 	spaceRemaining     int64
 
 	// RPC Tracking

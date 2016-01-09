@@ -9,6 +9,11 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
+)
+
+const (
+	testUploadDuration = 20 // Duration in blocks of a standard upload during testing.
 )
 
 // uploadTestFile uploads a file to the host from the tester's renter.
@@ -34,8 +39,8 @@ func (ht *hostTester) uploadFile(name string) error {
 	// Have the renter upload to the host.
 	fup := modules.FileUploadParams{
 		Filename:    filepath,
-		Nickname:    name, // TODO: setting the nickname to 'filepath' failed?
-		Duration:    20,
+		Nickname:    name,
+		Duration:    testUploadDuration,
 		Renew:       false,
 		ErasureCode: nil,
 		PieceSize:   0,
@@ -90,10 +95,108 @@ func TestRPCUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ht.host.mu.RLock()
+	baselineAnticipatedRevenue := ht.host.anticipatedRevenue
+	baselineSpace := ht.host.spaceRemaining
+	ht.host.mu.RUnlock()
 	err = ht.uploadFile("TestRPCUpload - 1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// TODO: Check that the anticipated revenue has increased.
+	var expectedRevenue types.Currency
+	func() {
+		ht.host.mu.RLock()
+		defer ht.host.mu.RUnlock()
+
+		if ht.host.anticipatedRevenue.Cmp(baselineAnticipatedRevenue) <= 0 {
+			t.Error("Anticipated revenue did not increase after a file was uploaded")
+		}
+		if baselineSpace <= ht.host.spaceRemaining {
+			t.Error("space remaining on the host does not seem to have decreased")
+		}
+		expectedRevenue = ht.host.anticipatedRevenue
+	}()
+
+	// Mine until the storage proof goes through, and the obligation gets
+	// cleared.
+	for i := 0; i <= testUploadDuration+confirmationRequirement+testingWindowSize; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Check that the storage proof has succeeded.
+	ht.host.mu.Lock()
+	defer ht.host.mu.Unlock()
+	if len(ht.host.obligationsByID) != 0 {
+		t.Error("host still has obligation, when it should have completed the obligation and submitted a storage proof.")
+	}
+	if !ht.host.anticipatedRevenue.IsZero() {
+		t.Error("host anticipated revenue was not set back to zero")
+	}
+	if ht.host.spaceRemaining != baselineSpace {
+		t.Error("host does not seem to have reclaimed the space after a successful obligation")
+	}
+	if expectedRevenue.Cmp(ht.host.revenue) != 0 {
+		t.Error("host's revenue was not moved from anticipated to expected")
+	}
+}
+
+// TestFailedObligation tests that the host correctly handles missing a storage
+// proof.
+func TestFailedObligation(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestFailedObligation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	baselineSpace := ht.host.spaceRemaining
+	ht.host.mu.RUnlock()
+	err = ht.uploadFile("TestFailedObligation - 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	expectedLostRevenue := ht.host.anticipatedRevenue
+	ht.host.mu.RUnlock()
+
+	// Close the host, then mine enough blocks that the host has missed the
+	// storage proof window.
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i <= testUploadDuration+testingWindowSize; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Restart the host. While catching up, the host should realize that it
+	// missed a storage proof, and should delete the obligation.
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Host should delete the obligation before finishing startup.
+	rebootHost.mu.Lock()
+	defer rebootHost.mu.Unlock()
+	if len(rebootHost.obligationsByID) != 0 {
+		t.Error("host did not delete a dead storage proof at startup")
+	}
+	if !rebootHost.anticipatedRevenue.IsZero() {
+		t.Error("host did not subtract out anticipated revenue")
+	}
+	if rebootHost.spaceRemaining != baselineSpace {
+		t.Error("host did not reallocate space after failed storage proof")
+	}
+	if rebootHost.lostRevenue.Cmp(expectedLostRevenue) != 0 {
+		t.Error("host did not correctly report lost revenue")
+	}
 }

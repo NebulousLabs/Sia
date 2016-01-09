@@ -247,7 +247,7 @@ func TestSetAndGetSettings(t *testing.T) {
 	if settings.MaxDuration != defaultMaxDuration {
 		t.Error("settings GET did not return default value")
 	}
-	if settings.WindowSize != defaultWindowSize {
+	if settings.WindowSize != testingWindowSize {
 		t.Error("settings GET did not return default value")
 	}
 	if settings.Price.Cmp(defaultPrice) != 0 {
@@ -291,7 +291,7 @@ func TestSetUnlockHash(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := newHostTester("TestSetAndGetSettings")
+	ht, err := newHostTester("TestSetUnlockHash")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestPersistentSettings(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := newHostTester("TestSetAndGetSettings")
+	ht, err := newHostTester("TestSetPersistentSettings")
 	if err != nil {
 		t.Fatal(err)
 	}
