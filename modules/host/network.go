@@ -21,17 +21,45 @@ func (h *Host) initNetworking(address string) error {
 	}
 	h.netAddress = modules.NetAddress(h.listener.Addr().String())
 
-	// Networking subroutines.
-	go h.forwardPort(h.netAddress.Port())
-	go h.learnHostname()
-	go h.listen()
+	// Non-blocking, perform port forwarding and hostname discovery.
+	go func() {
+		h.resourceLock.RLock()
+		defer h.resourceLock.RUnlock()
+
+		// If the host has closed, return immediately.
+		if h.closed {
+			return
+		}
+
+		h.mu.RLock()
+		port := h.netAddress.Port()
+		h.mu.RUnlock()
+		h.forwardPort(port)
+		h.learnHostname()
+	}()
+
+	// Launch the listener.
+	h.resourceLock.RLock()
+	go h.threadedListen()
 	return nil
 }
 
-// threadedHandleConn handles an incoming connection to the host, typically an RPC.
+// threadedHandleConn handles an incoming connection to the host, typically an
+// RPC. threadedHandleConn is responsible for releasing a readlock on
+// host.resourceLock when all communications have completed.
 func (h *Host) threadedHandleConn(conn net.Conn) {
+	// All threaded functions are called holding the close lock, and are
+	// expected to keep it until they no longer need access to the host's
+	// resources.
+	defer h.resourceLock.RUnlock()
+
+	// If the host resources are unavailable, return early.
+	if h.closed {
+		return
+	}
+
 	// Set an initial duration that is generous, but finite. RPCs can extend
-	// this if so desired.
+	// this if desired.
 	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 	defer conn.Close()
 
@@ -47,19 +75,19 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	switch id {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		err = h.rpcDownload(conn)
+		err = h.managedRPCDownload(conn)
 	case modules.RPCRenew:
 		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		err = h.rpcRenew(conn)
+		err = h.managedRPCRenew(conn)
 	case modules.RPCRevise:
 		atomic.AddUint64(&h.atomicReviseCalls, 1)
-		err = h.rpcRevise(conn)
+		err = h.managedRPCRevise(conn)
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
-		err = h.rpcSettings(conn)
+		err = h.managedRPCSettings(conn)
 	case modules.RPCUpload:
 		atomic.AddUint64(&h.atomicUploadCalls, 1)
-		err = h.threadedRPCUpload(conn)
+		err = h.managedRPCUpload(conn)
 	default:
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
 		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
@@ -72,17 +100,35 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 }
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
-func (h *Host) listen() {
+func (h *Host) threadedListen() {
+	// All threaded are called holding a readlock, and must release the
+	// readlock upon terminating.
+	defer h.resourceLock.RUnlock()
+
+	// If the host has closed, some of the necessary resources will not be
+	// available, and therefore the host should not be receiving connections.
+	if h.closed {
+		return
+	}
+
+	// Receive connections until an error is returned by the listener. When an
+	// error is returned, there will be no more calls to receive.
 	for {
+		// Block until there is a connection to handle.
 		conn, err := h.listener.Accept()
 		if err != nil {
 			return
 		}
+
+		// Grab the resource lock before creating a goroutine.
+		h.resourceLock.RLock()
 		go h.threadedHandleConn(conn)
 	}
 }
 
-// rpcSettings is an rpc that returns the host's settings.
-func (h *Host) rpcSettings(conn net.Conn) error {
+// managedRPCSettings is an rpc that returns the host's settings.
+func (h *Host) managedRPCSettings(conn net.Conn) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return encoding.WriteObject(conn, h.Settings())
 }

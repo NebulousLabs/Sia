@@ -66,6 +66,11 @@ func (h *Host) initConsensusSubscription() error {
 // significant amount of disk I/O happens, meaning this function should be
 // called in a separate goroutine.
 func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
+	defer h.resourceLock.RUnlock()
+	if build.DEBUG && h.closed {
+		panic("the close order should guarantee that threadedCreateStorageProof has access to host resources - yet host is closed!")
+	}
+
 	file, err := os.Open(obligation.Path)
 	if err != nil {
 		h.log.Printf("ERROR: could not open obligation %v (%v) for storage proof: %v", obligation.ID, obligation.Path, err)
@@ -199,6 +204,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		// The storage proof for the contract has not made it onto the
 		// blockchain, recreate the storage proof and submit it to the
 		// blockchain.
+		h.resourceLock.RLock()
 		go h.threadedCreateStorageProof(co)
 
 		// Add an action to check that the storage proof has been successful.

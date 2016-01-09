@@ -34,7 +34,9 @@ func TestEarlySaving(t *testing.T) {
 	ht.host.revenue = ht.host.revenue.Add(types.NewCurrency64(91e3))
 
 	// Load the host and see that the fields are reset correctly.
+	ht.host.mu.Lock()
 	err = ht.host.load()
+	ht.host.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}

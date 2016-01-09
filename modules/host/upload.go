@@ -138,11 +138,11 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	return nil
 }
 
-// threadedNegotiateContract negotiates a file contract with a renter, and adds
+// managedNegotiateContract negotiates a file contract with a renter, and adds
 // the metadata to the host's obligation set. The filesize, merkleRoot, and
-// filename arguments are provided to make threadedNegotiateContract usable
+// filename arguments are provided to make managedNegotiateContract usable
 // with both rpcUpload and rpcRenew.
-func (h *Host) threadedNegotiateContract(conn net.Conn, filesize uint64, merkleRoot crypto.Hash, filename string) error {
+func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRoot crypto.Hash, filename string) error {
 	// allow 5 minutes for contract negotiation
 	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
@@ -245,9 +245,9 @@ func (h *Host) threadedNegotiateContract(conn net.Conn, filesize uint64, merkleR
 	return nil
 }
 
-// threadedRPCUpload is an RPC that negotiates a file contract. Under the new
+// managedRPCUpload is an RPC that negotiates a file contract. Under the new
 // scheme, file contracts should not initially hold any data.
-func (h *Host) threadedRPCUpload(conn net.Conn) error {
+func (h *Host) managedRPCUpload(conn net.Conn) error {
 	// Check that the host has grabbed an address from the wallet.
 	h.mu.RLock()
 	uh := h.settings.UnlockHash
@@ -260,12 +260,12 @@ func (h *Host) threadedRPCUpload(conn net.Conn) error {
 	}
 
 	// negotiate expecting empty Merkle root
-	return h.threadedNegotiateContract(conn, 0, crypto.Hash{}, filename)
+	return h.managedNegotiateContract(conn, 0, crypto.Hash{}, filename)
 }
 
-// rpcRevise is an RPC that allows a renter to revise a file contract. It will
+// managedRPCRevise is an RPC that allows a renter to revise a file contract. It will
 // read new revisions in a loop until the renter sends a termination signal.
-func (h *Host) rpcRevise(conn net.Conn) error {
+func (h *Host) managedRPCRevise(conn net.Conn) error {
 	// read ID of contract to be revised
 	var fcid types.FileContractID
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
@@ -394,10 +394,10 @@ func (h *Host) rpcRevise(conn net.Conn) error {
 	return revisionErr
 }
 
-// rpcRenew is an RPC that allows a renter to renew a file contract. The
+// managedRPCRenew is an RPC that allows a renter to renew a file contract. The
 // protocol is identical to standard contract negotiation, except that the
 // Merkle root is copied over from the old contract.
-func (h *Host) rpcRenew(conn net.Conn) error {
+func (h *Host) managedRPCRenew(conn net.Conn) error {
 	// read ID of contract to be renewed
 	var fcid types.FileContractID
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
@@ -439,5 +439,5 @@ func (h *Host) rpcRenew(conn net.Conn) error {
 		return err
 	}
 
-	return h.threadedNegotiateContract(conn, filesize, merkleRoot, filename)
+	return h.managedNegotiateContract(conn, filesize, merkleRoot, filename)
 }

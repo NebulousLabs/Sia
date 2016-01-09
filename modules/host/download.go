@@ -27,7 +27,7 @@ const (
 // TODO: There is no lock obtained on the obligation, which means that a
 // revision could modify the file at the same time that it is being read from
 // disk.
-func (h *Host) rpcDownload(conn net.Conn) error {
+func (h *Host) managedRPCDownload(conn net.Conn) error {
 	// Read the contract ID.
 	var contractID types.FileContractID
 	err := encoding.ReadObject(conn, &contractID, crypto.HashSize)

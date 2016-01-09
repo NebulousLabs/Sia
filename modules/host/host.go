@@ -87,6 +87,15 @@ type Host struct {
 	atomicSettingsCalls  uint64
 	atomicUploadCalls    uint64
 
+	// The resource lock is held by threaded functions for the duration of
+	// their operation. Functions should grab the resource lock as a read lock
+	// unless they are planning on manipulating the 'closed' variable.
+	// Readlocks are used so that multiple functions can use resources
+	// simultaneously, but the resources are not closed until all functions
+	// accessing them have returned.
+	closed       bool
+	resourceLock sync.RWMutex
+
 	// Utilities.
 	listener   net.Listener
 	log        *persist.Logger
@@ -144,20 +153,36 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 
 // Close shuts down the host, preparing it for garbage collection.
 func (h *Host) Close() error {
-	// The order in which things are closed has been explicitly chosen to
-	// minimize turbulence in the event of an error.
+	// Unsubscribe the host from the consensus set. Call will not terminate
+	// until the last consensus update has been sent to the host.
+	// Unsubscription must happen before any resources are released or
+	// terminated because the process consensus change function makes use of
+	// those resources.
+	h.cs.Unsubscribe(h)
 
-	// Save the latest host state.
-	h.mu.Lock()
-	err := h.save()
-	h.mu.Unlock()
+	// Close the listener, which means incoming network connections will be
+	// rejected. The listener should be closed before the host resources are
+	// disabled, as incoming connections will want to use the hosts resources.
+	err := h.listener.Close()
 	if err != nil {
 		return err
 	}
 
-	// Clean up networking processes.
+	// Manage the port forwarding.
 	h.clearPort(h.netAddress.Port())
-	err = h.listener.Close()
+
+	// Grab the resource lock and indicate that the host is closing. Concurrent
+	// functions hold the resource lock until they terminate, meaning that no
+	// threaded function will be running by the time the resource lock is
+	// acquired.
+	h.resourceLock.Lock()
+	h.closed = true
+	h.resourceLock.Unlock()
+
+	// Save the latest host state.
+	h.mu.Lock()
+	err = h.save()
+	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -167,8 +192,6 @@ func (h *Host) Close() error {
 	if err != nil {
 		return err
 	}
-
-	h.cs.Unsubscribe(h)
 	return nil
 }
 
