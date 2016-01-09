@@ -12,52 +12,38 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// repairUploader is a mocked hostdb.Uploader, used for testing the uploading
-// and repairing functions of the renter.
-type repairUploader struct{}
+// repairHostDB is a mocked hostDB, hostdb.HostPool, and hostdb.Uploader. It
+// is used for testing the uploading and repairing functions of the renter.
+type repairHostDB struct{}
 
-// Upload simulates a successful data upload.
-func (repairUploader) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
+// NewPool returns a new mock HostPool. Since repairHostDB implements the
+// HostPool interface, it can simply return itself.
+func (hdb repairHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) {
+	return hdb, nil
+}
 
-func (repairUploader) Address() modules.NetAddress      { return "" }
-func (repairUploader) ContractID() types.FileContractID { return types.FileContractID{} }
-func (repairUploader) EndHeight() types.BlockHeight     { return 10000 }
-func (repairUploader) Close() error                     { return nil }
-
-// repairHostPool is a mocked hostdb.HostPool, used for testing the uploading
-// and repairing functions of the renter.
-type repairHostPool struct{}
-
-// UniqueHosts returns a set of mocked Uploaders.
-func (repairHostPool) UniqueHosts(n int, _ []modules.NetAddress) (ups []hostdb.Uploader) {
+// UniqueHosts returns a set of mocked Uploaders. Since repairHostDB
+// implements the Uploader interface, it can simply return itself.
+func (hdb repairHostDB) UniqueHosts(n int, _ []modules.NetAddress) (ups []hostdb.Uploader) {
 	for i := 0; i < n; i++ {
-		ups = append(ups, repairUploader{})
+		ups = append(ups, hdb)
 	}
 	return
 }
 
-// Close is a stub implementation of the Close method.
-func (repairHostPool) Close() error { return nil }
+// Upload simulates a successful data upload.
+func (repairHostDB) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
 
-// repairHostDB is a mocked hostDB, used for testing the uploading and
-// repairing functions of the renter.
-type repairHostDB struct{}
+// stub implementations of the hostdb.Uploader methods
+func (repairHostDB) Address() modules.NetAddress      { return "" }
+func (repairHostDB) ContractID() types.FileContractID { return types.FileContractID{} }
+func (repairHostDB) EndHeight() types.BlockHeight     { return 10000 }
+func (repairHostDB) Close() error                     { return nil }
 
-// ActiveHosts is a stub implementation of the ActiveHosts method.
+// stub implementations of the hostDB methods
 func (repairHostDB) ActiveHosts() []modules.HostSettings { return nil }
-
-// AllHosts is a stub implementation of the AllHosts method.
-func (repairHostDB) AllHosts() []modules.HostSettings { return nil }
-
-// AveragePrice is a stub implementation of the AveragePrice method.
-func (repairHostDB) AveragePrice() types.Currency { return types.Currency{} }
-
-// NewPool returns a new mock HostPool.
-func (hdb repairHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) {
-	return repairHostPool{}, nil
-}
-
-// Renew is a stub implementation of the Renew method.
+func (repairHostDB) AllHosts() []modules.HostSettings    { return nil }
+func (repairHostDB) AveragePrice() types.Currency        { return types.Currency{} }
 func (repairHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
 	return types.FileContractID{}, nil
 }
