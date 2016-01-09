@@ -41,7 +41,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 
 	return nil

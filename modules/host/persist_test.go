@@ -132,25 +132,31 @@ func TestUnitLoadObligations(t *testing.T) {
 	}
 
 	// Create a set of obligations to load into the host.
-	ob1 := contractObligation{
+	ob1 := &contractObligation{
 		ID: types.FileContractID{1},
-		FileContract: types.FileContract{
-			WindowStart: 10e3,
+		OriginTxn: types.Transaction{
+			FileContracts: []types.FileContract{{
+				WindowStart: 10e3,
+			}},
 		},
 	}
-	ob2 := contractObligation{
+	ob2 := &contractObligation{
 		ID: types.FileContractID{2},
-		FileContract: types.FileContract{
-			WindowStart: 20e3,
+		OriginTxn: types.Transaction{
+			FileContracts: []types.FileContract{{
+				WindowStart: 20e3,
+			}},
 		},
 	}
-	ob3 := contractObligation{
+	ob3 := &contractObligation{
 		ID: types.FileContractID{3},
-		FileContract: types.FileContract{
-			WindowStart: 20e3,
+		OriginTxn: types.Transaction{
+			FileContracts: []types.FileContract{{
+				WindowStart: 20e3,
+			}},
 		},
 	}
-	obs := []contractObligation{ob1, ob2, ob3}
+	obs := []*contractObligation{ob1, ob2, ob3}
 	ht.host.loadObligations(obs)
 
 	// Check that the host has the obligations set up as expected.
@@ -162,23 +168,5 @@ func TestUnitLoadObligations(t *testing.T) {
 	}
 	if ht.host.obligationsByID[ob3.ID].ID != ob3.ID {
 		t.Error("ob3 not loaded correctly")
-	}
-	if len(ht.host.obligationsByHeight[10e3+StorageProofReorgDepth]) != 1 {
-		t.Fatal("ob1 not loaded correctly into byHeight structure:", len(ht.host.obligationsByHeight[10e3+StorageProofReorgDepth]))
-	}
-	if ht.host.obligationsByHeight[10e3+StorageProofReorgDepth][0].ID != ob1.ID {
-		t.Fatal("ob1 not loaded correctly into byHeight structure")
-	}
-	if len(ht.host.obligationsByHeight[20e3+StorageProofReorgDepth]) != 2 {
-		t.Fatal("ob2 and ob3 not loaded correctly into byHeight structure")
-	}
-	if ht.host.obligationsByHeight[20e3+StorageProofReorgDepth][0].ID != ob2.ID && ht.host.obligationsByHeight[20e3+StorageProofReorgDepth][0].ID != ob3.ID {
-		t.Fatal("ob2 and ob3 not loaded correctly into byHeight structure")
-	}
-	if ht.host.obligationsByHeight[20e3+StorageProofReorgDepth][1].ID != ob2.ID && ht.host.obligationsByHeight[20e3+StorageProofReorgDepth][1].ID != ob3.ID {
-		t.Fatal("ob2 and ob3 not loaded correctly into byHeight structure")
-	}
-	if ht.host.obligationsByHeight[20e3+StorageProofReorgDepth][0].ID == ht.host.obligationsByHeight[20e3+StorageProofReorgDepth][1].ID {
-		t.Fatal("ob2 and ob3 not loaded correctly into byHeight structure")
 	}
 }

@@ -47,21 +47,6 @@ var (
 	errNilWallet = errors.New("host cannot use a nil wallet")
 )
 
-// A contractObligation tracks a file contract that the host is obligated to
-// fulfill.
-type contractObligation struct {
-	ID              types.FileContractID
-	FileContract    types.FileContract
-	LastRevisionTxn types.Transaction
-	Path            string // Where on disk the file is stored.
-
-	// The mutex ensures that revisions are happening in serial. The actual
-	// data under the obligations is being protected by the host's mutex.
-	// Grabbing 'mu' is not sufficient to guarantee modification safety of the
-	// struct, the host mutex must also be grabbed.
-	mu sync.Mutex
-}
-
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
@@ -70,9 +55,13 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// Consensus Tracking
+	// Consensus Tracking. 'actionItems' lists a bunch of contract obligations
+	// that have 'todos' at a given height. The required action ranges from
+	// needed to resubmit a revision to handling a storage proof or getting
+	// pruned from the host.
 	blockHeight  types.BlockHeight
 	recentChange modules.ConsensusChangeID
+	actionItems  map[types.BlockHeight][]*contractObligation
 
 	// Host Identity
 	netAddress modules.NetAddress
@@ -80,8 +69,7 @@ type Host struct {
 	secretKey  crypto.SecretKey
 
 	// File Management.
-	obligationsByID     map[types.FileContractID]*contractObligation
-	obligationsByHeight map[types.BlockHeight][]*contractObligation
+	obligationsByID map[types.FileContractID]*contractObligation
 
 	// Statistics
 	revenue            types.Currency
@@ -90,14 +78,14 @@ type Host struct {
 	fileCounter        int64
 	spaceRemaining     int64
 
-	// RPC Tracking - variables are all updated atomically.
-	erroredCalls   uint64
-	malformedCalls uint64
-	downloadCalls  uint64
-	renewCalls     uint64
-	reviseCalls    uint64
-	settingsCalls  uint64
-	uploadCalls    uint64
+	// RPC Tracking
+	atomicErroredCalls   uint64
+	atomicMalformedCalls uint64
+	atomicDownloadCalls  uint64
+	atomicRenewCalls     uint64
+	atomicReviseCalls    uint64
+	atomicSettingsCalls  uint64
+	atomicUploadCalls    uint64
 
 	// Utilities.
 	listener   net.Listener
@@ -126,8 +114,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		tpool:  tpool,
 		wallet: wallet,
 
-		obligationsByID:     make(map[types.FileContractID]*contractObligation),
-		obligationsByHeight: make(map[types.BlockHeight][]*contractObligation),
+		actionItems: make(map[types.BlockHeight][]*contractObligation),
+
+		obligationsByID: make(map[types.FileContractID]*contractObligation),
 
 		persistDir: persistDir,
 	}
@@ -157,15 +146,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	}
 
 	return h, nil
-}
-
-// Capacity returns the amount of storage still available on the machine. The
-// amount can be negative if the total capacity was reduced to below the active
-// capacity.
-func (h *Host) Capacity() int64 {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.spaceRemaining
 }
 
 // Close shuts down the host, preparing it for garbage collection.
@@ -198,6 +178,15 @@ func (h *Host) Close() error {
 	return nil
 }
 
+// Capacity returns the amount of storage still available on the machine. The
+// amount can be negative if the total capacity was reduced to below the active
+// capacity.
+func (h *Host) Capacity() int64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.spaceRemaining
+}
+
 // Contracts returns the number of unresolved file contracts that the host is
 // responsible for.
 func (h *Host) Contracts() uint64 {
@@ -218,11 +207,7 @@ func (h *Host) NetAddress() modules.NetAddress {
 func (h *Host) Revenue() (unresolved, resolved types.Currency) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	for _, obligation := range h.obligationsByID {
-		fc := obligation.FileContract
-		unresolved = unresolved.Add(types.PostTax(h.blockHeight, fc.Payout))
-	}
-	return unresolved, h.revenue
+	return h.anticipatedRevenue, h.revenue
 }
 
 // SetSettings updates the host's internal HostSettings object.

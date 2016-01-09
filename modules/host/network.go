@@ -38,7 +38,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	// Read a specifier indicating which action is beeing called.
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
-		atomic.AddUint64(&h.malformedCalls, 1)
+		atomic.AddUint64(&h.atomicMalformedCalls, 1)
 		h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
 		return
 	}
@@ -46,27 +46,27 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	var err error
 	switch id {
 	case modules.RPCDownload:
-		atomic.AddUint64(&h.downloadCalls, 1)
+		atomic.AddUint64(&h.atomicDownloadCalls, 1)
 		err = h.rpcDownload(conn)
 	case modules.RPCRenew:
-		atomic.AddUint64(&h.renewCalls, 1)
+		atomic.AddUint64(&h.atomicRenewCalls, 1)
 		err = h.rpcRenew(conn)
 	case modules.RPCRevise:
-		atomic.AddUint64(&h.reviseCalls, 1)
+		atomic.AddUint64(&h.atomicReviseCalls, 1)
 		err = h.rpcRevise(conn)
 	case modules.RPCSettings:
-		atomic.AddUint64(&h.settingsCalls, 1)
+		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.rpcSettings(conn)
 	case modules.RPCUpload:
-		atomic.AddUint64(&h.uploadCalls, 1)
+		atomic.AddUint64(&h.atomicUploadCalls, 1)
 		err = h.threadedRPCUpload(conn)
 	default:
-		atomic.AddUint64(&h.erroredCalls, 1)
+		atomic.AddUint64(&h.atomicErroredCalls, 1)
 		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
 	if err != nil {
-		atomic.AddUint64(&h.erroredCalls, 1)
+		atomic.AddUint64(&h.atomicErroredCalls, 1)
 		h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
 }

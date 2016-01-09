@@ -3,8 +3,8 @@ package host
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -34,7 +34,7 @@ type persistence struct {
 
 	// File Management.
 	FileCounter int64
-	Obligations []contractObligation
+	Obligations []*contractObligation
 
 	// Statistics.
 	Revenue types.Currency
@@ -51,17 +51,10 @@ type persistence struct {
 
 // getObligations returns a slice containing all of the contract obligations
 // currently being tracked by the host.
-func (h *Host) getObligations() []contractObligation {
-	cos := make([]contractObligation, 0, len(h.obligationsByID))
+func (h *Host) getObligations() []*contractObligation {
+	cos := make([]*contractObligation, 0, len(h.obligationsByID))
 	for _, ob := range h.obligationsByID {
-		// Explicit copies of the object are made so that the mutex is not
-		// touched - it is contested whether this is necessary.
-		cos = append(cos, contractObligation{
-			ID:              ob.ID,
-			FileContract:    ob.FileContract,
-			LastRevisionTxn: ob.LastRevisionTxn,
-			Path:            ob.Path,
-		})
+		cos = append(cos, ob)
 	}
 	return cos
 }
@@ -80,40 +73,63 @@ func (h *Host) save() error {
 
 		Revenue: h.revenue,
 
-		ErroredCalls:   h.erroredCalls,
-		MalformedCalls: h.malformedCalls,
-		DownloadCalls:  h.downloadCalls,
-		RenewCalls:     h.renewCalls,
-		ReviseCalls:    h.reviseCalls,
-		SettingsCalls:  h.settingsCalls,
-		UploadCalls:    h.uploadCalls,
+		ErroredCalls:   atomic.LoadUint64(&h.atomicErroredCalls),
+		MalformedCalls: atomic.LoadUint64(&h.atomicMalformedCalls),
+		DownloadCalls:  atomic.LoadUint64(&h.atomicDownloadCalls),
+		RenewCalls:     atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:    atomic.LoadUint64(&h.atomicReviseCalls),
+		SettingsCalls:  atomic.LoadUint64(&h.atomicSettingsCalls),
+		UploadCalls:    atomic.LoadUint64(&h.atomicUploadCalls),
 	}
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
 }
 
 // loadObligations loads file contract obligations from the persistent file
 // into the host.
-func (h *Host) loadObligations(cos []contractObligation) {
-	// Clear the existing obligations maps.
+func (h *Host) loadObligations(cos []*contractObligation) {
 	for i := range cos {
-		obligation := &cos[i] // both maps should use same pointer
-		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
-		// Sanity check - if the height is below the current height, then set
-		// the height to current height + 3. This makes sure that all file
-		// contracts will eventually be hit or garbage collected by the host,
-		// even if a bug means that they aren't acted upon at the right moment.
-		if build.DEBUG && height < h.blockHeight {
-			panic("host settings file is inconsistent")
-		} else if height < h.blockHeight {
-			height = h.blockHeight + 3
-		}
-		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
+		// Store the obligation in the obligations list.
+		obligation := cos[i] // all objects should reference the same obligation
 		h.obligationsByID[obligation.ID] = obligation
+
+		// Check which action is relevant, and queue the obligation for
+		// inspection based on what needs to happen next.
+		if !obligation.OriginConfirmed || !obligation.RevisionConfirmed {
+			// The transaction that validates the obligation has not been
+			// sucessfully put on the blockchain. The status should be
+			// rechecked and the transaction resubmitted after 'resbumissionTimeout'
+			// blocks.
+			resubmissionBlock := h.blockHeight + resubmissionTimeout
+			h.actionItems[resubmissionBlock] = append(h.actionItems[resubmissionBlock], obligation)
+		} else if !obligation.ProofConfirmed {
+			// A storage proof for this file contract has not been sucessfully
+			// submitted to the blockchain.
+			originFC := obligation.OriginTxn.FileContracts[0]
+			revs := obligation.RevisionTxn.FileContractRevisions
+			proofHeight := originFC.WindowStart
+			if len(revs) > 0 && revs[0].NewWindowStart > proofHeight {
+				// Use the revision height if there is a revision that triggers
+				// at a later height.
+				proofHeight = revs[0].NewWindowStart
+			}
+			if h.blockHeight > proofHeight {
+				// Use the current height plus 1 if the current height is ahead
+				// of the window start.
+				proofHeight = h.blockHeight + 1
+			}
+			h.actionItems[proofHeight] = append(h.actionItems[proofHeight], obligation)
+		} else {
+			// A storage proof for this file has been sucessfully confirmed -
+			// wait out the confirmation requirement before deleting the
+			// contract.
+			purgeHeight := h.blockHeight + confirmationRequirement
+			h.actionItems[purgeHeight] = append(h.actionItems[purgeHeight], obligation)
+		}
 
 		// update spaceRemaining to account for the storage held by this
 		// obligation.
-		if len(obligation.LastRevisionTxn.FileContractRevisions) > 0 {
-			h.spaceRemaining -= int64(obligation.LastRevisionTxn.FileContractRevisions[0].NewFileSize)
+		if len(obligation.RevisionTxn.FileContractRevisions) > 0 {
+			h.spaceRemaining -= int64(obligation.RevisionTxn.FileContractRevisions[0].NewFileSize)
 		}
 	}
 }
@@ -144,13 +160,13 @@ func (h *Host) load() error {
 	h.revenue = p.Revenue
 
 	// Copy over rpc tracking.
-	h.erroredCalls = p.ErroredCalls
-	h.malformedCalls = p.MalformedCalls
-	h.downloadCalls = p.DownloadCalls
-	h.renewCalls = p.RenewCalls
-	h.reviseCalls = p.ReviseCalls
-	h.settingsCalls = p.SettingsCalls
-	h.uploadCalls = p.UploadCalls
+	atomic.StoreUint64(&h.atomicErroredCalls, p.ErroredCalls)
+	atomic.StoreUint64(&h.atomicMalformedCalls, p.MalformedCalls)
+	atomic.StoreUint64(&h.atomicDownloadCalls, p.DownloadCalls)
+	atomic.StoreUint64(&h.atomicRenewCalls, p.RenewCalls)
+	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)
+	atomic.StoreUint64(&h.atomicSettingsCalls, p.SettingsCalls)
+	atomic.StoreUint64(&h.atomicUploadCalls, p.UploadCalls)
 
 	return nil
 }

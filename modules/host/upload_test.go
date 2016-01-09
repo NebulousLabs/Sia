@@ -1,6 +1,7 @@
 package host
 
 import (
+	"errors"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
@@ -20,7 +21,8 @@ func (ht *hostTester) uploadFile(name string) error {
 
 	// Create a file to upload to the host.
 	filepath := filepath.Join(ht.persistDir, name+".testfile")
-	data, err := crypto.RandBytes(1024)
+	datasize := uint64(1024)
+	data, err := crypto.RandBytes(int(datasize))
 	if err != nil {
 		return err
 	}
@@ -48,21 +50,34 @@ func (ht *hostTester) uploadFile(name string) error {
 		time.Sleep(time.Millisecond * 100)
 
 		// Asynchronous processes in the host access obligations by id.
-		ht.host.mu.Lock()
-		lenOBID := len(ht.host.obligationsByID)
-		ht.host.mu.Unlock()
-		if lenOBID != 0 {
+		if func() bool {
+			ht.host.mu.Lock()
+			defer ht.host.mu.Unlock()
+
+			for _, ob := range ht.host.obligationsByID {
+				if ob.fileSize() >= datasize {
+					return true
+				}
+			}
+			return false
+		}() {
 			break
 		}
 	}
-	// Asynchronous processes in the host access obligations by id.
+
+	// The rest of the upload can be performed under lock.
 	ht.host.mu.Lock()
-	lenOBID := len(ht.host.obligationsByID)
-	ht.host.mu.Unlock()
-	if lenOBID == 0 {
-		return err
+	defer ht.host.mu.Unlock()
+
+	if len(ht.host.obligationsByID) != 1 {
+		return errors.New("expecting a single obligation")
 	}
-	return nil
+	for _, ob := range ht.host.obligationsByID {
+		if ob.fileSize() >= datasize {
+			return nil
+		}
+	}
+	return errors.New("ht.uploadFile: upload failed")
 }
 
 // TestRPCUPload attempts to upload a file to the host, adding coverage to the

@@ -2,6 +2,7 @@ package host
 
 import (
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -22,13 +23,13 @@ func TestRPCTracking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ht.host.reviseCalls != 1 {
+	if atomic.LoadUint64(&ht.host.atomicReviseCalls) != 1 {
 		t.Error("expected to count a revise call")
 	}
-	if ht.host.settingsCalls != 1 {
+	if atomic.LoadUint64(&ht.host.atomicSettingsCalls) != 1 {
 		t.Error("expected to count a settings call")
 	}
-	if ht.host.uploadCalls != 1 {
+	if atomic.LoadUint64(&ht.host.atomicUploadCalls) != 1 {
 		t.Error("expected to count an upload call")
 	}
 
@@ -38,13 +39,13 @@ func TestRPCTracking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rebootHost.reviseCalls != 1 {
+	if atomic.LoadUint64(&rebootHost.atomicReviseCalls) != 1 {
 		t.Error("expected to count a revise call")
 	}
-	if rebootHost.settingsCalls != 1 {
+	if atomic.LoadUint64(&rebootHost.atomicSettingsCalls) != 1 {
 		t.Error("expected to count a settings call")
 	}
-	if rebootHost.uploadCalls != 1 {
+	if atomic.LoadUint64(&rebootHost.atomicUploadCalls) != 1 {
 		t.Error("expected to count an upload call")
 	}
 }
