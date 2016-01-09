@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestIntegrationHosting tests that the host correctly receives payment for
@@ -50,8 +49,10 @@ func TestIntegrationHosting(t *testing.T) {
 		time.Sleep(1 * time.Second)
 	}
 
-	// mine blocks until storage proof is complete
-	for i := 0; i < 20+int(types.MaturityDelay); i++ {
+	// Mine blocks until the host recognizes profit. The host will wait for 12
+	// blocks after the storage window has closed to report the profit, a total
+	// of 40 blocks should be mined.
+	for i := 0; i < 40; i++ {
 		st.miner.AddBlock()
 	}
 
@@ -61,7 +62,7 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expRevenue := "15928888888855757473"
+	expRevenue := "15307662222190387473"
 	if hg.Revenue.String() != expRevenue {
 		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
 	}

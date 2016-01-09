@@ -5,7 +5,6 @@ package host
 import (
 	"errors"
 	"net"
-	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -124,12 +123,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 
 	// Load all of the saved host state into the host.
 	err := h.initPersist()
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize the logger.
-	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}

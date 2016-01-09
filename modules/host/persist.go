@@ -104,18 +104,20 @@ func (h *Host) save() error {
 // loadObligations loads file contract obligations from the persistent file
 // into the host.
 func (h *Host) loadObligations(cos []*contractObligation) {
-	for i := range cos {
+	for _, co := range cos {
 		// Store the obligation in the obligations list.
-		obligation := cos[i] // all objects should reference the same obligation
-		h.obligationsByID[obligation.ID] = obligation
+		h.obligationsByID[co.ID] = co
 
 		// Update spaceRemaining to account for the storage held by this
 		// obligation.
-		h.spaceRemaining -= int64(obligation.fileSize())
+		h.spaceRemaining -= int64(co.fileSize())
 
 		// Update anticipated revenue to reflect the revenue in this file
 		// contract.
-		h.anticipatedRevenue = h.anticipatedRevenue.Add(obligation.value())
+		h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value())
+
+		// Handle any required actions for the host.
+		h.handleActionItem(co)
 	}
 }
 
@@ -204,6 +206,13 @@ func (h *Host) establishDefaults() error {
 func (h *Host) initPersist() error {
 	// Create the perist directory if it does not yet exist.
 	err := os.MkdirAll(h.persistDir, 0700)
+	if err != nil {
+		return err
+	}
+
+	// Initialize the logger. Logger must be initialized first, because the
+	// rest of the initialization makes use of the logger.
+	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return err
 	}

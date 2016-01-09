@@ -256,8 +256,6 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 	}
 
 	// Update host statistics.
-	println(h.anticipatedRevenue.String())
-	println(co.value().String())
 	h.anticipatedRevenue = h.anticipatedRevenue.Sub(co.value())
 	if successful {
 		h.revenue = h.revenue.Add(co.value())
