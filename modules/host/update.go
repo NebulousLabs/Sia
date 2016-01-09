@@ -242,7 +242,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		for _, txn := range block.Transactions {
 			// Look for file contracts, revisions, and storage proofs that are
 			// no longer confirmed on-chain.
-			for k, _ := range txn.FileContracts {
+			for k := range txn.FileContracts {
 				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
 				if exists {
 					ob.OriginConfirmed = false
@@ -274,7 +274,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		for _, txn := range block.Transactions {
 			// Look for file contracts, revisions, and storage proofs that have
 			// been confirmed on-chain.
-			for k, _ := range txn.FileContracts {
+			for k := range txn.FileContracts {
 				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
 				if exists {
 					ob.OriginConfirmed = true

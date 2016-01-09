@@ -53,9 +53,8 @@ type contractObligation struct {
 func (co *contractObligation) fileSize() uint64 {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewFileSize
-	} else {
-		return co.OriginTxn.FileContracts[0].FileSize
 	}
+	return co.OriginTxn.FileContracts[0].FileSize
 }
 
 // hasRevision indiciates whether there is a file contract reivision contained
@@ -69,9 +68,8 @@ func (co *contractObligation) hasRevision() bool {
 func (co *contractObligation) missedProofUnlockHash() types.UnlockHash {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewMissedProofOutputs[1].UnlockHash
-	} else {
-		return co.OriginTxn.FileContracts[0].MissedProofOutputs[1].UnlockHash
 	}
+	return co.OriginTxn.FileContracts[0].MissedProofOutputs[1].UnlockHash
 }
 
 // payout returns the operating payout of the contract obligation.
@@ -112,9 +110,8 @@ func (co *contractObligation) reset() {
 func (co *contractObligation) revisionNumber() uint64 {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewRevisionNumber
-	} else {
-		return co.OriginTxn.FileContracts[0].RevisionNumber
 	}
+	return co.OriginTxn.FileContracts[0].RevisionNumber
 }
 
 // txnsConfirmed indiactes whether the file contract and its latest revision
@@ -134,27 +131,24 @@ func (co *contractObligation) txnsConfirmed() bool {
 func (co *contractObligation) validProofUnlockHash() types.UnlockHash {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewValidProofOutputs[1].UnlockHash
-	} else {
-		return co.OriginTxn.FileContracts[0].ValidProofOutputs[1].UnlockHash
 	}
+	return co.OriginTxn.FileContracts[0].ValidProofOutputs[1].UnlockHash
 }
 
 // value returns the expected monetary value of the file contract.
 func (co *contractObligation) value() types.Currency {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewValidProofOutputs[1].Value
-	} else {
-		return co.OriginTxn.FileContracts[0].ValidProofOutputs[1].Value
 	}
+	return co.OriginTxn.FileContracts[0].ValidProofOutputs[1].Value
 }
 
 // unlockHash returns the operating unlock hash of the contract obligation.
 func (co *contractObligation) unlockHash() types.UnlockHash {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewUnlockHash
-	} else {
-		return co.OriginTxn.FileContracts[0].UnlockHash
 	}
+	return co.OriginTxn.FileContracts[0].UnlockHash
 }
 
 // windowStart returns the first block in the storage proof window of the
@@ -162,9 +156,8 @@ func (co *contractObligation) unlockHash() types.UnlockHash {
 func (co *contractObligation) windowStart() types.BlockHeight {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewWindowStart
-	} else {
-		return co.OriginTxn.FileContracts[0].WindowStart
 	}
+	return co.OriginTxn.FileContracts[0].WindowStart
 }
 
 // windowEnd returns the first block in the storage proof window of the
@@ -172,9 +165,8 @@ func (co *contractObligation) windowStart() types.BlockHeight {
 func (co *contractObligation) windowEnd() types.BlockHeight {
 	if co.hasRevision() {
 		return co.RevisionTxn.FileContractRevisions[0].NewWindowEnd
-	} else {
-		return co.OriginTxn.FileContracts[0].WindowEnd
 	}
+	return co.OriginTxn.FileContracts[0].WindowEnd
 }
 
 // addObligation adds a new file contract obligation to the host. The

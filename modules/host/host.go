@@ -1,5 +1,5 @@
-// host is an implementation of the host module, and is responsible for storing
-// data and advertising available storage to the network.
+// Package host is an implementation of the host module, and is responsible for
+// storing data and advertising available storage to the network.
 package host
 
 import (

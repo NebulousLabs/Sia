@@ -50,6 +50,11 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
+	// As an exported function that needs resources, Annouce holds the resource
+	// lock throughout its operation.
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
 	h.mu.RLock()
@@ -64,7 +69,12 @@ func (h *Host) Announce() error {
 	return h.announce(addr)
 }
 
-// ForceAnnounce announces using the provided address.
+// AnnounceAddress submits a host announcement to the blockchain to announce a
+// specific address. No checks for validity are performed on the address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
+	// As an exported function that needs resources, AnnouceAddress holds the
+	// resource lock throughout its operation.
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
 	return h.announce(addr)
 }
