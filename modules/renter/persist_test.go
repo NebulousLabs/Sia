@@ -3,12 +3,12 @@ package renter
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -68,12 +68,51 @@ func TestFileSaveLoad(t *testing.T) {
 	}
 }
 
-// TestFileSaveLoadASCII tests the ASCII saving/loading functions.
-func TestFileSaveLoadASCII(t *testing.T) {
+// TestFileShareLoad tests the sharing/loading functions of the renter.
+func TestFileShareLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	rt, err := newRenterTester("TestRenterSaveLoad")
+	rt, err := newRenterTester("TestRenterShareLoad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Create a file and add it to the renter.
+	savedFile := newTestingFile()
+	rt.renter.files[savedFile.name] = savedFile
+
+	// Share .sia file to disk.
+	path := filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test.sia")
+	err = rt.renter.ShareFiles([]string{savedFile.name}, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the file from the renter.
+	delete(rt.renter.files, savedFile.name)
+
+	names, err := rt.renter.LoadSharedFiles(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 1 || names[0] != savedFile.name {
+		t.Fatal("nickname not loaded properly")
+	}
+
+	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestFileShareLoadASCII tests the ASCII sharing/loading functions.
+func TestFileShareLoadASCII(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester("TestRenterShareLoadASCII")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,6 +171,11 @@ func TestRenterSaveLoad(t *testing.T) {
 	rt.renter.saveFile(f2)
 	rt.renter.saveFile(f3)
 
+	err = rt.renter.save() // save metadata
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// load should now load the files into memory.
 	id := rt.renter.mu.Lock()
 	err = rt.renter.load()
@@ -148,17 +192,6 @@ func TestRenterSaveLoad(t *testing.T) {
 	}
 	if err := equalFiles(f3, rt.renter.files[f3.name]); err != nil {
 		t.Fatal(err)
-	}
-
-	// Corrupt a renter file and try to reload it.
-	err = ioutil.WriteFile(filepath.Join(rt.renter.persistDir, "corrupt"+ShareExtension), []byte{1, 2, 3}, 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = rt.renter.load()
-	if err == nil {
-		t.Fatal("expected error, got nil")
 	}
 }
 
