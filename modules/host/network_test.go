@@ -19,7 +19,7 @@ func TestRPCTracking(t *testing.T) {
 	}
 
 	// Upload a test file to get some metrics to increment.
-	err = ht.uploadFile("TestRPCTracking - 1")
+	_, err = ht.uploadFile("TestRPCTracking - 1", renewDisabled)
 	if err != nil {
 		t.Fatal(err)
 	}

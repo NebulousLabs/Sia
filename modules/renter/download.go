@@ -178,6 +178,7 @@ func (d *download) run(w io.Writer) error {
 			chunk[j] = d.getPiece(i, uint64(j))
 			if chunk[j] != nil {
 				left--
+			} else {
 			}
 			if left == 0 {
 				break
@@ -230,9 +231,17 @@ func (r *Renter) Download(nickname, destination string) error {
 		return errors.New("no file of that nickname")
 	}
 
+	// Copy the file's metadata
+	var contracts []fileContract
+	file.mu.RLock()
+	for _, fc := range file.contracts {
+		contracts = append(contracts, fc)
+	}
+	file.mu.RUnlock()
+
 	// Initiate connections to each host.
 	var hosts []fetcher
-	for _, fc := range file.contracts {
+	for _, fc := range contracts {
 		// TODO: connect in parallel
 		hf, err := newHostFetcher(fc, file.pieceSize, file.masterKey)
 		if err != nil {

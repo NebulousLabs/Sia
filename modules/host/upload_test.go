@@ -9,19 +9,27 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	testUploadDuration = 20 // Duration in blocks of a standard upload during testing.
+
+	// Helper variables to indicate whether renew is being toggled as input to
+	// uploadFile.
+	renewEnabled  = true
+	renewDisabled = false
 )
 
-// uploadTestFile uploads a file to the host from the tester's renter.
-func (ht *hostTester) uploadFile(name string) error {
+// uploadFile uploads a file to the host from the tester's renter. The data
+// used to make the file is returned. The nickname of the file in the renter is
+// the same as the name provided as input.
+func (ht *hostTester) uploadFile(name string, renew bool) ([]byte, error) {
 	// Check that renting is initialized properly.
 	err := ht.initRenting()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create a file to upload to the host.
@@ -29,32 +37,37 @@ func (ht *hostTester) uploadFile(name string) error {
 	datasize := uint64(1024)
 	data, err := crypto.RandBytes(int(datasize))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = ioutil.WriteFile(filepath, data, 0600)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Have the renter upload to the host.
+	rsc, err := renter.NewRSCode(1, 1)
+	if err != nil {
+		return nil, err
+	}
 	fup := modules.FileUploadParams{
 		Filename:    filepath,
 		Nickname:    name,
 		Duration:    testUploadDuration,
-		Renew:       false,
-		ErasureCode: nil,
+		Renew:       renew,
+		ErasureCode: rsc,
 		PieceSize:   0,
 	}
 	err = ht.renter.Upload(fup)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Wait until the upload has finished.
 	for i := 0; i < 100; i++ {
 		time.Sleep(time.Millisecond * 100)
 
-		// Asynchronous processes in the host access obligations by id.
+		// Asynchronous processes in the host access obligations by id,
+		// therefore a lock is required to scan the set of obligations.
 		if func() bool {
 			ht.host.mu.Lock()
 			defer ht.host.mu.Unlock()
@@ -75,14 +88,14 @@ func (ht *hostTester) uploadFile(name string) error {
 	defer ht.host.mu.Unlock()
 
 	if len(ht.host.obligationsByID) != 1 {
-		return errors.New("expecting a single obligation")
+		return nil, errors.New("expecting a single obligation")
 	}
 	for _, ob := range ht.host.obligationsByID {
 		if ob.fileSize() >= datasize {
-			return nil
+			return data, nil
 		}
 	}
-	return errors.New("ht.uploadFile: upload failed")
+	return nil, errors.New("ht.uploadFile: upload failed")
 }
 
 // TestRPCUPload attempts to upload a file to the host, adding coverage to the
@@ -99,7 +112,7 @@ func TestRPCUpload(t *testing.T) {
 	baselineAnticipatedRevenue := ht.host.anticipatedRevenue
 	baselineSpace := ht.host.spaceRemaining
 	ht.host.mu.RUnlock()
-	err = ht.uploadFile("TestRPCUpload - 1")
+	_, err = ht.uploadFile("TestRPCUpload - 1", renewDisabled)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +170,7 @@ func TestFailedObligation(t *testing.T) {
 	ht.host.mu.RLock()
 	baselineSpace := ht.host.spaceRemaining
 	ht.host.mu.RUnlock()
-	err = ht.uploadFile("TestFailedObligation - 1")
+	_, err = ht.uploadFile("TestFailedObligation - 1", renewDisabled)
 	if err != nil {
 		t.Fatal(err)
 	}

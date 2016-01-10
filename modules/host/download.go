@@ -17,7 +17,7 @@ const (
 	// tolerableDownloadSize specifies the maximum size that can be downloaded
 	// in a single request. 64MB is chosen because most requests should be at
 	// 4MB exactly and connections can be unstable beyond 200MB.
-	tolerableDownloadSize = 1 >> 26
+	tolerableDownloadSize = 1 << 26
 )
 
 // rpcDownload is an RPC that uploads requested segments of a file. After the
