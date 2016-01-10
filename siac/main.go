@@ -165,7 +165,7 @@ func main() {
 	root.AddCommand(stopCmd)
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd)
 
 	root.AddCommand(hostdbCmd)
 	hostCmd.AddCommand(hostdbCmd)
