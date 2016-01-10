@@ -25,6 +25,7 @@ dependencies:
 	go get -u github.com/spf13/cobra
 	# Developer Dependencies
 	go install -race std
+	go get -u github.com/golang/lint/golint
 	go get -u github.com/laher/goxc
 	go get -u golang.org/x/tools/cmd/cover
 
