@@ -84,7 +84,7 @@ func TestStorageProof(t *testing.T) {
 		Path: filepath.Join(ht.host.persistDir, "foo"),
 	}
 	ht.host.obligationsByID[fcid] = obligation
-	ht.host.actionItems[fc.WindowStart+1][obligation.ID] = obligation
+	ht.host.addActionItem(fc.WindowStart+1, obligation)
 
 	// submit both to tpool
 	err = ht.tpool.AcceptTransactionSet(append(signedTxnSet, revTxn))
