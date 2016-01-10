@@ -3,6 +3,7 @@ package host
 import (
 	"os"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -13,13 +14,18 @@ import (
 // typically happens if the user is replacing or altering the persistent files
 // in the consensus set or the host.
 func (h *Host) initRescan() error {
-	// Reset all of the variables that have relevance to the consensus set. For
-	// the host, this is just the block height.
+	// Reset all of the variables that have relevance to the consensus set.
 	err := func() error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 
+		// Reset all of the consensus-relevant variables in the host.
 		h.blockHeight = 0
+		h.actionItems = make(map[types.BlockHeight]map[types.FileContractID]*contractObligation)
+		for _, ob := range h.obligationsByID {
+			ob.reset()
+		}
+
 		return h.save()
 	}()
 	if err != nil {
@@ -28,7 +34,18 @@ func (h *Host) initRescan() error {
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the host has fully caught up to the current block.
-	return h.cs.ConsensusSetPersistentSubscribe(h, modules.ConsensusChangeID{})
+	err = h.cs.ConsensusSetPersistentSubscribe(h, modules.ConsensusChangeID{})
+	if err != nil {
+		return err
+	}
+
+	// After the host has caught up to the current consensus, perform any
+	// necessary actions on each obligation, including adding necessary future
+	// actions (such as creating storage proofs) to the queue.
+	for _, ob := range h.obligationsByID {
+		h.handleActionItem(ob)
+	}
+	return nil
 }
 
 // initConsensusSubscription subscribes the host to the consensus set.
@@ -44,23 +61,16 @@ func (h *Host) initConsensusSubscription() error {
 	return err
 }
 
-// threadedDeleteObligation deletes a file obligation.
-func (h *Host) threadedDeleteObligation(obligation *contractObligation) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	err := h.deallocate(obligation.Path)
-	if err != nil {
-		h.log.Printf("WARN: failed to deallocate %v: %v", obligation.Path, err)
-	}
-	delete(h.obligationsByID, obligation.ID)
-	h.save()
-}
-
 // threadedCreateStorageProof creates a storage proof for a file contract
-// obligation and submits it to the blockchain.
+// obligation and submits it to the blockchain. Though a lock is never held, a
+// significant amount of disk I/O happens, meaning this function should be
+// called in a separate goroutine.
 func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
-	defer h.threadedDeleteObligation(obligation)
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if build.DEBUG && h.closed {
+		panic("the close order should guarantee that threadedCreateStorageProof has access to host resources - yet host is closed!")
+	}
 
 	file, err := os.Open(obligation.Path)
 	if err != nil {
@@ -98,11 +108,6 @@ func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
 		h.log.Printf("ERROR: could not submit storage proof txn for %v (%v): %v", obligation.ID, obligation.Path, err)
 		return
 	}
-
-	// Storage proof was successful, so increment profit tracking
-	h.mu.Lock()
-	h.profit = h.profit.Add(obligation.FileContract.Payout)
-	h.mu.Unlock()
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
@@ -111,30 +116,89 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Adjust the height of the host. The host height is initialized to zero,
-	// but the genesis block is actually height zero. For the genesis block
-	// only, the height will be left at zero.
-	//
-	// Checking the height here eliminates the need to initialize the host to
-	// and underflowed types.BlockHeight.
-	oldHeight := h.blockHeight
-	if h.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisBlock.ID() {
-		h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
-		h.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-	}
-
-	// Check the range of heights between the previous height and the current
-	// height for storage proof obligations. There is no mechanism for
-	// re-submitting a storage proof in the event of a deep reorg, but the host
-	// waits StorageProofReorgDepth confirmations before submitting a storage
-	// proof. Reorgs deeper than that are assumed to be rare enough that it's
-	// okay for the host to eat losses under those circumstances.
-	for oldHeight < h.blockHeight {
-		oldHeight++
-		for _, ob := range h.obligationsByHeight[oldHeight] {
-			go h.threadedCreateStorageProof(ob)
+	// Go through the diffs and track any obligation-relevant transactions that
+	// have been confirmed or reorged.
+	for _, block := range cc.RevertedBlocks {
+		for _, txn := range block.Transactions {
+			// Look for file contracts, revisions, and storage proofs that are
+			// no longer confirmed on-chain.
+			for k := range txn.FileContracts {
+				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
+				if exists {
+					ob.OriginConfirmed = false
+				}
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				ob, exists := h.obligationsByID[fcr.ParentID]
+				if exists {
+					// There is a guarantee in the blockchain that if a
+					// revision for this file contract id is being removed, the
+					// most recent revision on the file contract is not in the
+					// blockchain. This guarantee only holds so long as the
+					// host has the revision with the highest revision number,
+					// and as long as there is only one revision signed with
+					// each revision number.
+					ob.RevisionConfirmed = false
+				}
+			}
+			for _, sp := range txn.StorageProofs {
+				ob, exists := h.obligationsByID[sp.ParentID]
+				if exists {
+					ob.ProofConfirmed = false
+				}
+			}
 		}
-		delete(h.obligationsByHeight, oldHeight)
+
+		if block.ID() != types.GenesisBlock.ID() {
+			h.blockHeight--
+		}
+	}
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			// Look for file contracts, revisions, and storage proofs that have
+			// been confirmed on-chain.
+			for k := range txn.FileContracts {
+				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
+				if exists {
+					ob.OriginConfirmed = true
+				}
+			}
+			for _, fcr := range txn.FileContractRevisions {
+				ob, exists := h.obligationsByID[fcr.ParentID]
+				if exists && ob.revisionNumber() == fcr.NewRevisionNumber {
+					// Need to check that the revision is the most recent
+					// revision. By assuming that the host only signs one
+					// revision for each number, and that the host has the most
+					// recent revision in the obligation, just checking the
+					// revision number is sufficient.
+					ob.RevisionConfirmed = true
+				}
+			}
+			for _, sp := range txn.StorageProofs {
+				ob, exists := h.obligationsByID[sp.ParentID]
+				if exists {
+					ob.ProofConfirmed = true
+				}
+			}
+		}
+
+		// Adjust the height of the host. The host height is initialized to
+		// zero, but the genesis block is actually height zero. For the genesis
+		// block only, the height will be left at zero.
+		//
+		// Checking the height here eliminates the need to initialize the host
+		// to and underflowed types.BlockHeight.
+		if block.ID() != types.GenesisBlock.ID() {
+			h.blockHeight++
+		}
+
+		// Handle any action items that have been scheduled for the current
+		// height.
+		obMap := h.actionItems[h.blockHeight]
+		for _, ob := range obMap {
+			h.handleActionItem(ob)
+		}
+		delete(h.actionItems, h.blockHeight)
 	}
 
 	// Update the host's recent change pointer to point to the most recent

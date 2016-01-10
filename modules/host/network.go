@@ -2,8 +2,10 @@ package host
 
 import (
 	"net"
+	"sync/atomic"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -20,57 +22,107 @@ func (h *Host) initNetworking(address string) error {
 	}
 	h.netAddress = modules.NetAddress(h.listener.Addr().String())
 
-	// Networking subroutines.
-	go h.forwardPort(h.netAddress.Port())
-	go h.learnHostname()
-	go h.listen()
+	// Non-blocking, perform port forwarding and hostname discovery.
+	go func() {
+		h.resourceLock.RLock()
+		defer h.resourceLock.RUnlock()
+		if h.closed {
+			return
+		}
+
+		h.mu.RLock()
+		port := h.netAddress.Port()
+		h.mu.RUnlock()
+		err := h.forwardPort(port)
+		if err != nil {
+			h.log.Println("ERROR: failed to forward port:", err)
+		}
+		h.learnHostname()
+	}()
+
+	// Launch the listener.
+	go h.threadedListen()
 	return nil
 }
 
-// listen listens for incoming RPCs and spawns an appropriate handler for each.
-func (h *Host) listen() {
-	for {
-		conn, err := h.listener.Accept()
-		if err != nil {
-			return
-		}
-		go h.handleConn(conn)
-	}
-}
-
-// handleConn handles an incoming connection to the host, typically an RPC.
-func (h *Host) handleConn(conn net.Conn) {
-	defer conn.Close()
-	// Set an initial duration that is generous, but finite. RPCs can extend
-	// this if so desired.
-	conn.SetDeadline(time.Now().Add(5 * time.Minute))
-
-	var id types.Specifier
-	if err := encoding.ReadObject(conn, &id, 16); err != nil {
+// threadedHandleConn handles an incoming connection to the host, typically an
+// RPC.
+func (h *Host) threadedHandleConn(conn net.Conn) {
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
 		return
 	}
-	var err error
+
+	// Set an initial duration that is generous, but finite. RPCs can extend
+	// this if desired.
+	err := conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	if err != nil {
+		h.log.Println("WARN: could not set deadline on connection:", err)
+		return
+	}
+	defer conn.Close()
+
+	// Read a specifier indicating which action is beeing called.
+	var id types.Specifier
+	if err := encoding.ReadObject(conn, &id, 16); err != nil {
+		atomic.AddUint64(&h.atomicMalformedCalls, 1)
+		h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
+		return
+	}
+
 	switch id {
-	case modules.RPCSettings:
-		err = h.rpcSettings(conn)
-	case modules.RPCUpload:
-		err = h.rpcUpload(conn)
-	case modules.RPCRenew:
-		err = h.rpcRenew(conn)
-	case modules.RPCRevise:
-		err = h.rpcRevise(conn)
 	case modules.RPCDownload:
-		err = h.rpcDownload(conn)
+		atomic.AddUint64(&h.atomicDownloadCalls, 1)
+		err = h.managedRPCDownload(conn)
+	case modules.RPCRenew:
+		atomic.AddUint64(&h.atomicRenewCalls, 1)
+		err = h.managedRPCRenew(conn)
+	case modules.RPCRevise:
+		atomic.AddUint64(&h.atomicReviseCalls, 1)
+		err = h.managedRPCRevise(conn)
+	case modules.RPCSettings:
+		atomic.AddUint64(&h.atomicSettingsCalls, 1)
+		err = h.managedRPCSettings(conn)
+	case modules.RPCUpload:
+		atomic.AddUint64(&h.atomicUploadCalls, 1)
+		err = h.managedRPCUpload(conn)
 	default:
+		atomic.AddUint64(&h.atomicErroredCalls, 1)
 		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
 	if err != nil {
+		atomic.AddUint64(&h.atomicErroredCalls, 1)
 		h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
 }
 
-// rpcSettings is an rpc that returns the host's settings.
-func (h *Host) rpcSettings(conn net.Conn) error {
+// listen listens for incoming RPCs and spawns an appropriate handler for each.
+func (h *Host) threadedListen() {
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if build.DEBUG && h.closed {
+		panic("threaded listen does not have access to host resources - is only called at startup")
+	}
+
+	// Receive connections until an error is returned by the listener. When an
+	// error is returned, there will be no more calls to receive.
+	for {
+		// Block until there is a connection to handle.
+		conn, err := h.listener.Accept()
+		if err != nil {
+			return
+		}
+
+		// Grab the resource lock before creating a goroutine.
+		go h.threadedHandleConn(conn)
+	}
+}
+
+// managedRPCSettings is an rpc that returns the host's settings.
+func (h *Host) managedRPCSettings(conn net.Conn) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return encoding.WriteObject(conn, h.Settings())
 }

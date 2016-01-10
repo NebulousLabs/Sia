@@ -3,6 +3,7 @@ package host
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -40,7 +41,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 
 	return nil
@@ -50,6 +50,12 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
+
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
 	h.mu.RLock()
@@ -57,14 +63,20 @@ func (h *Host) Announce() error {
 	h.mu.RUnlock()
 
 	// Check that the host's ip address is known.
-	if addr.IsLoopback() {
+	if addr.IsLoopback() && build.Release != "testing" {
 		return errors.New("can't announce without knowing external IP")
 	}
 
 	return h.announce(addr)
 }
 
-// ForceAnnounce announces using the provided address.
+// AnnounceAddress submits a host announcement to the blockchain to announce a
+// specific address. No checks for validity are performed on the address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
 	return h.announce(addr)
 }

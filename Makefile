@@ -25,6 +25,7 @@ dependencies:
 	go get -u github.com/spf13/cobra
 	# Developer Dependencies
 	go install -race std
+	go get -u github.com/golang/lint/golint
 	go get -u github.com/laher/goxc
 	go get -u golang.org/x/tools/cmd/cover
 
@@ -43,6 +44,11 @@ fmt:
 # vet calls go vet on all packages.
 vet:
 	go vet $(pkgs)
+
+# will always run on some packages for a while.
+lint:
+	golint -min_confidence=1.0 ./modules/host
+	@test -z $$(golint -min_confidence=1.0 ./modules/host)
 
 # REBUILD touches all of the build-dependent source files, forcing them to be
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
@@ -76,7 +82,7 @@ test: REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs) -run=$(run)
 test-v: REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
-test-long: clean fmt vet REBUILD
+test-long: clean fmt vet lint REBUILD
 	go test -v -race -tags='testing debug' -timeout=300s $(pkgs) -run=$(run)
 bench: clean fmt REBUILD
 	go test -tags='testing' -timeout=300s -run=XXX -bench=. $(pkgs)
@@ -92,7 +98,7 @@ cover-integration: clean REBUILD
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestIntegration -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestIntegration -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
@@ -100,7 +106,7 @@ cover-unit: clean REBUILD
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestUnit -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestUnit -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done

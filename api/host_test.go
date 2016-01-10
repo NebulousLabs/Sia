@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestIntegrationHosting tests that the host correctly receives payment for
@@ -45,13 +44,18 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
 		st.getAPI("/renter/files", &rf)
-		time.Sleep(1 * time.Second)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+		t.Fatal("the uploading is not succeeding for some reason")
 	}
 
-	// mine blocks until storage proof is complete
-	for i := 0; i < 20+int(types.MaturityDelay); i++ {
+	// Mine blocks until the host recognizes profit. The host will wait for 12
+	// blocks after the storage window has closed to report the profit, a total
+	// of 40 blocks should be mined.
+	for i := 0; i < 40; i++ {
 		st.miner.AddBlock()
 	}
 
@@ -61,7 +65,7 @@ func TestIntegrationHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expRevenue := "15928888888855757473"
+	expRevenue := "15307662222190387473"
 	if hg.Revenue.String() != expRevenue {
 		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
 	}
@@ -73,7 +77,6 @@ func TestIntegrationRenewing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	st, err := createServerTester("TestIntegrationRenewing")
 	if err != nil {
 		t.Fatal(err)
@@ -103,24 +106,29 @@ func TestIntegrationRenewing(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
 		st.getAPI("/renter/files", &rf)
-		time.Sleep(1 * time.Second)
+		time.Sleep(50 * time.Millisecond)
 	}
-	// default expiration is 60 blocks
-	expExpiration := st.cs.Height() + 60
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+		t.Error(rf.Files[0].UploadProgress)
+		t.Fatal("uploading has failed")
+	}
+
+	// default expiration is 20 blocks
+	expExpiration := st.cs.Height() + 20
 	if rf.Files[0].Expiration != expExpiration {
 		t.Fatalf("expected expiration of %v, got %v", expExpiration, rf.Files[0].Expiration)
 	}
 
-	// mine blocks until we hit the renew threshold (default 20 blocks)
-	for st.cs.Height() < expExpiration-20 {
+	// mine blocks until we hit the renew threshold (default 10 blocks)
+	for st.cs.Height() < expExpiration-10 {
 		st.miner.AddBlock()
 	}
 
-	// renter should now renew the contract for another 60 blocks
-	newExpiration := st.cs.Height() + 60
-	for rf.Files[0].Expiration != newExpiration {
+	// renter should now renew the contract for another 20 blocks
+	newExpiration := st.cs.Height() + 20
+	for i := 0; i < 5 && rf.Files[0].Expiration != newExpiration; i++ {
 		time.Sleep(1 * time.Second)
 		st.getAPI("/renter/files", &rf)
 	}

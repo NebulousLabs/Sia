@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestStorageProof checks that the host can create and submit a storage proof.
 func TestStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -45,12 +46,18 @@ func TestStorageProof(t *testing.T) {
 	// generate data
 	const dataSize = 777
 	data := make([]byte, dataSize)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	root, err := crypto.ReaderMerkleRoot(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
+	err = ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create revision
 	rev := types.FileContractRevision{
@@ -70,12 +77,14 @@ func TestStorageProof(t *testing.T) {
 
 	// create obligation
 	obligation := &contractObligation{
-		ID:           fcid,
-		FileContract: fc,
-		Path:         filepath.Join(ht.host.persistDir, "foo"),
+		ID: fcid,
+		OriginTransaction: types.Transaction{
+			FileContracts: []types.FileContract{fc},
+		},
+		Path: filepath.Join(ht.host.persistDir, "foo"),
 	}
 	ht.host.obligationsByID[fcid] = obligation
-	ht.host.obligationsByHeight[fc.WindowStart+1] = []*contractObligation{obligation}
+	ht.host.addActionItem(fc.WindowStart+1, obligation)
 
 	// submit both to tpool
 	err = ht.tpool.AcceptTransactionSet(append(signedTxnSet, revTxn))
