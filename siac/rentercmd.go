@@ -137,7 +137,7 @@ func renterfilesdeletecmd(nickname string) {
 }
 
 func renterfilesdownloadcmd(nickname, destination string) {
-	err := post("/renter/download/"+nickname, "destination="+abs(destination))
+	err := get("/renter/download/" + nickname + "?destination=" + abs(destination))
 	if err != nil {
 		fmt.Println("Could not download file:", err)
 		return
