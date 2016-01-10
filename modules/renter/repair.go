@@ -98,31 +98,6 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	return nil
 }
 
-// threadedRepairLoop improves the health of files tracked by the renter by
-// reuploading their missing pieces. Multiple repair attempts may be necessary
-// before the file reaches full redundancy.
-func (r *Renter) threadedRepairLoop() {
-	for {
-		time.Sleep(5 * time.Second)
-
-		if !r.wallet.Unlocked() {
-			continue
-		}
-
-		// make copy of repair set under lock
-		repairing := make(map[string]trackedFile)
-		id := r.mu.RLock()
-		for name, meta := range r.tracking {
-			repairing[name] = meta
-		}
-		r.mu.RUnlock(id)
-
-		for name, meta := range repairing {
-			r.threadedRepairFile(name, meta)
-		}
-	}
-}
-
 // incompleteChunks returns a map of chunks containing pieces that have not
 // been uploaded.
 func (f *file) incompleteChunks() map[uint64][]uint64 {
@@ -225,6 +200,37 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 		}
 	}
 	return filtered
+}
+
+// threadedRepairLoop improves the health of files tracked by the renter by
+// reuploading their missing pieces. Multiple repair attempts may be necessary
+// before the file reaches full redundancy.
+func (r *Renter) threadedRepairLoop() {
+	for {
+		time.Sleep(5 * time.Second)
+
+		if !r.wallet.Unlocked() {
+			continue
+		}
+
+		// make copy of repair set under lock
+		repairing := make(map[string]trackedFile)
+		id := r.mu.RLock()
+		for name, meta := range r.tracking {
+			repairing[name] = meta
+		}
+		r.mu.RUnlock(id)
+
+		var wg sync.WaitGroup
+		wg.Add(len(repairing))
+		for name, meta := range repairing {
+			go func(name string, meta trackedFile) {
+				defer wg.Done()
+				r.threadedRepairFile(name, meta)
+			}(name, meta)
+		}
+		wg.Wait()
+	}
 }
 
 // threadedRepairFile repairs and saves an individual file.
