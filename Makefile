@@ -93,7 +93,7 @@ cover-integration: clean REBUILD
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestIntegration -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestIntegration -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
@@ -101,7 +101,7 @@ cover-unit: clean REBUILD
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestUnit -tags='testing debug' -timeout=300s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestUnit -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done

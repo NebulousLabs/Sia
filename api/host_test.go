@@ -106,12 +106,17 @@ func TestIntegrationRenewing(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+	for i := 0; i < 50 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
 		st.getAPI("/renter/files", &rf)
-		time.Sleep(1 * time.Second)
+		time.Sleep(50 * time.Millisecond)
 	}
-	// default expiration is 60 blocks
-	expExpiration := st.cs.Height() + 60
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+		t.Error(rf.Files[0].UploadProgress)
+		t.Fatal("uploading has failed")
+	}
+
+	// default expiration is 20 blocks
+	expExpiration := st.cs.Height() + 20
 	if rf.Files[0].Expiration != expExpiration {
 		t.Fatalf("expected expiration of %v, got %v", expExpiration, rf.Files[0].Expiration)
 	}
