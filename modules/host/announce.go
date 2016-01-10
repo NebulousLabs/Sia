@@ -54,6 +54,9 @@ func (h *Host) Announce() error {
 	// lock throughout its operation.
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
 
 	// Get the external IP again; it may have changed.
 	h.learnHostname()
@@ -76,5 +79,8 @@ func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	// resource lock throughout its operation.
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
 	return h.announce(addr)
 }
