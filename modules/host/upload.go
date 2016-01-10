@@ -229,9 +229,9 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 
 	// Add this contract to the host's list of obligations.
 	co := &contractObligation{
-		ID:        contractTxn.FileContractID(0),
-		OriginTxn: contractTxn,
-		Path:      filename,
+		ID:                contractTxn.FileContractID(0),
+		OriginTransaction: contractTxn,
+		Path:              filename,
 	}
 	h.mu.Lock()
 	h.addObligation(co)
@@ -406,7 +406,7 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 		return err
 	}
 
-	err = h.tpool.AcceptTransactionSet([]types.Transaction{obligation.RevisionTxn})
+	err = h.tpool.AcceptTransactionSet([]types.Transaction{obligation.RevisionTransaction})
 	if err != nil {
 		h.log.Println("WARN: transaction pool rejected revision transaction: " + err.Error())
 	}
@@ -433,8 +433,8 @@ func (h *Host) managedRPCRenew(conn net.Conn) error {
 	// need to protect against simultaneous renewals of the same contract
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
-	filesize := obligation.RevisionTxn.FileContractRevisions[0].NewFileSize
-	merkleRoot := obligation.RevisionTxn.FileContractRevisions[0].NewFileMerkleRoot
+	filesize := obligation.RevisionTransaction.FileContractRevisions[0].NewFileSize
+	merkleRoot := obligation.RevisionTransaction.FileContractRevisions[0].NewFileMerkleRoot
 
 	// copy over old file data
 	h.mu.RLock()

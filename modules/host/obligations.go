@@ -31,12 +31,12 @@ type contractObligation struct {
 	// because the same storage proof transaction is not always guaranteed to
 	// be valid. If the origin or the revision has not been confirmed, the host
 	// will need to resubmit them to the transaction pool.
-	ID                types.FileContractID // The ID of the file contract.
-	OriginTxn         types.Transaction    // The transaction containing the original file contract.
-	RevisionTxn       types.Transaction    // The most recent revision to the contract.
-	OriginConfirmed   bool                 // whether the origin transaction has been confirmed.
-	RevisionConfirmed bool                 // whether the most recent revision has been confirmed.
-	ProofConfirmed    bool                 // whether the storage proof has been confirmed.
+	ID                  types.FileContractID // The ID of the file contract.
+	OriginTransaction   types.Transaction    // The transaction containing the original file contract.
+	RevisionTransaction types.Transaction    // The most recent revision to the contract.
+	OriginConfirmed     bool                 // whether the origin transaction has been confirmed.
+	RevisionConfirmed   bool                 // whether the most recent revision has been confirmed.
+	ProofConfirmed      bool                 // whether the storage proof has been confirmed.
 
 	// Where on disk the file is stored.
 	Path string
@@ -52,24 +52,24 @@ type contractObligation struct {
 // obligation.
 func (co *contractObligation) fileSize() uint64 {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewFileSize
+		return co.RevisionTransaction.FileContractRevisions[0].NewFileSize
 	}
-	return co.OriginTxn.FileContracts[0].FileSize
+	return co.OriginTransaction.FileContracts[0].FileSize
 }
 
 // hasRevision indiciates whether there is a file contract reivision contained
 // within the contract obligation.
 func (co *contractObligation) hasRevision() bool {
-	return len(co.RevisionTxn.FileContractRevisions) == 1
+	return len(co.RevisionTransaction.FileContractRevisions) == 1
 }
 
 // missedProofUnlockHash returns the operating unlock hash for a successful
 // file contract in the obligation.
 func (co *contractObligation) missedProofUnlockHash() types.UnlockHash {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewMissedProofOutputs[1].UnlockHash
+		return co.RevisionTransaction.FileContractRevisions[0].NewMissedProofOutputs[1].UnlockHash
 	}
-	return co.OriginTxn.FileContracts[0].MissedProofOutputs[1].UnlockHash
+	return co.OriginTransaction.FileContracts[0].MissedProofOutputs[1].UnlockHash
 }
 
 // payout returns the operating payout of the contract obligation.
@@ -77,7 +77,7 @@ func (co *contractObligation) payout() types.Currency {
 	// Function seems unnecessary because it is just a getter, but adding this
 	// function helps maintain consistency with the way that the other fields
 	// are accessed.
-	return co.OriginTxn.FileContracts[0].Payout
+	return co.OriginTransaction.FileContracts[0].Payout
 }
 
 // proofConfirmed inidicates whether the storage proofs have been seen on the
@@ -105,9 +105,9 @@ func (co *contractObligation) reset() {
 // revisionNumber returns the operating revision number of the obligation.
 func (co *contractObligation) revisionNumber() uint64 {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewRevisionNumber
+		return co.RevisionTransaction.FileContractRevisions[0].NewRevisionNumber
 	}
-	return co.OriginTxn.FileContracts[0].RevisionNumber
+	return co.OriginTransaction.FileContracts[0].RevisionNumber
 }
 
 // txnsConfirmed indicates whether the file contract and its latest revision
@@ -134,43 +134,43 @@ func (co *contractObligation) txnsConfirmed() bool {
 // contract in the obligation.
 func (co *contractObligation) validProofUnlockHash() types.UnlockHash {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewValidProofOutputs[1].UnlockHash
+		return co.RevisionTransaction.FileContractRevisions[0].NewValidProofOutputs[1].UnlockHash
 	}
-	return co.OriginTxn.FileContracts[0].ValidProofOutputs[1].UnlockHash
+	return co.OriginTransaction.FileContracts[0].ValidProofOutputs[1].UnlockHash
 }
 
 // value returns the expected monetary value of the file contract.
 func (co *contractObligation) value() types.Currency {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewValidProofOutputs[1].Value
+		return co.RevisionTransaction.FileContractRevisions[0].NewValidProofOutputs[1].Value
 	}
-	return co.OriginTxn.FileContracts[0].ValidProofOutputs[1].Value
+	return co.OriginTransaction.FileContracts[0].ValidProofOutputs[1].Value
 }
 
 // unlockHash returns the operating unlock hash of the contract obligation.
 func (co *contractObligation) unlockHash() types.UnlockHash {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewUnlockHash
+		return co.RevisionTransaction.FileContractRevisions[0].NewUnlockHash
 	}
-	return co.OriginTxn.FileContracts[0].UnlockHash
+	return co.OriginTransaction.FileContracts[0].UnlockHash
 }
 
 // windowStart returns the first block in the storage proof window of the
 // contract obligation.
 func (co *contractObligation) windowStart() types.BlockHeight {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewWindowStart
+		return co.RevisionTransaction.FileContractRevisions[0].NewWindowStart
 	}
-	return co.OriginTxn.FileContracts[0].WindowStart
+	return co.OriginTransaction.FileContracts[0].WindowStart
 }
 
 // windowEnd returns the first block in the storage proof window of the
 // contract obligation.
 func (co *contractObligation) windowEnd() types.BlockHeight {
 	if co.hasRevision() {
-		return co.RevisionTxn.FileContractRevisions[0].NewWindowEnd
+		return co.RevisionTransaction.FileContractRevisions[0].NewWindowEnd
 	}
-	return co.OriginTxn.FileContracts[0].WindowEnd
+	return co.OriginTransaction.FileContracts[0].WindowEnd
 }
 
 // addObligation adds a new file contract obligation to the host. The
@@ -219,13 +219,12 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	h.anticipatedRevenue = h.anticipatedRevenue.Sub(obligation.value())
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(revisionTransaction.FileContractRevisions[0].NewValidProofOutputs[1].Value)
 
-	// Queue an action item to ensure that the transaction made it into the
+	// The host needs to verify that the revision transaction made it into the
 	// blockchain.
-	confirmHeight := h.blockHeight + resubmissionTimeout
-	h.addActionItem(confirmHeight, obligation)
+	h.addActionItem(h.blockHeight+resubmissionTimeout, obligation)
 
 	// Add the revision to the obligation
-	obligation.RevisionTxn = revisionTransaction
+	obligation.RevisionTransaction = revisionTransaction
 	obligation.RevisionConfirmed = false
 }
 

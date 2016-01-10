@@ -78,7 +78,7 @@ func TestStorageProof(t *testing.T) {
 	// create obligation
 	obligation := &contractObligation{
 		ID: fcid,
-		OriginTxn: types.Transaction{
+		OriginTransaction: types.Transaction{
 			FileContracts: []types.FileContract{fc},
 		},
 		Path: filepath.Join(ht.host.persistDir, "foo"),
