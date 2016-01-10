@@ -157,6 +157,55 @@ func TestRPCUpload(t *testing.T) {
 	}
 }
 
+// TestRPCRenew attempts to upload a file to the host, adding coverage to the
+// upload function.
+func TestRPCRenew(t *testing.T) {
+	t.Skip("test skipped because the renter renew function isn't block based")
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestRPCRenew")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ht.uploadFile("TestRPCRenew- 1", renewEnabled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	expectedRevenue := ht.host.anticipatedRevenue
+	expectedSpaceRemaining := ht.host.spaceRemaining
+	ht.host.mu.RUnlock()
+
+	// Mine until the storage proof goes through, and the obligation gets
+	// cleared.
+	for i := 0; i <= testUploadDuration+confirmationRequirement+testingWindowSize; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Check that the rewards for the first obligation went through, and that
+	// there is another from the contract being renewed.
+	ht.host.mu.Lock()
+	defer ht.host.mu.Unlock()
+	if len(ht.host.obligationsByID) != 1 {
+		t.Error("file contract was not renenwed after being completed")
+	}
+	if ht.host.anticipatedRevenue.IsZero() {
+		t.Error("host anticipated revenue should be nonzero")
+	}
+	if ht.host.spaceRemaining != expectedSpaceRemaining {
+		t.Error("host space remaining changed after a renew happened")
+	}
+	if expectedRevenue.Cmp(ht.host.revenue) > 0 {
+		t.Error("host's revenue was not increased though a proof was successful")
+	}
+
+	// TODO: Download the file that got renewed, see if the data is correct.
+}
+
 // TestFailedObligation tests that the host correctly handles missing a storage
 // proof.
 func TestFailedObligation(t *testing.T) {
