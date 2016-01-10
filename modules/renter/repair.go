@@ -258,6 +258,14 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		return
 	}
 
+	// determine if there is any work to do
+	incChunks := f.incompleteChunks()
+	offlineChunks := f.offlineChunks(r.hostDB)
+	expContracts := f.expiringContracts(height)
+	if len(incChunks) == 0 && len(offlineChunks) == 0 && (!meta.Renew || len(expContracts) == 0) {
+		return
+	}
+
 	// open file handle
 	handle, err := os.Open(meta.RepairPath)
 	if err != nil {
@@ -267,36 +275,34 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	defer handle.Close()
 
 	// repair incomplete chunks
-	if badChunks := f.incompleteChunks(); len(badChunks) != 0 {
-		r.log.Printf("repairing %v chunks of %v", len(badChunks), f.name)
+	if len(incChunks) != 0 {
+		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
 		var duration types.BlockHeight
 		if meta.Renew {
 			duration = defaultDuration
 		} else {
 			duration = meta.EndHeight - height
 		}
-		r.repairChunks(f, handle, badChunks, duration)
+		r.repairChunks(f, handle, incChunks, duration)
 	}
 
 	// repair offline chunks
-	if badChunks := f.offlineChunks(r.hostDB); len(badChunks) != 0 {
-		r.log.Printf("reuploading %v offline chunks of %v", len(badChunks), f.name)
+	if len(offlineChunks) != 0 {
+		r.log.Printf("reuploading %v offline chunks of %v", len(offlineChunks), f.name)
 		var duration types.BlockHeight
 		if meta.Renew {
 			duration = defaultDuration
 		} else {
 			duration = meta.EndHeight - height
 		}
-		r.repairChunks(f, handle, badChunks, duration)
+		r.repairChunks(f, handle, offlineChunks, duration)
 	}
 
 	// renew expiring contracts
-	if meta.Renew {
-		if badContracts := f.expiringContracts(height); len(badContracts) != 0 {
-			r.log.Printf("renewing %v contracts of %v", len(badContracts), f.name)
-			newHeight := height + defaultDuration
-			r.renewContracts(f, badContracts, newHeight)
-		}
+	if meta.Renew && len(expContracts) != 0 {
+		r.log.Printf("renewing %v contracts of %v", len(expContracts), f.name)
+		newHeight := height + defaultDuration
+		r.renewContracts(f, expContracts, newHeight)
 	}
 
 	// save the repaired file data
