@@ -44,7 +44,7 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for i := 0; i < 100 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
+	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -106,7 +106,7 @@ func TestIntegrationRenewing(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for i := 0; i < 50 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
+	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -121,14 +121,14 @@ func TestIntegrationRenewing(t *testing.T) {
 		t.Fatalf("expected expiration of %v, got %v", expExpiration, rf.Files[0].Expiration)
 	}
 
-	// mine blocks until we hit the renew threshold (default 20 blocks)
-	for st.cs.Height() < expExpiration-20 {
+	// mine blocks until we hit the renew threshold (default 10 blocks)
+	for st.cs.Height() < expExpiration-10 {
 		st.miner.AddBlock()
 	}
 
-	// renter should now renew the contract for another 60 blocks
-	newExpiration := st.cs.Height() + 60
-	for rf.Files[0].Expiration != newExpiration {
+	// renter should now renew the contract for another 20 blocks
+	newExpiration := st.cs.Height() + 20
+	for i := 0; i < 5 && rf.Files[0].Expiration != newExpiration; i++ {
 		time.Sleep(1 * time.Second)
 		st.getAPI("/renter/files", &rf)
 	}
