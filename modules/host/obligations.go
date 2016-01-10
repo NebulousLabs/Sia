@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -75,6 +76,15 @@ func (co *contractObligation) fileSize() uint64 {
 // within the contract obligation.
 func (co *contractObligation) hasRevision() bool {
 	return len(co.RevisionTransaction.FileContractRevisions) == 1
+}
+
+// merkleRoot returns the operating unlock hash for a successful
+// file contract in the obligation.
+func (co *contractObligation) merkleRoot() crypto.Hash {
+	if co.hasRevision() {
+		return co.RevisionTransaction.FileContractRevisions[0].NewFileMerkleRoot
+	}
+	return co.OriginTransaction.FileContracts[0].FileMerkleRoot
 }
 
 // missedProofUnlockHash returns the operating unlock hash for a successful

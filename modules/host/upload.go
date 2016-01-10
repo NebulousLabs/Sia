@@ -433,8 +433,6 @@ func (h *Host) managedRPCRenew(conn net.Conn) error {
 	// need to protect against simultaneous renewals of the same contract
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
-	filesize := obligation.RevisionTransaction.FileContractRevisions[0].NewFileSize
-	merkleRoot := obligation.RevisionTransaction.FileContractRevisions[0].NewFileMerkleRoot
 
 	// copy over old file data
 	h.mu.RLock()
@@ -458,5 +456,5 @@ func (h *Host) managedRPCRenew(conn net.Conn) error {
 		return err
 	}
 
-	return h.managedNegotiateContract(conn, filesize, merkleRoot, filename)
+	return h.managedNegotiateContract(conn, obligation.fileSize(), obligation.merkleRoot(), filename)
 }

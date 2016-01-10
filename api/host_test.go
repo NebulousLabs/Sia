@@ -44,9 +44,12 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+	for i := 0; i < 100 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
 		st.getAPI("/renter/files", &rf)
-		time.Sleep(1 * time.Second)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+		t.Fatal("the uploading is not succeeding for some reason")
 	}
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12
@@ -74,7 +77,6 @@ func TestIntegrationRenewing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	st, err := createServerTester("TestIntegrationRenewing")
 	if err != nil {
 		t.Fatal(err)
