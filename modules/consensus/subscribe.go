@@ -140,21 +140,13 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 	}
 }
 
-// ConsensusSetPersistentSubscribe adds a subscriber to the list of
-// subscribers, and gives them every consensus change that has occured since
-// the change with the provided id.
+// initializePersistentSubscribe will take a subscriber and feed them all of the
+// consensus changes that have occurred since the change provided.
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
-func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
-	// Add the subscriber to the list of subscribers under lock, and then
-	// demote while sending the subscriber all of the changes they've missed.
-	cs.mu.Lock()
-	cs.subscribers = append(cs.subscribers, subscriber)
-	cs.mu.Demote()
-	defer cs.mu.DemotedUnlock()
-
-	err := cs.db.View(func(tx *bolt.Tx) error {
+func (cs *ConsensusSet) initializePersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	return cs.db.View(func(tx *bolt.Tx) error {
 		// 'exists' and 'entry' are going to be pointed to the first entry that
 		// has not yet been seen by subscriber.
 		var exists bool
@@ -195,9 +187,27 @@ func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.Conse
 		}
 		return nil
 	})
+}
+
+// ConsensusSetPersistentSubscribe adds a subscriber to the list of
+// subscribers, and gives them every consensus change that has occured since
+// the change with the provided id.
+//
+// As a special case, using an empty id as the start will have all the changes
+// sent to the modules starting with the genesis block.
+func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	// Get the input module caught up to the currenct consnesus set.
+	cs.mu.RLock()
+	err := cs.initializePersistentSubscribe(subscriber, start)
+	cs.mu.RUnlock()
 	if err != nil {
 		return err
 	}
+
+	// Only add the module as a subscriber if there was no error.
+	cs.mu.Lock()
+	cs.subscribers = append(cs.subscribers, subscriber)
+	cs.mu.Unlock()
 	return nil
 }
 
