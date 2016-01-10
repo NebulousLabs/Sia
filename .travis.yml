@@ -6,6 +6,7 @@ go:
 install:
   - make dependencies
   - test -z "$(go fmt ./...)"
+  - golint ./modules/host
   - make
 
 script: make test && make test-long && make cover && make bench
