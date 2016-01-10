@@ -111,7 +111,7 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 // renterShareHandler handles the API call to create a '.sia' file that
 // shares a set of file.
 func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.ShareFiles(strings.Split(req.FormValue("path"), ","), req.FormValue("destination"))
+	err := srv.renter.ShareFiles(strings.Split(req.FormValue("paths"), ","), req.FormValue("destination"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -123,7 +123,7 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 // renterShareAsciiHandler handles the API call to return a '.sia' file
 // in ascii form.
 func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	ascii, err := srv.renter.ShareFilesAscii(strings.Split(req.FormValue("path"), ","))
+	ascii, err := srv.renter.ShareFilesAscii(strings.Split(req.FormValue("paths"), ","))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
