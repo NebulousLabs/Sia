@@ -99,11 +99,7 @@ func (co *contractObligation) reset() {
 	// If there is no revision, then the final revision counts as being
 	// confirmed. Otherwise, the revision should not be considered as
 	// confirmed.
-	if co.hasRevision() {
-		co.RevisionConfirmed = false
-	} else {
-		co.RevisionConfirmed = true
-	}
+	co.RevisionConfirmed = !co.hasRevision()
 }
 
 // revisionNumber returns the operating revision number of the obligation.
@@ -114,15 +110,23 @@ func (co *contractObligation) revisionNumber() uint64 {
 	return co.OriginTxn.FileContracts[0].RevisionNumber
 }
 
-// txnsConfirmed indiactes whether the file contract and its latest revision
+// txnsConfirmed indicates whether the file contract and its latest revision
 // have been seen on the blockchain.
 func (co *contractObligation) txnsConfirmed() bool {
+	// The origin transaction is always present. If the origin transaction
+	// isn't marked as confirmed, then the transactions aren't confirmed.
 	if !co.OriginConfirmed {
 		return false
 	}
+
+	// If there is a revision and it hasn't been confirmed, then the
+	// transactions aren't confirmed.
 	if co.hasRevision() && !co.RevisionConfirmed {
 		return false
 	}
+
+	// Both potential fail conditions have been checked, all other possibilites
+	// mean that all transactions have been confirmed.
 	return true
 }
 
@@ -209,13 +213,14 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 		panic("cannot revise obligation - obligation not found")
 	}
 
-	// Update the host's statistics, and determine whether the host needs a new
-	// action item due to the revision window moving.
+	// Update the host's statistics.
 	h.spaceRemaining += int64(obligation.fileSize())
 	h.spaceRemaining -= int64(revisionTransaction.FileContractRevisions[0].NewFileSize)
 	h.anticipatedRevenue = h.anticipatedRevenue.Sub(obligation.value())
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(revisionTransaction.FileContractRevisions[0].NewValidProofOutputs[1].Value)
 
+	// Queue an action item to ensure that the transaction made it into the
+	// blockchain.
 	confirmHeight := h.blockHeight + resubmissionTimeout
 	h.addActionItem(confirmHeight, obligation)
 
