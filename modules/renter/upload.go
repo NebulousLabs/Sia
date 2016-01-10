@@ -42,6 +42,9 @@ var ErrDuplicateNickname = errors.New("file with that nickname already exists")
 // money in the wallet to support such an upload. An error is returned if it is
 // determined that there is not enough money.
 func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
+	if !r.wallet.Unlocked() {
+		return errors.New("wallet is locked")
+	}
 	// Get the size of the file.
 	fileInfo, err := os.Stat(up.Filename)
 	if err != nil {
