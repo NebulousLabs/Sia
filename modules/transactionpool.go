@@ -60,7 +60,10 @@ type TransactionPool interface {
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
 }
 
-// ConsensusConflict implements the error interface, and indicates
+// ConsensusConflict implements the error interface, and indicates that a
+// transaction was rejected due to being incompatible with the current
+// consensus set, meaning either a double spend or a consensus rule violation -
+// it is unlikely that the transaction will ever be valid.
 type ConsensusConflict string
 
 // NewConsensusConflict returns a consensus conflict, which implements the

@@ -233,7 +233,7 @@ func TestFailedObligation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i <= testUploadDuration+testingWindowSize; i++ {
+	for i := 0; i <= testUploadDuration+testingWindowSize+3; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)

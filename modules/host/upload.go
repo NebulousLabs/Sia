@@ -347,7 +347,7 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 				// There is nothing that can be done if there is an error while
 				// writing to a connection.
 				_ = encoding.WriteObject(conn, err.Error())
-				continue // don't terminate loop; subsequent revisions may be okay
+				return err
 			}
 
 			// indicate acceptance

@@ -268,7 +268,10 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				}
 			}
 		}
-		h.blockHeight--
+
+		if block.ID() != types.GenesisBlock.ID() {
+			h.blockHeight--
+		}
 	}
 	for _, block := range cc.AppliedBlocks {
 		for _, txn := range block.Transactions {
@@ -305,7 +308,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		//
 		// Checking the height here eliminates the need to initialize the host
 		// to and underflowed types.BlockHeight.
-		if h.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != h.cs.GenesisBlock().ID() {
+		if block.ID() != types.GenesisBlock.ID() {
 			h.blockHeight++
 		}
 
