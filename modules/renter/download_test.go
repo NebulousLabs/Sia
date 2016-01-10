@@ -118,12 +118,14 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	/*
+		// These metrics can be used to assess the efficiency of the download
+		// algorithm.
+
 		totFetch := 0
 		for i, h := range hosts {
 			h := h.(*testHost)
 			t.Logf("Host %2d:  Fetched: %v/%v", i, h.nFetch, h.nAttempt)
 			totFetch += h.nAttempt
-
 		}
 		t.Log("Optimal fetches:", i*uint64(rsc.MinPieces()))
 		t.Log("Total fetches:  ", totFetch)

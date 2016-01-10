@@ -133,6 +133,9 @@ func TestRepair(t *testing.T) {
 	}
 
 	/*
+		// These metrics can be used to assess the efficiency of the repair
+		// algorithm.
+
 		for i, h := range hosts {
 			host := h.(*testHost)
 			pieces := 0
