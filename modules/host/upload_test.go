@@ -152,7 +152,7 @@ func TestRPCUpload(t *testing.T) {
 
 	// Mine until the storage proof goes through, and the obligation gets
 	// cleared.
-	for i := 0; i <= testUploadDuration+confirmationRequirement+testingWindowSize; i++ {
+	for i := types.BlockHeight(0); i <= testUploadDuration+confirmationRequirement+defaultWindowSize; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -198,7 +198,7 @@ func TestRPCRenew(t *testing.T) {
 
 	// Mine until the storage proof goes through, and the obligation gets
 	// cleared.
-	for i := 0; i <= testUploadDuration+confirmationRequirement+testingWindowSize; i++ {
+	for i := types.BlockHeight(0); i <= testUploadDuration+confirmationRequirement+defaultWindowSize; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -252,7 +252,7 @@ func TestFailedObligation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i <= testUploadDuration+testingWindowSize+3; i++ {
+	for i := types.BlockHeight(0); i <= testUploadDuration+defaultWindowSize+2; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)

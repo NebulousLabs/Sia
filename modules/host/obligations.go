@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -13,15 +14,28 @@ const (
 	// before trying to resubmit a transaction to the blockchain.
 	resubmissionTimeout = 2
 
-	// confirmationRequirement is the number of blocks that the host is going
-	// to wait before assuming that a storage proof has successfully been
-	// confirmed by the blockchain.
-	confirmationRequirement = 12
-
 	// Booleans to indicate that a contract obligation has been successful or
 	// unsuccessful.
 	obligationSucceeded = true
 	obligationFailed    = false
+)
+
+var (
+	// confirmationRequirement is the number of blocks that the host waits
+	// before assuming that a storage proof has been confirmed by the
+	// blockchain, and will not need to be reconstructed.
+	confirmationRequirement = func() types.BlockHeight {
+		if build.Release == "testing" {
+			return 3
+		}
+		if build.Release == "standard" {
+			return 12
+		}
+		if build.Release == "dev" {
+			return 6
+		}
+		panic("unrecognized release value")
+	}()
 )
 
 // A contractObligation tracks a file contract that the host is obligated to
@@ -185,10 +199,9 @@ func (h *Host) addObligation(co *contractObligation) {
 	// Add the obligation to the list of host obligations.
 	h.obligationsByID[co.ID] = co
 
-	// The host needs to make sure that the file contract has made it into the
-	// blockchain, and to make sure that a storage proof is submitted on time.
-	confirmHeight := h.blockHeight + resubmissionTimeout
-	h.addActionItem(confirmHeight, co)
+	// The host needs to verify that the obligation transaction made it into
+	// the blockchain.
+	h.addActionItem(h.blockHeight+resubmissionTimeout, co)
 
 	// Update the statistics.
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value()) // Output at index 1 alone belongs to host.

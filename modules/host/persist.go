@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -176,11 +175,6 @@ func (h *Host) establishDefaults() error {
 		Collateral:   defaultCollateral,
 	}
 	h.spaceRemaining = h.settings.TotalStorage
-
-	// Reduce the window size when testing.
-	if build.Release == "testing" {
-		h.settings.WindowSize = testingWindowSize
-	}
 
 	// Generate signing key, for revising contracts.
 	sk, pk, err := crypto.GenerateKeyPair()

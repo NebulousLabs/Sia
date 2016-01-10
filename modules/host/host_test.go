@@ -247,7 +247,7 @@ func TestSetAndGetSettings(t *testing.T) {
 	if settings.MaxDuration != defaultMaxDuration {
 		t.Error("settings GET did not return default value")
 	}
-	if settings.WindowSize != testingWindowSize {
+	if settings.WindowSize != defaultWindowSize {
 		t.Error("settings GET did not return default value")
 	}
 	if settings.Price.Cmp(defaultPrice) != 0 {

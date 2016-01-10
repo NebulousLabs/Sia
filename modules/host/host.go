@@ -15,16 +15,9 @@ import (
 )
 
 const (
-	// StorageProofReorgDepth states how many blocks to wait before submitting
-	// a storage proof. This reduces the chance of needing to resubmit because
-	// of a reorg.
-	StorageProofReorgDepth = 10
-	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
-
+	maxContractLen      = 1 << 16   // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 	defaultTotalStorage = 10e9      // 10 GB.
 	defaultMaxDuration  = 144 * 120 // 120 days.
-	defaultWindowSize   = 36        // 6 hours.
-	testingWindowSize   = 3         // Small to keep testing fast.
 )
 
 var (
@@ -37,6 +30,22 @@ var (
 	// collateral per-byte by default. Set to zero currently because neither of
 	// the negotiation protocols have logic to deal with non-zero collateral.
 	defaultCollateral = types.NewCurrency64(0)
+
+	// defaultWindowSize is the size of the proof of storage window requested
+	// by the host. The host will not delete any obligations until the window
+	// has closed and buried under several confirmations.
+	defaultWindowSize = func() types.BlockHeight {
+		if build.Release == "testing" {
+			return 5
+		}
+		if build.Release == "standard" {
+			return 36
+		}
+		if build.Release == "dev" {
+			return 36
+		}
+		panic("unrecognized release constant in host")
+	}()
 
 	// errChangedUnlockHash is returned by SetSettings if the unlock hash has
 	// changed, an illegal operation.
