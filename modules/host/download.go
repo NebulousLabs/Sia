@@ -75,9 +75,12 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 		}
 
 		// Write segment to conn.
-		conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
+		err := conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
+		if err != nil {
+			return err // TODO: Is this the correct way to handle this error?
+		}
 		segment := io.NewSectionReader(file, int64(request.Offset), int64(request.Length))
-		_, err := io.Copy(conn, segment)
+		_, err = io.Copy(conn, segment)
 		if err != nil {
 			return err
 		}

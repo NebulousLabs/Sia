@@ -34,7 +34,10 @@ func TestRPCTracking(t *testing.T) {
 	}
 
 	// Restart the host and check that the counts persist.
-	ht.host.Close()
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)

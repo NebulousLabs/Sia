@@ -45,12 +45,18 @@ func TestStorageProof(t *testing.T) {
 	// generate data
 	const dataSize = 777
 	data := make([]byte, dataSize)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	root, err := crypto.ReaderMerkleRoot(bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
+	err = ioutil.WriteFile(filepath.Join(ht.host.persistDir, "foo"), data, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create revision
 	rev := types.FileContractRevision{

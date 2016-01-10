@@ -74,7 +74,10 @@ func TestIntegrationValuePersistence(t *testing.T) {
 	}
 
 	// Close the current host and create a new host pointing to the same file.
-	ht.host.Close()
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	newHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)

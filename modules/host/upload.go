@@ -144,13 +144,16 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 // with both rpcUpload and rpcRenew.
 func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRoot crypto.Hash, filename string) error {
 	// allow 5 minutes for contract negotiation
-	conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	err := conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	if err != nil {
+		return err
+	}
 
 	// Exchange keys between the renter and the host.
 	//
 	// TODO: This is vulnerable to MITM attacks, the renter should be getting
 	// the host's key from the blockchain.
-	if err := encoding.WriteObject(conn, h.publicKey); err != nil {
+	if err = encoding.WriteObject(conn, h.publicKey); err != nil {
 		return errors.New("couldn't write our public key: " + err.Error())
 	}
 	var renterKey types.SiaPublicKey
@@ -173,10 +176,10 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 	// host, then accept the contract.
 	contractTxn := unsignedTxnSet[len(unsignedTxnSet)-1]
 	h.mu.RLock()
-	err := h.considerContract(contractTxn, renterKey, filesize, merkleRoot)
+	err = h.considerContract(contractTxn, renterKey, filesize, merkleRoot)
 	h.mu.RUnlock()
 	if err != nil {
-		encoding.WriteObject(conn, err.Error())
+		_ = encoding.WriteObject(conn, err.Error())
 		return errors.New("rejected file contract: " + err.Error())
 	}
 	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
@@ -273,7 +276,10 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	}
 
 	// remove conn deadline while we wait for lock and rebuild the Merkle tree.
-	conn.SetDeadline(time.Time{})
+	err := conn.SetDeadline(time.Time{})
+	if err != nil {
+		return err
+	}
 
 	h.mu.RLock()
 	obligation, exists := h.obligationsByID[fcid]
@@ -301,7 +307,9 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	tree := crypto.NewTree()
 	err = tree.ReadSegments(file)
 	if err != nil {
-		file.Close()
+		// Error does not need to be checked when closing the file, already
+		// there have been issues related to the filesystem.
+		_ = file.Close()
 		return err
 	}
 
@@ -310,11 +318,14 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	revisionErr := func() error {
 		for {
 			// allow 5 minutes between revisions
-			conn.SetDeadline(time.Now().Add(5 * time.Minute))
+			err := conn.SetDeadline(time.Now().Add(5 * time.Minute))
+			if err != nil {
+				return err
+			}
 
 			// read proposed revision
 			var revTxn types.Transaction
-			if err := encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
+			if err = encoding.ReadObject(conn, &revTxn, types.BlockSizeLimit); err != nil {
 				return errors.New("couldn't read revision: " + err.Error())
 			}
 			// an empty transaction indicates completion
@@ -323,14 +334,19 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 			}
 
 			// allow 5 minutes for each revision
-			conn.SetDeadline(time.Now().Add(5 * time.Minute))
+			err = conn.SetDeadline(time.Now().Add(5 * time.Minute))
+			if err != nil {
+				return err
+			}
 
 			// check revision against original file contract
 			h.mu.RLock()
-			err := h.considerRevision(revTxn, obligation)
+			err = h.considerRevision(revTxn, obligation)
 			h.mu.RUnlock()
 			if err != nil {
-				encoding.WriteObject(conn, err.Error())
+				// There is nothing that can be done if there is an error while
+				// writing to a connection.
+				_ = encoding.WriteObject(conn, err.Error())
 				continue // don't terminate loop; subsequent revisions may be okay
 			}
 
@@ -385,7 +401,10 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 			}
 		}
 	}()
-	file.Close()
+	err = file.Close()
+	if err != nil {
+		return err
+	}
 
 	err = h.tpool.AcceptTransactionSet([]types.Transaction{obligation.RevisionTxn})
 	if err != nil {

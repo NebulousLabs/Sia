@@ -52,7 +52,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	// expected to keep it until they no longer need access to the host's
 	// resources.
 	defer h.resourceLock.RUnlock()
-
 	// If the host resources are unavailable, return early.
 	if h.closed {
 		return
@@ -60,7 +59,11 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 
 	// Set an initial duration that is generous, but finite. RPCs can extend
 	// this if desired.
-	conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	err := conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	if err != nil {
+		h.log.Println("WARN: could not set deadline on connection:", err)
+		return
+	}
 	defer conn.Close()
 
 	// Read a specifier indicating which action is beeing called.
@@ -71,7 +74,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		return
 	}
 
-	var err error
 	switch id {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
