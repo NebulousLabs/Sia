@@ -173,7 +173,10 @@ func (h *Host) Close() error {
 	}
 
 	// Manage the port forwarding.
-	h.clearPort(h.netAddress.Port())
+	err = h.clearPort(h.netAddress.Port())
+	if err != nil {
+		return err
+	}
 
 	// Grab the resource lock and indicate that the host is closing. Concurrent
 	// functions hold the resource lock until they terminate, meaning that no

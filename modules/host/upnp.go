@@ -61,44 +61,51 @@ func (h *Host) learnHostname() {
 }
 
 // forwardPort adds a port mapping to the router.
-func (h *Host) forwardPort(port string) {
+func (h *Host) forwardPort(port string) error {
+	// If the port is invalid, there is no need to perform any of the other
+	// tasks.
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
 	if build.Release == "testing" {
-		return
+		return nil
 	}
 
 	d, err := upnp.Discover()
 	if err != nil {
-		h.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found", port)
-		return
+		return err
 	}
-
-	portInt, _ := strconv.Atoi(port)
 	err = d.Forward(uint16(portInt), "Sia Host")
 	if err != nil {
-		h.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
-		return
+		return err
 	}
 
 	h.log.Println("INFO: successfully forwarded port", port)
+	return nil
 }
 
 // clearPort removes a port mapping from the router.
-func (h *Host) clearPort(port string) {
+func (h *Host) clearPort(port string) error {
+	// If the port is invalid, there is no need to perform any of the other
+	// tasks.
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
 	if build.Release == "testing" {
-		return
+		return nil
 	}
 
 	d, err := upnp.Discover()
 	if err != nil {
-		return
+		return err
 	}
-
-	portInt, _ := strconv.Atoi(port)
 	err = d.Clear(uint16(portInt))
 	if err != nil {
-		h.log.Printf("WARN: could not automatically unforward port %s: %v", port, err)
-		return
+		return err
 	}
 
 	h.log.Println("INFO: successfully unforwarded port", port)
+	return nil
 }

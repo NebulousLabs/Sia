@@ -34,7 +34,10 @@ func (h *Host) initNetworking(address string) error {
 		h.mu.RLock()
 		port := h.netAddress.Port()
 		h.mu.RUnlock()
-		h.forwardPort(port)
+		err := h.forwardPort(port)
+		if err != nil {
+			h.log.Println("ERROR: failed to forward port:", err)
+		}
 		h.learnHostname()
 	}()
 
