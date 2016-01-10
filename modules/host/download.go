@@ -54,9 +54,11 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 		return err
 	}
 
-	// Process requests until 'stop' signal is received.
+	// Process requests until 'stop' signal is received, or until 100 requests
+	// have been received. A malicious host can at most extend the request out
+	// to 500 minutes.
 	var request modules.DownloadRequest
-	for {
+	for i := 0; i < 100; i++ {
 		if err := encoding.ReadObject(conn, &request, 16); err != nil {
 			return err
 		}
@@ -77,7 +79,7 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 		// Write segment to conn.
 		err := conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
 		if err != nil {
-			return err // TODO: Is this the correct way to handle this error?
+			return err
 		}
 		segment := io.NewSectionReader(file, int64(request.Offset), int64(request.Length))
 		_, err = io.Copy(conn, segment)
