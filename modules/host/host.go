@@ -41,6 +41,10 @@ var (
 	// changed, an illegal operation.
 	errChangedUnlockHash = errors.New("cannot change the unlock hash in SetSettings")
 
+	// errHostClosed gets returned when a call is rejected due to the host
+	// having been closed.
+	errHostClosed = errors.New("call is disabled because the host is closed")
+
 	// Nil dependency errors.
 	errNilCS     = errors.New("host cannot use a nil state")
 	errNilTpool  = errors.New("host cannot use a nil transaction pool")
@@ -231,6 +235,11 @@ func (h *Host) Revenue() (unresolved, resolved types.Currency) {
 func (h *Host) SetSettings(settings modules.HostSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
 
 	// Check that the unlock hash was not changed.
 	if settings.UnlockHash != h.settings.UnlockHash {
