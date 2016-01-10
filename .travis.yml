@@ -6,7 +6,7 @@ go:
 install:
   - make dependencies
   - test -z "$(go fmt ./...)"
-  - test -z "$(golint ./modules/host)"
+  - test -z "$(golint -min_confidence=1.0 ./modules/host)"
   - make
 
 script: make test && make test-long && make cover && make bench
