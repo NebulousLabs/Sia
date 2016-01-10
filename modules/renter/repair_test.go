@@ -28,10 +28,12 @@ type testHost struct {
 	sync.Mutex
 }
 
+// stub implementations of the hostdb.Uploader methods
 func (h *testHost) Address() modules.NetAddress  { return h.ip }
 func (h *testHost) EndHeight() types.BlockHeight { return 0 }
 func (h *testHost) Close() error                 { return nil }
 
+// ContractID returns a fake (but unique) file contract ID.
 func (h *testHost) ContractID() types.FileContractID {
 	var fcid types.FileContractID
 	copy(fcid[:], h.ip)
