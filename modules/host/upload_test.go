@@ -281,3 +281,148 @@ func TestFailedObligation(t *testing.T) {
 		t.Error("host did not correctly report lost revenue")
 	}
 }
+
+// TestRestartSuccessObligation tests that a host who went offline for a few
+// blocks is still able to successfully submit a storage proof.
+func TestRestartSuccessObligation(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestRestartSuccessObligation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	baselineSpace := ht.host.spaceRemaining
+	ht.host.mu.RUnlock()
+	_, err = ht.uploadFile("TestRestartSuccessObligation - 1", renewDisabled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	expectedRevenue := ht.host.anticipatedRevenue
+	ht.host.mu.RUnlock()
+
+	// Close the host, then mine some blocks, but not enough that the host
+	// misses the storage proof.
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i <= 5; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Restart the host, and mine enough blocks that the host can submit a
+	// successful storage proof.
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rebootHost.blockHeight != ht.cs.Height() {
+		t.Error("Host block height does not match the cs block height")
+	}
+	for i := types.BlockHeight(0); i <= testUploadDuration+defaultWindowSize+confirmationRequirement-5; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Confirm that the storage proof was successful.
+	rebootHost.mu.Lock()
+	defer rebootHost.mu.Unlock()
+	if len(rebootHost.obligationsByID) != 0 {
+		t.Error("host did not delete a finished obligation")
+	}
+	if !rebootHost.anticipatedRevenue.IsZero() {
+		t.Error("host did not subtract out anticipated revenue")
+	}
+	if rebootHost.spaceRemaining != baselineSpace {
+		t.Error("host did not reallocate space after storage proof")
+	}
+	if rebootHost.revenue.Cmp(expectedRevenue) != 0 {
+		t.Error("host did not correctly report revenue gains")
+	}
+}
+
+// TestRestartCorruptSuccessObligation tests that a host who went offline for a
+// few blocks, corrupted the consensus database, but is still able to correctly
+// create a storage proof.
+func TestRestartCorruptSuccessObligation(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestRestartCorruptSuccessObligation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	baselineSpace := ht.host.spaceRemaining
+	ht.host.mu.RUnlock()
+	_, err = ht.uploadFile("TestRestartCorruptSuccessObligation - 1", renewDisabled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.RLock()
+	expectedRevenue := ht.host.anticipatedRevenue
+	ht.host.mu.RUnlock()
+
+	// Corrupt the host's consensus tracking, close the host, then mine some
+	// blocks, but not enough that the host misses the storage proof. The host
+	// will need to perform a rescan and update its obligations correctly.
+	ht.host.mu.Lock()
+	ht.host.recentChange[0]++
+	ht.host.mu.Unlock()
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i <= 3; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Restart the host, and mine enough blocks that the host can submit a
+	// successful storage proof.
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rebootHost.blockHeight != ht.cs.Height() {
+		t.Error("Host block height does not match the cs block height")
+	}
+	if len(rebootHost.obligationsByID) == 0 {
+		t.Error("host did not correctly reload its obligation")
+	}
+	for i := types.BlockHeight(0); i <= testUploadDuration+defaultWindowSize+confirmationRequirement-3; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Confirm that the storage proof was successful.
+	rebootHost.mu.Lock()
+	defer rebootHost.mu.Unlock()
+	if len(rebootHost.obligationsByID) != 0 {
+		t.Error("host did not delete a finished obligation")
+	}
+	if !rebootHost.anticipatedRevenue.IsZero() {
+		t.Error("host did not subtract out anticipated revenue")
+	}
+	if rebootHost.spaceRemaining != baselineSpace {
+		t.Error("host did not reallocate space after storage proof")
+	}
+	if rebootHost.revenue.Cmp(expectedRevenue) != 0 {
+		t.Error("host did not correctly report revenue gains")
+	}
+	if rebootHost.lostRevenue.Cmp(expectedRevenue) == 0 {
+		t.Error("host is reporting losses on the file contract")
+	}
+}

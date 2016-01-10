@@ -279,3 +279,123 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 		h.log.Println("WARN: failed to save host:", err)
 	}
 }
+
+// handleActionItem looks at a contract obligation and contextually determines
+// if any actions need to be taken. Potential actions include submitting
+// storage proofs, resubmitting file contracts, and deleting the obligation.
+// handleActionItem will properly queue up any future actions that need to be
+// taken.
+func (h *Host) handleActionItem(co *contractObligation) {
+	// Check that the obligation has not already been deleted.
+	_, exists := h.obligationsByID[co.ID]
+	if !exists {
+		return
+	}
+
+	// Check for indications that the obligation should be deleted.
+	if !co.txnsConfirmed() && co.windowStart() < h.blockHeight {
+		// The final file contract revision has not made it into the
+		// blockchain, and the window for submitting it has closed. The
+		// obligation can be deleted.
+		h.removeObligation(co, obligationFailed)
+		return
+	}
+	if !co.proofConfirmed() && co.windowEnd() < h.blockHeight {
+		// The storage proof has not been confirmed and the window for
+		// submitting the proof has closed. The obligation can be deleted.
+		h.removeObligation(co, obligationFailed)
+		return
+	}
+	if co.proofConfirmed() && co.windowEnd()+confirmationRequirement <= h.blockHeight {
+		// The storage proof has been successful, and has enough confirmations
+		// to be considered stable. Therefore the obligation can be deleted.
+		h.removeObligation(co, obligationSucceeded)
+		return
+	}
+
+	// Check for actions that need to be performed immediately.
+	if !co.OriginConfirmed {
+		// The origin transaction has not been seen on the blockchain, and
+		// should be resubmitted.
+		err := h.tpool.AcceptTransactionSet([]types.Transaction{co.OriginTransaction})
+		if err != nil {
+			if _, ok := err.(modules.ConsensusConflict); ok {
+				// The transaction has been rejected because it is in conflict
+				// with the consensus database, usually meaning some type of
+				// double spend has been confirmed on the blockchain. This
+				// means that it's very unlikely that the file contract is
+				// going to be accepted onto the blockchain at any point in the
+				// future, and therefore the obligation should be removed.
+				h.removeObligation(co, obligationFailed)
+				h.log.Println("WARN: a file contract given to the host has been double spent!")
+				return
+			}
+			h.log.Println("WARN: could not submit file contract transaction:", err)
+		}
+	}
+	if !co.RevisionConfirmed && co.hasRevision() {
+		// The revision transaction has not been seen on the blockchain, and
+		// should be resubmitted.
+		err := h.tpool.AcceptTransactionSet([]types.Transaction{co.RevisionTransaction})
+		if err != nil {
+			// There should be no circumstances under which the revision is
+			// rejected from the transaction pool on the grounds of the
+			// revision having been invalidated unless the original transaction
+			// has also been removed. Therefore, it is not necessary to have
+			// logic that determines whether the obligation should be deleted
+			// due to the invalidity of the revision - all cases where the
+			// obligation should be deleted will instead be handled by checking
+			// the origin transaction.
+			h.log.Println("WARN: could not submit file contract revision transaction:", err)
+		}
+	}
+	if !co.txnsConfirmed() {
+		// Not all of the transactions have been confirmed, which means
+		// previous code in the function has submitted the transactions to the
+		// blockchain. An action item should be added to check up on the
+		// transaction status. Two blocks are waited to give the transactions
+		// time to confirm in the event of network congestion.
+		nextCheckup := h.blockHeight + resubmissionTimeout
+		h.addActionItem(nextCheckup, co)
+		return
+	}
+
+	// If this part of the code is being reached, everything has succeeded
+	// except for maybe the storage proof. The remaining code is for handling
+	// the storage proof.
+	if co.windowStart() > h.blockHeight {
+		// The file contract has not expired, which means it is too early to
+		// create or submit a storage proof. Set an action item in the future
+		// to handle the storage proof.
+		nextCheckup := co.windowStart() + resubmissionTimeout
+		h.addActionItem(nextCheckup, co)
+		return
+	}
+	if !co.proofConfirmed() && co.windowStart() <= h.blockHeight {
+		// The storage proof for the contract has not made it onto the
+		// blockchain, recreate the storage proof and submit it to the
+		// blockchain.
+		go h.threadedCreateStorageProof(co)
+
+		// Add an action to check that the storage proof has been successful.
+		nextCheckup := h.blockHeight + resubmissionTimeout
+		h.addActionItem(nextCheckup, co)
+		return
+	}
+	if co.proofConfirmed() {
+		// The storage proof has been confirmed, but the obligation is held
+		// until there have been enough confirmations on the storage proof to
+		// be certain that a different storage proof won't need to be created.
+		// Add an action item that will trigger once the storage proof has
+		// enough confirmations.
+		nextCheckup := co.windowEnd() + confirmationRequirement
+		h.addActionItem(nextCheckup, co)
+		return
+	}
+
+	// At this point, all possible scenarios should be covered. This part of
+	// the function should not be reachable.
+	if build.DEBUG {
+		panic("logic error - unreachable code has been hit")
+	}
+}
