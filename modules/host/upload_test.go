@@ -83,6 +83,25 @@ func (ht *hostTester) uploadFile(name string, renew bool) ([]byte, error) {
 		}
 	}
 
+	// Block until the renter is at 50 upload progress - it takes time for the
+	// contract to confirm renter-side.
+	complete := false
+	for i := 0; i < 50 && !complete; i++ {
+		fileInfos := ht.renter.FileList()
+		for _, fileInfo := range fileInfos {
+			if fileInfo.UploadProgress >= 50 {
+				complete = true
+			}
+		}
+		if complete {
+			break
+		}
+		time.Sleep(time.Millisecond * 50)
+	}
+	if !complete {
+		return nil, errors.New("renter never recognized that the upload completed")
+	}
+
 	// The rest of the upload can be performed under lock.
 	ht.host.mu.Lock()
 	defer ht.host.mu.Unlock()
