@@ -184,7 +184,7 @@ func (h *Host) addObligation(co *contractObligation) {
 	// The host needs to make sure that the file contract has made it into the
 	// blockchain, and to make sure that a storage proof is submitted on time.
 	confirmHeight := h.blockHeight + resubmissionTimeout
-	h.actionItems[confirmHeight] = append(h.actionItems[confirmHeight], co)
+	h.addActionItem(confirmHeight, co)
 
 	// Update the statistics.
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value()) // Output at index 1 alone belongs to host.
@@ -217,7 +217,7 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(revisionTransaction.FileContractRevisions[0].NewValidProofOutputs[1].Value)
 
 	confirmHeight := h.blockHeight + resubmissionTimeout
-	h.actionItems[confirmHeight] = append(h.actionItems[confirmHeight], obligation)
+	h.addActionItem(confirmHeight, obligation)
 
 	// Add the revision to the obligation
 	obligation.RevisionTxn = revisionTransaction

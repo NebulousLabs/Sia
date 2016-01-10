@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestStorageProof checks that the host can create and submit a storage proof.
 func TestStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -83,7 +84,7 @@ func TestStorageProof(t *testing.T) {
 		Path: filepath.Join(ht.host.persistDir, "foo"),
 	}
 	ht.host.obligationsByID[fcid] = obligation
-	ht.host.actionItems[fc.WindowStart+1] = []*contractObligation{obligation}
+	ht.host.actionItems[fc.WindowStart+1][obligation.ID] = obligation
 
 	// submit both to tpool
 	err = ht.tpool.AcceptTransactionSet(append(signedTxnSet, revTxn))

@@ -65,7 +65,7 @@ type Host struct {
 	// pruned from the host.
 	blockHeight  types.BlockHeight
 	recentChange modules.ConsensusChangeID
-	actionItems  map[types.BlockHeight][]*contractObligation
+	actionItems  map[types.BlockHeight]map[types.FileContractID]*contractObligation
 
 	// Host Identity
 	netAddress modules.NetAddress
@@ -127,7 +127,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		tpool:  tpool,
 		wallet: wallet,
 
-		actionItems: make(map[types.BlockHeight][]*contractObligation),
+		actionItems: make(map[types.BlockHeight]map[types.FileContractID]*contractObligation),
 
 		obligationsByID: make(map[types.FileContractID]*contractObligation),
 
@@ -200,6 +200,16 @@ func (h *Host) Close() error {
 		return err
 	}
 	return nil
+}
+
+// addActionItem adds an action item at the given height for the given contract
+// obligation.
+func (h *Host) addActionItem(height types.BlockHeight, co *contractObligation) {
+	_, exists := h.actionItems[height]
+	if !exists {
+		h.actionItems[height] = make(map[types.FileContractID]*contractObligation)
+	}
+	h.actionItems[height][co.ID] = co
 }
 
 // Capacity returns the amount of storage still available on the machine. The

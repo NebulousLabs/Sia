@@ -28,9 +28,9 @@ const (
 var defaultDuration = func() types.BlockHeight {
 	switch build.Release {
 	case "testing":
-		return 60
+		return 20
 	case "dev":
-		return 600
+		return 200
 	default:
 		return 6000
 	}

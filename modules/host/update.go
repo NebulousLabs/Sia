@@ -21,7 +21,7 @@ func (h *Host) initRescan() error {
 
 		// Reset all of the consensus-relevant variables in the host.
 		h.blockHeight = 0
-		h.actionItems = make(map[types.BlockHeight][]*contractObligation)
+		h.actionItems = make(map[types.BlockHeight]map[types.FileContractID]*contractObligation)
 		for _, ob := range h.obligationsByID {
 			ob.reset()
 		}
@@ -185,7 +185,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		// transaction status. Two blocks are waited to give the transactions
 		// time to confirm in the event of network congestion.
 		nextCheckup := h.blockHeight + 2
-		h.actionItems[nextCheckup] = append(h.actionItems[nextCheckup], co)
+		h.addActionItem(nextCheckup, co)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		// create or submit a storage proof. Set an action item in the future
 		// to handle the storage proof.
 		nextCheckup := co.windowStart() + 1
-		h.actionItems[nextCheckup] = append(h.actionItems[nextCheckup], co)
+		h.addActionItem(nextCheckup, co)
 		return
 	}
 	if !co.proofConfirmed() && co.windowStart() < h.blockHeight {
@@ -208,8 +208,8 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		go h.threadedCreateStorageProof(co)
 
 		// Add an action to check that the storage proof has been successful.
-		nextCheckup := h.blockHeight + 1
-		h.actionItems[nextCheckup] = append(h.actionItems[nextCheckup], co)
+		nextCheckup := h.blockHeight + 2
+		h.addActionItem(nextCheckup, co)
 		return
 	}
 	if co.proofConfirmed() {
@@ -219,7 +219,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		// Add an action item that will trigger once the storage proof has
 		// enough confirmations.
 		nextCheckup := co.windowEnd() + confirmationRequirement
-		h.actionItems[nextCheckup] = append(h.actionItems[nextCheckup], co)
+		h.addActionItem(nextCheckup, co)
 		return
 	}
 
@@ -311,7 +311,8 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		// Handle any action items that have been scheduled for the current
 		// height.
-		for _, ob := range h.actionItems[h.blockHeight] {
+		obMap := h.actionItems[h.blockHeight]
+		for _, ob := range obMap {
 			h.handleActionItem(ob)
 		}
 		delete(h.actionItems, h.blockHeight)
