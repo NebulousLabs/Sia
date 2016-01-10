@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	hostTimeout = 15 * time.Second
+	// repairThreads is the number of repairs that can run concurrently.
+	repairThreads = 10
 )
 
 // When a file contract is within 'renewThreshold' blocks of expiring, the renter
@@ -96,31 +97,6 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	wg.Wait()
 
 	return nil
-}
-
-// threadedRepairLoop improves the health of files tracked by the renter by
-// reuploading their missing pieces. Multiple repair attempts may be necessary
-// before the file reaches full redundancy.
-func (r *Renter) threadedRepairLoop() {
-	for {
-		time.Sleep(5 * time.Second)
-
-		if !r.wallet.Unlocked() {
-			continue
-		}
-
-		// make copy of repair set under lock
-		repairing := make(map[string]trackedFile)
-		id := r.mu.RLock()
-		for name, meta := range r.tracking {
-			repairing[name] = meta
-		}
-		r.mu.RUnlock(id)
-
-		for name, meta := range repairing {
-			r.threadedRepairFile(name, meta)
-		}
-	}
 }
 
 // incompleteChunks returns a map of chunks containing pieces that have not
@@ -227,6 +203,50 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	return filtered
 }
 
+// threadedRepairLoop improves the health of files tracked by the renter by
+// reuploading their missing pieces. Multiple repair attempts may be necessary
+// before the file reaches full redundancy.
+func (r *Renter) threadedRepairLoop() {
+	// Files are repaired concurrently. A repair worker must acquire a 'token'
+	// in order to run, and returns the token to the pool when it has
+	// finished.
+	tokenPool := make(chan struct{}, repairThreads)
+	// fill the tokenPool with tokens
+	for i := 0; i < repairThreads; i++ {
+		tokenPool <- struct{}{}
+	}
+
+	for {
+		time.Sleep(5 * time.Second)
+
+		if !r.wallet.Unlocked() {
+			continue
+		}
+
+		// make copy of repair set under lock
+		repairing := make(map[string]trackedFile)
+		id := r.mu.RLock()
+		for name, meta := range r.tracking {
+			repairing[name] = meta
+		}
+		r.mu.RUnlock(id)
+
+		var wg sync.WaitGroup
+		wg.Add(len(repairing))
+		for name, meta := range repairing {
+			go func(name string, meta trackedFile) {
+				defer wg.Done()
+				t := <-tokenPool                 // acquire token
+				r.threadedRepairFile(name, meta) // repair
+				tokenPool <- t                   // return token
+			}(name, meta)
+		}
+		// wait for all repairs to complete before looping; otherwise we risk
+		// spawning multiple repair threads for the same file.
+		wg.Wait()
+	}
+}
+
 // threadedRepairFile repairs and saves an individual file.
 func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// helper function
@@ -252,6 +272,14 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		return
 	}
 
+	// determine if there is any work to do
+	incChunks := f.incompleteChunks()
+	offlineChunks := f.offlineChunks(r.hostDB)
+	expContracts := f.expiringContracts(height)
+	if len(incChunks) == 0 && len(offlineChunks) == 0 && (!meta.Renew || len(expContracts) == 0) {
+		return
+	}
+
 	// open file handle
 	handle, err := os.Open(meta.RepairPath)
 	if err != nil {
@@ -261,36 +289,34 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	defer handle.Close()
 
 	// repair incomplete chunks
-	if badChunks := f.incompleteChunks(); len(badChunks) != 0 {
-		r.log.Printf("repairing %v chunks of %v", len(badChunks), f.name)
+	if len(incChunks) != 0 {
+		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
 		var duration types.BlockHeight
 		if meta.Renew {
 			duration = defaultDuration
 		} else {
 			duration = meta.EndHeight - height
 		}
-		r.repairChunks(f, handle, badChunks, duration)
+		r.repairChunks(f, handle, incChunks, duration)
 	}
 
 	// repair offline chunks
-	if badChunks := f.offlineChunks(r.hostDB); len(badChunks) != 0 {
-		r.log.Printf("reuploading %v offline chunks of %v", len(badChunks), f.name)
+	if len(offlineChunks) != 0 {
+		r.log.Printf("reuploading %v offline chunks of %v", len(offlineChunks), f.name)
 		var duration types.BlockHeight
 		if meta.Renew {
 			duration = defaultDuration
 		} else {
 			duration = meta.EndHeight - height
 		}
-		r.repairChunks(f, handle, badChunks, duration)
+		r.repairChunks(f, handle, offlineChunks, duration)
 	}
 
 	// renew expiring contracts
-	if meta.Renew {
-		if badContracts := f.expiringContracts(height); len(badContracts) != 0 {
-			r.log.Printf("renewing %v contracts of %v", len(badContracts), f.name)
-			newHeight := height + defaultDuration
-			r.renewContracts(f, badContracts, newHeight)
-		}
+	if meta.Renew && len(expContracts) != 0 {
+		r.log.Printf("renewing %v contracts of %v", len(expContracts), f.name)
+		newHeight := height + defaultDuration
+		r.renewContracts(f, expContracts, newHeight)
 	}
 
 	// save the repaired file data

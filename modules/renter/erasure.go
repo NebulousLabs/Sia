@@ -31,6 +31,8 @@ func (rs *rsCode) Encode(data []byte) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// err should not be possible if Encode is called on the result of Split,
+	// but no harm in checking anyway.
 	err = rs.enc.Encode(pieces)
 	if err != nil {
 		return nil, err

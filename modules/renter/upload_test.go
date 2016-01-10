@@ -1,142 +1,89 @@
 package renter
 
 import (
-	"bytes"
-	"crypto/rand"
-	"errors"
-	"strconv"
-	"sync"
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// a testHost simulates a host. It implements the hostdb.Uploader interface.
-type testHost struct {
-	ip   modules.NetAddress
-	data []byte
+// uploadHostDB is a mocked hostDB, hostdb.HostPool, and hostdb.Uploader. It
+// is used for testing the uploading and repairing functions of the renter.
+type uploadHostDB struct{}
 
-	// used to simulate real-world conditions
-	delay    time.Duration // transfers will take this long
-	failRate int           // transfers will randomly fail with probability 1/failRate
-
-	sync.Mutex
+// NewPool returns a new mock HostPool. Since uploadHostDB implements the
+// HostPool interface, it can simply return itself.
+func (hdb uploadHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) {
+	return hdb, nil
 }
 
-func (h *testHost) Address() modules.NetAddress  { return h.ip }
-func (h *testHost) EndHeight() types.BlockHeight { return 0 }
-func (h *testHost) Close() error                 { return nil }
-
-func (h *testHost) ContractID() types.FileContractID {
-	var fcid types.FileContractID
-	copy(fcid[:], h.ip)
-	return fcid
-}
-
-// Upload adds a piece to the testHost. It randomly fails according to the
-// testHost's parameters.
-func (h *testHost) Upload(data []byte) (offset uint64, err error) {
-	// simulate I/O delay
-	time.Sleep(h.delay)
-
-	h.Lock()
-	defer h.Unlock()
-
-	// randomly fail
-	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
-		return 0, errors.New("no data")
+// UniqueHosts returns a set of mocked Uploaders. Since uploadHostDB
+// implements the Uploader interface, it can simply return itself.
+func (hdb uploadHostDB) UniqueHosts(n int, _ []modules.NetAddress) (ups []hostdb.Uploader) {
+	for i := 0; i < n; i++ {
+		ups = append(ups, hdb)
 	}
-
-	h.data = append(h.data, data...)
-	return uint64(len(h.data) - len(data)), nil
+	return
 }
 
-// TestErasureUpload tests parallel uploading of erasure-coded data.
-func TestErasureUpload(t *testing.T) {
+// Upload simulates a successful data upload.
+func (uploadHostDB) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
+
+// stub implementations of the hostdb.Uploader methods
+func (uploadHostDB) Address() modules.NetAddress      { return "" }
+func (uploadHostDB) ContractID() types.FileContractID { return types.FileContractID{} }
+func (uploadHostDB) EndHeight() types.BlockHeight     { return 10000 }
+func (uploadHostDB) Close() error                     { return nil }
+
+// stub implementations of the hostDB methods
+func (uploadHostDB) ActiveHosts() []modules.HostSettings { return nil }
+func (uploadHostDB) AllHosts() []modules.HostSettings    { return nil }
+func (uploadHostDB) AveragePrice() types.Currency        { return types.Currency{} }
+func (uploadHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
+	return types.FileContractID{}, nil
+}
+
+// TestUpload tests the uploading and repairing functions. The hostDB is
+// mocked, isolating the upload/repair logic from the negotation logic.
+func TestUpload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	// generate data
-	const dataSize = 777
-	data := make([]byte, dataSize)
-	rand.Read(data)
+	// create renter
+	rt, err := newRenterTester("TestUpload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// swap in our own hostdb
+	rt.renter.hostDB = &uploadHostDB{}
 
-	// create Reed-Solomon encoder
-	rsc, err := NewRSCode(2, 10)
+	// create a file
+	path := filepath.Join(build.SiaTestingDir, "renter", "TestUpload", "test.dat")
+	err = ioutil.WriteFile(path, []byte{1, 2, 3}, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create hosts
-	const pieceSize = 10
-	hosts := make([]hostdb.Uploader, rsc.NumPieces())
-	for i := range hosts {
-		hosts[i] = &testHost{
-			ip:       modules.NetAddress(strconv.Itoa(i)),
-			delay:    time.Duration(i) * time.Millisecond,
-			failRate: 5, // 20% failure rate
-		}
-	}
-	// make one host really slow
-	hosts[0].(*testHost).delay = 100 * time.Millisecond
-	// make one host always fail
-	hosts[1].(*testHost).failRate = 1
-
-	// upload data to hosts
-	f := newFile("foo", rsc, pieceSize, dataSize)
-	r := bytes.NewReader(data)
-	for chunk, pieces := range f.incompleteChunks() {
-		err = f.repair(chunk, pieces, r, hosts)
-		if err != nil {
-			t.Fatal(err)
-		}
+	// upload file
+	rt.renter.Upload(modules.FileUploadParams{
+		Filename: path,
+		Nickname: "foo",
+		// Upload will use sane defaults for other params
+	})
+	files := rt.renter.FileList()
+	if len(files) != 1 {
+		t.Fatal("expected 1 file, got", len(files))
 	}
 
-	// download data
-	chunks := make([][][]byte, f.numChunks())
-	for i := uint64(0); i < f.numChunks(); i++ {
-		chunks[i] = make([][]byte, rsc.NumPieces())
+	// wait for repair loop for fully upload file
+	for files[0].UploadProgress != 100 {
+		files = rt.renter.FileList()
+		time.Sleep(time.Second)
 	}
-	for _, h := range hosts {
-		contract, exists := f.contracts[h.ContractID()]
-		if !exists {
-			continue
-		}
-		for _, p := range contract.Pieces {
-			encPiece := h.(*testHost).data[p.Offset : p.Offset+pieceSize+crypto.TwofishOverhead]
-			piece, err := deriveKey(f.masterKey, p.Chunk, p.Piece).DecryptBytes(encPiece)
-			if err != nil {
-				t.Fatal(err)
-			}
-			chunks[p.Chunk][p.Piece] = piece
-		}
-	}
-	buf := new(bytes.Buffer)
-	for _, chunk := range chunks {
-		err = rsc.Recover(chunk, f.chunkSize(), buf)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	buf.Truncate(dataSize)
-
-	if !bytes.Equal(buf.Bytes(), data) {
-		t.Fatal("recovered data does not match original")
-	}
-
-	/*
-		for i, h := range hosts {
-			host := h.(*testHost)
-			pieces := 0
-			for _, p := range host.pieceMap {
-				pieces += len(p)
-			}
-			t.Logf("Host #: %d\tDelay: %v\t# Pieces: %v\t# Chunks: %d", i, host.delay, pieces, len(host.pieceMap))
-		}
-	*/
 }

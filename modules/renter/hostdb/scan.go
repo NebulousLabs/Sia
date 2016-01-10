@@ -1,6 +1,6 @@
 package hostdb
 
-// scan.go contians the functions which periodically scan the list of all hosts
+// scan.go contains the functions which periodically scan the list of all hosts
 // to see which hosts are online or offline, and to get any updates to the
 // settings of the hosts.
 
@@ -15,6 +15,22 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// oldHostSettings is the HostSettings type used prior to v0.5.0. It is
+// preserved for compatibility with those hosts.
+// COMPATv0.4.8
+type oldHostSettings struct {
+	IPAddress    modules.NetAddress
+	TotalStorage int64
+	MinFilesize  uint64
+	MaxFilesize  uint64
+	MinDuration  types.BlockHeight
+	MaxDuration  types.BlockHeight
+	WindowSize   types.BlockHeight
+	Price        types.Currency
+	Collateral   types.Currency
+	UnlockHash   types.UnlockHash
+}
 
 const (
 	DefaultScanSleep = 1*time.Hour + 37*time.Minute
@@ -91,7 +107,33 @@ func (hdb *HostDB) threadedProbeHosts() {
 			if err != nil {
 				return err
 			}
-			return encoding.ReadObject(conn, &settings, maxSettingsLen)
+			// COMPATv0.4.8 - If first decoding attempt fails, try decoding
+			// into the old HostSettings type. Because we decode twice, we
+			// must read the data into memory first.
+			settingsBytes, err := encoding.ReadPrefix(conn, maxSettingsLen)
+			if err != nil {
+				return err
+			}
+			err = encoding.Unmarshal(settingsBytes, &settings)
+			if err != nil {
+				var oldSettings oldHostSettings
+				err = encoding.Unmarshal(settingsBytes, &oldSettings)
+				if err != nil {
+					return err
+				}
+				// Convert the old type.
+				settings = modules.HostSettings{
+					IPAddress:    oldSettings.IPAddress,
+					TotalStorage: oldSettings.TotalStorage,
+					MinDuration:  oldSettings.MinDuration,
+					MaxDuration:  oldSettings.MaxDuration,
+					WindowSize:   oldSettings.WindowSize,
+					Price:        oldSettings.Price,
+					Collateral:   oldSettings.Collateral,
+					UnlockHash:   oldSettings.UnlockHash,
+				}
+			}
+			return nil
 		}()
 
 		// Now that network communication is done, lock the hostdb to modify the
