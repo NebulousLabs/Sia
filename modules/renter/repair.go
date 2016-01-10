@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	hostTimeout = 15 * time.Second
+	// repairThreads is the number of repairs that can run concurrently.
+	repairThreads = 10
 )
 
 // When a file contract is within 'renewThreshold' blocks of expiring, the renter
@@ -206,6 +207,15 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairLoop() {
+	// Files are repaired concurrently. A repair worker must acquire a 'token'
+	// in order to run, and returns the token to the pool when it has
+	// finished.
+	tokenPool := make(chan struct{}, repairThreads)
+	// fill the tokenPool with tokens
+	for i := 0; i < repairThreads; i++ {
+		tokenPool <- struct{}{}
+	}
+
 	for {
 		time.Sleep(5 * time.Second)
 
@@ -226,9 +236,13 @@ func (r *Renter) threadedRepairLoop() {
 		for name, meta := range repairing {
 			go func(name string, meta trackedFile) {
 				defer wg.Done()
-				r.threadedRepairFile(name, meta)
+				t := <-tokenPool                 // acquire token
+				r.threadedRepairFile(name, meta) // repair
+				tokenPool <- t                   // return token
 			}(name, meta)
 		}
+		// wait for all repairs to complete before looping; otherwise we risk
+		// spawning multiple repair threads for the same file.
 		wg.Wait()
 	}
 }
