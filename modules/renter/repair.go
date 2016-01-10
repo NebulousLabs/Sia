@@ -23,7 +23,7 @@ const (
 var renewThreshold = func() types.BlockHeight {
 	switch build.Release {
 	case "testing":
-		return 20
+		return 10
 	case "dev":
 		return 200
 	default:

@@ -32,7 +32,7 @@ var defaultDuration = func() types.BlockHeight {
 	case "dev":
 		return 200
 	default:
-		return 6000
+		return 504 // 3.5 days - RC ONLY!
 	}
 }()
 
