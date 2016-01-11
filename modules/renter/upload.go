@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	defaultDataPieces   = 2 // Data pieces per erasure-coded chunk
-	defaultParityPieces = 8 // Parity pieces per erasure-coded chunk
-
 	// piece sizes
 	// NOTE: The encryption overhead is subtracted so that encrypted piece
 	// will always be a multiple of 64 (i.e. crypto.SegmentSize). Without this
@@ -23,20 +20,37 @@ const (
 	smallPieceSize   = 1<<16 - crypto.TwofishOverhead // 64 KiB
 )
 
-// defaultDuration is the contract length that the renter will use when the
-// uploader does not specify a duration.
-var defaultDuration = func() types.BlockHeight {
-	switch build.Release {
-	case "testing":
-		return 20
-	case "dev":
-		return 200
-	default:
-		return 504 // 3.5 days - RC ONLY!
-	}
-}()
+var (
+	// defaultDuration is the contract length that the renter will use when the
+	// uploader does not specify a duration.
+	defaultDuration = func() types.BlockHeight {
+		switch build.Release {
+		case "testing":
+			return 20
+		case "dev":
+			return 200
+		default:
+			return 504 // 3.5 days - RC ONLY!
+		}
+	}()
 
-var ErrDuplicateSiaPath = errors.New("file with that path already exists")
+	// defaultDataPieces is the number of data pieces per erasure-coded chunk
+	defaultDataPieces = func() int {
+		if build.Release == "testing" {
+			return 2
+		}
+		return 4
+	}()
+
+	// defaultParityPieces is the number of parity pieces per erasure-coded
+	// chunk
+	defaultParityPieces = func() int {
+		if build.Release == "testing" {
+			return 8
+		}
+		return 20
+	}()
+)
 
 // checkWalletBalance looks at an upload and determines if there is enough
 // money in the wallet to support such an upload. An error is returned if it is
