@@ -157,7 +157,10 @@ func (h *Host) establishDefaults() error {
 func (h *Host) load() error {
 	p := new(persistence)
 	err := persist.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
-	if os.IsNotExist(err) {
+	if err == persist.ErrBadVersion {
+		// COMPATv0.4.8 - try the compatibility loader.
+		return h.compatibilityLoad()
+	} else if os.IsNotExist(err) {
 		// This is the host's first run, set up the default values.
 		return h.establishDefaults()
 	} else if err != nil {
