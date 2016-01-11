@@ -15,7 +15,7 @@ type (
 	// /host.
 	HostGET struct {
 		Collateral   types.Currency     `json:"collateral"`
-		IPAddress    modules.NetAddress `json:"ipaddress"`
+		NetAddress   modules.NetAddress `json:"netaddress"`
 		MaxDuration  types.BlockHeight  `json:"maxduration"`
 		MinDuration  types.BlockHeight  `json:"minduration"`
 		Price        types.Currency     `json:"price"`
@@ -36,7 +36,7 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ ht
 	upcomingRevenue, revenue := srv.host.Revenue()
 	hg := HostGET{
 		Collateral:   settings.Collateral,
-		IPAddress:    settings.IPAddress,
+		NetAddress:   settings.NetAddress,
 		MaxDuration:  settings.MaxDuration,
 		MinDuration:  settings.MinDuration,
 		Price:        settings.Price,
@@ -84,7 +84,7 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 // to the network.
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var err error
-	if addr := req.FormValue("address"); addr != "" {
+	if addr := req.FormValue("netaddress"); addr != "" {
 		err = srv.host.AnnounceAddress(modules.NetAddress(addr))
 	} else {
 		err = srv.host.Announce()

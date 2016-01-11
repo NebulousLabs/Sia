@@ -274,7 +274,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 	for _, name := range nicknames {
 		file, exists := r.files[name]
 		if !exists {
-			return ErrUnknownNickname
+			return ErrUnknownPath
 		}
 		err := file.save(w)
 		if err != nil {

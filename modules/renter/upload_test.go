@@ -64,16 +64,16 @@ func TestUpload(t *testing.T) {
 	rt.renter.hostDB = &uploadHostDB{}
 
 	// create a file
-	path := filepath.Join(build.SiaTestingDir, "renter", "TestUpload", "test.dat")
-	err = ioutil.WriteFile(path, []byte{1, 2, 3}, 0600)
+	source := filepath.Join(build.SiaTestingDir, "renter", "TestUpload", "test.dat")
+	err = ioutil.WriteFile(source, []byte{1, 2, 3}, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// upload file
 	rt.renter.Upload(modules.FileUploadParams{
-		Filename: path,
-		Nickname: "foo",
+		Source:  source,
+		SiaPath: "foo",
 		// Upload will use sane defaults for other params
 	})
 	files := rt.renter.FileList()

@@ -122,7 +122,7 @@ func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *
 // with 0 weight will never be selected, they are accetped into the tree.
 func (hdb *HostDB) insertNode(entry *hostEntry) {
 	// If there's already a host of the same id, remove that host.
-	priorEntry, exists := hdb.activeHosts[entry.IPAddress]
+	priorEntry, exists := hdb.activeHosts[entry.NetAddress]
 	if exists {
 		priorEntry.removeNode()
 	}
@@ -130,10 +130,10 @@ func (hdb *HostDB) insertNode(entry *hostEntry) {
 	// Insert the updated entry into the host tree.
 	if hdb.hostTree == nil {
 		hdb.hostTree = createNode(nil, entry)
-		hdb.activeHosts[entry.IPAddress] = hdb.hostTree
+		hdb.activeHosts[entry.NetAddress] = hdb.hostTree
 	} else {
 		_, hostNode := hdb.hostTree.recursiveInsert(entry)
-		hdb.activeHosts[entry.IPAddress] = hostNode
+		hdb.activeHosts[entry.NetAddress] = hostNode
 	}
 }
 
@@ -192,7 +192,7 @@ func (hdb *HostDB) randomHosts(n int, ignore []modules.NetAddress) (hosts []modu
 		hosts = append(hosts, node.hostEntry.HostSettings)
 
 		node.removeNode()
-		delete(hdb.activeHosts, node.hostEntry.IPAddress)
+		delete(hdb.activeHosts, node.hostEntry.NetAddress)
 		removedEntries = append(removedEntries, node.hostEntry)
 	}
 

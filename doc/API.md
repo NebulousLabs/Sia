@@ -259,9 +259,9 @@ Gateway
 
 Queries:
 
-* /gateway               [GET]
-* /gateway/add/{addr}    [POST]
-* /gateway/remove/{addr} [POST]
+* /gateway                     [GET]
+* /gateway/add/{netaddress}    [POST]
+* /gateway/remove/{netaddress} [POST]
 
 #### /gateway
 
@@ -272,39 +272,39 @@ Parameters: none
 Response:
 ```
 struct {
-	address string
-	peers   []string
+	netaddress string
+	peers      []string
 }
 ```
-'address' is the network address of the Gateway, including its external IP
+'netaddress' is the network address of the Gateway, including its external IP
 address and the port Sia is listening on.
 
 'peers' is a list of the network addresses of peers that the Gateway is
 currently connected to.
 
-#### /gateway/add/{addr} [POST]
+#### /gateway/add/{netaddress} [POST]
 
 Function: Adds a peer to the gateway.
 
 Parameters:
 ```
-addr string
+netaddress string
 ```
-'addr' should be a reachable hostname + port number, typically of the form
-"a.b.c.d:xxxx".
+'netaddress' should be a reachable hostname + port number, typically of the
+form "a.b.c.d:xxxx".
 
 Response: standard
 
-#### /gateway/remove/{addr} [POST]
+#### /gateway/remove/{netaddress} [POST]
 
 Function: Will remove a peer from the gateway.
 
 Parameters:
 ```
-addr string
+netaddress string
 ```
-'addr' should be a reachable hostname + port number, typically of the form
-"a.b.c.d:xxxx".
+'netaddress' should be a reachable hostname + port number, typically of the
+form "a.b.c.d:xxxx".
 
 Response: standard
 
@@ -327,7 +327,7 @@ Response:
 ```
 struct {
 	collateral   types.Currency     (string)
-	ipaddress    modules.NetAddress (string)
+	netaddress   modules.NetAddress (string)
 	maxduration  types.BlockHeight  (uint64)
 	minduration  types.BlockHeight  (uint64)
 	price        types.Currency     (string)
@@ -344,7 +344,7 @@ struct {
 'collateral' is the number of hastings per byte per block that are put up as
 collateral when making file contracts.
 
-'ipaddress' is the network address of the host.
+'netaddress' is the network address of the host.
 
 'maxduration' is the maximum allowed duration of a file contract.
 
@@ -417,9 +417,9 @@ Generally only needs to be called once.
 
 Parameters:
 ```
-address string
+netaddress string
 ```
-'address' is an optional parameter that specifies the address to be
+'netaddress' is an optional parameter that specifies the address to be
 announced. Supplying this parameters will also override standard connectivity
 checks.
 
@@ -512,20 +512,20 @@ Renter
 
 Queries:
 
-* /renter/downloadqueue     [GET]
-* /renter/load              [POST]
-* /renter/loadascii         [POST]
-* /renter/files             [GET]
-* /renter/delete/{path}     [POST]
-* /renter/download/{path}   [GET]
-* /renter/rename/{path}     [POST]
-* /renter/share             [GET]
-* /renter/shareascii        [GET]
-* /renter/upload/{path}     [POST]
-* /renter/hosts/active      [GET]
-* /renter/hosts/all         [GET]
+* /renter/downloads          [GET]
+* /renter/files              [GET]
+* /renter/load               [POST]
+* /renter/loadascii          [POST]
+* /renter/share              [GET]
+* /renter/shareascii         [GET]
+* /renter/delete/{siapath}   [POST]
+* /renter/download/{siapath} [GET]
+* /renter/rename/{siapath}   [POST]
+* /renter/upload/{siapath}   [POST]
+* /renter/hosts/active       [GET]
+* /renter/hosts/all          [GET]
 
-#### /renter/downloadqueue [GET]
+#### /renter/downloads [GET]
 
 Function: Lists all files in the download queue.
 
@@ -535,7 +535,7 @@ Response:
 ```
 struct {
 	downloads []struct {
-		nickname    string
+		siapath     string
 		destination string
 		filesize    uint64
 		received    uint64
@@ -543,11 +543,11 @@ struct {
 	}
 }
 ```
-'nickname' is the nickname given to the file when it was uploaded.
+'siapath' is the siapath given to the file when it was uploaded.
 
-'destination' is the path that the file was downloaded to.
+'destination' is the path that the file will be downloaded to.
 
-'filesize' is the size of the file being download.
+'filesize' is the size of the file being downloaded.
 
 'received' is the number of bytes downloaded thus far.
 
@@ -563,23 +563,27 @@ Response:
 ```
 struct {
 	files []struct {
-		nickname       string
+		siapath        string
 		filesize       uint64
 		available      bool
-		uploadprogress float32
+		renewing       bool
+		uploadprogress float64
 		expiration     types.BlockHeight (uint64)
 	}
 }
 ```
-'nickname' is the nickname given to the file when it was uploaded.
+'siapath' is the location of the file in the renter.
 
 'filesize' is the size of the file in bytes.
 
 'available' indicates whether or not the file can be downloaded immediately.
 
-'uploadProgress' is the current upload percentage of the file, including
+'renewing' indicates whether or not the file's contracts will be renewed
+automatically by the renter.
+
+'uploadprogress' is the current upload percentage of the file, including
 redundancy. In general, files will be available for download before
-UploadProgress == 100.
+uploadprogress == 100.
 
 'expiration' is the block height at which the file ceases availability.
 
@@ -589,9 +593,9 @@ Function: Load a .sia file into the renter.
 
 Parameters:
 ```
-filename string
+source string
 ```
-'filename' is the filepath of the .sia file that is being loaded.
+'source' is the location on disk of the .sia file being loaded.
 
 Response:
 ```
@@ -599,8 +603,8 @@ struct {
 	filesadded []string
 }
 ```
-'filesadded' is a list of the nicknames of the files contained in the .sia file
-that was loaded.
+'filesadded' is an array of renter locations of the files contained in the
+.sia file.
 
 
 #### /renter/loadascii [POST]
@@ -609,9 +613,9 @@ Function: Load a .sia file into the renter.
 
 Parameters:
 ```
-file string
+asciisia string
 ```
-'file' is the ASCII-encoded .sia file that is being loaded.
+'asciisia' is the ASCII-encoded .sia file that is being loaded.
 
 Response:
 ```
@@ -619,50 +623,7 @@ struct {
 	filesadded []string
 }
 ```
-
-#### /renter/delete/{path} [POST]
-
-Function: Deletes a renter file entry. Does not delete any downloads or
-original files, only the entry in the renter.
-
-Parameters:
-```
-path string
-```
-'path' is the nickname of the file.
-
-Response: standard
-
-#### /renter/download/{path} [GET]
-
-Function: Downloads a file. The call will block until the download completes.
-
-Parameters:
-```
-path        string
-destination string
-```
-'path' is the nickname of the file.
-
-'destination' is the path that the file will be downloaded to.
-
-Response: standard
-
-#### /renter/rename/{path} [POST]
-
-Function: Rename a file. Does not rename any downloads or source files, only
-renames the entry in the renter.
-
-Parameters:
-```
-nickname string
-newname  string
-```
-'nickname' is the current name of the file entry.
-
-'newname' is the new name for the file entry.
-
-Response: standard.
+See /renter/load for a description of 'filesadded'
 
 #### /renter/share [GET]
 
@@ -670,10 +631,10 @@ Function: Create a .sia file that can be shared with other people.
 
 Parameters:
 ```
-paths       []string
+siapaths    []string
 destination string
 ```
-'paths' is an array of the nicknames to be shared. It is comma-delimited.
+'siapaths' is an array of the renter paths to be shared. It is comma-delimited.
 
 'destination' is the path of the .sia file to be created. It must end in
 '.sia'.
@@ -686,30 +647,82 @@ Function: Create an ASCII .sia file that can be shared with other people.
 
 Parameters:
 ```
-paths []string
+siapaths []string
 ```
-'paths' is an array of the nicknames to be shared. It is comma-delimited.
+'siapaths' is an array of the nicknames to be shared. It is comma-delimited.
 
 Response:
 ```
 struct {
-	file string
+	asciisia string
 }
 ```
-'file' is the ASCII-encoded .sia file.
+'asciisia' is the ASCII-encoded .sia file.
 
-#### /renter/upload/{path} [POST]
+#### /renter/delete/{siapath} [POST]
+
+Function: Deletes a renter file entry. Does not delete any downloads or
+original files, only the entry in the renter.
+
+Parameters:
+```
+siapath string
+```
+'siapath' is the location of the file in the renter.
+
+Response: standard
+
+#### /renter/download/{siapath} [GET]
+
+Function: Downloads a file. The call will block until the download completes.
+
+Parameters:
+```
+siapath     string
+destination string
+```
+'siapath' is the location of the file in the renter.
+
+'destination' is the location on disk that the file will be downloaded to.
+
+Response: standard
+
+#### /renter/rename/{siapath} [POST]
+
+Function: Rename a file. Does not rename any downloads or source files, only
+renames the entry in the renter.
+
+Parameters:
+```
+siapath     string
+newsiapath  string
+```
+'siapath' is the current location of the file in the renter.
+
+'newsiapath' is the new location of the file in the renter.
+
+Response: standard.
+
+#### /renter/upload/{siapath} [POST]
 
 Function: Uploads a file.
 
 Parameters:
 ```
-path     string
+siapath  string
 source   string
+duration types.BlockHeight (uint64)
+renew    bool
 ```
-'path' is the nickname that will be used to reference the file.
+'siapath' is the location where the file will reside in the renter.
 
-'source' is the path to the file to be uploaded.
+'source' is the location on disk of the file being uploaded.
+
+'duration' is the number of blocks for which the file will be available. If
+the renew parameter is true, this parameter will be ignored.
+
+'renew' indicates whether the file's contracts should be automatically renewed
+by the renter. If renew is true, the duration parameter will be ignored.
 
 Response: standard.
 
@@ -723,7 +736,7 @@ Response:
 ```
 struct {
 	hosts []struct {
-		ipaddress    string
+		netaddress   string
 		totalstorage int64
 		minduration  types.BlockHeight (uint64)
 		maxduration  types.BlockHeight (uint64)
@@ -746,7 +759,7 @@ Response:
 ```
 struct {
 	hosts []struct {
-		ipaddress    string
+		netaddress   string
 		totalstorage int64
 		minduration  types.BlockHeight (uint64)
 		maxduration  types.BlockHeight (uint64)
@@ -757,7 +770,7 @@ struct {
 	}
 }
 ```
-'ipaddress' is the IP address of the host.
+'netaddress' is the network address of the host.
 
 'totalstorage' is the amount of storage advertised by the host.
 
@@ -844,7 +857,7 @@ struct {
 	unconfirmedincomingsiacoins types.Currency (string)
 
 	siafundbalance      types.Currency (string)
-	siacoinclaimBalance types.Currency (string)
+	siacoinclaimbalance types.Currency (string)
 }
 ```
 'encrypted' indicates whether the wallet has been encrypted or not. If the
@@ -889,11 +902,10 @@ from the current wallet.
 
 Parameters:
 ```
-filepath           string
+source             string
 encryptionpassword string
 ```
-'filepath' is the filepath of the v0.3.3.x wallet that is being loaded into the
-current wallet.
+'source' is the location on disk of the v0.3.3.x wallet that is being loaded.
 
 'encryptionpassword' is the encryption key of the wallet. An error will be
 returned if the wrong key is provided.
@@ -913,7 +925,7 @@ struct {
 	address types.UnlockHash (string)
 }
 ```
-'address' is a Sia address that can receive siacoins or siafunds.
+'address' is a wallet address that can receive siacoins or siafunds.
 
 #### /wallet/addresses [GET]
 
@@ -924,18 +936,10 @@ Parameters: none
 Response:
 ```
 struct {
-	addresses []WalletAddress
+	addresses []types.UnlockHash (string)
 }
 ```
-'addresses' is an array of wallet addresses. Wallet addresses take the
-following form:
-```
-struct {
-	address types.UnlockHash (string)
-}
-```
-A struct is used to allow future fields such as a list of transactions or a set
-of balances to be provided without breaking JSON compatibility.
+'addresses' is an array of wallet addresses.
 
 #### /wallet/backup [GET]
 
@@ -946,9 +950,9 @@ find their wallet file.
 
 Parameters:
 ```
-filepath string
+destination string
 ```
-'filepath' is the on-disk location that the file is going to be saved.
+'destination' is the location on disk where the file will be saved.
 
 Response: standard
 
@@ -1023,7 +1027,7 @@ Response:
 struct {
 	primaryseed        mnemonics.Phrase   (string)
 	addressesremaining int
-	allseeds           []mnemonics.Phrase (array of strings)
+	allseeds           []mnemonics.Phrase ([]string)
 }
 ```
 'primaryseed' is the seed that is actively being used to generate new addresses
@@ -1034,7 +1038,7 @@ until exhaustion has been reached. Once exhaustion has been reached, new
 addresses will continue to be generated but they will be more difficult to
 recover in the event of a lost wallet file or encryption password.
 
-'allseeds' is a list of all seeds that the wallet references when scanning the
+'allseeds' is an array of all seeds that the wallet references when scanning the
 blockchain for outputs. The wallet is able to spend any output generated by any
 of the seeds, however only the primary seed is being used to generate new
 addresses.
@@ -1056,7 +1060,7 @@ from addresses in the wallet.
 Parameters:
 ```
 amount      int
-destination string
+destination types.UnlockHash (string)
 ```
 'amount' is the number of hastings being sent. A hasting is the smallest unit
 in Sia. There are 10^24 hastings in a siacoin.
@@ -1066,7 +1070,7 @@ in Sia. There are 10^24 hastings in a siacoin.
 Response:
 ```
 struct {
-	transactionids []types.TransactionID (string)
+	transactionids []types.TransactionID ([]string)
 }
 ```
 'transactionids' are the ids of the transactions that were created when sending
@@ -1095,7 +1099,7 @@ destination string
 Response:
 ```
 struct {
-	transactionids []types.TransactionID (string)
+	transactionids []types.TransactionID ([]string)
 }
 ```
 'transactionids' are the ids of the transactions that were created when sending

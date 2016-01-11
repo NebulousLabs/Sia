@@ -135,7 +135,7 @@ type download struct {
 	received uint64
 
 	startTime   time.Time
-	nickname    string
+	siapath     string
 	destination string
 
 	erasureCode modules.ErasureCoder
@@ -215,20 +215,20 @@ func (f *file) newDownload(hosts []fetcher, destination string) *download {
 
 		startTime:   time.Now(),
 		received:    0,
-		nickname:    f.name,
+		siapath:     f.name,
 		destination: destination,
 	}
 }
 
-// Download downloads a file, identified by its nickname, to the destination
+// Download downloads a file, identified by its path, to the destination
 // specified.
-func (r *Renter) Download(nickname, destination string) error {
+func (r *Renter) Download(path, destination string) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.Lock()
-	file, exists := r.files[nickname]
+	file, exists := r.files[path]
 	r.mu.Unlock(lockID)
 	if !exists {
-		return errors.New("no file of that nickname")
+		return errors.New("no file with that path")
 	}
 
 	// Copy the file's metadata
@@ -298,7 +298,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	for i := range r.downloadQueue {
 		d := r.downloadQueue[len(r.downloadQueue)-i-1]
 		downloads[i] = modules.DownloadInfo{
-			Nickname:    d.nickname,
+			SiaPath:     d.siapath,
 			Destination: d.destination,
 			Filesize:    d.fileSize,
 			Received:    atomic.LoadUint64(&d.received),

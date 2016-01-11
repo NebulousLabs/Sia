@@ -174,10 +174,10 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	// ActiveHosts should be sufficient.
 	hostSet := make(map[modules.NetAddress]bool)
 	for _, host := range hdb.AllHosts() {
-		hostSet[host.IPAddress] = false
+		hostSet[host.NetAddress] = false
 	}
 	for _, host := range hdb.ActiveHosts() {
-		hostSet[host.IPAddress] = true
+		hostSet[host.NetAddress] = true
 	}
 	isOffline := func(addr modules.NetAddress) bool {
 		active, exists := hostSet[addr]

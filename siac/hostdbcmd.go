@@ -20,7 +20,7 @@ var (
 
 func hostdbhostscmd() {
 	info := new(api.ActiveHosts)
-	err := getAPI("/hostdb/hosts/active", info)
+	err := getAPI("/renter/hosts/active", info)
 	if err != nil {
 		fmt.Println("Could not fetch host list:", err)
 		return
@@ -31,6 +31,6 @@ func hostdbhostscmd() {
 	}
 	fmt.Println("Active hosts:")
 	for _, host := range info.Hosts {
-		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.IPAddress, host.Price.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
+		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.NetAddress, host.Price.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
 	}
 }

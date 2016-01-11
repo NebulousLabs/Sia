@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	ErrUnknownNickname  = errors.New("no file known by that nickname")
-	ErrNicknameOverload = errors.New("a file with the proposed nickname already exists")
+	ErrUnknownPath  = errors.New("no file known with that path")
+	ErrPathOverload = errors.New("a file already exists at that location")
 )
 
 // A file is a single file that has been uploaded to the network. Files are
@@ -95,7 +95,7 @@ func (f *file) available() bool {
 // uploadProgress indicates what percentage of the file (plus redundancy) has
 // been uploaded. Note that a file may be Available long before UploadProgress
 // reaches 100%, and UploadProgress may report a value greater than 100%.
-func (f *file) uploadProgress() float32 {
+func (f *file) uploadProgress() float64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	var uploaded uint64
@@ -104,7 +104,7 @@ func (f *file) uploadProgress() float32 {
 	}
 	desired := f.pieceSize * uint64(f.erasureCode.NumPieces()) * f.numChunks()
 
-	return 100 * (float32(uploaded) / float32(desired))
+	return 100 * (float64(uploaded) / float64(desired))
 }
 
 // expiration returns the lowest height at which any of the file's contracts
@@ -144,7 +144,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 
 	f, exists := r.files[nickname]
 	if !exists {
-		return ErrUnknownNickname
+		return ErrUnknownPath
 	}
 	delete(r.files, nickname)
 
@@ -163,10 +163,15 @@ func (r *Renter) FileList() []modules.FileInfo {
 
 	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
+		var renewing bool
+		if meta, ok := r.tracking[f.name]; ok {
+			renewing = meta.Renew
+		}
 		files = append(files, modules.FileInfo{
-			Nickname:       f.name,
+			SiaPath:        f.name,
 			Filesize:       f.size,
 			Available:      f.available(),
+			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
@@ -184,11 +189,11 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Check that currentName exists and newName doesn't.
 	file, exists := r.files[currentName]
 	if !exists {
-		return ErrUnknownNickname
+		return ErrUnknownPath
 	}
 	_, exists = r.files[newName]
 	if exists {
-		return ErrNicknameOverload
+		return ErrPathOverload
 	}
 
 	// Modify the file and save it to disk.

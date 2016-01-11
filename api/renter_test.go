@@ -60,7 +60,7 @@ func TestRenterPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rf.Files) != 1 || rf.Files[0].Nickname != "foo/bar/test" {
+	if len(rf.Files) != 1 || rf.Files[0].SiaPath != "foo/bar/test" {
 		t.Fatal("/renter/files did not return correct file:", rf)
 	}
 }
@@ -106,14 +106,14 @@ func TestRenterConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rf.Files) != 1 || rf.Files[0].Nickname != "foo/bar.sia/test" {
+	if len(rf.Files) != 1 || rf.Files[0].SiaPath != "foo/bar.sia/test" {
 		t.Fatal("/renter/files did not return correct file:", rf)
 	}
 
 	// Upload using the same nickname.
 	err = st.stdPostAPI("/renter/upload/foo/bar.sia/test", uploadValues)
-	if err == renter.ErrDuplicateNickname {
-		t.Fatalf("expected %v, got %v", renter.ErrDuplicateNickname, err)
+	if err == renter.ErrPathOverload {
+		t.Fatalf("expected %v, got %v", renter.ErrPathOverload, err)
 	}
 
 	// Upload using nickname that conflicts with folder.

@@ -9,8 +9,8 @@ import (
 )
 
 type GatewayInfo struct {
-	Address modules.NetAddress   `json:"address"`
-	Peers   []modules.NetAddress `json:"peers"`
+	NetAddress modules.NetAddress   `json:"netaddress"`
+	Peers      []modules.NetAddress `json:"peers"`
 }
 
 // gatewayHandler handles the API call asking for the gatway status.
@@ -24,7 +24,7 @@ func (srv *Server) gatewayHandler(w http.ResponseWriter, req *http.Request, _ ht
 
 // gatewayAddHandler handles the API call to add a peer to the gateway.
 func (srv *Server) gatewayAddHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	addr := modules.NetAddress(ps.ByName("addr"))
+	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := srv.gateway.Connect(addr)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -36,7 +36,7 @@ func (srv *Server) gatewayAddHandler(w http.ResponseWriter, req *http.Request, p
 
 // gatewayRemoveHandler handles the API call to remove a peer from the gateway.
 func (srv *Server) gatewayRemoveHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	addr := modules.NetAddress(ps.ByName("addr"))
+	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := srv.gateway.Disconnect(addr)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)

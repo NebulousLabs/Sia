@@ -63,7 +63,7 @@ func gatewaystatuscmd() {
 		fmt.Println("Could not get gateway status:", err)
 		return
 	}
-	fmt.Println("Address:", info.Address)
+	fmt.Println("Address:", info.NetAddress)
 	if len(info.Peers) == 0 {
 		fmt.Println("No peers to show.")
 		return

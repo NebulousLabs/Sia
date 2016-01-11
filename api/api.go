@@ -66,8 +66,8 @@ func (srv *Server) initAPI() {
 	// Gateway API Calls
 	if srv.gateway != nil {
 		router.GET("/gateway", srv.gatewayHandler)
-		router.POST("/gateway/add/:addr", srv.gatewayAddHandler)
-		router.POST("/gateway/remove/:addr", srv.gatewayRemoveHandler)
+		router.POST("/gateway/add/:netaddress", srv.gatewayAddHandler)
+		router.POST("/gateway/remove/:netaddress", srv.gatewayRemoveHandler)
 	}
 
 	// Host API Calls
@@ -98,10 +98,10 @@ func (srv *Server) initAPI() {
 		router.GET("/renter/share", srv.renterShareHandler)
 		router.GET("/renter/shareascii", srv.renterShareAsciiHandler)
 
-		router.POST("/renter/delete/*path", srv.renterDeleteHandler)
-		router.GET("/renter/download/*path", srv.renterDownloadHandler)
-		router.POST("/renter/rename/*path", srv.renterRenameHandler)
-		router.POST("/renter/upload/*path", srv.renterUploadHandler)
+		router.POST("/renter/delete/*siapath", srv.renterDeleteHandler)
+		router.GET("/renter/download/*siapath", srv.renterDownloadHandler)
+		router.POST("/renter/rename/*siapath", srv.renterRenameHandler)
+		router.POST("/renter/upload/*siapath", srv.renterUploadHandler)
 
 		router.GET("/renter/hosts/active", srv.renterHostsActiveHandler)
 		router.GET("/renter/hosts/all", srv.renterHostsAllHandler)

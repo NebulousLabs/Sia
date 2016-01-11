@@ -52,7 +52,7 @@ type (
 	// values that the renter will request from the host in order to build its
 	// database.
 	HostSettings struct {
-		IPAddress    NetAddress        `json:"ipaddress"`
+		NetAddress   NetAddress        `json:"netaddress"`
 		TotalStorage int64             `json:"totalstorage"`
 		MinDuration  types.BlockHeight `json:"minduration"`
 		MaxDuration  types.BlockHeight `json:"maxduration"`
