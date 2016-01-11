@@ -243,15 +243,36 @@ func TestRepeatInsert(t *testing.T) {
 	}
 }
 
-// TestRandomHosts probles the randomHosts function.
-func TestRandomHosts(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
+// TestNodeAtWeight tests the nodeAtWeight method.
+func TestNodeAtWeight(t *testing.T) {
+	// create hostTree
+	h1 := new(hostEntry)
+	h1.NetAddress = "foo"
+	h1.weight = baseWeight
+	ht := createNode(nil, h1)
+
+	// overweight
+	_, err := ht.nodeAtWeight(baseWeight.Mul(types.NewCurrency64(2)))
+	if err != ErrOverweight {
+		t.Errorf("expected %v, got %v", ErrOverweight, err)
 	}
-	hdb := &HostDB{
-		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
-		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+	h, err := ht.nodeAtWeight(baseWeight)
+	if err != nil {
+		t.Error(err)
+	} else if h.hostEntry != h1 {
+		t.Errorf("nodeAtWeight returned wrong node: expected %v, got %v", h1, h.hostEntry)
+	}
+}
+
+// TestRandomHosts probes the randomHosts function.
+func TestRandomHosts(t *testing.T) {
+	// Create the hostdb (no dependencies needed).
+	hdb := newHostDB(nil, nil, nil, nil, nil, nil)
+
+	// Empty.
+	if hosts := hdb.randomHosts(1, nil); len(hosts) != 0 {
+		t.Errorf("empty hostdb returns %v hosts: %v", len(hosts), hosts)
 	}
 
 	// Insert 3 hosts to be selected.
@@ -284,23 +305,11 @@ func TestRandomHosts(t *testing.T) {
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
-	if len(hdb.activeHosts) != 3 {
-		t.Error("wrong number of hosts")
-	}
-	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
-		t.Error("unexpected weight at initialization")
-	}
 
 	// Grab 2 random hosts.
 	randHosts = hdb.randomHosts(2, nil)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
-	}
-	if len(hdb.activeHosts) != 3 {
-		t.Error("wrong number of hosts")
-	}
-	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
-		t.Error("unexpected weight at initialization")
 	}
 	if randHosts[0].NetAddress == randHosts[1].NetAddress {
 		t.Error("doubled up")
@@ -311,12 +320,6 @@ func TestRandomHosts(t *testing.T) {
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
-	if len(hdb.activeHosts) != 3 {
-		t.Error("wrong number of hosts")
-	}
-	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
-		t.Error("unexpected weight at initialization")
-	}
 	if randHosts[0].NetAddress == randHosts[1].NetAddress || randHosts[0].NetAddress == randHosts[2].NetAddress || randHosts[1].NetAddress == randHosts[2].NetAddress {
 		t.Error("doubled up")
 	}
@@ -325,12 +328,6 @@ func TestRandomHosts(t *testing.T) {
 	randHosts = hdb.randomHosts(4, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
-	}
-	if len(hdb.activeHosts) != 3 {
-		t.Error("wrong number of hosts")
-	}
-	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
-		t.Error("unexpected weight at initialization")
 	}
 	if randHosts[0].NetAddress == randHosts[1].NetAddress || randHosts[0].NetAddress == randHosts[2].NetAddress || randHosts[1].NetAddress == randHosts[2].NetAddress {
 		t.Error("doubled up")
@@ -346,4 +343,14 @@ func TestRandomHosts(t *testing.T) {
 	if len(uniqueHosts) != 0 {
 		t.Error("didn't get 0 hosts")
 	}
+
+	// Ask for 3 hosts, blacklisting non-existent hosts. 3 should be returned.
+	randHosts = hdb.randomHosts(3, []modules.NetAddress{"foo", "bar", "baz"})
+	if len(randHosts) != 3 {
+		t.Error("didn't get 3 hosts")
+	}
+	if randHosts[0].NetAddress == randHosts[1].NetAddress || randHosts[0].NetAddress == randHosts[2].NetAddress || randHosts[1].NetAddress == randHosts[2].NetAddress {
+		t.Error("doubled up")
+	}
+
 }
