@@ -8,48 +8,42 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
-// logFileWrapper wraps a log file to perform sanity checks on the Write and
-// Close functions. An error will be returned if Close is called multiple times
-// or if Write is called after Close has been called.
-type logFileWrapper struct {
-	closed bool // Flag is set after Close is called.
-	file   *os.File
+// closeableFile wraps an os.File to perform sanity checks on its Write and
+// Close methods. When the checks are enable, calls to Write or Close will
+// panic if they are called after the file has already been closed.
+type closeableFile struct {
+	*os.File
+	closed bool
 }
 
-// newLogFileWrapper returns a logFileWrapper that has been initialized with
-// the input file.
-func newLogFileWrapper(f *os.File) *logFileWrapper {
-	return &logFileWrapper{file: f}
-}
-
-// Close closes the log file wrapper.
-func (lfw *logFileWrapper) Close() error {
+// Close closes the file and sets the closed flag.
+func (cf *closeableFile) Close() error {
 	// Sanity check - close should not have been called yet.
-	if build.DEBUG && lfw.closed {
-		panic("cannot close the logger after it has been closed")
+	if build.DEBUG && cf.closed {
+		panic("cannot close the file; already closed")
 	}
 	// Ensure that all data has actually hit the disk.
-	if err := lfw.file.Sync(); err != nil {
+	if err := cf.Sync(); err != nil {
 		return err
 	}
-	lfw.closed = true
-	return lfw.file.Close()
+	cf.closed = true
+	return cf.File.Close()
 }
 
 // Write takes the input data and writes it to the file.
-func (lfw *logFileWrapper) Write(b []byte) (int, error) {
+func (cf *closeableFile) Write(b []byte) (int, error) {
 	// Sanity check - close should not have been called yet.
-	if build.DEBUG && lfw.closed {
-		panic("cannot write to the logger after it has been closed")
+	if build.DEBUG && cf.closed {
+		panic("cannot write to the file after it has been closed")
 	}
-	return lfw.file.Write(b)
+	return cf.File.Write(b)
 }
 
 // Logger is a wrapper for the standard library logger that enforces logging
 // into a file with the Sia-standard settings.
 type Logger struct {
 	*log.Logger
-	logFileWrapper *logFileWrapper
+	file *closeableFile
 }
 
 // NewLogger returns a logger that can be closed. Calls should not be made to
@@ -59,16 +53,16 @@ func NewLogger(logFilename string) (*Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	lfw := newLogFileWrapper(logFile)
-	logger := log.New(lfw, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LUTC)
-	logger.Println("STARTUP: Logging has started.")
-	return &Logger{Logger: logger, logFileWrapper: lfw}, nil
+	cf := &closeableFile{File: logFile}
+	l := log.New(cf, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LUTC)
+	l.Println("STARTUP: Logging has started.")
+	return &Logger{Logger: l, file: cf}, nil
 }
 
 // Close terminates the Logger.
 func (l *Logger) Close() error {
 	l.Println("SHUTDOWN: Logging has terminated.")
-	return l.logFileWrapper.Close()
+	return l.file.Close()
 }
 
 // Critical will panic if debug mode is activated, and will log the statement
