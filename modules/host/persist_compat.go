@@ -97,6 +97,9 @@ func (h *Host) compatibilityLoad() error {
 	if build.DEBUG && h.recentChange != (modules.ConsensusChangeID{}) {
 		panic("compatibility loading is not starting from blank consensus?")
 	}
+	// initConsensusSubscription will scan through the consensus set and set
+	// 'OriginConfirmed' and 'RevisionConfirmed' when the accociated file
+	// contract and file contract revisions are found.
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err

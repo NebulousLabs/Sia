@@ -17,7 +17,7 @@ const (
 )
 
 // persistMetadata is the header that gets written to the persist file, and is
-// used to recognize other persisit files.
+// used to recognize other persist files.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Host",
 	Version: "0.5",
