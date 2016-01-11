@@ -242,19 +242,19 @@ func TestSetAndGetSettings(t *testing.T) {
 	// Check the default settings get returned at first call.
 	settings := ht.host.Settings()
 	if settings.TotalStorage != defaultTotalStorage {
-		t.Error("settings GET did not return default value:", settings.TotalStorage, defaultTotalStorage)
+		t.Error("settings retrieval did not return default value:", settings.TotalStorage, defaultTotalStorage)
 	}
 	if settings.MaxDuration != defaultMaxDuration {
-		t.Error("settings GET did not return default value")
+		t.Error("settings retrieval did not return default value")
 	}
 	if settings.WindowSize != defaultWindowSize {
-		t.Error("settings GET did not return default value")
+		t.Error("settings retrieval did not return default value")
 	}
 	if settings.Price.Cmp(defaultPrice) != 0 {
-		t.Error("settings GET did not return default value")
+		t.Error("settings retrieval did not return default value")
 	}
 	if settings.Collateral.Cmp(defaultCollateral) != 0 {
-		t.Error("settings GET did not return default value")
+		t.Error("settings retrieval did not return default value")
 	}
 
 	// Submit updated settings and check that the changes stuck.
@@ -269,19 +269,19 @@ func TestSetAndGetSettings(t *testing.T) {
 	}
 	newSettings := ht.host.Settings()
 	if settings.TotalStorage != newSettings.TotalStorage {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.MaxDuration != newSettings.MaxDuration {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.WindowSize != newSettings.WindowSize {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.Price.Cmp(newSettings.Price) != 0 {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.Collateral.Cmp(newSettings.Collateral) != 0 {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 
 	// Reload the host and verify that the altered settings persisted.
@@ -295,19 +295,19 @@ func TestSetAndGetSettings(t *testing.T) {
 	}
 	rebootSettings := rebootHost.Settings()
 	if settings.TotalStorage != rebootSettings.TotalStorage {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.MaxDuration != rebootSettings.MaxDuration {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.WindowSize != rebootSettings.WindowSize {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.Price.Cmp(rebootSettings.Price) != 0 {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.Collateral.Cmp(rebootSettings.Collateral) != 0 {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 }
 
@@ -365,18 +365,18 @@ func TestPersistentSettings(t *testing.T) {
 	}
 	newSettings := h.Settings()
 	if settings.TotalStorage != newSettings.TotalStorage {
-		t.Error("settings GET did not return updated value:", settings.TotalStorage, "vs", newSettings.TotalStorage)
+		t.Error("settings retrieval did not return updated value:", settings.TotalStorage, "vs", newSettings.TotalStorage)
 	}
 	if settings.MaxDuration != newSettings.MaxDuration {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.WindowSize != newSettings.WindowSize {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.Price.Cmp(newSettings.Price) != 0 {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 	if settings.Collateral.Cmp(newSettings.Collateral) != 0 {
-		t.Error("settings GET did not return updated value")
+		t.Error("settings retrieval did not return updated value")
 	}
 }

@@ -17,7 +17,7 @@ const (
 )
 
 // persistMetadata is the header that gets written to the persist file, and is
-// used to recognize other persisit files.
+// used to recognize other persist files.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Host",
 	Version: "0.5",
@@ -157,7 +157,10 @@ func (h *Host) establishDefaults() error {
 func (h *Host) load() error {
 	p := new(persistence)
 	err := persist.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
-	if os.IsNotExist(err) {
+	if err == persist.ErrBadVersion {
+		// COMPATv0.4.8 - try the compatibility loader.
+		return h.compatibilityLoad()
+	} else if os.IsNotExist(err) {
 		// This is the host's first run, set up the default values.
 		return h.establishDefaults()
 	} else if err != nil {

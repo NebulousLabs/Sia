@@ -161,11 +161,23 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
 				if exists {
 					ob.OriginConfirmed = true
+
+					// COMPATv0.4.8 - found the original transaction on the
+					// chain, can copy it over for compatibility. An equivalent
+					// check is not needed when rewinding, as a rescan is
+					// performed that puts the host knowledge at the tip of
+					// consensus.
+					ob.OriginTransaction = txn
 				}
 			}
 			for _, fcr := range txn.FileContractRevisions {
 				ob, exists := h.obligationsByID[fcr.ParentID]
 				if exists && ob.revisionNumber() == fcr.NewRevisionNumber {
+					// COMPATv0.4.8 - found a revision, can move it over to get
+					// compatibility. No harm is done by adding the revision as
+					// long as it is set to 'confirmed' after the fact.
+					h.reviseObligation(txn)
+
 					// Need to check that the revision is the most recent
 					// revision. By assuming that the host only signs one
 					// revision for each number, and that the host has the most
