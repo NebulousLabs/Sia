@@ -119,7 +119,7 @@ func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *
 
 // insertNode inserts a host entry into the host tree, removing
 // any conflicts. The host settings are assummed to be correct. Though hosts
-// with 0 weight will never be selected, they are accetped into the tree.
+// with 0 weight will never be selected, they are accepted into the tree.
 func (hdb *HostDB) insertNode(entry *hostEntry) {
 	// If there's already a host of the same id, remove that host.
 	priorEntry, exists := hdb.activeHosts[entry.NetAddress]
