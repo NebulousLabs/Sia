@@ -48,12 +48,6 @@ type (
 	// WalletTransactionID is a unique identifier for a wallet transaction.
 	WalletTransactionID crypto.Hash
 
-	// A WalletAddress is an address. A struct is used so that it can be
-	// expanded in the future to include items such as balances.
-	WalletAddress struct {
-		Address types.UnlockHash `json:"address"`
-	}
-
 	// A ProcessedInput represents funding to a transaction. The input is
 	// coming from an address and going to the outputs. The fund types are
 	// 'SiacoinInput', 'SiafundInput'.

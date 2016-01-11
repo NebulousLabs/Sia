@@ -45,7 +45,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 			if len(entries) == 0 {
 				return errors.New("no hosts!")
 			}
-			selectionMap[entries[0].IPAddress] = selectionMap[entries[0].IPAddress] + 1
+			selectionMap[entries[0].NetAddress] = selectionMap[entries[0].NetAddress] + 1
 		}
 
 		// See if each host was selected enough times.
@@ -72,7 +72,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 			break
 		}
 		node.removeNode()
-		delete(hdb.activeHosts, node.hostEntry.IPAddress)
+		delete(hdb.activeHosts, node.hostEntry.NetAddress)
 
 		// remove the entry from the hostdb so it won't be selected as a
 		// repeat.
@@ -102,7 +102,7 @@ func TestWeightedList(t *testing.T) {
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
+			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
 			weight:       types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
@@ -147,7 +147,7 @@ func TestWeightedList(t *testing.T) {
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
+			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
 			weight:       types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
@@ -178,7 +178,7 @@ func TestVariedWeights(t *testing.T) {
 	selections := 0
 	for i := 0; i < hostCount; i++ {
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
+			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
 			weight:       types.NewCurrency64(uint64(i)),
 		}
 		hdb.insertNode(&entry)
@@ -193,7 +193,7 @@ func TestVariedWeights(t *testing.T) {
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
-		node, exists := hdb.activeHosts[randEntry[0].IPAddress]
+		node, exists := hdb.activeHosts[randEntry[0].NetAddress]
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
@@ -230,7 +230,7 @@ func TestRepeatInsert(t *testing.T) {
 	}
 
 	entry1 := hostEntry{
-		HostSettings: modules.HostSettings{IPAddress: fakeAddr(0)},
+		HostSettings: modules.HostSettings{NetAddress: fakeAddr(0)},
 		weight:       types.NewCurrency64(1),
 	}
 	entry2 := entry1
@@ -256,15 +256,15 @@ func TestRandomHosts(t *testing.T) {
 
 	// Insert 3 hosts to be selected.
 	entry1 := hostEntry{
-		HostSettings: modules.HostSettings{IPAddress: fakeAddr(1)},
+		HostSettings: modules.HostSettings{NetAddress: fakeAddr(1)},
 		weight:       types.NewCurrency64(1),
 	}
 	entry2 := hostEntry{
-		HostSettings: modules.HostSettings{IPAddress: fakeAddr(2)},
+		HostSettings: modules.HostSettings{NetAddress: fakeAddr(2)},
 		weight:       types.NewCurrency64(2),
 	}
 	entry3 := hostEntry{
-		HostSettings: modules.HostSettings{IPAddress: fakeAddr(3)},
+		HostSettings: modules.HostSettings{NetAddress: fakeAddr(3)},
 		weight:       types.NewCurrency64(3),
 	}
 	hdb.insertNode(&entry1)
@@ -302,7 +302,7 @@ func TestRandomHosts(t *testing.T) {
 	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
-	if randHosts[0].IPAddress == randHosts[1].IPAddress {
+	if randHosts[0].NetAddress == randHosts[1].NetAddress {
 		t.Error("doubled up")
 	}
 
@@ -317,7 +317,7 @@ func TestRandomHosts(t *testing.T) {
 	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
-	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {
+	if randHosts[0].NetAddress == randHosts[1].NetAddress || randHosts[0].NetAddress == randHosts[2].NetAddress || randHosts[1].NetAddress == randHosts[2].NetAddress {
 		t.Error("doubled up")
 	}
 
@@ -332,16 +332,16 @@ func TestRandomHosts(t *testing.T) {
 	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
 		t.Error("unexpected weight at initialization")
 	}
-	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {
+	if randHosts[0].NetAddress == randHosts[1].NetAddress || randHosts[0].NetAddress == randHosts[2].NetAddress || randHosts[1].NetAddress == randHosts[2].NetAddress {
 		t.Error("doubled up")
 	}
 
 	// Ask for 3 hosts that are not in randHosts. No hosts should be
 	// returned.
 	uniqueHosts := hdb.randomHosts(3, []modules.NetAddress{
-		randHosts[0].IPAddress,
-		randHosts[1].IPAddress,
-		randHosts[2].IPAddress,
+		randHosts[0].NetAddress,
+		randHosts[1].NetAddress,
+		randHosts[2].NetAddress,
 	})
 	if len(uniqueHosts) != 0 {
 		t.Error("didn't get 0 hosts")

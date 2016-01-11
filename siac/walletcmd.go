@@ -165,7 +165,7 @@ func walletaddressescmd() {
 		return
 	}
 	for _, addr := range addrs.Addresses {
-		fmt.Println(addr.Address)
+		fmt.Println(addr)
 	}
 }
 

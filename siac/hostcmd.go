@@ -74,7 +74,7 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	case 0:
 		err = post("/host/announce", "")
 	case 1:
-		err = post("/host/announce", "address="+args[0])
+		err = post("/host/announce", "netaddress="+args[0])
 	default:
 		cmd.Usage()
 		return

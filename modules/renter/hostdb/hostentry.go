@@ -20,10 +20,10 @@ type hostEntry struct {
 // TODO: Function should return an error.
 func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	// Remove garbage hosts and local hosts.
-	if !host.IPAddress.IsValid() {
+	if !host.NetAddress.IsValid() {
 		return
 	}
-	if host.IPAddress.IsLoopback() && build.Release != "testing" {
+	if host.NetAddress.IsLoopback() && build.Release != "testing" {
 		return
 	}
 
@@ -32,9 +32,9 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 		HostSettings: host,
 		reliability:  DefaultReliability,
 	}
-	_, exists := hdb.allHosts[entry.IPAddress]
+	_, exists := hdb.allHosts[entry.NetAddress]
 	if !exists {
-		hdb.allHosts[entry.IPAddress] = entry
+		hdb.allHosts[entry.NetAddress] = entry
 		hdb.scanHostEntry(entry)
 	}
 }

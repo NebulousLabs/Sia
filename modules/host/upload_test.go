@@ -25,7 +25,7 @@ const (
 // uploadFile uploads a file to the host from the tester's renter. The data
 // used to make the file is returned. The nickname of the file in the renter is
 // the same as the name provided as input.
-func (ht *hostTester) uploadFile(name string, renew bool) ([]byte, error) {
+func (ht *hostTester) uploadFile(path string, renew bool) ([]byte, error) {
 	// Check that renting is initialized properly.
 	err := ht.initRenting()
 	if err != nil {
@@ -33,13 +33,13 @@ func (ht *hostTester) uploadFile(name string, renew bool) ([]byte, error) {
 	}
 
 	// Create a file to upload to the host.
-	filepath := filepath.Join(ht.persistDir, name+".testfile")
+	source := filepath.Join(ht.persistDir, path+".testfile")
 	datasize := uint64(1024)
 	data, err := crypto.RandBytes(int(datasize))
 	if err != nil {
 		return nil, err
 	}
-	err = ioutil.WriteFile(filepath, data, 0600)
+	err = ioutil.WriteFile(source, data, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +50,8 @@ func (ht *hostTester) uploadFile(name string, renew bool) ([]byte, error) {
 		return nil, err
 	}
 	fup := modules.FileUploadParams{
-		Filename:    filepath,
-		Nickname:    name,
+		Source:      source,
+		SiaPath:     path,
 		Duration:    testUploadDuration,
 		Renew:       renew,
 		ErasureCode: rsc,

@@ -36,8 +36,8 @@ type ErasureCoder interface {
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
 type FileUploadParams struct {
-	Filename    string
-	Nickname    string
+	Source      string
+	SiaPath     string
 	Duration    types.BlockHeight
 	Renew       bool
 	ErasureCode ErasureCoder
@@ -46,17 +46,18 @@ type FileUploadParams struct {
 
 // FileInfo provides information about a file.
 type FileInfo struct {
-	Nickname       string            `json:"nickname"`
+	SiaPath        string            `json:"siapath"`
 	Filesize       uint64            `json:"filesize"`
 	Available      bool              `json:"available"`
-	UploadProgress float32           `json:"uploadprogress"`
+	Renewing       bool              `json:"renewing"`
+	UploadProgress float64           `json:"uploadprogress"`
 	Expiration     types.BlockHeight `json:"expiration"`
 }
 
 // DownloadInfo provides information about a file that has been requested for
 // download.
 type DownloadInfo struct {
-	Nickname    string    `json:"nickname"`
+	SiaPath     string    `json:"siapath"`
 	Destination string    `json:"destination"`
 	Filesize    uint64    `json:"filesize"`
 	Received    uint64    `json:"received"`
@@ -74,10 +75,10 @@ type Renter interface {
 	AllHosts() []HostSettings
 
 	// DeleteFile deletes a file entry from the renter.
-	DeleteFile(nickname string) error
+	DeleteFile(path string) error
 
-	// Download downloads a file to the given filepath.
-	Download(nickname, filepath string) error
+	// Download downloads a file to the given destination.
+	Download(path, destination string) error
 
 	// DownloadQueue lists all the files that have been scheduled for download.
 	DownloadQueue() []DownloadInfo
@@ -86,21 +87,21 @@ type Renter interface {
 	FileList() []FileInfo
 
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
-	// contain multiple files. The nicknames of the added files are returned.
-	LoadSharedFiles(filename string) ([]string, error)
+	// contain multiple files. The paths of the added files are returned.
+	LoadSharedFiles(source string) ([]string, error)
 
 	// LoadSharedFilesAscii loads an ASCII-encoded '.sia' file into the
 	// renter.
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
-	// Rename changes the nickname of a file.
-	RenameFile(currentName, newName string) error
+	// Rename changes the path of a file.
+	RenameFile(path, newPath string) error
 
 	// ShareFiles creates a '.sia' file that can be shared with others.
-	ShareFiles(nicknames []string, shareDest string) error
+	ShareFiles(paths []string, shareDest string) error
 
 	// ShareFilesAscii creates an ASCII-encoded '.sia' file.
-	ShareFilesAscii(nicknames []string) (asciiSia string, err error)
+	ShareFilesAscii(paths []string) (asciiSia string, err error)
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error

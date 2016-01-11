@@ -205,7 +205,7 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 	txnBuilder := hdb.wallet.StartTransaction()
 
 	// initiate connection
-	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 15*time.Second)
+	conn, err := net.DialTimeout("tcp", string(host.NetAddress), 15*time.Second)
 	if err != nil {
 		return hostContract{}, err
 	}
@@ -215,7 +215,7 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 	}
 
 	// execute negotiation protocol
-	contract, err := negotiateContract(conn, host.IPAddress, fc, txnBuilder, hdb.tpool)
+	contract, err := negotiateContract(conn, host.NetAddress, fc, txnBuilder, hdb.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return hostContract{}, err

@@ -36,14 +36,14 @@ var (
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
-		Use:   "delete [nickname]",
+		Use:   "delete [path]",
 		Short: "Delete a file",
 		Long:  "Delete a file. Does not delete the file on disk.",
 		Run:   wrap(renterfilesdeletecmd),
 	}
 
 	renterFilesDownloadCmd = &cobra.Command{
-		Use:   "download [nickname] [destination]",
+		Use:   "download [path] [destination]",
 		Short: "Download a file",
 		Long:  "Download a previously-uploaded file to a specified destination.",
 		Run:   wrap(renterfilesdownloadcmd),
@@ -57,42 +57,42 @@ var (
 	}
 
 	renterFilesLoadCmd = &cobra.Command{
-		Use:   "load [filename]",
+		Use:   "load [source]",
 		Short: "Load a .sia file",
 		Long:  "Load a .sia file, adding the file entries contained within.",
 		Run:   wrap(renterfilesloadcmd),
 	}
 
 	renterFilesLoadASCIICmd = &cobra.Command{
-		Use:   "loadascii [data]",
+		Use:   "loadascii [ascii]",
 		Short: "Load an ASCII-encoded .sia file",
 		Long:  "Load an ASCII-encoded .sia file.",
 		Run:   wrap(renterfilesloadasciicmd),
 	}
 
 	renterFilesRenameCmd = &cobra.Command{
-		Use:   "rename [nickname] [newname]",
+		Use:   "rename [path] [newpath]",
 		Short: "Rename a file",
 		Long:  "Rename a file.",
 		Run:   wrap(renterfilesrenamecmd),
 	}
 
 	renterFilesShareCmd = &cobra.Command{
-		Use:   "share [nickname] [destination]",
+		Use:   "share [path] [destination]",
 		Short: "Export a file to a .sia for sharing",
 		Long:  "Export a file to a .sia for sharing.",
 		Run:   wrap(renterfilessharecmd),
 	}
 
 	renterFilesShareASCIICmd = &cobra.Command{
-		Use:   "shareascii [nickname]",
+		Use:   "shareascii [path]",
 		Short: "Export a file as an ASCII-encoded .sia file",
 		Long:  "Export a file as an ASCII-encoded .sia file.",
 		Run:   wrap(renterfilesshareasciicmd),
 	}
 
 	renterFilesUploadCmd = &cobra.Command{
-		Use:   "upload [filename] [nickname]",
+		Use:   "upload [source] [path]",
 		Short: "Upload a file",
 		Long:  "Upload a file using a given nickname.",
 		Run:   wrap(renterfilesuploadcmd),
@@ -123,26 +123,26 @@ func renterdownloadqueuecmd() {
 	}
 	fmt.Println("Download Queue:")
 	for _, file := range queue.Downloads {
-		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
+		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
 	}
 }
 
-func renterfilesdeletecmd(nickname string) {
-	err := post("/renter/delete/"+nickname, "")
+func renterfilesdeletecmd(path string) {
+	err := post("/renter/delete/"+path, "")
 	if err != nil {
 		fmt.Println("Could not delete file:", err)
 		return
 	}
-	fmt.Println("Deleted", nickname)
+	fmt.Println("Deleted", path)
 }
 
-func renterfilesdownloadcmd(nickname, destination string) {
-	err := get("/renter/download/" + nickname + "?destination=" + abs(destination))
+func renterfilesdownloadcmd(path, destination string) {
+	err := get("/renter/download/" + path + "?destination=" + abs(destination))
 	if err != nil {
 		fmt.Println("Could not download file:", err)
 		return
 	}
-	fmt.Printf("Downloaded '%s' to %s.\n", nickname, abs(destination))
+	fmt.Printf("Downloaded '%s' to %s.\n", path, abs(destination))
 }
 
 func renterfileslistcmd() {
@@ -158,18 +158,17 @@ func renterfileslistcmd() {
 	}
 	fmt.Println("Tracking", len(rf.Files), "files:")
 	for _, file := range rf.Files {
-		// TODO: write a filesize() helper function to display proper units
 		if file.Available {
-			fmt.Printf("%13s  %s\n", filesizeUnits(int64(file.Filesize)), file.Nickname)
+			fmt.Printf("%13s  %s\n", filesizeUnits(int64(file.Filesize)), file.SiaPath)
 		} else {
-			fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(int64(file.Filesize)), file.Nickname, file.UploadProgress)
+			fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(int64(file.Filesize)), file.SiaPath, file.UploadProgress)
 		}
 	}
 }
 
-func renterfilesloadcmd(filename string) {
+func renterfilesloadcmd(source string) {
 	var info api.RenterLoad
-	err := postResp("/renter/load", "filename="+abs(filename), &info)
+	err := postResp("/renter/load", "source="+abs(source), &info)
 	if err != nil {
 		fmt.Println("Could not load file:", err)
 		return
@@ -180,9 +179,9 @@ func renterfilesloadcmd(filename string) {
 	}
 }
 
-func renterfilesloadasciicmd(data string) {
+func renterfilesloadasciicmd(ascii string) {
 	var info api.RenterLoad
-	err := postResp("/renter/loadascii", "file="+data, &info)
+	err := postResp("/renter/loadascii", "asciisia="+ascii, &info)
 	if err != nil {
 		fmt.Println("Could not load file:", err)
 		return
@@ -193,39 +192,39 @@ func renterfilesloadasciicmd(data string) {
 	}
 }
 
-func renterfilesrenamecmd(path, newname string) {
-	err := post("/renter/rename/"+path, "newname="+newname)
+func renterfilesrenamecmd(path, newpath string) {
+	err := post("/renter/rename/"+path, "newsiapath="+newpath)
 	if err != nil {
 		fmt.Println("Could not rename file:", err)
 		return
 	}
-	fmt.Printf("Renamed %s to %s\n", path, newname)
+	fmt.Printf("Renamed %s to %s\n", path, newpath)
 }
 
-func renterfilessharecmd(nickname, destination string) {
-	err := get(fmt.Sprintf("/renter/share?paths=%s&destination=%s", nickname, abs(destination)))
+func renterfilessharecmd(path, destination string) {
+	err := get(fmt.Sprintf("/renter/share?siapaths=%s&destination=%s", path, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
 	}
-	fmt.Printf("Exported %s to %s\n", nickname, abs(destination))
+	fmt.Printf("Exported %s to %s\n", path, abs(destination))
 }
 
-func renterfilesshareasciicmd(nickname string) {
+func renterfilesshareasciicmd(path string) {
 	var data api.RenterShareASCII
-	err := getAPI("/renter/shareascii?paths="+nickname, &data)
+	err := getAPI("/renter/shareascii?siapaths="+path, &data)
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
 	}
-	fmt.Println(data.File)
+	fmt.Println(data.ASCIIsia)
 }
 
-func renterfilesuploadcmd(source, nickname string) {
-	err := post("/renter/upload/"+nickname, "source="+abs(source))
+func renterfilesuploadcmd(source, path string) {
+	err := post("/renter/upload/"+path, "source="+abs(source))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
 	}
-	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), nickname)
+	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
 }

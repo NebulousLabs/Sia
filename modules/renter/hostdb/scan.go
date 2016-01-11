@@ -20,7 +20,7 @@ import (
 // preserved for compatibility with those hosts.
 // COMPATv0.4.8
 type oldHostSettings struct {
-	IPAddress    modules.NetAddress
+	NetAddress   modules.NetAddress
 	TotalStorage int64
 	MinFilesize  uint64
 	MaxFilesize  uint64
@@ -79,7 +79,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// database.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
-		delete(hdb.activeHosts, entry.IPAddress)
+		delete(hdb.activeHosts, entry.NetAddress)
 		node.removeNode()
 	}
 
@@ -98,7 +98,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 		// Request settings from the queued host entry.
 		var settings modules.HostSettings
 		err := func() error {
-			conn, err := net.DialTimeout("tcp", string(hostEntry.IPAddress), hostRequestTimeout)
+			conn, err := net.DialTimeout("tcp", string(hostEntry.NetAddress), hostRequestTimeout)
 			if err != nil {
 				return err
 			}
@@ -123,7 +123,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 				}
 				// Convert the old type.
 				settings = modules.HostSettings{
-					IPAddress:    oldSettings.IPAddress,
+					NetAddress:   oldSettings.NetAddress,
 					TotalStorage: oldSettings.TotalStorage,
 					MinDuration:  oldSettings.MinDuration,
 					MaxDuration:  oldSettings.MaxDuration,
@@ -141,22 +141,22 @@ func (hdb *HostDB) threadedProbeHosts() {
 		hdb.mu.Lock()
 		{
 			if err != nil {
-				hdb.decrementReliability(hostEntry.IPAddress, UnreachablePenalty)
+				hdb.decrementReliability(hostEntry.NetAddress, UnreachablePenalty)
 				hdb.mu.Unlock()
 				continue
 			}
 
-			// Update the host settings, reliability, and weight. The old IPAddress
+			// Update the host settings, reliability, and weight. The old NetAddress
 			// must be preserved.
-			settings.IPAddress = hostEntry.HostSettings.IPAddress
+			settings.NetAddress = hostEntry.HostSettings.NetAddress
 			hostEntry.HostSettings = settings
 			hostEntry.reliability = MaxReliability
 			hostEntry.weight = calculateHostWeight(*hostEntry)
 
 			// If the host is not already in the database and 'MaxActiveHosts' has not
 			// been reached, add the host to the database.
-			_, exists1 := hdb.activeHosts[hostEntry.IPAddress]
-			_, exists2 := hdb.allHosts[hostEntry.IPAddress]
+			_, exists1 := hdb.activeHosts[hostEntry.NetAddress]
+			_, exists2 := hdb.allHosts[hostEntry.NetAddress]
 			if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
 				hdb.insertNode(hostEntry)
 			}
@@ -182,7 +182,7 @@ func (hdb *HostDB) threadedScan() {
 			// Assemble all of the inactive hosts into a single array.
 			var random []*hostEntry
 			for _, entry := range hdb.allHosts {
-				entry2, exists := hdb.activeHosts[entry.IPAddress]
+				entry2, exists := hdb.activeHosts[entry.NetAddress]
 				if !exists {
 					random = append(random, entry)
 				} else {

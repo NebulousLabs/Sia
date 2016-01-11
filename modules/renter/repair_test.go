@@ -156,7 +156,7 @@ type offlineHostDB map[modules.NetAddress]bool
 func (hdb offlineHostDB) ActiveHosts() (hosts []modules.HostSettings) {
 	for addr, active := range hdb {
 		if active {
-			hosts = append(hosts, modules.HostSettings{IPAddress: addr})
+			hosts = append(hosts, modules.HostSettings{NetAddress: addr})
 		}
 	}
 	return
@@ -165,7 +165,7 @@ func (hdb offlineHostDB) ActiveHosts() (hosts []modules.HostSettings) {
 // AllHosts returns the entire contents of the offlineHostDB.
 func (hdb offlineHostDB) AllHosts() (hosts []modules.HostSettings) {
 	for addr := range hdb {
-		hosts = append(hosts, modules.HostSettings{IPAddress: addr})
+		hosts = append(hosts, modules.HostSettings{NetAddress: addr})
 	}
 	return
 }

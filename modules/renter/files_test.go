@@ -105,8 +105,8 @@ func TestRenterDeleteFile(t *testing.T) {
 
 	// Delete a file from an empty renter.
 	err = rt.renter.DeleteFile("dne")
-	if err != ErrUnknownNickname {
-		t.Error("Expected ErrUnknownNickname:", err)
+	if err != ErrUnknownPath {
+		t.Error("Expected ErrUnknownPath:", err)
 	}
 
 	// Put a file in the renter.
@@ -115,8 +115,8 @@ func TestRenterDeleteFile(t *testing.T) {
 	}
 	// Delete a different file.
 	err = rt.renter.DeleteFile("one")
-	if err != ErrUnknownNickname {
-		t.Error("Expected ErrUnknownNickname, got", err)
+	if err != ErrUnknownPath {
+		t.Error("Expected ErrUnknownPath, got", err)
 	}
 	// Delete the file.
 	err = rt.renter.DeleteFile("1")
@@ -134,8 +134,8 @@ func TestRenterDeleteFile(t *testing.T) {
 	rt.renter.RenameFile(f.name, "one")
 	// Call delete on the previous name.
 	err = rt.renter.DeleteFile("1")
-	if err != ErrUnknownNickname {
-		t.Error("Expected ErrUnknownNickname, got", err)
+	if err != ErrUnknownPath {
+		t.Error("Expected ErrUnknownPath, got", err)
 	}
 	// Call delete on the new name.
 	err = rt.renter.DeleteFile("one")
@@ -185,7 +185,7 @@ func TestRenterFileList(t *testing.T) {
 	if len(rt.renter.FileList()) != 1 {
 		t.Error("FileList is not returning the only file in the renter")
 	}
-	if rt.renter.FileList()[0].Nickname != "one" {
+	if rt.renter.FileList()[0].SiaPath != "one" {
 		t.Error("FileList is not returning the correct filename for the only file")
 	}
 
@@ -199,10 +199,10 @@ func TestRenterFileList(t *testing.T) {
 		t.Error("FileList is not returning both files in the renter")
 	}
 	files := rt.renter.FileList()
-	if !((files[0].Nickname == "one" || files[0].Nickname == "two") &&
-		(files[1].Nickname == "one" || files[1].Nickname == "two") &&
-		(files[0].Nickname != files[1].Nickname)) {
-		t.Error("FileList is returning wrong names for the files:", files[0].Nickname, files[1].Nickname)
+	if !((files[0].SiaPath == "one" || files[0].SiaPath == "two") &&
+		(files[1].SiaPath == "one" || files[1].SiaPath == "two") &&
+		(files[0].SiaPath != files[1].SiaPath)) {
+		t.Error("FileList is returning wrong names for the files:", files[0].SiaPath, files[1].SiaPath)
 	}
 }
 
@@ -216,8 +216,8 @@ func TestRenterRenameFile(t *testing.T) {
 
 	// Rename a file that doesn't exist.
 	err = rt.renter.RenameFile("1", "1a")
-	if err != ErrUnknownNickname {
-		t.Error("Expecting ErrUnknownNickname:", err)
+	if err != ErrUnknownPath {
+		t.Error("Expecting ErrUnknownPath:", err)
 	}
 
 	// Rename a file that does exist.
@@ -232,8 +232,8 @@ func TestRenterRenameFile(t *testing.T) {
 	if len(files) != 1 {
 		t.Fatal("FileList has unexpected number of files:", len(files))
 	}
-	if files[0].Nickname != "1a" {
-		t.Errorf("RenameFile failed: expected 1a, got %v", files[0].Nickname)
+	if files[0].SiaPath != "1a" {
+		t.Errorf("RenameFile failed: expected 1a, got %v", files[0].SiaPath)
 	}
 
 	// Rename a file to an existing name.
@@ -241,13 +241,13 @@ func TestRenterRenameFile(t *testing.T) {
 	f2.name = "1"
 	rt.renter.files["1"] = f2
 	err = rt.renter.RenameFile("1", "1a")
-	if err != ErrNicknameOverload {
-		t.Error("Expecting ErrNicknameOverload, got", err)
+	if err != ErrPathOverload {
+		t.Error("Expecting ErrPathOverload, got", err)
 	}
 
 	// Rename a file to the same name.
 	err = rt.renter.RenameFile("1", "1")
-	if err != ErrNicknameOverload {
-		t.Error("Expecting ErrNicknameOverload, got", err)
+	if err != ErrPathOverload {
+		t.Error("Expecting ErrPathOverload, got", err)
 	}
 }

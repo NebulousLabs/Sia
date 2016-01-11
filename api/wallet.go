@@ -36,7 +36,7 @@ type (
 	// WalletAddressesGET contains the list of wallet addresses returned by a
 	// GET call to /wallet/addresses.
 	WalletAddressesGET struct {
-		Addresses []modules.WalletAddress `json:"addresses"`
+		Addresses []types.UnlockHash `json:"addresses"`
 	}
 
 	// WalletInitPOST contains the primary seed that gets generated during a
@@ -126,6 +126,24 @@ func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request, _ htt
 	})
 }
 
+// wallet033xHandler handles API calls to /wallet/033x.
+func (srv *Server) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	source := req.FormValue("source")
+	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+	for _, key := range potentialKeys {
+		err := srv.wallet.Load033xWallet(key, source)
+		if err == nil {
+			writeSuccess(w)
+			return
+		}
+		if err != nil && err != modules.ErrBadEncryptionKey {
+			writeError(w, "error when calling /wallet/033x: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	writeError(w, modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
+}
+
 // walletAddressHandler handles API calls to /wallet/address.
 func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	unlockConditions, err := srv.wallet.NextAddress()
@@ -140,22 +158,14 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 
 // walletAddressHandler handles API calls to /wallet/addresses.
 func (srv *Server) walletAddressesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// Get the addresses and assemble the WalletAddress field.
-	addrs := srv.wallet.AllAddresses()
-	waddrs := make([]modules.WalletAddress, len(addrs))
-	for i := range addrs {
-		waddrs[i].Address = addrs[i]
-	}
-
-	// Print the result to the caller.
 	writeJSON(w, WalletAddressesGET{
-		Addresses: waddrs,
+		Addresses: srv.wallet.AllAddresses(),
 	})
 }
 
 // walletBackupHandler handles API calls to /wallet/backup.
 func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	err := srv.wallet.CreateBackup(req.FormValue("filepath"))
+	err := srv.wallet.CreateBackup(req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "error after call to /wallet/backup: "+err.Error(), http.StatusBadRequest)
 		return
@@ -187,24 +197,6 @@ func (srv *Server) walletInitHandler(w http.ResponseWriter, req *http.Request, _
 	writeJSON(w, WalletInitPOST{
 		PrimarySeed: seedStr,
 	})
-}
-
-// wallet033xHandler handles API calls to /wallet/033x.
-func (srv *Server) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	filepath := req.FormValue("filepath")
-	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
-	for _, key := range potentialKeys {
-		err := srv.wallet.Load033xWallet(key, filepath)
-		if err == nil {
-			writeSuccess(w)
-			return
-		}
-		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, "error when calling /wallet/033x: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	writeError(w, modules.ErrBadEncryptionKey.Error(), http.StatusBadRequest)
 }
 
 // walletSeedHandler handles API calls to /wallet/seed.

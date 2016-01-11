@@ -36,7 +36,7 @@ var defaultDuration = func() types.BlockHeight {
 	}
 }()
 
-var ErrDuplicateNickname = errors.New("file with that nickname already exists")
+var ErrDuplicateSiaPath = errors.New("file with that path already exists")
 
 // checkWalletBalance looks at an upload and determines if there is enough
 // money in the wallet to support such an upload. An error is returned if it is
@@ -46,7 +46,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 		return errors.New("wallet is locked")
 	}
 	// Get the size of the file.
-	fileInfo, err := os.Stat(up.Filename)
+	fileInfo, err := os.Stat(up.Source)
 	if err != nil {
 		return err
 	}
@@ -67,20 +67,20 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // automatically upload and repair tracked files using a background loop.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Enforce nickname rules.
-	if strings.HasPrefix(up.Nickname, "/") {
+	if strings.HasPrefix(up.SiaPath, "/") {
 		return errors.New("nicknames cannot begin with /")
 	}
 
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
-	_, exists := r.files[up.Nickname]
+	_, exists := r.files[up.SiaPath]
 	r.mu.RUnlock(lockID)
 	if exists {
-		return ErrDuplicateNickname
+		return ErrPathOverload
 	}
 
 	// Fill in any missing upload params with sensible defaults.
-	fileInfo, err := os.Stat(up.Filename)
+	fileInfo, err := os.Stat(up.Source)
 	if err != nil {
 		return err
 	}
@@ -106,14 +106,14 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := newFile(up.Nickname, up.ErasureCode, up.PieceSize, uint64(fileInfo.Size()))
+	f := newFile(up.SiaPath, up.ErasureCode, up.PieceSize, uint64(fileInfo.Size()))
 	f.mode = uint32(fileInfo.Mode())
 
 	// Add file to renter.
 	lockID = r.mu.Lock()
-	r.files[up.Nickname] = f
-	r.tracking[up.Nickname] = trackedFile{
-		RepairPath: up.Filename,
+	r.files[up.SiaPath] = f
+	r.tracking[up.SiaPath] = trackedFile{
+		RepairPath: up.Source,
 		EndHeight:  endHeight,
 		Renew:      up.Renew,
 	}

@@ -29,7 +29,7 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings)
 
 			// Add the announcement to the slice being returned.
 			announcements = append(announcements, modules.HostSettings{
-				IPAddress: ha.IPAddress,
+				NetAddress: ha.IPAddress,
 			})
 		}
 	}
