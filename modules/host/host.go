@@ -150,12 +150,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		return nil, err
 	}
 
-	// Subscribe to the consensus set.
-	err = h.initConsensusSubscription()
-	if err != nil {
-		return nil, err
-	}
-
 	// Get the host established on the network.
 	err = h.initNetworking(address)
 	if err != nil {

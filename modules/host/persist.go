@@ -16,8 +16,8 @@ const (
 	logFile = modules.HostDir + ".log"
 )
 
-// Variables indicating the metadata header and the version of the data that
-// has been saved to disk.
+// persistMetadata is the header that gets written to the persist file, and is
+// used to recognize other persisit files.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Host",
 	Version: "0.5",
@@ -120,19 +120,55 @@ func (h *Host) loadObligations(cos []*contractObligation) {
 	}
 }
 
-// load extrats the save data from disk and populates the host.
-func (h *Host) load() error {
-	p := new(persistence)
-	err := persist.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
+// establishDefaults configures the default settings for the host, overwriting
+// any existing settings.
+func (h *Host) establishDefaults() error {
+	// Configure the settings object.
+	h.settings = modules.HostSettings{
+		TotalStorage: defaultTotalStorage,
+		MaxDuration:  defaultMaxDuration,
+		WindowSize:   defaultWindowSize,
+		Price:        defaultPrice,
+		Collateral:   defaultCollateral,
+	}
+	h.spaceRemaining = h.settings.TotalStorage
+
+	// Generate signing key, for revising contracts.
+	sk, pk, err := crypto.GenerateKeyPair()
+	if err != nil {
+		return err
+	}
+	h.secretKey = sk
+	h.publicKey = types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
+
+	// Subscribe to the consensus set.
+	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
 	}
 
-	// Consensus Tracking.
+	return nil
+}
+
+// load extrats the save data from disk and populates the host.
+func (h *Host) load() error {
+	p := new(persistence)
+	err := persist.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
+	if os.IsNotExist(err) {
+		// This is the host's first run, set up the default values.
+		return h.establishDefaults()
+	} else if err != nil {
+		return err
+	}
+
+	// Copy over consensus tracking.
 	h.blockHeight = p.BlockHeight
 	h.recentChange = p.RecentChange
 
-	// Host Identity.
+	// Copy over host identity.
 	h.netAddress = p.NetAddress
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
@@ -160,38 +196,12 @@ func (h *Host) load() error {
 	// Utilities.
 	h.settings = p.Settings
 
-	return nil
-}
-
-// establishDefaults configures the default settings for the host, overwriting
-// any existing settings.
-func (h *Host) establishDefaults() error {
-	// Configure the settings object.
-	h.settings = modules.HostSettings{
-		TotalStorage: defaultTotalStorage,
-		MaxDuration:  defaultMaxDuration,
-		WindowSize:   defaultWindowSize,
-		Price:        defaultPrice,
-		Collateral:   defaultCollateral,
-	}
-	h.spaceRemaining = h.settings.TotalStorage
-
-	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateKeyPair()
+	// Subscribe to the consensus set.
+	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
 	}
-	h.secretKey = sk
-	h.publicKey = types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       pk[:],
-	}
 
-	// Save the defaults to disk.
-	err = h.save()
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -213,12 +223,7 @@ func (h *Host) initPersist() error {
 
 	// Load the prior persistance structures.
 	err = h.load()
-	if os.IsNotExist(err) {
-		err = h.establishDefaults()
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
+	if err != nil {
 		return err
 	}
 	return nil
