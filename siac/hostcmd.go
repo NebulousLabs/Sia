@@ -14,7 +14,7 @@ var (
 		Use:   "host",
 		Short: "Perform host actions",
 		Long:  "View or modify host settings. Modifying host settings also announces the host to the network.",
-		Run:   wrap(hoststatuscmd),
+		Run:   wrap(hostcmd),
 	}
 
 	hostConfigCmd = &cobra.Command{
@@ -23,13 +23,10 @@ var (
 		Long: `Modify host settings.
 Available settings:
 	totalstorage
-	minfilesize
-	maxfilesize
 	minduration
 	maxduration
 	windowsize
-	price (in SC per GB per month)
-	collateral`,
+	price (in SC per GB per month)`,
 		Run: wrap(hostconfigcmd),
 	}
 
@@ -41,13 +38,6 @@ You may also supply a specific address to be announced, e.g.:
 	siac host announce my-host-domain.com:9001
 Doing so will override the standard connectivity checks.`,
 		Run: hostannouncecmd,
-	}
-
-	hostStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "View host settings",
-		Long:  "View host settings, including available storage, price, and more.",
-		Run:   wrap(hoststatuscmd),
 	}
 )
 
@@ -63,14 +53,14 @@ func hostconfigcmd(param, value string) {
 		value = new(big.Int).Div(p.Num(), p.Denom()).String()
 	}
 	// parse sizes of form 10GB, 10TB, 1TiB etc
-	if param == "totalstorage" || param == "minfilesize" || param == "maxfilesize" {
-		var err error // must be pre-declared because value is
+	if param == "totalstorage" {
+		var err error
 		value, err = parseSize(value)
 		if err != nil {
 			fmt.Println("could not parse " + param)
 		}
 	}
-	err := post("/host/configure", param+"="+value)
+	err := post("/host", param+"="+value)
 	if err != nil {
 		fmt.Println("Could not update host settings:", err)
 		return
@@ -96,9 +86,9 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	fmt.Println("Host announcement submitted to network.")
 }
 
-func hoststatuscmd() {
+func hostcmd() {
 	hg := new(api.HostGET)
-	err := getAPI("/host/status", &hg)
+	err := getAPI("/host", &hg)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)
 		return
@@ -106,12 +96,13 @@ func hoststatuscmd() {
 	// convert price to SC/GB/mo
 	price := new(big.Rat).SetInt(hg.Price.Big())
 	price.Mul(price, big.NewRat(4320, 1e24/1e9))
-	fmt.Printf(`Host settings:
+	fmt.Printf(`Host info:
 Storage:      %v (%v used)
 Price:        %v SC per GB per month
-Collateral:   %v
-Max Duration: %v
+Max Duration: %v Blocks
 Contracts:    %v
+Revenue:      %v (%v expected)
 `, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
-		price.FloatString(3), hg.Collateral, hg.MaxDuration, hg.NumContracts)
+		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.Revenue,
+		hg.UpcomingRevenue)
 }

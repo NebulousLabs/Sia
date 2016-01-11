@@ -171,7 +171,7 @@ func walletaddressescmd() {
 
 // walletinitcmd encrypts the wallet with the given password
 func walletinitcmd() {
-	var er api.WalletEncryptPOST
+	var er api.WalletInitPOST
 	qs := fmt.Sprintf("dictionary=%s", "english")
 	if initPassword {
 		password, err := speakeasy.Ask("Wallet password: ")
@@ -181,7 +181,7 @@ func walletinitcmd() {
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	err := postResp("/wallet/encrypt", qs, &er)
+	err := postResp("/wallet/init", qs, &er)
 	if err != nil {
 		fmt.Println("Error when encrypting wallet:", err)
 		return

@@ -519,8 +519,8 @@ Queries:
 * /renter/delete/{path}     [POST]
 * /renter/download/{path}   [GET]
 * /renter/rename/{path}     [POST]
-* /renter/share/{path}      [GET]
-* /renter/shareascii/{path} [GET]
+* /renter/share             [GET]
+* /renter/shareascii        [GET]
 * /renter/upload/{path}     [POST]
 * /renter/hosts/active      [GET]
 * /renter/hosts/all         [GET]
@@ -664,31 +664,31 @@ newname  string
 
 Response: standard.
 
-#### /renter/share/{path} [GET]
+#### /renter/share [GET]
 
 Function: Create a .sia file that can be shared with other people.
 
 Parameters:
 ```
-path     string
+paths       []string
 destination string
 ```
-'path' is the nickname of the file that will be shared.
+'paths' is an array of the nicknames to be shared. It is comma-delimited.
 
 'destination' is the path of the .sia file to be created. It must end in
 '.sia'.
 
 Response: standard.
 
-#### /renter/shareascii/{path} [GET]
+#### /renter/shareascii [GET]
 
 Function: Create an ASCII .sia file that can be shared with other people.
 
 Parameters:
 ```
-path string
+paths []string
 ```
-'path' is the nickname of the file that will be shared.
+'paths' is an array of the nicknames to be shared. It is comma-delimited.
 
 Response:
 ```
