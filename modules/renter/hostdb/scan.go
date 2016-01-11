@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -187,11 +188,11 @@ func (hdb *HostDB) threadedScan() {
 			}
 
 			// Assemble all of the inactive hosts into a single array.
-			var random []*hostEntry
+			var entries []*hostEntry
 			for _, entry := range hdb.allHosts {
 				entry2, exists := hdb.activeHosts[entry.NetAddress]
 				if !exists {
-					random = append(random, entry)
+					entries = append(entries, entry)
 				} else {
 					if build.DEBUG {
 						if entry2.hostEntry != entry {
@@ -201,32 +202,20 @@ func (hdb *HostDB) threadedScan() {
 				}
 			}
 
-			// Randomize the slice by swapping each element with an element
-			// that hasn't been visited yet.
-			for i := 0; i < len(random); i++ {
-				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(random)-i)))
-				if err != nil {
-					if build.DEBUG {
-						panic(err)
-					}
-				} else {
-					break
-				}
-
-				n := int(N.Int64()) + i
-				tmp := random[i]
-				random[i] = random[n]
-				random[n] = tmp
-			}
-
-			// Select the first InactiveHostCheckupQuantity hosts from the
-			// shuffled list and scan them.
+			// Generate a random ordering of up to InactiveHostCheckupQuantity
+			// hosts.
 			n := InactiveHostCheckupQuantity
-			if len(random) < InactiveHostCheckupQuantity {
-				n = len(random)
+			if n > len(entries) {
+				n = len(entries)
 			}
-			for i := 0; i < n; i++ {
-				hdb.scanHostEntry(random[i])
+			perm, err := crypto.Perm(n)
+			if err != nil {
+				hdb.log.Println("ERR: could not generate random permutation:", err)
+			}
+
+			// Scan each host.
+			for _, randIndex := range perm {
+				hdb.scanHostEntry(entries[randIndex])
 			}
 		}()
 
