@@ -1,4 +1,4 @@
-Sia 0.4.8
+Sia 0.5.0
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -103,37 +103,16 @@ If your issue is not addressed above, you can get in touch with us personally:
 Version Information
 -------------------
 
-- v0.4.0 introduces wallet seeds, which can be used to regenerate your wallet
-  using only a passphrase. To create a wallet, run `siac wallet init`. Be sure
-  to write down the passphrase somewhere safe! You will also need it to unlock
-  the wallet each time you start siad.
+- The API changed a great deal in v0.5.0. The majority of routes were changed,
+  though some less dramatically than others. The wallet and miner are mostly
+  unchanged, but the renter was overhauled completely. When in doubt, consult
+  doc/API.md.
 
-  As a result, compatibility with the old wallet.dat files has been broken. To
-  transfer funds from v0.3.3.3 to v0.4.0, you must send them from the v0.3.3.3
-  client to a v0.4.0 address. Note that you can run both clients at once (from
-  different folders).
-
-- v0.4.0 uses erasure-coding to enable durability, availability, and efficiency
-  when uploading and downloading files. However, the new upload and download
-  algorithms have not yet been perfected. Specifically, you may observe slower-
-  than-expected download speeds. These algorithms will be a top  priority in
-  future releases. After all, they are crucial to the Sia platform!
-
-- The format of the block database has changed, which means you will need to
-  redownload the entire blockchain. This may take anywhere from 10 minutes to
-  6 hours. Check http://explore.siacoin.com to see the current block height.
-
-- Ports are now automatically forwarded using UPnP. If your router supports
-  UPnP, you no longer need to manually set up port forwarding. This should
-  improve the general health of the network. Note that for now, there is no
-  way to disable UPnP, but you can always turn it off in your router settings.
-
-- Much compatibility with the v0.3.3.3 host and renter has been broken. The
-  .sia format has changed, the network protocol is different, etc. The bottom
-  line is, if you were hosting on v0.3.3.3, you should continue to do so until
-  your contracts expire. If you were renting, you should download those files
-  with the v0.3.3.3 client and reupload them on v0.4.0. We apologize for the
-  inconvenience. Fortunately, storage is cheap and the network is small.
+- v0.5.0 introduces folder structure to the renter. This means that Sia behaves
+  more like a traditional storage volume. File names are interpreted as paths,
+  relative to the Sia "root folder." Note that when manipulating such paths,
+  there is no leading slash (`/`); as an example, `foo.sia` lives at the root
+  level, while `bar/baz.sia` lives in the `bar` folder.
 
 Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
@@ -141,6 +120,15 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+January 2016:
+
+v0.5.0 (minor release)
+- Major API changes to most modules
+- Automatic contract renewal
+- Data on inactive hosts is reuploaded
+- Support for folder structure
+- Smarter host
 
 October 2015:
 
