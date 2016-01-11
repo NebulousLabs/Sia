@@ -199,7 +199,7 @@ func TestHostInitialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bht.host.blockHeight != 1 {
-		t.Fatal("block height did not increase correctly after first block mined")
+		t.Fatal("block height did not increase correctly after first block mined:", bht.host.blockHeight, 1)
 	}
 }
 
@@ -242,7 +242,7 @@ func TestSetAndGetSettings(t *testing.T) {
 	// Check the default settings get returned at first call.
 	settings := ht.host.Settings()
 	if settings.TotalStorage != defaultTotalStorage {
-		t.Error("settings GET did not return default value")
+		t.Error("settings GET did not return default value:", settings.TotalStorage, defaultTotalStorage)
 	}
 	if settings.MaxDuration != defaultMaxDuration {
 		t.Error("settings GET did not return default value")
@@ -281,6 +281,32 @@ func TestSetAndGetSettings(t *testing.T) {
 		t.Error("settings GET did not return updated value")
 	}
 	if settings.Collateral.Cmp(newSettings.Collateral) != 0 {
+		t.Error("settings GET did not return updated value")
+	}
+
+	// Reload the host and verify that the altered settings persisted.
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootSettings := rebootHost.Settings()
+	if settings.TotalStorage != rebootSettings.TotalStorage {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.MaxDuration != rebootSettings.MaxDuration {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.WindowSize != rebootSettings.WindowSize {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.Price.Cmp(rebootSettings.Price) != 0 {
+		t.Error("settings GET did not return updated value")
+	}
+	if settings.Collateral.Cmp(rebootSettings.Collateral) != 0 {
 		t.Error("settings GET did not return updated value")
 	}
 }
