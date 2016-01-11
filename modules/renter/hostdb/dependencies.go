@@ -16,6 +16,17 @@ type (
 	hdbConsensusSet interface {
 		ConsensusSetSubscribe(modules.ConsensusSetSubscriber)
 	}
+	// in order to restrict the modules.TransactionBuilder interface, we must
+	// provide a shim to bridge the gap between modules.Wallet and
+	// hdbTransactionBuilder.
+	hdbWalletShim interface {
+		NextAddress() (types.UnlockConditions, error)
+		StartTransaction() modules.TransactionBuilder
+	}
+	hdbWallet interface {
+		NextAddress() (types.UnlockConditions, error)
+		StartTransaction() hdbTransactionBuilder
+	}
 	hdbTransactionBuilder interface {
 		AddArbitraryData([]byte) uint64
 		AddFileContract(types.FileContract) uint64
@@ -23,10 +34,6 @@ type (
 		FundSiacoins(types.Currency) error
 		Sign(bool) ([]types.Transaction, error)
 		View() (types.Transaction, []types.Transaction)
-	}
-	hdbWallet interface {
-		NextAddress() (types.UnlockConditions, error)
-		StartTransaction() hdbTransactionBuilder
 	}
 	hdbTransactionPool interface {
 		AcceptTransactionSet([]types.Transaction) error
@@ -51,13 +58,13 @@ type (
 )
 
 // because hdbWallet is not directly compatible with modules.Wallet (wrong
-// type signature for StartTransaction), we must provide a shim type.
-type hdbWalletShim struct {
-	w modules.Wallet
+// type signature for StartTransaction), we must provide a bridge type.
+type hdbWalletBridge struct {
+	w hdbWalletShim
 }
 
-func (ws *hdbWalletShim) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
-func (ws *hdbWalletShim) StartTransaction() hdbTransactionBuilder      { return ws.w.StartTransaction() }
+func (ws *hdbWalletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
+func (ws *hdbWalletBridge) StartTransaction() hdbTransactionBuilder      { return ws.w.StartTransaction() }
 
 // stdDialer implements the hdbDialer interface via net.DialTimeout.
 type stdDialer struct{}

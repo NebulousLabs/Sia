@@ -77,7 +77,7 @@ type hostContract struct {
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, persistDir string) (*HostDB, error) {
+func New(cs hdbConsensusSet, wallet hdbWalletShim, tpool hdbTransactionPool, persistDir string) (*HostDB, error) {
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -101,7 +101,7 @@ func New(cs hdbConsensusSet, wallet modules.Wallet, tpool hdbTransactionPool, pe
 
 	// Create the HostDB using the supplied modules and standard
 	// implementations of each dependency.
-	hdb := newHostDB(&hdbWalletShim{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+	hdb := newHostDB(&hdbWalletBridge{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
 
 	// Load the prior persistance structures.
 	err = hdb.load()
