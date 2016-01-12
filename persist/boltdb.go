@@ -74,13 +74,17 @@ func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 		return nil, err
 	}
 
+	// Check the metadata.
 	boltDB := &BoltDatabase{
 		Metadata: md,
 		DB:       db,
 	}
 	err = boltDB.checkMetadata(md)
 	if err != nil {
+		// Database opening failed, and therefore needs to be closed.
+		db.Close()
 		return nil, err
 	}
+
 	return boltDB, nil
 }
