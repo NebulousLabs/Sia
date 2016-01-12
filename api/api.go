@@ -84,8 +84,8 @@ func (srv *Server) initAPI() {
 		router.POST("/miner/header", srv.minerHeaderHandlerPOST)
 		router.GET("/miner/start", srv.minerStartHandler)
 		router.GET("/miner/stop", srv.minerStopHandler)
-		router.GET("/miner/headerforwork", srv.minerHeaderHandlerGET) // COMPATv0.4.8
-		router.GET("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
+		router.GET("/miner/headerforwork", srv.minerHeaderHandlerGET)  // COMPATv0.4.8
+		router.POST("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
 	}
 
 	// Renter API Calls
