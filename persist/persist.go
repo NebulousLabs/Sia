@@ -60,6 +60,10 @@ func (sf *safeFile) Commit() error {
 	if err != nil {
 		return err
 	}
+	err = sf.Close()
+	if err != nil {
+		return err
+	}
 	return os.Rename(sf.finalName+"_temp", sf.finalName)
 }
 
