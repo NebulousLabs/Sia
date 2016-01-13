@@ -259,6 +259,11 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	// Add the revision to the obligation
 	obligation.RevisionTransaction = revisionTransaction
 	obligation.RevisionConfirmed = false
+
+	err := h.save()
+	if err != nil {
+		h.log.Println("WARN: failed to save host:", err)
+	}
 }
 
 // removeObligation removes a file contract obligation and the corresponding

@@ -287,7 +287,6 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	if !exists {
 		return errors.New("no record of that contract")
 	}
-
 	// need to protect against two simultaneous revisions to the same
 	// contract; this can cause inconsistency and data loss, making storage
 	// proofs impossible
@@ -429,7 +428,6 @@ func (h *Host) managedRPCRenew(conn net.Conn) error {
 	if !exists {
 		return errors.New("no record of that contract")
 	}
-
 	// need to protect against simultaneous renewals of the same contract
 	obligation.mu.Lock()
 	defer obligation.mu.Unlock()
