@@ -276,7 +276,7 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	}
 
 	// remove conn deadline while we wait for lock and rebuild the Merkle tree.
-	err := conn.SetDeadline(time.Time{})
+	err := conn.SetDeadline(time.Now().Add(15 * time.Minute))
 	if err != nil {
 		return err
 	}
