@@ -97,10 +97,14 @@ type (
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
 
-		// Revenue returns the amount of revenue that the host has lined up, as
-		// well as the amount of revenue that the host has successfully
-		// captured.
-		Revenue() (unresolved, resolved types.Currency)
+		// Revenue returns the amount of revenue that the host has lined up,
+		// the amount of revenue the host has successfully captured, and the
+		// amount of revenue the host has lost.
+		//
+		// TODO: This function will eventually include two more numbers, one
+		// representing current collateral at risk, and one representing total
+		// collateral lost.
+		Revenue() (unresolved, resolved, lost types.Currency)
 
 		// RPCTracking returns information on the types of rpc calls that have
 		// been made to the host.
