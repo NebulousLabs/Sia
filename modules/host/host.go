@@ -64,7 +64,7 @@ var (
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	// RPC Tracking - atomic variables need to be placed at the top to preserve
+	// RPC Metrics - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems.
 	atomicErroredCalls      uint64
 	atomicUnrecognizedCalls uint64

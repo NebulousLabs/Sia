@@ -43,7 +43,7 @@ type (
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings := srv.host.Settings()
 	upcomingRevenue, revenue, lostRevenue := srv.host.Revenue()
-	rpcCalls := srv.host.RPCTracking()
+	rpcCalls := srv.host.RPCMetrics()
 	hg := HostGET{
 		Collateral:   settings.Collateral,
 		NetAddress:   settings.NetAddress,

@@ -42,7 +42,7 @@ type persistence struct {
 	LostRevenue types.Currency
 	Revenue     types.Currency
 
-	// RPC Tracking.
+	// RPC Metrics.
 	ErroredCalls      uint64
 	UnrecognizedCalls uint64
 	DownloadCalls     uint64
@@ -85,7 +85,7 @@ func (h *Host) save() error {
 		LostRevenue: h.lostRevenue,
 		Revenue:     h.revenue,
 
-		// RPC Tracking.
+		// RPC Metrics.
 		ErroredCalls:      atomic.LoadUint64(&h.atomicErroredCalls),
 		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),

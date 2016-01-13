@@ -39,10 +39,10 @@ func (h *Host) Revenue() (unresolved, resolved, lost types.Currency) {
 	return h.anticipatedRevenue, h.revenue, h.lostRevenue
 }
 
-// RPCTracking returns information about the types of rpc calls that have been
+// RPCMetrics returns information about the types of rpc calls that have been
 // made to the host.
-func (h *Host) RPCTracking() modules.HostRPCTracking {
-	return modules.HostRPCTracking{
+func (h *Host) RPCMetrics() modules.HostRPCMetrics {
+	return modules.HostRPCMetrics{
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
 		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),

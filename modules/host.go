@@ -62,9 +62,9 @@ type (
 		UnlockHash   types.UnlockHash  `json:"unlockhash"`
 	}
 
-	// HostRPCTracking reports the quantity of each type of rpc call that has
+	// HostRPCMetrics reports the quantity of each type of rpc call that has
 	// been made to the host.
-	HostRPCTracking struct {
+	HostRPCMetrics struct {
 		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
 		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 		DownloadCalls     uint64 `json:"downloadcalls"`
@@ -106,9 +106,9 @@ type (
 		// collateral lost.
 		Revenue() (unresolved, resolved, lost types.Currency)
 
-		// RPCTracking returns information on the types of rpc calls that have
+		// RPCMetrics returns information on the types of rpc calls that have
 		// been made to the host.
-		RPCTracking() HostRPCTracking
+		RPCMetrics() HostRPCMetrics
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error
