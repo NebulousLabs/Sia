@@ -66,7 +66,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	// Read a specifier indicating which action is beeing called.
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
-		atomic.AddUint64(&h.atomicMalformedCalls, 1)
+		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
+		atomic.AddUint64(&h.atomicErroredCalls, 1)
 		h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
 		return
 	}

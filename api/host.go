@@ -27,6 +27,14 @@ type (
 		Revenue          types.Currency `json:"revenue"`
 		StorageRemaining int64          `json:"storageremaining"`
 		UpcomingRevenue  types.Currency `json:"upcomingrevenue"`
+
+		RPCErrorCalls        uint64 `json:"rpcerrorcalls"`
+		RPCUnrecognizedCalls uint64 `json:"rpcunrecognizedcalls"`
+		RPCDownloadCalls     uint64 `json:"rpcdownloadcalls"`
+		RPCRenewCalls        uint64 `json:"rpcrenewcalls"`
+		RPCReviseCalls       uint64 `json:"rpcrevisecalls"`
+		RPCSettingsCalls     uint64 `json:"rpcsettingscalls"`
+		RPCUploadCalls       uint64 `json:"rpcuploadcalls"`
 	}
 )
 
@@ -34,6 +42,7 @@ type (
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings := srv.host.Settings()
 	upcomingRevenue, revenue := srv.host.Revenue()
+	rpcCalls := srv.host.RPCTracking()
 	hg := HostGET{
 		Collateral:   settings.Collateral,
 		NetAddress:   settings.NetAddress,
@@ -48,6 +57,14 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ ht
 		Revenue:          revenue,
 		StorageRemaining: srv.host.Capacity(),
 		UpcomingRevenue:  upcomingRevenue,
+
+		RPCErrorCalls:        rpcCalls.ErrorCalls,
+		RPCUnrecognizedCalls: rpcCalls.UnrecognizedCalls,
+		RPCDownloadCalls:     rpcCalls.DownloadCalls,
+		RPCRenewCalls:        rpcCalls.RenewCalls,
+		RPCReviseCalls:       rpcCalls.ReviseCalls,
+		RPCSettingsCalls:     rpcCalls.SettingsCalls,
+		RPCUploadCalls:       rpcCalls.UploadCalls,
 	}
 	writeJSON(w, hg)
 }

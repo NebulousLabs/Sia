@@ -66,13 +66,13 @@ var (
 type Host struct {
 	// RPC Tracking - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems.
-	atomicErroredCalls   uint64
-	atomicMalformedCalls uint64
-	atomicDownloadCalls  uint64
-	atomicRenewCalls     uint64
-	atomicReviseCalls    uint64
-	atomicSettingsCalls  uint64
-	atomicUploadCalls    uint64
+	atomicErroredCalls      uint64
+	atomicUnrecognizedCalls uint64
+	atomicDownloadCalls     uint64
+	atomicRenewCalls        uint64
+	atomicReviseCalls       uint64
+	atomicSettingsCalls     uint64
+	atomicUploadCalls       uint64
 
 	// Module dependencies.
 	cs     modules.ConsensusSet
