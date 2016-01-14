@@ -26,17 +26,18 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	if host.NetAddress.IsLoopback() && build.Release != "testing" {
 		return
 	}
+	// Don't do anything if we've already seen this host.
+	if _, exists := hdb.allHosts[host.NetAddress]; exists {
+		return
+	}
 
-	// Add the host to allHosts.
-	entry := &hostEntry{
+	// Add the host to the scan queue. After scanning, it will be placed in
+	// allHosts. If the scan is successful, it will also be placed in
+	// activeHosts.
+	hdb.scanHostEntry(&hostEntry{
 		HostSettings: host,
 		reliability:  DefaultReliability,
-	}
-	_, exists := hdb.allHosts[entry.NetAddress]
-	if !exists {
-		hdb.allHosts[entry.NetAddress] = entry
-		hdb.scanHostEntry(entry)
-	}
+	})
 }
 
 // Remove deletes an entry from the hostdb.

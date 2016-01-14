@@ -164,8 +164,9 @@ type pool struct {
 	filesize uint64
 	duration types.BlockHeight
 
-	hosts []*hostUploader
-	hdb   *HostDB
+	hosts     []*hostUploader
+	blacklist []modules.NetAddress
+	hdb       *HostDB
 }
 
 // Close closes all of the pool's open host connections, and submits their
@@ -187,7 +188,7 @@ func (p *pool) UniqueHosts(n int, exclude []modules.NetAddress) (hosts []Uploade
 		return
 	}
 
-	// first reuse existing connections
+	// First reuse existing connections.
 outer:
 	for _, h := range p.hosts {
 		for _, ip := range exclude {
@@ -201,17 +202,36 @@ outer:
 		}
 	}
 
-	// form new contracts from randomly-picked nodes
+	// Extend the exclude set with the hosts on the pool's blacklist and the
+	// hosts we're already connected to.
+	exclude = append(exclude, p.blacklist...)
+	for _, h := range p.hosts {
+		exclude = append(exclude, h.Address())
+	}
+
+	// Ask the hostdb for random hosts. We always ask for at least 10, to
+	// avoid selecting the same uncooperative hosts over and over.
+	ask := n
+	if ask < 10 {
+		ask = 10
+	}
 	p.hdb.mu.Lock()
-	randHosts := p.hdb.randomHosts(n*2, exclude)
+	randHosts := p.hdb.randomHosts(ask, exclude)
 	p.hdb.mu.Unlock()
+
+	// Form new contracts with the randomly-picked hosts. If a contract can't
+	// be formed, add the host to the pool's blacklist.
+	var errs []error
 	for _, host := range randHosts {
 		contract, err := p.hdb.newContract(host, p.filesize, p.duration)
 		if err != nil {
+			p.blacklist = append(p.blacklist, host.NetAddress)
+			errs = append(errs, err)
 			continue
 		}
 		hu, err := p.hdb.newHostUploader(contract)
 		if err != nil {
+			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
 		}
 		hosts = append(hosts, hu)
@@ -219,6 +239,12 @@ outer:
 		if len(hosts) >= n {
 			break
 		}
+	}
+	// If all attempts failed, log the error.
+	if len(errs) == len(randHosts) && len(errs) > 0 {
+		// Log the last error, since early errors are more likely to be
+		// host-specific.
+		p.hdb.log.Printf("couldn't form any host contracts: %v", errs[len(errs)-1])
 	}
 	return hosts
 }
