@@ -335,10 +335,11 @@ struct {
 	unlockhash   types.UnlockHash  (string)
 	windowsize   types.BlockHeight (uint64)
 
+	acceptingcontracts bool
 	numcontracts       uint64
 	revenue            types.Currency (string)
 	storageremaining   int64
-	anticipatedrevenue types.Currency (string)
+	upcomingrevenue    types.Currency (string)
 }
 ```
 'collateral' is the number of hastings per byte per block that are put up as
@@ -364,6 +365,10 @@ downtime, 40 blocks is recommended as an absolute minimum. The current network
 default is 288 blocks. The current software will break entirely below 20
 blocks, though in theory something as low as 6 blocks could be safe.
 
+'acceptingcontracts' indicates whether the host is accepting new file
+contracts, file contract revisions, and file contract renewals. A host that is
+not accepting file contracts will still accept download requests and will still
+submit storage proofs to the network. Renters will see that the host is online.
 
 'numcontracts' is the number of active contracts that the host is engaged in.
 
@@ -410,6 +415,16 @@ blocks, though in theory something as low as 6 blocks could be safe.
 
 Response: standard
 
+#### /host/acceptcontracts [GET]
+
+Function: Enable accepting contracts in the host. After being called, the host
+will be actively accepting file contracts, file contract revisions, and file
+contract renewals.
+
+Parameters: none
+
+Response: standard
+
 #### /host/announce [POST]
 
 Function: The host will announce itself to the network as a source of storage.
@@ -422,6 +437,17 @@ netaddress string
 'netaddress' is an optional parameter that specifies the address to be
 announced. Supplying this parameters will also override standard connectivity
 checks.
+
+Response: standard
+
+#### /host/rejectcontracts [GET]
+
+Function: Disable accepting contracts in the host. After being called, the host
+will reject file contracts, file contract revisions, and file contract
+renewals, but will still accept download requests and will still submit storage
+proofs.
+
+Parameters: none
 
 Response: standard
 
