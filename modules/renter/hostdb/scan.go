@@ -138,8 +138,10 @@ func (hdb *HostDB) threadedProbeHosts() {
 
 		// Now that network communication is done, lock the hostdb to modify the
 		// host entry.
-		hdb.mu.Lock()
-		{
+		func() {
+			hdb.mu.Lock()
+			defer hdb.mu.Unlock()
+
 			// Regardless of whether the host responded, add it to allHosts.
 			if _, exists := hdb.allHosts[hostEntry.NetAddress]; !exists {
 				hdb.allHosts[hostEntry.NetAddress] = hostEntry
@@ -148,8 +150,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			// If the scan was unsuccessful, decrement the host's reliability.
 			if err != nil {
 				hdb.decrementReliability(hostEntry.NetAddress, UnreachablePenalty)
-				hdb.mu.Unlock()
-				continue
+				return
 			}
 
 			// Update the host settings, reliability, and weight. The old NetAddress
@@ -164,8 +165,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; !exists && len(hdb.activeHosts) < MaxActiveHosts {
 				hdb.insertNode(hostEntry)
 			}
-		}
-		hdb.mu.Unlock()
+		}()
 	}
 }
 
@@ -176,8 +176,10 @@ func (hdb *HostDB) threadedScan() {
 		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.
-		hdb.mu.Lock()
-		{
+		func() {
+			hdb.mu.Lock()
+			defer hdb.mu.Unlock()
+
 			// Scan all active hosts.
 			for _, host := range hdb.activeHosts {
 				hdb.scanHostEntry(host.hostEntry)
@@ -225,8 +227,7 @@ func (hdb *HostDB) threadedScan() {
 			for i := 0; i < n; i++ {
 				hdb.scanHostEntry(random[i])
 			}
-		}
-		hdb.mu.Unlock()
+		}()
 
 		// Sleep for a random amount of time before doing another round of
 		// scanning. The minimums and maximums keep the scan time reasonable,
