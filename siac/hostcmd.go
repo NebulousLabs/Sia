@@ -105,16 +105,27 @@ func hostcmd() {
 	Anticipated Revenue: %v
 	Revenue:             %v
 	Lost Revenue:        %v
-
-	RPC Error Calls:        %v
-	RPC Unrecognized Calls: %v
-	RPC Download Calls:     %v
-	RPC Renew Calls:        %v
-	RPC Revise Calls:       %v
-	RPC Settings Calls:     %v
-	RPC Upload Calls:       %v
 `, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
 		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.AnticipatedRevenue,
-		hg.Revenue, hg.LostRevenue, hg.RPCErrorCalls, hg.RPCUnrecognizedCalls, hg.RPCDownloadCalls,
+		hg.Revenue, hg.LostRevenue)
+
+	// display more info if verbose flag is set
+	if !hostVerbose {
+		return
+	}
+	fmt.Printf(`
+	Net Address: %v
+	Unlock Hash: %v
+	(NOT a wallet address!)
+
+RPC Stats:
+	Error Calls:        %v
+	Unrecognized Calls: %v
+	Download Calls:     %v
+	Renew Calls:        %v
+	Revise Calls:       %v
+	Settings Calls:     %v
+	Upload Calls:       %v
+`, hg.NetAddress, hg.UnlockHash, hg.RPCErrorCalls, hg.RPCUnrecognizedCalls, hg.RPCDownloadCalls,
 		hg.RPCRenewCalls, hg.RPCReviseCalls, hg.RPCSettingsCalls, hg.RPCUploadCalls)
 }

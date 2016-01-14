@@ -16,9 +16,11 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+// flags
 var (
-	addr         string
-	initPassword bool
+	addr         string // override default API address
+	initPassword bool   // supply a custom password when creating a wallet
+	hostVerbose  bool   // display additional host info
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -169,6 +171,7 @@ func main() {
 
 	root.AddCommand(hostdbCmd)
 	hostCmd.AddCommand(hostdbCmd)
+	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
