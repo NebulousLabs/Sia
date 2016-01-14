@@ -333,7 +333,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 // repairChunks uploads missing chunks of f to new hosts.
 func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, duration types.BlockHeight) {
 	// create host pool
-	contractSize := (f.pieceSize + crypto.TwofishOverhead) * f.numChunks() // each host gets one piece of each chunk
+	contractSize := (f.pieceSize + crypto.TwofishOverhead) * uint64(len(chunks)) // each host gets one piece of each chunk
 	pool, err := r.hostDB.NewPool(contractSize, duration)
 	if err != nil {
 		r.log.Printf("failed to repair %v: %v", f.name, err)
