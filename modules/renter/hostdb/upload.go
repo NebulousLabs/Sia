@@ -211,7 +211,7 @@ outer:
 
 	// Ask the hostdb for random hosts. We always ask for at least 10, to
 	// avoid selecting the same uncooperative hosts over and over.
-	ask := n
+	ask := n * 2
 	if ask < 10 {
 		ask = 10
 	}
