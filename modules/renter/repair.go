@@ -342,9 +342,9 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 	defer pool.Close() // heh
 
 	for chunk, pieces := range chunks {
-		// determine host set
-		old := f.chunkHosts(chunk)
-		hosts := pool.UniqueHosts(f.erasureCode.NumPieces()-len(old), old)
+		// Determine host set. We want one host for each missing piece, and no
+		// repeats of other hosts of this chunk.
+		hosts := pool.UniqueHosts(len(pieces), f.chunkHosts(chunk))
 		if len(hosts) == 0 {
 			r.log.Printf("aborting repair of %v: not enough hosts", f.name)
 			return
