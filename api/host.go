@@ -114,3 +114,19 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 	}
 	writeSuccess(w)
 }
+
+// hostDeleteHandler deletes a file contract from the host.
+func (srv *Server) hostDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	hash, err := scanAddress(ps.ByName("filecontractid"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fcid := types.FileContractID(hash)
+	err = srv.host.DeleteContract(fcid)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}

@@ -75,6 +75,7 @@ func (srv *Server) initAPI() {
 		router.GET("/host", srv.hostHandlerGET)
 		router.POST("/host", srv.hostHandlerPOST)
 		router.POST("/host/announce", srv.hostAnnounceHandler)
+		router.GET("/host/delete/:filecontractid", srv.hostDeleteHandler)
 	}
 
 	// Miner API Calls

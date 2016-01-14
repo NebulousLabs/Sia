@@ -313,9 +313,10 @@ Host
 
 Queries:
 
-* /host          [GET]
-* /host          [POST]
-* /host/announce [POST]
+* /host                         [GET]
+* /host                         [POST]
+* /host/announce                [POST]
+* /host/delete/{filecontractid} [GET]
 
 #### /host [GET]
 
@@ -422,6 +423,23 @@ netaddress string
 'netaddress' is an optional parameter that specifies the address to be
 announced. Supplying this parameters will also override standard connectivity
 checks.
+
+Response: standard
+
+#### /host/delete/{filecontractid} [GET]
+
+Function: Delete a file contract from the host. This will cause the host to
+lose the future revenue, and also any collateral that the host had placed on
+the file. Typically, this is only used in emergency situations where capacity
+must be freed up, or in situations where legal pressure requires a host to
+delete a contract.
+
+Parameters:
+```
+filecontractid types.UnlockHash (string)
+```
+
+'filecontractid' is the ID of the file contract that is being deleted.
 
 Response: standard
 
