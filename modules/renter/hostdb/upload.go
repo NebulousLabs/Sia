@@ -164,8 +164,9 @@ type pool struct {
 	filesize uint64
 	duration types.BlockHeight
 
-	hosts []*hostUploader
-	hdb   *HostDB
+	hosts     []*hostUploader
+	blacklist []modules.NetAddress
+	hdb       *HostDB
 }
 
 // Close closes all of the pool's open host connections, and submits their
@@ -201,17 +202,33 @@ outer:
 		}
 	}
 
-	// form new contracts from randomly-picked nodes
+	// Also exclude hosts on the pool's blacklist, and hosts we're already
+	// connected to.
+	exclude = append(exclude, p.blacklist...)
+	for _, h := range p.hosts {
+		exclude = append(exclude, h.Address())
+	}
+
+	// Ask the hostdb for randomHosts. We always ask for at least 10, to avoid
+	// selecting the same uncooperative hosts over and over.
+	ask := n
+	if ask < 10 {
+		ask = 10
+	}
 	p.hdb.mu.Lock()
-	randHosts := p.hdb.randomHosts(n*2, exclude)
+	randHosts := p.hdb.randomHosts(ask, exclude)
 	p.hdb.mu.Unlock()
+
+	// Form new contracts from randomly-picked nodes.
 	for _, host := range randHosts {
 		contract, err := p.hdb.newContract(host, p.filesize, p.duration)
 		if err != nil {
+			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
 		}
 		hu, err := p.hdb.newHostUploader(contract)
 		if err != nil {
+			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
 		}
 		hosts = append(hosts, hu)
