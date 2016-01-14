@@ -35,7 +35,8 @@ type persistence struct {
 	SecretKey  crypto.SecretKey
 
 	// File Management.
-	Obligations []*contractObligation
+	AcceptingContracts bool
+	Obligations        []*contractObligation
 
 	// Statistics.
 	FileCounter int64
@@ -78,7 +79,8 @@ func (h *Host) save() error {
 		SecretKey:  h.secretKey,
 
 		// File Management.
-		Obligations: h.getObligations(),
+		AcceptingContracts: h.acceptingContracts,
+		Obligations:        h.getObligations(),
 
 		// Statistics.
 		FileCounter: h.fileCounter,
@@ -175,6 +177,9 @@ func (h *Host) load() error {
 	h.netAddress = p.NetAddress
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
+
+	// Copy over file management.
+	h.acceptingContracts = p.AcceptingContracts
 
 	// Copy over the file management. The space remaining is recalculated from
 	// disk instead of being saved, to maximize the potential usefulness of

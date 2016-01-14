@@ -43,6 +43,7 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	}
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 
+	h.acceptingContracts = true
 	return nil
 }
 

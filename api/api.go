@@ -74,7 +74,9 @@ func (srv *Server) initAPI() {
 	if srv.host != nil {
 		router.GET("/host", srv.hostHandlerGET)
 		router.POST("/host", srv.hostHandlerPOST)
+		router.GET("/host/acceptcontracts", srv.hostAcceptcontractsHandler)
 		router.POST("/host/announce", srv.hostAnnounceHandler)
+		router.GET("/host/rejectcontracts", srv.hostRejectcontractsHandler)
 	}
 
 	// Miner API Calls

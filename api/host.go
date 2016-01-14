@@ -23,11 +23,13 @@ type (
 		UnlockHash   types.UnlockHash   `json:"unlockhash"`
 		WindowSize   types.BlockHeight  `json:"windowsize"`
 
+		AcceptingContracts bool           `json:"acceptingcontracts"`
 		NumContracts       uint64         `json:"numcontracts"`
 		LostRevenue        types.Currency `json:"lostrevenue"`
 		Revenue            types.Currency `json:"revenue"`
 		StorageRemaining   int64          `json:"storageremaining"`
 		AnticipatedRevenue types.Currency `json:"anticipatedrevenue"`
+		UpcomingRevenue    types.Currency `json:"upcomingrevenue"`
 
 		RPCErrorCalls        uint64 `json:"rpcerrorcalls"`
 		RPCUnrecognizedCalls uint64 `json:"rpcunrecognizedcalls"`
@@ -99,6 +101,12 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 	writeSuccess(w)
 }
 
+// hostAcceptcontractsHandler enables accepting file contracts in the host.
+func (srv *Server) hostAcceptcontractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	srv.host.AcceptNewContracts()
+	writeSuccess(w)
+}
+
 // hostAnnounceHandler handles the API call to get the host to announce itself
 // to the network.
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
@@ -112,5 +120,13 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	writeSuccess(w)
+}
+
+// hostRejectcontractsHandler stops the host from accepting new file contracts.
+// Host will reject contract renewals and revisions as well. Host will still
+// accept download requests, and will still submit storage proofs.
+func (srv *Server) hostRejectcontractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	srv.host.RejectNewContracts()
 	writeSuccess(w)
 }

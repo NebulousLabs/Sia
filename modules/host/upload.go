@@ -252,11 +252,20 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 // scheme, file contracts should not initially hold any data.
 func (h *Host) managedRPCUpload(conn net.Conn) error {
 	// Check that the host has grabbed an address from the wallet.
-	h.mu.RLock()
+	h.mu.Lock()
+	acceptingContracts := h.acceptingContracts
 	uh := h.settings.UnlockHash
 	h.fileCounter++ // Harmless to increment the file counter in the event of an error.
 	filename := filepath.Join(h.persistDir, strconv.Itoa(int(h.fileCounter)))
-	h.mu.RUnlock()
+	h.mu.Unlock()
+
+	// Check that the host is accepting new file contracts.
+	if !acceptingContracts {
+		// No error needs to be returned, because the host is functioning as
+		// intended. The host should not be accepting file contracts, so the
+		// function ends immediately.
+		return nil
+	}
 
 	if uh == (types.UnlockHash{}) {
 		return errors.New("couldn't negotiate contract: host does not have an address")
@@ -269,6 +278,19 @@ func (h *Host) managedRPCUpload(conn net.Conn) error {
 // managedRPCRevise is an RPC that allows a renter to revise a file contract. It will
 // read new revisions in a loop until the renter sends a termination signal.
 func (h *Host) managedRPCRevise(conn net.Conn) error {
+	// Check that the host is accepting new file contracts.
+	h.mu.RLock()
+	ac := h.acceptingContracts
+	h.mu.RUnlock()
+	if !ac {
+		// The host is not accepting revisions, but the host is not
+		// experiencing an error, because it is intentionally still listening
+		// for RPCs. Return nil without processing the request.
+		//
+		// Revisions are rejected because they increase the size of the file,
+		// which may be undesirable to the operator.
+		return nil
+	}
 	// read ID of contract to be revised
 	var fcid types.FileContractID
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
@@ -416,6 +438,17 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 // protocol is identical to standard contract negotiation, except that the
 // Merkle root is copied over from the old contract.
 func (h *Host) managedRPCRenew(conn net.Conn) error {
+	// Check that the host is accepting new file contracts.
+	h.mu.RLock()
+	ac := h.acceptingContracts
+	h.mu.RUnlock()
+	if !ac {
+		// The host is not accepting new file contracts, but the host is not
+		// experiencing an error, because it is intentionally still listening
+		// for RPCs. Return nil without processing the request.
+		return nil
+	}
+
 	// read ID of contract to be renewed
 	var fcid types.FileContractID
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {

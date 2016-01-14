@@ -7,6 +7,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// AcceptingNewContracts returns whether the host is accepting new contracts or
+// not.
+func (h *Host) AcceptingNewContracts() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.acceptingContracts
+}
+
 // Capacity returns the amount of storage still available on the machine. The
 // amount can be negative if the total capacity was reduced to below the active
 // capacity.
@@ -51,29 +59,6 @@ func (h *Host) RPCMetrics() modules.HostRPCMetrics {
 		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
 		UploadCalls:       atomic.LoadUint64(&h.atomicUploadCalls),
 	}
-}
-
-// SetSettings updates the host's internal HostSettings object.
-func (h *Host) SetSettings(settings modules.HostSettings) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
-	}
-
-	// Check that the unlock hash was not changed.
-	if settings.UnlockHash != h.settings.UnlockHash {
-		return errChangedUnlockHash
-	}
-
-	// Update the amount of space remaining to reflect the new volume of total
-	// storage.
-	h.spaceRemaining += settings.TotalStorage - h.settings.TotalStorage
-
-	h.settings = settings
-	return h.save()
 }
 
 // Settings returns the settings of a host.

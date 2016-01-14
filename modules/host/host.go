@@ -93,7 +93,8 @@ type Host struct {
 	secretKey  crypto.SecretKey
 
 	// File Management.
-	obligationsByID map[types.FileContractID]*contractObligation
+	acceptingContracts bool
+	obligationsByID    map[types.FileContractID]*contractObligation
 
 	// Statistics
 	anticipatedRevenue types.Currency
@@ -160,6 +161,24 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return h, nil
 }
 
+// AcceptNewContracts causes the host to start accepting new file contracts.
+func (h *Host) AcceptNewContracts() error {
+	// Generate an unlock hash, if necessary.
+	if h.settings.UnlockHash == (types.UnlockHash{}) {
+		uc, err := h.wallet.NextAddress()
+		if err != nil {
+			return err
+		}
+		h.settings.UnlockHash = uc.UnlockHash()
+		err = h.save()
+		if err != nil {
+			return err
+		}
+	}
+	h.acceptingContracts = true
+	return nil
+}
+
 // Close shuts down the host, preparing it for garbage collection.
 func (h *Host) Close() error {
 	// Unsubscribe the host from the consensus set. Call will not terminate
@@ -205,4 +224,34 @@ func (h *Host) Close() error {
 		return err
 	}
 	return nil
+}
+
+// RejectNewContracts sets the host to start rejecting incoming contracts.
+func (h *Host) RejectNewContracts() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.acceptingContracts = false
+}
+
+// SetSettings updates the host's internal HostSettings object.
+func (h *Host) SetSettings(settings modules.HostSettings) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
+
+	// Check that the unlock hash was not changed.
+	if settings.UnlockHash != h.settings.UnlockHash {
+		return errChangedUnlockHash
+	}
+
+	// Update the amount of space remaining to reflect the new volume of total
+	// storage.
+	h.spaceRemaining += settings.TotalStorage - h.settings.TotalStorage
+
+	h.settings = settings
+	return h.save()
 }

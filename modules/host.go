@@ -52,14 +52,15 @@ type (
 	// values that the renter will request from the host in order to build its
 	// database.
 	HostSettings struct {
-		NetAddress   NetAddress        `json:"netaddress"`
-		TotalStorage int64             `json:"totalstorage"`
-		MinDuration  types.BlockHeight `json:"minduration"`
-		MaxDuration  types.BlockHeight `json:"maxduration"`
-		WindowSize   types.BlockHeight `json:"windowsize"`
-		Price        types.Currency    `json:"price"`
-		Collateral   types.Currency    `json:"collateral"`
-		UnlockHash   types.UnlockHash  `json:"unlockhash"`
+		AcceptingContracts bool              `json:"acceptingcontracts"`
+		Collateral         types.Currency    `json:"collateral"`
+		MaxDuration        types.BlockHeight `json:"maxduration"`
+		MinDuration        types.BlockHeight `json:"minduration"`
+		NetAddress         NetAddress        `json:"netaddress"`
+		Price              types.Currency    `json:"price"`
+		TotalStorage       int64             `json:"totalstorage"`
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`
+		WindowSize         types.BlockHeight `json:"windowsize"`
 	}
 
 	// HostRPCMetrics reports the quantity of each type of rpc call that has
@@ -78,11 +79,21 @@ type (
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// Announce announces the host on the blockchain, returning an error if the
-		// external ip address is unknown.
+		// AcceptingNewContracts indicates whether the host is actively
+		// accepting contracts or not.
+		AcceptingNewContracts() bool
+
+		// AcceptNewContracts will cause the host to start accepting incoming
+		// file contracts.
+		AcceptNewContracts() error
+
+		// Announce announces the host on the blockchain, returning an error if
+		// the external ip address is unknown. After announcing, the host will
+		// begin accepting new file contracts.
 		Announce() error
 
 		// AnnounceAddress announces the specified address on the blockchain.
+		// After announcing, the host will begin accepting new file contracts.
 		AnnounceAddress(NetAddress) error
 
 		// Capacity returns the amount of storage still available on the
@@ -109,6 +120,11 @@ type (
 		// RPCMetrics returns information on the types of rpc calls that have
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
+
+		// RejectNewContracts will cause the host to reject all incoming
+		// contracts. The host will still create storage proofs for existing
+		// file contracts.
+		RejectNewContracts()
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error
