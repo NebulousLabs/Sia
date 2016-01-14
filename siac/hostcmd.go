@@ -97,12 +97,24 @@ func hostcmd() {
 	price := new(big.Rat).SetInt(hg.Price.Big())
 	price.Mul(price, big.NewRat(4320, 1e24/1e9))
 	fmt.Printf(`Host info:
-Storage:      %v (%v used)
-Price:        %v SC per GB per month
-Max Duration: %v Blocks
-Contracts:    %v
-Revenue:      %v (%v expected)
+	Storage:      %v (%v used)
+	Price:        %v SC per GB per month
+	Max Duration: %v Blocks
+
+	Contracts:           %v
+	Anticipated Revenue: %v
+	Revenue:             %v
+	Lost Revenue:        %v
+
+	RPC Error Calls:        %v
+	RPC Unrecognized Calls: %v
+	RPC Download Calls:     %v
+	RPC Renew Calls:        %v
+	RPC Revise Calls:       %v
+	RPC Settings Calls:     %v
+	RPC Upload Calls:       %v
 `, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
-		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.Revenue,
-		hg.UpcomingRevenue)
+		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.AnticipatedRevenue,
+		hg.Revenue, hg.LostRevenue, hg.RPCErrorCalls, hg.RPCUnrecognizedCalls, hg.RPCDownloadCalls,
+		hg.RPCRenewCalls, hg.RPCReviseCalls, hg.RPCSettingsCalls, hg.RPCUploadCalls)
 }
