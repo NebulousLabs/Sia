@@ -202,8 +202,8 @@ outer:
 		}
 	}
 
-	// Also exclude hosts on the pool's blacklist, and hosts we're already
-	// connected to.
+	// Extend the exclude set with the hosts on the pool's blacklist and the
+	// hosts we're already connected to.
 	exclude = append(exclude, p.blacklist...)
 	for _, h := range p.hosts {
 		exclude = append(exclude, h.Address())
@@ -221,16 +221,16 @@ outer:
 
 	// Form new contracts with the randomly-picked hosts. If a contract can't
 	// be formed, add the host to the pool's blacklist.
+	var errs []error
 	for _, host := range randHosts {
 		contract, err := p.hdb.newContract(host, p.filesize, p.duration)
 		if err != nil {
-			p.hdb.log.Printf("couldn't form contract with %v: %v", host.NetAddress, err)
 			p.blacklist = append(p.blacklist, host.NetAddress)
+			errs = append(errs, err)
 			continue
 		}
 		hu, err := p.hdb.newHostUploader(contract)
 		if err != nil {
-			p.hdb.log.Printf("couldn't create uploader for %v: %v", host.NetAddress, err)
 			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
 		}
@@ -239,6 +239,12 @@ outer:
 		if len(hosts) >= n {
 			break
 		}
+	}
+	// If all attempts failed, log the error.
+	if len(errs) == len(randHosts) && len(errs) > 0 {
+		// Log the last error, since early errors are more likely to be
+		// host-specific.
+		p.hdb.log.Printf("couldn't form any host contracts: %v", errs[len(errs)-1])
 	}
 	return hosts
 }
