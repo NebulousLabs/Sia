@@ -40,9 +40,7 @@ var (
 // save saves a file to w in shareable form. Files are stored in binary format
 // and gzipped to reduce size.
 func (f *file) save(w io.Writer) error {
-	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
-	defer zip.Close()
-	enc := encoding.NewEncoder(zip)
+	enc := encoding.NewEncoder(w)
 
 	// encode easy fields
 	err := enc.EncodeAll(
@@ -93,18 +91,13 @@ func (f *file) save(w io.Writer) error {
 
 // load loads a file created by save.
 func (f *file) load(r io.Reader) error {
-	zip, err := gzip.NewReader(r)
-	if err != nil {
-		return err
-	}
-	defer zip.Close()
-	dec := encoding.NewDecoder(zip)
+	dec := encoding.NewDecoder(r)
 
 	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
 	var bytesUploaded, chunksUploaded uint64
 
 	// decode easy fields
-	err = dec.DecodeAll(
+	err := dec.DecodeAll(
 		&f.name,
 		&f.size,
 		&f.masterKey,
@@ -182,8 +175,17 @@ func (r *Renter) saveFile(f *file) error {
 		return err
 	}
 
+	// Create compressor.
+	zip, _ := gzip.NewWriterLevel(handle, gzip.BestCompression)
+
 	// Write file.
-	err = f.save(handle)
+	err = f.save(zip)
+	if err != nil {
+		return err
+	}
+
+	// Flush compressor.
+	err = zip.Close()
 	if err != nil {
 		return err
 	}
@@ -270,13 +272,17 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		return err
 	}
 
+	// Create compressor.
+	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	defer zip.Close()
+
 	// Write each file.
 	for _, name := range nicknames {
 		file, exists := r.files[name]
 		if !exists {
 			return ErrUnknownPath
 		}
-		err := file.save(w)
+		err := file.save(zip)
 		if err != nil {
 			return err
 		}
@@ -344,11 +350,17 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 		return nil, ErrIncompatible
 	}
 
+	// Create decompressor.
+	unzip, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+
 	// Read each file.
 	files := make([]*file, numFiles)
 	for i := range files {
 		files[i] = new(file)
-		err := files[i].load(reader)
+		err := files[i].load(unzip)
 		if err != nil {
 			return nil, err
 		}

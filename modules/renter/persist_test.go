@@ -93,15 +93,44 @@ func TestFileShareLoad(t *testing.T) {
 	// Remove the file from the renter.
 	delete(rt.renter.files, savedFile.name)
 
+	// Load the .sia file back into the renter.
 	names, err := rt.renter.LoadSharedFiles(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(names) != 1 || names[0] != savedFile.name {
-		t.Fatal("nickname not loaded properly")
+		t.Fatal("nickname not loaded properly:", names)
+	}
+	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	// Share and load multiple files.
+	savedFile2 := newTestingFile()
+	rt.renter.files[savedFile2.name] = savedFile2
+	path = filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test2.sia")
+	err = rt.renter.ShareFiles([]string{savedFile.name, savedFile2.name}, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the files from the renter.
+	delete(rt.renter.files, savedFile.name)
+	delete(rt.renter.files, savedFile2.name)
+
+	names, err = rt.renter.LoadSharedFiles(path)
+	if err != nil {
+		t.Fatal(nil)
+	}
+	if len(names) != 2 || (names[0] != savedFile2.name && names[1] != savedFile2.name) {
+		t.Fatal("nicknames not loaded properly:", names)
+	}
 	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = equalFiles(rt.renter.files[savedFile2.name], savedFile2)
 	if err != nil {
 		t.Fatal(err)
 	}
