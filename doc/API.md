@@ -340,6 +340,14 @@ struct {
 	revenue            types.Currency (string)
 	storageremaining   int64
 	upcomingrevenue    types.Currency (string)
+
+	rpcerrorcalls        uint64
+	rpcunrecognizedcalls uint64
+	rpcdownloadcalls     uint64
+	rpcrenewcalls        uint64
+	rpcrevisecalls       uint64
+	rpcsettingscalls     uint64
+	rpcuploadcalls       uint64
 }
 ```
 'collateral' is the number of hastings per byte per block that are put up as
@@ -379,6 +387,24 @@ stored.
 
 'anticipatedrevenue' is the value of the contracts that have been created but
 not fulfilled.
+
+'rpcerrorcalls' is the number of rpcs to the host that have returned errors.
+
+'rpcunrecognizedcalls' is the number of rpcs to the host that used unrecognized
+identifiers.
+
+'rpcdownloadcalls' is the number of rpcs to the host that requested a download.
+
+'rpcrenewcalls' is the number of rpcs to the host that requested a file
+contract renewal.
+
+'rpcrevisecalls' is the number of rpcs to the host that requested a file
+contract revision.
+
+'rpcsettingscalls' is the number of rpcs to the host that requested the host's
+settings.
+
+'rpcuploadcalls' is the number of rpcs to the host that tried to upload a file.
 
 #### /host [POST]
 
