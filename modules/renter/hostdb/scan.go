@@ -140,6 +140,12 @@ func (hdb *HostDB) threadedProbeHosts() {
 		// host entry.
 		hdb.mu.Lock()
 		{
+			// Regardless of whether the host responded, add it to allHosts.
+			if _, exists := hdb.allHosts[hostEntry.NetAddress]; !exists {
+				hdb.allHosts[hostEntry.NetAddress] = hostEntry
+			}
+
+			// If the scan was unsuccessful, decrement the host's reliability.
 			if err != nil {
 				hdb.decrementReliability(hostEntry.NetAddress, UnreachablePenalty)
 				hdb.mu.Unlock()
@@ -153,11 +159,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			hostEntry.reliability = MaxReliability
 			hostEntry.weight = calculateHostWeight(*hostEntry)
 
-			// If the host is not already in the database and 'MaxActiveHosts' has not
-			// been reached, add the host to the database.
-			_, exists1 := hdb.activeHosts[hostEntry.NetAddress]
-			_, exists2 := hdb.allHosts[hostEntry.NetAddress]
-			if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
+			// If 'MaxActiveHosts' has not been reached, add the host to the
+			// activeHosts tree.
+			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; !exists && len(hdb.activeHosts) < MaxActiveHosts {
 				hdb.insertNode(hostEntry)
 			}
 		}
