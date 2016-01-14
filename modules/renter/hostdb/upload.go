@@ -188,7 +188,7 @@ func (p *pool) UniqueHosts(n int, exclude []modules.NetAddress) (hosts []Uploade
 		return
 	}
 
-	// first reuse existing connections
+	// First reuse existing connections.
 outer:
 	for _, h := range p.hosts {
 		for _, ip := range exclude {
@@ -209,8 +209,8 @@ outer:
 		exclude = append(exclude, h.Address())
 	}
 
-	// Ask the hostdb for randomHosts. We always ask for at least 10, to avoid
-	// selecting the same uncooperative hosts over and over.
+	// Ask the hostdb for random hosts. We always ask for at least 10, to
+	// avoid selecting the same uncooperative hosts over and over.
 	ask := n
 	if ask < 10 {
 		ask = 10
@@ -219,15 +219,18 @@ outer:
 	randHosts := p.hdb.randomHosts(ask, exclude)
 	p.hdb.mu.Unlock()
 
-	// Form new contracts from randomly-picked nodes.
+	// Form new contracts with the randomly-picked hosts. If a contract can't
+	// be formed, add the host to the pool's blacklist.
 	for _, host := range randHosts {
 		contract, err := p.hdb.newContract(host, p.filesize, p.duration)
 		if err != nil {
+			p.hdb.log.Printf("couldn't form contract with %v: %v", host.NetAddress, err)
 			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
 		}
 		hu, err := p.hdb.newHostUploader(contract)
 		if err != nil {
+			p.hdb.log.Printf("couldn't create uploader for %v: %v", host.NetAddress, err)
 			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
 		}
