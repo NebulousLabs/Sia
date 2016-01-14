@@ -97,12 +97,35 @@ func hostcmd() {
 	price := new(big.Rat).SetInt(hg.Price.Big())
 	price.Mul(price, big.NewRat(4320, 1e24/1e9))
 	fmt.Printf(`Host info:
-Storage:      %v (%v used)
-Price:        %v SC per GB per month
-Max Duration: %v Blocks
-Contracts:    %v
-Revenue:      %v (%v expected)
+	Storage:      %v (%v used)
+	Price:        %v SC per GB per month
+	Max Duration: %v Blocks
+
+	Contracts:           %v
+	Anticipated Revenue: %v
+	Revenue:             %v
+	Lost Revenue:        %v
 `, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
-		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.Revenue,
-		hg.UpcomingRevenue)
+		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.AnticipatedRevenue,
+		hg.Revenue, hg.LostRevenue)
+
+	// display more info if verbose flag is set
+	if !hostVerbose {
+		return
+	}
+	fmt.Printf(`
+	Net Address: %v
+	Unlock Hash: %v
+	(NOT a wallet address!)
+
+RPC Stats:
+	Error Calls:        %v
+	Unrecognized Calls: %v
+	Download Calls:     %v
+	Renew Calls:        %v
+	Revise Calls:       %v
+	Settings Calls:     %v
+	Upload Calls:       %v
+`, hg.NetAddress, hg.UnlockHash, hg.RPCErrorCalls, hg.RPCUnrecognizedCalls, hg.RPCDownloadCalls,
+		hg.RPCRenewCalls, hg.RPCReviseCalls, hg.RPCSettingsCalls, hg.RPCUploadCalls)
 }

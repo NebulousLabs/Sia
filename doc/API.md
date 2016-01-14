@@ -335,10 +335,10 @@ struct {
 	unlockhash   types.UnlockHash  (string)
 	windowsize   types.BlockHeight (uint64)
 
-	numcontracts      uint64
-	revenue           types.Currency (string)
-	storageremaining  int64
-	upcomingrevenue   types.Currency (string)
+	numcontracts       uint64
+	revenue            types.Currency (string)
+	storageremaining   int64
+	anticipatedrevenue types.Currency (string)
 }
 ```
 'collateral' is the number of hastings per byte per block that are put up as
@@ -372,8 +372,8 @@ blocks, though in theory something as low as 6 blocks could be safe.
 'storageremaining' is 'totalstorage' minus the number of bytes currently being
 stored.
 
-'upcomingrevenue' is the value of the contracts that have been created but not
-fulfilled.
+'anticipatedrevenue' is the value of the contracts that have been created but
+not fulfilled.
 
 #### /host [POST]
 
