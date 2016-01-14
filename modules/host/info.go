@@ -7,6 +7,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// AcceptingNewContracts returns whether the host is accepting new contracts or
+// not.
+func (h *Host) AcceptingNewContracts() bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.acceptingContracts
+}
+
 // Capacity returns the amount of storage still available on the machine. The
 // amount can be negative if the total capacity was reduced to below the active
 // capacity.
