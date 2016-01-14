@@ -8,18 +8,18 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// TestRPCTracking checks that the rpc tracking is counting incoming RPC cals.
-func TestRPCTracking(t *testing.T) {
+// TestRPCMetrics checks that the rpc tracking is counting incoming RPC cals.
+func TestRPCMetrics(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := newHostTester("TestRPCTracking")
+	ht, err := newHostTester("TestRPCMetrics")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Upload a test file to get some metrics to increment.
-	_, err = ht.uploadFile("TestRPCTracking - 1", renewDisabled)
+	_, err = ht.uploadFile("TestRPCMetrics - 1", renewDisabled)
 	if err != nil {
 		t.Fatal(err)
 	}

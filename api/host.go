@@ -24,16 +24,26 @@ type (
 		WindowSize   types.BlockHeight  `json:"windowsize"`
 
 		NumContracts     uint64         `json:"numcontracts"`
+		LostRevenue      types.Currency `json:"lostrevenue"`
 		Revenue          types.Currency `json:"revenue"`
 		StorageRemaining int64          `json:"storageremaining"`
 		UpcomingRevenue  types.Currency `json:"upcomingrevenue"`
+
+		RPCErrorCalls        uint64 `json:"rpcerrorcalls"`
+		RPCUnrecognizedCalls uint64 `json:"rpcunrecognizedcalls"`
+		RPCDownloadCalls     uint64 `json:"rpcdownloadcalls"`
+		RPCRenewCalls        uint64 `json:"rpcrenewcalls"`
+		RPCReviseCalls       uint64 `json:"rpcrevisecalls"`
+		RPCSettingsCalls     uint64 `json:"rpcsettingscalls"`
+		RPCUploadCalls       uint64 `json:"rpcuploadcalls"`
 	}
 )
 
 // hostHandlerGET handles GET requests to the /host API endpoint.
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	settings := srv.host.Settings()
-	upcomingRevenue, revenue := srv.host.Revenue()
+	upcomingRevenue, revenue, lostRevenue := srv.host.Revenue()
+	rpcCalls := srv.host.RPCMetrics()
 	hg := HostGET{
 		Collateral:   settings.Collateral,
 		NetAddress:   settings.NetAddress,
@@ -45,9 +55,18 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ ht
 		WindowSize:   settings.WindowSize,
 
 		NumContracts:     srv.host.Contracts(),
+		LostRevenue:      lostRevenue,
 		Revenue:          revenue,
 		StorageRemaining: srv.host.Capacity(),
 		UpcomingRevenue:  upcomingRevenue,
+
+		RPCErrorCalls:        rpcCalls.ErrorCalls,
+		RPCUnrecognizedCalls: rpcCalls.UnrecognizedCalls,
+		RPCDownloadCalls:     rpcCalls.DownloadCalls,
+		RPCRenewCalls:        rpcCalls.RenewCalls,
+		RPCReviseCalls:       rpcCalls.ReviseCalls,
+		RPCSettingsCalls:     rpcCalls.SettingsCalls,
+		RPCUploadCalls:       rpcCalls.UploadCalls,
 	}
 	writeJSON(w, hg)
 }

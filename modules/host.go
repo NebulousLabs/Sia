@@ -62,6 +62,18 @@ type (
 		UnlockHash   types.UnlockHash  `json:"unlockhash"`
 	}
 
+	// HostRPCMetrics reports the quantity of each type of rpc call that has
+	// been made to the host.
+	HostRPCMetrics struct {
+		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
+		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
+		DownloadCalls     uint64 `json:"downloadcalls"`
+		RenewCalls        uint64 `json:"renewcalls"`
+		ReviseCalls       uint64 `json:"revisecalls"`
+		SettingsCalls     uint64 `json:"settingscalls"`
+		UploadCalls       uint64 `json:"uploadcalls"`
+	}
+
 	// Host can take storage from disk and offer it to the network, managing things
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
@@ -85,10 +97,18 @@ type (
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
 
-		// Revenue returns the amount of revenue that the host has lined up, as
-		// well as the amount of revenue that the host has successfully
-		// captured.
-		Revenue() (unresolved, resolved types.Currency)
+		// Revenue returns the amount of revenue that the host has lined up,
+		// the amount of revenue the host has successfully captured, and the
+		// amount of revenue the host has lost.
+		//
+		// TODO: This function will eventually include two more numbers, one
+		// representing current collateral at risk, and one representing total
+		// collateral lost.
+		Revenue() (unresolved, resolved, lost types.Currency)
+
+		// RPCMetrics returns information on the types of rpc calls that have
+		// been made to the host.
+		RPCMetrics() HostRPCMetrics
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error

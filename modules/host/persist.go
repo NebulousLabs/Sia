@@ -42,14 +42,14 @@ type persistence struct {
 	LostRevenue types.Currency
 	Revenue     types.Currency
 
-	// RPC Tracking.
-	ErroredCalls   uint64
-	MalformedCalls uint64
-	DownloadCalls  uint64
-	RenewCalls     uint64
-	ReviseCalls    uint64
-	SettingsCalls  uint64
-	UploadCalls    uint64
+	// RPC Metrics.
+	ErroredCalls      uint64
+	UnrecognizedCalls uint64
+	DownloadCalls     uint64
+	RenewCalls        uint64
+	ReviseCalls       uint64
+	SettingsCalls     uint64
+	UploadCalls       uint64
 
 	// Utilities.
 	Settings modules.HostSettings
@@ -85,14 +85,14 @@ func (h *Host) save() error {
 		LostRevenue: h.lostRevenue,
 		Revenue:     h.revenue,
 
-		// RPC Tracking.
-		ErroredCalls:   atomic.LoadUint64(&h.atomicErroredCalls),
-		MalformedCalls: atomic.LoadUint64(&h.atomicMalformedCalls),
-		DownloadCalls:  atomic.LoadUint64(&h.atomicDownloadCalls),
-		RenewCalls:     atomic.LoadUint64(&h.atomicRenewCalls),
-		ReviseCalls:    atomic.LoadUint64(&h.atomicReviseCalls),
-		SettingsCalls:  atomic.LoadUint64(&h.atomicSettingsCalls),
-		UploadCalls:    atomic.LoadUint64(&h.atomicUploadCalls),
+		// RPC Metrics.
+		ErroredCalls:      atomic.LoadUint64(&h.atomicErroredCalls),
+		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
+		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
+		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
+		UploadCalls:       atomic.LoadUint64(&h.atomicUploadCalls),
 
 		// Utilities.
 		Settings: h.settings,
@@ -189,7 +189,7 @@ func (h *Host) load() error {
 
 	// Copy over rpc tracking.
 	atomic.StoreUint64(&h.atomicErroredCalls, p.ErroredCalls)
-	atomic.StoreUint64(&h.atomicMalformedCalls, p.MalformedCalls)
+	atomic.StoreUint64(&h.atomicUnrecognizedCalls, p.UnrecognizedCalls)
 	atomic.StoreUint64(&h.atomicDownloadCalls, p.DownloadCalls)
 	atomic.StoreUint64(&h.atomicRenewCalls, p.RenewCalls)
 	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)

@@ -197,6 +197,16 @@ func (co *contractObligation) windowEnd() types.BlockHeight {
 	return co.OriginTransaction.FileContracts[0].WindowEnd
 }
 
+// addActionItem adds an action item at the given height for the given contract
+// obligation.
+func (h *Host) addActionItem(height types.BlockHeight, co *contractObligation) {
+	_, exists := h.actionItems[height]
+	if !exists {
+		h.actionItems[height] = make(map[types.FileContractID]*contractObligation)
+	}
+	h.actionItems[height][co.ID] = co
+}
+
 // addObligation adds a new file contract obligation to the host. The
 // obligation assumes that none of the transaction required by the obligation
 // have not yet been confirmed on the blockchain.

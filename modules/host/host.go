@@ -64,15 +64,15 @@ var (
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	// RPC Tracking - atomic variables need to be placed at the top to preserve
+	// RPC Metrics - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems.
-	atomicErroredCalls   uint64
-	atomicMalformedCalls uint64
-	atomicDownloadCalls  uint64
-	atomicRenewCalls     uint64
-	atomicReviseCalls    uint64
-	atomicSettingsCalls  uint64
-	atomicUploadCalls    uint64
+	atomicErroredCalls      uint64
+	atomicUnrecognizedCalls uint64
+	atomicDownloadCalls     uint64
+	atomicRenewCalls        uint64
+	atomicReviseCalls       uint64
+	atomicSettingsCalls     uint64
+	atomicUploadCalls       uint64
 
 	// Module dependencies.
 	cs     modules.ConsensusSet
@@ -205,76 +205,4 @@ func (h *Host) Close() error {
 		return err
 	}
 	return nil
-}
-
-// addActionItem adds an action item at the given height for the given contract
-// obligation.
-func (h *Host) addActionItem(height types.BlockHeight, co *contractObligation) {
-	_, exists := h.actionItems[height]
-	if !exists {
-		h.actionItems[height] = make(map[types.FileContractID]*contractObligation)
-	}
-	h.actionItems[height][co.ID] = co
-}
-
-// Capacity returns the amount of storage still available on the machine. The
-// amount can be negative if the total capacity was reduced to below the active
-// capacity.
-func (h *Host) Capacity() int64 {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.spaceRemaining
-}
-
-// Contracts returns the number of unresolved file contracts that the host is
-// responsible for.
-func (h *Host) Contracts() uint64 {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return uint64(len(h.obligationsByID))
-}
-
-// NetAddress returns the address at which the host can be reached.
-func (h *Host) NetAddress() modules.NetAddress {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.netAddress
-}
-
-// Revenue returns the amount of revenue that the host has lined up, as well as
-// the amount of revenue that the host has successfully captured.
-func (h *Host) Revenue() (unresolved, resolved types.Currency) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.anticipatedRevenue, h.revenue
-}
-
-// SetSettings updates the host's internal HostSettings object.
-func (h *Host) SetSettings(settings modules.HostSettings) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
-	}
-
-	// Check that the unlock hash was not changed.
-	if settings.UnlockHash != h.settings.UnlockHash {
-		return errChangedUnlockHash
-	}
-
-	// Update the amount of space remaining to reflect the new volume of total
-	// storage.
-	h.spaceRemaining += settings.TotalStorage - h.settings.TotalStorage
-
-	h.settings = settings
-	return h.save()
-}
-
-// Settings returns the settings of a host.
-func (h *Host) Settings() modules.HostSettings {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.settings
 }
