@@ -79,11 +79,14 @@ type (
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// Announce announces the host on the blockchain, returning an error if the
-		// external ip address is unknown.
+		// Announce submits a host announcement to the blockchain, returning an
+		// error if its external IP address is unknown. After announcing, the
+		// host will begin accepting contracts.
 		Announce() error
 
-		// AnnounceAddress announces the specified address on the blockchain.
+		// AnnounceAddress behaves like Announce, but allows the caller to
+		// specify the address announced. Like Announce, this will cause the
+		// host to start accepting contracts.
 		AnnounceAddress(NetAddress) error
 
 		// Capacity returns the amount of storage still available on the

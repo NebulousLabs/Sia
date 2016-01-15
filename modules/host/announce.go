@@ -43,6 +43,9 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	}
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 
+	// Start accepting contracts.
+	h.settings.AcceptingContracts = true
+
 	return nil
 }
 
@@ -67,6 +70,8 @@ func (h *Host) Announce() error {
 		return errors.New("can't announce without knowing external IP")
 	}
 
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.announce(addr)
 }
 
@@ -78,5 +83,8 @@ func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	if h.closed {
 		return errHostClosed
 	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.announce(addr)
 }
