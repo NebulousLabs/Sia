@@ -288,3 +288,25 @@ func TestRenterPaths(t *testing.T) {
 		t.Fatalf("Bad walk string: expected %v, got %v", expWalkStr, walkStr)
 	}
 }
+
+// TestSiafileCompatibility tests that the renter is able to load v0.4.8 .sia files.
+func TestSiafileCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester("TestSiafileCompatibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Load the compatibility file into the renter.
+	path := filepath.Join("..", "..", "compatibility", "siafile_v0.4.8.sia")
+	names, err := rt.renter.LoadSharedFiles(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 1 || names[0] != "testfile-183" {
+		t.Fatal("nickname not loaded properly:", names)
+	}
+}
