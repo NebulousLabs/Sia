@@ -23,6 +23,7 @@ type (
 		UnlockHash   types.UnlockHash   `json:"unlockhash"`
 		WindowSize   types.BlockHeight  `json:"windowsize"`
 
+		AcceptingContracts bool           `json:"acceptingcontracts"`
 		NumContracts       uint64         `json:"numcontracts"`
 		LostRevenue        types.Currency `json:"lostrevenue"`
 		Revenue            types.Currency `json:"revenue"`
@@ -76,12 +77,13 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 	// Map each query string to a field in the host settings.
 	settings := srv.host.Settings()
 	qsVars := map[string]interface{}{
-		"collateral":   &settings.Collateral,
-		"maxduration":  &settings.MaxDuration,
-		"minduration":  &settings.MinDuration,
-		"price":        &settings.Price,
-		"totalstorage": &settings.TotalStorage,
-		"windowsize":   &settings.WindowSize,
+		"acceptingcontracts": &settings.AcceptingContracts,
+		"collateral":         &settings.Collateral,
+		"maxduration":        &settings.MaxDuration,
+		"minduration":        &settings.MinDuration,
+		"price":              &settings.Price,
+		"totalstorage":       &settings.TotalStorage,
+		"windowsize":         &settings.WindowSize,
 	}
 
 	// Iterate through the query string and replace any fields that have been

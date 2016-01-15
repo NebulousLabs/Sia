@@ -52,14 +52,15 @@ type (
 	// values that the renter will request from the host in order to build its
 	// database.
 	HostSettings struct {
-		NetAddress   NetAddress        `json:"netaddress"`
-		TotalStorage int64             `json:"totalstorage"`
-		MinDuration  types.BlockHeight `json:"minduration"`
-		MaxDuration  types.BlockHeight `json:"maxduration"`
-		WindowSize   types.BlockHeight `json:"windowsize"`
-		Price        types.Currency    `json:"price"`
-		Collateral   types.Currency    `json:"collateral"`
-		UnlockHash   types.UnlockHash  `json:"unlockhash"`
+		AcceptingContracts bool              `json:"acceptingcontracts"`
+		NetAddress         NetAddress        `json:"netaddress"`
+		TotalStorage       int64             `json:"totalstorage"`
+		MinDuration        types.BlockHeight `json:"minduration"`
+		MaxDuration        types.BlockHeight `json:"maxduration"`
+		WindowSize         types.BlockHeight `json:"windowsize"`
+		Price              types.Currency    `json:"price"`
+		Collateral         types.Currency    `json:"collateral"`
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`
 	}
 
 	// HostRPCMetrics reports the quantity of each type of rpc call that has
