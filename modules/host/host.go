@@ -206,3 +206,16 @@ func (h *Host) Close() error {
 	}
 	return nil
 }
+
+// DeleteContract deletes a file contract. The revenue and collateral on the
+// file contract will be lost, and the data will be removed.
+func (h *Host) DeleteContract(id types.FileContractID) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	obligation, exists := h.obligationsByID[id]
+	if !exists {
+		return errors.New("obligation not found")
+	}
+	h.removeObligation(obligation, obligationFailed)
+	return nil
+}

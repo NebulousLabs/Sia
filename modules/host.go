@@ -94,6 +94,10 @@ type (
 		// host is responsible for.
 		Contracts() uint64
 
+		// DeleteContract deletes a file contract. The revenue and collateral
+		// on the file contract will be lost, and the data will be removed.
+		DeleteContract(types.FileContractID) error
+
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
 

@@ -275,7 +275,7 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 	var size int64
 	stat, err := os.Stat(co.Path)
 	if err != nil {
-		h.log.Println("WARN: failed to remove obligation:", err)
+		h.log.Println("ERROR: failed to remove obligation due to stat error:", err)
 	} else {
 		size = stat.Size()
 	}
@@ -284,7 +284,7 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 	// none of the space will be re-added.
 	err = os.Remove(co.Path)
 	if err != nil {
-		h.log.Println("WARN: failed to remove obligation:", err)
+		h.log.Println("ERROR: failed to remove obligation:", err)
 	} else {
 		h.spaceRemaining += size
 	}
@@ -301,7 +301,7 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 	delete(h.obligationsByID, co.ID)
 	err = h.save()
 	if err != nil {
-		h.log.Println("WARN: failed to save host:", err)
+		h.log.Println("ERROR: failed to save host:", err)
 	}
 }
 
