@@ -251,14 +251,18 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 // managedRPCUpload is an RPC that negotiates a file contract. Under the new
 // scheme, file contracts should not initially hold any data.
 func (h *Host) managedRPCUpload(conn net.Conn) error {
-	// Check that the host has grabbed an address from the wallet.
 	h.mu.RLock()
-	uh := h.settings.UnlockHash
+	settings := h.settings
 	h.fileCounter++ // Harmless to increment the file counter in the event of an error.
 	filename := filepath.Join(h.persistDir, strconv.Itoa(int(h.fileCounter)))
 	h.mu.RUnlock()
 
-	if uh == (types.UnlockHash{}) {
+	// Terminate connection if host is not accepting contracts
+	if !settings.AcceptingContracts {
+		return nil
+	}
+
+	if settings.UnlockHash == (types.UnlockHash{}) {
 		return errors.New("couldn't negotiate contract: host does not have an address")
 	}
 
@@ -269,6 +273,14 @@ func (h *Host) managedRPCUpload(conn net.Conn) error {
 // managedRPCRevise is an RPC that allows a renter to revise a file contract. It will
 // read new revisions in a loop until the renter sends a termination signal.
 func (h *Host) managedRPCRevise(conn net.Conn) error {
+	// Terminate connection if host is not accepting contracts.
+	h.mu.RLock()
+	accepting := h.settings.AcceptingContracts
+	h.mu.RUnlock()
+	if !accepting {
+		return nil
+	}
+
 	// read ID of contract to be revised
 	var fcid types.FileContractID
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
@@ -416,6 +428,14 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 // protocol is identical to standard contract negotiation, except that the
 // Merkle root is copied over from the old contract.
 func (h *Host) managedRPCRenew(conn net.Conn) error {
+	// Terminate connection if host is not accepting contracts.
+	h.mu.RLock()
+	accepting := h.settings.AcceptingContracts
+	h.mu.RUnlock()
+	if !accepting {
+		return nil
+	}
+
 	// read ID of contract to be renewed
 	var fcid types.FileContractID
 	if err := encoding.ReadObject(conn, &fcid, crypto.HashSize); err != nil {
