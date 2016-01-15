@@ -244,7 +244,7 @@ outer:
 	if len(errs) == len(randHosts) && len(errs) > 0 {
 		// Log the last error, since early errors are more likely to be
 		// host-specific.
-		p.hdb.log.Printf("couldn't form any host contracts: %v", errs[len(errs)-1])
+		p.hdb.log.Println("couldn't form any host contracts:", errs[len(errs)-1])
 	}
 	return hosts
 }
