@@ -13,7 +13,7 @@ var (
 	hostCmd = &cobra.Command{
 		Use:   "host",
 		Short: "Perform host actions",
-		Long:  "View or modify host settings. Modifying host settings also announces the host to the network.",
+		Long:  "View or modify host settings.",
 		Run:   wrap(hostcmd),
 	}
 
@@ -26,7 +26,13 @@ Available settings:
 	minduration
 	maxduration
 	windowsize
-	price (in SC per GB per month)`,
+	price (in SC per GB per month)
+	acceptingcontracts
+
+To configure the host to not accept new contracts, set acceptingcontracts
+to false, e.g.:
+	siac host config acceptingcontracts false
+`,
 		Run: wrap(hostconfigcmd),
 	}
 
@@ -93,6 +99,11 @@ func hostcmd() {
 		fmt.Println("Could not fetch host settings:", err)
 		return
 	}
+	// convert accepting bool
+	accept := "Yes"
+	if !hg.AcceptingContracts {
+		accept = "No"
+	}
 	// convert price to SC/GB/mo
 	price := new(big.Rat).SetInt(hg.Price.Big())
 	price.Mul(price, big.NewRat(4320, 1e24/1e9))
@@ -102,12 +113,13 @@ func hostcmd() {
 	Max Duration: %v Blocks
 
 	Contracts:           %v
+	Accepting Contracts: %v
 	Anticipated Revenue: %v
 	Revenue:             %v
 	Lost Revenue:        %v
 `, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
-		price.FloatString(3), hg.MaxDuration, hg.NumContracts, hg.AnticipatedRevenue,
-		hg.Revenue, hg.LostRevenue)
+		price.FloatString(3), hg.MaxDuration, hg.NumContracts, accept,
+		hg.AnticipatedRevenue, hg.Revenue, hg.LostRevenue)
 
 	// display more info if verbose flag is set
 	if !hostVerbose {
