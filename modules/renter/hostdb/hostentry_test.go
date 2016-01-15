@@ -13,30 +13,25 @@ func TestInsertHost(t *testing.T) {
 	// no dependencies necessary
 	hdb := newHostDB(nil, nil, nil, nil, nil, nil)
 
-	// invalid host should not be added
+	// invalid host should not be scanned
 	hdb.insertHost(modules.HostSettings{NetAddress: "foo"})
-	if _, exists := hdb.allHosts["foo"]; exists {
-		t.Error("host with invalid NetAddress was inserted")
+	select {
+	case <-hdb.scanPool:
+		t.Error("invalid host was added to scan pool")
+	case <-time.After(10 * time.Millisecond):
 	}
 
-	// valid host should be added
+	// valid host should be scanned
 	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
-	if _, exists := hdb.allHosts["foo:1234"]; !exists {
-		t.Error("host with valid NetAddress was not inserted")
-	}
-	// host should be scanned
 	select {
 	case <-hdb.scanPool:
 	case <-time.After(10 * time.Millisecond):
 		t.Error("host was not scanned")
 	}
 
-	// duplicate host should not be added
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
-	if len(hdb.allHosts) != 1 {
-		t.Error("duplicate host was added:", hdb.allHosts)
-	}
-	// no scan should occur
+	// duplicate host should not be scanned
+	hdb.allHosts["bar:1234"] = nil
+	hdb.insertHost(modules.HostSettings{NetAddress: "bar:1234"})
 	select {
 	case <-hdb.scanPool:
 		t.Error("duplicate host was added to scan pool")
