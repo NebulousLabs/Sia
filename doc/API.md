@@ -336,10 +336,19 @@ struct {
 	unlockhash   types.UnlockHash  (string)
 	windowsize   types.BlockHeight (uint64)
 
+	acceptingcontracts bool
 	numcontracts       uint64
 	revenue            types.Currency (string)
 	storageremaining   int64
 	anticipatedrevenue types.Currency (string)
+
+	rpcerrorcalls        uint64
+	rpcunrecognizedcalls uint64
+	rpcdownloadcalls     uint64
+	rpcrenewcalls        uint64
+	rpcrevisecalls       uint64
+	RPCsettingscalls     uint64
+	rpcuploadcalls       uint64
 }
 ```
 'collateral' is the number of hastings per byte per block that are put up as
@@ -365,6 +374,10 @@ downtime, 40 blocks is recommended as an absolute minimum. The current network
 default is 288 blocks. The current software will break entirely below 20
 blocks, though in theory something as low as 6 blocks could be safe.
 
+'acceptingcontracts' indicates whether the host is accepting new file
+contracts, file contract revisions, and file contract renewals. A host that is
+not accepting these calls will still accept download requests, and will still
+submit storage proofs to the network.
 
 'numcontracts' is the number of active contracts that the host is engaged in.
 
@@ -375,6 +388,24 @@ stored.
 
 'anticipatedrevenue' is the value of the contracts that have been created but
 not fulfilled.
+
+'rpcerrorcalls' is the number of RPCs to the host that returned errors.
+
+'rpcunrecognizedcalls' is the number of RPCs to the host that used unrecognized
+identifiers.
+
+'rpcdownloadcalls' is the number of RPCs to the host that requested a download.
+
+'rpcrenewcalls' is the number of RPCs to the host that requested a file
+contract renewal.
+
+'rpcrevisecalls' is the number of RPCs to the host that requested a file
+contract revision.
+
+'rpcsettingscalls' is the number of RPCs to the host that requested the host's
+settings.
+
+'rpcuploadcalls' is the number of RPCs to the host that tried to upload a file.
 
 #### /host [POST]
 
