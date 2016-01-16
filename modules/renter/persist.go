@@ -160,33 +160,15 @@ func (r *Renter) saveFile(f *file) error {
 		return err
 	}
 
+	// Open SafeFile handle.
 	handle, err := persist.NewSafeFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
 		return err
 	}
 	defer handle.Close()
 
-	// Write header with length of 1.
-	err = encoding.NewEncoder(handle).EncodeAll(
-		shareHeader,
-		shareVersion,
-		uint64(1),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Create compressor.
-	zip, _ := gzip.NewWriterLevel(handle, gzip.BestCompression)
-
-	// Write compressed file.
-	err = encoding.NewEncoder(zip).Encode(f)
-	if err != nil {
-		return err
-	}
-
-	// Flush compressor.
-	err = zip.Close()
+	// Write file data.
+	err = shareFiles([]*file{f}, handle)
 	if err != nil {
 		return err
 	}
@@ -261,13 +243,14 @@ func (r *Renter) load() error {
 	return nil
 }
 
-// shareFiles writes the specified files to w.
-func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
+// shareFiles writes the specified files to w. First a header is written,
+// followed by the gzipped concatenation of each file.
+func shareFiles(files []*file, w io.Writer) error {
 	// Write header.
 	err := encoding.NewEncoder(w).EncodeAll(
 		shareHeader,
 		shareVersion,
-		uint64(len(nicknames)),
+		uint64(len(files)),
 	)
 	if err != nil {
 		return err
@@ -275,22 +258,17 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 
 	// Create compressor.
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
-	defer zip.Close()
 	enc := encoding.NewEncoder(zip)
 
-	// Write each file.
-	for _, name := range nicknames {
-		file, exists := r.files[name]
-		if !exists {
-			return ErrUnknownPath
-		}
-		err := enc.Encode(file)
+	// Encode each file.
+	for _, f := range files {
+		err = enc.Encode(f)
 		if err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return zip.Close()
 }
 
 // ShareFile saves the specified files to shareDest.
@@ -303,13 +281,23 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 		return ErrNonShareSuffix
 	}
 
-	file, err := os.Create(shareDest)
+	handle, err := os.Create(shareDest)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer handle.Close()
 
-	err = r.shareFiles(nicknames, file)
+	// Load files from renter.
+	files := make([]*file, len(nicknames))
+	for i, name := range nicknames {
+		f, exists := r.files[name]
+		if !exists {
+			return ErrUnknownPath
+		}
+		files[i] = f
+	}
+
+	err = shareFiles(files, handle)
 	if err != nil {
 		os.Remove(shareDest)
 		return err
@@ -323,8 +311,18 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	// Load files from renter.
+	files := make([]*file, len(nicknames))
+	for i, name := range nicknames {
+		f, exists := r.files[name]
+		if !exists {
+			return "", ErrUnknownPath
+		}
+		files[i] = f
+	}
+
 	buf := new(bytes.Buffer)
-	err := r.shareFiles(nicknames, base64.NewEncoder(base64.URLEncoding, buf))
+	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
 		return "", err
 	}
