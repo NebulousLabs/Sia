@@ -37,9 +37,9 @@ var (
 	}
 )
 
-// save saves a file to w in shareable form. Files are stored in binary format
-// and gzipped to reduce size.
-func (f *file) save(w io.Writer) error {
+// MarshalSia implements the encoding.SiaMarshaller interface, writing the
+// file data to w.
+func (f *file) MarshalSia(w io.Writer) error {
 	enc := encoding.NewEncoder(w)
 
 	// encode easy fields
@@ -89,8 +89,9 @@ func (f *file) save(w io.Writer) error {
 	return nil
 }
 
-// load loads a file created by save.
-func (f *file) load(r io.Reader) error {
+// UnmarshalSia implements the encoding.SiaUnmarshaller interface,
+// reconstructing a file from the encoded bytes read from r.
+func (f *file) UnmarshalSia(r io.Reader) error {
 	dec := encoding.NewDecoder(r)
 
 	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
@@ -178,8 +179,8 @@ func (r *Renter) saveFile(f *file) error {
 	// Create compressor.
 	zip, _ := gzip.NewWriterLevel(handle, gzip.BestCompression)
 
-	// Write file.
-	err = f.save(zip)
+	// Write compressed file.
+	err = encoding.NewEncoder(zip).Encode(f)
 	if err != nil {
 		return err
 	}
@@ -275,6 +276,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 	// Create compressor.
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
 	defer zip.Close()
+	enc := encoding.NewEncoder(zip)
 
 	// Write each file.
 	for _, name := range nicknames {
@@ -282,7 +284,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if !exists {
 			return ErrUnknownPath
 		}
-		err := file.save(zip)
+		err := enc.Encode(file)
 		if err != nil {
 			return err
 		}
@@ -355,12 +357,13 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	dec := encoding.NewDecoder(unzip)
 
 	// Read each file.
 	files := make([]*file, numFiles)
 	for i := range files {
 		files[i] = new(file)
-		err := files[i].load(unzip)
+		err := dec.Decode(files[i])
 		if err != nil {
 			return nil, err
 		}

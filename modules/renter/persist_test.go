@@ -50,14 +50,15 @@ func equalFiles(f1, f2 *file) error {
 	return nil
 }
 
-// TestFileSaveLoad tests the save and load functions of the file type.
-func TestFileSaveLoad(t *testing.T) {
+// TestFileMarshalling tests the MarshalSia and UnmarshalSia functions of the
+// file type.
+func TestFileMarshalling(t *testing.T) {
 	savedFile := newTestingFile()
 	buf := new(bytes.Buffer)
-	savedFile.save(buf)
+	savedFile.MarshalSia(buf)
 
 	loadedFile := new(file)
-	err := loadedFile.load(buf)
+	err := loadedFile.UnmarshalSia(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
