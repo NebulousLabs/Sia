@@ -37,12 +37,10 @@ var (
 	}
 )
 
-// save saves a file to w in shareable form. Files are stored in binary format
-// and gzipped to reduce size.
-func (f *file) save(w io.Writer) error {
-	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
-	defer zip.Close()
-	enc := encoding.NewEncoder(zip)
+// MarshalSia implements the encoding.SiaMarshaller interface, writing the
+// file data to w.
+func (f *file) MarshalSia(w io.Writer) error {
+	enc := encoding.NewEncoder(w)
 
 	// encode easy fields
 	err := enc.EncodeAll(
@@ -91,20 +89,16 @@ func (f *file) save(w io.Writer) error {
 	return nil
 }
 
-// load loads a file created by save.
-func (f *file) load(r io.Reader) error {
-	zip, err := gzip.NewReader(r)
-	if err != nil {
-		return err
-	}
-	defer zip.Close()
-	dec := encoding.NewDecoder(zip)
+// UnmarshalSia implements the encoding.SiaUnmarshaller interface,
+// reconstructing a file from the encoded bytes read from r.
+func (f *file) UnmarshalSia(r io.Reader) error {
+	dec := encoding.NewDecoder(r)
 
 	// COMPATv0.4.3 - decode bytesUploaded and chunksUploaded into dummy vars.
 	var bytesUploaded, chunksUploaded uint64
 
 	// decode easy fields
-	err = dec.DecodeAll(
+	err := dec.DecodeAll(
 		&f.name,
 		&f.size,
 		&f.masterKey,
@@ -166,24 +160,15 @@ func (r *Renter) saveFile(f *file) error {
 		return err
 	}
 
+	// Open SafeFile handle.
 	handle, err := persist.NewSafeFile(filepath.Join(r.persistDir, f.name+ShareExtension))
 	if err != nil {
 		return err
 	}
 	defer handle.Close()
 
-	// Write header with length of 1.
-	err = encoding.NewEncoder(handle).EncodeAll(
-		shareHeader,
-		shareVersion,
-		uint64(1),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Write file.
-	err = f.save(handle)
+	// Write file data.
+	err = shareFiles([]*file{f}, handle)
 	if err != nil {
 		return err
 	}
@@ -258,31 +243,32 @@ func (r *Renter) load() error {
 	return nil
 }
 
-// shareFiles writes the specified files to w.
-func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
+// shareFiles writes the specified files to w. First a header is written,
+// followed by the gzipped concatenation of each file.
+func shareFiles(files []*file, w io.Writer) error {
 	// Write header.
 	err := encoding.NewEncoder(w).EncodeAll(
 		shareHeader,
 		shareVersion,
-		uint64(len(nicknames)),
+		uint64(len(files)),
 	)
 	if err != nil {
 		return err
 	}
 
-	// Write each file.
-	for _, name := range nicknames {
-		file, exists := r.files[name]
-		if !exists {
-			return ErrUnknownPath
-		}
-		err := file.save(w)
+	// Create compressor.
+	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	enc := encoding.NewEncoder(zip)
+
+	// Encode each file.
+	for _, f := range files {
+		err = enc.Encode(f)
 		if err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return zip.Close()
 }
 
 // ShareFile saves the specified files to shareDest.
@@ -295,13 +281,23 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 		return ErrNonShareSuffix
 	}
 
-	file, err := os.Create(shareDest)
+	handle, err := os.Create(shareDest)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer handle.Close()
 
-	err = r.shareFiles(nicknames, file)
+	// Load files from renter.
+	files := make([]*file, len(nicknames))
+	for i, name := range nicknames {
+		f, exists := r.files[name]
+		if !exists {
+			return ErrUnknownPath
+		}
+		files[i] = f
+	}
+
+	err = shareFiles(files, handle)
 	if err != nil {
 		os.Remove(shareDest)
 		return err
@@ -315,8 +311,18 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	// Load files from renter.
+	files := make([]*file, len(nicknames))
+	for i, name := range nicknames {
+		f, exists := r.files[name]
+		if !exists {
+			return "", ErrUnknownPath
+		}
+		files[i] = f
+	}
+
 	buf := new(bytes.Buffer)
-	err := r.shareFiles(nicknames, base64.NewEncoder(base64.URLEncoding, buf))
+	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
 		return "", err
 	}
@@ -344,11 +350,18 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 		return nil, ErrIncompatible
 	}
 
+	// Create decompressor.
+	unzip, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	dec := encoding.NewDecoder(unzip)
+
 	// Read each file.
 	files := make([]*file, numFiles)
 	for i := range files {
 		files[i] = new(file)
-		err := files[i].load(reader)
+		err := dec.Decode(files[i])
 		if err != nil {
 			return nil, err
 		}

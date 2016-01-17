@@ -50,14 +50,15 @@ func equalFiles(f1, f2 *file) error {
 	return nil
 }
 
-// TestFileSaveLoad tests the save and load functions of the file type.
-func TestFileSaveLoad(t *testing.T) {
+// TestFileMarshalling tests the MarshalSia and UnmarshalSia functions of the
+// file type.
+func TestFileMarshalling(t *testing.T) {
 	savedFile := newTestingFile()
 	buf := new(bytes.Buffer)
-	savedFile.save(buf)
+	savedFile.MarshalSia(buf)
 
 	loadedFile := new(file)
-	err := loadedFile.load(buf)
+	err := loadedFile.UnmarshalSia(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,15 +94,44 @@ func TestFileShareLoad(t *testing.T) {
 	// Remove the file from the renter.
 	delete(rt.renter.files, savedFile.name)
 
+	// Load the .sia file back into the renter.
 	names, err := rt.renter.LoadSharedFiles(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(names) != 1 || names[0] != savedFile.name {
-		t.Fatal("nickname not loaded properly")
+		t.Fatal("nickname not loaded properly:", names)
+	}
+	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	// Share and load multiple files.
+	savedFile2 := newTestingFile()
+	rt.renter.files[savedFile2.name] = savedFile2
+	path = filepath.Join(build.SiaTestingDir, "renter", "TestRenterShareLoad", "test2.sia")
+	err = rt.renter.ShareFiles([]string{savedFile.name, savedFile2.name}, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the files from the renter.
+	delete(rt.renter.files, savedFile.name)
+	delete(rt.renter.files, savedFile2.name)
+
+	names, err = rt.renter.LoadSharedFiles(path)
+	if err != nil {
+		t.Fatal(nil)
+	}
+	if len(names) != 2 || (names[0] != savedFile2.name && names[1] != savedFile2.name) {
+		t.Fatal("nicknames not loaded properly:", names)
+	}
 	err = equalFiles(rt.renter.files[savedFile.name], savedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = equalFiles(rt.renter.files[savedFile2.name], savedFile2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,5 +287,27 @@ func TestRenterPaths(t *testing.T) {
 	expWalkStr := (f3.name + ".sia") + (f2.name + ".sia") + (f1.name + ".sia")
 	if walkStr != expWalkStr {
 		t.Fatalf("Bad walk string: expected %v, got %v", expWalkStr, walkStr)
+	}
+}
+
+// TestSiafileCompatibility tests that the renter is able to load v0.4.8 .sia files.
+func TestSiafileCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	rt, err := newRenterTester("TestSiafileCompatibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+
+	// Load the compatibility file into the renter.
+	path := filepath.Join("..", "..", "compatibility", "siafile_v0.4.8.sia")
+	names, err := rt.renter.LoadSharedFiles(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 1 || names[0] != "testfile-183" {
+		t.Fatal("nickname not loaded properly:", names)
 	}
 }
