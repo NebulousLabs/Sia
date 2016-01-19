@@ -13,21 +13,21 @@ import (
 // These interfaces define the HostDB's dependencies. Using the smallest
 // interface possible makes it easier to mock these dependencies in testing.
 type (
-	hdbConsensusSet interface {
+	consensusSet interface {
 		ConsensusSetSubscribe(modules.ConsensusSetSubscriber)
 	}
 	// in order to restrict the modules.TransactionBuilder interface, we must
 	// provide a shim to bridge the gap between modules.Wallet and
-	// hdbTransactionBuilder.
-	hdbWalletShim interface {
+	// transactionBuilder.
+	walletShim interface {
 		NextAddress() (types.UnlockConditions, error)
 		StartTransaction() modules.TransactionBuilder
 	}
-	hdbWallet interface {
+	wallet interface {
 		NextAddress() (types.UnlockConditions, error)
-		StartTransaction() hdbTransactionBuilder
+		StartTransaction() transactionBuilder
 	}
-	hdbTransactionBuilder interface {
+	transactionBuilder interface {
 		AddArbitraryData([]byte) uint64
 		AddFileContract(types.FileContract) uint64
 		Drop()
@@ -35,50 +35,50 @@ type (
 		Sign(bool) ([]types.Transaction, error)
 		View() (types.Transaction, []types.Transaction)
 	}
-	hdbTransactionPool interface {
+	transactionPool interface {
 		AcceptTransactionSet([]types.Transaction) error
 	}
 
-	hdbDialer interface {
+	dialer interface {
 		DialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
 	}
 
-	hdbSleeper interface {
+	sleeper interface {
 		Sleep(time.Duration)
 	}
 
-	hdbPersister interface {
+	persister interface {
 		save(hdbPersist) error
 		load(*hdbPersist) error
 	}
 
-	hdbLogger interface {
+	logger interface {
 		Println(...interface{})
 	}
 )
 
-// because hdbWallet is not directly compatible with modules.Wallet (wrong
+// because wallet is not directly compatible with modules.Wallet (wrong
 // type signature for StartTransaction), we must provide a bridge type.
-type hdbWalletBridge struct {
-	w hdbWalletShim
+type walletBridge struct {
+	w walletShim
 }
 
-func (ws *hdbWalletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
-func (ws *hdbWalletBridge) StartTransaction() hdbTransactionBuilder      { return ws.w.StartTransaction() }
+func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
+func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
 
-// stdDialer implements the hdbDialer interface via net.DialTimeout.
+// stdDialer implements the dialer interface via net.DialTimeout.
 type stdDialer struct{}
 
 func (d stdDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("tcp", string(addr), timeout)
 }
 
-// stdSleeper implements the hdbSleeper interface via time.Sleep.
+// stdSleeper implements the sleeper interface via time.Sleep.
 type stdSleeper struct{}
 
 func (s stdSleeper) Sleep(d time.Duration) { time.Sleep(d) }
 
-// stdPersist implements the hdbPersister interface via persist.SaveFile and
+// stdPersist implements the persister interface via persist.SaveFile and
 // persist.LoadFile. The metadata and filename required by these functions is
 // internal to stdPersist.
 type stdPersist struct {

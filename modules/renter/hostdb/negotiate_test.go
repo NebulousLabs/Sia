@@ -11,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
-	"github.com/NebulousLabs/Sia/modules/wallet"
+	modWallet "github.com/NebulousLabs/Sia/modules/wallet" // name conflicts with type
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -52,7 +52,7 @@ func newHostDBTester(name string) (*hostdbTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	w, err := modWallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		return nil, err
 	}

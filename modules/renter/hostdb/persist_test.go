@@ -8,7 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// memPersist implements the hdbPersister interface in-memory.
+// memPersist implements the persister interface in-memory.
 type memPersist hdbPersist
 
 func (m *memPersist) save(data hdbPersist) error { *m = memPersist(data); return nil }

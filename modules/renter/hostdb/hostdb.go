@@ -32,12 +32,12 @@ var (
 // for uploading files.
 type HostDB struct {
 	// dependencies
-	wallet  hdbWallet
-	tpool   hdbTransactionPool
-	dialer  hdbDialer
-	sleeper hdbSleeper
-	persist hdbPersister
-	log     hdbLogger
+	wallet  wallet
+	tpool   transactionPool
+	dialer  dialer
+	sleeper sleeper
+	persist persister
+	log     logger
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -77,7 +77,7 @@ type hostContract struct {
 
 // New creates and starts up a hostdb. The hostdb that gets returned will not
 // have finished scanning the network or blockchain.
-func New(cs hdbConsensusSet, wallet hdbWalletShim, tpool hdbTransactionPool, persistDir string) (*HostDB, error) {
+func New(cs consensusSet, wallet walletShim, tpool transactionPool, persistDir string) (*HostDB, error) {
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -101,7 +101,7 @@ func New(cs hdbConsensusSet, wallet hdbWalletShim, tpool hdbTransactionPool, per
 
 	// Create the HostDB using the supplied modules and standard
 	// implementations of each dependency.
-	hdb := newHostDB(&hdbWalletBridge{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+	hdb := newHostDB(&walletBridge{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
 
 	// Load the prior persistance structures.
 	err = hdb.load()
@@ -123,7 +123,7 @@ func New(cs hdbConsensusSet, wallet hdbWalletShim, tpool hdbTransactionPool, per
 // newHostDB creates a HostDB using the provided dependencies. Unlike New, it
 // does not have any side effects (i.e. it does not spawn background threads,
 // perform I/O, or call stateful methods of its dependencies.)
-func newHostDB(w hdbWallet, tp hdbTransactionPool, d hdbDialer, s hdbSleeper, p hdbPersister, l hdbLogger) *HostDB {
+func newHostDB(w wallet, tp transactionPool, d dialer, s sleeper, p persister, l logger) *HostDB {
 	return &HostDB{
 		wallet:  w,
 		tpool:   tp,
