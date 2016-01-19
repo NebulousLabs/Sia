@@ -51,3 +51,36 @@ func TestLogger(t *testing.T) {
 		t.Error("logger did not create the correct number of lines:", len(fileLines))
 	}
 }
+
+// TestLoggerCritical prints a critical message from the logger.
+func TestLoggerCritical(t *testing.T) {
+	// Create a folder for the log file.
+	testdir := build.TempDir(persistDir, "TestLogger")
+	err := os.MkdirAll(testdir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the logger.
+	logFilename := filepath.Join(testdir, "test.log")
+	fl, err := NewLogger(logFilename)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a catch for a panic that should trigger when logger.Critical is
+	// called.
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("critical message was not thrown in a panic")
+		}
+
+		// Close the file logger to clean up the test.
+		err = fl.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	fl.Critical("a critical message")
+}
