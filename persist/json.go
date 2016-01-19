@@ -2,7 +2,6 @@ package persist
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"os"
 )
@@ -60,7 +59,7 @@ func SaveFile(meta Metadata, data interface{}, filename string) error {
 	defer file.Close()
 	err = Save(meta, data, file)
 	if err != nil {
-		return errors.New("error saving " + filename + ": " + err.Error())
+		return err
 	}
 	return file.Commit()
 }
@@ -74,7 +73,7 @@ func LoadFile(meta Metadata, data interface{}, filename string) error {
 	defer file.Close()
 	err = Load(meta, data, file)
 	if err != nil {
-		return errors.New("error loading " + filename + ": " + err.Error())
+		return err
 	}
 	return nil
 }

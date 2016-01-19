@@ -13,7 +13,8 @@ import (
 
 const (
 	// logFile establishes the name of the file that gets used for logging.
-	logFile = modules.HostDir + ".log"
+	settingsFile = "settings.json"
+	logFile      = modules.HostDir + ".log"
 )
 
 // persistMetadata is the header that gets written to the persist file, and is
@@ -97,7 +98,7 @@ func (h *Host) save() error {
 		// Utilities.
 		Settings: h.settings,
 	}
-	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
+	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 }
 
 // loadObligations loads file contract obligations from the persistent file

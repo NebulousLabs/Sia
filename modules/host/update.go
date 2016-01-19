@@ -172,7 +172,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			for _, fcr := range txn.FileContractRevisions {
 				ob, exists := h.obligationsByID[fcr.ParentID]
-				if exists && ob.revisionNumber() == fcr.NewRevisionNumber {
+				if exists && ob.revisionNumber() <= fcr.NewRevisionNumber {
 					// COMPATv0.4.8 - found a revision, can move it over to get
 					// compatibility. No harm is done by adding the revision as
 					// long as it is set to 'confirmed' after the fact.

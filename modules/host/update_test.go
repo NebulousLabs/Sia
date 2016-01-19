@@ -28,8 +28,8 @@ func TestStorageProof(t *testing.T) {
 		WindowEnd:          1000,
 		Payout:             types.NewCurrency64(1),
 		UnlockHash:         types.UnlockConditions{}.UnlockHash(),
-		ValidProofOutputs:  []types.SiacoinOutput{{Value: types.NewCurrency64(1)}},
-		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(1)}},
+		ValidProofOutputs:  []types.SiacoinOutput{{Value: types.NewCurrency64(1)}, {Value: types.NewCurrency64(0)}},
+		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(1)}, {Value: types.NewCurrency64(0)}},
 	}
 	txnBuilder := ht.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
