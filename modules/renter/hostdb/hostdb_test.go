@@ -11,6 +11,17 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// bareHostDB returns a HostDB with its fields initialized, but without any
+// dependencies or scanning threads. It is only intended for use in unit tests.
+func bareHostDB() *HostDB {
+	return &HostDB{
+		contracts:   make(map[types.FileContractID]hostContract),
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+	}
+}
+
 // newStub is used to test the New function. It implements all of the hostdb's
 // dependencies.
 type newStub struct{}

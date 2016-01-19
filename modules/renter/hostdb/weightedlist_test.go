@@ -267,8 +267,8 @@ func TestNodeAtWeight(t *testing.T) {
 
 // TestRandomHosts probes the randomHosts function.
 func TestRandomHosts(t *testing.T) {
-	// Create the hostdb (no dependencies needed).
-	hdb := newHostDB(nil, nil, nil, nil, nil, nil)
+	// Create the hostdb.
+	hdb := bareHostDB()
 
 	// Empty.
 	if hosts := hdb.randomHosts(1, nil); len(hosts) != 0 {

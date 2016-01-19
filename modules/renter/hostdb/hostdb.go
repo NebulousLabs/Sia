@@ -75,9 +75,9 @@ type hostContract struct {
 	SecretKey       crypto.SecretKey
 }
 
-// New creates and starts up a hostdb. The hostdb that gets returned will not
-// have finished scanning the network or blockchain.
+// New returns a new HostDB.
 func New(cs consensusSet, wallet walletShim, tpool transactionPool, persistDir string) (*HostDB, error) {
+	// Check for nil inputs.
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -99,12 +99,31 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, persistDir s
 		return nil, err
 	}
 
-	// Create the HostDB using the supplied modules and standard
-	// implementations of each dependency.
-	hdb := newHostDB(&walletBridge{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+	// Create HostDB using production dependencies.
+	return newHostDB(cs, &walletBridge{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+}
+
+// newHostDB creates a HostDB using the provided dependencies. It loads the old
+// persistence data, spawns the HostDB's scanning threads, and subscribes it to
+// the consensusSet.
+func newHostDB(cs consensusSet, w wallet, tp transactionPool, d dialer, s sleeper, p persister, l logger) (*HostDB, error) {
+	// Create the HostDB object.
+	hdb := &HostDB{
+		wallet:  w,
+		tpool:   tp,
+		dialer:  d,
+		sleeper: s,
+		persist: p,
+		log:     l,
+
+		contracts:   make(map[types.FileContractID]hostContract),
+		activeHosts: make(map[modules.NetAddress]*hostNode),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
+		scanPool:    make(chan *hostEntry, scanPoolSize),
+	}
 
 	// Load the prior persistance structures.
-	err = hdb.load()
+	err := hdb.load()
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -118,23 +137,4 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, persistDir s
 	cs.ConsensusSetSubscribe(hdb)
 
 	return hdb, nil
-}
-
-// newHostDB creates a HostDB using the provided dependencies. Unlike New, it
-// does not have any side effects (i.e. it does not spawn background threads,
-// perform I/O, or call stateful methods of its dependencies.)
-func newHostDB(w wallet, tp transactionPool, d dialer, s sleeper, p persister, l logger) *HostDB {
-	return &HostDB{
-		wallet:  w,
-		tpool:   tp,
-		dialer:  d,
-		sleeper: s,
-		persist: p,
-		log:     l,
-
-		contracts:   make(map[types.FileContractID]hostContract),
-		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
-		scanPool:    make(chan *hostEntry, scanPoolSize),
-	}
 }

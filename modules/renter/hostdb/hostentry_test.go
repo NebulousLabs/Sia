@@ -8,10 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestInsertHost tests the insertHost method.
+// TestInsertHost tests the insertHost method, which also depends on the
+// scanHostEntry method.
 func TestInsertHost(t *testing.T) {
-	// no dependencies necessary
-	hdb := newHostDB(nil, nil, nil, nil, nil, nil)
+	hdb := bareHostDB()
 
 	// invalid host should not be scanned
 	hdb.insertHost(modules.HostSettings{NetAddress: "foo"})
@@ -41,8 +41,7 @@ func TestInsertHost(t *testing.T) {
 
 // TestActiveHosts tests the ActiveHosts method.
 func TestActiveHosts(t *testing.T) {
-	// no dependencies necessary
-	hdb := newHostDB(nil, nil, nil, nil, nil, nil)
+	hdb := bareHostDB()
 
 	// empty
 	if hosts := hdb.ActiveHosts(); len(hosts) != 0 {
@@ -72,10 +71,9 @@ func TestActiveHosts(t *testing.T) {
 }
 
 // TestAveragePrice tests the AveragePrice method, which also depends on the
-// randomHosts function.
+// randomHosts method.
 func TestAveragePrice(t *testing.T) {
-	// no dependencies necessary
-	hdb := newHostDB(nil, nil, nil, nil, nil, nil)
+	hdb := bareHostDB()
 
 	// empty
 	if avg := hdb.AveragePrice(); !avg.IsZero() {
@@ -88,9 +86,6 @@ func TestAveragePrice(t *testing.T) {
 	h1.Price = types.NewCurrency64(100)
 	h1.weight = baseWeight
 	hdb.insertNode(h1)
-	if len(hdb.activeHosts) != 1 {
-		t.Error("host was not added:", hdb.activeHosts)
-	}
 	if avg := hdb.AveragePrice(); avg.Cmp(h1.Price) != 0 {
 		t.Error("average of one host should be that host's price:", avg)
 	}

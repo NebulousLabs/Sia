@@ -17,8 +17,9 @@ func (m memPersist) load(data *hdbPersist) error { *data = hdbPersist(m); return
 // TestSaveLoad tests that the hostdb can save and load itself.
 func TestSaveLoad(t *testing.T) {
 	// create hostdb with mocked persist dependency
-	p := new(memPersist)
-	hdb := newHostDB(nil, nil, nil, nil, p, nil)
+	hdb := bareHostDB()
+	hdb.persist = new(memPersist)
+
 	// add some fake contracts
 	hdb.contracts = map[types.FileContractID]hostContract{
 		{0}: {IP: "foo"},
