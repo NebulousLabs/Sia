@@ -316,7 +316,7 @@ Queries:
 * /host                         [GET]
 * /host                         [POST]
 * /host/announce                [POST]
-* /host/delete/{filecontractid} [GET]
+* /host/delete/{filecontractid} [POST]
 
 #### /host [GET]
 
@@ -457,7 +457,7 @@ checks.
 
 Response: standard
 
-#### /host/delete/{filecontractid} [GET]
+#### /host/delete/{filecontractid} [POST]
 
 Function: Delete a file contract from the host. This will cause the host to
 lose the future revenue, and also any collateral that the host had placed on
