@@ -56,6 +56,8 @@ func TestActiveHosts(t *testing.T) {
 	}
 	if hosts := hdb.ActiveHosts(); len(hosts) != 1 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 1, len(hosts))
+	} else if hosts[0].NetAddress != h1.NetAddress {
+		t.Errorf("ActiveHosts returned wrong host: expected %v, got %v", h1.NetAddress, hosts[0].NetAddress)
 	}
 
 	// with multiple hosts
@@ -67,6 +69,10 @@ func TestActiveHosts(t *testing.T) {
 	}
 	if hosts := hdb.ActiveHosts(); len(hosts) != 2 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 2, len(hosts))
+	} else if hosts[0].NetAddress != h1.NetAddress && hosts[1].NetAddress != h1.NetAddress {
+		t.Errorf("ActiveHosts did not contain an inserted host: %v (missing %v)", hosts, h1.NetAddress)
+	} else if hosts[0].NetAddress != h2.NetAddress && hosts[1].NetAddress != h2.NetAddress {
+		t.Errorf("ActiveHosts did not contain an inserted host: %v (missing %v)", hosts, h2.NetAddress)
 	}
 }
 
