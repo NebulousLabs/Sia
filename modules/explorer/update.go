@@ -18,9 +18,9 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tbid := types.TransactionID(bid)
 
 		// Update all of the explorer statistics.
-		e.currentBlock = block.ID()
+		e.currentBlock = bid
 		e.blockchainHeight -= 1
-		e.target = e.blockTargets[block.ID()]
+		e.target = e.blockTargets[bid]
 		e.timestamp = block.Timestamp
 		if e.blockchainHeight > types.MaturityDelay {
 			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
@@ -134,7 +134,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Add the block to the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
-		e.currentBlock = block.ID()
+		e.currentBlock = bid
 		e.blockchainHeight++
 		var exists bool
 		e.target, exists = e.cs.ChildTarget(block.ParentID)
