@@ -18,7 +18,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tbid := types.TransactionID(bid)
 
 		// Update all of the explorer statistics.
-		e.blockchainHeight -= 1
+		e.blockchainHeight--
 		e.target = e.blockTargets[bid]
 		e.timestamp = block.Timestamp
 		e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.target)
@@ -370,11 +370,11 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// for large reorgs.
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
-			e.activeContractCount += 1
+			e.activeContractCount++
 			e.activeContractCost = e.activeContractCost.Add(diff.FileContract.Payout)
 			e.activeContractSize = e.activeContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
 		} else {
-			e.activeContractCount -= 1
+			e.activeContractCount--
 			e.activeContractCost = e.activeContractCost.Sub(diff.FileContract.Payout)
 			e.activeContractSize = e.activeContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 		}
