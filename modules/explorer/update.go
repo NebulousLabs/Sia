@@ -30,6 +30,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		// Delete the block from the list of active blocks.
 		delete(e.blockHashes, bid)
+		delete(e.blockTargets, bid)
 		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
 		// Catalog the removed miner payouts.
