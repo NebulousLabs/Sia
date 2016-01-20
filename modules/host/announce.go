@@ -78,13 +78,12 @@ func (h *Host) Announce() error {
 // AnnounceAddress submits a host announcement to the blockchain to announce a
 // specific address. No checks for validity are performed on the address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
 	if h.closed {
 		return errHostClosed
 	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	return h.announce(addr)
 }
