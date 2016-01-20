@@ -43,6 +43,9 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	}
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 
+	// Start accepting contracts.
+	h.settings.AcceptingContracts = true
+
 	return nil
 }
 
@@ -67,12 +70,16 @@ func (h *Host) Announce() error {
 		return errors.New("can't announce without knowing external IP")
 	}
 
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.announce(addr)
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
 // specific address. No checks for validity are performed on the address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
 	if h.closed {

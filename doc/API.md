@@ -316,7 +316,7 @@ Queries:
 * /host                         [GET]
 * /host                         [POST]
 * /host/announce                [POST]
-* /host/delete/{filecontractid} [GET]
+* /host/delete/{filecontractid} [POST]
 
 #### /host [GET]
 
@@ -328,28 +328,37 @@ Response:
 ```
 struct {
 	collateral   types.Currency     (string)
-	netaddress   modules.NetAddress (string)
 	maxduration  types.BlockHeight  (uint64)
 	minduration  types.BlockHeight  (uint64)
+	netaddress   modules.NetAddress (string)
 	price        types.Currency     (string)
 	totalstorage int64
 	unlockhash   types.UnlockHash  (string)
 	windowsize   types.BlockHeight (uint64)
 
+	acceptingcontracts bool
+	anticipatedrevenue types.Currency (string)
 	numcontracts       uint64
 	revenue            types.Currency (string)
 	storageremaining   int64
-	anticipatedrevenue types.Currency (string)
+
+	rpcdownloadcalls     uint64
+	rpcerrorcalls        uint64
+	rpcrenewcalls        uint64
+	rpcrevisecalls       uint64
+	rpcsettingscalls     uint64
+	rpcunrecognizedcalls uint64
+	rpcuploadcalls       uint64
 }
 ```
 'collateral' is the number of hastings per byte per block that are put up as
 collateral when making file contracts.
 
-'netaddress' is the network address of the host.
-
 'maxduration' is the maximum allowed duration of a file contract.
 
 'minduration' is the minimum allowed duration of a file contract.
+
+'netaddress' is the network address of the host.
 
 'price' is the number of hastings per byte per block that the host is charging
 when making file contracts.
@@ -365,6 +374,13 @@ downtime, 40 blocks is recommended as an absolute minimum. The current network
 default is 288 blocks. The current software will break entirely below 20
 blocks, though in theory something as low as 6 blocks could be safe.
 
+'acceptingcontracts' indicates whether the host is accepting new file
+contracts, file contract revisions, and file contract renewals. A host that is
+not accepting these calls will still accept download requests, and will still
+submit storage proofs to the network.
+
+'anticipatedrevenue' is the value of the contracts that have been created but
+not fulfilled.
 
 'numcontracts' is the number of active contracts that the host is engaged in.
 
@@ -373,8 +389,23 @@ blocks, though in theory something as low as 6 blocks could be safe.
 'storageremaining' is 'totalstorage' minus the number of bytes currently being
 stored.
 
-'anticipatedrevenue' is the value of the contracts that have been created but
-not fulfilled.
+'rpcdownloadcalls' is the number of RPCs to the host that requested a download.
+
+'rpcerrorcalls' is the number of RPCs to the host that returned errors.
+
+'rpcrenewcalls' is the number of RPCs to the host that requested a file
+contract renewal.
+
+'rpcrevisecalls' is the number of RPCs to the host that requested a file
+contract revision.
+
+'rpcsettingscalls' is the number of RPCs to the host that requested the host's
+settings.
+
+'rpcunrecognizedcalls' is the number of RPCs to the host that used unrecognized
+identifiers.
+
+'rpcuploadcalls' is the number of RPCs to the host that tried to upload a file.
 
 #### /host [POST]
 
@@ -426,7 +457,7 @@ checks.
 
 Response: standard
 
-#### /host/delete/{filecontractid} [GET]
+#### /host/delete/{filecontractid} [POST]
 
 Function: Delete a file contract from the host. This will cause the host to
 lose the future revenue, and also any collateral that the host had placed on

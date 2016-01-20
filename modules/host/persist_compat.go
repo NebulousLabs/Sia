@@ -92,6 +92,8 @@ func (h *Host) compatibilityLoad() error {
 
 	// Copy over utilities.
 	h.settings = c04h.HostSettings
+	// AcceptingContracts should be true by default
+	h.settings.AcceptingContracts = true
 
 	// Subscribe to the consensus set.
 	if build.DEBUG && h.recentChange != (modules.ConsensusChangeID{}) {
