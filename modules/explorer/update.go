@@ -18,20 +18,15 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		tbid := types.TransactionID(bid)
 
 		// Update all of the explorer statistics.
-		e.currentBlock = bid
 		e.blockchainHeight -= 1
 		e.target = e.blockTargets[bid]
 		e.timestamp = block.Timestamp
-		if e.blockchainHeight > types.MaturityDelay {
-			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
-		}
 		e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.target)
 		if e.blockchainHeight > hashrateEstimationBlocks {
 			e.blocksDifficulty = e.blocksDifficulty.AddDifficulties(e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].target)
 			secondsPassed := e.timestamp - e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].timestamp
 			e.estimatedHashrate = e.blocksDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
 		}
-		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
 
 		// Delete the block from the list of active blocks.
 		delete(e.blockHashes, bid)
