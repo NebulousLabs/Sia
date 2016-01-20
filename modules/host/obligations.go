@@ -1,7 +1,9 @@
 package host
 
 import (
+	"errors"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -63,6 +65,57 @@ type contractObligation struct {
 	mu sync.Mutex
 }
 
+// isSane run several checks on a file contract obligation to make sure that
+// all of the stateful assumptions hold. Listed below:
+//  - There is exactly one file contract in OriginTransaction
+//  - There is either one or zero file contracts in RevisionTransaction
+//  - There are two 'validProofOutputs' and two 'missedProofOutputs' for each
+//    file contract or revision.
+//  - RevisionConfirmed is set to 'true' if there is no file contract revision.
+//  - The ID is non-zero.
+func (co *contractObligation) isSane() error {
+	// Check that there is a file contract, and that it has the correct number
+	// of valid and missed proof outputs.
+	fclen := len(co.OriginTransaction.FileContracts)
+	if fclen != 1 {
+		return errors.New("obligation has bad file contract count: " + strconv.Itoa(fclen))
+	}
+	fcvpolen := len(co.OriginTransaction.FileContracts[0].ValidProofOutputs)
+	if fcvpolen != 2 {
+		return errors.New("obligation contract has bad valid proof output count: " + strconv.Itoa(fcvpolen))
+	}
+	fcmpolen := len(co.OriginTransaction.FileContracts[0].MissedProofOutputs)
+	if fcmpolen != 2 {
+		return errors.New("obligation contract has bad missed proof output count: " + strconv.Itoa(fcmpolen))
+	}
+
+	// Check that RevisionConfirmed is set to true if there is no revision.
+	if !co.hasRevision() && !co.RevisionConfirmed {
+		return errors.New("obligation has no revision, and no revision confirmation")
+	}
+	if !co.hasRevision() {
+		// The rest of the function only pertains to obligations that contain
+		// file contract revisions.
+		return nil
+	}
+
+	// Check that there is exactly one revision, and that it has the correct
+	// number number of valid and missed proof outputs.
+	fcrlen := len(co.RevisionTransaction.FileContractRevisions)
+	if fcrlen != 1 {
+		return errors.New("obligation has bad revision count: " + strconv.Itoa(fcrlen))
+	}
+	fcrvpolen := len(co.RevisionTransaction.FileContractRevisions[0].NewValidProofOutputs)
+	if fcrvpolen != 2 {
+		return errors.New("obligation has bad revision valid proof output count: " + strconv.Itoa(fcrvpolen))
+	}
+	fcrmpolen := len(co.RevisionTransaction.FileContractRevisions[0].NewMissedProofOutputs)
+	if fcrmpolen != 2 {
+		return errors.New("obligation has bad revision missed proof output count: " + strconv.Itoa(fcrmpolen))
+	}
+	return nil
+}
+
 // fileSize returns the size of the file that is held by the contract
 // obligation.
 func (co *contractObligation) fileSize() uint64 {
@@ -72,10 +125,10 @@ func (co *contractObligation) fileSize() uint64 {
 	return co.OriginTransaction.FileContracts[0].FileSize
 }
 
-// hasRevision indiciates whether there is a file contract reivision contained
-// within the contract obligation.
+// hasRevision indiciates whether there is at least one file contract revision
+// in the contract obligation.
 func (co *contractObligation) hasRevision() bool {
-	return len(co.RevisionTransaction.FileContractRevisions) == 1
+	return len(co.RevisionTransaction.FileContractRevisions) > 0
 }
 
 // merkleRoot returns the operating unlock hash for a successful
@@ -98,9 +151,6 @@ func (co *contractObligation) missedProofUnlockHash() types.UnlockHash {
 
 // payout returns the operating payout of the contract obligation.
 func (co *contractObligation) payout() types.Currency {
-	// Function seems unnecessary because it is just a getter, but adding this
-	// function helps maintain consistency with the way that the other fields
-	// are accessed.
 	return co.OriginTransaction.FileContracts[0].Payout
 }
 
@@ -227,7 +277,11 @@ func (h *Host) addObligation(co *contractObligation) {
 	h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value()) // Output at index 1 alone belongs to host.
 	h.spaceRemaining = h.spaceRemaining - int64(co.fileSize())
 
-	err := h.save()
+	err := co.isSane()
+	if err != nil {
+		h.log.Critical("addObligation: obligation is not sane: " + err.Error())
+	}
+	err = h.save()
 	if err != nil {
 		h.log.Println("WARN: failed to save host:", err)
 	}
@@ -236,14 +290,17 @@ func (h *Host) addObligation(co *contractObligation) {
 // reviseObligation takes a file contract revision + transaction and applies it
 // to an existing obligation.
 func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
-	// Sanity check - there should only be one file contract revision in the
-	// transaction.
-	if build.DEBUG && len(revisionTransaction.FileContractRevisions) != 1 {
-		panic("cannot revise obligation without a file contract revision")
+	// Sanity checks - there should be exactly one revision in the transaction,
+	// and that revision should correspond to a known obligation.
+	fcrlen := len(revisionTransaction.FileContractRevisions)
+	if fcrlen != 1 {
+		h.log.Critical("reviseObligation: revisionTransaction has the wrong number of revisions: " + strconv.Itoa(fcrlen))
+		return
 	}
 	obligation, exists := h.obligationsByID[revisionTransaction.FileContractRevisions[0].ParentID]
-	if build.DEBUG && !exists {
-		panic("cannot revise obligation - obligation not found")
+	if !exists {
+		h.log.Critical("reviseObligation: revisionTransaction has no corresponding obligation")
+		return
 	}
 
 	// Update the host's statistics.
@@ -260,7 +317,11 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	obligation.RevisionTransaction = revisionTransaction
 	obligation.RevisionConfirmed = false
 
-	err := h.save()
+	err := obligation.isSane()
+	if err != nil {
+		h.log.Critical("reviseObligation: obligation is not sane: " + err.Error())
+	}
+	err = h.save()
 	if err != nil {
 		h.log.Println("WARN: failed to save host:", err)
 	}
@@ -311,6 +372,15 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 // handleActionItem will properly queue up any future actions that need to be
 // taken.
 func (h *Host) handleActionItem(co *contractObligation) {
+	// Sanity check - after action is taken on the contract obligation, check
+	// that the contract still satisfies the conditions for sanity.
+	defer func() {
+		err := co.isSane()
+		if err != nil {
+			h.log.Critical("handleActionItems: post-processing, obligation is insane: " + err.Error())
+		}
+	}()
+
 	// Check that the obligation has not already been deleted.
 	_, exists := h.obligationsByID[co.ID]
 	if !exists {
@@ -418,9 +488,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 		return
 	}
 
-	// At this point, all possible scenarios should be covered. This part of
-	// the function should not be reachable.
-	if build.DEBUG {
-		panic("logic error - unreachable code has been hit")
-	}
+	// All possible scenarios should be covered. This code should not be
+	// reachable.
+	h.log.Critical("logic error - bottom of handleActionItems has been reached")
 }
