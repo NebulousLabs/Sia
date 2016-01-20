@@ -92,3 +92,34 @@ func TestNew(t *testing.T) {
 		t.Fatal("expected permissions error, got nil")
 	}
 }
+
+// testWalletShim is used to test the walletBridge type.
+type testWalletShim struct {
+	nextAddressCalled bool
+	startTxnCalled    bool
+}
+
+// These stub implementations for the walletShim interface set their respective
+// booleans to true, allowing tests to verify that they have been called.
+func (ws *testWalletShim) NextAddress() (types.UnlockConditions, error) {
+	ws.nextAddressCalled = true
+	return types.UnlockConditions{}, nil
+}
+func (ws *testWalletShim) StartTransaction() modules.TransactionBuilder {
+	ws.startTxnCalled = true
+	return nil
+}
+
+// TestWalletBridge tests the walletBridge type.
+func TestWalletBridge(t *testing.T) {
+	shim := new(testWalletShim)
+	bridge := walletBridge{shim}
+	bridge.NextAddress()
+	if !shim.nextAddressCalled {
+		t.Error("NextAddress was not called on the shim")
+	}
+	bridge.StartTransaction()
+	if !shim.startTxnCalled {
+		t.Error("StartTransaction was not called on the shim")
+	}
+}
