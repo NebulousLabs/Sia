@@ -78,15 +78,15 @@ func (co *contractObligation) isSane() error {
 	// of valid and missed proof outputs.
 	fclen := len(co.OriginTransaction.FileContracts)
 	if fclen != 1 {
-		return errors.New("obligation has bad file contract count: " + strconv.Itoa(fclen))
+		return fmt.Errorf("obligation has bad file contract count: %v", fclen)
 	}
 	fcvpolen := len(co.OriginTransaction.FileContracts[0].ValidProofOutputs)
 	if fcvpolen != 2 {
-		return errors.New("obligation contract has bad valid proof output count: " + strconv.Itoa(fcvpolen))
+		return fmt.Errorf("obligation contract has bad valid proof output count: %v", fcvpolen)
 	}
 	fcmpolen := len(co.OriginTransaction.FileContracts[0].MissedProofOutputs)
 	if fcmpolen != 2 {
-		return errors.New("obligation contract has bad missed proof output count: " + strconv.Itoa(fcmpolen))
+		return fmt.Errorf("obligation contract has bad missed proof output count: %v", fcmpolen)
 	}
 
 	// Check that RevisionConfirmed is set to true if there is no revision.
@@ -103,15 +103,15 @@ func (co *contractObligation) isSane() error {
 	// number number of valid and missed proof outputs.
 	fcrlen := len(co.RevisionTransaction.FileContractRevisions)
 	if fcrlen != 1 {
-		return errors.New("obligation has bad revision count: " + strconv.Itoa(fcrlen))
+		return fmt.Errorf("obligation has bad revision count: %v", fcrlen)
 	}
 	fcrvpolen := len(co.RevisionTransaction.FileContractRevisions[0].NewValidProofOutputs)
 	if fcrvpolen != 2 {
-		return errors.New("obligation has bad revision valid proof output count: " + strconv.Itoa(fcrvpolen))
+		return fmt.Errorf("obligation has bad revision valid proof output count: %v", fcrvpolen)
 	}
 	fcrmpolen := len(co.RevisionTransaction.FileContractRevisions[0].NewMissedProofOutputs)
 	if fcrmpolen != 2 {
-		return errors.New("obligation has bad revision missed proof output count: " + strconv.Itoa(fcrmpolen))
+		return fmt.Errorf("obligation has bad revision missed proof output count: %v", fcrmpolen)
 	}
 	return nil
 }
@@ -294,7 +294,7 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	// and that revision should correspond to a known obligation.
 	fcrlen := len(revisionTransaction.FileContractRevisions)
 	if fcrlen != 1 {
-		h.log.Critical("reviseObligation: revisionTransaction has the wrong number of revisions: " + strconv.Itoa(fcrlen))
+		h.log.Critical("reviseObligation: revisionTransaction has the wrong number of revisions:", fcrlen)
 		return
 	}
 	obligation, exists := h.obligationsByID[revisionTransaction.FileContractRevisions[0].ParentID]
