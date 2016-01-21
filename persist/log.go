@@ -1,6 +1,7 @@
 package persist
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -68,8 +69,9 @@ func (l *Logger) Close() error {
 
 // Critical will panic if debug mode is activated, and will log the statement
 // otherwise.
-func (l *Logger) Critical(s string) {
-	os.Stderr.WriteString("Severe Error: " + s + "\n")
+func (l *Logger) Critical(v ...interface{}) {
+	s := fmt.Sprintln(v...)
+	os.Stderr.WriteString("Severe Error: " + s)
 	l.Println("CRITICAL:", s)
 	if build.DEBUG {
 		panic(s)

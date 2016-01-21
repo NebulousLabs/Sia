@@ -2,8 +2,8 @@ package host
 
 import (
 	"errors"
+	"fmt"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
