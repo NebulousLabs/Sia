@@ -12,6 +12,10 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if len(cc.AppliedBlocks) == 0 {
+		build.Critical("Explorer.ProcessConsensusChange called with a ConensusChange that has no AppliedBlocks")
+	}
+
 	// Update cumulative stats for reverted blocks.
 	for _, block := range cc.RevertedBlocks {
 		bid := block.ID()
