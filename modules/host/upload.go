@@ -231,6 +231,7 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 	co := &contractObligation{
 		ID:                contractTxn.FileContractID(0),
 		OriginTransaction: contractTxn,
+		RevisionConfirmed: true,
 		Path:              filename,
 	}
 	h.mu.Lock()
