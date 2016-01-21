@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // filesize returns a string that displays a filesize in human-readable units.
@@ -28,11 +29,18 @@ var (
 		Run:   wrap(renterfileslistcmd),
 	}
 
-	renterDownloadQueueCmd = &cobra.Command{
-		Use:   "queue",
+	renterUploadsCmd = &cobra.Command{
+		Use:   "uploads",
+		Short: "View the upload queue",
+		Long:  "View the list of files currently uploading.",
+		Run:   wrap(renteruploadscmd),
+	}
+
+	renterDownloadsCmd = &cobra.Command{
+		Use:   "downloads",
 		Short: "View the download queue",
-		Long:  "View the list of files that have been downloaded.",
-		Run:   wrap(renterdownloadqueuecmd),
+		Long:  "View the list of files currently downloading.",
+		Run:   wrap(renterdownloadscmd),
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
@@ -52,7 +60,7 @@ var (
 	renterFilesListCmd = &cobra.Command{
 		Use:   "list",
 		Short: "List the status of all files",
-		Long:  "List the status of all files known to the renter.",
+		Long:  "List the status of all files known to the renter on the Sia network.",
 		Run:   wrap(renterfileslistcmd),
 	}
 
@@ -110,21 +118,81 @@ func abs(path string) string {
 	return abspath
 }
 
-func renterdownloadqueuecmd() {
+func renteruploadscmd() {
+	var rf api.RenterFiles
+	err := getAPI("/renter/files", &rf)
+	if err != nil {
+		fmt.Println("Could not get upload queue:", err)
+		return
+	}
+
+	// TODO: add a --history flag to the uploads command to mirror the --history
+	//       flag in the downloads command. This hasn't been done yet because the
+	//       call to /renter/files includes files that have been shared with you,
+	//       not just files you've uploaded.
+
+	// Filter out files that have been uploaded.
+	var filteredFiles []modules.FileInfo
+	for _, fi := range rf.Files {
+		if !fi.Available {
+			filteredFiles = append(filteredFiles, fi)
+		}
+	}
+	if len(filteredFiles) == 0 {
+		fmt.Println("No files are uploading.")
+		return
+	}
+	fmt.Println("Uploading", len(filteredFiles), "files:")
+	for _, file := range filteredFiles {
+		fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(int64(file.Filesize)), file.SiaPath, file.UploadProgress)
+	}
+}
+
+func renterdownloadscmd() {
 	var queue api.RenterDownloadQueue
 	err := getAPI("/renter/downloads", &queue)
 	if err != nil {
 		fmt.Println("Could not get download queue:", err)
 		return
 	}
-	if len(queue.Downloads) == 0 {
-		fmt.Println("No downloads to show.")
+	func() {
+		// Filter out files that have been downloaded.
+		var downloading []modules.DownloadInfo
+		for _, file := range queue.Downloads {
+			if file.Received != file.Filesize {
+				downloading = append(downloading, file)
+			}
+		}
+		if len(downloading) == 0 {
+			fmt.Println("No files are downloading.")
+			return
+		}
+		fmt.Println("Downloading", len(downloading), "files:")
+		for _, file := range downloading {
+			fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
+		}
+	}()
+	if !renterShowHistory {
 		return
 	}
-	fmt.Println("Download Queue:")
-	for _, file := range queue.Downloads {
-		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
-	}
+	func() {
+		fmt.Println()
+		// Filter out files that are downloading.
+		var downloaded []modules.DownloadInfo
+		for _, file := range queue.Downloads {
+			if file.Received == file.Filesize {
+				downloaded = append(downloaded, file)
+			}
+		}
+		if len(downloaded) == 0 {
+			fmt.Println("No files downloaded.")
+			return
+		}
+		fmt.Println("Downloaded", len(downloaded), "files:")
+		for _, file := range downloaded {
+			fmt.Printf("%s: %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), file.SiaPath, file.Destination)
+		}
+	}()
 }
 
 func renterfilesdeletecmd(path string) {
