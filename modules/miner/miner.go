@@ -5,34 +5,66 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
+var (
+	errNilCS     = errors.New("miner cannot use a nil consensus set")
+	errNilTpool  = errors.New("miner cannot use a nil transaction pool")
+	errNilWallet = errors.New("miner cannot use a nil wallet")
+
 	// HeaderMemory is the number of previous calls to 'header'
 	// that are remembered. Additionally, 'header' will only poll for a
 	// new block every 'headerMemory / blockMemory' times it is
 	// called. This reduces the amount of memory used, but comes at the cost of
 	// not always having the most recent transactions.
-	HeaderMemory = 10000
+	HeaderMemory = func() int {
+		if build.Release == "dev" {
+			return 500
+		}
+		if build.Release == "standard" {
+			return 10000
+		}
+		if build.Release == "testing" {
+			return 50
+		}
+		panic("unrecognized build.Release")
+	}()
 
 	// BlockMemory is the maximum number of blocks the miner will store
 	// Blocks take up to 2 megabytes of memory, which is why this number is
 	// limited.
-	BlockMemory = 50
+	BlockMemory = func() int {
+		if build.Release == "dev" {
+			return 10
+		}
+		if build.Release == "standard" {
+			return 50
+		}
+		if build.Release == "testing" {
+			return 5
+		}
+		panic("unrecognized build.Release")
+	}()
 
 	// MaxSourceBlockAge is the maximum amount of time that is allowed to
 	// elapse between generating source blocks.
-	MaxSourceBlockAge = 60 * time.Second
-)
-
-var (
-	errNilCS     = errors.New("miner cannot use a nil consensus set")
-	errNilTpool  = errors.New("miner cannot use a nil transaction pool")
-	errNilWallet = errors.New("miner cannot use a nil wallet")
+	MaxSourceBlockAge = func() time.Duration {
+		if build.Release == "dev" {
+			return 5 * time.Second
+		}
+		if build.Release == "standard" {
+			return 30 * time.Second
+		}
+		if build.Release == "testing" {
+			return 1 * time.Second
+		}
+		panic("unrecognized build.Release")
+	}()
 )
 
 // Miner struct contains all variables the miner needs
