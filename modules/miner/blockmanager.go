@@ -65,7 +65,7 @@ func (m *Miner) newSourceBlock() {
 // will store the header in memory for a while, depending on the constants
 // 'HeaderMemory', 'BlockMemory', and 'MaxSourceBlockAge'. On the full network,
 // it is typically safe to assume that headers will be remembered for
-// min(10 minutes, 1000 requests).
+// min(10 minutes, 10e3 requests).
 func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
