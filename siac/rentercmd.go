@@ -94,15 +94,15 @@ var (
 
 	renterFilesShareASCIICmd = &cobra.Command{
 		Use:   "shareascii [path]",
-		Short: "Export a file as an ASCII-encoded .sia file",
-		Long:  "Export a file as an ASCII-encoded .sia file.",
+		Short: "Prints an ASCII-encoded .sia file for sharing",
+		Long:  "Prints an ASCII-encoded .sia file for sharing, but does not save the .sia file to disk.",
 		Run:   wrap(renterfilesshareasciicmd),
 	}
 
 	renterFilesUploadCmd = &cobra.Command{
 		Use:   "upload [source] [path]",
 		Short: "Upload a file",
-		Long:  "Upload a file using a given nickname.",
+		Long:  "Upload a file to [path] on the Sia network.",
 		Run:   wrap(renterfilesuploadcmd),
 	}
 )
@@ -118,6 +118,8 @@ func abs(path string) string {
 	return abspath
 }
 
+// renteruploadscmd is the handler for the command `siac renter uploads`.
+// Lists files currently uploading.
 func renteruploadscmd() {
 	var rf api.RenterFiles
 	err := getAPI("/renter/files", &rf)
@@ -148,6 +150,9 @@ func renteruploadscmd() {
 	}
 }
 
+// renterdownloadscmd is the handler for the command `siac renter downloads`.
+// Lists files currently downloading, and optionally previously downloaded
+// files if the -H or --history flag is specified.
 func renterdownloadscmd() {
 	var queue api.RenterDownloadQueue
 	err := getAPI("/renter/downloads", &queue)
@@ -191,6 +196,8 @@ func renterdownloadscmd() {
 	}
 }
 
+// renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
+// Removes the specified path from the Sia network.
 func renterfilesdeletecmd(path string) {
 	err := post("/renter/delete/"+path, "")
 	if err != nil {
@@ -200,6 +207,8 @@ func renterfilesdeletecmd(path string) {
 	fmt.Println("Deleted", path)
 }
 
+// renterfilesdownloadcmd is the handler for the comand `siac renter download [path] [destination]`.
+// Downloads a path from the Sia network to the local specified destination.
 func renterfilesdownloadcmd(path, destination string) {
 	err := get("/renter/download/" + path + "?destination=" + abs(destination))
 	if err != nil {
@@ -209,6 +218,8 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("Downloaded '%s' to %s.\n", path, abs(destination))
 }
 
+// renterfileslistcmd is the handler for the command `siac renter list`.
+// Lists files known to the renter on the network.
 func renterfileslistcmd() {
 	var rf api.RenterFiles
 	err := getAPI("/renter/files", &rf)
@@ -230,6 +241,8 @@ func renterfileslistcmd() {
 	}
 }
 
+// renterfilesloadcmd is the handler for the command `siac renter load [source]`.
+// Loads a .sia file, adding the file entries contained within.
 func renterfilesloadcmd(source string) {
 	var info api.RenterLoad
 	err := postResp("/renter/load", "source="+abs(source), &info)
@@ -243,6 +256,8 @@ func renterfilesloadcmd(source string) {
 	}
 }
 
+// renterfilesloadasciicmd is the handler for the command `siac renter loadascii [ascii]`.
+// Load an ASCII-encoded .sia file.
 func renterfilesloadasciicmd(ascii string) {
 	var info api.RenterLoad
 	err := postResp("/renter/loadascii", "asciisia="+ascii, &info)
@@ -256,6 +271,8 @@ func renterfilesloadasciicmd(ascii string) {
 	}
 }
 
+// renterfilesrenamecmd is the handler for the command `siac renter rename [path] [newpath]`.
+// Renames a file on the Sia network.
 func renterfilesrenamecmd(path, newpath string) {
 	err := post("/renter/rename/"+path, "newsiapath="+newpath)
 	if err != nil {
@@ -265,6 +282,8 @@ func renterfilesrenamecmd(path, newpath string) {
 	fmt.Printf("Renamed %s to %s\n", path, newpath)
 }
 
+// renterfilessharecmd is the handler for the command `siac renter share [path] [destination]`.
+// Export a file to a .sia for sharing.
 func renterfilessharecmd(path, destination string) {
 	err := get(fmt.Sprintf("/renter/share?siapaths=%s&destination=%s", path, abs(destination)))
 	if err != nil {
@@ -274,6 +293,8 @@ func renterfilessharecmd(path, destination string) {
 	fmt.Printf("Exported %s to %s\n", path, abs(destination))
 }
 
+// renterfilesshareasciicmd is the handler for the command `siac renter shareascii [path]`.
+// Prints an ascii-encoded sia file.
 func renterfilesshareasciicmd(path string) {
 	var data api.RenterShareASCII
 	err := getAPI("/renter/shareascii?siapaths="+path, &data)
@@ -284,6 +305,8 @@ func renterfilesshareasciicmd(path string) {
 	fmt.Println(data.ASCIIsia)
 }
 
+// renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
+// Uploads the [source] file to [path] on the Sia network.
 func renterfilesuploadcmd(source, path string) {
 	err := post("/renter/upload/"+path, "source="+abs(source))
 	if err != nil {
