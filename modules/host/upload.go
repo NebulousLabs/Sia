@@ -44,6 +44,8 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	switch {
 	case fc.FileSize != filesize:
 		return errors.New("bad initial file size")
+	case fc.FileSize > uint64(h.spaceRemaining):
+		return errors.New("not enough space remaining to complete the upload")
 	case fc.WindowStart <= h.blockHeight:
 		return errors.New("window start cannot be in the past")
 	case duration < h.settings.MinDuration || duration > h.settings.MaxDuration:
@@ -115,10 +117,12 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	case rev.NewRevisionNumber <= obligation.revisionNumber():
 		return errors.New("revision must have higher revision number")
 
-	case rev.NewFileSize > uint64(h.spaceRemaining):
-		return errors.New("revision file size is too large")
 	case rev.NewFileSize <= obligation.fileSize():
 		return errors.New("revision must add data")
+	case rev.NewFileSize-obligation.fileSize() > uint64(h.spaceRemaining):
+		// TODO: Revisions should leave some headroom so that files can be
+		// renewed even when the host is near capacity.
+		return errors.New("revision file size is too large")
 	case rev.NewFileSize-obligation.fileSize() > maxRevisionSize:
 		return errors.New("revision adds too much data")
 
@@ -416,6 +420,20 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	err = file.Close()
 	if err != nil {
 		return err
+	}
+
+	// If the file has no data in it, delete the file. Prevents clutter in the
+	// filesystem, as this is a pretty common occurance, especially if the host
+	// is at capacity.
+	info, err := os.Stat(obligation.Path)
+	if err != nil {
+		return err
+	}
+	if info.FileSize() == 0 {
+		err = os.Remove(obligation.Path)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = h.tpool.AcceptTransactionSet([]types.Transaction{obligation.RevisionTransaction})
