@@ -55,6 +55,7 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ ht
 		UnlockHash:   settings.UnlockHash,
 		WindowSize:   settings.WindowSize,
 
+		AcceptingContracts: settings.AcceptingContracts,
 		NumContracts:       srv.host.Contracts(),
 		LostRevenue:        lostRevenue,
 		Revenue:            revenue,
