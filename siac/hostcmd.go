@@ -48,8 +48,9 @@ Doing so will override the standard connectivity checks.`,
 )
 
 func hostconfigcmd(param, value string) {
-	// convert price to hastings/byte/block
-	if param == "price" {
+	switch param {
+	case "price":
+		// convert price to hastings/byte/block
 		p, ok := new(big.Rat).SetString(value)
 		if !ok {
 			fmt.Println("could not parse price")
@@ -57,14 +58,19 @@ func hostconfigcmd(param, value string) {
 		}
 		p.Mul(p, big.NewRat(1e24/1e9, 4320))
 		value = new(big.Int).Div(p.Num(), p.Denom()).String()
-	}
-	// parse sizes of form 10GB, 10TB, 1TiB etc
-	if param == "totalstorage" {
+	case "totalstorage":
+		// parse sizes of form 10GB, 10TB, 1TiB etc
 		var err error
 		value, err = parseSize(value)
 		if err != nil {
 			fmt.Println("could not parse " + param)
+			return
 		}
+	case "minduration", "maxduration", "windowsize", "acceptingcontracts": // Other valid settings.
+	default:
+		// Reject invalid host config commands.
+		fmt.Println("\"" + param + "\" is not a host setting")
+		return
 	}
 	err := post("/host", param+"="+value)
 	if err != nil {
