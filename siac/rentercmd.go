@@ -155,44 +155,40 @@ func renterdownloadscmd() {
 		fmt.Println("Could not get download queue:", err)
 		return
 	}
-	func() {
-		// Filter out files that have been downloaded.
-		var downloading []modules.DownloadInfo
-		for _, file := range queue.Downloads {
-			if file.Received != file.Filesize {
-				downloading = append(downloading, file)
-			}
+	// Filter out files that have been downloaded.
+	var downloading []modules.DownloadInfo
+	for _, file := range queue.Downloads {
+		if file.Received != file.Filesize {
+			downloading = append(downloading, file)
 		}
-		if len(downloading) == 0 {
-			fmt.Println("No files are downloading.")
-			return
-		}
+	}
+	if len(downloading) == 0 {
+		fmt.Println("No files are downloading.")
+	} else {
 		fmt.Println("Downloading", len(downloading), "files:")
 		for _, file := range downloading {
 			fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
 		}
-	}()
+	}
 	if !renterShowHistory {
 		return
 	}
-	func() {
-		fmt.Println()
-		// Filter out files that are downloading.
-		var downloaded []modules.DownloadInfo
-		for _, file := range queue.Downloads {
-			if file.Received == file.Filesize {
-				downloaded = append(downloaded, file)
-			}
+	fmt.Println()
+	// Filter out files that are downloading.
+	var downloaded []modules.DownloadInfo
+	for _, file := range queue.Downloads {
+		if file.Received == file.Filesize {
+			downloaded = append(downloaded, file)
 		}
-		if len(downloaded) == 0 {
-			fmt.Println("No files downloaded.")
-			return
-		}
+	}
+	if len(downloaded) == 0 {
+		fmt.Println("No files downloaded.")
+	} else {
 		fmt.Println("Downloaded", len(downloaded), "files:")
 		for _, file := range downloaded {
 			fmt.Printf("%s: %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), file.SiaPath, file.Destination)
 		}
-	}()
+	}
 }
 
 func renterfilesdeletecmd(path string) {
