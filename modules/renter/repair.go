@@ -27,7 +27,7 @@ var renewThreshold = func() types.BlockHeight {
 	case "dev":
 		return 200
 	default:
-		return 2000
+		return 144 // RC ONLY!
 	}
 }()
 
