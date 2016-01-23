@@ -24,7 +24,6 @@ type Server struct {
 	wallet   modules.Wallet
 
 	apiServer         *http.Server
-	daemonExposed     bool
 	listener          net.Listener
 	requiredUserAgent string
 }
