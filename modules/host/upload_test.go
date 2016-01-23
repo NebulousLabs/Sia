@@ -131,6 +131,8 @@ func TestRPCUpload(t *testing.T) {
 	baselineAnticipatedRevenue := ht.host.anticipatedRevenue
 	baselineSpace := ht.host.spaceRemaining
 	ht.host.mu.RUnlock()
+
+	// Upload the file.
 	_, err = ht.uploadFile("TestRPCUpload - 1", renewDisabled)
 	if err != nil {
 		t.Fatal(err)
@@ -425,4 +427,89 @@ func TestRestartCorruptSuccessObligation(t *testing.T) {
 	if rebootHost.lostRevenue.Cmp(expectedRevenue) == 0 {
 		t.Error("host is reporting losses on the file contract")
 	}
+}
+
+// TestUploadConstraints checks that file contract negotiation correctly
+// rejects contracts that don't meet required criteria.
+func TestUploadConstraints(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := newHostTester("TestUploadConstraints")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := ht.host
+	settings := h.Settings()
+	settings.TotalStorage = 10e3
+	err = h.SetSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a valid file contract transaction.
+	filesize := uint64(5e3)
+	merkleRoot := crypto.Hash{51, 23}
+	currencyDuration := types.NewCurrency64(1 + uint64(settings.MinDuration))
+	payment := types.NewCurrency64(filesize).Mul(settings.Price).Mul(currencyDuration)
+	payout := payment.Mul(types.NewCurrency64(20))
+	refund := types.PostTax(ht.cs.Height(), payout).Sub(payment)
+	renterKey := types.SiaPublicKey{}
+	txn := types.Transaction{
+		FileContracts: []types.FileContract{{
+			FileSize:       filesize,
+			FileMerkleRoot: merkleRoot,
+			WindowStart:    ht.cs.Height() + 1 + settings.MinDuration,
+			WindowEnd:      ht.cs.Height() + 1 + settings.MinDuration + 1 + settings.WindowSize,
+			Payout:         payout,
+			ValidProofOutputs: []types.SiacoinOutput{
+				{
+					Value:      refund,
+					UnlockHash: types.UnlockHash{},
+				},
+				{
+					Value:      payment,
+					UnlockHash: settings.UnlockHash,
+				},
+			},
+			MissedProofOutputs: []types.SiacoinOutput{
+				{
+					Value:      refund,
+					UnlockHash: types.UnlockHash{},
+				},
+				{
+					Value:      payment,
+					UnlockHash: types.UnlockHash{},
+				},
+			},
+			UnlockHash: types.UnlockConditions{
+				PublicKeys:         []types.SiaPublicKey{renterKey, h.publicKey},
+				SignaturesRequired: 2,
+			}.UnlockHash(),
+			RevisionNumber: 3,
+		}},
+	}
+	err = h.considerContract(txn, renterKey, filesize, merkleRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that too-large files get rejected.
+	largeFilesize := uint64(10001)
+	largeFilePayment := types.NewCurrency64(largeFilesize).Mul(settings.Price).Mul(currencyDuration)
+	largeFileRefund := types.PostTax(ht.cs.Height(), payout).Sub(largeFilePayment)
+	txn.FileContracts[0].FileSize = largeFilesize
+	txn.FileContracts[0].ValidProofOutputs[0].Value = largeFileRefund
+	txn.FileContracts[0].ValidProofOutputs[1].Value = largeFilePayment
+	txn.FileContracts[0].MissedProofOutputs[0].Value = largeFileRefund
+	txn.FileContracts[0].MissedProofOutputs[1].Value = largeFilePayment
+	err = h.considerContract(txn, renterKey, largeFilesize, merkleRoot)
+	if err != ErrHostCapacity {
+		t.Fatal(err)
+	}
+
+	// Test that file revisions get rejected if they are too large.
+
+	// Test that file revisions get accepted if the updated file size is too
+	// large but just the added data is small enough (regression test).
 }

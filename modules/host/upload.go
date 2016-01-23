@@ -22,9 +22,9 @@ const (
 )
 
 var (
-	// HostCapacityErr indicates that a host does not have enough room on disk
+	// ErrHostCapacity indicates that a host does not have enough room on disk
 	// to accept more files.
-	HostCapacityErr = errors.New("host is at capacity and cannot take more files")
+	ErrHostCapacity = errors.New("host is at capacity and cannot take more files")
 )
 
 // considerContract checks that the provided transaction matches the host's
@@ -38,14 +38,20 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	// convenience variables
 	fc := txn.FileContracts[0]
 	duration := fc.WindowStart - h.blockHeight
-	voidAddress := types.UnlockHash{}
+	minPayment := types.NewCurrency64(filesize).Mul(types.NewCurrency64(uint64(duration))).Mul(h.settings.Price)
+	expectedOutputSum := types.PostTax(h.blockHeight, fc.Payout)
 
 	// check contract fields for sanity and acceptability
 	switch {
+	// Check for legal filesize and content.
 	case fc.FileSize != filesize:
 		return errors.New("bad initial file size")
-	case fc.FileSize > uint64(h.spaceRemaining):
-		return errors.New("not enough space remaining to complete the upload")
+	case fc.FileSize >= uint64(h.spaceRemaining):
+		return ErrHostCapacity
+	case fc.FileMerkleRoot != merkleRoot:
+		return errors.New("bad file contract Merkle root")
+
+	// Check for legal duration and proof window.
 	case fc.WindowStart <= h.blockHeight:
 		return errors.New("window start cannot be in the past")
 	case duration < h.settings.MinDuration || duration > h.settings.MaxDuration:
@@ -54,17 +60,24 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 		return errors.New("window cannot end before it starts")
 	case fc.WindowEnd-fc.WindowStart < h.settings.WindowSize:
 		return errors.New("challenge window is not large enough")
-	case fc.FileMerkleRoot != merkleRoot:
-		return errors.New("bad file contract Merkle root")
+
+	// Check for legal payout.
 	case fc.Payout.IsZero():
 		return errors.New("bad file contract payout")
 	case len(fc.ValidProofOutputs) != 2:
 		return errors.New("bad file contract valid proof outputs")
 	case len(fc.MissedProofOutputs) != 2:
 		return errors.New("bad file contract missed proof outputs")
+	case fc.ValidProofOutputs[0].Value.Add(fc.ValidProofOutputs[1].Value).Cmp(expectedOutputSum) != 0,
+		fc.MissedProofOutputs[0].Value.Add(fc.MissedProofOutputs[1].Value).Cmp(expectedOutputSum) != 0:
+		return errors.New("file contract outputs do not sum to original payout")
 	case fc.ValidProofOutputs[1].UnlockHash != h.settings.UnlockHash:
 		return errors.New("file contract valid proof output not sent to host")
-	case fc.MissedProofOutputs[1].UnlockHash != voidAddress:
+	case fc.ValidProofOutputs[1].Value.Cmp(minPayment) < 0:
+		return errors.New("file contract price is too small")
+	case fc.MissedProofOutputs[0].Value.Cmp(fc.ValidProofOutputs[0].Value) != 0:
+		return errors.New("file contract missed renter payout does not match valid payout")
+	case fc.MissedProofOutputs[1].UnlockHash != (types.UnlockHash{}):
 		return errors.New("file contract missed proof output not sent to void")
 	}
 
@@ -91,21 +104,42 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	// calculate minimum expected output value
 	rev := txn.FileContractRevisions[0]
 	duration := types.NewCurrency64(uint64(obligation.windowStart() - h.blockHeight))
-	minHostPrice := types.NewCurrency64(rev.NewFileSize).Mul(duration).Mul(h.settings.Price)
+	sizeDiff := rev.NewFileSize - obligation.fileSize()
+	priceAdd := types.NewCurrency64(sizeDiff).Mul(duration).Mul(h.settings.Price)
+	minPayment := obligation.value().Add(priceAdd)
 	expectedPayout := types.PostTax(h.blockHeight, obligation.payout())
 
 	switch {
-	// these fields should never change
+	// Check that the revision matches the previous file contract.
 	case rev.ParentID != obligation.ID:
 		return errors.New("bad revision parent ID")
-	case rev.NewWindowStart != obligation.windowStart():
-		return errors.New("bad revision window start")
-	case rev.NewWindowEnd != obligation.windowEnd():
-		return errors.New("bad revision window end")
+	case rev.NewRevisionNumber <= obligation.revisionNumber():
+		return errors.New("revision must have higher revision number")
 	case rev.NewUnlockHash != obligation.unlockHash():
 		return errors.New("bad revision unlock hash")
 	case rev.UnlockConditions.UnlockHash() != obligation.unlockHash():
 		return errors.New("bad revision unlock conditions")
+
+	// Check that the window is unchanged.
+	case rev.NewWindowStart != obligation.windowStart():
+		return errors.New("bad revision window start")
+	case rev.NewWindowEnd != obligation.windowEnd():
+		return errors.New("bad revision window end")
+
+	// Check that the change in filesize is legal.
+	//
+	// TODO: Revisions should leave enough headroom so that renewals always
+	// have some space.
+	case rev.NewFileSize <= obligation.fileSize():
+		return errors.New("revision must add data")
+	case rev.NewFileSize-obligation.fileSize() > uint64(h.spaceRemaining):
+		println(h.spaceRemaining)
+		println(rev.NewFileSize - obligation.fileSize())
+		return errors.New("revision file size is too large")
+	case rev.NewFileSize-obligation.fileSize() > maxRevisionSize:
+		return errors.New("revision adds too much data")
+
+	// Check that the payout information is correct.
 	case len(rev.NewValidProofOutputs) != 2:
 		return errors.New("bad revision valid proof outputs")
 	case len(rev.NewMissedProofOutputs) != 2:
@@ -113,28 +147,11 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	case rev.NewValidProofOutputs[1].UnlockHash != obligation.validProofUnlockHash(),
 		rev.NewMissedProofOutputs[1].UnlockHash != obligation.missedProofUnlockHash():
 		return errors.New("bad revision proof outputs")
-
-	case rev.NewRevisionNumber <= obligation.revisionNumber():
-		return errors.New("revision must have higher revision number")
-
-	case rev.NewFileSize <= obligation.fileSize():
-		return errors.New("revision must add data")
-	case rev.NewFileSize-obligation.fileSize() > uint64(h.spaceRemaining):
-		// TODO: Revisions should leave some headroom so that files can be
-		// renewed even when the host is near capacity.
-		return errors.New("revision file size is too large")
-	case rev.NewFileSize-obligation.fileSize() > maxRevisionSize:
-		return errors.New("revision adds too much data")
-
 	case rev.NewValidProofOutputs[0].Value.Add(rev.NewValidProofOutputs[1].Value).Cmp(expectedPayout) != 0,
-		// valid and missing outputs should still sum to payout
 		rev.NewMissedProofOutputs[0].Value.Add(rev.NewMissedProofOutputs[1].Value).Cmp(expectedPayout) != 0:
 		return errors.New("revision outputs do not sum to original payout")
-
-	case rev.NewValidProofOutputs[1].Value.Cmp(minHostPrice) < 0:
-		// outputs should have been adjusted proportional to the new filesize
+	case rev.NewValidProofOutputs[1].Value.Cmp(minPayment) < 0:
 		return errors.New("revision price is too small")
-
 	case rev.NewMissedProofOutputs[0].Value.Cmp(rev.NewValidProofOutputs[0].Value) != 0:
 		return errors.New("revision missed renter payout does not match valid payout")
 	}
@@ -183,6 +200,8 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 	err = h.considerContract(contractTxn, renterKey, filesize, merkleRoot)
 	h.mu.RUnlock()
 	if err != nil {
+		println("upload error")
+		println(err.Error())
 		_ = encoding.WriteObject(conn, err.Error())
 		return errors.New("rejected file contract: " + err.Error())
 	}
@@ -360,6 +379,8 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 			err = h.considerRevision(revTxn, obligation)
 			h.mu.RUnlock()
 			if err != nil {
+				println("revision error")
+				println(err.Error())
 				// There is nothing that can be done if there is an error while
 				// writing to a connection.
 				_ = encoding.WriteObject(conn, err.Error())
@@ -429,7 +450,7 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	if info.FileSize() == 0 {
+	if info.Size() == 0 {
 		err = os.Remove(obligation.Path)
 		if err != nil {
 			return err
