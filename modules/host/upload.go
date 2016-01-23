@@ -202,8 +202,6 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 	err = h.considerContract(contractTxn, renterKey, filesize, merkleRoot)
 	h.mu.RUnlock()
 	if err != nil {
-		println("upload error")
-		println(err.Error())
 		_ = encoding.WriteObject(conn, err.Error())
 		return errors.New("rejected file contract: " + err.Error())
 	}
@@ -381,8 +379,6 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 			err = h.considerRevision(revTxn, obligation)
 			h.mu.RUnlock()
 			if err != nil {
-				println("revision error")
-				println(err.Error())
 				// There is nothing that can be done if there is an error while
 				// writing to a connection.
 				_ = encoding.WriteObject(conn, err.Error())

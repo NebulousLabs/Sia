@@ -1,6 +1,7 @@
 package host
 
 import (
+	"bytes"
 	"errors"
 	"io/ioutil"
 	"path/filepath"
@@ -39,6 +40,10 @@ func (ht *hostTester) uploadFile(path string, renew bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	dataMerkleRoot, err := crypto.ReaderMerkleRoot(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
 	err = ioutil.WriteFile(source, data, 0600)
 	if err != nil {
 		return nil, err
@@ -73,7 +78,7 @@ func (ht *hostTester) uploadFile(path string, renew bool) ([]byte, error) {
 			defer ht.host.mu.Unlock()
 
 			for _, ob := range ht.host.obligationsByID {
-				if ob.fileSize() >= datasize {
+				if dataMerkleRoot == ob.merkleRoot() {
 					return true
 				}
 			}

@@ -53,14 +53,11 @@ func TestPersistCompat04(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Get a compatibility file to save after closing the host.
-	ht.host.mu.Lock()
-	c04h := ht.buildCompat04Host()
-	ht.host.mu.Unlock()
+	err = ht.host.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.Close()
+	c04h := ht.buildCompat04Host()
 	if err != nil {
 		t.Fatal(err)
 	}
