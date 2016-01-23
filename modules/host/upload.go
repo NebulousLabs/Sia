@@ -25,6 +25,10 @@ var (
 	// ErrHostCapacity indicates that a host does not have enough room on disk
 	// to accept more files.
 	ErrHostCapacity = errors.New("host is at capacity and cannot take more files")
+
+	// ErrLowPayment indicates that the money given to the host is not
+	// sufficient for the file being uploaded.
+	ErrLowPayment = errors.New("file contract does not pay enough")
 )
 
 // considerContract checks that the provided transaction matches the host's
@@ -74,7 +78,7 @@ func (h *Host) considerContract(txn types.Transaction, renterKey types.SiaPublic
 	case fc.ValidProofOutputs[1].UnlockHash != h.settings.UnlockHash:
 		return errors.New("file contract valid proof output not sent to host")
 	case fc.ValidProofOutputs[1].Value.Cmp(minPayment) < 0:
-		return errors.New("file contract price is too small")
+		return ErrLowPayment
 	case fc.MissedProofOutputs[0].Value.Cmp(fc.ValidProofOutputs[0].Value) != 0:
 		return errors.New("file contract missed renter payout does not match valid payout")
 	case fc.MissedProofOutputs[1].UnlockHash != (types.UnlockHash{}):
@@ -133,9 +137,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 	case rev.NewFileSize <= obligation.fileSize():
 		return errors.New("revision must add data")
 	case rev.NewFileSize-obligation.fileSize() > uint64(h.spaceRemaining):
-		println(h.spaceRemaining)
-		println(rev.NewFileSize - obligation.fileSize())
-		return errors.New("revision file size is too large")
+		return ErrHostCapacity
 	case rev.NewFileSize-obligation.fileSize() > maxRevisionSize:
 		return errors.New("revision adds too much data")
 
@@ -151,7 +153,7 @@ func (h *Host) considerRevision(txn types.Transaction, obligation *contractOblig
 		rev.NewMissedProofOutputs[0].Value.Add(rev.NewMissedProofOutputs[1].Value).Cmp(expectedPayout) != 0:
 		return errors.New("revision outputs do not sum to original payout")
 	case rev.NewValidProofOutputs[1].Value.Cmp(minPayment) < 0:
-		return errors.New("revision price is too small")
+		return ErrLowPayment
 	case rev.NewMissedProofOutputs[0].Value.Cmp(rev.NewValidProofOutputs[0].Value) != 0:
 		return errors.New("revision missed renter payout does not match valid payout")
 	}

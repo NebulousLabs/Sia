@@ -450,6 +450,8 @@ func TestUploadConstraints(t *testing.T) {
 	// Create a valid file contract transaction.
 	filesize := uint64(5e3)
 	merkleRoot := crypto.Hash{51, 23}
+	windowStart := ht.cs.Height() + 1 + settings.MinDuration
+	windowEnd := ht.cs.Height() + 1 + settings.MinDuration + 1 + settings.WindowSize
 	currencyDuration := types.NewCurrency64(1 + uint64(settings.MinDuration))
 	payment := types.NewCurrency64(filesize).Mul(settings.Price).Mul(currencyDuration)
 	payout := payment.Mul(types.NewCurrency64(20))
@@ -459,8 +461,8 @@ func TestUploadConstraints(t *testing.T) {
 		FileContracts: []types.FileContract{{
 			FileSize:       filesize,
 			FileMerkleRoot: merkleRoot,
-			WindowStart:    ht.cs.Height() + 1 + settings.MinDuration,
-			WindowEnd:      ht.cs.Height() + 1 + settings.MinDuration + 1 + settings.WindowSize,
+			WindowStart:    windowStart,
+			WindowEnd:      windowEnd,
 			Payout:         payout,
 			ValidProofOutputs: []types.SiacoinOutput{
 				{
@@ -494,6 +496,18 @@ func TestUploadConstraints(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Test that under-paid file contracts get rejected.
+	underPayment := types.NewCurrency64(filesize * 5 / 6).Mul(settings.Price).Mul(currencyDuration)
+	underRefund := types.PostTax(ht.cs.Height(), payout).Sub(underPayment)
+	txn.FileContracts[0].ValidProofOutputs[0].Value = underRefund
+	txn.FileContracts[0].ValidProofOutputs[1].Value = underPayment
+	txn.FileContracts[0].MissedProofOutputs[0].Value = underRefund
+	txn.FileContracts[0].MissedProofOutputs[1].Value = underPayment
+	err = h.considerContract(txn, renterKey, filesize, merkleRoot)
+	if err != ErrLowPayment {
+		t.Fatal(err)
+	}
+
 	// Test that too-large files get rejected.
 	largeFilesize := uint64(10001)
 	largeFilePayment := types.NewCurrency64(largeFilesize).Mul(settings.Price).Mul(currencyDuration)
@@ -508,8 +522,94 @@ func TestUploadConstraints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Test that file revisions get rejected if they are too large.
+	// Reset the file contract to a working contract, and create an obligation
+	// from the transaction.
+	txn.FileContracts[0].FileSize = filesize
+	txn.FileContracts[0].ValidProofOutputs[0].Value = refund
+	txn.FileContracts[0].ValidProofOutputs[1].Value = payment
+	txn.FileContracts[0].MissedProofOutputs[0].Value = refund
+	txn.FileContracts[0].MissedProofOutputs[1].Value = payment
+	obligation := &contractObligation{
+		ID:                txn.FileContractID(0),
+		OriginTransaction: txn,
+	}
+
+	// Create a legal revision transaction.
+	newFileSize := filesize + uint64(4e3)
+	revisedPayment := payment.Add(types.NewCurrency64(newFileSize - filesize).Mul(currencyDuration).Mul(settings.Price))
+	revisedRefund := types.PostTax(ht.cs.Height(), payout).Sub(revisedPayment)
+	revisionTxn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID: txn.FileContractID(0),
+			UnlockConditions: types.UnlockConditions{
+				PublicKeys:         []types.SiaPublicKey{renterKey, h.publicKey},
+				SignaturesRequired: 2,
+			},
+			NewRevisionNumber: txn.FileContracts[0].RevisionNumber + 1,
+
+			NewFileSize:       newFileSize,
+			NewFileMerkleRoot: merkleRoot,
+			NewWindowStart:    windowStart,
+			NewWindowEnd:      windowEnd,
+			NewValidProofOutputs: []types.SiacoinOutput{
+				{
+					Value:      revisedRefund,
+					UnlockHash: types.UnlockHash{},
+				},
+				{
+					Value:      revisedPayment,
+					UnlockHash: settings.UnlockHash,
+				},
+			},
+			NewMissedProofOutputs: []types.SiacoinOutput{
+				{
+					Value:      revisedRefund,
+					UnlockHash: types.UnlockHash{},
+				},
+				{
+					Value:      revisedPayment,
+					UnlockHash: types.UnlockHash{},
+				},
+			},
+			NewUnlockHash: txn.FileContracts[0].UnlockHash,
+		}},
+	}
+	err = ht.host.considerRevision(revisionTxn, obligation)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that too large revisions get rejected.
+	settings.TotalStorage = 3e3
+	ht.host.SetSettings(settings)
+	if ht.host.spaceRemaining != 3e3 {
+		t.Fatal("host is not getting the correct space remaining")
+	}
+	err = ht.host.considerRevision(revisionTxn, obligation)
+	if err != ErrHostCapacity {
+		t.Fatal(err)
+	}
 
 	// Test that file revisions get accepted if the updated file size is too
 	// large but just the added data is small enough (regression test).
+	settings.TotalStorage = 8e3
+	ht.host.SetSettings(settings)
+	err = ht.host.considerRevision(revisionTxn, obligation)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that underpaid revisions get rejected.
+	revisedUnderPayment := payment.Add(types.NewCurrency64(newFileSize - filesize - 1e3).Mul(currencyDuration).Mul(settings.Price))
+	revisedUnderRefund := types.PostTax(ht.cs.Height(), payout).Sub(revisedUnderPayment)
+	revisionTxn.FileContractRevisions[0].NewValidProofOutputs[0].Value = revisedUnderRefund
+	revisionTxn.FileContractRevisions[0].NewValidProofOutputs[1].Value = revisedUnderPayment
+	revisionTxn.FileContractRevisions[0].NewMissedProofOutputs[0].Value = revisedUnderRefund
+	revisionTxn.FileContractRevisions[0].NewMissedProofOutputs[1].Value = revisedUnderPayment
+	revisionTxn.FileContractRevisions[0].NewMissedProofOutputs[1].Value = revisedUnderPayment
+	revisionTxn.FileContractRevisions[0].NewMissedProofOutputs[1].Value = revisedUnderPayment
+	err = ht.host.considerRevision(revisionTxn, obligation)
+	if err != ErrLowPayment {
+		t.Fatal(err)
+	}
 }
