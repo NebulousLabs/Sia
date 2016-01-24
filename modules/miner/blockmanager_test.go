@@ -97,9 +97,9 @@ func TestIntegrationHeaderForWorkUpdates(t *testing.T) {
 	}
 }
 
-// TestIntegrationManyHeaders checks that requesting a thousand headers in
-// a row results in a thousand unique headers, and all of them can be
-// reassebled into valid blocks.
+// TestIntegrationManyHeaders checks that requesting a full set of headers a
+// row results in all unique headers, and that all of them can be reassebled
+// into valid blocks.
 func TestIntegrationManyHeaders(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

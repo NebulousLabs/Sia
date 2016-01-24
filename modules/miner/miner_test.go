@@ -117,6 +117,10 @@ func TestIntegrationMiner(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	morecoins, _, _ := mt.wallet.ConfirmedBalance()
+	if siacoins.Cmp(morecoins) >= 0 {
+		t.Error("wallet is not gaining balance while mining")
+	}
 }
 
 // TestIntegrationNilMinerDependencies tests that the miner properly handles
@@ -157,7 +161,8 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Unsolve the header.
+	// Unsolve the header - necessary because the target is very low when
+	// mining.
 	for {
 		unsolvedHeader.Nonce[0]++
 		id := crypto.HashObject(unsolvedHeader)
@@ -192,13 +197,28 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
 	}
-
 	goodBlocks, staleBlocks := mt.miner.BlocksMined()
 	if goodBlocks != 1 {
 		t.Error("expexting 1 good block")
 	}
 	if staleBlocks != 1 {
-		t.Error(len(mt.miner.persist.BlocksFound))
+		t.Error("expecting 1 stale block, got", staleBlocks)
+	}
+
+	// Reboot the miner and verify that the block record has persisted.
+	err = mt.miner.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootMiner, err := New(mt.cs, mt.tpool, mt.wallet, filepath.Join(mt.persistDir, modules.MinerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	goodBlocks, staleBlocks = rebootMiner.BlocksMined()
+	if goodBlocks != 1 {
+		t.Error("expexting 1 good block")
+	}
+	if staleBlocks != 1 {
 		t.Error("expecting 1 stale block, got", staleBlocks)
 	}
 }

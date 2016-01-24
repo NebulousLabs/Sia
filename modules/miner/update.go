@@ -29,11 +29,11 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.persist.UnsolvedBlock.ParentID = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 	m.persist.Target, exists1 = m.cs.ChildTarget(m.persist.UnsolvedBlock.ParentID)
 	m.persist.UnsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.persist.UnsolvedBlock.ParentID)
-	if build.DEBUG && !exists1 {
-		panic("could not get child target")
+	if !exists1 {
+		build.Critical("miner was unable to find parent id of an unsolved block in the consensus set")
 	}
-	if build.DEBUG && !exists2 {
-		panic("could not get child earliest timestamp")
+	if !exists2 {
+		build.Critical("miner was unable to find child timestamp of an unsovled block in the consensus set")
 	}
 
 	// There is a new parent block, the source block should be updated to keep

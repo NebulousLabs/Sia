@@ -33,7 +33,7 @@ func (m *Miner) threadedMine() {
 		// Grab a block and try to solve it.
 		b, solved := m.SolveBlock(bfw, target)
 		if solved {
-			err := m.SubmitBlock(b)
+			err := m.managedSubmitBlock(b)
 			if err != nil {
 				m.log.Println("ERROR: An error occurred while cpu mining:", err)
 			}
