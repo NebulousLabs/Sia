@@ -192,7 +192,7 @@ func main() {
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 
 	root.AddCommand(gatewayCmd)
-	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)
+	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayListCmd)
 
 	root.AddCommand(consensusStatusCmd)
 

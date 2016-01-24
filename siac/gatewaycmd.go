@@ -13,7 +13,7 @@ var (
 		Use:   "gateway",
 		Short: "Perform gateway actions",
 		Long:  "Add or remove a peer, view the current peer list, or synchronize to the network.",
-		Run:   wrap(gatewaystatuscmd),
+		Run:   wrap(gatewaylistcmd),
 	}
 
 	gatewayAddCmd = &cobra.Command{
@@ -30,11 +30,11 @@ var (
 		Run:   wrap(gatewayremovecmd),
 	}
 
-	gatewayStatusCmd = &cobra.Command{
-		Use:   "status",
+	gatewayListCmd = &cobra.Command{
+		Use:   "list",
 		Short: "View a list of peers",
 		Long:  "View the current peer list.",
-		Run:   wrap(gatewaystatuscmd),
+		Run:   wrap(gatewaylistcmd),
 	}
 )
 
@@ -56,11 +56,11 @@ func gatewayremovecmd(addr string) {
 	fmt.Println("Removed", addr, "from peer list.")
 }
 
-func gatewaystatuscmd() {
+func gatewaylistcmd() {
 	var info api.GatewayInfo
 	err := getAPI("/gateway", &info)
 	if err != nil {
-		fmt.Println("Could not get gateway status:", err)
+		fmt.Println("Could not get peer list:", err)
 		return
 	}
 	fmt.Println("Address:", info.NetAddress)
