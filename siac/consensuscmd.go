@@ -17,6 +17,8 @@ var (
 	}
 )
 
+// consensusstatuscmd is the handler for the command `siac status`.
+// Prints the current state of the daemon.
 func consensusstatuscmd() {
 	var cg api.ConsensusGET
 	err := getAPI("/consensus", &cg)

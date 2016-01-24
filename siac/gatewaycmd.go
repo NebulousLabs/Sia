@@ -38,6 +38,8 @@ var (
 	}
 )
 
+// gatewayaddcmd is the handler for the command `siac gateway add [address]`.
+// Adds a new peer to the peer list.
 func gatewayaddcmd(addr string) {
 	err := post("/gateway/add/"+addr, "")
 	if err != nil {
@@ -47,6 +49,8 @@ func gatewayaddcmd(addr string) {
 	fmt.Println("Added", addr, "to peer list.")
 }
 
+// gatewayremovecmd is the handler for the command `siac gateway remove [address]`.
+// Removes a peer from the peer list.
 func gatewayremovecmd(addr string) {
 	err := post("/gateway/remove/"+addr, "")
 	if err != nil {
@@ -56,6 +60,8 @@ func gatewayremovecmd(addr string) {
 	fmt.Println("Removed", addr, "from peer list.")
 }
 
+// gatewaylistcmd is the handler for the command `siac gateway list`.
+// Prints a list of all peers.
 func gatewaylistcmd() {
 	var info api.GatewayInfo
 	err := getAPI("/gateway", &info)

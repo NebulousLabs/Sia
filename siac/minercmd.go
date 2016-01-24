@@ -31,6 +31,8 @@ var (
 	}
 )
 
+// minerstartcmd is the handler for the command `siac miner start`.
+// Starts the CPU miner.
 func minerstartcmd() {
 	err := get("/miner/start")
 	if err != nil {
@@ -40,6 +42,8 @@ func minerstartcmd() {
 	fmt.Println("CPU Miner is now running.")
 }
 
+// minercmd is the handler for the command `siac miner`.
+// Prints the status of the miner.
 func minercmd() {
 	status := new(api.MinerGET)
 	err := getAPI("/miner", status)
@@ -59,6 +63,8 @@ Blocks Mined: %d (%d stale)
 `, miningStr, status.CPUHashrate/1000, status.BlocksMined, status.StaleBlocksMined)
 }
 
+// minerstopcmd is the handler for the command `siac miner stop`.
+// Stops the CPU miner.
 func minerstopcmd() {
 	err := get("/miner/stop")
 	if err != nil {
