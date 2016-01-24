@@ -327,6 +327,8 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 		return types.FileContractID{}, errors.New("no record of that host")
 	} else if newEndHeight < height {
 		return types.FileContractID{}, errors.New("cannot renew below current height")
+	} else if host.Price.Cmp(maxPrice) > 0 {
+		return types.FileContractID{}, errTooExpensive
 	}
 
 	// get an address to use for negotiation
