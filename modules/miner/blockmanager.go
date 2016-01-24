@@ -117,9 +117,9 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
 	return header, m.persist.Target, nil
 }
 
-// SubmitBlock takes a solved block and submits it to the blockchain.
-// SubmitBlock should not be called with a lock.
-func (m *Miner) SubmitBlock(b types.Block) error {
+// managedSubmitBlock takes a solved block and submits it to the blockchain.
+// managedSubmitBlock should not be called with a lock.
+func (m *Miner) managedSubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
 	// Add the miner to the blocks list if the only problem is that it's stale.
@@ -154,38 +154,48 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 
 // SubmitHeader accepts a block header.
 func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
-	m.mu.Lock()
-
-	// Lookup the block that corresponds to the provided header.
+	// Because a call to managedSubmitBlock is required at the end of this
+	// function, the first part needs to be wrapped in an anonymous function
+	// for lock safety.
 	var b types.Block
-	nonce := bh.Nonce
-	bh.Nonce = [8]byte{}
-	bPointer, bExists := m.blockMem[bh]
-	arbData, arbExists := m.arbDataMem[bh]
-	if !bExists || !arbExists {
-		m.log.Println("ERROR:", errLateHeader)
-		m.mu.Unlock()
-		return errLateHeader
-	}
+	err := func() error {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 
-	// Block is going to be passed to external memory, but the memory pointed
-	// to by the transactions slice is still being modified - needs to be
-	// copied. Same with the memory being pointed to by the arb data slice.
-	b = *bPointer
-	txns := make([]types.Transaction, len(b.Transactions))
-	copy(txns, b.Transactions)
-	b.Transactions = txns
-	b.Transactions[0].ArbitraryData = [][]byte{arbData[:]}
-	b.Nonce = nonce
+		// Lookup the block that corresponds to the provided header.
+		nonce := bh.Nonce
+		bh.Nonce = [8]byte{}
+		bPointer, bExists := m.blockMem[bh]
+		arbData, arbExists := m.arbDataMem[bh]
+		if !bExists || !arbExists {
+			return errLateHeader
+		}
 
-	// Sanity check - block should have same id as header.
-	if build.DEBUG {
+		// Block is going to be passed to external memory, but the memory pointed
+		// to by the transactions slice is still being modified - needs to be
+		// copied. Same with the memory being pointed to by the arb data slice.
+		b = *bPointer
+		txns := make([]types.Transaction, len(b.Transactions))
+		copy(txns, b.Transactions)
+		b.Transactions = txns
+		b.Transactions[0].ArbitraryData = [][]byte{arbData[:]}
+		b.Nonce = nonce
+
+		// Sanity check - block should have same id as header.
 		bh.Nonce = nonce
 		if types.BlockID(crypto.HashObject(bh)) != b.ID() {
-			panic("block reconstruction failed")
+			build.Critical("block reconstruction failed")
 		}
+		return nil
+	}()
+	if err != nil {
+		m.log.Println("ERROR during call to SubmitHeader, pre SubmitBlock:", err)
+		return err
 	}
-
-	m.mu.Unlock()
-	return m.SubmitBlock(b)
+	err = m.managedSubmitBlock(b)
+	if err != nil {
+		m.log.Println("ERROR returned by managedSubmitBlock:", err)
+		return err
+	}
+	return nil
 }
