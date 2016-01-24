@@ -186,11 +186,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 // collection.
 func (m *Miner) Close() error {
 	// Save the latest miner state.
-	err := func() error {
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		return m.save()
-	}()
+	m.mu.RLock()
+	err := m.save()
+	m.mu.RUnlock()
 	if err != nil {
 		return err
 	}
