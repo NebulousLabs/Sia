@@ -44,10 +44,11 @@ var (
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
-		Use:   "delete [path]",
-		Short: "Delete a file",
-		Long:  "Delete a file. Does not delete the file on disk.",
-		Run:   wrap(renterfilesdeletecmd),
+		Use:     "delete [path]",
+		Aliases: []string{"rm"},
+		Short:   "Delete a file",
+		Long:    "Delete a file. Does not delete the file on disk.",
+		Run:     wrap(renterfilesdeletecmd),
 	}
 
 	renterFilesDownloadCmd = &cobra.Command{
@@ -58,10 +59,11 @@ var (
 	}
 
 	renterFilesListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List the status of all files",
-		Long:  "List the status of all files known to the renter on the Sia network.",
-		Run:   wrap(renterfileslistcmd),
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List the status of all files",
+		Long:    "List the status of all files known to the renter on the Sia network.",
+		Run:     wrap(renterfileslistcmd),
 	}
 
 	renterFilesLoadCmd = &cobra.Command{
@@ -79,10 +81,11 @@ var (
 	}
 
 	renterFilesRenameCmd = &cobra.Command{
-		Use:   "rename [path] [newpath]",
-		Short: "Rename a file",
-		Long:  "Rename a file.",
-		Run:   wrap(renterfilesrenamecmd),
+		Use:     "rename [path] [newpath]",
+		Aliases: []string{"mv"},
+		Short:   "Rename a file",
+		Long:    "Rename a file.",
+		Run:     wrap(renterfilesrenamecmd),
 	}
 
 	renterFilesShareCmd = &cobra.Command{
