@@ -12,8 +12,8 @@ var (
 	minerCmd = &cobra.Command{
 		Use:   "miner",
 		Short: "Perform miner actions",
-		Long:  "Interact with the miner",
-		Run:   wrap(minerstatuscmd),
+		Long:  "Perform miner actions and view miner status.",
+		Run:   wrap(minercmd),
 	}
 
 	minerStartCmd = &cobra.Command{
@@ -21,13 +21,6 @@ var (
 		Short: "Start cpu mining",
 		Long:  "Start cpu mining, if the miner is already running, this command does nothing",
 		Run:   wrap(minerstartcmd),
-	}
-
-	minerStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "View miner status",
-		Long:  "View the current mining status",
-		Run:   wrap(minerstatuscmd),
 	}
 
 	minerStopCmd = &cobra.Command{
@@ -47,7 +40,7 @@ func minerstartcmd() {
 	fmt.Println("CPU Miner is now running.")
 }
 
-func minerstatuscmd() {
+func minercmd() {
 	status := new(api.MinerGET)
 	err := getAPI("/miner", status)
 	if err != nil {

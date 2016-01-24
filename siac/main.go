@@ -175,7 +175,7 @@ func main() {
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(minerCmd)
-	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
+	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd,
