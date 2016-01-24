@@ -28,7 +28,7 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
   MS (mega, 10^6 SC)
   GS (giga, 10^9 SC)
   TS (tera, 10^12 SC)`,
-		Run: wrap(walletstatuscmd),
+		Run: wrap(walletbalancecmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
@@ -122,11 +122,11 @@ Run 'wallet send --help' to see a list of available units.`,
 		Run: wrap(walletsendsiafundscmd),
 	}
 
-	walletStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "View wallet status",
-		Long:  "View wallet status, including the current balance and number of addresses.",
-		Run:   wrap(walletstatuscmd),
+	walletBalanceCmd = &cobra.Command{
+		Use:   "balance",
+		Short: "View wallet balance",
+		Long:  "View wallet balance, including confirmed and unconfirmed siacoins and siafunds.",
+		Run:   wrap(walletbalancecmd),
 	}
 
 	walletTransactionsCmd = &cobra.Command{
@@ -302,8 +302,8 @@ func walletsendsiafundscmd(amount, dest string) {
 	fmt.Printf("Sent %s siafunds to %s\n", amount, dest)
 }
 
-// walletstatuscmd retrieves and displays information about the wallet
-func walletstatuscmd() {
+// walletbalancecmd retrieves and displays information about the wallet.
+func walletbalancecmd() {
 	status := new(api.WalletGET)
 	err := getAPI("/wallet", status)
 	if err != nil {
@@ -315,24 +315,27 @@ func walletstatuscmd() {
 		encStatus = "Encrypted"
 	}
 	lockStatus := "Locked"
+	balance := "Unlock the wallet to view balance"
 	if status.Unlocked {
 		lockStatus = "Unlocked"
-	}
-	// divide by 1e24 to get SC
-	r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-	sc, _ := r.Float64()
-	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
-	unconfirmedDifference := new(big.Int).Sub(unconfirmedBalance.Big(), status.ConfirmedSiacoinBalance.Big())
-	r = new(big.Rat).SetFrac(unconfirmedDifference, new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-	usc, _ := r.Float64()
-	fmt.Printf(`Wallet status:
-%s, %s
-Confirmed Balance:   %.2f SC
+		// Divide by 1e24 to get SC.
+		r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+		sc, _ := r.Float64()
+		unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
+		unconfirmedDifference := new(big.Int).Sub(unconfirmedBalance.Big(), status.ConfirmedSiacoinBalance.Big())
+		r = new(big.Rat).SetFrac(unconfirmedDifference, new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+		usc, _ := r.Float64()
+		balance = fmt.Sprintf(`Confirmed Balance:   %.2f SC
 Unconfirmed Delta:  %+.2f SC
 Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v H
-`, encStatus, lockStatus, sc, usc, status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+`, sc, usc, status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+	}
+	fmt.Printf(`Wallet status:
+%s, %s
+%s
+`, encStatus, lockStatus, balance)
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,
