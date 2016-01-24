@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // filesize returns a string that displays a filesize in human-readable units.
@@ -28,11 +29,18 @@ var (
 		Run:   wrap(renterfileslistcmd),
 	}
 
-	renterDownloadQueueCmd = &cobra.Command{
-		Use:   "queue",
+	renterUploadsCmd = &cobra.Command{
+		Use:   "uploads",
+		Short: "View the upload queue",
+		Long:  "View the list of files currently uploading.",
+		Run:   wrap(renteruploadscmd),
+	}
+
+	renterDownloadsCmd = &cobra.Command{
+		Use:   "downloads",
 		Short: "View the download queue",
-		Long:  "View the list of files that have been downloaded.",
-		Run:   wrap(renterdownloadqueuecmd),
+		Long:  "View the list of files currently downloading.",
+		Run:   wrap(renterdownloadscmd),
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
@@ -52,7 +60,7 @@ var (
 	renterFilesListCmd = &cobra.Command{
 		Use:   "list",
 		Short: "List the status of all files",
-		Long:  "List the status of all files known to the renter.",
+		Long:  "List the status of all files known to the renter on the Sia network.",
 		Run:   wrap(renterfileslistcmd),
 	}
 
@@ -86,15 +94,15 @@ var (
 
 	renterFilesShareASCIICmd = &cobra.Command{
 		Use:   "shareascii [path]",
-		Short: "Export a file as an ASCII-encoded .sia file",
-		Long:  "Export a file as an ASCII-encoded .sia file.",
+		Short: "Prints an ASCII-encoded .sia file for sharing",
+		Long:  "Prints an ASCII-encoded .sia file for sharing, but does not save the .sia file to disk.",
 		Run:   wrap(renterfilesshareasciicmd),
 	}
 
 	renterFilesUploadCmd = &cobra.Command{
 		Use:   "upload [source] [path]",
 		Short: "Upload a file",
-		Long:  "Upload a file using a given nickname.",
+		Long:  "Upload a file to [path] on the Sia network.",
 		Run:   wrap(renterfilesuploadcmd),
 	}
 )
@@ -110,23 +118,86 @@ func abs(path string) string {
 	return abspath
 }
 
-func renterdownloadqueuecmd() {
+// renteruploadscmd is the handler for the command `siac renter uploads`.
+// Lists files currently uploading.
+func renteruploadscmd() {
+	var rf api.RenterFiles
+	err := getAPI("/renter/files", &rf)
+	if err != nil {
+		fmt.Println("Could not get upload queue:", err)
+		return
+	}
+
+	// TODO: add a --history flag to the uploads command to mirror the --history
+	//       flag in the downloads command. This hasn't been done yet because the
+	//       call to /renter/files includes files that have been shared with you,
+	//       not just files you've uploaded.
+
+	// Filter out files that have been uploaded.
+	var filteredFiles []modules.FileInfo
+	for _, fi := range rf.Files {
+		if !fi.Available {
+			filteredFiles = append(filteredFiles, fi)
+		}
+	}
+	if len(filteredFiles) == 0 {
+		fmt.Println("No files are uploading.")
+		return
+	}
+	fmt.Println("Uploading", len(filteredFiles), "files:")
+	for _, file := range filteredFiles {
+		fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(int64(file.Filesize)), file.SiaPath, file.UploadProgress)
+	}
+}
+
+// renterdownloadscmd is the handler for the command `siac renter downloads`.
+// Lists files currently downloading, and optionally previously downloaded
+// files if the -H or --history flag is specified.
+func renterdownloadscmd() {
 	var queue api.RenterDownloadQueue
 	err := getAPI("/renter/downloads", &queue)
 	if err != nil {
 		fmt.Println("Could not get download queue:", err)
 		return
 	}
-	if len(queue.Downloads) == 0 {
-		fmt.Println("No downloads to show.")
+	// Filter out files that have been downloaded.
+	var downloading []modules.DownloadInfo
+	for _, file := range queue.Downloads {
+		if file.Received != file.Filesize {
+			downloading = append(downloading, file)
+		}
+	}
+	if len(downloading) == 0 {
+		fmt.Println("No files are downloading.")
+	} else {
+		fmt.Println("Downloading", len(downloading), "files:")
+		for _, file := range downloading {
+			fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
+		}
+	}
+	if !renterShowHistory {
 		return
 	}
-	fmt.Println("Download Queue:")
+	fmt.Println()
+	// Filter out files that are downloading.
+	var downloaded []modules.DownloadInfo
 	for _, file := range queue.Downloads {
-		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
+		if file.Received == file.Filesize {
+			downloaded = append(downloaded, file)
+		}
+	}
+	if len(downloaded) == 0 {
+		fmt.Println("No files downloaded.")
+	} else {
+		fmt.Println("Downloaded", len(downloaded), "files:")
+		for _, file := range downloaded {
+			fmt.Printf("%s: %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), file.SiaPath, file.Destination)
+		}
 	}
 }
 
+// renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
+// Removes the specified path from the Sia network.
 func renterfilesdeletecmd(path string) {
 	err := post("/renter/delete/"+path, "")
 	if err != nil {
@@ -136,6 +207,8 @@ func renterfilesdeletecmd(path string) {
 	fmt.Println("Deleted", path)
 }
 
+// renterfilesdownloadcmd is the handler for the comand `siac renter download [path] [destination]`.
+// Downloads a path from the Sia network to the local specified destination.
 func renterfilesdownloadcmd(path, destination string) {
 	err := get("/renter/download/" + path + "?destination=" + abs(destination))
 	if err != nil {
@@ -145,6 +218,8 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("Downloaded '%s' to %s.\n", path, abs(destination))
 }
 
+// renterfileslistcmd is the handler for the command `siac renter list`.
+// Lists files known to the renter on the network.
 func renterfileslistcmd() {
 	var rf api.RenterFiles
 	err := getAPI("/renter/files", &rf)
@@ -166,6 +241,8 @@ func renterfileslistcmd() {
 	}
 }
 
+// renterfilesloadcmd is the handler for the command `siac renter load [source]`.
+// Loads a .sia file, adding the file entries contained within.
 func renterfilesloadcmd(source string) {
 	var info api.RenterLoad
 	err := postResp("/renter/load", "source="+abs(source), &info)
@@ -179,6 +256,8 @@ func renterfilesloadcmd(source string) {
 	}
 }
 
+// renterfilesloadasciicmd is the handler for the command `siac renter loadascii [ascii]`.
+// Load an ASCII-encoded .sia file.
 func renterfilesloadasciicmd(ascii string) {
 	var info api.RenterLoad
 	err := postResp("/renter/loadascii", "asciisia="+ascii, &info)
@@ -192,6 +271,8 @@ func renterfilesloadasciicmd(ascii string) {
 	}
 }
 
+// renterfilesrenamecmd is the handler for the command `siac renter rename [path] [newpath]`.
+// Renames a file on the Sia network.
 func renterfilesrenamecmd(path, newpath string) {
 	err := post("/renter/rename/"+path, "newsiapath="+newpath)
 	if err != nil {
@@ -201,6 +282,8 @@ func renterfilesrenamecmd(path, newpath string) {
 	fmt.Printf("Renamed %s to %s\n", path, newpath)
 }
 
+// renterfilessharecmd is the handler for the command `siac renter share [path] [destination]`.
+// Export a file to a .sia for sharing.
 func renterfilessharecmd(path, destination string) {
 	err := get(fmt.Sprintf("/renter/share?siapaths=%s&destination=%s", path, abs(destination)))
 	if err != nil {
@@ -210,6 +293,8 @@ func renterfilessharecmd(path, destination string) {
 	fmt.Printf("Exported %s to %s\n", path, abs(destination))
 }
 
+// renterfilesshareasciicmd is the handler for the command `siac renter shareascii [path]`.
+// Prints an ascii-encoded sia file.
 func renterfilesshareasciicmd(path string) {
 	var data api.RenterShareASCII
 	err := getAPI("/renter/shareascii?siapaths="+path, &data)
@@ -220,6 +305,8 @@ func renterfilesshareasciicmd(path string) {
 	fmt.Println(data.ASCIIsia)
 }
 
+// renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
+// Uploads the [source] file to [path] on the Sia network.
 func renterfilesuploadcmd(source, path string) {
 	err := post("/renter/upload/"+path, "source="+abs(source))
 	if err != nil {

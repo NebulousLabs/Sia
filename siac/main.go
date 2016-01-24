@@ -18,9 +18,10 @@ import (
 
 // flags
 var (
-	addr         string // override default API address
-	initPassword bool   // supply a custom password when creating a wallet
-	hostVerbose  bool   // display additional host info
+	addr              string // override default API address
+	initPassword      bool   // supply a custom password when creating a wallet
+	hostVerbose       bool   // display additional host info
+	renterShowHistory bool   // Show download history in addition to download queue.
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -185,9 +186,10 @@ func main() {
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 
 	root.AddCommand(renterCmd)
-	renterCmd.AddCommand(renterDownloadQueueCmd, renterFilesDeleteCmd, renterFilesDownloadCmd,
+	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd, renterDownloadsCmd,
 		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd, renterFilesRenameCmd,
-		renterFilesShareCmd, renterFilesShareASCIICmd, renterFilesUploadCmd)
+		renterFilesShareCmd, renterFilesShareASCIICmd, renterFilesUploadCmd, renterUploadsCmd)
+	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)
