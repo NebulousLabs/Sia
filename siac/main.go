@@ -24,6 +24,12 @@ var (
 	renterShowHistory bool   // Show download history in addition to download queue.
 )
 
+// exit codes
+// inspired by sysexits.h
+const (
+	exitCodeUsage   = 64
+)
+
 // apiGet wraps a GET request with a status code check, such that if the GET does
 // not return 200, the error will be read and returned. The response body is
 // not closed.
@@ -135,7 +141,7 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		if len(args) != fnType.NumIn() {
 			cmd.Usage()
-			return
+			os.Exit(exitCodeUsage)
 		}
 		argVals := make([]reflect.Value, fnType.NumIn())
 		for i := range args {
@@ -200,5 +206,11 @@ func main() {
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
 
 	// run
-	root.Execute()
+	if err := root.Execute(); err != nil {
+		// Since no commands return errors (all commands set Command.Run instead of
+		// Command.RunE), Command.Execute() should only return an error on an
+		// invalid command or flag. Therefore Command.Usage() was called (assuming
+		// Command.SilenceUsage is false) and we should exit with exitCodeUsage.
+		os.Exit(exitCodeUsage)
+	}
 }
