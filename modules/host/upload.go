@@ -252,8 +252,8 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 
 	// Add this contract to the host's list of obligations.
 	co := &contractObligation{
-		ID:                contractTxn.FileContractID(0),
-		OriginTransaction: contractTxn,
+		ID:                signedTxn.FileContractID(0),
+		OriginTransaction: signedTxn,
 		RevisionConfirmed: true,
 		Path:              filename,
 	}

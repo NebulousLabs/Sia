@@ -261,9 +261,18 @@ func (h *Host) addActionItem(height types.BlockHeight, co *contractObligation) {
 // obligation assumes that none of the transaction required by the obligation
 // have not yet been confirmed on the blockchain.
 func (h *Host) addObligation(co *contractObligation) {
-	// 'addObligation' should not be adding an obligation that has a revision.
-	if build.DEBUG && co.hasRevision() {
-		panic("calling 'addObligation' with a file contract revision")
+	// Sanity check - 'addObligation' should not be adding an obligation that
+	// has a revision.
+	if co.hasRevision() {
+		h.log.Critical("calling 'addObligation' with a file contract revision")
+	}
+	// Expensive Sanity check - obligation being added should have a valid
+	// tranasction.
+	if build.DEBUG {
+		err := co.OriginTransaction.StandaloneValid(h.blockHeight)
+		if err != nil {
+			h.log.Critical("invalid transaction is being added in an obligation")
+		}
 	}
 
 	// Add the obligation to the list of host obligations.
@@ -301,6 +310,13 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 	if !exists {
 		h.log.Critical("reviseObligation: revisionTransaction has no corresponding obligation")
 		return
+	}
+	// Expensive Sanity check - obligation being added should have a valid tranasction.
+	if build.DEBUG {
+		err := revisionTransaction.StandaloneValid(h.blockHeight)
+		if err != nil {
+			h.log.Critical("invalid transaction is being added in an obligation")
+		}
 	}
 
 	// Update the host's statistics.
@@ -422,7 +438,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 				// going to be accepted onto the blockchain at any point in the
 				// future, and therefore the obligation should be removed.
 				h.removeObligation(co, obligationFailed)
-				h.log.Println("WARN: a file contract given to the host has been invalidated")
+				h.log.Println("WARN: a file contract given to the host has been invalidated:", err)
 				return
 			}
 			h.log.Println("WARN: could not submit file contract transaction:", err)

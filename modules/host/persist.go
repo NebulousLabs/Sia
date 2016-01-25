@@ -198,7 +198,6 @@ func (h *Host) load() error {
 	// restarting Sia as a means of eliminating unkonwn errors.
 	h.fileCounter = p.FileCounter
 	h.spaceRemaining = p.Settings.TotalStorage
-	h.loadObligations(p.Obligations)
 
 	// Subscribe to the consensus set.
 	err = h.initConsensusSubscription()
@@ -206,6 +205,7 @@ func (h *Host) load() error {
 		return err
 	}
 
+	h.loadObligations(p.Obligations)
 	return nil
 }
 
