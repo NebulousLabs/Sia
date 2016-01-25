@@ -13,7 +13,7 @@ var (
 		Use:   "gateway",
 		Short: "Perform gateway actions",
 		Long:  "Add or remove a peer, view the current peer list, or synchronize to the network.",
-		Run:   wrap(gatewaylistcmd),
+		Run:   wrap(gatewaycmd),
 	}
 
 	gatewayAddCmd = &cobra.Command{
@@ -28,6 +28,13 @@ var (
 		Short: "Remove a peer",
 		Long:  "Remove a peer from the peer list.",
 		Run:   wrap(gatewayremovecmd),
+	}
+
+	gatewayAddressCmd = &cobra.Command{
+		Use:   "address",
+		Short: "Print the gateway address",
+		Long:  "Print the network address of the gateway.",
+		Run:   wrap(gatewayaddresscmd),
 	}
 
 	gatewayListCmd = &cobra.Command{
@@ -60,6 +67,31 @@ func gatewayremovecmd(addr string) {
 	fmt.Println("Removed", addr, "from peer list.")
 }
 
+// gatewayaddresscmd is the handler for the command `siac gateway address`.
+// Prints the gateway's network address.
+func gatewayaddresscmd() {
+	var info api.GatewayInfo
+	err := getAPI("/gateway", &info)
+	if err != nil {
+		fmt.Println("Could not get gateway address:", err)
+		return
+	}
+	fmt.Println("Address:", info.NetAddress)
+}
+
+// gatewaycmd is the handler for the command `siac gateway`.
+// Prints the gateway's network address and number of peers.
+func gatewaycmd() {
+	var info api.GatewayInfo
+	err := getAPI("/gateway", &info)
+	if err != nil {
+		fmt.Println("Could not get gateway address:", err)
+		return
+	}
+	fmt.Println("Address:", info.NetAddress)
+	fmt.Println("Active peers:", len(info.Peers))
+}
+
 // gatewaylistcmd is the handler for the command `siac gateway list`.
 // Prints a list of all peers.
 func gatewaylistcmd() {
@@ -69,7 +101,6 @@ func gatewaylistcmd() {
 		fmt.Println("Could not get peer list:", err)
 		return
 	}
-	fmt.Println("Address:", info.NetAddress)
 	if len(info.Peers) == 0 {
 		fmt.Println("No peers to show.")
 		return
