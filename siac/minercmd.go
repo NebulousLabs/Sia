@@ -12,8 +12,8 @@ var (
 	minerCmd = &cobra.Command{
 		Use:   "miner",
 		Short: "Perform miner actions",
-		Long:  "Interact with the miner",
-		Run:   wrap(minerstatuscmd),
+		Long:  "Perform miner actions and view miner status.",
+		Run:   wrap(minercmd),
 	}
 
 	minerStartCmd = &cobra.Command{
@@ -21,13 +21,6 @@ var (
 		Short: "Start cpu mining",
 		Long:  "Start cpu mining, if the miner is already running, this command does nothing",
 		Run:   wrap(minerstartcmd),
-	}
-
-	minerStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "View miner status",
-		Long:  "View the current mining status",
-		Run:   wrap(minerstatuscmd),
 	}
 
 	minerStopCmd = &cobra.Command{
@@ -38,6 +31,8 @@ var (
 	}
 )
 
+// minerstartcmd is the handler for the command `siac miner start`.
+// Starts the CPU miner.
 func minerstartcmd() {
 	err := get("/miner/start")
 	if err != nil {
@@ -47,7 +42,9 @@ func minerstartcmd() {
 	fmt.Println("CPU Miner is now running.")
 }
 
-func minerstatuscmd() {
+// minercmd is the handler for the command `siac miner`.
+// Prints the status of the miner.
+func minercmd() {
 	status := new(api.MinerGET)
 	err := getAPI("/miner", status)
 	if err != nil {
@@ -66,6 +63,8 @@ Blocks Mined: %d (%d stale)
 `, miningStr, status.CPUHashrate/1000, status.BlocksMined, status.StaleBlocksMined)
 }
 
+// minerstopcmd is the handler for the command `siac miner stop`.
+// Stops the CPU miner.
 func minerstopcmd() {
 	err := get("/miner/stop")
 	if err != nil {

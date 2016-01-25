@@ -154,7 +154,7 @@ func main() {
 		Use:   os.Args[0],
 		Short: "Sia Client v" + build.Version,
 		Long:  "Sia Client v" + build.Version,
-		Run:   version,
+		Run:   wrap(consensuscmd),
 	}
 
 	// create command tree
@@ -175,12 +175,12 @@ func main() {
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(minerCmd)
-	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
+	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd,
 		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd,
-		walletStatusCmd, walletTransactionsCmd, walletUnlockCmd)
+		walletBalanceCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
@@ -192,9 +192,9 @@ func main() {
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 
 	root.AddCommand(gatewayCmd)
-	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)
+	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayAddressCmd, gatewayListCmd)
 
-	root.AddCommand(consensusStatusCmd)
+	root.AddCommand(consensusCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")

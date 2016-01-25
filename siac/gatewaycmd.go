@@ -13,7 +13,7 @@ var (
 		Use:   "gateway",
 		Short: "Perform gateway actions",
 		Long:  "Add or remove a peer, view the current peer list, or synchronize to the network.",
-		Run:   wrap(gatewaystatuscmd),
+		Run:   wrap(gatewaycmd),
 	}
 
 	gatewayAddCmd = &cobra.Command{
@@ -30,14 +30,23 @@ var (
 		Run:   wrap(gatewayremovecmd),
 	}
 
-	gatewayStatusCmd = &cobra.Command{
-		Use:   "status",
+	gatewayAddressCmd = &cobra.Command{
+		Use:   "address",
+		Short: "Print the gateway address",
+		Long:  "Print the network address of the gateway.",
+		Run:   wrap(gatewayaddresscmd),
+	}
+
+	gatewayListCmd = &cobra.Command{
+		Use:   "list",
 		Short: "View a list of peers",
 		Long:  "View the current peer list.",
-		Run:   wrap(gatewaystatuscmd),
+		Run:   wrap(gatewaylistcmd),
 	}
 )
 
+// gatewayaddcmd is the handler for the command `siac gateway add [address]`.
+// Adds a new peer to the peer list.
 func gatewayaddcmd(addr string) {
 	err := post("/gateway/add/"+addr, "")
 	if err != nil {
@@ -47,6 +56,8 @@ func gatewayaddcmd(addr string) {
 	fmt.Println("Added", addr, "to peer list.")
 }
 
+// gatewayremovecmd is the handler for the command `siac gateway remove [address]`.
+// Removes a peer from the peer list.
 func gatewayremovecmd(addr string) {
 	err := post("/gateway/remove/"+addr, "")
 	if err != nil {
@@ -56,14 +67,40 @@ func gatewayremovecmd(addr string) {
 	fmt.Println("Removed", addr, "from peer list.")
 }
 
-func gatewaystatuscmd() {
+// gatewayaddresscmd is the handler for the command `siac gateway address`.
+// Prints the gateway's network address.
+func gatewayaddresscmd() {
 	var info api.GatewayInfo
 	err := getAPI("/gateway", &info)
 	if err != nil {
-		fmt.Println("Could not get gateway status:", err)
+		fmt.Println("Could not get gateway address:", err)
 		return
 	}
 	fmt.Println("Address:", info.NetAddress)
+}
+
+// gatewaycmd is the handler for the command `siac gateway`.
+// Prints the gateway's network address and number of peers.
+func gatewaycmd() {
+	var info api.GatewayInfo
+	err := getAPI("/gateway", &info)
+	if err != nil {
+		fmt.Println("Could not get gateway address:", err)
+		return
+	}
+	fmt.Println("Address:", info.NetAddress)
+	fmt.Println("Active peers:", len(info.Peers))
+}
+
+// gatewaylistcmd is the handler for the command `siac gateway list`.
+// Prints a list of all peers.
+func gatewaylistcmd() {
+	var info api.GatewayInfo
+	err := getAPI("/gateway", &info)
+	if err != nil {
+		fmt.Println("Could not get peer list:", err)
+		return
+	}
 	if len(info.Peers) == 0 {
 		fmt.Println("No peers to show.")
 		return

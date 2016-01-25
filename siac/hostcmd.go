@@ -47,6 +47,8 @@ Doing so will override the standard connectivity checks.`,
 	}
 )
 
+// hostconfigcmd is the handler for the command `siac host config [setting] [value]`.
+// Modifies host settings.
 func hostconfigcmd(param, value string) {
 	switch param {
 	case "price":
@@ -80,6 +82,9 @@ func hostconfigcmd(param, value string) {
 	fmt.Println("Host settings updated.")
 }
 
+// hostannouncecmd is the handler for the command `siac host announce`.
+// Announces yourself as a host to the network. Optionally takes an address to
+// announce as.
 func hostannouncecmd(cmd *cobra.Command, args []string) {
 	var err error
 	switch len(args) {
@@ -98,6 +103,8 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	fmt.Println("Host announcement submitted to network.")
 }
 
+// hostcmd is the handler for the command `siac host`.
+// Prints info about the host.
 func hostcmd() {
 	hg := new(api.HostGET)
 	err := getAPI("/host", &hg)

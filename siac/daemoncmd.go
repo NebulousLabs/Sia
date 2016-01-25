@@ -15,6 +15,8 @@ var (
 	}
 )
 
+// stopcmd is the handler for the command `siac stop`.
+// Stops the daemon.
 func stopcmd() {
 	err := get("/daemon/stop")
 	if err != nil {
