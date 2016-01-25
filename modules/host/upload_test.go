@@ -181,6 +181,17 @@ func TestRPCUpload(t *testing.T) {
 	if expectedRevenue.Cmp(ht.host.revenue) != 0 {
 		t.Error("host's revenue was not moved from anticipated to expected")
 	}
+
+	// Check that the file has been removed from the host directory.
+	fileInfos, err := ioutil.ReadDir(filepath.Join(ht.persistDir, modules.HostDir))
+	if len(fileInfos) != 2 {
+		t.Error("too many files in directory after storage proof completed")
+	}
+	for _, fileInfo := range fileInfos {
+		if fileInfo.Name() != "host.log" && fileInfo.Name() != "settings.json" {
+			t.Error("unexpected file after storage proof", fileInfo.Name())
+		}
+	}
 }
 
 // TestRPCRenew attempts to upload a file to the host, adding coverage to the
