@@ -201,7 +201,7 @@ func (tp *TransactionPool) handleConflicts(ts []types.Transaction, conflicts []T
 	// Check that the transaction set is valid.
 	cc, err := tp.consensusSet.TryTransactionSet(superset)
 	if err != nil {
-		return err
+		return modules.NewConsensusConflict(err.Error())
 	}
 
 	// Remove the conflicts from the transaction pool. The diffs do not need to
@@ -260,7 +260,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 	}
 	cc, err := tp.consensusSet.TryTransactionSet(ts)
 	if err != nil {
-		return err
+		return modules.NewConsensusConflict(err.Error())
 	}
 
 	// Add the transaction set to the pool.
