@@ -145,7 +145,7 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 	}
 }
 
-func version(*cobra.Command, []string) {
+func version() {
 	println("Sia Client v" + build.Version)
 }
 
@@ -162,7 +162,7 @@ func main() {
 		Use:   "version",
 		Short: "Print version information",
 		Long:  "Print version information.",
-		Run:   version,
+		Run:   wrap(version),
 	})
 
 	root.AddCommand(stopCmd)
