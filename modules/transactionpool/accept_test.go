@@ -198,6 +198,17 @@ func TestIntegrationTransactionSuperset(t *testing.T) {
 	if err != nil {
 		t.Fatal("super setting is not working:", err)
 	}
+
+	// Try resubmitting the individual transaction and the superset, a
+	// duplication error should be returned for each case.
+	err = tpt.tpool.AcceptTransactionSet(txnSet[:1])
+	if err != modules.ErrDuplicateTransactionSet {
+		t.Fatal(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != modules.ErrDuplicateTransactionSet {
+		t.Fatal("super setting is not working:", err)
+	}
 }
 
 // TestIntegrationTransactionChild submits a single transaction to the network,
