@@ -154,7 +154,7 @@ func main() {
 		Use:   os.Args[0],
 		Short: "Sia Client v" + build.Version,
 		Long:  "Sia Client v" + build.Version,
-		Run:   version,
+		Run:   wrap(consensuscmd),
 	}
 
 	// create command tree
@@ -194,7 +194,7 @@ func main() {
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayListCmd)
 
-	root.AddCommand(consensusStatusCmd)
+	root.AddCommand(consensusCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")

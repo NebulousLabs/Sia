@@ -9,21 +9,21 @@ import (
 )
 
 var (
-	consensusStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "Print the current state of the daemon",
-		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
-		Run:   wrap(consensusstatuscmd),
+	consensusCmd = &cobra.Command{
+		Use:   "consensus",
+		Short: "Print the current state of consensus",
+		Long:  "Print the current state of consensus such as current block, block height, and target.",
+		Run:   wrap(consensuscmd),
 	}
 )
 
-// consensusstatuscmd is the handler for the command `siac status`.
-// Prints the current state of the daemon.
-func consensusstatuscmd() {
+// consensuscmd is the handler for the command `siac consensus`.
+// Prints the current state of consensus.
+func consensuscmd() {
 	var cg api.ConsensusGET
 	err := getAPI("/consensus", &cg)
 	if err != nil {
-		fmt.Println("Could not get daemon status:", err)
+		fmt.Println("Could not get current consensus state:", err)
 		return
 	}
 	fmt.Printf(`Block:  %v
