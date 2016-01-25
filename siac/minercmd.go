@@ -36,8 +36,7 @@ var (
 func minerstartcmd() {
 	err := get("/miner/start")
 	if err != nil {
-		fmt.Println("Could not start miner:", err)
-		return
+		die("Could not start miner", err)
 	}
 	fmt.Println("CPU Miner is now running.")
 }
@@ -48,8 +47,7 @@ func minercmd() {
 	status := new(api.MinerGET)
 	err := getAPI("/miner", status)
 	if err != nil {
-		fmt.Println("Could not get miner status:", err)
-		return
+		die("Could not get miner status", err)
 	}
 
 	miningStr := "off"
@@ -68,8 +66,7 @@ Blocks Mined: %d (%d stale)
 func minerstopcmd() {
 	err := get("/miner/stop")
 	if err != nil {
-		fmt.Println("Could not stop miner:", err)
-		return
+		die("Could not stop miner", err)
 	}
 	fmt.Println("Stopped mining.")
 }

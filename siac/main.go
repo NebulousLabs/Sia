@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -27,6 +28,7 @@ var (
 // exit codes
 // inspired by sysexits.h
 const (
+	exitCodeGeneral = 1
 	exitCodeUsage   = 64
 )
 
@@ -149,6 +151,20 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 		}
 		fnVal.Call(argVals)
 	}
+}
+
+// die prints a custom message an error, then exits the program with a
+// non-successful error code.
+func die(context string, err error) {
+	fmt.Fprintln(os.Stderr, context)
+	fmt.Fprintln(os.Stderr, "Error:", err)
+	os.Exit(exitCodeGeneral)
+}
+
+// dieNoError is like die, but does not take an error argument.
+func dieNoError(context string) {
+	fmt.Fprintln(os.Stderr, context)
+	os.Exit(exitCodeGeneral)
 }
 
 func version() {

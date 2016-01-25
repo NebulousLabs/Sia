@@ -22,8 +22,7 @@ func hostdbhostscmd() {
 	info := new(api.ActiveHosts)
 	err := getAPI("/renter/hosts/active", info)
 	if err != nil {
-		fmt.Println("Could not fetch host list:", err)
-		return
+		die("Could not fetch host list", err)
 	}
 	if len(info.Hosts) == 0 {
 		fmt.Println("No known active hosts")
