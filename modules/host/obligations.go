@@ -428,7 +428,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 			h.log.Println("WARN: could not submit file contract transaction:", err)
 		}
 	}
-	if co.OriginConfirmed && !co.RevisionConfirmed && co.hasRevision() {
+	if !co.RevisionConfirmed && co.hasRevision() {
 		// The revision transaction has not been seen on the blockchain, and
 		// should be resubmitted.
 		err := h.tpool.AcceptTransactionSet([]types.Transaction{co.RevisionTransaction})
