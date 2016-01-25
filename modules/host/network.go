@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -68,7 +69,17 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
 		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
-		h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
+
+		// Don't clutter the logs with repeat messages - after 1000 messages
+		// have been printed, only print 1-in-200.
+		randInt, err := crypto.RandIntn(200)
+		if err != nil {
+			return
+		}
+		unrecognizedCalls := atomic.LoadUint64(&h.atomicUnrecognizedCalls)
+		if unrecognizedCalls < 1e3 || (unrecognizedCalls > 1e3 && randInt == 0) {
+			h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
+		}
 		return
 	}
 
@@ -90,12 +101,32 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		err = h.managedRPCUpload(conn)
 	default:
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
-		h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+
+		// Don't clutter the logs with repeat messages - after 1000 messages
+		// have been printed, only print 1-in-200.
+		randInt, err := crypto.RandIntn(200)
+		if err != nil {
+			return
+		}
+		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
+		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
+			h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		}
 		return
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
-		h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+
+		// Don't clutter the logs with repeat messages - after 1000 messages
+		// have been printed, only print 1-in-200.
+		randInt, err := crypto.RandIntn(200)
+		if err != nil {
+			return
+		}
+		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
+		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
+			h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+		}
 	}
 }
 
