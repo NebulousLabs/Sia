@@ -177,13 +177,6 @@ func (h *Host) load() error {
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
 
-	// Copy over the file management. The space remaining is recalculated from
-	// disk instead of being saved, to maximize the potential usefulness of
-	// restarting Sia as a means of eliminating unkonwn errors.
-	h.fileCounter = p.FileCounter
-	h.spaceRemaining = p.Settings.TotalStorage
-	h.loadObligations(p.Obligations)
-
 	// Copy over statistics.
 	h.revenue = p.Revenue
 	h.lostRevenue = p.LostRevenue
@@ -199,6 +192,13 @@ func (h *Host) load() error {
 
 	// Utilities.
 	h.settings = p.Settings
+
+	// Copy over the file management. The space remaining is recalculated from
+	// disk instead of being saved, to maximize the potential usefulness of
+	// restarting Sia as a means of eliminating unkonwn errors.
+	h.fileCounter = p.FileCounter
+	h.spaceRemaining = p.Settings.TotalStorage
+	h.loadObligations(p.Obligations)
 
 	// Subscribe to the consensus set.
 	err = h.initConsensusSubscription()

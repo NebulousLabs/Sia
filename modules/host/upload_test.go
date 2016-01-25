@@ -296,6 +296,8 @@ func TestFailedObligation(t *testing.T) {
 		t.Error("host did not reallocate space after failed storage proof")
 	}
 	if rebootHost.lostRevenue.Cmp(expectedLostRevenue) != 0 {
+		t.Error(rebootHost.lostRevenue)
+		t.Error(expectedLostRevenue)
 		t.Error("host did not correctly report lost revenue")
 	}
 }

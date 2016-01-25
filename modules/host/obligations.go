@@ -422,7 +422,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 				// going to be accepted onto the blockchain at any point in the
 				// future, and therefore the obligation should be removed.
 				h.removeObligation(co, obligationFailed)
-				h.log.Println("WARN: a file contract given to the host has been double spent!")
+				h.log.Println("WARN: a file contract given to the host has been invalidated")
 				return
 			}
 			h.log.Println("WARN: could not submit file contract transaction:", err)
