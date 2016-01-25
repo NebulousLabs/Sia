@@ -35,22 +35,21 @@ type hostTester struct {
 	persistDir string
 }
 
-// initWallet creates a wallet key, initializes the host wallet, unlocks it,
-// and then stores the key in the host tester.
-func (ht *hostTester) initWallet() error {
-	// Create the keys for the wallet and unlock it.
-	key, err := crypto.GenerateTwofishKey()
+// Close shuts down all of the modules in the host tester. Close will call
+// panic instead of returning an error to mitigate the need to check the error
+// returned by Close.
+func (ht *hostTester) Close() error {
+	err := ht.host.Close()
 	if err != nil {
-		return err
+		panic(err)
 	}
-	ht.walletKey = key
-	_, err = ht.wallet.Encrypt(key)
+	err = ht.cs.Close()
 	if err != nil {
-		return err
+		panic(err)
 	}
-	err = ht.wallet.Unlock(key)
+	err = ht.gateway.Close()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	return nil
 }
@@ -94,6 +93,26 @@ func (ht *hostTester) initRenting() error {
 		return errors.New("could not start renting in the host tester")
 	}
 	ht.renting = true
+	return nil
+}
+
+// initWallet creates a wallet key, initializes the host wallet, unlocks it,
+// and then stores the key in the host tester.
+func (ht *hostTester) initWallet() error {
+	// Create the keys for the wallet and unlock it.
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return err
+	}
+	ht.walletKey = key
+	_, err = ht.wallet.Encrypt(key)
+	if err != nil {
+		return err
+	}
+	err = ht.wallet.Unlock(key)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -184,6 +203,7 @@ func TestHostInitialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer bht.Close()
 	if bht.host.blockHeight != 0 {
 		t.Error("host initialized to the wrong block height")
 	}
@@ -212,6 +232,7 @@ func TestNilValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	hostDir := filepath.Join(ht.persistDir, modules.HostDir)
 	_, err = New(nil, ht.tpool, ht.wallet, ":0", hostDir)
@@ -321,6 +342,7 @@ func TestSetUnlockHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Get the settings and try changing the unlock hash.
 	settings := ht.host.Settings()
