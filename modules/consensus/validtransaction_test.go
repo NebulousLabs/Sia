@@ -16,7 +16,7 @@ func TestTryValidTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	initialHash := cst.cs.dbConsensusChecksum()
 
 	// Try a valid transaction.
@@ -47,7 +47,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	initialHash := cst.cs.dbConsensusChecksum()
 
 	// Try a valid transaction followed by an invalid transaction.

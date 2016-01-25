@@ -296,7 +296,7 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Mine a block that is valid except for containing a buried invalid
 	// transaction. The transaction has more siacoin inputs than outputs.
@@ -340,7 +340,7 @@ func TestBlockKnownHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Get a block destined to be stale.
 	block, target, err := cst.miner.BlockForWork()
@@ -403,7 +403,7 @@ func TestOrphanHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Try submitting an orphan block to the consensus set. The empty block can
 	// be used, because looking for a parent is one of the first checks the
@@ -428,7 +428,7 @@ func TestMissedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Mine a block that doesn't meet the target.
 	block, target, err := cst.miner.BlockForWork()
@@ -457,7 +457,7 @@ func TestMinerPayoutHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Create a block with the wrong miner payout structure - testing can be
 	// light here because there is heavier testing in the 'types' package,
@@ -484,7 +484,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Submit a block with a timestamp in the future, but not the extreme
 	// future.
@@ -528,7 +528,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Create a good transaction using the wallet.
@@ -578,7 +578,6 @@ func TestInconsistentCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
 
 	// Corrupt the consensus set by adding a new siafund output.
 	sfo := types.SiafundOutput{
@@ -609,7 +608,7 @@ func TestTaxHardfork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Create a file contract with a payout that is put into the blockchain
 	// before the hardfork block but expires after the hardfork block.

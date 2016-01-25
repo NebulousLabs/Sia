@@ -168,9 +168,19 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	return cst, nil
 }
 
-// closeCst safely closes the consensus set tester.
-func (cst *consensusSetTester) closeCst() error {
-	return cst.gateway.Close()
+// Close safely closes the consensus set tester. Because there's not a good way
+// to errcheck when deferring a close, a panic is called in the event of an
+// error.
+func (cst *consensusSetTester) Close() error {
+	err := cst.cs.Close()
+	if err != nil {
+		panic(err)
+	}
+	err = cst.gateway.Close()
+	if err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 // TestNilInputs tries to create new consensus set modules using nil inputs.

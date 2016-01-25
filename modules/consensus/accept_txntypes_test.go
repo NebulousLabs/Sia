@@ -94,7 +94,7 @@ func TestIntegrationSimpleBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	cst.testSimpleBlock()
 }
 
@@ -151,7 +151,7 @@ func TestIntegrationSpendSiacoinsBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	cst.testSpendSiacoinsBlock()
 }
 
@@ -297,7 +297,7 @@ func TestIntegrationValidStorageProofBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	cst.testValidStorageProofBlocks()
 }
 
@@ -401,7 +401,7 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	cst.testMissedStorageProofBlocks()
 }
 
@@ -566,7 +566,7 @@ func TestIntegrationFileContractRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	cst.testFileContractRevision()
 }
 
@@ -662,7 +662,7 @@ func (cst *consensusSetTester) TestIntegrationSpendSiafunds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	cst.testSpendSiafunds()
 }
 
