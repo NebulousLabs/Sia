@@ -50,8 +50,7 @@ var (
 func gatewayaddcmd(addr string) {
 	err := post("/gateway/add/"+addr, "")
 	if err != nil {
-		fmt.Println("Could not add peer:", err)
-		return
+		die("Could not add peer:", err)
 	}
 	fmt.Println("Added", addr, "to peer list.")
 }
@@ -61,8 +60,7 @@ func gatewayaddcmd(addr string) {
 func gatewayremovecmd(addr string) {
 	err := post("/gateway/remove/"+addr, "")
 	if err != nil {
-		fmt.Println("Could not remove peer:", err)
-		return
+		die("Could not remove peer:", err)
 	}
 	fmt.Println("Removed", addr, "from peer list.")
 }
@@ -73,8 +71,7 @@ func gatewayaddresscmd() {
 	var info api.GatewayInfo
 	err := getAPI("/gateway", &info)
 	if err != nil {
-		fmt.Println("Could not get gateway address:", err)
-		return
+		die("Could not get gateway address:", err)
 	}
 	fmt.Println("Address:", info.NetAddress)
 }
@@ -85,8 +82,7 @@ func gatewaycmd() {
 	var info api.GatewayInfo
 	err := getAPI("/gateway", &info)
 	if err != nil {
-		fmt.Println("Could not get gateway address:", err)
-		return
+		die("Could not get gateway address:", err)
 	}
 	fmt.Println("Address:", info.NetAddress)
 	fmt.Println("Active peers:", len(info.Peers))
@@ -98,8 +94,7 @@ func gatewaylistcmd() {
 	var info api.GatewayInfo
 	err := getAPI("/gateway", &info)
 	if err != nil {
-		fmt.Println("Could not get peer list:", err)
-		return
+		die("Could not get peer list:", err)
 	}
 	if len(info.Peers) == 0 {
 		fmt.Println("No peers to show.")

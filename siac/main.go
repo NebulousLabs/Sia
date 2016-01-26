@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -22,6 +23,13 @@ var (
 	initPassword      bool   // supply a custom password when creating a wallet
 	hostVerbose       bool   // display additional host info
 	renterShowHistory bool   // Show download history in addition to download queue.
+)
+
+// exit codes
+// inspired by sysexits.h
+const (
+	exitCodeGeneral = 1
+	exitCodeUsage   = 64
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -135,7 +143,7 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		if len(args) != fnType.NumIn() {
 			cmd.Usage()
-			return
+			os.Exit(exitCodeUsage)
 		}
 		argVals := make([]reflect.Value, fnType.NumIn())
 		for i := range args {
@@ -145,7 +153,14 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 	}
 }
 
-func version(*cobra.Command, []string) {
+// die prints its arguments to stderr, then exits the program with the default
+// error code.
+func die(args ...interface{}) {
+	fmt.Fprintln(os.Stderr, args...)
+	os.Exit(exitCodeGeneral)
+}
+
+func version() {
 	println("Sia Client v" + build.Version)
 }
 
@@ -162,7 +177,7 @@ func main() {
 		Use:   "version",
 		Short: "Print version information",
 		Long:  "Print version information.",
-		Run:   version,
+		Run:   wrap(version),
 	})
 
 	root.AddCommand(stopCmd)
@@ -200,5 +215,11 @@ func main() {
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
 
 	// run
-	root.Execute()
+	if err := root.Execute(); err != nil {
+		// Since no commands return errors (all commands set Command.Run instead of
+		// Command.RunE), Command.Execute() should only return an error on an
+		// invalid command or flag. Therefore Command.Usage() was called (assuming
+		// Command.SilenceUsage is false) and we should exit with exitCodeUsage.
+		os.Exit(exitCodeUsage)
+	}
 }

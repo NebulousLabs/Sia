@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -55,8 +56,7 @@ func hostconfigcmd(param, value string) {
 		// convert price to hastings/byte/block
 		p, ok := new(big.Rat).SetString(value)
 		if !ok {
-			fmt.Println("could not parse price")
-			return
+			die("Could not parse price")
 		}
 		p.Mul(p, big.NewRat(1e24/1e9, 4320))
 		value = new(big.Int).Div(p.Num(), p.Denom()).String()
@@ -65,19 +65,16 @@ func hostconfigcmd(param, value string) {
 		var err error
 		value, err = parseSize(value)
 		if err != nil {
-			fmt.Println("could not parse " + param)
-			return
+			die("Could not parse totalstorage:", err)
 		}
 	case "minduration", "maxduration", "windowsize", "acceptingcontracts": // Other valid settings.
 	default:
 		// Reject invalid host config commands.
-		fmt.Println("\"" + param + "\" is not a host setting")
-		return
+		die("\"" + param + "\" is not a host setting")
 	}
 	err := post("/host", param+"="+value)
 	if err != nil {
-		fmt.Println("Could not update host settings:", err)
-		return
+		die("Could not update host settings:", err)
 	}
 	fmt.Println("Host settings updated.")
 }
@@ -94,11 +91,10 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 		err = post("/host/announce", "netaddress="+args[0])
 	default:
 		cmd.Usage()
-		return
+		os.Exit(exitCodeUsage)
 	}
 	if err != nil {
-		fmt.Println("Could not announce host:", err)
-		return
+		die("Could not announce host:", err)
 	}
 	fmt.Println("Host announcement submitted to network.")
 }
@@ -109,8 +105,7 @@ func hostcmd() {
 	hg := new(api.HostGET)
 	err := getAPI("/host", &hg)
 	if err != nil {
-		fmt.Println("Could not fetch host settings:", err)
-		return
+		die("Could not fetch host settings:", err)
 	}
 	// convert accepting bool
 	accept := "Yes"

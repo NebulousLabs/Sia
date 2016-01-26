@@ -127,8 +127,7 @@ func renteruploadscmd() {
 	var rf api.RenterFiles
 	err := getAPI("/renter/files", &rf)
 	if err != nil {
-		fmt.Println("Could not get upload queue:", err)
-		return
+		die("Could not get upload queue:", err)
 	}
 
 	// TODO: add a --history flag to the uploads command to mirror the --history
@@ -160,8 +159,7 @@ func renterdownloadscmd() {
 	var queue api.RenterDownloadQueue
 	err := getAPI("/renter/downloads", &queue)
 	if err != nil {
-		fmt.Println("Could not get download queue:", err)
-		return
+		die("Could not get download queue:", err)
 	}
 	// Filter out files that have been downloaded.
 	var downloading []modules.DownloadInfo
@@ -204,8 +202,7 @@ func renterdownloadscmd() {
 func renterfilesdeletecmd(path string) {
 	err := post("/renter/delete/"+path, "")
 	if err != nil {
-		fmt.Println("Could not delete file:", err)
-		return
+		die("Could not delete file:", err)
 	}
 	fmt.Println("Deleted", path)
 }
@@ -215,8 +212,7 @@ func renterfilesdeletecmd(path string) {
 func renterfilesdownloadcmd(path, destination string) {
 	err := get("/renter/download/" + path + "?destination=" + abs(destination))
 	if err != nil {
-		fmt.Println("Could not download file:", err)
-		return
+		die("Could not download file:", err)
 	}
 	fmt.Printf("Downloaded '%s' to %s.\n", path, abs(destination))
 }
@@ -227,8 +223,7 @@ func renterfileslistcmd() {
 	var rf api.RenterFiles
 	err := getAPI("/renter/files", &rf)
 	if err != nil {
-		fmt.Println("Could not get file list:", err)
-		return
+		die("Could not get file list:", err)
 	}
 	if len(rf.Files) == 0 {
 		fmt.Println("No files have been uploaded.")
@@ -250,8 +245,7 @@ func renterfilesloadcmd(source string) {
 	var info api.RenterLoad
 	err := postResp("/renter/load", "source="+abs(source), &info)
 	if err != nil {
-		fmt.Println("Could not load file:", err)
-		return
+		die("Could not load file:", err)
 	}
 	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
 	for _, file := range info.FilesAdded {
@@ -265,8 +259,7 @@ func renterfilesloadasciicmd(ascii string) {
 	var info api.RenterLoad
 	err := postResp("/renter/loadascii", "asciisia="+ascii, &info)
 	if err != nil {
-		fmt.Println("Could not load file:", err)
-		return
+		die("Could not load file:", err)
 	}
 	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
 	for _, file := range info.FilesAdded {
@@ -279,8 +272,7 @@ func renterfilesloadasciicmd(ascii string) {
 func renterfilesrenamecmd(path, newpath string) {
 	err := post("/renter/rename/"+path, "newsiapath="+newpath)
 	if err != nil {
-		fmt.Println("Could not rename file:", err)
-		return
+		die("Could not rename file:", err)
 	}
 	fmt.Printf("Renamed %s to %s\n", path, newpath)
 }
@@ -290,8 +282,7 @@ func renterfilesrenamecmd(path, newpath string) {
 func renterfilessharecmd(path, destination string) {
 	err := get(fmt.Sprintf("/renter/share?siapaths=%s&destination=%s", path, abs(destination)))
 	if err != nil {
-		fmt.Println("Could not share file:", err)
-		return
+		die("Could not share file:", err)
 	}
 	fmt.Printf("Exported %s to %s\n", path, abs(destination))
 }
@@ -302,8 +293,7 @@ func renterfilesshareasciicmd(path string) {
 	var data api.RenterShareASCII
 	err := getAPI("/renter/shareascii?siapaths="+path, &data)
 	if err != nil {
-		fmt.Println("Could not share file:", err)
-		return
+		die("Could not share file:", err)
 	}
 	fmt.Println(data.ASCIIsia)
 }
@@ -313,8 +303,7 @@ func renterfilesshareasciicmd(path string) {
 func renterfilesuploadcmd(source, path string) {
 	err := post("/renter/upload/"+path, "source="+abs(source))
 	if err != nil {
-		fmt.Println("Could not upload file:", err)
-		return
+		die("Could not upload file:", err)
 	}
 	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), path)
 }
