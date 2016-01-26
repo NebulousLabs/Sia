@@ -16,7 +16,6 @@ func TestRPCDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 	nickname := "TestRPCDownload1"
 	uploadData, err := ht.uploadFile(nickname, renewDisabled)
 	if err != nil {

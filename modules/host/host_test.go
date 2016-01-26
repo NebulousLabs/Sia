@@ -35,25 +35,6 @@ type hostTester struct {
 	persistDir string
 }
 
-// Close shuts down all of the modules in the host tester. Close will call
-// panic instead of returning an error to mitigate the need to check the error
-// returned by Close.
-func (ht *hostTester) Close() error {
-	err := ht.host.Close()
-	if err != nil {
-		panic(err)
-	}
-	err = ht.cs.Close()
-	if err != nil {
-		panic(err)
-	}
-	err = ht.gateway.Close()
-	if err != nil {
-		panic(err)
-	}
-	return nil
-}
-
 // initRenting prepares the host tester for uploads and downloads by announcing
 // the host to the network and performing other preparational tasks.
 // initRenting takes a while because the renter needs to process the host
@@ -203,7 +184,6 @@ func TestHostInitialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer bht.Close()
 	if bht.host.blockHeight != 0 {
 		t.Error("host initialized to the wrong block height")
 	}
@@ -232,7 +212,6 @@ func TestNilValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 
 	hostDir := filepath.Join(ht.persistDir, modules.HostDir)
 	_, err = New(nil, ht.tpool, ht.wallet, ":0", hostDir)
@@ -342,7 +321,6 @@ func TestSetUnlockHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 
 	// Get the settings and try changing the unlock hash.
 	settings := ht.host.Settings()
