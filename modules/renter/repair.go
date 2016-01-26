@@ -318,16 +318,6 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		newHeight := height + defaultDuration
 		r.renewContracts(f, expContracts, newHeight)
 	}
-
-	// save the repaired file data
-	f.mu.RLock()
-	err = r.saveFile(f)
-	f.mu.RUnlock()
-	if err != nil {
-		// definitely bad, but we probably shouldn't delete from the
-		// repair set if this happens
-		r.log.Printf("failed to save repaired file %v: %v", name, err)
-	}
 }
 
 // repairChunks uploads missing chunks of f to new hosts.
@@ -355,6 +345,17 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 			r.log.Printf("aborting repair of %v: %v", f.name, err)
 			return
 		}
+
+		// save the new contract
+		f.mu.RLock()
+		err = r.saveFile(f)
+		f.mu.RUnlock()
+		if err != nil {
+			// If saving failed for this chunk, it will probably fail for the
+			// next chunk as well. Better to try again on the next cycle.
+			r.log.Printf("failed to save repaired file %v: %v", f.name, err)
+			return
+		}
 	}
 }
 
@@ -377,6 +378,13 @@ func (r *Renter) renewContracts(f *file, contracts []fileContract, newHeight typ
 		// need to delete the old contract; otherwise f.expiringContracts
 		// will continue to return it
 		delete(f.contracts, c.ID)
+
+		// save the updated contract
+		err = r.saveFile(f)
 		f.mu.Unlock()
+		if err != nil {
+			r.log.Printf("failed to save renewed file %v: %v", f.name, err)
+			return
+		}
 	}
 }
