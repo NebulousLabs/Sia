@@ -132,7 +132,6 @@ func TestRPCUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 	ht.host.mu.RLock()
 	baselineAnticipatedRevenue := ht.host.anticipatedRevenue
 	baselineSpace := ht.host.spaceRemaining
@@ -206,7 +205,6 @@ func TestRPCRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 	_, err = ht.uploadFile("TestRPCRenew- 1", renewEnabled)
 	if err != nil {
 		t.Fatal(err)
@@ -459,7 +457,6 @@ func TestUploadConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ht.Close()
 	h := ht.host
 	settings := h.Settings()
 	settings.TotalStorage = 10e3
