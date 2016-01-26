@@ -153,17 +153,10 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 	}
 }
 
-// die prints a custom message an error, then exits the program with a
-// non-successful error code.
-func die(context string, err error) {
-	fmt.Fprintln(os.Stderr, context)
-	fmt.Fprintln(os.Stderr, "Error:", err)
-	os.Exit(exitCodeGeneral)
-}
-
-// dieNoError is like die, but does not take an error argument.
-func dieNoError(context string) {
-	fmt.Fprintln(os.Stderr, context)
+// die prints its arguments to stderr, then exits the program with the default
+// error code.
+func die(args ...interface{}) {
+	fmt.Fprintln(os.Stderr, args...)
 	os.Exit(exitCodeGeneral)
 }
 

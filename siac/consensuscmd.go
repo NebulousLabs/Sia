@@ -23,7 +23,7 @@ func consensuscmd() {
 	var cg api.ConsensusGET
 	err := getAPI("/consensus", &cg)
 	if err != nil {
-		die("Could not get current consensus state", err)
+		die("Could not get current consensus state:", err)
 	}
 	fmt.Printf(`Block:  %v
 Height: %v

@@ -20,7 +20,7 @@ var (
 func stopcmd() {
 	err := get("/daemon/stop")
 	if err != nil {
-		die("Could not stop daemon", err)
+		die("Could not stop daemon:", err)
 	}
 	fmt.Println("Sia daemon stopped.")
 }

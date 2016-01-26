@@ -152,7 +152,7 @@ func walletaddresscmd() {
 	addr := new(api.WalletAddressGET)
 	err := getAPI("/wallet/address", addr)
 	if err != nil {
-		die("Could not generate new address", err)
+		die("Could not generate new address:", err)
 	}
 	fmt.Printf("Created new address: %s\n", addr.Address)
 }
@@ -162,7 +162,7 @@ func walletaddressescmd() {
 	addrs := new(api.WalletAddressesGET)
 	err := getAPI("/wallet/addresses", addrs)
 	if err != nil {
-		die("Failed to fetch addresses", err)
+		die("Failed to fetch addresses:", err)
 	}
 	for _, addr := range addrs.Addresses {
 		fmt.Println(addr)
@@ -176,13 +176,13 @@ func walletinitcmd() {
 	if initPassword {
 		password, err := speakeasy.Ask("Wallet password: ")
 		if err != nil {
-			die("Reading password failed", err)
+			die("Reading password failed:", err)
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
 	err := postResp("/wallet/init", qs, &er)
 	if err != nil {
-		die("Error when encrypting wallet", err)
+		die("Error when encrypting wallet:", err)
 	}
 	fmt.Printf("Seed is:\n %s\n\n", er.PrimarySeed)
 	if initPassword {
@@ -196,12 +196,12 @@ func walletinitcmd() {
 func walletload033xcmd(filepath string) {
 	password, err := speakeasy.Ask("Wallet password: ")
 	if err != nil {
-		die("Reading password failed", err)
+		die("Reading password failed:", err)
 	}
 	qs := fmt.Sprintf("filepath=%s&encryptionpassword=%s", filepath, password)
 	err = post("/wallet/033x", qs)
 	if err != nil {
-		die("Loading wallet failed", err)
+		die("Loading wallet failed:", err)
 	}
 	fmt.Println("Wallet loading successful.")
 }
@@ -210,16 +210,16 @@ func walletload033xcmd(filepath string) {
 func walletloadseedcmd() {
 	password, err := speakeasy.Ask("Wallet password: ")
 	if err != nil {
-		die("Reading password failed", err)
+		die("Reading password failed:", err)
 	}
 	seed, err := speakeasy.Ask("New Seed: ")
 	if err != nil {
-		die("Reading seed failed", err)
+		die("Reading seed failed:", err)
 	}
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
 	err = post("/wallet/seed", qs)
 	if err != nil {
-		die("Could not add seed", err)
+		die("Could not add seed:", err)
 	}
 	fmt.Println("Added Key")
 }
@@ -228,12 +228,12 @@ func walletloadseedcmd() {
 func walletloadsiagcmd(keyfiles string) {
 	password, err := speakeasy.Ask("Wallet password: ")
 	if err != nil {
-		die("Reading password failed", err)
+		die("Reading password failed:", err)
 	}
 	qs := fmt.Sprintf("keyfiles=%s&encryptionpassword=%s", keyfiles, password)
 	err = post("/wallet/siagkey", qs)
 	if err != nil {
-		die("Loading siag key failed", err)
+		die("Loading siag key failed:", err)
 	}
 	fmt.Println("Wallet loading successful.")
 }
@@ -242,7 +242,7 @@ func walletloadsiagcmd(keyfiles string) {
 func walletlockcmd() {
 	err := post("/wallet/lock", "")
 	if err != nil {
-		die("Could not lock wallet", err)
+		die("Could not lock wallet:", err)
 	}
 }
 
@@ -251,7 +251,7 @@ func walletseedscmd() {
 	var seedInfo api.WalletSeedsGET
 	err := getAPI("/wallet/seeds", &seedInfo)
 	if err != nil {
-		die("Error retrieving the current seed", err)
+		die("Error retrieving the current seed:", err)
 	}
 	fmt.Printf("Primary Seed: %s\n"+
 		"Addresses Remaining %d\n"+
@@ -265,11 +265,11 @@ func walletseedscmd() {
 func walletsendsiacoinscmd(amount, dest string) {
 	adjAmount, err := coinUnits(amount)
 	if err != nil {
-		die("Could not parse amount", err)
+		die("Could not parse amount:", err)
 	}
 	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
 	if err != nil {
-		die("Could not send siacoins", err)
+		die("Could not send siacoins:", err)
 	}
 	fmt.Printf("Sent %s hastings to %s\n", adjAmount, dest)
 }
@@ -278,7 +278,7 @@ func walletsendsiacoinscmd(amount, dest string) {
 func walletsendsiafundscmd(amount, dest string) {
 	err := post("/wallet/siafunds", fmt.Sprintf("amount=%s&destination=%s", amount, dest))
 	if err != nil {
-		die("Could not send siafunds", err)
+		die("Could not send siafunds:", err)
 	}
 	fmt.Printf("Sent %s siafunds to %s\n", amount, dest)
 }
@@ -288,7 +288,7 @@ func walletbalancecmd() {
 	status := new(api.WalletGET)
 	err := getAPI("/wallet", status)
 	if err != nil {
-		die("Could not get wallet status", err)
+		die("Could not get wallet status:", err)
 	}
 	encStatus := "Unencrypted"
 	if status.Encrypted {
@@ -324,7 +324,7 @@ func wallettransactionscmd() {
 	wtg := new(api.WalletTransactionsGET)
 	err := getAPI("/wallet/transactions?startheight=0&endheight=10000000", wtg)
 	if err != nil {
-		die("Could not fetch transaction history", err)
+		die("Could not fetch transaction history:", err)
 	}
 
 	fmt.Println("    [height]                                                   [transaction id]    [net siacoins]   [net siafunds]")
@@ -381,12 +381,12 @@ func wallettransactionscmd() {
 func walletunlockcmd() {
 	password, err := speakeasy.Ask("Wallet password: ")
 	if err != nil {
-		die("Reading password failed", err)
+		die("Reading password failed:", err)
 	}
 	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 	err = post("/wallet/unlock", qs)
 	if err != nil {
-		die("Could not unlock wallet", err)
+		die("Could not unlock wallet:", err)
 	}
 	fmt.Println("Wallet unlocked")
 }
