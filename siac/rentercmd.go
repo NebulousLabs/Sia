@@ -43,6 +43,14 @@ var (
 		Run:   wrap(renterdownloadscmd),
 	}
 
+	// DEPRECATED v0.5.0
+	renterDeprecatedDownloadQueueCmd = &cobra.Command{
+		Use:        "queue",
+		Deprecated: `use "downloads [-H | --history]" instead.`,
+		PreRun:     func(*cobra.Command, []string) { renterShowHistory = true }, // Show completed downloads too.
+		Run:        wrap(renterdownloadscmd),
+	}
+
 	renterFilesDeleteCmd = &cobra.Command{
 		Use:     "delete [path]",
 		Aliases: []string{"rm"},
