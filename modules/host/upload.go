@@ -252,8 +252,8 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 
 	// Add this contract to the host's list of obligations.
 	co := &contractObligation{
-		ID:                contractTxn.FileContractID(0),
-		OriginTransaction: contractTxn,
+		ID:                signedTxn.FileContractID(0),
+		OriginTransaction: signedTxn,
 		RevisionConfirmed: true,
 		Path:              filename,
 	}
@@ -512,5 +512,14 @@ func (h *Host) managedRPCRenew(conn net.Conn) error {
 		return err
 	}
 
-	return h.managedNegotiateContract(conn, obligation.fileSize(), obligation.merkleRoot(), filename)
+	err = h.managedNegotiateContract(conn, obligation.fileSize(), obligation.merkleRoot(), filename)
+	if err != nil {
+		// Negotiation failed, delete the copied file.
+		err2 := os.Remove(filename)
+		if err2 != nil {
+			return errors.New(err.Error() + " and " + err2.Error())
+		}
+		return err
+	}
+	return nil
 }

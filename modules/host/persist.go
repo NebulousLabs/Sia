@@ -101,26 +101,6 @@ func (h *Host) save() error {
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 }
 
-// loadObligations loads file contract obligations from the persistent file
-// into the host.
-func (h *Host) loadObligations(cos []*contractObligation) {
-	for _, co := range cos {
-		// Store the obligation in the obligations list.
-		h.obligationsByID[co.ID] = co
-
-		// Update spaceRemaining to account for the storage held by this
-		// obligation.
-		h.spaceRemaining -= int64(co.fileSize())
-
-		// Update anticipated revenue to reflect the revenue in this file
-		// contract.
-		h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value())
-
-		// Handle any required actions for the host.
-		h.handleActionItem(co)
-	}
-}
-
 // establishDefaults configures the default settings for the host, overwriting
 // any existing settings.
 func (h *Host) establishDefaults() error {
@@ -177,13 +157,6 @@ func (h *Host) load() error {
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
 
-	// Copy over the file management. The space remaining is recalculated from
-	// disk instead of being saved, to maximize the potential usefulness of
-	// restarting Sia as a means of eliminating unkonwn errors.
-	h.fileCounter = p.FileCounter
-	h.spaceRemaining = p.Settings.TotalStorage
-	h.loadObligations(p.Obligations)
-
 	// Copy over statistics.
 	h.revenue = p.Revenue
 	h.lostRevenue = p.LostRevenue
@@ -200,12 +173,32 @@ func (h *Host) load() error {
 	// Utilities.
 	h.settings = p.Settings
 
+	// Copy over the file management. The space remaining is recalculated from
+	// disk instead of being saved, to maximize the potential usefulness of
+	// restarting Sia as a means of eliminating unkonwn errors.
+	h.fileCounter = p.FileCounter
+	h.spaceRemaining = p.Settings.TotalStorage
+
 	// Subscribe to the consensus set.
+	for _, obligation := range p.Obligations {
+		// Store the obligation in the obligations list.
+		h.obligationsByID[obligation.ID] = obligation
+
+		// Update spaceRemaining to account for the storage held by this
+		// obligation.
+		h.spaceRemaining -= int64(obligation.fileSize())
+
+		// Update anticipated revenue to reflect the revenue in this file
+		// contract.
+		h.anticipatedRevenue = h.anticipatedRevenue.Add(obligation.value())
+	}
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
 	}
-
+	for _, obligation := range h.obligationsByID {
+		h.handleActionItem(obligation)
+	}
 	return nil
 }
 

@@ -44,7 +44,7 @@ func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	ms := newMockSubscriber()
 	badCCID := modules.ConsensusChangeID{1}
@@ -64,7 +64,7 @@ func TestUnitUnsubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Subscribe the mock subscriber to the consensus set.
 	ms := newMockSubscriber()

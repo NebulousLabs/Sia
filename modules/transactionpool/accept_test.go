@@ -189,7 +189,8 @@ func TestIntegrationTransactionSuperset(t *testing.T) {
 		t.Fatal("transaction set must have dependent transactions")
 	}
 
-	// Submit the first transaction in the set to the transaction pool.
+	// Submit the first transaction in the set to the transaction pool, and
+	// then the superset.
 	err = tpt.tpool.AcceptTransactionSet(txnSet[:1])
 	if err != nil {
 		t.Fatal("first transaction in the transaction set was not valid?")
@@ -197,6 +198,63 @@ func TestIntegrationTransactionSuperset(t *testing.T) {
 	err = tpt.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal("super setting is not working:", err)
+	}
+
+	// Try resubmitting the individual transaction and the superset, a
+	// duplication error should be returned for each case.
+	err = tpt.tpool.AcceptTransactionSet(txnSet[:1])
+	if err != modules.ErrDuplicateTransactionSet {
+		t.Fatal(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != modules.ErrDuplicateTransactionSet {
+		t.Fatal("super setting is not working:", err)
+	}
+}
+
+// TestTransactionSubset submits a transaction set to the network, followed by
+// just a subset, expectint ErrDuplicateTransactionSet as a response.
+func TestIntegrationTransactionSubset(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester("TestTransactionSubset")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fund a partial transaction.
+	fund := types.NewCurrency64(30e6)
+	txnBuilder := tpt.wallet.StartTransaction()
+	err = txnBuilder.FundSiacoins(fund)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnBuilder.AddMinerFee(fund)
+	// wholeTransaction is set to false so that we can use the same signature
+	// to create a double spend.
+	txnSet, err := txnBuilder.Sign(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(txnSet) <= 1 {
+		t.Fatal("test is invalid unless the transaction set has two or more transactions")
+	}
+	// Check that the second transaction is dependent on the first.
+	err = tpt.tpool.AcceptTransactionSet(txnSet[1:])
+	if err == nil {
+		t.Fatal("transaction set must have dependent transactions")
+	}
+
+	// Submit the set to the pool, followed by just the transaction.
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Fatal("super setting is not working:", err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSet[:1])
+	if err != modules.ErrDuplicateTransactionSet {
+		t.Fatal(err)
 	}
 }
 

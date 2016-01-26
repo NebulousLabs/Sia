@@ -19,23 +19,39 @@ type reorgSets struct {
 	cstBackup *consensusSetTester
 }
 
+// Close will close all of the testers in the reorgSets. Because we don't yet
+// have a good way to check errors on a deferred statement, a panic will be
+// thrown if there are any problems closing the reorgSets.
+func (rs *reorgSets) Close() error {
+	err := rs.cstMain.Close()
+	if err != nil {
+		panic(err)
+	}
+	err = rs.cstAlt.Close()
+	if err != nil {
+		panic(err)
+	}
+	err = rs.cstBackup.Close()
+	if err != nil {
+		panic(err)
+	}
+	return nil
+}
+
 // createReorgSets creates a reorg set that is ready to be manipulated.
 func createReorgSets(name string) *reorgSets {
 	cstMain, err := createConsensusSetTester(name + " - 1")
 	if err != nil {
 		panic(err)
 	}
-	defer cstMain.closeCst()
 	cstAlt, err := createConsensusSetTester(name + " - 2")
 	if err != nil {
 		panic(err)
 	}
-	defer cstAlt.closeCst()
 	cstBackup, err := createConsensusSetTester(name + " - 3")
 	if err != nil {
 		panic(err)
 	}
-	defer cstBackup.closeCst()
 
 	return &reorgSets{
 		cstMain:   cstMain,
@@ -148,6 +164,7 @@ func TestIntegrationSimpleReorg(t *testing.T) {
 		t.SkipNow()
 	}
 	rs := createReorgSets("TestIntegrationSimpleReorg")
+	defer rs.Close()
 
 	// Give a simple block to cstMain.
 	rs.cstMain.testSimpleBlock()
@@ -164,6 +181,7 @@ func TestIntegrationSiacoinReorg(t *testing.T) {
 		t.SkipNow()
 	}
 	rs := createReorgSets("TestIntegrationSiacoinReorg")
+	defer rs.Close()
 
 	// Give a siacoin block to cstMain.
 	rs.cstMain.testSpendSiacoinsBlock()
@@ -180,6 +198,7 @@ func TestIntegrationValidStorageProofReorg(t *testing.T) {
 		t.SkipNow()
 	}
 	rs := createReorgSets("TestIntegrationValidStorageProofReorg")
+	defer rs.Close()
 
 	// Give a series of blocks containing a file contract and a valid storage
 	// proof to cstMain.
@@ -197,6 +216,7 @@ func TestIntegrationMissedStorageProofReorg(t *testing.T) {
 		t.SkipNow()
 	}
 	rs := createReorgSets("TestIntegrationMissedStorageProofReorg")
+	defer rs.Close()
 
 	// Give a series of blocks containing a file contract and a valid storage
 	// proof to cstMain.
@@ -214,6 +234,7 @@ func TestIntegrationFileContractRevisionReorg(t *testing.T) {
 		t.SkipNow()
 	}
 	rs := createReorgSets("TestIntegrationFileContractRevisionReorg")
+	defer rs.Close()
 
 	// Give a series of blocks containing a file contract and a valid storage
 	// proof to cstMain.
@@ -231,6 +252,7 @@ func TestIntegrationComplexReorg(t *testing.T) {
 		t.SkipNow()
 	}
 	rs := createReorgSets("TestIntegrationComplexReorg")
+	defer rs.Close()
 
 	// Give a wide variety of block types to cstMain.
 	for i := 0; i < 3; i++ {
@@ -262,7 +284,7 @@ func TestBuriedBadFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Create a bad block that builds on a parent, so that it is part of not

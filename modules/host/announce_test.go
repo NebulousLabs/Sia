@@ -19,6 +19,7 @@ func TestAnnouncement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Place the announcement.
 	ht.host.mu.RLock()

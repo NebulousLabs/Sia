@@ -132,6 +132,7 @@ func TestRPCUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 	ht.host.mu.RLock()
 	baselineAnticipatedRevenue := ht.host.anticipatedRevenue
 	baselineSpace := ht.host.spaceRemaining
@@ -181,6 +182,17 @@ func TestRPCUpload(t *testing.T) {
 	if expectedRevenue.Cmp(ht.host.revenue) != 0 {
 		t.Error("host's revenue was not moved from anticipated to expected")
 	}
+
+	// Check that the file has been removed from the host directory.
+	fileInfos, err := ioutil.ReadDir(filepath.Join(ht.persistDir, modules.HostDir))
+	if len(fileInfos) != 2 {
+		t.Error("too many files in directory after storage proof completed")
+	}
+	for _, fileInfo := range fileInfos {
+		if fileInfo.Name() != "host.log" && fileInfo.Name() != "settings.json" {
+			t.Error("unexpected file after storage proof", fileInfo.Name())
+		}
+	}
 }
 
 // TestRPCRenew attempts to upload a file to the host, adding coverage to the
@@ -194,6 +206,7 @@ func TestRPCRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 	_, err = ht.uploadFile("TestRPCRenew- 1", renewEnabled)
 	if err != nil {
 		t.Fatal(err)
@@ -285,6 +298,8 @@ func TestFailedObligation(t *testing.T) {
 		t.Error("host did not reallocate space after failed storage proof")
 	}
 	if rebootHost.lostRevenue.Cmp(expectedLostRevenue) != 0 {
+		t.Error(rebootHost.lostRevenue)
+		t.Error(expectedLostRevenue)
 		t.Error("host did not correctly report lost revenue")
 	}
 }
@@ -316,8 +331,8 @@ func TestRestartSuccessObligation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i <= 5; i++ {
-		_, err := ht.miner.AddBlock()
+	for i := 0; i <= 3; i++ {
+		_, err = ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -389,7 +404,7 @@ func TestRestartCorruptSuccessObligation(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i <= 3; i++ {
-		_, err := ht.miner.AddBlock()
+		_, err = ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -444,6 +459,7 @@ func TestUploadConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 	h := ht.host
 	settings := h.Settings()
 	settings.TotalStorage = 10e3

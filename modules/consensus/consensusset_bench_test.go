@@ -17,6 +17,6 @@ func BenchmarkCreateServerTester(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		cst.closeCst()
+		cst.Close()
 	}
 }
