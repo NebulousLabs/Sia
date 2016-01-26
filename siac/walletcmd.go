@@ -31,6 +31,13 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 		Run: wrap(walletbalancecmd),
 	}
 
+	// DEPRECATED v0.5.0
+	walletDeprecatedStatusCmd = &cobra.Command{
+		Use:        "status",
+		Deprecated: "use `siac wallet` or `siac wallet balance` instead.",
+		Run:        wrap(walletbalancecmd),
+	}
+
 	walletAddressCmd = &cobra.Command{
 		Use:   "address",
 		Short: "Get a new wallet address",

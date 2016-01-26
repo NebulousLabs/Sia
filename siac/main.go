@@ -211,6 +211,12 @@ func main() {
 
 	root.AddCommand(consensusCmd)
 
+	// DEPRECATED v0.5.0
+	root.AddCommand(consensusDeprecatedStatusCmd)
+	gatewayCmd.AddCommand(gatewayDeprecatedStatusCmd)
+	minerCmd.AddCommand(minerDeprecatedStatusCmd)
+	walletCmd.AddCommand(walletDeprecatedStatusCmd)
+
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
 

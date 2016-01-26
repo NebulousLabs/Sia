@@ -16,6 +16,13 @@ var (
 		Run:   wrap(gatewaycmd),
 	}
 
+	// DEPRECATED v0.5.0
+	gatewayDeprecatedStatusCmd = &cobra.Command{
+		Use:        "status",
+		Deprecated: "use `siac gateway` instead. Use `siac gateway list` to view peer list.",
+		Run:        wrap(gatewaycmd),
+	}
+
 	gatewayAddCmd = &cobra.Command{
 		Use:   "add [address]",
 		Short: "Add a peer",
