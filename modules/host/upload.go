@@ -18,7 +18,7 @@ import (
 
 const (
 	// maxRevisionSize is the maximum number of bytes added in a single revision
-	maxRevisionSize = 1 << 28
+	maxRevisionSize = 1 << 28 // 256 MB
 )
 
 var (

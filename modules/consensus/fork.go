@@ -61,7 +61,7 @@ func (cs *ConsensusSet) revertToBlock(tx *bolt.Tx, pb *processedBlock) (reverted
 
 		// Sanity check - after removing a block, check that the consensus set
 		// has maintained consistency.
-		if build.DEBUG {
+		if build.Release == "testing" {
 			cs.checkConsistency(tx)
 		} else {
 			cs.maybeCheckConsistency(tx)
@@ -92,7 +92,7 @@ func (cs *ConsensusSet) applyUntilBlock(tx *bolt.Tx, pb *processedBlock) (applie
 
 		// Sanity check - after applying a block, check that the consensus set
 		// has maintained consistency.
-		if build.DEBUG {
+		if build.Release == "testing" {
 			cs.checkConsistency(tx)
 		} else {
 			cs.maybeCheckConsistency(tx)
