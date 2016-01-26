@@ -27,7 +27,7 @@ var renewThreshold = func() types.BlockHeight {
 	case "dev":
 		return 200
 	default:
-		return 144 // RC ONLY!
+		return 144 * 7 * 3 // 3 weeks - to soon be 6 weeks.
 	}
 }()
 

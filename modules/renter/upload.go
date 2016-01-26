@@ -30,7 +30,7 @@ var (
 		case "dev":
 			return 200
 		default:
-			return 504 // 3.5 days - RC ONLY!
+			return 144 * 60 // 60 days - to soon be 6 months.
 		}
 	}()
 
