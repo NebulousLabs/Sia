@@ -28,8 +28,8 @@ var (
 // exit codes
 // inspired by sysexits.h
 const (
-	exitCodeGeneral = 1
-	exitCodeUsage   = 64
+	exitCodeGeneral = 1  // Not in sysexits.h, but is standard practice.
+	exitCodeUsage   = 64 // EX_USAGE in sysexits.h
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
