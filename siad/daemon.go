@@ -46,7 +46,7 @@ func processModules(modules string) (string, error) {
 		invalidModules = strings.Replace(invalidModules, string(m), "", 1)
 	}
 	if len(invalidModules) > 0 {
-		return "", errors.New("Unable to parse --modules flag, unrecognized modules: " + invalidModules)
+		return "", errors.New("Unable to parse --modules flag, unrecognized or duplicate modules: " + invalidModules)
 	}
 	return modules, nil
 }
