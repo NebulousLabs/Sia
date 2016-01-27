@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -47,7 +48,7 @@ func processConfig(config Config) (Config, error) {
 		invalidModules = strings.Replace(invalidModules, string(m), "", 1)
 	}
 	if len(invalidModules) > 0 {
-		return Config{}, errors.New("Unrecognized modules: " + invalidModules)
+		return Config{}, errors.New("Unable to parse --modules flag, unrecognized modules: " + invalidModules)
 	}
 	return config, nil
 }
@@ -61,7 +62,7 @@ func startDaemon(config Config) (err error) {
 	// Create all of the modules.
 	var g modules.Gateway
 	if strings.Contains(config.Siad.Modules, "g") {
-		fmt.Print("Loading gateway...")
+		fmt.Println("Loading gateway...")
 		g, err = gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
 		if err != nil {
 			return err
@@ -164,7 +165,7 @@ func startDaemon(config Config) (err error) {
 }
 
 // startDaemonCmd is a passthrough function for startDaemon.
-func startDaemonCmd(*cobra.Command, []string) {
+func startDaemonCmd(cmd *cobra.Command, _ []string) {
 	// Create the profiling directory if profiling is enabled.
 	if globalConfig.Siad.Profile {
 		go profile.StartContinuousProfile(globalConfig.Siad.ProfileDir)
@@ -173,16 +174,14 @@ func startDaemonCmd(*cobra.Command, []string) {
 	// Process the config variables after they are parsed by cobra.
 	config, err := processConfig(globalConfig)
 	if err != nil {
-		fmt.Println(err)
-		// TODO: print err to stderr and die
-		return
+		fmt.Fprintln(os.Stderr, err)
+		cmd.Usage()
+		os.Exit(exitCodeUsage)
 	}
 
 	// Start siad. startDaemon will only return when it is shutting down.
 	err = startDaemon(config)
 	if err != nil {
-		fmt.Println(err)
-		// TODO: print err to stderr and die
-		return
+		die(err)
 	}
 }

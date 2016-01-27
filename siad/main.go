@@ -15,6 +15,13 @@ var (
 	globalConfig Config
 )
 
+// exit codes
+// inspired by sysexits.h
+const (
+	exitCodeGeneral = 1  // Not in sysexits.h, but is standard practice.
+	exitCodeUsage   = 64 // EX_USAGE in sysexits.h
+)
+
 // The Config struct contains all configurable variables for siad. It is
 // compatible with gcfg.
 type Config struct {
@@ -31,6 +38,13 @@ type Config struct {
 		ProfileDir string
 		SiaDir     string
 	}
+}
+
+// die prints its arguments to stderr, then exits the program with the default
+// error code.
+func die(args ...interface{}) {
+	fmt.Fprintln(os.Stderr, args...)
+	os.Exit(exitCodeGeneral)
 }
 
 // versionCmd is a cobra command that prints the version of siad.
@@ -67,5 +81,11 @@ func main() {
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.
-	root.Execute()
+	if err := root.Execute(); err != nil {
+		// Since no commands return errors (all commands set Command.Run instead of
+		// Command.RunE), Command.Execute() should only return an error on an
+		// invalid command or flag. Therefore Command.Usage() was called (assuming
+		// Command.SilenceUsage is false) and we should exit with exitCodeUsage.
+		os.Exit(exitCodeUsage)
+	}
 }
