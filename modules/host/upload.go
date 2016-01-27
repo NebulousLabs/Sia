@@ -456,7 +456,10 @@ func (h *Host) managedRPCRevise(conn net.Conn) error {
 	}
 
 	err = h.tpool.AcceptTransactionSet([]types.Transaction{obligation.RevisionTransaction})
-	if err != nil {
+	if err != nil && err != modules.ErrDuplicateTransactionSet {
+		// It is safe to ignore the duplicate transaction errors, it means that
+		// either the transaction has not changed or the renter already
+		// successfully propagated the transaction through the network.
 		h.log.Println("WARN: transaction pool rejected revision transaction: " + err.Error())
 	}
 	return revisionErr
