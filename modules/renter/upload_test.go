@@ -44,6 +44,7 @@ func (uploadHostDB) Close() error                     { return nil }
 func (uploadHostDB) ActiveHosts() []modules.HostSettings { return nil }
 func (uploadHostDB) AllHosts() []modules.HostSettings    { return nil }
 func (uploadHostDB) AveragePrice() types.Currency        { return types.Currency{} }
+func (uploadHostDB) IsOffline(modules.NetAddress) bool   { return true }
 func (uploadHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
 	return types.FileContractID{}, nil
 }
