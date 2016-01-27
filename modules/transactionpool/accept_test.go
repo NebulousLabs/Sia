@@ -310,11 +310,11 @@ func TestIntegrationNilAccept(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// Create a transaction pool tester.
 	tpt, err := createTpoolTester("TestTransactionChild")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	err = tpt.tpool.AcceptTransactionSet(nil)
 	if err == nil {
 		t.Error("no error returned when submitting nothing to the transaction pool")

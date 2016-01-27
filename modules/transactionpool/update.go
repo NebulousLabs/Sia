@@ -18,6 +18,18 @@ func (tp *TransactionPool) purge() {
 func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	tp.mu.Lock()
 
+	// Scan the applied blocks for transactions that got accepted. This will
+	// help to determine which transactions to remove from the transaction
+	// pool. Having this list enables both efficiency improvements and helps to
+	// clean out transactions with no dependencies, such as arbitrary data
+	// transactions from the host.
+	txids := make(map[types.TransactionID]struct{})
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			txids[txn.ID()] = struct{}{}
+		}
+	}
+
 	// TODO: Right now, transactions that were reverted to not get saved and
 	// retried, because some transactions such as storage proofs might be
 	// illegal, and there's no good way to preserve dependencies when illegal
@@ -36,7 +48,19 @@ func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Save all of the current unconfirmed transaction sets into a list.
 	var unconfirmedSets [][]types.Transaction
 	for _, tSet := range tp.transactionSets {
-		unconfirmedSets = append(unconfirmedSets, tSet)
+		// Compile a new transaction set the removes all transactions duplicated
+		// in the block. Though mostly handled by the dependency manager in the
+		// transaction pool, this should both improve efficiency and will strip
+		// out duplicate transactions with no dependencies (arbitrary data only
+		// transactions)
+		var newTSet []types.Transaction
+		for _, txn := range tSet {
+			_, exists := txids[txn.ID()]
+			if !exists {
+				newTSet = append(newTSet, txn)
+			}
+		}
+		unconfirmedSets = append(unconfirmedSets, newTSet)
 	}
 
 	// Purge the transaction pool. Some of the transactions sets may be invalid
