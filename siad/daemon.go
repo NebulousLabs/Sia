@@ -35,20 +35,32 @@ func processNetAddr(addr string) string {
 	return addr
 }
 
-// processConfig checks the configuration values and performs cleanup on
-// incorrect-but-allowed values.
-func processConfig(config Config) (Config, error) {
-	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
-	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
-	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
-	config.Siad.Modules = strings.ToLower(config.Siad.Modules)
+// processModules makes the modules string lowercase to make checking if a
+// module in the string easier, and returns an error if the string contains an
+// invalid module character.
+func processModules(modules string) (string, error) {
+	modules = strings.ToLower(modules)
 	validModules := "cghmrtwe"
-	invalidModules := config.Siad.Modules
+	invalidModules := modules
 	for _, m := range validModules {
 		invalidModules = strings.Replace(invalidModules, string(m), "", 1)
 	}
 	if len(invalidModules) > 0 {
-		return Config{}, errors.New("Unable to parse --modules flag, unrecognized modules: " + invalidModules)
+		return "", errors.New("Unable to parse --modules flag, unrecognized modules: " + invalidModules)
+	}
+	return modules, nil
+}
+
+// processConfig checks the configuration values and performs cleanup on
+// incorrect-but-allowed values.
+func processConfig(config Config) (Config, error) {
+	var err error
+	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
+	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
+	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
+	config.Siad.Modules, err = processModules(config.Siad.Modules)
+	if err != nil {
+		return Config{}, err
 	}
 	return config, nil
 }
