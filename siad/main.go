@@ -23,7 +23,7 @@ type Config struct {
 		RPCaddr  string
 		HostAddr string
 
-		Explorer          bool
+		Modules           string
 		NoBootstrap       bool
 		RequiredUserAgent string
 
@@ -56,7 +56,6 @@ func main() {
 
 	// Set default values, which have the lowest priority.
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.RequiredUserAgent, "agent", "A", "Sia-Agent", "required substring for the user agent")
-	root.PersistentFlags().BoolVarP(&globalConfig.Siad.Explorer, "explorer", "E", false, "whether or not to run an explorer in the daemon")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
@@ -64,6 +63,7 @@ func main() {
 	root.PersistentFlags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
 	root.PersistentFlags().BoolVarP(&globalConfig.Siad.Profile, "profile", "p", false, "enable profiling")
 	root.PersistentFlags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
+	root.PersistentFlags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

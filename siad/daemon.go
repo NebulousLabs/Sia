@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -34,80 +36,118 @@ func processNetAddr(addr string) string {
 
 // processConfig checks the configuration values and performs cleanup on
 // incorrect-but-allowed values.
-func processConfig(config Config) Config {
+func processConfig(config Config) (Config, error) {
 	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
 	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
 	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
-	return config
+	config.Siad.Modules = strings.ToLower(config.Siad.Modules)
+	validModules := "cghmrtwe"
+	invalidModules := config.Siad.Modules
+	for _, m := range validModules {
+		invalidModules = strings.Replace(invalidModules, string(m), "", 1)
+	}
+	if len(invalidModules) > 0 {
+		return Config{}, errors.New("Unrecognized modules: " + invalidModules)
+	}
+	return config, nil
 }
 
 // startDaemonCmd uses the config parameters to start siad.
-func startDaemon(config Config) error {
+func startDaemon(config Config) (err error) {
 	// Print a startup message.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
 
 	// Create all of the modules.
-	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
-	if err != nil {
-		return err
+	var g modules.Gateway
+	if strings.Contains(config.Siad.Modules, "g") {
+		fmt.Print("Loading gateway...")
+		g, err = gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
+		if err != nil {
+			return err
+		}
 	}
-	cs, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
-	if err != nil {
-		return err
+	var cs modules.ConsensusSet
+	if strings.Contains(config.Siad.Modules, "c") {
+		fmt.Println("Loading consensus...")
+		cs, err = consensus.New(g, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+		if err != nil {
+			return err
+		}
 	}
-	var e *explorer.Explorer
-	if config.Siad.Explorer {
+	var e modules.Explorer
+	if strings.Contains(config.Siad.Modules, "e") {
+		fmt.Println("Loading explorer...")
 		e, err = explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
 		if err != nil {
 			return err
 		}
 	}
-	tpool, err := transactionpool.New(cs, gateway)
-	if err != nil {
-		return err
+	var tpool modules.TransactionPool
+	if strings.Contains(config.Siad.Modules, "t") {
+		fmt.Println("Loading transaction pool...")
+		tpool, err = transactionpool.New(cs, g)
+		if err != nil {
+			return err
+		}
 	}
-	wallet, err := wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
-	if err != nil {
-		return err
+	var w modules.Wallet
+	if strings.Contains(config.Siad.Modules, "w") {
+		fmt.Println("Loading wallet...")
+		w, err = wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
+		if err != nil {
+			return err
+		}
 	}
-	miner, err := miner.New(cs, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
-	if err != nil {
-		return err
+	var m modules.Miner
+	if strings.Contains(config.Siad.Modules, "m") {
+		fmt.Println("Loading miner...")
+		m, err = miner.New(cs, tpool, w, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
+		if err != nil {
+			return err
+		}
 	}
-	host, err := host.New(cs, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
-	if err != nil {
-		return err
+	var h modules.Host
+	if strings.Contains(config.Siad.Modules, "h") {
+		fmt.Println("Loading host...")
+		h, err = host.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
+		if err != nil {
+			return err
+		}
 	}
-	renter, err := renter.New(cs, wallet, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
-	if err != nil {
-		return err
+	var r modules.Renter
+	if strings.Contains(config.Siad.Modules, "r") {
+		fmt.Println("Loading renter...")
+		r, err = renter.New(cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
+		if err != nil {
+			return err
+		}
 	}
 	srv, err := api.NewServer(
 		config.Siad.APIaddr,
 		config.Siad.RequiredUserAgent,
 		cs,
 		e,
-		gateway,
-		host,
-		miner,
-		renter,
+		g,
+		h,
+		m,
+		r,
 		tpool,
-		wallet,
+		w,
 	)
 	if err != nil {
 		return err
 	}
 
 	// Bootstrap to the network.
-	if !config.Siad.NoBootstrap {
+	if !config.Siad.NoBootstrap && g != nil {
 		// connect to 3 random bootstrap nodes
 		perm, err := crypto.Perm(len(modules.BootstrapPeers))
 		if err != nil {
 			return err
 		}
 		for _, i := range perm[:3] {
-			go gateway.Connect(modules.BootstrapPeers[i])
+			go g.Connect(modules.BootstrapPeers[i])
 		}
 	}
 
@@ -131,11 +171,18 @@ func startDaemonCmd(*cobra.Command, []string) {
 	}
 
 	// Process the config variables after they are parsed by cobra.
-	config := processConfig(globalConfig)
-
-	// Start siad. startDaemon will only return when it is shutting down.
-	err := startDaemon(config)
+	config, err := processConfig(globalConfig)
 	if err != nil {
 		fmt.Println(err)
+		// TODO: print err to stderr and die
+		return
+	}
+
+	// Start siad. startDaemon will only return when it is shutting down.
+	err = startDaemon(config)
+	if err != nil {
+		fmt.Println(err)
+		// TODO: print err to stderr and die
+		return
 	}
 }
