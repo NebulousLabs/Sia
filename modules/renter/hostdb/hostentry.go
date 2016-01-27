@@ -31,13 +31,16 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 		return
 	}
 
-	// Add the host to the scan queue. After scanning, it will be placed in
-	// allHosts. If the scan is successful, it will also be placed in
-	// activeHosts.
-	hdb.scanHostEntry(&hostEntry{
+	// Create hostEntry and add to allHosts.
+	h := &hostEntry{
 		HostSettings: host,
 		reliability:  DefaultReliability,
-	})
+	}
+	hdb.allHosts[host.NetAddress] = h
+
+	// Add the host to the scan queue. If the scan is successful, the host
+	// will be placed in activeHosts.
+	hdb.scanHostEntry(h)
 }
 
 // Remove deletes an entry from the hostdb.
