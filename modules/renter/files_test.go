@@ -59,6 +59,39 @@ func TestFileAvailable(t *testing.T) {
 	}
 }
 
+func TestFileRedundancy(t *testing.T) {
+	testNData := []int{1, 2, 10}
+	for _, nData := range testNData {
+		rsc, _ := NewRSCode(nData, 10)
+		f := &file{
+			size:        1000,
+			erasureCode: rsc,
+			pieceSize:   100,
+		}
+
+		r := f.redundancy()
+		if r != 0 {
+			t.Error("expected 0 redundancy, got", r)
+		}
+
+		testRedundancies := []int{1, 6, 10}
+		for _, testR := range testRedundancies {
+			var fc fileContract
+			for i := uint64(0); i < f.numChunks(); i++ {
+				for j := 0; j < testR; j++ {
+					fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
+				}
+			}
+			f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
+			expectedR := float64(testR) / float64(nData)
+			r = f.redundancy()
+			if r != expectedR {
+				t.Errorf("expected %f redundancy, got %f", expectedR, r)
+			}
+		}
+	}
+}
+
 // TestFileExpiration probes the expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
 	f := &file{

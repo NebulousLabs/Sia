@@ -107,6 +107,21 @@ func (f *file) uploadProgress() float64 {
 	return 100 * (float64(uploaded) / float64(desired))
 }
 
+// redundancy returns the average redundancy of a file across all chunks.
+// Because average redundancy is calculated, a redundancy >= 1 does not mean
+// all chunks have been uploaded.
+func (f *file) redundancy() float64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	var uploaded uint64
+	for _, fc := range f.contracts {
+		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
+	}
+	// f.size is not the padded size.
+	paddedSize := f.chunkSize() * f.numChunks()
+	return float64(uploaded) / float64(paddedSize)
+}
+
 // expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) expiration() types.BlockHeight {
@@ -171,6 +186,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			SiaPath:        f.name,
 			Filesize:       f.size,
 			Available:      f.available(),
+			Redundancy:     f.redundancy(),
 			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
