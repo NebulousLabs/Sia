@@ -11,6 +11,7 @@ type hostEntry struct {
 	modules.HostSettings
 	weight      types.Currency
 	reliability types.Currency
+	online      bool
 }
 
 // insert adds a host entry to the state. The host will be inserted into the
@@ -94,4 +95,19 @@ func (hdb *HostDB) AveragePrice() types.Currency {
 		totalPrice = totalPrice.Add(host.Price)
 	}
 	return totalPrice.Div(types.NewCurrency64(uint64(len(hosts))))
+}
+
+// IsOffline reports whether a host is offline. If the HostDB has no record of
+// the host, IsOffline will return false and spawn a goroutine to the scan the
+// host.
+func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
+	if _, ok := hdb.activeHosts[addr]; ok {
+		return false
+	}
+	if h, ok := hdb.allHosts[addr]; ok {
+		return !h.online
+	}
+	// no record of the host; add it to the HostDB
+	hdb.insertHost(modules.HostSettings{NetAddress: addr})
+	return false
 }

@@ -22,6 +22,9 @@ type hostDB interface {
 	// AveragePrice returns the average price of a host.
 	AveragePrice() types.Currency
 
+	// IsOffline reports whether a host is consider offline.
+	IsOffline(modules.NetAddress) bool
+
 	// NewPool returns a new HostPool, which can negotiate contracts with
 	// hosts. The size and duration of these contracts are supplied as
 	// arguments.

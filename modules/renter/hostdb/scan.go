@@ -74,6 +74,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 		return
 	}
 	entry.reliability = entry.reliability.Sub(penalty)
+	entry.online = false
 
 	// If the entry is in the active database, remove it from the active
 	// database.
@@ -159,6 +160,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			hostEntry.HostSettings = settings
 			hostEntry.reliability = MaxReliability
 			hostEntry.weight = calculateHostWeight(*hostEntry)
+			hostEntry.online = true
 
 			// If 'MaxActiveHosts' has not been reached, add the host to the
 			// activeHosts tree.
