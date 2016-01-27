@@ -60,9 +60,11 @@ func startDaemon(config Config) (err error) {
 	loadStart := time.Now()
 
 	// Create all of the modules.
+	i := 0
 	var g modules.Gateway
 	if strings.Contains(config.Siad.Modules, "g") {
-		fmt.Println("Loading gateway...")
+		i++
+		fmt.Printf("(%d/%d) Loading gateway...\n", i, len(config.Siad.Modules))
 		g, err = gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
 		if err != nil {
 			return err
@@ -70,7 +72,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var cs modules.ConsensusSet
 	if strings.Contains(config.Siad.Modules, "c") {
-		fmt.Println("Loading consensus...")
+		i++
+		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(config.Siad.Modules))
 		cs, err = consensus.New(g, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
 		if err != nil {
 			return err
@@ -78,7 +81,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var e modules.Explorer
 	if strings.Contains(config.Siad.Modules, "e") {
-		fmt.Println("Loading explorer...")
+		i++
+		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(config.Siad.Modules))
 		e, err = explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
 		if err != nil {
 			return err
@@ -86,7 +90,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var tpool modules.TransactionPool
 	if strings.Contains(config.Siad.Modules, "t") {
-		fmt.Println("Loading transaction pool...")
+		i++
+		fmt.Printf("(%d/%d) Loading transaction pool...\n", i, len(config.Siad.Modules))
 		tpool, err = transactionpool.New(cs, g)
 		if err != nil {
 			return err
@@ -94,7 +99,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var w modules.Wallet
 	if strings.Contains(config.Siad.Modules, "w") {
-		fmt.Println("Loading wallet...")
+		i++
+		fmt.Printf("(%d/%d) Loading wallet...\n", i, len(config.Siad.Modules))
 		w, err = wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
 		if err != nil {
 			return err
@@ -102,7 +108,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var m modules.Miner
 	if strings.Contains(config.Siad.Modules, "m") {
-		fmt.Println("Loading miner...")
+		i++
+		fmt.Printf("(%d/%d) Loading miner...\n", i, len(config.Siad.Modules))
 		m, err = miner.New(cs, tpool, w, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
 		if err != nil {
 			return err
@@ -110,7 +117,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var h modules.Host
 	if strings.Contains(config.Siad.Modules, "h") {
-		fmt.Println("Loading host...")
+		i++
+		fmt.Printf("(%d/%d) Loading host...\n", i, len(config.Siad.Modules))
 		h, err = host.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
 		if err != nil {
 			return err
@@ -118,7 +126,8 @@ func startDaemon(config Config) (err error) {
 	}
 	var r modules.Renter
 	if strings.Contains(config.Siad.Modules, "r") {
-		fmt.Println("Loading renter...")
+		i++
+		fmt.Printf("(%d/%d) Loading renter...\n", i, len(config.Siad.Modules))
 		r, err = renter.New(cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
 		if err != nil {
 			return err
