@@ -115,7 +115,7 @@ func (h *Host) compatibilityLoad() error {
 			// the old host did not keep the transaction, it's highly unlikely
 			// that a transaction will appear - the obligation should be
 			// removed.
-			h.removeObligation(uo, obligationFailed)
+			h.removeObligation(uo, obligationUnconfirmed)
 			continue
 		}
 		// Check that the file Merkle root matches the Merkle root found in the
@@ -138,10 +138,6 @@ func (h *Host) compatibilityLoad() error {
 			h.removeObligation(uo, obligationFailed)
 			continue
 		}
-
-		// No action items have been created for this contract yet, create
-		// them now.
-		h.handleActionItem(uo)
 	}
 	return nil
 }
