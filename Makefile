@@ -70,7 +70,7 @@ release-std: REBUILD
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
 	goxc -arch="386 amd64 arm" -bc="darwin linux windows" -d=release \
-	     -pv=v0.5.0 -br=rc -include=LICENSE,README.md,doc/API.md   \
+	     -pv=v0.5.1 -br=beta -include=LICENSE,README.md,doc/API.md   \
 	     -tasks-=deb,deb-dev,deb-source,go-test -n=Sia
 
 # clean removes all directories that get automatically created during
