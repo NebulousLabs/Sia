@@ -16,11 +16,16 @@ const (
 	// resubmissionTimeout is the number of blocks that the host will wait
 	// before trying to resubmit a transaction to the blockchain.
 	resubmissionTimeout = 2
+)
 
-	// Booleans to indicate that a contract obligation has been successful or
-	// unsuccessful.
-	obligationSucceeded = true
-	obligationFailed    = false
+const (
+	// When removing an obligation from the host, a status is sent to indicate
+	// whether the obligation was successful (count towards 'revenue'), failed
+	// (count towards 'lost revenue'), or unconfirmed (count towards neither).
+	obligationUnspecified = iota
+	obligationUnconfirmed
+	obligationSucceeded
+	obligationFailed
 )
 
 var (
@@ -347,7 +352,13 @@ func (h *Host) reviseObligation(revisionTransaction types.Transaction) {
 // file, allowing that space to be reallocated to new file contracts.
 //
 // TODO: The error handling in this function is not very tolerant.
-func (h *Host) removeObligation(co *contractObligation, successful bool) {
+func (h *Host) removeObligation(co *contractObligation, status int) {
+	// Sanity check - obligationUnspeficied indicates that the function is
+	// being used incorrectly.
+	if status == obligationUnspecified {
+		h.log.Critical("removeObligation called with unspecified status")
+	}
+
 	// Get the size of the file that's about to be removed.
 	var size int64
 	stat, err := os.Stat(co.Path)
@@ -368,9 +379,9 @@ func (h *Host) removeObligation(co *contractObligation, successful bool) {
 
 	// Update host statistics.
 	h.anticipatedRevenue = h.anticipatedRevenue.Sub(co.value())
-	if successful {
+	if status == obligationSucceeded {
 		h.revenue = h.revenue.Add(co.value())
-	} else {
+	} else if status == obligationFailed {
 		h.lostRevenue = h.lostRevenue.Add(co.value())
 	}
 
@@ -437,7 +448,7 @@ func (h *Host) handleActionItem(co *contractObligation) {
 				// means that it's very unlikely that the file contract is
 				// going to be accepted onto the blockchain at any point in the
 				// future, and therefore the obligation should be removed.
-				h.removeObligation(co, obligationFailed)
+				h.removeObligation(co, obligationUnconfirmed)
 				h.log.Println("WARN: a file contract given to the host has been invalidated:", err)
 				return
 			}
