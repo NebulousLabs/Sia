@@ -12,20 +12,27 @@ import (
 var (
 	hostdbCmd = &cobra.Command{
 		Use:   "hostdb",
-		Short: "List active hosts on the network",
-		Long:  "List active hosts on the network",
-		Run:   wrap(hostdbhostscmd),
+		Short: "View or modify the host database",
+		Long:  "Add and remove hosts, or list active hosts on the network.",
+		Run:   wrap(hostdblistcmd),
 	}
 
 	// DEPRECATED v0.5.2
 	hostdbDeprecatedCmd = &cobra.Command{
 		Use:        "hostdb",
 		Deprecated: "use `siac hostdb` instead.",
-		Run:        wrap(hostdbhostscmd),
+		Run:        wrap(hostdblistcmd),
+	}
+
+	hostdbListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List active hosts on the network",
+		Long:  "List active hosts on the network.",
+		Run:   wrap(hostdblistcmd),
 	}
 )
 
-func hostdbhostscmd() {
+func hostdblistcmd() {
 	info := new(api.ActiveHosts)
 	err := getAPI("/renter/hosts/active", info)
 	if err != nil {
