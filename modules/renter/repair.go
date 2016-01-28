@@ -165,29 +165,10 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	// helper function for determining if a host is offline. A host is
-	// considered offline if it is in AllHosts but not ActiveHosts. For good
-	// order notation, we covert AllHosts and ActiveHosts to a single map. The
-	// map lookup will return true if the host was in ActiveHosts.
-	//
-	// TODO: once the hostdb is persistent, checking for existence in
-	// ActiveHosts should be sufficient.
-	hostSet := make(map[modules.NetAddress]bool)
-	for _, host := range hdb.AllHosts() {
-		hostSet[host.NetAddress] = false
-	}
-	for _, host := range hdb.ActiveHosts() {
-		hostSet[host.NetAddress] = true
-	}
-	isOffline := func(addr modules.NetAddress) bool {
-		active, exists := hostSet[addr]
-		return exists && !active
-	}
-
 	// mark all pieces belonging to offline hosts.
 	offline := make(map[uint64][]uint64)
 	for _, fc := range f.contracts {
-		if isOffline(fc.IP) {
+		if hdb.IsOffline(fc.IP) {
 			for _, p := range fc.Pieces {
 				offline[p.Chunk] = append(offline[p.Chunk], p.Piece)
 			}

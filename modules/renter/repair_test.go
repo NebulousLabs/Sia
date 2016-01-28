@@ -152,36 +152,17 @@ func TestRepair(t *testing.T) {
 // where the bool indicates whether the host is active.
 type offlineHostDB map[modules.NetAddress]bool
 
-// ActiveHosts returns the set of hosts marked active in the offlineHostDB.
-func (hdb offlineHostDB) ActiveHosts() (hosts []modules.HostSettings) {
-	for addr, active := range hdb {
-		if active {
-			hosts = append(hosts, modules.HostSettings{NetAddress: addr})
-		}
-	}
-	return
+// IsOffline is a stub implementation of the IsOffline method.
+func (hdb offlineHostDB) IsOffline(addr modules.NetAddress) bool {
+	return !hdb[addr]
 }
 
-// AllHosts returns the entire contents of the offlineHostDB.
-func (hdb offlineHostDB) AllHosts() (hosts []modules.HostSettings) {
-	for addr := range hdb {
-		hosts = append(hosts, modules.HostSettings{NetAddress: addr})
-	}
-	return
-}
-
-// AveragePrice is a stub implementation of the AveragePrice method.
-func (hdb offlineHostDB) AveragePrice() types.Currency {
-	return types.Currency{}
-}
-
-// NewPool is a stub implementation of the NewPool method.
-func (hdb offlineHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) {
-	return nil, nil
-}
-
-// Renew is a stub implementation of the Renew method.
-func (hdb offlineHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
+// Stub implementations of other hostDB methods.
+func (offlineHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) { return nil, nil }
+func (offlineHostDB) ActiveHosts() []modules.HostSettings                        { return nil }
+func (offlineHostDB) AllHosts() []modules.HostSettings                           { return nil }
+func (offlineHostDB) AveragePrice() types.Currency                               { return types.Currency{} }
+func (offlineHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
 	return types.FileContractID{}, nil
 }
 
