@@ -15,6 +15,13 @@ var (
 		Long:  "Print the current state of consensus such as current block, block height, and target.",
 		Run:   wrap(consensuscmd),
 	}
+
+	// DEPRECATED v0.5.0
+	consensusDeprecatedStatusCmd = &cobra.Command{
+		Use:        "status",
+		Deprecated: "use `siac` or `siac consensus` instead.",
+		Run:        wrap(consensuscmd),
+	}
 )
 
 // consensuscmd is the handler for the command `siac consensus`.
