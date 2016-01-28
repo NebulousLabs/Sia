@@ -16,6 +16,13 @@ var (
 		Long:  "List active hosts on the network",
 		Run:   wrap(hostdbhostscmd),
 	}
+
+	// DEPRECATED v0.5.2
+	hostdbDeprecatedCmd = &cobra.Command{
+		Use:        "hostdb",
+		Deprecated: "use `siac hostdb` instead.",
+		Run:        wrap(hostdbhostscmd),
+	}
 )
 
 func hostdbhostscmd() {
