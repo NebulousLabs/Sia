@@ -1,4 +1,4 @@
-Sia 0.5.0
+Sia 0.5.1
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -122,6 +122,11 @@ Version History
 ---------------
 
 January 2016:
+
+v0.5.1 (patch)
+- Fixed bug severely impacting performance
+- Restored (but deprecated) some siac commands
+- Added modules flag, allowing modules to be disabled
 
 v0.5.0 (minor release)
 - Major API changes to most modules
