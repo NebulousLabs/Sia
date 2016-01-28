@@ -309,7 +309,7 @@ func renterfilesshareasciicmd(path string) {
 // renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
 // Uploads the [source] file to [path] on the Sia network.
 func renterfilesuploadcmd(source, path string) {
-	err := post("/renter/upload/"+path, "source="+abs(source))
+	err := post("/renter/upload/"+path, "renew=true&source="+abs(source))
 	if err != nil {
 		die("Could not upload file:", err)
 	}
