@@ -59,7 +59,7 @@ func TestUnitProcessModules(t *testing.T) {
 	}
 
 	// Test invalid modules.
-	invalidModules := []string{"abdfijklnopqsuvxyz", "cghmrtwez", "cz", "z"}
+	invalidModules := []string{"abdfijklnopqsuvxyz", "cghmrtwez", "cz", "z", "cc", "ccz", "ccm", "cmm", "ccmm"}
 	for _, invalidModule := range invalidModules {
 		_, err := processModules(invalidModule)
 		if err == nil {
