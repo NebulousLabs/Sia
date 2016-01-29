@@ -30,8 +30,7 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// duplicate host should not be scanned
-	hdb.allHosts["bar:1234"] = nil
-	hdb.insertHost(modules.HostSettings{NetAddress: "bar:1234"})
+	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
 	select {
 	case <-hdb.scanPool:
 		t.Error("duplicate host was added to scan pool")
@@ -107,5 +106,45 @@ func TestAveragePrice(t *testing.T) {
 	}
 	if avg := hdb.AveragePrice(); avg.Cmp(types.NewCurrency64(200)) != 0 {
 		t.Error("average of two hosts should be their sum/2:", avg)
+	}
+}
+
+// TestIsOffline tests the IsOffline method.
+func TestIsOffline(t *testing.T) {
+	hdb := &HostDB{
+		allHosts: map[modules.NetAddress]*hostEntry{
+			"foo:1234": &hostEntry{online: true},
+			"bar:1234": &hostEntry{online: false},
+			"baz:1234": &hostEntry{online: true},
+		},
+		activeHosts: map[modules.NetAddress]*hostNode{
+			"foo:1234": nil,
+		},
+		scanPool: make(chan *hostEntry),
+	}
+
+	tests := []struct {
+		addr    modules.NetAddress
+		offline bool
+	}{
+		{"foo:1234", false},
+		{"bar:1234", true},
+		{"baz:1234", false},
+		{"quux:1234", false},
+	}
+	for _, test := range tests {
+		if offline := hdb.IsOffline(test.addr); offline != test.offline {
+			t.Errorf("IsOffline(%v) = %v, expected %v", test.addr, offline, test.offline)
+		}
+	}
+
+	// quux should have sent host down scanPool
+	select {
+	case h := <-hdb.scanPool:
+		if h.NetAddress != "quux:1234" {
+			t.Error("wrong host in scan pool:", h.NetAddress)
+		}
+	case <-time.After(time.Second):
+		t.Error("unknown host was not added to scan pool")
 	}
 }

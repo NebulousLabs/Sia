@@ -2,7 +2,6 @@ package hostdb
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -82,45 +81,5 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	// Check that there is now a host in the hostdb.
 	if len(ht.hostdb.AllHosts()) != 1 {
 		t.Fatal("hostdb should have a host after getting a host announcement transcation")
-	}
-}
-
-// TestIsOffline tests the IsOffline method.
-func TestIsOffline(t *testing.T) {
-	hdb := &HostDB{
-		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo:1234": &hostEntry{online: true},
-			"bar:1234": &hostEntry{online: false},
-			"baz:1234": &hostEntry{online: true},
-		},
-		activeHosts: map[modules.NetAddress]*hostNode{
-			"foo:1234": nil,
-		},
-		scanPool: make(chan *hostEntry),
-	}
-
-	tests := []struct {
-		addr    modules.NetAddress
-		offline bool
-	}{
-		{"foo:1234", false},
-		{"bar:1234", true},
-		{"baz:1234", false},
-		{"quux:1234", false},
-	}
-	for _, test := range tests {
-		if offline := hdb.IsOffline(test.addr); offline != test.offline {
-			t.Errorf("IsOffline(%v) = %v, expected %v", test.addr, offline, test.offline)
-		}
-	}
-
-	// quux should have sent host down scanPool
-	select {
-	case h := <-hdb.scanPool:
-		if h.NetAddress != "quux:1234" {
-			t.Error("wrong host in scan pool:", h.NetAddress)
-		}
-	case <-time.After(time.Second):
-		t.Error("unknown host was not added to scan pool")
 	}
 }
