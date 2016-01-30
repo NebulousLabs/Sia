@@ -107,19 +107,27 @@ func (f *file) uploadProgress() float64 {
 	return 100 * (float64(uploaded) / float64(desired))
 }
 
-// redundancy returns the average redundancy of a file across all chunks.
-// Because average redundancy is calculated, a redundancy >= 1 does not mean
-// all chunks have been uploaded.
+// redundancy returns the redundancy of the least redundant chunk. -1 is
+// returned if the file has 0 chunks. A file becomes available when this
+// redundancy is >= 1. Assumes that every piece is unique within a file
+// contract.
 func (f *file) redundancy() float64 {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-	var uploaded uint64
-	for _, fc := range f.contracts {
-		uploaded += uint64(len(fc.Pieces)) * f.pieceSize
+	if f.numChunks() == 0 {
+		return -1
 	}
-	// f.size is not the padded size.
-	paddedSize := f.chunkSize() * f.numChunks()
-	return float64(uploaded) / float64(paddedSize)
+	piecesPerChunk := make([]int, f.numChunks())
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			piecesPerChunk[p.Chunk]++
+		}
+	}
+	minPieces := piecesPerChunk[0]
+	for _, numPieces := range piecesPerChunk {
+		if numPieces < minPieces {
+			minPieces = numPieces
+		}
+	}
+	return float64(minPieces) / float64(f.erasureCode.MinPieces())
 }
 
 // expiration returns the lowest height at which any of the file's contracts

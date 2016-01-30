@@ -74,12 +74,12 @@ func TestFileRedundancy(t *testing.T) {
 			t.Error("expected 0 redundancy, got", r)
 		}
 
-		testRedundancies := []int{1, 6, 10}
+		testRedundancies := []uint64{1, 6, 10}
 		for _, testR := range testRedundancies {
 			var fc fileContract
 			for i := uint64(0); i < f.numChunks(); i++ {
-				for j := 0; j < testR; j++ {
-					fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: 0})
+				for j := uint64(0); j < testR; j++ {
+					fc.Pieces = append(fc.Pieces, pieceData{Chunk: i, Piece: j})
 				}
 			}
 			f.contracts = map[types.FileContractID]fileContract{types.FileContractID{}: fc}
