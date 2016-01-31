@@ -208,13 +208,13 @@ func (hdb *HostDB) threadedScan() {
 			if n > len(entries) {
 				n = len(entries)
 			}
-			perm, err := crypto.Perm(n)
+			hostOrder, err := crypto.Perm(n)
 			if err != nil {
 				hdb.log.Println("ERR: could not generate random permutation:", err)
 			}
 
 			// Scan each host.
-			for _, randIndex := range perm {
+			for _, randIndex := range hostOrder {
 				hdb.scanHostEntry(entries[randIndex])
 			}
 		}()
