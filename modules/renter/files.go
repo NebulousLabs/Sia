@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -107,13 +108,13 @@ func (f *file) uploadProgress() float64 {
 	return 100 * (float64(uploaded) / float64(desired))
 }
 
-// redundancy returns the redundancy of the least redundant chunk. -1 is
-// returned if the file has 0 chunks. A file becomes available when this
-// redundancy is >= 1. Assumes that every piece is unique within a file
-// contract.
+// redundancy returns the redundancy of the least redundant chunk. A file
+// becomes available when this redundancy is >= 1. Assumes that every piece is
+// unique within a file contract.
 func (f *file) redundancy() float64 {
 	if f.numChunks() == 0 {
-		return -1
+		build.Critical("cannot get redundancy of a file with 0 chunks")
+		return 0
 	}
 	piecesPerChunk := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
