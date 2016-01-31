@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -69,15 +70,15 @@ func TestNew(t *testing.T) {
 
 	// Bad persistDir.
 	_, err = New(stub, stub, stub, "")
-	if err == nil {
-		t.Fatal("expected invalid directory, got nil")
+	if !os.IsNotExist(err) {
+		t.Fatalf("expected invalid directory, got %v", err)
 	}
 
 	// Corrupted persist file.
 	ioutil.WriteFile(filepath.Join(dir, "hostdb.json"), []byte{1, 2, 3}, 0666)
 	_, err = New(stub, stub, stub, dir)
-	if err == nil {
-		t.Fatalf("expected invalid json, got nil")
+	if _, ok := err.(*json.SyntaxError); !ok {
+		t.Fatalf("expected invalid json, got %v", err)
 	}
 
 	// Corrupted logfile.
@@ -88,8 +89,8 @@ func TestNew(t *testing.T) {
 	}
 	defer f.Close()
 	_, err = New(stub, stub, stub, dir)
-	if err == nil {
-		t.Fatal("expected permissions error, got nil")
+	if !os.IsPermission(err) {
+		t.Fatalf("expected permissions error, got %v", err)
 	}
 }
 
