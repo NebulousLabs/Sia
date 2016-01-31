@@ -27,13 +27,13 @@ func TestDecrementReliability(t *testing.T) {
 	hdb.allHosts[h.NetAddress] = h
 	hdb.activeHosts[h.NetAddress] = &hostNode{hostEntry: h}
 	hdb.decrementReliability(h.NetAddress, types.NewCurrency64(0))
-	if _, ok := hdb.activeHosts[h.NetAddress]; ok {
+	if len(hdb.ActiveHosts()) != 0 {
 		t.Error("decrementing did not remove host from activeHosts")
 	}
 
 	// Decrement reliability to 0. This should remove the host from allHosts.
 	hdb.decrementReliability(h.NetAddress, h.reliability)
-	if _, ok := hdb.allHosts[h.NetAddress]; ok {
+	if len(hdb.AllHosts()) != 0 {
 		t.Error("decrementing did not remove host from allHosts")
 	}
 }
@@ -73,7 +73,7 @@ func TestThreadedProbeHosts(t *testing.T) {
 		return nil, net.UnknownNetworkError("fail")
 	})
 	runProbe(h)
-	if _, ok := hdb.activeHosts[h.NetAddress]; ok {
+	if len(hdb.ActiveHosts()) != 0 {
 		t.Error("unresponsive host was added")
 	}
 
@@ -84,7 +84,7 @@ func TestThreadedProbeHosts(t *testing.T) {
 		return theirPipe, nil
 	})
 	runProbe(h)
-	if _, ok := hdb.activeHosts[h.NetAddress]; ok {
+	if len(hdb.ActiveHosts()) != 0 {
 		t.Error("unresponsive host was added")
 	}
 
@@ -104,7 +104,7 @@ func TestThreadedProbeHosts(t *testing.T) {
 		return theirConn, nil
 	})
 	runProbe(h)
-	if _, ok := hdb.activeHosts[h.NetAddress]; !ok {
+	if len(hdb.ActiveHosts()) != 1 {
 		t.Error("host was not added")
 	}
 
