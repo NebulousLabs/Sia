@@ -134,7 +134,7 @@ func TestThreadedScan(t *testing.T) {
 	// host should be sent down scanPool
 	select {
 	case <-hdb.scanPool:
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Error("host was not scanned")
 	}
 
@@ -150,7 +150,7 @@ func TestThreadedScan(t *testing.T) {
 	// host should be sent down scanPool
 	select {
 	case <-hdb.scanPool:
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Error("host was not scanned")
 	}
 }

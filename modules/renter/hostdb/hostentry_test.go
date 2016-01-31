@@ -18,14 +18,14 @@ func TestInsertHost(t *testing.T) {
 	select {
 	case <-hdb.scanPool:
 		t.Error("invalid host was added to scan pool")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 	}
 
 	// valid host should be scanned
 	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
 	select {
 	case <-hdb.scanPool:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Error("host was not scanned")
 	}
 
@@ -34,7 +34,7 @@ func TestInsertHost(t *testing.T) {
 	select {
 	case <-hdb.scanPool:
 		t.Error("duplicate host was added to scan pool")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
