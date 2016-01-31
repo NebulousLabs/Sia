@@ -247,14 +247,8 @@ func renterfileslistcmd() {
 	for _, file := range rf.Files {
 		fmt.Fprintf(w, "%s", filesizeUnits(int64(file.Filesize)))
 		if renterListVerbose {
-			availableStr := "No"
-			if file.Available {
-				availableStr = "Yes"
-			}
-			renewingStr := "No"
-			if file.Renewing {
-				renewingStr = "Yes"
-			}
+			availableStr := yesNo(file.Available)
+			renewingStr := yesNo(file.Renewing)
 			fmt.Fprintf(w, "\t%s\t%0.2f%%\t%0.2f\t%s", availableStr, file.UploadProgress, file.Redundancy, renewingStr)
 		}
 		fmt.Fprintf(w, "\t%s", file.SiaPath)

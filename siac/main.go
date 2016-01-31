@@ -161,6 +161,14 @@ func die(args ...interface{}) {
 	os.Exit(exitCodeGeneral)
 }
 
+// yesNo returns "Yes" if b is true, and "No" if b is false.
+func yesNo(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
+}
+
 func version() {
 	println("Sia Client v" + build.Version)
 }
