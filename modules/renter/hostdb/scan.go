@@ -193,12 +193,8 @@ func (hdb *HostDB) threadedScan() {
 				entry2, exists := hdb.activeHosts[entry.NetAddress]
 				if !exists {
 					entries = append(entries, entry)
-				} else {
-					if build.DEBUG {
-						if entry2.hostEntry != entry {
-							panic("allHosts + activeHosts mismatch!")
-						}
-					}
+				} else if entry2.hostEntry != entry {
+					build.Critical("allHosts + activeHosts mismatch!")
 				}
 			}
 
@@ -227,9 +223,7 @@ func (hdb *HostDB) threadedScan() {
 		minBig := big.NewInt(int64(MinScanSleep))
 		randSleep, err := rand.Int(rand.Reader, maxBig.Sub(maxBig, minBig))
 		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			}
+			build.Critical(err)
 			// If there's an error, sleep for the default amount of time.
 			defaultBig := big.NewInt(int64(DefaultScanSleep))
 			randSleep = defaultBig.Sub(defaultBig, minBig)

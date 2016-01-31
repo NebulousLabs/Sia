@@ -19,8 +19,8 @@ type closeableFile struct {
 // Close closes the file and sets the closed flag.
 func (cf *closeableFile) Close() error {
 	// Sanity check - close should not have been called yet.
-	if build.DEBUG && cf.closed {
-		panic("cannot close the file; already closed")
+	if cf.closed {
+		build.Critical("cannot close the file; already closed")
 	}
 	// Ensure that all data has actually hit the disk.
 	if err := cf.Sync(); err != nil {
@@ -33,8 +33,8 @@ func (cf *closeableFile) Close() error {
 // Write takes the input data and writes it to the file.
 func (cf *closeableFile) Write(b []byte) (int, error) {
 	// Sanity check - close should not have been called yet.
-	if build.DEBUG && cf.closed {
-		panic("cannot write to the file after it has been closed")
+	if cf.closed {
+		build.Critical("cannot write to the file after it has been closed")
 	}
 	return cf.File.Write(b)
 }
@@ -65,13 +65,9 @@ func (l *Logger) Close() error {
 	return l.file.Close()
 }
 
-// Critical will panic if debug mode is activated, and will log the statement
-// otherwise.
+// Critical logs a message with a CRITICAL prefix. If debug mode is enabled,
+// it will also write the message to os.Stderr and panic.
 func (l *Logger) Critical(v ...interface{}) {
-	s := fmt.Sprintln(v...)
-	os.Stderr.WriteString("Severe Error: " + s)
-	l.Println("CRITICAL:", s)
-	if build.DEBUG {
-		panic(s)
-	}
+	l.Print("CRITICAL:", fmt.Sprintln(v...))
+	build.Critical(v...)
 }
