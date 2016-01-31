@@ -32,12 +32,12 @@ var (
 // for uploading files.
 type HostDB struct {
 	// dependencies
-	wallet  wallet
-	tpool   transactionPool
 	dialer  dialer
-	sleeper sleeper
-	persist persister
 	log     logger
+	persist persister
+	sleeper sleeper
+	tpool   transactionPool
+	wallet  wallet
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
