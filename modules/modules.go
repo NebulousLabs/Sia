@@ -8,7 +8,14 @@ import (
 )
 
 var (
-	LogSettings    = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
+	// LogSettings is the recommended settings for logging. This value is
+	// DEPRECATED. Instead, the persist.Logger should be used.
+	LogSettings = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
+
+	// SafeMutexDelay is the recommended timeout for the deadlock detecting
+	// mutex. This value is DEPRECATED, as safe mutexes are no longer
+	// recommended. Instead, the locking conventions should be followed and a
+	// traditional mutex or a demote mutex should be used.
 	SafeMutexDelay time.Duration
 )
 

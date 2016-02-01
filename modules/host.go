@@ -11,7 +11,7 @@ const (
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
 
-	// MaxfileContractSetLen determines the maximum allowed size of a
+	// MaxFileContractSetLen determines the maximum allowed size of a
 	// transaction set that can be sent when trying to negotiate a file
 	// contract. The transaction set will contain all of the unconfirmed
 	// dependencies of the file contract, meaning that it can be quite large.

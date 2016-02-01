@@ -46,9 +46,12 @@ vet:
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
+lintpkgs = ./modules/host ./modules
 lint:
-	golint -min_confidence=1.0 ./modules/host
-	@test -z $$(golint -min_confidence=1.0 ./modules/host)
+	@for package in $(lintpkgs); do                           \
+		golint -min_confidence=1.0 $$package                  \
+		&& test -z $$(golint -min_confidence=1.0 $$package) ; \
+	done
 
 # REBUILD touches all of the build-dependent source files, forcing them to be
 # rebuilt. This is necessary because the go tool is not smart enough to trigger

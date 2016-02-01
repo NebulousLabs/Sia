@@ -8,6 +8,8 @@ import (
 )
 
 var (
+	// RenterDir is the name of the directory that is used to store the
+	// renter's persistent data.
 	RenterDir = "renter"
 )
 

@@ -18,7 +18,12 @@ const (
 	// addresses to prevent accidental spending.
 	SeedChecksumSize = 6
 
-	PublicKeysPerSeed      = 2500
+	// PublicKeysPerSeed define the number of public keys that get pregenerated
+	// for a seed at startup when searching for balances in the blockchain.
+	PublicKeysPerSeed = 2500
+
+	// WalletSeedPreloadDepth is the number of addresses that get automatically
+	// loaded by the wallet at startup.
 	WalletSeedPreloadDepth = 25
 )
 
@@ -41,8 +46,8 @@ var (
 )
 
 type (
-	// AddressSeed is cryptographic entropy that is used to derive spendable
-	// wallet addresses.
+	// Seed is cryptographic entropy that is used to derive spendable wallet
+	// addresses.
 	Seed [crypto.EntropySize]byte
 
 	// WalletTransactionID is a unique identifier for a wallet transaction.
@@ -78,7 +83,7 @@ type (
 		Value          types.Currency    `json:"value"`
 	}
 
-	// A processed transaction is a transaction that has been processed into
+	// A ProcessedTransaction is a transaction that has been processed into
 	// explicit inputs and outputs and tagged with some header data such as
 	// confirmation height + timestamp.
 	//

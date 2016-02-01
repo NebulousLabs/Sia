@@ -5,11 +5,19 @@ import (
 )
 
 const (
+	// GatewayDir is the name of the directory used to store the gateway's
+	// persistent data.
 	GatewayDir = "gateway"
 )
 
 // TODO: Move this and it's functionality into the gateway package.
 var (
+	// BootstrapPeers is a list of peers that can be used to find other peers -
+	// when a client first connects to the network, the only options for
+	// finding peers are either manual entry of peers or to use a hardcoded
+	// bootstrap point. While the bootstrap point could be a central service,
+	// it can also be a list of peers that are known to be stable. We have
+	// chosen to hardcode known-stable peers.
 	BootstrapPeers = []NetAddress{
 		"23.239.14.98:9981",
 		"87.98.216.46:9981",
