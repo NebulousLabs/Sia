@@ -5,6 +5,8 @@ package host
 import (
 	"errors"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -101,6 +103,13 @@ type Host struct {
 	revenue            types.Currency
 	spaceRemaining     int64
 
+	// Utilities.
+	listener   net.Listener
+	log        *persist.Logger
+	mu         sync.RWMutex
+	persistDir string
+	settings   modules.HostSettings
+
 	// The resource lock is held by threaded functions for the duration of
 	// their operation. Functions should grab the resource lock as a read lock
 	// unless they are planning on manipulating the 'closed' variable.
@@ -109,13 +118,6 @@ type Host struct {
 	// accessing them have returned.
 	closed       bool
 	resourceLock sync.RWMutex
-
-	// Utilities.
-	listener   net.Listener
-	log        *persist.Logger
-	mu         sync.RWMutex
-	persistDir string
-	settings   modules.HostSettings
 }
 
 // New returns an initialized Host.
@@ -144,8 +146,21 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		persistDir: persistDir,
 	}
 
-	// Load all of the saved host state into the host.
-	err := h.initPersist()
+	// Create the perist directory if it does not yet exist.
+	err := os.MkdirAll(h.persistDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize the logger. Logging should be initialized ASAP, because the
+	// rest of the initialization makes use of the logger.
+	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
+	if err != nil {
+		return nil, err
+	}
+
+	// Load the prior persistance structures.
+	err = h.load()
 	if err != nil {
 		return nil, err
 	}
@@ -176,12 +191,6 @@ func (h *Host) Close() error {
 		return err
 	}
 
-	// Manage the port forwarding.
-	err = h.clearPort(h.netAddress.Port())
-	if err != nil {
-		return err
-	}
-
 	// Grab the resource lock and indicate that the host is closing. Concurrent
 	// functions hold the resource lock until they terminate, meaning that no
 	// threaded function will be running by the time the resource lock is
@@ -189,6 +198,13 @@ func (h *Host) Close() error {
 	h.resourceLock.Lock()
 	h.closed = true
 	h.resourceLock.Unlock()
+
+	// Clear the port that was forwarded at startup. The port handling must
+	// happen before the logger is closed, as it leaves a logging message.
+	err = h.clearPort(h.netAddress.Port())
+	if err != nil {
+		return err
+	}
 
 	// Save the latest host state.
 	h.mu.Lock()
@@ -198,7 +214,8 @@ func (h *Host) Close() error {
 		return err
 	}
 
-	// Close the logger.
+	// Close the logger. The logger should be the last thing to shut down so
+	// that all other objects have access to logging while closing.
 	err = h.log.Close()
 	if err != nil {
 		return err
