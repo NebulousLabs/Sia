@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	maxContractLen      = 1 << 16      // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 	defaultTotalStorage = 10e9         // 10 GB.
 	defaultMaxDuration  = 144 * 30 * 6 // 6 months.
 )

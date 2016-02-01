@@ -187,7 +187,7 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 	// Read the initial transaction set, which will contain a file contract and
 	// any required parent transactions.
 	var unsignedTxnSet []types.Transaction
-	if err := encoding.ReadObject(conn, &unsignedTxnSet, maxContractLen); err != nil {
+	if err := encoding.ReadObject(conn, &unsignedTxnSet, modules.MaxFileContractSetLen); err != nil {
 		return errors.New("couldn't read the initial transaction set: " + err.Error())
 	}
 	if len(unsignedTxnSet) == 0 {
@@ -218,7 +218,7 @@ func (h *Host) managedNegotiateContract(conn net.Conn, filesize uint64, merkleRo
 
 	// The renter will sign the transaction set, agreeing to pay the host.
 	var signedTxnSet []types.Transaction
-	if err := encoding.ReadObject(conn, &signedTxnSet, maxContractLen); err != nil {
+	if err := encoding.ReadObject(conn, &signedTxnSet, modules.MaxFileContractSetLen); err != nil {
 		return errors.New("couldn't read signed transaction set:" + err.Error())
 	}
 
