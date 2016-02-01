@@ -168,7 +168,7 @@ func (c Currency) Uint64() (u uint64, err error) {
 	if c.Cmp(NewCurrency64(math.MaxUint64)) > 0 {
 		return 0, ErrUint64Overflow
 	}
-	return uint64(c.Big().Int64()), nil
+	return c.Big().Uint64(), nil
 }
 
 // MarshalJSON implements the json.Marshaler interface.

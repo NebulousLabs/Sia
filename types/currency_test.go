@@ -303,14 +303,14 @@ func TestNegativeNewCurrency(t *testing.T) {
 // TestCurrencyUint64 tests that a currency is correctly converted to a uint64.
 func TestCurrencyUint64(t *testing.T) {
 	// Try a set of valid values.
-	attempts := []uint64{0, 1, 2, 3, 4, 25e3, math.MaxUint64}
-	for _, attempt := range attempts {
-		c := NewCurrency64(attempt)
+	values := []uint64{0, 1, 2, 3, 4, 25e3, math.MaxUint64 - 1e6, math.MaxUint64}
+	for _, value := range values {
+		c := NewCurrency64(value)
 		result, err := c.Uint64()
 		if err != nil {
 			t.Error(err)
 		}
-		if attempt != result {
+		if value != result {
 			t.Error("uint64 conversion failed")
 		}
 	}
