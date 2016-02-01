@@ -7,18 +7,46 @@ import (
 )
 
 const (
-	TransactionSizeLimit    = 16e3
+	// TransactionSizeLimit defines the size of the largest transaction that
+	// will be accepted by the transaction pool according to the IsStandard
+	// rules.
+	TransactionSizeLimit = 16e3
+
+	// TransactionSetSizeLimit defines the largest set of dependent unconfirmed
+	// transactions that will be accepted by the transaction pool.
 	TransactionSetSizeLimit = 250e3
 )
 
 var (
+	// ErrDuplicateTransactionSet is the error that gets returned if a
+	// duplicate transaction set is given to the transaction pool.
 	ErrDuplicateTransactionSet = errors.New("transaction is a duplicate")
-	ErrLargeTransaction        = errors.New("transaction is too large for this transaction pool")
-	ErrLargeTransactionSet     = errors.New("transaction set is too large for this transaction pool")
-	ErrInvalidArbPrefix        = errors.New("transaction contains non-standard arbitrary data")
 
+	// ErrLargeTransaction is the error that gets returned if a transaction
+	// provided to the transaction pool is larger than what is allowed by the
+	// IsStandard rules.
+	ErrLargeTransaction = errors.New("transaction is too large for this transaction pool")
+
+	// ErrLargeTransactionSet is the error that gets returned if a transaction
+	// set is given to the transaction pool if the transaction is larger than
+	// limit placed by the IsStandard rules of the transaction pool.
+	ErrLargeTransactionSet = errors.New("transaction set is too large for this transaction pool")
+
+	// ErrInvalidArbPrefix is the error that gets returned if a transaction is
+	// submitted to the transaction pool which contains a prefix that is not
+	// recognized. This helps prevent miners on old versions from mining
+	// potentially illegal transactions in the event of a soft-fork.
+	ErrInvalidArbPrefix = errors.New("transaction contains non-standard arbitrary data")
+
+	// PrefixNonSia defines the prefix that should be appended to any
+	// transactions that use the arbitrary data for reasons outside of the
+	// standard Sia protocol. This will prevent these transactions from being
+	// rejected by the IsStandard set of rules, but also means that the data
+	// will never be used within the formal Sia protocol.
 	PrefixNonSia = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
 
+	// TransactionPoolDir is the name of the directory that is used to store
+	// the transaction pool's persistent data.
 	TransactionPoolDir = "transactionpool"
 )
 

@@ -5,11 +5,19 @@ import (
 )
 
 const (
-	// AcceptResponse defines the response that is sent to a succesful rpc.
+	// AcceptResponse defines the response that is sent to a successful RPC.
 	AcceptResponse = "accept"
 
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
+
+	// MaxFileContractSetLen determines the maximum allowed size of a
+	// transaction set that can be sent when trying to negotiate a file
+	// contract. The transaction set will contain all of the unconfirmed
+	// dependencies of the file contract, meaning that it can be quite large.
+	// The transaction pool's size limit for transaction sets has been chosen
+	// as a reasonable guideline for determining what is too large.
+	MaxFileContractSetLen = TransactionSetSizeLimit - 1e3
 )
 
 var (
@@ -63,7 +71,7 @@ type (
 		UnlockHash         types.UnlockHash  `json:"unlockhash"`
 	}
 
-	// HostRPCMetrics reports the quantity of each type of rpc call that has
+	// HostRPCMetrics reports the quantity of each type of RPC call that has
 	// been made to the host.
 	HostRPCMetrics struct {
 		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
@@ -114,7 +122,7 @@ type (
 		// collateral lost.
 		Revenue() (unresolved, resolved, lost types.Currency)
 
-		// RPCMetrics returns information on the types of rpc calls that have
+		// RPCMetrics returns information on the types of RPC calls that have
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
 
@@ -128,3 +136,36 @@ type (
 		Close() error
 	}
 )
+
+// StoragePriceToConsensus converts a human storage price, having the unit
+// 'Siacoins Per Month Per Terabyte', to a consensus storage price, having the
+// unit 'Hastings Per Block Per Byte'.
+func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Currency) {
+	// Perform multiplication first to preserve precision.
+	hastingsMonthTB := types.NewCurrency64(siacoinsMonthTB).Mul(types.SiacoinPrecision)
+	hastingsBlockTB := hastingsMonthTB.Div(types.NewCurrency64(4320))
+	hastingsBlockByte = hastingsBlockTB.Div(types.NewCurrency64(1e12))
+	return hastingsBlockByte
+}
+
+// StoragePriceToHuman converts a consensus storage price, having the unit
+// 'Hastings Per Block Per Byte', to a human storage price, having the unit
+// 'Siacoins Per Month Per Terabyte'. An error is returned if the result would
+// overflow a uint64. If the result is between 0 and 1, the value is rounded to
+// the nearest value.
+func StoragePriceToHuman(hastingsBlockByte types.Currency) (siacoinsMonthTB uint64, err error) {
+	// Perform multiplication first to preserve precision.
+	hastingsMonthByte := hastingsBlockByte.Mul(types.NewCurrency64(4320))
+	hastingsMonthTB := hastingsMonthByte.Mul(types.NewCurrency64(1e12))
+	if hastingsMonthTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
+		// The result of the final division is going to be less than 0.5,
+		// therefore 0 should be returned.
+		return 0, nil
+	}
+	if hastingsMonthTB.Cmp(types.SiacoinPrecision) < 0 {
+		// The result of the final division is going to be greater than or
+		// equal to 0.5, but less than 1, therefore 1 should be returned.
+		return 1, nil
+	}
+	return hastingsMonthTB.Div(types.SiacoinPrecision).Uint64()
+}

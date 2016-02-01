@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -225,7 +226,7 @@ func TestNegativeCurrencyMulRat(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
-		if r != ErrNegativeCurrency {
+		if r == nil {
 			t.Error("no panic occured when trying to create a negative currency")
 		}
 	}()
@@ -240,7 +241,7 @@ func TestNegativeCurrencySub(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
-		if r != ErrNegativeCurrency {
+		if r == nil {
 			t.Error("no panic occured when trying to create a negative currency")
 		}
 	}()
@@ -289,7 +290,7 @@ func TestNegativeNewCurrency(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
-		if r != ErrNegativeCurrency {
+		if r == nil {
 			t.Error("no panic occured when trying to create a negative currency")
 		}
 	}()
@@ -297,4 +298,31 @@ func TestNegativeNewCurrency(t *testing.T) {
 	// Try to create a new currency from a negative number.
 	negBig := big.NewInt(-1)
 	_ = NewCurrency(negBig)
+}
+
+// TestCurrencyUint64 tests that a currency is correctly converted to a uint64.
+func TestCurrencyUint64(t *testing.T) {
+	// Try a set of valid values.
+	values := []uint64{0, 1, 2, 3, 4, 25e3, math.MaxUint64 - 1e6, math.MaxUint64}
+	for _, value := range values {
+		c := NewCurrency64(value)
+		result, err := c.Uint64()
+		if err != nil {
+			t.Error(err)
+		}
+		if value != result {
+			t.Error("uint64 conversion failed")
+		}
+	}
+
+	// Try an overflow.
+	c := NewCurrency64(math.MaxUint64)
+	c = c.Mul(NewCurrency64(2))
+	result, err := c.Uint64()
+	if err != ErrUint64Overflow {
+		t.Error(err)
+	}
+	if result != 0 {
+		t.Error("result is not being zeroed in the event of an error")
+	}
 }

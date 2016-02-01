@@ -5,6 +5,8 @@ import (
 )
 
 const (
+	// MinerDir is the name of the directory that is used to store the miner's
+	// persistent data.
 	MinerDir = "miner"
 )
 

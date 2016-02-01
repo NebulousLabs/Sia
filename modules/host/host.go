@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	maxContractLen      = 1 << 16      // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 	defaultTotalStorage = 10e9         // 10 GB.
 	defaultMaxDuration  = 144 * 30 * 6 // 6 months.
 )
@@ -24,7 +23,7 @@ var (
 	// defaultPrice defines the starting price for hosts selling storage. We
 	// try to match a number that is both reasonably profitable and reasonably
 	// competitive.
-	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(100)) // 100 SC / GB / Month
+	defaultPrice = modules.StoragePriceToConsensus(100e3) // 100 SC / GB / Month
 
 	// defaultCollateral defines the amount of money that the host puts up as
 	// collateral per-byte by default. Set to zero currently because neither of
