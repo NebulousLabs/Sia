@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -297,4 +298,31 @@ func TestNegativeNewCurrency(t *testing.T) {
 	// Try to create a new currency from a negative number.
 	negBig := big.NewInt(-1)
 	_ = NewCurrency(negBig)
+}
+
+// TestCurrencyUint64 tests that a currency is correctly converted to a uint64.
+func TestCurrencyUint64(t *testing.T) {
+	// Try a set of valid values.
+	attempts := []uint64{0, 1, 2, 3, 4, 25e3, math.MaxUint64}
+	for _, attempt := range attempts {
+		c := NewCurrency64(attempt)
+		result, err := c.Uint64()
+		if err != nil {
+			t.Error(err)
+		}
+		if attempt != result {
+			t.Error("uint64 conversion failed")
+		}
+	}
+
+	// Try an overflow.
+	c := NewCurrency64(math.MaxUint64)
+	c = c.Mul(NewCurrency64(2))
+	result, err := c.Uint64()
+	if err != ErrUint64Overflow {
+		t.Error(err)
+	}
+	if result != 0 {
+		t.Error("result is not being zeroed in the event of an error")
+	}
 }

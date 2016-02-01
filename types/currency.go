@@ -159,6 +159,18 @@ func (x Currency) Sub(y Currency) (c Currency) {
 	return
 }
 
+// Uint64 converts a Currency to a uint64. An error is returned because this
+// function is sometimes called on values that can be determined by users -
+// rather than have all user-facing points do input checking, the input
+// checking should happen at the base type. This minimizes the chances of a
+// rogue user causing a build.Critical to be triggered.
+func (c Currency) Uint64() (u uint64, err error) {
+	if c.Cmp(NewCurrency64(math.MaxUint64)) > 0 {
+		return 0, ErrUint64Overflow
+	}
+	return uint64(c.Big().Int64()), nil
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 func (c Currency) MarshalJSON() ([]byte, error) {
 	// Must enclosed the value in quotes; otherwise JS will convert it to a
