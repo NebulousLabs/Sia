@@ -3,13 +3,14 @@ package profile
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 // There's a global lock on cpu and memory profiling, because I'm not sure what
@@ -80,35 +81,34 @@ func SaveMemProfile(profileDir, identifier string) error {
 	return nil
 }
 
-// StartContinuousProfiling starts profiling in a gothread, logging at
-// intervals various metrics such as the number of gothreads and some memory
-// statistics.
+// StartContinuousProfiling will continuously print statistics about the cpu
+// usage, memory usage, and runtime stats of the program.
 func StartContinuousProfile(profileDir string) {
+	// Create the folder for all of the profiling results.
 	err := os.MkdirAll(profileDir, 0700)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	// Create a logger to infrequently log performance statistics.
+	// Continuously log statistics about the running Sia application.
 	go func() {
-		// Create a logger for the goroutine.
-		logFile, err := os.OpenFile(filepath.Join(profileDir, "continuousProfiling.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+		// Create the logger.
+		log, err := persist.NewLogger(filepath.Join(profileDir, "continuousProfiling.log"))
 		if err != nil {
-			fmt.Println("Goroutine logging failed:", err)
+			fmt.Println("Profile logging failed:", err)
 			return
 		}
-		log := log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
-		log.Println("Continuous profiling started.")
 
-		// Infinite loop to print out the goroutine count.
-		sleepTime := time.Second * 3
+		// Collect statistics in an infinite loop.
+		sleepTime := time.Second * 20
 		for {
 			// Sleep for an exponential amount of time each iteration, this
 			// keeps the size of the log small while still providing lots of
 			// information.
 			time.Sleep(sleepTime)
 			sleepTime = time.Duration(1.5 * float64(sleepTime))
+
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
 			log.Printf("\n\tGoroutines: %v\n\tAlloc: %v\n\tTotalAlloc: %v\n\tHeapAlloc: %v\n\tHeapSys: %v\n", runtime.NumGoroutine(), m.Alloc, m.TotalAlloc, m.HeapAlloc, m.HeapSys)
