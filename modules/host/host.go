@@ -23,7 +23,7 @@ var (
 	// defaultPrice defines the starting price for hosts selling storage. We
 	// try to match a number that is both reasonably profitable and reasonably
 	// competitive.
-	defaultPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(100)) // 100 SC / GB / Month
+	defaultPrice = modules.StoragePriceToConsensus(100e3) // 100 SC / GB / Month
 
 	// defaultCollateral defines the amount of money that the host puts up as
 	// collateral per-byte by default. Set to zero currently because neither of
