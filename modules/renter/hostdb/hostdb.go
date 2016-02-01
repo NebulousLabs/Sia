@@ -6,7 +6,7 @@ package hostdb
 
 import (
 	"errors"
-	"log"
+	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -22,19 +22,22 @@ const (
 )
 
 var (
-	errNilCS     = errors.New("cannot create renter with nil consensus set")
-	errNilWallet = errors.New("cannot create renter with nil wallet")
-	errNilTpool  = errors.New("cannot create renter with nil transaction pool")
+	errNilCS     = errors.New("cannot create hostdb with nil consensus set")
+	errNilWallet = errors.New("cannot create hostdb with nil wallet")
+	errNilTpool  = errors.New("cannot create hostdb with nil transaction pool")
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
-	// modules
-	cs     modules.ConsensusSet
-	wallet modules.Wallet
-	tpool  modules.TransactionPool
+	// dependencies
+	dialer  dialer
+	log     logger
+	persist persister
+	sleeper sleeper
+	tpool   transactionPool
+	wallet  wallet
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -58,10 +61,7 @@ type HostDB struct {
 	contracts     map[types.FileContractID]hostContract
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 
-	persistDir string
-
-	log *log.Logger
-	mu  sync.RWMutex
+	mu sync.RWMutex
 }
 
 // a hostContract includes the original contract made with a host, along with
@@ -75,9 +75,9 @@ type hostContract struct {
 	SecretKey       crypto.SecretKey
 }
 
-// New creates and starts up a hostdb. The hostdb that gets returned will not
-// have finished scanning the network or blockchain.
-func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*HostDB, error) {
+// New returns a new HostDB.
+func New(cs consensusSet, wallet walletShim, tpool transactionPool, persistDir string) (*HostDB, error) {
+	// Check for nil inputs.
 	if cs == nil {
 		return nil, errNilCS
 	}
@@ -88,20 +88,43 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 		return nil, errNilTpool
 	}
 
+	// Create the persist directory if it does not yet exist.
+	err := os.MkdirAll(persistDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+	// Create the logger.
+	logger, err := newLogger(persistDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create HostDB using production dependencies.
+	return newHostDB(cs, &walletBridge{w: wallet}, tpool, stdDialer{}, stdSleeper{}, newPersist(persistDir), logger)
+}
+
+// newHostDB creates a HostDB using the provided dependencies. It loads the old
+// persistence data, spawns the HostDB's scanning threads, and subscribes it to
+// the consensusSet.
+func newHostDB(cs consensusSet, w wallet, tp transactionPool, d dialer, s sleeper, p persister, l logger) (*HostDB, error) {
+	// Create the HostDB object.
 	hdb := &HostDB{
-		cs:     cs,
-		wallet: wallet,
-		tpool:  tpool,
+		wallet:  w,
+		tpool:   tp,
+		dialer:  d,
+		sleeper: s,
+		persist: p,
+		log:     l,
 
 		contracts:   make(map[types.FileContractID]hostContract),
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
-
-		persistDir: persistDir,
 	}
-	err := hdb.initPersist()
-	if err != nil {
+
+	// Load the prior persistance structures.
+	err := hdb.load()
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 

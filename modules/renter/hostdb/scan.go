@@ -7,10 +7,10 @@ package hostdb
 import (
 	"crypto/rand"
 	"math/big"
-	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -71,6 +71,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// Look up the entry and decrement the reliability.
 	entry, exists := hdb.allHosts[addr]
 	if !exists {
+		// TODO: should panic here
 		return
 	}
 	entry.reliability = entry.reliability.Sub(penalty)
@@ -99,7 +100,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 		// Request settings from the queued host entry.
 		var settings modules.HostSettings
 		err := func() error {
-			conn, err := net.DialTimeout("tcp", string(hostEntry.NetAddress), hostRequestTimeout)
+			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
 			if err != nil {
 				return err
 			}
@@ -188,46 +189,30 @@ func (hdb *HostDB) threadedScan() {
 			}
 
 			// Assemble all of the inactive hosts into a single array.
-			var random []*hostEntry
+			var entries []*hostEntry
 			for _, entry := range hdb.allHosts {
 				entry2, exists := hdb.activeHosts[entry.NetAddress]
 				if !exists {
-					random = append(random, entry)
-				} else {
-					if build.DEBUG {
-						if entry2.hostEntry != entry {
-							panic("allHosts + activeHosts mismatch!")
-						}
-					}
+					entries = append(entries, entry)
+				} else if entry2.hostEntry != entry {
+					build.Critical("allHosts + activeHosts mismatch!")
 				}
 			}
 
-			// Randomize the slice by swapping each element with an element
-			// that hasn't been visited yet.
-			for i := 0; i < len(random); i++ {
-				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(random)-i)))
-				if err != nil {
-					if build.DEBUG {
-						panic(err)
-					}
-				} else {
-					break
-				}
-
-				n := int(N.Int64()) + i
-				tmp := random[i]
-				random[i] = random[n]
-				random[n] = tmp
-			}
-
-			// Select the first InactiveHostCheckupQuantity hosts from the
-			// shuffled list and scan them.
+			// Generate a random ordering of up to InactiveHostCheckupQuantity
+			// hosts.
 			n := InactiveHostCheckupQuantity
-			if len(random) < InactiveHostCheckupQuantity {
-				n = len(random)
+			if n > len(entries) {
+				n = len(entries)
 			}
-			for i := 0; i < n; i++ {
-				hdb.scanHostEntry(random[i])
+			hostOrder, err := crypto.Perm(n)
+			if err != nil {
+				hdb.log.Println("ERR: could not generate random permutation:", err)
+			}
+
+			// Scan each host.
+			for _, randIndex := range hostOrder {
+				hdb.scanHostEntry(entries[randIndex])
 			}
 		}()
 
@@ -239,14 +224,11 @@ func (hdb *HostDB) threadedScan() {
 		minBig := big.NewInt(int64(MinScanSleep))
 		randSleep, err := rand.Int(rand.Reader, maxBig.Sub(maxBig, minBig))
 		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			} else {
-				// If there's an error, sleep for the default amount of time.
-				defaultBig := big.NewInt(int64(DefaultScanSleep))
-				randSleep = defaultBig.Sub(defaultBig, minBig)
-			}
+			build.Critical(err)
+			// If there's an error, sleep for the default amount of time.
+			defaultBig := big.NewInt(int64(DefaultScanSleep))
+			randSleep = defaultBig.Sub(defaultBig, minBig)
 		}
-		time.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep) // this means the MaxScanSleep is actual Max+Min.
+		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep) // this means the MaxScanSleep is actual Max+Min.
 	}
 }

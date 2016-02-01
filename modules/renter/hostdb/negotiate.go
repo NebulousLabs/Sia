@@ -20,7 +20,7 @@ var (
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder modules.TransactionBuilder, tpool modules.TransactionPool) (hostContract, error) {
+func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool) (hostContract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -205,7 +205,7 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 	txnBuilder := hdb.wallet.StartTransaction()
 
 	// initiate connection
-	conn, err := net.DialTimeout("tcp", string(host.NetAddress), 15*time.Second)
+	conn, err := hdb.dialer.DialTimeout(host.NetAddress, 15*time.Second)
 	if err != nil {
 		return hostContract{}, err
 	}
@@ -373,7 +373,7 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	txnBuilder := hdb.wallet.StartTransaction()
 
 	// initiate connection
-	conn, err := net.DialTimeout("tcp", string(hc.IP), 15*time.Second)
+	conn, err := hdb.dialer.DialTimeout(hc.IP, 15*time.Second)
 	if err != nil {
 		return types.FileContractID{}, err
 	}

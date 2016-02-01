@@ -121,7 +121,7 @@ func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
 	// TODO: check for excessive price again?
 
 	// initiate revision loop
-	conn, err := net.DialTimeout("tcp", string(hc.IP), 15*time.Second)
+	conn, err := hdb.dialer.DialTimeout(hc.IP, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ outer:
 
 	// Ask the hostdb for random hosts. We always ask for at least 10, to
 	// avoid selecting the same uncooperative hosts over and over.
-	ask := n
+	ask := n * 2
 	if ask < 10 {
 		ask = 10
 	}
@@ -244,7 +244,7 @@ outer:
 	if len(errs) == len(randHosts) && len(errs) > 0 {
 		// Log the last error, since early errors are more likely to be
 		// host-specific.
-		p.hdb.log.Printf("couldn't form any host contracts: %v", errs[len(errs)-1])
+		p.hdb.log.Println("couldn't form any host contracts:", errs[len(errs)-1])
 	}
 	return hosts
 }
