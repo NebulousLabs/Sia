@@ -31,18 +31,23 @@ type (
 )
 
 var (
+	// ZeroCurrency defines a currency of value zero.
 	ZeroCurrency = NewCurrency64(0)
 
+	// ErrNegativeCurrency is the error that is returned if performing an
+	// operation results in a negative currency.
 	ErrNegativeCurrency = errors.New("negative currency not allowed")
+
+	// ErrUint64Overflow is the error that is returned if converting to a
+	// unit64 would cause an overflow.
+	ErrUint64Overflow = errors.New("cannot return the uint64 of this currency - result is an overflow")
 )
 
 // NewCurrency creates a Currency value from a big.Int. Undefined behavior
 // occurs if a negative input is used.
 func NewCurrency(b *big.Int) (c Currency) {
 	if b.Sign() < 0 {
-		if build.DEBUG {
-			panic(ErrNegativeCurrency)
-		}
+		build.Critical(ErrNegativeCurrency)
 	} else {
 		c.i = *b
 	}
@@ -92,9 +97,7 @@ func (x Currency) Mul(y Currency) (c Currency) {
 // Behavior is undefined when x is negative.
 func (x Currency) MulFloat(y float64) (c Currency) {
 	if y < 0 {
-		if build.DEBUG {
-			panic(ErrNegativeCurrency)
-		}
+		build.Critical(ErrNegativeCurrency)
 	} else {
 		cRat := new(big.Rat).Mul(
 			new(big.Rat).SetInt(&x.i),
@@ -108,9 +111,7 @@ func (x Currency) MulFloat(y float64) (c Currency) {
 // MulRat returns a new Currency value c = x * y, where y is a big.Rat.
 func (x Currency) MulRat(y *big.Rat) (c Currency) {
 	if y.Sign() < 0 {
-		if build.DEBUG {
-			panic(ErrNegativeCurrency)
-		}
+		build.Critical(ErrNegativeCurrency)
 	} else {
 		c.i.Mul(&x.i, y.Num())
 		c.i.Div(&c.i, y.Denom())
@@ -151,9 +152,7 @@ func (x Currency) Sqrt() (c Currency) {
 func (x Currency) Sub(y Currency) (c Currency) {
 	if x.Cmp(y) < 0 {
 		c = x
-		if build.DEBUG {
-			panic(ErrNegativeCurrency)
-		}
+		build.Critical(ErrNegativeCurrency)
 	} else {
 		c.i.Sub(&x.i, &y.i)
 	}

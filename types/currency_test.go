@@ -225,7 +225,7 @@ func TestNegativeCurrencyMulRat(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
-		if r != ErrNegativeCurrency {
+		if r == nil {
 			t.Error("no panic occured when trying to create a negative currency")
 		}
 	}()
@@ -240,7 +240,7 @@ func TestNegativeCurrencySub(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
-		if r != ErrNegativeCurrency {
+		if r == nil {
 			t.Error("no panic occured when trying to create a negative currency")
 		}
 	}()
@@ -289,7 +289,7 @@ func TestNegativeNewCurrency(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
-		if r != ErrNegativeCurrency {
+		if r == nil {
 			t.Error("no panic occured when trying to create a negative currency")
 		}
 	}()
