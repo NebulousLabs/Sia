@@ -23,7 +23,7 @@ func TestUnitMaxFileContractSetLenSanity(t *testing.T) {
 }
 
 // TestUnitStoragePriceConversions checks the functions StoragePriceToHuman and
-// StoragePriceToConsensus, verifiying that they correclty convert between
+// StoragePriceToConsensus, verifying that they correctly convert between
 // human-readable prices and consensus-level prices.
 func TestUnitStoragePriceConversions(t *testing.T) {
 	// Establish a series of trials for conversion.
@@ -56,7 +56,7 @@ func TestUnitStoragePriceConversions(t *testing.T) {
 	// Run all of the trials.
 	for i, trial := range trials {
 		// Convert from the consensus result to the human result, and
-		// vice-versa. The transformations should be communitive, so both
+		// vice-versa. The transformations should be commutative, so both
 		// passing should indicate that the trial has succeeded.
 		toHuman, err := StoragePriceToHuman(trial.consensus)
 		if err != nil {

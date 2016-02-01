@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	// AcceptResponse defines the response that is sent to a succesful rpc.
+	// AcceptResponse defines the response that is sent to a successful RPC.
 	AcceptResponse = "accept"
 
 	// HostDir names the directory that contains the host persistence.
@@ -71,7 +71,7 @@ type (
 		UnlockHash         types.UnlockHash  `json:"unlockhash"`
 	}
 
-	// HostRPCMetrics reports the quantity of each type of rpc call that has
+	// HostRPCMetrics reports the quantity of each type of RPC call that has
 	// been made to the host.
 	HostRPCMetrics struct {
 		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
@@ -122,7 +122,7 @@ type (
 		// collateral lost.
 		Revenue() (unresolved, resolved, lost types.Currency)
 
-		// RPCMetrics returns information on the types of rpc calls that have
+		// RPCMetrics returns information on the types of RPC calls that have
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
 
@@ -141,7 +141,7 @@ type (
 // 'Siacoins Per Month Per Terabyte', to a consensus storage price, having the
 // unit 'Hastings Per Block Per Byte'.
 func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Currency) {
-	// Perform multiplcation first to preserve precision.
+	// Perform multiplication first to preserve precision.
 	hastingsMonthTB := types.NewCurrency64(siacoinsMonthTB).Mul(types.SiacoinPrecision)
 	hastingsBlockTB := hastingsMonthTB.Div(types.NewCurrency64(4320))
 	hastingsBlockByte = hastingsBlockTB.Div(types.NewCurrency64(1e12))
@@ -154,7 +154,7 @@ func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Cu
 // overflow a uint64. If the result is between 0 and 1, the value is rounded to
 // the nearest value.
 func StoragePriceToHuman(hastingsBlockByte types.Currency) (siacoinsMonthTB uint64, err error) {
-	// Perform multiplcation first to preserve precision.
+	// Perform multiplication first to preserve precision.
 	hastingsMonthByte := hastingsBlockByte.Mul(types.NewCurrency64(4320))
 	hastingsMonthTB := hastingsMonthByte.Mul(types.NewCurrency64(1e12))
 	if hastingsMonthTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
