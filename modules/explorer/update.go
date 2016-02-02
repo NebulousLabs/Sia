@@ -12,29 +12,29 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if len(cc.AppliedBlocks) == 0 {
+		build.Critical("Explorer.ProcessConsensusChange called with a ConensusChange that has no AppliedBlocks")
+	}
+
 	// Update cumulative stats for reverted blocks.
 	for _, block := range cc.RevertedBlocks {
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
 
 		// Update all of the explorer statistics.
-		e.currentBlock = block.ID()
-		e.blockchainHeight -= 1
-		e.target = e.blockTargets[block.ID()]
+		e.blockchainHeight--
+		e.target = e.blockTargets[bid]
 		e.timestamp = block.Timestamp
-		if e.blockchainHeight > types.MaturityDelay {
-			e.maturityTimestamp = e.historicFacts[e.blockchainHeight-types.MaturityDelay].timestamp
-		}
 		e.blocksDifficulty = e.blocksDifficulty.SubtractDifficulties(e.target)
 		if e.blockchainHeight > hashrateEstimationBlocks {
 			e.blocksDifficulty = e.blocksDifficulty.AddDifficulties(e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].target)
 			secondsPassed := e.timestamp - e.historicFacts[e.blockchainHeight-hashrateEstimationBlocks].timestamp
 			e.estimatedHashrate = e.blocksDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
 		}
-		e.totalCoins = types.CalculateNumSiacoins(e.blockchainHeight)
 
 		// Delete the block from the list of active blocks.
 		delete(e.blockHashes, bid)
+		delete(e.blockTargets, bid)
 		delete(e.transactionHashes, tbid) // Miner payouts are a transaction.
 
 		// Catalog the removed miner payouts.
@@ -134,7 +134,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Add the block to the list of active blocks.
 		bid := block.ID()
 		tbid := types.TransactionID(bid)
-		e.currentBlock = block.ID()
+		e.currentBlock = bid
 		e.blockchainHeight++
 		var exists bool
 		e.target, exists = e.cs.ChildTarget(block.ParentID)
@@ -375,11 +375,11 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// for large reorgs.
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
-			e.activeContractCount += 1
+			e.activeContractCount++
 			e.activeContractCost = e.activeContractCost.Add(diff.FileContract.Payout)
 			e.activeContractSize = e.activeContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
 		} else {
-			e.activeContractCount -= 1
+			e.activeContractCount--
 			e.activeContractCost = e.activeContractCost.Sub(diff.FileContract.Payout)
 			e.activeContractSize = e.activeContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
 		}
