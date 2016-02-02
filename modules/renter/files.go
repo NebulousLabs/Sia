@@ -110,13 +110,18 @@ func (f *file) uploadProgress() float64 {
 
 // redundancy returns the redundancy of the least redundant chunk. A file
 // becomes available when this redundancy is >= 1. Assumes that every piece is
-// unique within a file contract.
+// unique within a file contract. -1 is returned if the file has size 0.
 func (f *file) redundancy() float64 {
-	if f.numChunks() == 0 {
+	if f.size == 0 {
+		return -1
+	}
+	piecesPerChunk := make([]int, f.numChunks())
+	// We cannot get the redundancy if piecesPerChunk has 0 length because later
+	// in the function we use the first element of the slice.
+	if len(piecesPerChunk) == 0 {
 		build.Critical("cannot get redundancy of a file with 0 chunks")
 		return 0
 	}
-	piecesPerChunk := make([]int, f.numChunks())
 	for _, fc := range f.contracts {
 		for _, p := range fc.Pieces {
 			piecesPerChunk[p.Chunk]++

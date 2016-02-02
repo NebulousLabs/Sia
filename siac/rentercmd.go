@@ -249,7 +249,11 @@ func renterfileslistcmd() {
 		if renterListVerbose {
 			availableStr := yesNo(file.Available)
 			renewingStr := yesNo(file.Renewing)
-			fmt.Fprintf(w, "\t%s\t%7.2f%%\t%10.2f\t%s", availableStr, file.UploadProgress, file.Redundancy, renewingStr)
+			redundancyStr := fmt.Sprintf("%.2f", file.Redundancy)
+			if file.Redundancy < 0 {
+				redundancyStr = "-"
+			}
+			fmt.Fprintf(w, "\t%s\t%7.2f%%\t%10s\t%s", availableStr, file.UploadProgress, redundancyStr, renewingStr)
 		}
 		fmt.Fprintf(w, "\t%s", file.SiaPath)
 		if !renterListVerbose && !file.Available {
