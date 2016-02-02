@@ -102,7 +102,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Add the bootstrap peers to the node list.
-	if build.Release != "testing" {
+	if build.Release == "standard" {
 		for _, addr := range modules.BootstrapPeers {
 			g.addNode(addr)
 		}

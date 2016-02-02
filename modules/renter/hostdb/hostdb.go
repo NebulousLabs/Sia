@@ -134,7 +134,7 @@ func newHostDB(cs consensusSet, w wallet, tp transactionPool, d dialer, s sleepe
 	}
 	go hdb.threadedScan()
 
-	cs.ConsensusSetSubscribe(hdb)
+	cs.ConsensusSetPersistentSubscribe(hdb, modules.ConsensusChangeID{})
 
 	return hdb, nil
 }

@@ -28,7 +28,9 @@ func bareHostDB() *HostDB {
 type newStub struct{}
 
 // consensus set stubs
-func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber) {}
+func (newStub) ConsensusSetPersistentSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
+	return nil
+}
 
 // wallet stubs
 func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }
