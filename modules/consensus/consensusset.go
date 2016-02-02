@@ -34,9 +34,9 @@ type ConsensusSet struct {
 	// The block root contains the genesis block.
 	blockRoot processedBlock
 
-	// Modules subscribed to the consensus set will receive an ordered list of
-	// changes that occur to the consensus set, computed using the changeLog.
-	changeLog   []changeEntry
+	// Subscribers to the consensus set will receive a changelog every time
+	// there is an update to the consensus set. At initialization, they receive
+	// all changes that they are missing.
 	subscribers []modules.ConsensusSetSubscriber
 
 	// dosBlocks are blocks that are invalid, but the invalidity is only

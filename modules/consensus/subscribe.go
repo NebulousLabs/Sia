@@ -1,16 +1,10 @@
 package consensus
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
-)
-
-var (
-	errChangeEntryNotFound = errors.New("module requesting a consensus starting point unknown to the database")
 )
 
 // computeConsensusChange computes the consensus change from the change entry
@@ -88,7 +82,7 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Compute the consensus change so it can be sent to subscribers.
 		var err error
-		cc, err = cs.computeConsensusChange(tx, cs.changeLog[len(cs.changeLog)-1])
+		cc, err = cs.computeConsensusChange(tx, ce)
 		return err
 	})
 	if err != nil && build.DEBUG {
@@ -97,24 +91,6 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	for _, subscriber := range cs.subscribers {
 		subscriber.ProcessConsensusChange(cc)
 	}
-}
-
-// ConsensusChange returns the consensus change that occured at index 'i',
-// returning an error if the input is out of bounds. For example,
-// ConsensusChange(5) will return the 6th consensus change that was issued to
-// subscribers. ConsensusChanges can be assumed to be consecutive.
-func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err error) {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	err = cs.db.View(func(tx *bolt.Tx) error {
-		cc, err = cs.computeConsensusChange(tx, cs.changeLog[i])
-		return err
-	})
-	if err != nil {
-		return modules.ConsensusChange{}, err
-	}
-	return cc, nil
 }
 
 // initializePersistentSubscribe will take a subscriber and feed them all of the

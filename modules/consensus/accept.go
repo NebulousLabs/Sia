@@ -109,7 +109,6 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 		if err != nil {
 			return err
 		}
-		cs.changeLog = append(cs.changeLog, ce)
 		return nil
 	})
 	if err != nil {
