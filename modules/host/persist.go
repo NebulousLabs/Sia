@@ -26,6 +26,15 @@ var persistMetadata = persist.Metadata{
 
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
+	// RPC Metrics.
+	ErroredCalls      uint64
+	UnrecognizedCalls uint64
+	DownloadCalls     uint64
+	RenewCalls        uint64
+	ReviseCalls       uint64
+	SettingsCalls     uint64
+	UploadCalls       uint64
+
 	// Consensus Tracking.
 	BlockHeight  types.BlockHeight
 	RecentChange modules.ConsensusChangeID
@@ -42,15 +51,6 @@ type persistence struct {
 	FileCounter int64
 	LostRevenue types.Currency
 	Revenue     types.Currency
-
-	// RPC Metrics.
-	ErroredCalls      uint64
-	UnrecognizedCalls uint64
-	DownloadCalls     uint64
-	RenewCalls        uint64
-	ReviseCalls       uint64
-	SettingsCalls     uint64
-	UploadCalls       uint64
 
 	// Utilities.
 	Settings modules.HostSettings
@@ -69,6 +69,15 @@ func (h *Host) getObligations() []*contractObligation {
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
 	p := persistence{
+		// RPC Metrics.
+		ErroredCalls:      atomic.LoadUint64(&h.atomicErroredCalls),
+		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
+		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
+		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
+		UploadCalls:       atomic.LoadUint64(&h.atomicUploadCalls),
+
 		// Consensus Tracking.
 		BlockHeight:  h.blockHeight,
 		RecentChange: h.recentChange,
@@ -85,15 +94,6 @@ func (h *Host) save() error {
 		FileCounter: h.fileCounter,
 		LostRevenue: h.lostRevenue,
 		Revenue:     h.revenue,
-
-		// RPC Metrics.
-		ErroredCalls:      atomic.LoadUint64(&h.atomicErroredCalls),
-		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
-		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
-		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
-		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
-		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
-		UploadCalls:       atomic.LoadUint64(&h.atomicUploadCalls),
 
 		// Utilities.
 		Settings: h.settings,
@@ -142,11 +142,20 @@ func (h *Host) load() error {
 		// COMPATv0.4.8 - try the compatibility loader.
 		return h.compatibilityLoad()
 	} else if os.IsNotExist(err) {
-		// This is the host's first run, set up the default values.
+		// There is no host.json file, set up sane defaults.
 		return h.establishDefaults()
 	} else if err != nil {
 		return err
 	}
+
+	// Copy over rpc tracking.
+	atomic.StoreUint64(&h.atomicErroredCalls, p.ErroredCalls)
+	atomic.StoreUint64(&h.atomicUnrecognizedCalls, p.UnrecognizedCalls)
+	atomic.StoreUint64(&h.atomicDownloadCalls, p.DownloadCalls)
+	atomic.StoreUint64(&h.atomicRenewCalls, p.RenewCalls)
+	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)
+	atomic.StoreUint64(&h.atomicSettingsCalls, p.SettingsCalls)
+	atomic.StoreUint64(&h.atomicUploadCalls, p.UploadCalls)
 
 	// Copy over consensus tracking.
 	h.blockHeight = p.BlockHeight
@@ -161,15 +170,6 @@ func (h *Host) load() error {
 	h.revenue = p.Revenue
 	h.lostRevenue = p.LostRevenue
 
-	// Copy over rpc tracking.
-	atomic.StoreUint64(&h.atomicErroredCalls, p.ErroredCalls)
-	atomic.StoreUint64(&h.atomicUnrecognizedCalls, p.UnrecognizedCalls)
-	atomic.StoreUint64(&h.atomicDownloadCalls, p.DownloadCalls)
-	atomic.StoreUint64(&h.atomicRenewCalls, p.RenewCalls)
-	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)
-	atomic.StoreUint64(&h.atomicSettingsCalls, p.SettingsCalls)
-	atomic.StoreUint64(&h.atomicUploadCalls, p.UploadCalls)
-
 	// Utilities.
 	h.settings = p.Settings
 
@@ -179,7 +179,7 @@ func (h *Host) load() error {
 	h.fileCounter = p.FileCounter
 	h.spaceRemaining = p.Settings.TotalStorage
 
-	// Subscribe to the consensus set.
+	// Copy over the obligations and then subscribe to the consensus set.
 	for _, obligation := range p.Obligations {
 		// Store the obligation in the obligations list.
 		h.obligationsByID[obligation.ID] = obligation
@@ -198,30 +198,6 @@ func (h *Host) load() error {
 	}
 	for _, obligation := range h.obligationsByID {
 		h.handleActionItem(obligation)
-	}
-	return nil
-}
-
-// initPersist loads all of the saved host state into the host object. If there
-// is no saved state, suitable defaults are chosen instead.
-func (h *Host) initPersist() error {
-	// Create the perist directory if it does not yet exist.
-	err := os.MkdirAll(h.persistDir, 0700)
-	if err != nil {
-		return err
-	}
-
-	// Initialize the logger. Logger must be initialized first, because the
-	// rest of the initialization makes use of the logger.
-	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
-	if err != nil {
-		return err
-	}
-
-	// Load the prior persistance structures.
-	err = h.load()
-	if err != nil {
-		return err
 	}
 	return nil
 }
