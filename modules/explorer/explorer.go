@@ -128,7 +128,7 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		return nil, err
 	}
 
-	cs.ConsensusSetSubscribe(e)
+	cs.ConsensusSetPersistentSubscribe(e, modules.ConsensusChangeID{})
 
 	return e, nil
 }

@@ -117,29 +117,6 @@ func (cs *ConsensusSet) ConsensusChange(i int) (cc modules.ConsensusChange, err 
 	return cc, nil
 }
 
-// ConsensusSetSubscribe accepts a new subscriber who will receive a call to
-// ProcessConsensusChange every time there is a change in the consensus set.
-func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
-	cs.mu.Lock()
-	cs.subscribers = append(cs.subscribers, subscriber)
-	cs.mu.Demote()
-	defer cs.mu.DemotedUnlock()
-
-	err := cs.db.View(func(tx *bolt.Tx) error {
-		for i := range cs.changeLog {
-			cc, err := cs.computeConsensusChange(tx, cs.changeLog[i])
-			if err != nil && build.DEBUG {
-				panic(err)
-			}
-			subscriber.ProcessConsensusChange(cc)
-		}
-		return nil
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-}
-
 // initializePersistentSubscribe will take a subscriber and feed them all of the
 // consensus changes that have occurred since the change provided.
 //

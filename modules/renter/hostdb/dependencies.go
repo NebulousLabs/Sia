@@ -14,7 +14,7 @@ import (
 // interface possible makes it easier to mock these dependencies in testing.
 type (
 	consensusSet interface {
-		ConsensusSetSubscribe(modules.ConsensusSetSubscriber)
+		ConsensusSetPersistentSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error
 	}
 	// in order to restrict the modules.TransactionBuilder interface, we must
 	// provide a shim to bridge the gap between modules.Wallet and

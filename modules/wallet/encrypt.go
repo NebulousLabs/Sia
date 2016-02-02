@@ -206,7 +206,7 @@ func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 	// Subscribe to the consensus set if this is the first unlock for the
 	// wallet object.
 	if !subscribed {
-		w.cs.ConsensusSetSubscribe(w)
+		w.cs.ConsensusSetPersistentSubscribe(w, modules.ConsensusChangeID{})
 		w.tpool.TransactionPoolSubscribe(w)
 		w.mu.Lock()
 		w.subscribed = true

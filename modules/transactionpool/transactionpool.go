@@ -91,7 +91,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
-	cs.ConsensusSetSubscribe(tp)
+	cs.ConsensusSetPersistentSubscribe(tp, modules.ConsensusChangeID{})
 
 	return tp, nil
 }

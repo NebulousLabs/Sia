@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -27,8 +26,7 @@ func (cs *ConsensusSet) loadDB() error {
 	}
 
 	// Walk through initialization for Sia.
-	var height types.BlockHeight
-	err = cs.db.Update(func(tx *bolt.Tx) error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
 		// Check if the database has been initialized.
 		if !dbInitialized(tx) {
 			return cs.initDB(tx)
@@ -48,39 +46,8 @@ func (cs *ConsensusSet) loadDB() error {
 		if genesisID != cs.blockRoot.Block.ID() {
 			return errors.New("Blockchain has wrong genesis block, exiting.")
 		}
-
-		height = blockHeight(tx)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// Send all of the existing blocks to subscribers - temporary while
-	// subscribers don't have any persistence for block progress.
-	err = cs.db.View(func(tx *bolt.Tx) error {
-		for i := types.BlockHeight(0); i <= height; i++ {
-			// Fetch the processed block at height 'i'.
-			id, err := getPath(tx, i)
-			if build.DEBUG && err != nil {
-				panic(err)
-			}
-			pb, err := getBlockMap(tx, id)
-			if build.DEBUG && err != nil {
-				panic(err)
-			}
-
-			// Add the block to the changelog. There are no subscribers yet,
-			// and startup is serial so a lock is held implicitly.
-			ce := changeEntry{RevertedBlocks: nil, AppliedBlocks: []types.BlockID{pb.Block.ID()}}
-			cs.changeLog = append(cs.changeLog, ce)
-		}
-		return nil
-	})
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	return nil
 }
 
 // initPersist initializes the persistence structures of the consensus set, in
