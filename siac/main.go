@@ -184,10 +184,10 @@ func main() {
 
 	root.AddCommand(hostCmd)
 	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd)
+	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(hostdbCmd)
-	hostCmd.AddCommand(hostdbCmd)
-	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
+	hostdbCmd.AddCommand(hostdbListCmd)
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
@@ -217,6 +217,8 @@ func main() {
 	minerCmd.AddCommand(minerDeprecatedStatusCmd)
 	walletCmd.AddCommand(walletDeprecatedStatusCmd)
 	renterCmd.AddCommand(renterDeprecatedDownloadQueueCmd)
+	// DEPRECATED v0.5.2
+	hostCmd.AddCommand(hostdbDeprecatedCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
