@@ -72,8 +72,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 
 		// Don't clutter the logs with repeat messages - after 1000 messages
 		// have been printed, only print 1-in-200.
-		randInt, err := crypto.RandIntn(200)
-		if err != nil {
+		randInt, randErr := crypto.RandIntn(200)
+		if randErr != nil {
 			return
 		}
 		unrecognizedCalls := atomic.LoadUint64(&h.atomicUnrecognizedCalls)
@@ -104,8 +104,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 
 		// Don't clutter the logs with repeat messages - after 1000 messages
 		// have been printed, only print 1-in-200.
-		randInt, err := crypto.RandIntn(200)
-		if err != nil {
+		randInt, randErr := crypto.RandIntn(200)
+		if randErr != nil {
 			return
 		}
 		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
@@ -119,8 +119,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 
 		// Don't clutter the logs with repeat messages - after 1000 messages
 		// have been printed, only print 1-in-200.
-		randInt, err := crypto.RandIntn(200)
-		if err != nil {
+		randInt, randErr := crypto.RandIntn(200)
+		if randErr != nil {
 			return
 		}
 		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
