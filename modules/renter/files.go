@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -113,14 +114,15 @@ func (f *file) uploadProgress() float64 {
 // unique within a file contract. -1 is returned if the file has size 0.
 func (f *file) redundancy() float64 {
 	if f.size == 0 {
-		return -1
+		return math.NaN()
 	}
 	piecesPerChunk := make([]int, f.numChunks())
-	// We cannot get the redundancy if piecesPerChunk has 0 length because later
-	// in the function we use the first element of the slice.
+	// If the file has non-0 size then the number of chunks should also be
+	// non-0. Therefore the f.size == 0 conditional block above must appear
+	// before this check.
 	if len(piecesPerChunk) == 0 {
 		build.Critical("cannot get redundancy of a file with 0 chunks")
-		return 0
+		return math.NaN()
 	}
 	for _, fc := range f.contracts {
 		for _, p := range fc.Pieces {

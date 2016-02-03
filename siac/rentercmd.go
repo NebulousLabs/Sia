@@ -250,7 +250,7 @@ func renterfileslistcmd() {
 			availableStr := yesNo(file.Available)
 			renewingStr := yesNo(file.Renewing)
 			redundancyStr := fmt.Sprintf("%.2f", file.Redundancy)
-			if file.Redundancy < 0 {
+			if math.IsNaN(file.Redundancy) {
 				redundancyStr = "-"
 			}
 			uploadProgressStr := fmt.Sprintf("%.2f%%", file.UploadProgress)
