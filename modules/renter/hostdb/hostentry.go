@@ -84,6 +84,9 @@ func (hdb *HostDB) AllHosts() (allHosts []modules.HostSettings) {
 
 // AveragePrice returns the average price of a host.
 func (hdb *HostDB) AveragePrice() types.Currency {
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
+
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
@@ -101,6 +104,9 @@ func (hdb *HostDB) AveragePrice() types.Currency {
 // the host, IsOffline will return false and spawn a goroutine to the scan the
 // host.
 func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
+
 	if _, ok := hdb.activeHosts[addr]; ok {
 		return false
 	}
