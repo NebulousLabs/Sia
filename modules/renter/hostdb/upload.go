@@ -39,8 +39,7 @@ type hostUploader struct {
 	price types.Currency
 
 	// updated after each revision
-	tree     crypto.MerkleTree
-	contract hostContract // only lastTxn is updated
+	contract hostContract
 
 	// resources
 	conn net.Conn
@@ -87,9 +86,16 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(hu.contract.FileContract.WindowStart - height))).Mul(hu.price)
 	piecePrice = piecePrice.MulFloat(1.02) // COMPATv0.4.8 -- hosts reject exact prices
 
-	// calculate new merkle root (no error possible with bytes.Reader)
-	_ = hu.tree.ReadSegments(bytes.NewReader(data))
-	merkleRoot := hu.tree.Root()
+	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
+	pieceRoot, _ := crypto.ReaderMerkleRoot(bytes.NewReader(data))
+
+	// calculate the new total Merkle root
+	tree := crypto.NewCachedTree(0) // height is not relevant here
+	for _, h := range hu.contract.MerkleRoots {
+		tree.Push(h[:])
+	}
+	tree.Push(pieceRoot[:])
+	merkleRoot := tree.Root()
 
 	// revise the file contract
 	rev := newRevision(hu.contract.LastRevision, uint64(len(data)), merkleRoot, piecePrice)
@@ -101,6 +107,7 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	// update host contract
 	hu.contract.LastRevision = rev
 	hu.contract.LastRevisionTxn = signedTxn
+	hu.contract.MerkleRoots = append(hu.contract.MerkleRoots, pieceRoot)
 	hu.hdb.mu.Lock()
 	hu.hdb.contracts[hu.contract.ID] = hu.contract
 	hu.hdb.save()
@@ -137,8 +144,6 @@ func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
 	hu := &hostUploader{
 		contract: hc,
 		price:    settings.Price,
-
-		tree: crypto.NewTree(),
 
 		conn: conn,
 		hdb:  hdb,

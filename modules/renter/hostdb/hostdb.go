@@ -70,6 +70,7 @@ type hostContract struct {
 	IP              modules.NetAddress
 	ID              types.FileContractID
 	FileContract    types.FileContract
+	MerkleRoots     []crypto.Hash
 	LastRevision    types.FileContractRevision
 	LastRevisionTxn types.Transaction
 	SecretKey       crypto.SecretKey
