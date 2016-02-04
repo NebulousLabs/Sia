@@ -61,22 +61,6 @@ func (t *CachedMerkleTree) Root() (h Hash) {
 	return
 }
 
-// MerkleRoot calculates the "root hash" formed by repeatedly concatenating
-// and hashing a binary tree of hashes. If the number of leaves is not a
-// power of 2, the orphan hash(es) are not rehashed. Examples:
-//
-//       ┌───┴──┐       ┌────┴───┐         ┌─────┴─────┐
-//    ┌──┴──┐   │    ┌──┴──┐     │      ┌──┴──┐     ┌──┴──┐
-//  ┌─┴─┐ ┌─┴─┐ │  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   │
-//     (5-leaf)         (6-leaf)             (7-leaf)
-func MerkleRoot(leaves [][]byte) (h Hash) {
-	tree := NewTree()
-	for _, leaf := range leaves {
-		tree.Push(leaf)
-	}
-	return tree.Root()
-}
-
 // Calculates the number of leaves in the file when building a Merkle tree.
 func CalculateLeaves(fileSize uint64) uint64 {
 	numSegments := fileSize / SegmentSize
