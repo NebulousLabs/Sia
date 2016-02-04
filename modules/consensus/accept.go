@@ -120,11 +120,12 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 	return ce, nil
 }
 
-// AcceptBlock will add a block to the state, forking the blockchain if it is
-// on a fork that is heavier than the current fork. If the block is accepted,
-// it will be relayed to connected peers. This function should only be called
-// for new, untrusted blocks.
-func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
+// acceptBlockNoBroadcast accepts a block but does not broadcast it to any
+// peers. See comment for AcceptBlock. Typically AcceptBlock should be used.
+// This method should only be used when there would otherwise be multiple
+// consecutive calls to AcceptBlock with each successive call accepting the
+// child block of the previous call.
+func (cs *ConsensusSet) acceptBlockNoBroadcast(b types.Block) error {
 	// Grab a lock on the consensus set. Lock is demoted later in the function,
 	// failure to unlock before returning an error will cause a deadlock.
 	cs.mu.Lock()
@@ -179,9 +180,19 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	if len(changeEntry.AppliedBlocks) > 0 {
 		cs.readlockUpdateSubscribers(changeEntry)
 	}
+	return nil
+}
 
+// AcceptBlock will add a block to the state, forking the blockchain if it is
+// on a fork that is heavier than the current fork. If the block is accepted,
+// it will be relayed to connected peers. This function should only be called
+// for new, untrusted blocks.
+func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
+	err := cs.acceptBlockNoBroadcast(b)
+	if err != nil {
+		return err
+	}
 	// Broadcast the new block to all peers.
 	go cs.gateway.Broadcast("RelayBlock", b)
-
 	return nil
 }

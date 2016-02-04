@@ -90,8 +90,14 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 		}
 
 		// Integrate the blocks into the consensus set.
-		for _, block := range newBlocks {
-			acceptErr := cs.AcceptBlock(block)
+		for i, block := range newBlocks {
+			// Only broadcast the last block.
+			var acceptErr error
+			if !moreAvailable && i == len(newBlocks)-1 {
+				acceptErr = cs.AcceptBlock(block)
+			} else {
+				acceptErr = cs.acceptBlockNoBroadcast(block)
+			}
 
 			// ErrNonExtendingBlock must be ignored until headers-first block
 			// sharing is implemented, block already in database should also be
