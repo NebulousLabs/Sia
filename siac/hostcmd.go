@@ -108,10 +108,7 @@ func hostcmd() {
 		die("Could not fetch host settings:", err)
 	}
 	// convert accepting bool
-	accept := "Yes"
-	if !hg.AcceptingContracts {
-		accept = "No"
-	}
+	accept := yesNo(hg.AcceptingContracts)
 	// convert price to SC/GB/mo
 	price := new(big.Rat).SetInt(hg.Price.Big())
 	price.Mul(price, big.NewRat(4320, 1e24/1e9))

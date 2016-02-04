@@ -23,6 +23,7 @@ var (
 	initPassword      bool   // supply a custom password when creating a wallet
 	hostVerbose       bool   // display additional host info
 	renterShowHistory bool   // Show download history in addition to download queue.
+	renterListVerbose bool   // Show additional info about uploaded files.
 )
 
 // exit codes
@@ -160,6 +161,14 @@ func die(args ...interface{}) {
 	os.Exit(exitCodeGeneral)
 }
 
+// yesNo returns "Yes" if b is true, and "No" if b is false.
+func yesNo(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
+}
+
 func version() {
 	println("Sia Client v" + build.Version)
 }
@@ -205,6 +214,7 @@ func main() {
 		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd, renterFilesRenameCmd,
 		renterFilesShareCmd, renterFilesShareASCIICmd, renterFilesUploadCmd, renterUploadsCmd)
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
+	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayAddressCmd, gatewayListCmd)

@@ -59,6 +59,94 @@ func TestFileAvailable(t *testing.T) {
 	}
 }
 
+// TestFileRedundancy tests that redundancy is correctly calculated for files
+// with varying number of filecontracts and erasure code settings.
+func TestFileRedundancy(t *testing.T) {
+	nDatas := []int{1, 2, 10}
+	for _, nData := range nDatas {
+		rsc, _ := NewRSCode(nData, 10)
+		f := &file{
+			size:        1000,
+			pieceSize:   100,
+			contracts:   make(map[types.FileContractID]fileContract),
+			erasureCode: rsc,
+		}
+
+		// Test that an empty file has 0 redundancy.
+		if r := f.redundancy(); r != 0 {
+			t.Error("expected 0 redundancy, got", r)
+		}
+		// Test that a file with 1 filecontract that has a piece for every chunk but
+		// one chunk still has a redundancy of 0.
+		fc := fileContract{
+			ID: types.FileContractID{0},
+		}
+		for i := uint64(0); i < f.numChunks()-1; i++ {
+			pd := pieceData{
+				Chunk: i,
+				Piece: 0,
+			}
+			fc.Pieces = append(fc.Pieces, pd)
+		}
+		f.contracts[fc.ID] = fc
+		if r := f.redundancy(); r != 0 {
+			t.Error("expected 0 redundancy, got", r)
+		}
+		// Test that adding another filecontract with a piece for every chunk but one
+		// chunk still results in a file with redundancy 0.
+		fc = fileContract{
+			ID: types.FileContractID{1},
+		}
+		for i := uint64(0); i < f.numChunks()-1; i++ {
+			pd := pieceData{
+				Chunk: i,
+				Piece: 1,
+			}
+			fc.Pieces = append(fc.Pieces, pd)
+		}
+		f.contracts[fc.ID] = fc
+		if r := f.redundancy(); r != 0 {
+			t.Error("expected 0 redundancy, got", r)
+		}
+		// Test that adding a file contract with a piece for the missing chunk
+		// results in a file with redundancy > 0 && <= 1.
+		fc = fileContract{
+			ID: types.FileContractID{2},
+		}
+		pd := pieceData{
+			Chunk: f.numChunks() - 1,
+			Piece: 0,
+		}
+		fc.Pieces = append(fc.Pieces, pd)
+		f.contracts[fc.ID] = fc
+		// 1.0 / MinPieces because the chunk with the least number of pieces has 1 piece.
+		expectedR := 1.0 / float64(f.erasureCode.MinPieces())
+		if r := f.redundancy(); r == 0 || r > 1 || r != expectedR {
+			t.Errorf("expected %f redundancy, got %f", expectedR, r)
+		}
+		// Test that adding a file contract that has erasureCode.MinPieces() pieces
+		// per chunk for all chunks results in a file with redundancy > 1.
+		fc = fileContract{
+			ID: types.FileContractID{3},
+		}
+		for iChunk := uint64(0); iChunk < f.numChunks(); iChunk++ {
+			for iPiece := 0; iPiece < f.erasureCode.MinPieces(); iPiece++ {
+				pd := pieceData{
+					Chunk: iChunk,
+					Piece: uint64(iPiece),
+				}
+				fc.Pieces = append(fc.Pieces, pd)
+			}
+		}
+		f.contracts[fc.ID] = fc
+		// 1+MinPieces / MinPieces because the chunk with the least number of pieces has 1+MinPieces pieces.
+		expectedR = float64(1+f.erasureCode.MinPieces()) / float64(f.erasureCode.MinPieces())
+		if r := f.redundancy(); r <= 1 || r != expectedR {
+			t.Errorf("expected a redundancy >1 and equal to %f, got %f", expectedR, r)
+		}
+	}
+}
+
 // TestFileExpiration probes the expiration method of the file type.
 func TestFileExpiration(t *testing.T) {
 	f := &file{

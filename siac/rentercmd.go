@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -238,13 +240,32 @@ func renterfileslistcmd() {
 		return
 	}
 	fmt.Println("Tracking", len(rf.Files), "files:")
-	for _, file := range rf.Files {
-		if file.Available {
-			fmt.Printf("%13s  %s\n", filesizeUnits(int64(file.Filesize)), file.SiaPath)
-		} else {
-			fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(int64(file.Filesize)), file.SiaPath, file.UploadProgress)
-		}
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	if renterListVerbose {
+		fmt.Fprintln(w, "File size\tAvailable\tProgress\tRedundancy\tRenewing\tSia path")
 	}
+	for _, file := range rf.Files {
+		fmt.Fprintf(w, "%9s", filesizeUnits(int64(file.Filesize)))
+		if renterListVerbose {
+			availableStr := yesNo(file.Available)
+			renewingStr := yesNo(file.Renewing)
+			redundancyStr := fmt.Sprintf("%.2f", file.Redundancy)
+			if math.IsNaN(file.Redundancy) {
+				redundancyStr = "-"
+			}
+			uploadProgressStr := fmt.Sprintf("%.2f%%", file.UploadProgress)
+			if math.IsNaN(file.UploadProgress) {
+				uploadProgressStr = "-"
+			}
+			fmt.Fprintf(w, "\t%s\t%8s\t%10s\t%s", availableStr, uploadProgressStr, redundancyStr, renewingStr)
+		}
+		fmt.Fprintf(w, "\t%s", file.SiaPath)
+		if !renterListVerbose && !file.Available {
+			fmt.Fprintf(w, " (uploading, %0.2f%%)", file.UploadProgress)
+		}
+		fmt.Fprintln(w, "")
+	}
+	w.Flush()
 }
 
 // renterfilesloadcmd is the handler for the command `siac renter load [source]`.

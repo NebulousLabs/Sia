@@ -2,10 +2,12 @@ package renter
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -107,6 +109,35 @@ func (f *file) uploadProgress() float64 {
 	return 100 * (float64(uploaded) / float64(desired))
 }
 
+// redundancy returns the redundancy of the least redundant chunk. A file
+// becomes available when this redundancy is >= 1. Assumes that every piece is
+// unique within a file contract. -1 is returned if the file has size 0.
+func (f *file) redundancy() float64 {
+	if f.size == 0 {
+		return math.NaN()
+	}
+	piecesPerChunk := make([]int, f.numChunks())
+	// If the file has non-0 size then the number of chunks should also be
+	// non-0. Therefore the f.size == 0 conditional block above must appear
+	// before this check.
+	if len(piecesPerChunk) == 0 {
+		build.Critical("cannot get redundancy of a file with 0 chunks")
+		return math.NaN()
+	}
+	for _, fc := range f.contracts {
+		for _, p := range fc.Pieces {
+			piecesPerChunk[p.Chunk]++
+		}
+	}
+	minPieces := piecesPerChunk[0]
+	for _, numPieces := range piecesPerChunk {
+		if numPieces < minPieces {
+			minPieces = numPieces
+		}
+	}
+	return float64(minPieces) / float64(f.erasureCode.MinPieces())
+}
+
 // expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) expiration() types.BlockHeight {
@@ -171,6 +202,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 			SiaPath:        f.name,
 			Filesize:       f.size,
 			Available:      f.available(),
+			Redundancy:     f.redundancy(),
 			Renewing:       renewing,
 			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
