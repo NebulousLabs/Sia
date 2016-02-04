@@ -120,12 +120,12 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 	return ce, nil
 }
 
-// acceptBlockNoBroadcast accepts a block but does not broadcast it to any
-// peers. See comment for AcceptBlock. Typically AcceptBlock should be used.
-// This method should only be used when there would otherwise be multiple
+// managedAcceptBlock accepts a block but does not broadcast it to any peers.
+// See comment for AcceptBlock. Typically AcceptBlock should be used. This
+// method should only be used when there would otherwise be multiple
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
-func (cs *ConsensusSet) acceptBlockNoBroadcast(b types.Block) error {
+func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	// Grab a lock on the consensus set. Lock is demoted later in the function,
 	// failure to unlock before returning an error will cause a deadlock.
 	cs.mu.Lock()
@@ -188,7 +188,7 @@ func (cs *ConsensusSet) acceptBlockNoBroadcast(b types.Block) error {
 // it will be relayed to connected peers. This function should only be called
 // for new, untrusted blocks.
 func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
-	err := cs.acceptBlockNoBroadcast(b)
+	err := cs.managedAcceptBlock(b)
 	if err != nil {
 		return err
 	}

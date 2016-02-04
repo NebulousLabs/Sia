@@ -96,7 +96,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 			if !moreAvailable && i == len(newBlocks)-1 {
 				acceptErr = cs.AcceptBlock(block)
 			} else {
-				acceptErr = cs.acceptBlockNoBroadcast(block)
+				acceptErr = cs.managedAcceptBlock(block)
 			}
 
 			// ErrNonExtendingBlock must be ignored until headers-first block
