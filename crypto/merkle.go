@@ -15,18 +15,18 @@ const (
 // MerkleTree wraps the merkletree.Tree type, providing convenient
 // Sia-specific functionality.
 type MerkleTree struct {
-	*merkletree.Tree
+	merkletree.Tree
 }
 
 // NewTree returns a tree object that can be used to get the Merkle root of a
 // dataset.
-func NewTree() MerkleTree {
-	return MerkleTree{merkletree.New(NewHash())}
+func NewTree() *MerkleTree {
+	return &MerkleTree{*merkletree.New(NewHash())}
 }
 
 // PushObject encodes and adds the hash of the encoded object to the tree as a
 // leaf.
-func (t MerkleTree) PushObject(obj interface{}) {
+func (t *MerkleTree) PushObject(obj interface{}) {
 	t.Push(encoding.Marshal(obj))
 }
 
@@ -34,12 +34,12 @@ func (t MerkleTree) PushObject(obj interface{}) {
 // mid-segment, the leaf is resized to the number of bytes read and then added
 // to the tree.  No error is returned unless err != io.EOF && err !=
 // io.errUnexpectedEOF
-func (t MerkleTree) ReadSegments(r io.Reader) error {
+func (t *MerkleTree) ReadSegments(r io.Reader) error {
 	return t.ReadAll(r, SegmentSize)
 }
 
 // Root returns the Merkle root of all the objects pushed to the tree.
-func (t MerkleTree) Root() (h Hash) {
+func (t *MerkleTree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
 	return
 }
@@ -47,16 +47,16 @@ func (t MerkleTree) Root() (h Hash) {
 // CachedMerkleTree wraps the merkletree.CachedTree type, providing convenient
 // Sia-specific functionality.
 type CachedMerkleTree struct {
-	*merkletree.CachedTree
+	merkletree.CachedTree
 }
 
 // NewCached returns a new cached tree object.
-func NewCachedTree(height uint64) CachedMerkleTree {
-	return CachedMerkleTree{merkletree.NewCachedTree(NewHash(), height)}
+func NewCachedTree(height uint64) *CachedMerkleTree {
+	return &CachedMerkleTree{*merkletree.NewCachedTree(NewHash(), height)}
 }
 
 // Root returns the Merkle root of all the objects pushed to the tree.
-func (t CachedMerkleTree) Root() (h Hash) {
+func (t *CachedMerkleTree) Root() (h Hash) {
 	copy(h[:], t.CachedTree.Root())
 	return
 }
