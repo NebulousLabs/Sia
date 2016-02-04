@@ -55,7 +55,9 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 
 // RegisterRPC registers an RPCFunc as a handler for a given identifier. To
 // call an RPC, use gateway.RPC, supplying the same identifier given to
-// RegisterRPC. Identifiers should always use PascalCase.
+// RegisterRPC. Identifiers should always use PascalCase. The first 8
+// characters of an identifier should be unique, as the identifier used
+// internally is truncated to 8 bytes.
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
