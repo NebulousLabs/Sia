@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -227,6 +228,14 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("Downloaded '%s' to %s.\n", path, abs(destination))
 }
 
+// bySiaPath implements sort.Interface for [] modules.FileInfo based on the
+// SiaPath field.
+type bySiaPath []modules.FileInfo
+
+func (s bySiaPath) Len() int           { return len(s) }
+func (s bySiaPath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s bySiaPath) Less(i, j int) bool { return s[i].SiaPath < s[j].SiaPath }
+
 // renterfileslistcmd is the handler for the command `siac renter list`.
 // Lists files known to the renter on the network.
 func renterfileslistcmd() {
@@ -244,6 +253,7 @@ func renterfileslistcmd() {
 	if renterListVerbose {
 		fmt.Fprintln(w, "File size\tAvailable\tProgress\tRedundancy\tRenewing\tSia path")
 	}
+	sort.Sort(bySiaPath(rf.Files))
 	for _, file := range rf.Files {
 		fmt.Fprintf(w, "%9s", filesizeUnits(int64(file.Filesize)))
 		if renterListVerbose {
