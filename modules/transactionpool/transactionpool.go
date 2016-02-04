@@ -91,7 +91,10 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
-	cs.ConsensusSetPersistentSubscribe(tp, modules.ConsensusChangeID{})
+	err := cs.ConsensusSetPersistentSubscribe(tp, modules.ConsensusChangeID{})
+	if err != nil {
+		return nil, errors.New("transactionpool subscription failed: " + err.Error())
+	}
 
 	return tp, nil
 }

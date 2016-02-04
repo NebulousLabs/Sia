@@ -128,7 +128,10 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		return nil, err
 	}
 
-	cs.ConsensusSetPersistentSubscribe(e, modules.ConsensusChangeID{})
+	err = cs.ConsensusSetPersistentSubscribe(e, modules.ConsensusChangeID{})
+	if err != nil {
+		return nil, errors.New("explorer subscription failed: " + err.Error())
+	}
 
 	return e, nil
 }
