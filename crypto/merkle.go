@@ -12,11 +12,13 @@ const (
 	SegmentSize = 64 // number of bytes that are hashed to form each base leaf of the Merkle tree
 )
 
+// MerkleTree wraps the merkletree.Tree type, providing convenient
+// Sia-specific functionality.
 type MerkleTree struct {
 	*merkletree.Tree
 }
 
-// NewTree returns a tree object that can be used to get the merkle root of a
+// NewTree returns a tree object that can be used to get the Merkle root of a
 // dataset.
 func NewTree() MerkleTree {
 	return MerkleTree{merkletree.New(NewHash())}
@@ -39,6 +41,23 @@ func (t MerkleTree) ReadSegments(r io.Reader) error {
 // Root returns the Merkle root of all the objects pushed to the tree.
 func (t MerkleTree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
+	return
+}
+
+// CachedMerkleTree wraps the merkletree.CachedTree type, providing convenient
+// Sia-specific functionality.
+type CachedMerkleTree struct {
+	*merkletree.CachedTree
+}
+
+// NewCached returns a new cached tree object.
+func NewCachedTree(height uint64) CachedMerkleTree {
+	return CachedMerkleTree{merkletree.NewCachedTree(NewHash(), height)}
+}
+
+// Root returns the Merkle root of all the objects pushed to the tree.
+func (t CachedMerkleTree) Root() (h Hash) {
+	copy(h[:], t.CachedTree.Root())
 	return
 }
 
@@ -67,7 +86,7 @@ func CalculateLeaves(fileSize uint64) uint64 {
 	return numSegments
 }
 
-// ReaderMerkleRoot returns the merkle root of a reader.
+// ReaderMerkleRoot returns the Merkle root of a reader.
 func ReaderMerkleRoot(r io.Reader) (h Hash, err error) {
 	root, err := merkletree.ReaderRoot(r, NewHash(), SegmentSize)
 	if err != nil {
@@ -93,7 +112,7 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base []byte, hashSet []Ha
 }
 
 // VerifySegment will verify that a segment, given the proof, is a part of a
-// merkle root.
+// Merkle root.
 func VerifySegment(base []byte, hashSet []Hash, numSegments, proofIndex uint64, root Hash) bool {
 	// convert base and hashSet to proofSet
 	proofSet := make([][]byte, len(hashSet)+1)
