@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -706,9 +707,12 @@ func TestTaxHardfork(t *testing.T) {
 type mockGateway struct {
 	modules.Gateway
 	numBroadcasts int
+	mu            sync.RWMutex
 }
 
 func (g *mockGateway) Broadcast(string, interface{}) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.numBroadcasts++
 	return
 }
@@ -721,7 +725,9 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	mg := &mockGateway{Gateway: cst.cs.gateway}
+	mg := &mockGateway{
+		Gateway: cst.cs.gateway,
+	}
 	cst.cs.gateway = mg
 
 	// Test that Broadcast is called for valid blocks.
@@ -734,31 +740,44 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 	// wait on a channel because we don't know how many times broadcast has
 	// been called.
 	time.Sleep(1)
-	if mg.numBroadcasts != 1 {
+	mg.mu.RLock()
+	numBroadcasts := mg.numBroadcasts
+	mg.mu.RUnlock()
+	if numBroadcasts != 1 {
 		t.Errorf("expected AcceptBlock to broadcast a valid block 1 time, instead it broadcasted %d times", mg.numBroadcasts)
 	}
 
 	// Test that Broadcast is not called for invalid blocks.
+	mg.mu.Lock()
 	mg.numBroadcasts = 0
+	mg.mu.Unlock()
 	err = cst.cs.AcceptBlock(types.Block{})
 	if err == nil {
 		t.Fatal("expected AcceptBlock to error on an invalid block")
 	}
 	// Sleep one second to wait for a possible call to g.Broadcast.
 	time.Sleep(1)
-	if mg.numBroadcasts != 0 {
+	mg.mu.RLock()
+	numBroadcasts = mg.numBroadcasts
+	mg.mu.RUnlock()
+	if numBroadcasts != 0 {
 		t.Error("AcceptBlock broadcasted an invalid block")
 	}
 
 	// Test that Broadcast is not called in managedAcceptBlock.
+	mg.mu.Lock()
 	mg.numBroadcasts = 0
+	mg.mu.Unlock()
 	b, _ = cst.miner.FindBlock()
 	err = cst.cs.managedAcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1)
-	if mg.numBroadcasts != 0 {
+	mg.mu.RLock()
+	numBroadcasts = mg.numBroadcasts
+	mg.mu.RUnlock()
+	if numBroadcasts != 0 {
 		t.Errorf("expected managedAcceptBlock to not broadcast any blocks, instead it broadcasted %d times", mg.numBroadcasts)
 	}
 }

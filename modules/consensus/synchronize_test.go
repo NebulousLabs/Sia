@@ -260,7 +260,9 @@ func TestSendBlocksBroadcasts(t *testing.T) {
 		{2 * MaxCatchUpBlocks, 1},
 	}
 	for _, test := range tests {
+		mg.mu.Lock()
 		mg.numBroadcasts = 0
+		mg.mu.Unlock()
 		for i := 0; i < test.blocksToMine; i++ {
 			b, minerErr := cst2.miner.FindBlock()
 			if minerErr != nil {
@@ -281,8 +283,11 @@ func TestSendBlocksBroadcasts(t *testing.T) {
 		// wait on a channel because we don't know how many times broadcast has
 		// been called.
 		time.Sleep(1)
-		if mg.numBroadcasts != test.expectedNumBroadcasts {
-			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, mg.numBroadcasts)
+		mg.mu.RLock()
+		numBroadcasts := mg.numBroadcasts
+		mg.mu.RUnlock()
+		if numBroadcasts != test.expectedNumBroadcasts {
+			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, numBroadcasts)
 		}
 	}
 }
