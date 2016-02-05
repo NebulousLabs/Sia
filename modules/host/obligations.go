@@ -288,7 +288,7 @@ func (h *Host) addObligation(co *contractObligation) {
 	h.addActionItem(h.blockHeight+resubmissionTimeout, co)
 
 	// Update the statistics.
-	h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value()) // Output at index 1 alone belongs to host.
+	h.anticipatedRevenue = h.anticipatedRevenue.Add(co.value())
 	h.spaceRemaining = h.spaceRemaining - int64(co.fileSize())
 
 	err := co.isSane()
@@ -518,4 +518,17 @@ func (h *Host) handleActionItem(co *contractObligation) {
 	// All possible scenarios should be covered. This code should not be
 	// reachable.
 	h.log.Critical("logic error - bottom of handleActionItems has been reached")
+}
+
+// DeleteContract deletes a file contract. The revenue and collateral on the
+// file contract will be lost, and the data will be removed.
+func (h *Host) DeleteContract(id types.FileContractID) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	obligation, exists := h.obligationsByID[id]
+	if !exists {
+		return errors.New("obligation not found")
+	}
+	h.removeObligation(obligation, obligationFailed)
+	return nil
 }

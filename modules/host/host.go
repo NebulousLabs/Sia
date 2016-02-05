@@ -19,9 +19,16 @@ import (
 const (
 	defaultTotalStorage = 10e9         // 10 GB.
 	defaultMaxDuration  = 144 * 30 * 6 // 6 months.
+
+	dbFilename = "host.db"
 )
 
 var (
+	dbMetadata = persist.Metadata{
+		Header:  "Host DB",
+		Version: "0.5.2",
+	}
+
 	// defaultPrice defines the starting price for hosts selling storage. We
 	// try to match a number that is both reasonably profitable and reasonably
 	// competitive.
@@ -62,6 +69,33 @@ var (
 	errNilWallet = errors.New("host cannot use a nil wallet")
 )
 
+// All of the following variables define the names of buckets used by the host
+// in the database.
+var (
+	// BucketActionItems maps a blockchain height to a list of storage
+	// obligations that need to be managed in some way at that height. The
+	// height is stored as a big endian uint64, which means that bolt will
+	// store the heights sorted in numerical order. The action item itself is
+	// an array of file contract ids. The host is able to contextually figure
+	// out what the necessary actions for that item are based on the file
+	// contract id and the associated storage obligation that can be retreived
+	// using the id.
+	BucketActionItems = []byte("BucketActionItems")
+
+	// BucketSectorUsage maps sector IDs to the number of times they are used
+	// in file contracts. If all data is correctly encrypted using a unique
+	// seed, each sector will be in use exactly one time. The host however
+	// cannot control this, and a user may upload unencrypted data or
+	// intentionally upload colliding sectors as a means of attack. The host
+	// can only delete a sector when it is in use zero times. The number of
+	// times a sector is in use is encoded as a big endian uint64.
+	BucketSectorUsage = []byte("BucketSectorUsage")
+
+	// BucketStorageObligations contains a set of serialized
+	// 'storageObligations' sorted by their file contract id.
+	BucketStorageObligations = []byte("BucketStorageObligations")
+)
+
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
@@ -80,21 +114,29 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
-	// Consensus Tracking. 'actionItems' lists a bunch of contract obligations
-	// that have 'todos' at a given height. The required action ranges from
-	// needed to resubmit a revision to handling a storage proof or getting
-	// pruned from the host.
+	// Consensus Tracking.
 	blockHeight  types.BlockHeight
 	recentChange modules.ConsensusChangeID
-	actionItems  map[types.BlockHeight]map[types.FileContractID]*contractObligation
 
 	// Host Identity
 	netAddress modules.NetAddress
 	publicKey  types.SiaPublicKey
 	secretKey  crypto.SecretKey
 
-	// File Management.
+	// File Management - 'actionItems' lists a bunch of contract obligations
+	// that have 'todos' at a given height. The required action ranges from
+	// needed to resubmit a revision to handling a storage proof or getting
+	// pruned from the host.
+	//
+	// DEPRECATED v0.5.2
 	obligationsByID map[types.FileContractID]*contractObligation
+	actionItems     map[types.BlockHeight]map[types.FileContractID]*contractObligation
+
+	// Storage Obligation Management - different from file management in that
+	// the storage obligation management is the new way of handling storage
+	// obligations. Is a replacement for the contract obligation logic, but the
+	// old logic is being kept for compatibility purposes.
+	lockedBucketStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
 
 	// Statistics
 	anticipatedRevenue types.Currency
@@ -104,6 +146,7 @@ type Host struct {
 	spaceRemaining     int64
 
 	// Utilities.
+	db         *persist.BoltDatabase
 	listener   net.Listener
 	log        *persist.Logger
 	mu         sync.RWMutex
@@ -118,6 +161,35 @@ type Host struct {
 	// accessing them have returned.
 	closed       bool
 	resourceLock sync.RWMutex
+}
+
+// initDB will check that the database has been initialized and if not, will
+// initialize the database.
+func (h *Host) initDB() error {
+	return cs.db.Update(func(tx *bolt.Tx) error {
+		// Return nil if the database is already initialized. The database can
+		// be safely assumed to be initialized if the storage obligation bucket
+		// exists.
+		bso := tx.Bucket(BucketStorageObligations)
+		if bso != nil {
+			return nil
+		}
+
+		// The storage obligation bucket does not exist, which means the
+		// database needs to be initialized. Create the database buckets.
+		buckets := [][]byte{
+			BucketActionItems,
+			BucketSectorUsage,
+			BucketStorageObligations,
+		}
+		for _, bucket := range buckets {
+			_, err := tx.CreateBucket(bucket)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // New returns an initialized Host.
@@ -143,6 +215,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 
 		obligationsByID: make(map[types.FileContractID]*contractObligation),
 
+		lockedStorageObligations: make(map[types.FileContractID]struct{}),
+
 		persistDir: persistDir,
 	}
 
@@ -155,6 +229,22 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	// Initialize the logger. Logging should be initialized ASAP, because the
 	// rest of the initialization makes use of the logger.
 	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
+	if err != nil {
+		return nil, err
+	}
+
+	// Open the database containing the host's storage obligation metadata.
+	db, err := persist.OpenDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	if err != nil {
+		// An error will be returned if the database has the wrong version, but
+		// as of writing there was only one version of the database and all
+		// other databases would be incompatible.
+		return nil, err
+	}
+	// After opening the database, it must be initalized. Most commonly,
+	// nothing happens. But for new databases, a set of buckets must be
+	// created. Intialization is also a good time to run sanity checks.
+	err = h.initDB()
 	if err != nil {
 		return nil, err
 	}
@@ -220,18 +310,5 @@ func (h *Host) Close() error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-// DeleteContract deletes a file contract. The revenue and collateral on the
-// file contract will be lost, and the data will be removed.
-func (h *Host) DeleteContract(id types.FileContractID) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	obligation, exists := h.obligationsByID[id]
-	if !exists {
-		return errors.New("obligation not found")
-	}
-	h.removeObligation(obligation, obligationFailed)
 	return nil
 }
