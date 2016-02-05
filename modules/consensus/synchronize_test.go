@@ -225,3 +225,64 @@ func TestBlockHistory(t *testing.T) {
 		}
 	}
 }
+
+// TestSendBlocksBroadcasts tests that the SendBlocks RPC call only Broadcasts
+// one block, no matter how many blocks are sent. In the case 0 blocks are
+// sent, tests that Broadcast is never called.
+func TestSendBlocksBroadcasts(t *testing.T) {
+	// Setup consensus sets.
+	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst1.Close()
+	cst2, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst2.Close()
+	// Setup mock gateway.
+	mg := mockGateway{Gateway: cst1.cs.gateway}
+	cst1.cs.gateway = &mg
+	err = cst1.cs.gateway.Connect(cst2.cs.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		blocksToMine          int
+		expectedNumBroadcasts int
+	}{
+		{0, 0},
+		{1, 1},
+		{2, 1},
+		{MaxCatchUpBlocks, 1},
+		{2 * MaxCatchUpBlocks, 1},
+	}
+	for _, test := range tests {
+		mg.numBroadcasts = 0
+		for i := 0; i < test.blocksToMine; i++ {
+			b, minerErr := cst2.miner.FindBlock()
+			if minerErr != nil {
+				t.Fatal(minerErr)
+			}
+			// managedAcceptBlock is used here instead of AcceptBlock so as not to
+			// call Broadcast outside of the SendBlocks RPC.
+			err = cst2.cs.managedAcceptBlock(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlocks", cst1.cs.threadedReceiveBlocks)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Sleep to wait for possible calls to Broadcast to complete. We cannot
+		// wait on a channel because we don't know how many times broadcast has
+		// been called.
+		time.Sleep(1)
+		if mg.numBroadcasts != test.expectedNumBroadcasts {
+			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, mg.numBroadcasts)
+		}
+	}
+}
