@@ -701,3 +701,64 @@ func TestTaxHardfork(t *testing.T) {
 		t.Fatal("siafund pool was not increased correctly")
 	}
 }
+
+// mockGateway implements modules.Gateway to mock the Broadcast method.
+type mockGateway struct {
+	modules.Gateway
+	numBroadcasts int
+}
+
+func (g *mockGateway) Broadcast(string, interface{}) {
+	g.numBroadcasts++
+	return
+}
+
+// TestAcceptBlockBroadcasts tests that AcceptBlock broadcasts valid blocks and
+// that managedAcceptBlock does not.
+func TestAcceptBlockBroadcasts(t *testing.T) {
+	cst, err := blankConsensusSetTester("TestAcceptBlockBroadcasts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+	mg := &mockGateway{Gateway: cst.cs.gateway}
+	cst.cs.gateway = mg
+
+	// Test that Broadcast is called for valid blocks.
+	b, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sleep to wait for possible calls to Broadcast to complete. We cannot
+	// wait on a channel because we don't know how many times broadcast has
+	// been called.
+	time.Sleep(1)
+	if mg.numBroadcasts != 1 {
+		t.Errorf("expected AcceptBlock to broadcast a valid block 1 time, instead it broadcasted %d times", mg.numBroadcasts)
+	}
+
+	// Test that Broadcast is not called for invalid blocks.
+	mg.numBroadcasts = 0
+	err = cst.cs.AcceptBlock(types.Block{})
+	if err == nil {
+		t.Fatal("expected AcceptBlock to error on an invalid block")
+	}
+	// Sleep one second to wait for a possible call to g.Broadcast.
+	time.Sleep(1)
+	if mg.numBroadcasts != 0 {
+		t.Error("AcceptBlock broadcasted an invalid block")
+	}
+
+	// Test that Broadcast is not called in managedAcceptBlock.
+	mg.numBroadcasts = 0
+	b, _ = cst.miner.FindBlock()
+	err = cst.cs.managedAcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1)
+	if mg.numBroadcasts != 0 {
+		t.Errorf("expected managedAcceptBlock to not broadcast any blocks, instead it broadcasted %d times", mg.numBroadcasts)
+	}
+}
