@@ -134,7 +134,10 @@ func newHostDB(cs consensusSet, w wallet, tp transactionPool, d dialer, s sleepe
 	}
 	go hdb.threadedScan()
 
-	cs.ConsensusSetPersistentSubscribe(hdb, modules.ConsensusChangeID{})
+	err = cs.ConsensusSetPersistentSubscribe(hdb, modules.ConsensusChangeID{})
+	if err != nil {
+		return nil, errors.New("hostdb subscription failed: " + err.Error())
+	}
 
 	return hdb, nil
 }
