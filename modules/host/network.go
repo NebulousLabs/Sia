@@ -78,7 +78,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		}
 		unrecognizedCalls := atomic.LoadUint64(&h.atomicUnrecognizedCalls)
 		if unrecognizedCalls < 1e3 || (unrecognizedCalls > 1e3 && randInt == 0) {
-			h.log.Printf("WARN: incoming conn %v was malformed", conn.RemoteAddr())
+			h.log.Printf("WARN: incoming conn %v was malformed: %v", conn.RemoteAddr(), err)
 		}
 		return
 	}
