@@ -5,7 +5,6 @@ package host
 import (
 	"errors"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
 
@@ -175,6 +174,9 @@ type Host struct {
 	// accessing them have returned.
 	closed       bool
 	resourceLock sync.RWMutex
+
+	// Dependencies
+	persister
 }
 
 // initDB will check that the database has been initialized and if not, will
@@ -206,8 +208,12 @@ func (h *Host) initDB() error {
 	})
 }
 
-// New returns an initialized Host.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+// newHost returns an initialized Host, taking a series of dependencies in as
+// arguments. By making the dependencies arguments of the 'new' call, the host
+// can be mocked such that the dependencies can return unexpected errors or
+// unique behaviors during testing, enabling easier testing of the failure
+// modes of the Host.
+func newHost(persister persister, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
@@ -232,10 +238,12 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 
 		persistDir: persistDir,
+
+		persister: persister,
 	}
 
 	// Create the perist directory if it does not yet exist.
-	err := os.MkdirAll(h.persistDir, 0700)
+	err := persister.MkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +261,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 		// An error will be returned if the database has the wrong version, but
 		// as of writing there was only one version of the database and all
 		// other databases would be incompatible.
+		_ = h.log.Close()
 		return nil, err
 	}
 	// After opening the database, it must be initalized. Most commonly,
@@ -260,22 +269,33 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	// created. Intialization is also a good time to run sanity checks.
 	err = h.initDB()
 	if err != nil {
+		_ = h.log.Close()
+		_ = h.db.Close()
 		return nil, err
 	}
 
 	// Load the prior persistance structures.
 	err = h.load()
 	if err != nil {
+		_ = h.log.Close()
+		_ = h.db.Close()
 		return nil, err
 	}
 
 	// Get the host established on the network.
 	err = h.initNetworking(address)
 	if err != nil {
+		_ = h.log.Close()
+		_ = h.db.Close()
 		return nil, err
 	}
 
 	return h, nil
+}
+
+// New returns an initialized Host.
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+	return newHost(productionPersister{}, cs, tpool, wallet, address, persistDir)
 }
 
 // Close shuts down the host, preparing it for garbage collection.
