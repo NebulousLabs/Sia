@@ -150,29 +150,25 @@ func TestRepair(t *testing.T) {
 // offlineHostDB is a mocked hostDB, used for testing the offlineChunks method
 // of the file type. It is implemented as a map from NetAddresses to booleans,
 // where the bool indicates whether the host is active.
-type offlineHostDB map[modules.NetAddress]bool
-
-// IsOffline is a stub implementation of the IsOffline method.
-func (hdb offlineHostDB) IsOffline(addr modules.NetAddress) bool {
-	return !hdb[addr]
+type offlineHostDB struct {
+	stubHostDB
+	hosts map[modules.NetAddress]bool
 }
 
-// Stub implementations of other hostDB methods.
-func (offlineHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) { return nil, nil }
-func (offlineHostDB) ActiveHosts() []modules.HostSettings                        { return nil }
-func (offlineHostDB) AllHosts() []modules.HostSettings                           { return nil }
-func (offlineHostDB) AveragePrice() types.Currency                               { return types.Currency{} }
-func (offlineHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
-	return types.FileContractID{}, nil
+// IsOffline is a stub implementation of the IsOffline method.
+func (hdb *offlineHostDB) IsOffline(addr modules.NetAddress) bool {
+	return !hdb.hosts[addr]
 }
 
 // TestOfflineChunks tests the offlineChunks method of the file type.
 func TestOfflineChunks(t *testing.T) {
 	// Create a mock hostdb.
 	hdb := &offlineHostDB{
-		"foo": false,
-		"bar": false,
-		"baz": true,
+		hosts: map[modules.NetAddress]bool{
+			"foo": false,
+			"bar": false,
+			"baz": true,
+		},
 	}
 	rsc, _ := NewRSCode(1, 1)
 	f := &file{

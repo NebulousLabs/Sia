@@ -14,7 +14,9 @@ import (
 
 // uploadHostDB is a mocked hostDB, hostdb.HostPool, and hostdb.Uploader. It
 // is used for testing the uploading and repairing functions of the renter.
-type uploadHostDB struct{}
+type uploadHostDB struct {
+	stubHostDB
+}
 
 // NewPool returns a new mock HostPool. Since uploadHostDB implements the
 // HostPool interface, it can simply return itself.
@@ -39,15 +41,6 @@ func (uploadHostDB) Address() modules.NetAddress      { return "" }
 func (uploadHostDB) ContractID() types.FileContractID { return types.FileContractID{} }
 func (uploadHostDB) EndHeight() types.BlockHeight     { return 10000 }
 func (uploadHostDB) Close() error                     { return nil }
-
-// stub implementations of the hostDB methods
-func (uploadHostDB) ActiveHosts() []modules.HostSettings { return nil }
-func (uploadHostDB) AllHosts() []modules.HostSettings    { return nil }
-func (uploadHostDB) AveragePrice() types.Currency        { return types.Currency{} }
-func (uploadHostDB) IsOffline(modules.NetAddress) bool   { return true }
-func (uploadHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
-	return types.FileContractID{}, nil
-}
 
 // TestUpload tests the uploading and repairing functions. The hostDB is
 // mocked, isolating the upload/repair logic from the negotation logic.
