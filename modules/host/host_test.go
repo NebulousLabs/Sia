@@ -2,7 +2,6 @@ package host
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -381,56 +380,3 @@ func TestPersistentSettings(t *testing.T) {
 		t.Error("settings retrieval did not return updated value")
 	}
 }
-
-// persisterErrMkdirAll is a persister that returns an error when MkdirAll is
-// called.
-type persisterErrMkdirAll struct {
-	stub
-}
-
-func (persisterErrMkdirAll) MkdirAll(_ string, _ os.FileMode) error {
-	return errMkdirAllMock
-}
-
-// TestFailedHostMkdirAll passes the host an errStub which implements the
-// persister interface, resulting in an err being returned by the host.
-func TestFailedHostMkdirAll(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	ht, err := blankHostTester("TestFailedHostMkdirAll")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = newHost(persisterErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != errMkdirAllMock {
-		t.Fatal(err)
-	}
-}
-
-/*
-// TestUnsuccessfulDBInit sets the stage for an error to be triggered when the
-// host tries to initialize the database. The host should return the error.
-func TestUnsuccessfulDBInit(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	// Create a blank host tester so that all the host dependencies are
-	// available.
-	ht, err := blankHostTester("TestSetPersistentSettings")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Corrupt the host database by deleting BucketStorageObligations, which
-	// Close the host so a new host can be created after the database has been
-	// corrupted.
-	err = ht.host.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-*/

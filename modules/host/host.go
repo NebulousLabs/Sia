@@ -176,7 +176,7 @@ type Host struct {
 	resourceLock sync.RWMutex
 
 	// Dependencies
-	persister
+	dependencies
 }
 
 // initDB will check that the database has been initialized and if not, will
@@ -213,7 +213,7 @@ func (h *Host) initDB() error {
 // can be mocked such that the dependencies can return unexpected errors or
 // unique behaviors during testing, enabling easier testing of the failure
 // modes of the Host.
-func newHost(persister persister, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
@@ -239,18 +239,18 @@ func newHost(persister persister, cs modules.ConsensusSet, tpool modules.Transac
 
 		persistDir: persistDir,
 
-		persister: persister,
+		dependencies: dependencies,
 	}
 
 	// Create the perist directory if it does not yet exist.
-	err := persister.MkdirAll(h.persistDir, 0700)
+	err := dependencies.MkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the logger. Logging should be initialized ASAP, because the
 	// rest of the initialization makes use of the logger.
-	h.log, err = persist.NewLogger(filepath.Join(h.persistDir, logFile))
+	h.log, err = dependencies.NewLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func newHost(persister persister, cs modules.ConsensusSet, tpool modules.Transac
 
 // New returns an initialized Host.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
-	return newHost(productionPersister{}, cs, tpool, wallet, address, persistDir)
+	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
 }
 
 // Close shuts down the host, preparing it for garbage collection.
@@ -315,12 +315,6 @@ func (h *Host) Close() error {
 		return err
 	}
 
-	// Close the bolt database.
-	err = h.db.Close()
-	if err != nil {
-		return err
-	}
-
 	// Grab the resource lock and indicate that the host is closing. Concurrent
 	// functions hold the resource lock until they terminate, meaning that no
 	// threaded function will be running by the time the resource lock is
@@ -328,6 +322,12 @@ func (h *Host) Close() error {
 	h.resourceLock.Lock()
 	h.closed = true
 	h.resourceLock.Unlock()
+
+	// Close the bolt database.
+	err = h.db.Close()
+	if err != nil {
+		return err
+	}
 
 	// Clear the port that was forwarded at startup. The port handling must
 	// happen before the logger is closed, as it leaves a logging message.
