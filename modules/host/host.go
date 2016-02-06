@@ -14,19 +14,33 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 const (
 	defaultTotalStorage = 10e9         // 10 GB.
 	defaultMaxDuration  = 144 * 30 * 6 // 6 months.
 
-	dbFilename = "host.db"
+	// Names of the various persistent files in the host.
+	dbFilename   = modules.HostDir + ".db"
+	logFile      = modules.HostDir + ".log"
+	settingsFile = modules.HostDir + ".json"
 )
 
 var (
+	// dbMetadata is a header that gets put into the database to identify a
+	// version and indicate that the database holds host information.
 	dbMetadata = persist.Metadata{
-		Header:  "Host DB",
+		Header:  "Sia Host DB",
 		Version: "0.5.2",
+	}
+
+	// persistMetadata is the header that gets written to the persist file, and is
+	// used to recognize other persist files.
+	persistMetadata = persist.Metadata{
+		Header:  "Sia Host",
+		Version: "0.5",
 	}
 
 	// defaultPrice defines the starting price for hosts selling storage. We
@@ -136,7 +150,7 @@ type Host struct {
 	// the storage obligation management is the new way of handling storage
 	// obligations. Is a replacement for the contract obligation logic, but the
 	// old logic is being kept for compatibility purposes.
-	lockedBucketStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
+	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
 
 	// Statistics
 	anticipatedRevenue types.Currency
@@ -166,7 +180,7 @@ type Host struct {
 // initDB will check that the database has been initialized and if not, will
 // initialize the database.
 func (h *Host) initDB() error {
-	return cs.db.Update(func(tx *bolt.Tx) error {
+	return h.db.Update(func(tx *bolt.Tx) error {
 		// Return nil if the database is already initialized. The database can
 		// be safely assumed to be initialized if the storage obligation bucket
 		// exists.
@@ -234,7 +248,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	}
 
 	// Open the database containing the host's storage obligation metadata.
-	db, err := persist.OpenDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	h.db, err = persist.OpenDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
 	if err != nil {
 		// An error will be returned if the database has the wrong version, but
 		// as of writing there was only one version of the database and all
@@ -277,6 +291,12 @@ func (h *Host) Close() error {
 	// rejected. The listener should be closed before the host resources are
 	// disabled, as incoming connections will want to use the hosts resources.
 	err := h.listener.Close()
+	if err != nil {
+		return err
+	}
+
+	// Close the bolt database.
+	err = h.db.Close()
 	if err != nil {
 		return err
 	}

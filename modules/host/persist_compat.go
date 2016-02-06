@@ -70,7 +70,7 @@ func (h *Host) loadCompat04Obligations(c04os []compat04Obligation) []*contractOb
 func (h *Host) compatibilityLoad() error {
 	// Try loading the file as a 0.4 file.
 	c04h := new(compat04Host)
-	err := persist.LoadFile(compat04Metadata, c04h, filepath.Join(h.persistDir, "settings.json"))
+	err := persist.LoadFile(compat04Metadata, c04h, filepath.Join(h.persistDir, settingsFile))
 	if err != nil {
 		// 0.4.x is the only backwards compatibility provided. File could not
 		// be loaded.

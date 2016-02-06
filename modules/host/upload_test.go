@@ -184,11 +184,12 @@ func TestRPCUpload(t *testing.T) {
 
 	// Check that the file has been removed from the host directory.
 	fileInfos, err := ioutil.ReadDir(filepath.Join(ht.persistDir, modules.HostDir))
-	if len(fileInfos) != 2 {
+	if len(fileInfos) != 3 {
+		// host.json, host.db, host.log
 		t.Error("too many files in directory after storage proof completed")
 	}
 	for _, fileInfo := range fileInfos {
-		if fileInfo.Name() != "host.log" && fileInfo.Name() != "settings.json" {
+		if fileInfo.Name() != "host.log" && fileInfo.Name() != "host.json" && fileInfo.Name() != "host.db" {
 			t.Error("unexpected file after storage proof", fileInfo.Name())
 		}
 	}

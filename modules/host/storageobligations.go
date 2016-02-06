@@ -13,6 +13,8 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -21,6 +23,31 @@ var (
 	// contract. This error should only happen in the event of a developer
 	// mistake.
 	ErrDuplicateStorageObligation = errors.New("storage obligation has a file contract which conflicts with an existing storage obligation")
+
+	// ErrInsaneFileContractOutputCounts is returned when a file contract has
+	// the wrong number of outputs for either the valid or missed payouts.
+	ErrInsaneFileContractOutputCounts = errors.New("file contract has incorrect number of outputs for the valid or missed payouts")
+
+	// ErrInsaneFileContractRevisionOutputCounts is returned when a file
+	// contract has the wrong number of outputs for either the valid or missed
+	// payouts.
+	ErrInsaneFileContractRevisionOutputCounts = errors.New("file contract revision has incorrect number of outputs for the valid or missed payouts")
+
+	// ErrInsaneOriginSetFileContract is returned is the final transaction of
+	// the origin transaction set of a storage obligation does not have a file
+	// contract in the final transaction - there should be a file contract
+	// associated with every storage obligation.
+	ErrInsaneOriginSetFileContract = errors.New("origin transaction set of storage obligation should have one file contract in the final transaction")
+
+	// ErrInsaneOriginSetSize is returned if the origin transaction set of a
+	// storage obligation is empty - there should be a file contract associated
+	// with every storage obligation.
+	ErrInsaneOriginSetSize = errors.New("origin transaction set of storage obligation is size zero")
+
+	// ErrInsaneRevisionSetRevisionCount is returned if the final transaction
+	// in the revision transaction set of a storage obligation has more or less
+	// than one file contract revision.
+	ErrInsaneRevisionSetRevisionCount = errors.New("revision transaction set of storage obligation should have one file contract revision in the final transaction")
 )
 
 // storageObligation contains all of the metadata related to a file contract
@@ -54,11 +81,104 @@ type storageObligation struct {
 	ProofConfirmed    bool
 }
 
+// isSane checks that required assumptions about the storage obligation are
+// correct.
+func (so *storageObligation) isSane() error {
+	// There should be an origin transaction set.
+	if len(so.OriginTransactionSet) == 0 {
+		build.Critical("origin transaction set is empty")
+		return ErrInsaneOriginSetSize
+	}
+
+	// The final transaction of the origin transaction set should have one file
+	// contract.
+	final := len(so.OriginTransactionSet) - 1
+	fcCount := len(so.OriginTransactionSet[final].FileContracts)
+	if fcCount != 1 {
+		build.Critical("wrong number of file contracts associated with storage obligation:", fcCount)
+		return ErrInsaneOriginSetFileContract
+	}
+
+	// The file contract in the final transaction of the origin transaction set
+	// should have two valid proof outputs and two missed proof outputs.
+	lenVPOs := len(so.OriginTransactionSet[final].FileContracts[0].ValidProofOutputs)
+	lenMPOs := len(so.OriginTransactionSet[final].FileContracts[0].MissedProofOutputs)
+	if lenVPOs != 2 || lenMPOs != 2 {
+		build.Critical("file contract has wrong number of VPOs and MPOs, expecting 2 each:", lenVPOs, lenMPOs)
+		return ErrInsaneFileContractOutputCounts
+	}
+
+	// If there is a revision transaction set, there should be one file
+	// contract revision in the final transaction.
+	if len(so.RevisionTransactionSet) > 0 {
+		final = len(so.OriginTransactionSet) - 1
+		fcrCount := len(so.OriginTransactionSet[final].FileContractRevisions)
+		if fcrCount != 1 {
+			build.Critical("wrong number of file contract revisions in final transaction of revision transaction set:", fcrCount)
+			return ErrInsaneRevisionSetRevisionCount
+		}
+
+		// The file contract revision in the final transaction of the revision
+		// transaction set should have two valid proof outputs and two missed
+		// proof outputs.
+		lenVPOs = len(so.RevisionTransactionSet[final].FileContractRevisions[0].NewValidProofOutputs)
+		lenMPOs = len(so.RevisionTransactionSet[final].FileContractRevisions[0].NewMissedProofOutputs)
+		if lenVPOs != 2 || lenMPOs != 2 {
+			build.Critical("file contract has wrong number of VPOs and MPOs, expecting 2 each:", lenVPOs, lenMPOs)
+			return ErrInsaneFileContractRevisionOutputCounts
+		}
+	}
+	return nil
+}
+
+// revenue returns the potential revenue for the host from the storage
+// obligation.
+func (so *storageObligation) revenue() types.Currency {
+	err := so.isSane()
+	if err != nil {
+		build.Critical("insane storage obligation when returning revenue")
+		return types.ZeroCurrency
+	}
+
+	if len(so.RevisionTransactionSet) == 0 {
+		// There are no revisions on this storage obligation's file contract,
+		// therefore the filesize in the file contract is sufficient.
+		final := len(so.OriginTransactionSet) - 1
+		return so.OriginTransactionSet[final].FileContracts[0].ValidProofOutputs[1].Value
+	}
+	final := len(so.RevisionTransactionSet) - 1
+	return so.RevisionTransactionSet[final].FileContractRevisions[0].NewValidProofOutputs[1].Value
+}
+
+// fileSize returns the volume of space on-disk that the storage obligation is
+// consuming, as indicated in the file contract. fileSize does not take into
+// account repeat sectors, however an adversarial model indicates that it
+// should not take into account repeat sectors, as those sectors may be
+// modified at anytime such that they become unique.
+func (so *storageObligation) fileSize() uint64 {
+	err := so.isSane()
+	if err != nil {
+		build.Critical("insane storage obligation when returning filesize")
+		return 0
+	}
+
+	if len(so.RevisionTransactionSet) == 0 {
+		// There are no revisions on this storage obligation's file contract,
+		// therefore the filesize in the file contract is sufficient.
+		final := len(so.OriginTransactionSet) - 1
+		return so.OriginTransactionSet[final].FileContracts[0].FileSize
+	}
+	// There is a file contract revision associated with the storage
+	// obligaiton, use the size indicated by the revision.
+	final := len(so.RevisionTransactionSet) - 1
+	return so.RevisionTransactionSet[final].FileContractRevisions[0].NewFileSize
+}
+
 // queueActionItem adds an action item to the host at the input height so that
 // the host knows to perform maintenance on the associated storage obligation
 // when that height is reached.
 func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID) error {
-	return cs.db.Update(func(tx *bolt.Tx) error {
+	return h.db.Update(func(tx *bolt.Tx) error {
 		// Translate the height into a byte slice.
 		heightBytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(heightBytes, uint64(height))
@@ -67,7 +187,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 		bai := tx.Bucket(BucketActionItems)
 		existingItems := bai.Get(heightBytes)
 		existingItems = append(existingItems, id[:]...)
-		err = bai.Put(existingItems)
+		err := bai.Put(heightBytes, existingItems)
 		if err != nil {
 			return err
 		}
@@ -81,7 +201,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 			var ids [][32]byte
 			for i := 0; i < len(existingItems); i += 32 {
 				var newID [32]byte
-				copy(newID, existingItems[i:i+32])
+				copy(newID[:], existingItems[i:i+32])
 				for _, id := range ids {
 					if newID == id {
 						h.log.Critical("host has multiple action items for a single storage obligation at one height")
@@ -91,7 +211,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 			}
 		}
 		return nil
-	}
+	})
 }
 
 // addStorageObligation adds a storage obligation to the host. There is an
@@ -120,7 +240,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	}
 
 	// Add the storage obligation information to the database.
-	err := cs.db.Update(func(tx *bolt.Tx) error {
+	err := h.db.Update(func(tx *bolt.Tx) error {
 		// Sanity check - a storage obligation using the same file contract id
 		// should not already exist. This situation can happen if the
 		// transaction pool ejects a file contract and then a new one is
@@ -129,7 +249,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		// contract ids should happen during the negotiation phase, and not
 		// during the 'addStorageObligation' phase.
 		bso := tx.Bucket(BucketStorageObligations)
-		soBytes := storageObligationBucket.Get(so.ID[:])
+		soBytes := bso.Get(so.ID[:])
 		if soBytes != nil {
 			h.log.Critical("host already has a save storage obligation for this file contract")
 			return ErrDuplicateStorageObligation
@@ -140,7 +260,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		if err != nil {
 			return err
 		}
-		err = bso.Put(soBytes)
+		err = bso.Put(so.ID[:], soBytes)
 		if err != nil {
 			return err
 		}
@@ -148,20 +268,21 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		// Expensive santiy check - all of the sectors in the obligation should
 		// already be represented in the sector usage bucket.
 		if build.DEBUG {
-			for _, root := range bsu.Get(root[:]) {
+			bsu := tx.Bucket(BucketSectorUsage)
+			for _, root := range so.SectorRoots {
 				if bsu.Get(root[:]) == nil {
 					h.log.Critical("sector root information has not been correctly updated")
 				}
 			}
 		}
 		return nil
-	}
+	})
 	if err != nil {
 		return err
 	}
 
 	// Update the host statistics to reflect the new storage obligation.
-	h.anticipatedRevenue = h.anticipatedRevenue.Add(so.value())
+	h.anticipatedRevenue = h.anticipatedRevenue.Add(so.revenue())
 	h.spaceRemaining = h.spaceRemaining - int64(so.fileSize())
 
 	// Set an action item that will have the host verify that the file contract
@@ -175,29 +296,29 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 
 // Sector update code - for use when adding sectors to the host.
 /*
-		bsu := tx.Bucket(BucketSectorUsage)
-		for _, root := range so.SectorRoots {
-			// Check if there is already a sector with this data.
-			sectorUsageBytes := bsu.Get(root[:])
-			if sectorUsageBytes != nil {
-				// This sector is already in use. Decode the number of times it
-				// is in use, increment the counter, and then store the usage
-				// information.
-				usage := binary.BigEndian.Uint64(sectorUsageBytes)
-				binary.BigEndian.PutUint64(sectorUsageBytes, usage+1)
-				err = bsu.Put(sectorUsageBytes)
-				if err != nil {
-					return err
-				}
-			} else {
-				// This sector is not in use yet. Encode '1' to indicate that
-				// the sector is in use in one time.
-				sectorUsageBytes = make([]byte, 8)
-				binary.BigEndian.PutUint64(sectorUsageBytes, 1)
-				err = bsu.Put(sectorUsageBytes)
-				if err != nil {
-					return err
-				}
+	bsu := tx.Bucket(BucketSectorUsage)
+	for _, root := range so.SectorRoots {
+		// Check if there is already a sector with this data.
+		sectorUsageBytes := bsu.Get(root[:])
+		if sectorUsageBytes != nil {
+			// This sector is already in use. Decode the number of times it
+			// is in use, increment the counter, and then store the usage
+			// information.
+			usage := binary.BigEndian.Uint64(sectorUsageBytes)
+			binary.BigEndian.PutUint64(sectorUsageBytes, usage+1)
+			err = bsu.Put(sectorUsageBytes)
+			if err != nil {
+				return err
+			}
+		} else {
+			// This sector is not in use yet. Encode '1' to indicate that
+			// the sector is in use in one time.
+			sectorUsageBytes = make([]byte, 8)
+			binary.BigEndian.PutUint64(sectorUsageBytes, 1)
+			err = bsu.Put(sectorUsageBytes)
+			if err != nil {
+				return err
 			}
 		}
+	}
 */
