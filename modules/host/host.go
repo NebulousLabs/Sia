@@ -256,7 +256,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	// Open the database containing the host's storage obligation metadata.
-	h.db, err = persist.OpenDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	h.db, err = dependencies.OpenDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
 	if err != nil {
 		// An error will be returned if the database has the wrong version, but
 		// as of writing there was only one version of the database and all

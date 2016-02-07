@@ -10,54 +10,92 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// persisterErrMkdirAll is a persister that returns an error when MkdirAll is
-// called.
-type persisterErrMkdirAll struct {
-	stub
+// dependencyErrMkdirAll is a dependency set that returns an error when MkdirAll
+// is called.
+type dependencyErrMkdirAll struct {
+	productionDependencies
 }
 
-func (persisterErrMkdirAll) MkdirAll(_ string, _ os.FileMode) error {
-	return errMkdirAllMock
+func (dependencyErrMkdirAll) MkdirAll(_ string, _ os.FileMode) error {
+	return mockErrMkdirAll
 }
 
-// TestFailedHostMkdirAll initializes the host using a call to MkdirAll that
+// TestHostFailedMkdirAll initializes the host using a call to MkdirAll that
 // will fail.
-func TestFailedHostMkdirAll(t *testing.T) {
+func TestHostFailedMkdirAll(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := blankHostTester("TestFailedHostMkdirAll")
+	ht, err := blankHostTester("TestHostFailedMkdirAll")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(persisterErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != errMkdirAllMock {
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = newHost(dependencyErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != mockErrMkdirAll {
 		t.Fatal(err)
 	}
 }
 
-// persisterErrMkdirAll is a persister that returns an error when MkdirAll is
-// called.
-type persisterErrNewLogger struct {
-	stub
+// dependencyErrNewLogger is a dependency set that returns an error when
+// NewLogger is called.
+type dependencyErrNewLogger struct {
+	productionDependencies
 }
 
-func (persisterErrNewLogger) NewLogger(_ string) (*persist.Logger, error) {
-	return nil, errNewLoggerMock
+func (dependencyErrNewLogger) NewLogger(_ string) (*persist.Logger, error) {
+	return nil, mockErrNewLogger
 }
 
-// TestFailedHostNewLogger initializes the host using a call to NewLogger that
+// TestHostFailedNewLogger initializes the host using a call to NewLogger that
 // will fail.
-func TestFailedHostNewLogger(t *testing.T) {
+func TestHostFailedNewLogger(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := blankHostTester("TestFailedHostNewLogger")
+	ht, err := blankHostTester("TestHostFailedNewLogger")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(persisterErrNewLogger{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err != errNewLoggerMock {
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = newHost(dependencyErrNewLogger{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != mockErrNewLogger {
+		t.Fatal(err)
+	}
+}
+
+// dependencyErrOpenDatabase is a dependency that returns an error when
+// OpenDatabase is called.
+type dependencyErrOpenDatabase struct {
+	productionDependencies
+}
+
+func (dependencyErrOpenDatabase) OpenDatabase(_ persist.Metadata, _ string) (*persist.BoltDatabase, error) {
+	return nil, mockErrOpenDatabase
+}
+
+// TestHostFailedOpenDatabase initializes the host using a call to OpenDatabase
+// that has been mocked to fail.
+func TestHostFailedOpenDatabase(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := blankHostTester("TestHostFailedOpenDatabase")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != mockErrOpenDatabase {
 		t.Fatal(err)
 	}
 }
@@ -84,7 +122,6 @@ func TestUnsuccessfulDBInit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Close the host so a new host can be created after the database has been
 	// corrupted.
 	err = ht.host.Close()
@@ -94,5 +131,35 @@ func TestUnsuccessfulDBInit(t *testing.T) {
 	_, err = New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err == nil {
 		t.Fatal("expecting initDB to fail")
+	}
+}
+
+// dependencyErrLoadFile is a dependency that returns an error when
+// LoadFile is called.
+type dependencyErrLoadFile struct {
+	productionDependencies
+}
+
+func (dependencyErrLoadFile) LoadFile(_ persist.Metadata, _ interface{}, _ string) error {
+	return mockErrLoadFile
+}
+
+// TestHostFailedLoadFile initializes the host using a call to LoadFile that
+// has been mocked to fail.
+func TestHostFailedLoadFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := blankHostTester("TestHostFailedLoadFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = newHost(dependencyErrLoadFile{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != mockErrLoadFile {
+		t.Fatal(err)
 	}
 }
