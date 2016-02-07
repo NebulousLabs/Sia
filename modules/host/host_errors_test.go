@@ -1,6 +1,7 @@
 package host
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -160,6 +161,36 @@ func TestHostFailedLoadFile(t *testing.T) {
 	}
 	_, err = newHost(dependencyErrLoadFile{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrLoadFile {
+		t.Fatal(err)
+	}
+}
+
+// dependencyErrListen is a dependency that returns an error when Listen is
+// called.
+type dependencyErrListen struct {
+	productionDependencies
+}
+
+func (dependencyErrListen) Listen(_, _ string) (net.Listener, error) {
+	return nil, mockErrListen
+}
+
+// TestHostFailedListen initializes the host using a call to Listen that
+// has been mocked to fail.
+func TestHostFailedListen(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	ht, err := blankHostTester("TestHostFailedListen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = newHost(dependencyErrListen{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != mockErrListen {
 		t.Fatal(err)
 	}
 }

@@ -122,10 +122,11 @@ type Host struct {
 	atomicSettingsCalls     uint64
 	atomicUploadCalls       uint64
 
-	// Module dependencies.
+	// Dependencies.
 	cs     modules.ConsensusSet
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
+	dependencies
 
 	// Consensus Tracking.
 	blockHeight  types.BlockHeight
@@ -174,9 +175,6 @@ type Host struct {
 	// accessing them have returned.
 	closed       bool
 	resourceLock sync.RWMutex
-
-	// Dependencies
-	dependencies
 }
 
 // initDB will check that the database has been initialized and if not, will
@@ -227,9 +225,10 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 
 	// Create the host object.
 	h := &Host{
-		cs:     cs,
-		tpool:  tpool,
-		wallet: wallet,
+		cs:           cs,
+		tpool:        tpool,
+		wallet:       wallet,
+		dependencies: dependencies,
 
 		actionItems: make(map[types.BlockHeight]map[types.FileContractID]*contractObligation),
 
@@ -238,8 +237,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 
 		persistDir: persistDir,
-
-		dependencies: dependencies,
 	}
 
 	// Create the perist directory if it does not yet exist.

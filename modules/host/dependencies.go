@@ -2,6 +2,7 @@ package host
 
 import (
 	"errors"
+	"net"
 	"os"
 
 	"github.com/NebulousLabs/Sia/persist"
@@ -10,6 +11,7 @@ import (
 // Fake errors that get returned when a simulated failure of a dependency is
 // desired for testing.
 var (
+	mockErrListen       = errors.New("simulated Listen failure")
 	mockErrLoadFile     = errors.New("simulated LoadFile failure")
 	mockErrMkdirAll     = errors.New("simulated MkdirAll failure")
 	mockErrNewLogger    = errors.New("simulated NewLogger failure")
@@ -22,6 +24,9 @@ var (
 type (
 	// dependencies defines all of the dependencies of the Host.
 	dependencies interface {
+		// Listen gives the host the ability to receive incoming connections.
+		Listen(string, string) (net.Listener, error)
+
 		// LoadFile allows the host to load a persistence structure form disk.
 		LoadFile(persist.Metadata, interface{}, string) error
 
@@ -45,6 +50,16 @@ type (
 	productionDependencies struct{}
 )
 
+// Listen gives the host the ability to receive incoming connections.
+func (productionDependencies) Listen(s1, s2 string) (net.Listener, error) {
+	return net.Listen(s1, s2)
+}
+
+// LoadFile allows the host to load a persistence structure form disk.
+func (productionDependencies) LoadFile(m persist.Metadata, i interface{}, s string) error {
+	return persist.LoadFile(m, i, s)
+}
+
 // MkdirAll gives the host the ability to create chains of folders within the
 // filesystem.
 func (productionDependencies) MkdirAll(s string, fm os.FileMode) error {
@@ -61,9 +76,4 @@ func (productionDependencies) NewLogger(s string) (*persist.Logger, error) {
 // volumes of persistent data.
 func (productionDependencies) OpenDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
 	return persist.OpenDatabase(m, s)
-}
-
-// LoadFile allows the host to load a persistence structure form disk.
-func (productionDependencies) LoadFile(m persist.Metadata, i interface{}, s string) error {
-	return persist.LoadFile(m, i, s)
 }
