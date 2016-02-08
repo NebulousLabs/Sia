@@ -1,9 +1,11 @@
 package consensus
 
 import (
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -226,10 +228,27 @@ func TestBlockHistory(t *testing.T) {
 	}
 }
 
-// TestSendBlocksBroadcasts tests that the SendBlocks RPC call only Broadcasts
-// one block, no matter how many blocks are sent. In the case 0 blocks are
-// sent, tests that Broadcast is never called.
-func TestSendBlocksBroadcasts(t *testing.T) {
+// mockGatewayCountBroadcasts implements modules.Gateway to mock the Broadcast
+// method.
+type mockGatewayCountBroadcasts struct {
+	modules.Gateway
+	numBroadcasts int
+	mu            sync.RWMutex
+}
+
+// Broadcast is a mock implementation of modules.Gateway.Broadcast that
+// increments a counter denoting the number of times it's been called.
+func (g *mockGatewayCountBroadcasts) Broadcast(string, interface{}) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.numBroadcasts++
+	return
+}
+
+// TestSendBlocksBroadcastsOnce tests that the SendBlocks RPC call only
+// Broadcasts one block, no matter how many blocks are sent. In the case 0
+// blocks are sent, tests that Broadcast is never called.
+func TestSendBlocksBroadcastsOnce(t *testing.T) {
 	// Setup consensus sets.
 	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
 	if err != nil {
@@ -242,7 +261,7 @@ func TestSendBlocksBroadcasts(t *testing.T) {
 	}
 	defer cst2.Close()
 	// Setup mock gateway.
-	mg := mockGateway{Gateway: cst1.cs.gateway}
+	mg := mockGatewayCountBroadcasts{Gateway: cst1.cs.gateway}
 	cst1.cs.gateway = &mg
 	err = cst1.cs.gateway.Connect(cst2.cs.gateway.Address())
 	if err != nil {
@@ -282,7 +301,7 @@ func TestSendBlocksBroadcasts(t *testing.T) {
 		// Sleep to wait for possible calls to Broadcast to complete. We cannot
 		// wait on a channel because we don't know how many times broadcast has
 		// been called.
-		time.Sleep(1)
+		time.Sleep(10 * time.Millisecond)
 		mg.mu.RLock()
 		numBroadcasts := mg.numBroadcasts
 		mg.mu.RUnlock()

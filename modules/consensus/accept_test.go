@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"errors"
-	"sync"
 	"testing"
 	"time"
 
@@ -703,18 +702,17 @@ func TestTaxHardfork(t *testing.T) {
 	}
 }
 
-// mockGateway implements modules.Gateway to mock the Broadcast method.
-type mockGateway struct {
+// mockGatewayDoesBroadcast implements modules.Gateway to mock the Broadcast
+// method.
+type mockGatewayDoesBroadcast struct {
 	modules.Gateway
-	numBroadcasts int
-	mu            sync.RWMutex
+	broadcastCalled chan struct{}
 }
 
-func (g *mockGateway) Broadcast(string, interface{}) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.numBroadcasts++
-	return
+// Broadcast is a mock implementation of modules.Gateway.Broadcast that
+// sends a sentinel value down a channel to signal it's been called.
+func (g *mockGatewayDoesBroadcast) Broadcast(string, interface{}) {
+	g.broadcastCalled <- struct{}{}
 }
 
 // TestAcceptBlockBroadcasts tests that AcceptBlock broadcasts valid blocks and
@@ -725,8 +723,9 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cst.Close()
-	mg := &mockGateway{
-		Gateway: cst.cs.gateway,
+	mg := &mockGatewayDoesBroadcast{
+		Gateway:         cst.cs.gateway,
+		broadcastCalled: make(chan struct{}),
 	}
 	cst.cs.gateway = mg
 
@@ -736,48 +735,32 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep to wait for possible calls to Broadcast to complete. We cannot
-	// wait on a channel because we don't know how many times broadcast has
-	// been called.
-	time.Sleep(1)
-	mg.mu.RLock()
-	numBroadcasts := mg.numBroadcasts
-	mg.mu.RUnlock()
-	if numBroadcasts != 1 {
-		t.Errorf("expected AcceptBlock to broadcast a valid block 1 time, instead it broadcasted %d times", mg.numBroadcasts)
+	select {
+	case <-mg.broadcastCalled:
+	case <-time.After(10 * time.Millisecond):
+		t.Error("expected AcceptBlock to broadcast a valid block")
 	}
 
 	// Test that Broadcast is not called for invalid blocks.
-	mg.mu.Lock()
-	mg.numBroadcasts = 0
-	mg.mu.Unlock()
 	err = cst.cs.AcceptBlock(types.Block{})
 	if err == nil {
 		t.Fatal("expected AcceptBlock to error on an invalid block")
 	}
-	// Sleep one second to wait for a possible call to g.Broadcast.
-	time.Sleep(1)
-	mg.mu.RLock()
-	numBroadcasts = mg.numBroadcasts
-	mg.mu.RUnlock()
-	if numBroadcasts != 0 {
+	select {
+	case <-mg.broadcastCalled:
 		t.Error("AcceptBlock broadcasted an invalid block")
+	case <-time.After(10 * time.Millisecond):
 	}
 
 	// Test that Broadcast is not called in managedAcceptBlock.
-	mg.mu.Lock()
-	mg.numBroadcasts = 0
-	mg.mu.Unlock()
 	b, _ = cst.miner.FindBlock()
 	err = cst.cs.managedAcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(1)
-	mg.mu.RLock()
-	numBroadcasts = mg.numBroadcasts
-	mg.mu.RUnlock()
-	if numBroadcasts != 0 {
-		t.Errorf("expected managedAcceptBlock to not broadcast any blocks, instead it broadcasted %d times", mg.numBroadcasts)
+	select {
+	case <-mg.broadcastCalled:
+		t.Errorf("managedAcceptBlock should not broadcast blocks")
+	case <-time.After(10 * time.Millisecond):
 	}
 }
