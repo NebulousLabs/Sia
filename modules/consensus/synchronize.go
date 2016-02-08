@@ -76,6 +76,17 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 		return err
 	}
 
+	// Broadcast the last block accepted. This functionality is in a defer to
+	// ensure that a block is always broadcast if any blocks are accepted. This
+	// is to stop an attacker from preventing block broadcasts.
+	chainExtended := false
+	defer func() {
+		if chainExtended {
+			currentBlock := cs.CurrentBlock()
+			go cs.gateway.Broadcast("RelayBlock", currentBlock)
+		}
+	}()
+
 	// Read blocks off of the wire and add them to the consensus set until
 	// there are no more blocks available.
 	moreAvailable := true
@@ -90,15 +101,14 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 		}
 
 		// Integrate the blocks into the consensus set.
-		for i, block := range newBlocks {
-			// Only broadcast the last block.
-			var acceptErr error
-			if !moreAvailable && i == len(newBlocks)-1 {
-				acceptErr = cs.AcceptBlock(block)
-			} else {
-				acceptErr = cs.managedAcceptBlock(block)
+		for _, block := range newBlocks {
+			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
+			// every block.
+			acceptErr := cs.managedAcceptBlock(block)
+			// Only broadcast the last block if a block was accepted.
+			if acceptErr == nil {
+				chainExtended = true
 			}
-
 			// ErrNonExtendingBlock must be ignored until headers-first block
 			// sharing is implemented, block already in database should also be
 			// ignored.
