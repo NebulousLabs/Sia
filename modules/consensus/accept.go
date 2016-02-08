@@ -120,9 +120,15 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 	return ce, nil
 }
 
-// managedAcceptBlock accepts a block but does not broadcast it to any peers.
-// See comment for AcceptBlock. Typically AcceptBlock should be used. This
-// method should only be used when there would otherwise be multiple
+// managedAcceptBlock will try to add a block to the consensus set. If the
+// block does not extend the longest currently known chain, an error is
+// returned but the block is still kept in memory. If the block extends a fork
+// such that the fork becomes the longest currently known chain, the consensus
+// set will reorganize itself to recognize the new longest fork. Accepted
+// blocks are not relayed.
+//
+// Typically AcceptBlock should be used so that the accepted block is relayed.
+// This method is typically only be used when there would otherwise be multiple
 // consecutive calls to AcceptBlock with each successive call accepting the
 // child block of the previous call.
 func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
@@ -183,10 +189,13 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	return nil
 }
 
-// AcceptBlock will add a block to the state, forking the blockchain if it is
-// on a fork that is heavier than the current fork. If the block is accepted,
-// it will be relayed to connected peers. This function should only be called
-// for new, untrusted blocks.
+// AcceptBlock will try to add a block to the consensus set. If the block does
+// not extend the longest currently known chain, an error is returned but the
+// block is still kept in memory. If the block extends a fork such that the
+// fork becomes the longest currently known chain, the consensus set will
+// reorganize itself to recognize the new longest fork. If a block is accepted
+// without error, it will be relayed to all connected peers. This function
+// should only be called for new blocks.
 func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	err := cs.managedAcceptBlock(b)
 	if err != nil {
