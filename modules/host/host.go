@@ -150,7 +150,12 @@ type Host struct {
 	// the storage obligation management is the new way of handling storage
 	// obligations. Is a replacement for the contract obligation logic, but the
 	// old logic is being kept for compatibility purposes.
+	//
+	// Storage is broken up into sectors. The sectors are distributed randomly
+	// across a set of storage folders, using rendevouz hashing to choose which
+	// folder holds each sector.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
+	storageFolders           []storageFolder
 
 	// Statistics
 	anticipatedRevenue types.Currency

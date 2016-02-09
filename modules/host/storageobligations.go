@@ -5,6 +5,11 @@ package host
 // TODO: File contracts actually cannot be mutable to add fees - makes the file
 // contract id mutable too. BUT, revisions can be mutable.
 
+// storageobligations.go is responsible for managing the storage obligations
+// within the host - making sure that any file contracts, transaction
+// dependencies, file contract revisions, and storage proofs are making it into
+// the blockchain in a reasonable time.
+
 import (
 	"encoding/binary"
 	"encoding/json"
@@ -70,7 +75,8 @@ type storageObligation struct {
 	// has already been confirmed on the blockchain. Therefore, when trying to
 	// submit a transaction set it is important to try several subsets to rule
 	// out the possibility that the transaction set is partially confirmed.
-	ID                     types.FileContractID
+	AnticipatedRevenue       types.Currency
+	RiskedCollateral       types.Currency
 	OriginTransactionSet   []types.Transaction
 	RevisionTransactionSet []types.Transaction
 
@@ -131,47 +137,15 @@ func (so *storageObligation) isSane() error {
 	return nil
 }
 
-// revenue returns the potential revenue for the host from the storage
-// obligation.
-func (so *storageObligation) revenue() types.Currency {
+// id returns the id of the storage obligation, which is definied by the file
+// contract id of the file contract that governs the storage contract.
+func (so *storageObligation) id() types.FileContractID {
 	err := so.isSane()
 	if err != nil {
-		build.Critical("insane storage obligation when returning revenue")
-		return types.ZeroCurrency
+		build.Critical("insane storage obligation when returning id")
+		return types.FileContractID{}
 	}
-
-	if len(so.RevisionTransactionSet) == 0 {
-		// There are no revisions on this storage obligation's file contract,
-		// therefore the filesize in the file contract is sufficient.
-		final := len(so.OriginTransactionSet) - 1
-		return so.OriginTransactionSet[final].FileContracts[0].ValidProofOutputs[1].Value
-	}
-	final := len(so.RevisionTransactionSet) - 1
-	return so.RevisionTransactionSet[final].FileContractRevisions[0].NewValidProofOutputs[1].Value
-}
-
-// fileSize returns the volume of space on-disk that the storage obligation is
-// consuming, as indicated in the file contract. fileSize does not take into
-// account repeat sectors, however an adversarial model indicates that it
-// should not take into account repeat sectors, as those sectors may be
-// modified at anytime such that they become unique.
-func (so *storageObligation) fileSize() uint64 {
-	err := so.isSane()
-	if err != nil {
-		build.Critical("insane storage obligation when returning filesize")
-		return 0
-	}
-
-	if len(so.RevisionTransactionSet) == 0 {
-		// There are no revisions on this storage obligation's file contract,
-		// therefore the filesize in the file contract is sufficient.
-		final := len(so.OriginTransactionSet) - 1
-		return so.OriginTransactionSet[final].FileContracts[0].FileSize
-	}
-	// There is a file contract revision associated with the storage
-	// obligaiton, use the size indicated by the revision.
-	final := len(so.RevisionTransactionSet) - 1
-	return so.RevisionTransactionSet[final].FileContractRevisions[0].NewFileSize
+	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContractID(0)
 }
 
 // queueActionItem adds an action item to the host at the input height so that
@@ -224,7 +198,8 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		h.log.Critical("addStroageObligation called with an obligation that has a revision")
 	}
 	// Sanity check - obligation should be under lock while being added.
-	_, exists := h.lockedStorageObligations[so.ID]
+	soid := so.id()
+	_, exists := h.lockedStorageObligations[soid]
 	if !exists {
 		h.log.Critical("addStorageObligation called with an obligation that is not locked")
 	}
@@ -249,7 +224,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		// contract ids should happen during the negotiation phase, and not
 		// during the 'addStorageObligation' phase.
 		bso := tx.Bucket(BucketStorageObligations)
-		soBytes := bso.Get(so.ID[:])
+		soBytes := bso.Get(soid[:])
 		if soBytes != nil {
 			h.log.Critical("host already has a save storage obligation for this file contract")
 			return ErrDuplicateStorageObligation
@@ -260,7 +235,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		if err != nil {
 			return err
 		}
-		err = bso.Put(so.ID[:], soBytes)
+		err = bso.Put(soid[:], soBytes)
 		if err != nil {
 			return err
 		}
@@ -282,43 +257,13 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	}
 
 	// Update the host statistics to reflect the new storage obligation.
-	h.anticipatedRevenue = h.anticipatedRevenue.Add(so.revenue())
-	h.spaceRemaining = h.spaceRemaining - int64(so.fileSize())
+	h.anticipatedRevenue = h.anticipatedRevenue.Add(so.AnticipatedRevenue)
 
 	// Set an action item that will have the host verify that the file contract
 	// has been submitted to the blockchain.
-	err = h.queueActionItem(h.blockHeight+resubmissionTimeout, so.ID)
+	err = h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-
-// Sector update code - for use when adding sectors to the host.
-/*
-	bsu := tx.Bucket(BucketSectorUsage)
-	for _, root := range so.SectorRoots {
-		// Check if there is already a sector with this data.
-		sectorUsageBytes := bsu.Get(root[:])
-		if sectorUsageBytes != nil {
-			// This sector is already in use. Decode the number of times it
-			// is in use, increment the counter, and then store the usage
-			// information.
-			usage := binary.BigEndian.Uint64(sectorUsageBytes)
-			binary.BigEndian.PutUint64(sectorUsageBytes, usage+1)
-			err = bsu.Put(sectorUsageBytes)
-			if err != nil {
-				return err
-			}
-		} else {
-			// This sector is not in use yet. Encode '1' to indicate that
-			// the sector is in use in one time.
-			sectorUsageBytes = make([]byte, 8)
-			binary.BigEndian.PutUint64(sectorUsageBytes, 1)
-			err = bsu.Put(sectorUsageBytes)
-			if err != nil {
-				return err
-			}
-		}
-	}
-*/
