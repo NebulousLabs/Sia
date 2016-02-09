@@ -88,6 +88,8 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		consensusChangeIndex: -1,
 	}
 	// Register RPCs
+	// TODO: rename RelayTransactionSet so that the conflicting RPC
+	// RelayTransaction calls v0.4.6 clients and earlier are ignored.
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
