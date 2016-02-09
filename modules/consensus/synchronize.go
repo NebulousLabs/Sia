@@ -10,11 +10,16 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-const (
+var (
 	// MaxCatchUpBlocks is the maxiumum number of blocks that can be given to
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
-	MaxCatchUpBlocks = 10
+	MaxCatchUpBlocks = func() types.BlockHeight {
+		if build.Release == "testing" {
+			return 3
+		}
+		return 10
+	}()
 )
 
 // blockHistory returns up to 32 block ids, starting with recent blocks and
@@ -93,7 +98,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	for moreAvailable {
 		// Read a slice of blocks from the wire.
 		var newBlocks []types.Block
-		if err := encoding.ReadObject(conn, &newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit); err != nil {
+		if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
 			return err
 		}
 		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
