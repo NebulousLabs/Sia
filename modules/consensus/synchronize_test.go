@@ -277,6 +277,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 		{2, 1},
 		{int(MaxCatchUpBlocks), 1},
 		{2 * int(MaxCatchUpBlocks), 1},
+		{2*int(MaxCatchUpBlocks) + 1, 1},
 	}
 	for _, test := range tests {
 		mg.mu.Lock()
