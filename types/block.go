@@ -99,6 +99,13 @@ func (b Block) ID() BlockID {
 	return BlockID(crypto.HashObject(b.Header()))
 }
 
+// ID returns the ID of a Block, which is calculated by hashing the
+// concatenation of the block's parent's ID, nonce, and the result of the
+// b.MerkleRoot().
+func (h BlockHeader) ID() BlockID {
+	return BlockID(crypto.HashObject(h))
+}
+
 // MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
 // tree are composed of the Timestamp, the miner outputs (one leaf per
 // payout), and the transactions (one leaf per transaction).
