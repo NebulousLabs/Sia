@@ -56,14 +56,30 @@ var (
 	// by the host. The host will not delete any obligations until the window
 	// has closed and buried under several confirmations.
 	defaultWindowSize = func() types.BlockHeight {
-		if build.Release == "testing" {
-			return 5
+		if build.Release == "dev" {
+			return 36
 		}
 		if build.Release == "standard" {
 			return 144
 		}
+		if build.Release == "testing" {
+			return 5
+		}
+		panic("unrecognized release constant in host - defaultWindowSize")
+	}()
+
+	// sectorSize defines how large a sector should be in bytes. The sector
+	// size needs to be a power of two to be compatible with package
+	// merkletree.
+	sectorSize = func() int64 {
 		if build.Release == "dev" {
-			return 36
+			return 1048576 // 1 MB
+		}
+		if build.Release == "standard" {
+			return 4194304 // 4 MB
+		}
+		if build.Release == "testing" {
+			return 4096 // 4 KB
 		}
 		panic("unrecognized release constant in host")
 	}()
