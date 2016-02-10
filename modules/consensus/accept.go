@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
@@ -54,6 +55,12 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
 
 	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1)
+}
+
+// checkTarget returns true if the header's ID meets the given target.
+func checkHeaderTarget(h types.BlockHeader, target types.Target) bool {
+	blockHash := h.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
 // addBlockToTree inserts a block into the blockNode tree by adding it to its

@@ -286,6 +286,31 @@ func TestUnitValidateHeaderAndBlock(t *testing.T) {
 	}
 }
 
+// TestCheckHeaderTarget probes the checkHeaderTarget function and checks that
+// the result matches the result of checkTarget.
+func TestCheckHeaderTarget(t *testing.T) {
+	var b types.Block
+	var h types.BlockHeader
+
+	tests := []struct {
+		target   types.Target
+		expected bool
+		msg      string
+	}{
+		{types.RootDepth, true, "checkHeaderTarget failed for a low target"},
+		{types.Target{}, false, "checkHeaderTarget passed for a high target"},
+		{types.Target(h.ID()), true, "checkHeaderTarget failed for a same target"},
+	}
+	for _, tt := range tests {
+		if checkHeaderTarget(h, tt.target) != tt.expected {
+			t.Error(tt.msg)
+		}
+		if checkHeaderTarget(h, tt.target) != checkTarget(b, tt.target) {
+			t.Errorf("checkHeaderTarget and checkTarget do not match for target %v", tt.target)
+		}
+	}
+}
+
 // TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly
 // ignored.
 func TestIntegrationDoSBlockHandling(t *testing.T) {
