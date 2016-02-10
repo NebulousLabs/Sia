@@ -171,8 +171,8 @@ func mockParent() (parent processedBlock) {
 	return parent
 }
 
-// TestUnitValidateHeader runs a series of unit tests for validateHeader.
-func TestUnitValidateHeader(t *testing.T) {
+// TestUnitValidateHeaderAndBlock runs a series of unit tests for validateHeaderAndBlock.
+func TestUnitValidateHeaderAndBlock(t *testing.T) {
 	var tests = []struct {
 		block                  types.Block
 		dosBlocks              map[types.BlockID]struct{}
@@ -191,7 +191,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                errNoBlockMap,
-			msg:                    "validateHeader should fail when no block map is found in the database",
+			msg:                    "validateHeaderAndBlock should fail when no block map is found in the database",
 		},
 		{
 			block: mockValidBlock,
@@ -202,7 +202,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                errDoSBlock,
-			msg:                    "validateHeader should reject known bad blocks",
+			msg:                    "validateHeaderAndBlock should reject known bad blocks",
 		},
 		{
 			block:                  mockValidBlock,
@@ -210,7 +210,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                errOrphan,
-			msg:                    "validateHeader should reject a block if its parent block does not appear in the block database",
+			msg:                    "validateHeaderAndBlock should reject a block if its parent block does not appear in the block database",
 		},
 		{
 			block:                  mockValidBlock,
@@ -219,7 +219,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              failingBlockUnmarshaler,
 			errWant:                unmarshalFailedErr,
-			msg:                    "validateHeader should fail when unmarshaling the parent block fails",
+			msg:                    "validateHeaderAndBlock should fail when unmarshaling the parent block fails",
 		},
 		{
 			block:     mockInvalidBlock,
@@ -231,7 +231,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			marshaler:              parentBlockUnmarshaler,
 			validateBlockErr:       errBadMinerPayouts,
 			errWant:                errBadMinerPayouts,
-			msg:                    "validateHeader should reject a block if ValidateBlock returns an error for the block",
+			msg:                    "validateHeaderAndBlock should reject a block if ValidateBlock returns an error for the block",
 		},
 		{
 			block:                  mockValidBlock,
@@ -240,7 +240,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
 			errWant:                nil,
-			msg:                    "validateHeader should accept a valid block",
+			msg:                    "validateHeaderAndBlock should accept a valid block",
 		},
 	}
 	for _, tt := range tests {
@@ -268,7 +268,7 @@ func TestUnitValidateHeader(t *testing.T) {
 		}
 		// Reset the stored parameters to ValidateBlock.
 		validateBlockParamsGot = validateBlockParams{}
-		err := cs.validateHeader(tx, tt.block)
+		err := cs.validateHeaderAndBlock(tx, tt.block)
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}

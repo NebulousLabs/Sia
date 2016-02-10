@@ -18,9 +18,10 @@ var (
 	errOrphan          = errors.New("block has no known parent")
 )
 
-// validateHeader does some early, low computation verification on the block.
-// Callers should not assume that validation will happen in a particular order.
-func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
+// validateHeaderAndBlock does some early, low computation verification on the
+// block. Callers should not assume that validation will happen in a particular
+// order.
+func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
 	// See if the block is known already.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
@@ -143,10 +144,10 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			return errors.New("inconsistent database")
 		}
 
-		// Check that the header is valid. The header is checked first because it
-		// is not computationally expensive to verify, but it is computationally
-		// expensive to create.
-		err := cs.validateHeader(boltTxWrapper{tx}, b)
+		// Do some relatively inexpensive checks to validate the header and block.
+		// Validation generally occurs in the order of least expensive validation
+		// first.
+		err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, b)
 		if err != nil {
 			// If the block is in the near future, but too far to be acceptable, then
 			// save the block and add it to the consensus set after it is no longer
