@@ -71,36 +71,38 @@ func TestStorageProof(t *testing.T) {
 		NewMissedProofOutputs: fc.MissedProofOutputs,
 		NewRevisionNumber:     1,
 	}
-	revTxn := types.Transaction{
+	_ = types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
 	}
 
-	// create obligation
-	obligation := &contractObligation{
-		ID: fcid,
-		OriginTransaction: types.Transaction{
-			FileContracts: []types.FileContract{fc},
-		},
-		Path: filepath.Join(ht.host.persistDir, "foo"),
-	}
-	ht.host.obligationsByID[fcid] = obligation
-	ht.host.addActionItem(fc.WindowStart+1, obligation)
+	/*
+		// create obligation
+		obligation := &contractObligation{
+			ID: fcid,
+			OriginTransaction: types.Transaction{
+				FileContracts: []types.FileContract{fc},
+			},
+			Path: filepath.Join(ht.host.persistDir, "foo"),
+		}
+		ht.host.obligationsByID[fcid] = obligation
+		ht.host.addActionItem(fc.WindowStart+1, obligation)
 
-	// submit both to tpool
-	err = ht.tpool.AcceptTransactionSet(append(signedTxnSet, revTxn))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = ht.miner.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+		// submit both to tpool
+		err = ht.tpool.AcceptTransactionSet(append(signedTxnSet, revTxn))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// storage proof will be submitted after mining one more block
-	_, err = ht.miner.AddBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+		// storage proof will be submitted after mining one more block
+		_, err = ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	*/
 }
 
 // TestInitRescan probes the initRescan function, verifying that it works in

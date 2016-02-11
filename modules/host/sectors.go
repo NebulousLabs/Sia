@@ -16,6 +16,10 @@ package host
 // folder is resized, only a fraction of the sectors will need to be moved
 // around.
 
+// TODO: Under the new paradigm, it's not really possible to have negative
+// storage anymore. Resize requests get rejected if there's not enough space to
+// move off the sectors.
+
 // TODO: Be rigorious about checking the int64 types - storage folders should
 // not have a negative size! Or maybe it's an edge case that gets handled
 // cleanly. User shouldn't need to disable storage manually to clear out enough
@@ -63,7 +67,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 
@@ -97,7 +100,7 @@ var (
 // storageFolder tracks the size and id of a folder that is being used to store
 // sectors.
 type storageFolder struct {
-	Size int64
+	Size uint64
 	UID  crypto.Hash
 }
 
@@ -111,10 +114,27 @@ type sectorUsage struct {
 	expiry []types.BlockHeight
 }
 
+// greatestStorageFolder determines which storage folder has the greatest score
+// for a given sector hash and returns the index of the greatest storage folder
+// as well as the score of that folder.
+//
+// For convenience, the sector hash is accepted as a byte array.
+func greatestStorageFolder(sectorRoot crypto.Hash, storageFolderSet []storageFolder) (winningIndex int, greatestScore types.Currency) {
+	for i, sf := range storageFolderSet {
+		score := types.NewCurrency(types.Target(crypto.HashAll(sf.UID, sectorRoot[:])).Int())
+		score = score.Mul(types.NewCurrency64(sf.Size))
+		if score.Cmp(greatestScore) > 0 {
+			greatestScore = score
+			winningIndex = i
+		}
+	}
+	return winningIndex, greatestScore
+}
+
 // addStorageFolder adds a storage folder to the host.
-func (h *Host) addStorageFolder(path string, size int64) error {
+func (h *Host) addStorageFolder(path string, size uint64) error {
 	// Create a storage folder object.
-	newSF := storageFolder {
+	newSF := storageFolder{
 		Size: size,
 	}
 	// Give the storage folder a new UID.
@@ -136,24 +156,19 @@ func (h *Host) addStorageFolder(path string, size int64) error {
 		bsu := tx.Bucket(BucketSectorUsage)
 		bsuc := bsu.Cursor()
 		for key, _ := bsuc.First(); key != nil; key, _ = bsuc.Next() {
-			// Try all storage folders except the current one, find the max.
-			var greatestScore *big.Int
-			var greatestSF int
-			for i, sf := range h.storageFolders {
-				score := types.Target(crypto.HashAll(sf.UID, key)).Int()
-				score = score.Mul(score, big.NewInt(sf.Size))
-				if score.Cmp(greatestScore) > 0 {
-					greatestScore = score
-					greatestSF = i
-				}
-			}
+			// Get the score of the greatest storage folder for this sector
+			// hash.
+			var sectorRoot crypto.Hash
+			copy(sectorRoot[:], key)
+			greatestSF, greatestScore := greatestStorageFolder(sectorRoot, h.storageFolders)
 
 			// Determine if this sector should be moved from its current
-			// location to the new location.
-			newSFScore := types.Target(crypto.HashAll(newSF.UID, key)).Int()
-			newSFScore = newSFScore.Mul(newSFScore, big.NewInt(size))
+			// location to the newly added storage folder.
+			newSFScore := types.NewCurrency(types.Target(crypto.HashAll(newSF.UID, sectorRoot)).Int())
+			newSFScore = newSFScore.Mul(types.NewCurrency64(size))
 			if newSFScore.Cmp(greatestScore) > 0 {
-				// The sector should be moved to the new location.
+				// The new storage folder scores higher for this sector, which
+				// means that the sector should be moved.
 				oldSectorPath := filepath.Join(h.persistDir, string(h.storageFolders[greatestSF].UID[:]))
 				newSectorPath := filepath.Join(h.persistDir, string(newSF.UID[:]))
 				err = os.Rename(oldSectorPath, newSectorPath)
@@ -188,7 +203,7 @@ func (h *Host) removeStorageFolder(removalIndex int) error {
 	// Check that there's enough room in the remaining disks to accept all of
 	// the data being moved off of this disk - to account for the turmoil,
 	// there should be about 2% extra room after this disk is removed.
-	var totalStorage int64
+	var totalStorage uint64
 	for i, sf := range h.storageFolders {
 		if i == removalIndex {
 			continue
@@ -198,7 +213,7 @@ func (h *Host) removeStorageFolder(removalIndex int) error {
 	// The removal request will be rejected if the amount of space remaining
 	// after the disk is removed is less than 2% of the total space remaining
 	// after the disk is removed.
-	if h.spaceRemaining - h.storageFolders[removalIndex].Size < totalStorage / 50 {
+	if h.spaceRemaining-h.storageFolders[removalIndex].Size < totalStorage/50 {
 		return ErrInsufficientRemainingStorageForRemoval
 	}
 
@@ -217,39 +232,21 @@ func (h *Host) removeStorageFolder(removalIndex int) error {
 		bsu := tx.Bucket(BucketSectorUsage)
 		bsuc := bsu.Cursor()
 		for key, _ := bsuc.First(); key != nil; key, _ = bsuc.Next() {
-			// Determine if this sector is in the storage folder that's being
+			// Determine if this sector is in the storage folder that is being
 			// removed.
-			var greatestScore *big.Int
-			var greatestSF int
-			for i, sf := range h.storageFolders {
-				score := types.Target(crypto.HashAll(sf.UID, key)).Int()
-				score = score.Mul(score, big.NewInt(sf.Size))
-				if score.Cmp(greatestScore) > 0 {
-					greatestScore = score
-					greatestSF = i
-				}
-			}
-			// Skip all sectors that aren't located on the storage folder being
-			// axed.
+			var sectorRoot crypto.Hash
+			copy(sectorRoot[:], key)
+			greatestSF, _ := greatestStorageFolder(sectorRoot, h.storageFolders)
 			if greatestSF != removalIndex {
+				// Skip this sector, as it is not in the storage folder that is
+				// being removed.
 				continue
 			}
 
 			// Determine which storage folder should receive the displaced
-			// sector.
-			var newGreatestScore *big.Int
-			var newGreatestSF int
-			for i, sf := range newStorageFolders {
-				score := types.Target(crypto.HashAll(sf.UID, key)).Int()
-				score = score.Mul(score, big.NewInt(sf.Size))
-				if score.Cmp(newGreatestScore) > 0 {
-					newGreatestScore = score
-					newGreatestSF = i
-				}
-			}
-
-			// Move the file from the storage folder being deleted to its new
-			// storage folder.
+			// sector, then move the sector from its current storage folder to
+			// the new greatest storage folder.
+			newGreatestSF, _ := greatestStorageFolder(sectorRoot, newStorageFolders)
 			oldSectorPath := filepath.Join(h.persistDir, string(h.storageFolders[removalIndex].UID[:]))
 			newSectorPath := filepath.Join(h.persistDir, string(newStorageFolders[newGreatestSF].UID[:]))
 			err := os.Rename(oldSectorPath, newSectorPath)
@@ -274,7 +271,7 @@ func (h *Host) removeStorageFolder(removalIndex int) error {
 
 // growStorageFolder will increase the size of a storage folder, appropriately
 // moving around sectors as necessary.
-func (h *Host) growStorageFolder(storageFolderIndex int, newSize int64) error {
+func (h *Host) growStorageFolder(storageFolderIndex int, newSize uint64) error {
 	// Open up the database of sectors and score them against the folders to
 	// figure out where they currently exist, and whether they now need to be
 	// moved to the increased sector.
@@ -282,17 +279,10 @@ func (h *Host) growStorageFolder(storageFolderIndex int, newSize int64) error {
 		bsu := tx.Bucket(BucketSectorUsage)
 		bsuc := bsu.Cursor()
 		for key, _ := bsuc.First(); key != nil; key, _ = bsuc.Next() {
-			// Try all storage folders except the current one, find the max.
-			var greatestScore *big.Int
-			var greatestSF int
-			for i, sf := range h.storageFolders {
-				score := types.Target(crypto.HashAll(sf.UID, key)).Int()
-				score = score.Mul(score, big.NewInt(sf.Size))
-				if score.Cmp(greatestScore) > 0 {
-					greatestScore = score
-					greatestSF = i
-				}
-			}
+			// Find the greatest storage folder and score for this sector.
+			var sectorRoot crypto.Hash
+			copy(sectorRoot[:], key)
+			greatestSF, greatestScore := greatestStorageFolder(sectorRoot, h.storageFolders)
 			if greatestSF == storageFolderIndex {
 				// Sector is already in the current storage folder, and the
 				// current storage folder score can only increase, meaning that
@@ -301,12 +291,14 @@ func (h *Host) growStorageFolder(storageFolderIndex int, newSize int64) error {
 			}
 
 			// Determine if this sector should be moved from its current
-			// location to the new location.
+			// storage folder to the storage folder that has been increased in
+			// size.
 			sfuid := h.storageFolders[storageFolderIndex].UID
-			increasedSFScore := types.Target(crypto.HashAll(sfuid, key)).Int()
-			increasedSFScore = increasedSFScore.Mul(increasedSFScore, big.NewInt(newSize))
+			increasedSFScore := types.NewCurrency(types.Target(crypto.HashAll(sfuid, sectorRoot)).Int())
+			increasedSFScore = increasedSFScore.Mul(types.NewCurrency64(newSize))
 			if increasedSFScore.Cmp(greatestScore) > 0 {
-				// The sector should be moved to the now-bigger storage folder.
+				// The sector should be moved from its current storage folder
+				// to the newly larger storage folder.
 				oldSectorPath := filepath.Join(h.persistDir, string(h.storageFolders[greatestSF].UID[:]))
 				newSectorPath := filepath.Join(h.persistDir, string(sfuid[:]))
 				err := os.Rename(oldSectorPath, newSectorPath)
@@ -325,17 +317,18 @@ func (h *Host) growStorageFolder(storageFolderIndex int, newSize int64) error {
 		// been copied.
 		return err
 	}
+
 	h.storageFolders[storageFolderIndex].Size = newSize
 	return h.save()
 }
 
 // shrinkStorageFolder will decrease the size of a storage folder,
 // appropriately moving around sectors as necessary.
-func (h *Host) shrinkStorageFolder(storageFolderIndex int, newSize int64) error {
+func (h *Host) shrinkStorageFolder(storageFolderIndex int, newSize uint64) error {
 	// Check that there's enough room in the remaining disks to accept all of
 	// the data being moved off of this disk - to account for the turmoil,
 	// there should be about 2% extra room after this disk is removed.
-	var totalStorage int64
+	var totalStorage uint64
 	for i, sf := range h.storageFolders {
 		if i == storageFolderIndex {
 			totalStorage += newSize
@@ -346,7 +339,7 @@ func (h *Host) shrinkStorageFolder(storageFolderIndex int, newSize int64) error 
 	// The removal request will be rejected if the amount of space remaining
 	// after the disk is removed is less than 2% of the total space remaining
 	// after the disk is removed.
-	if h.spaceRemaining - h.storageFolders[storageFolderIndex].Size < totalStorage / 50 {
+	if h.spaceRemaining-h.storageFolders[storageFolderIndex].Size < totalStorage/50 {
 		return ErrInsufficientRemainingStorageForShrink
 	}
 
@@ -362,20 +355,11 @@ func (h *Host) shrinkStorageFolder(storageFolderIndex int, newSize int64) error 
 		bsu := tx.Bucket(BucketSectorUsage)
 		bsuc := bsu.Cursor()
 		for key, _ := bsuc.First(); key != nil; key, _ = bsuc.Next() {
-			// Determine if this sector is in the storage folder that's being
+			// Determine if this sector is in the storage folder that is being
 			// shrunk.
-			var greatestScore *big.Int
-			var greatestSF int
-			for i, sf := range h.storageFolders {
-				score := types.Target(crypto.HashAll(sf.UID, key)).Int()
-				score = score.Mul(score, big.NewInt(sf.Size))
-				if score.Cmp(greatestScore) > 0 {
-					greatestScore = score
-					greatestSF = i
-				}
-			}
-			// Skip all sectors that aren't located on the storage folder being
-			// axed.
+			var sectorRoot crypto.Hash
+			copy(sectorRoot[:], key)
+			greatestSF, _ := greatestStorageFolder(sectorRoot, h.storageFolders)
 			if greatestSF != storageFolderIndex {
 				// Sectors can only be removed from the shrinking storage
 				// folder, so if the sector is not in the shrinking storage
@@ -384,21 +368,15 @@ func (h *Host) shrinkStorageFolder(storageFolderIndex int, newSize int64) error 
 			}
 
 			// Grab the second greatest storage folder, accounting for the
-			// shrinking of the current storage folder.
-			var secondScore *big.Int
-			var secondSF int
-			for i, sf := range h.storageFolders {
-				score := types.Target(crypto.HashAll(sf.UID, key)).Int()
-				if i == storageFolderIndex {
-					score = score.Mul(score, big.NewInt(newSize))
-				} else {
-					score = score.Mul(score, big.NewInt(sf.Size))
-				}
-				if score.Cmp(secondScore) > 0 {
-					secondScore = score
-					secondSF = i
-				}
-			}
+			// shrinking of the current storage folder. The greatest storage
+			// folder after shrinking is determined by updating the host
+			// storage folders as though the shrinking is complete, finding the
+			// greatest storage folder among the updated set, and then
+			// returning the host storage folders to their original state.
+			oldSize := h.storageFolders[storageFolderIndex].Size
+			h.storageFolders[storageFolderIndex].Size = newSize
+			secondSF, _ := greatestStorageFolder(sectorRoot, h.storageFolders)
+			h.storageFolders[storageFolderIndex].Size = oldSize
 			if secondSF == storageFolderIndex {
 				// If, after being shrunk, the shrinking storage folder is
 				// still the greatest, no operation needs to be performed.
@@ -429,7 +407,7 @@ func (h *Host) shrinkStorageFolder(storageFolderIndex int, newSize int64) error 
 
 // resizeStorageFolder changes the amount of disk space that is going to be
 // allocated to a storage folder.
-func (h *Host) resizeStorageFolder(storageFolderIndex int, newSize int64) error {
+func (h *Host) resizeStorageFolder(storageFolderIndex int, newSize uint64) error {
 	// Complain if an invalid sector index is provided.
 	if storageFolderIndex >= len(h.storageFolders) {
 		return ErrBadStorageFolderIndex
@@ -455,7 +433,7 @@ func (h *Host) resizeStorageFolder(storageFolderIndex int, newSize int64) error 
 // event of a problem.
 func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sector []byte) error {
 	// Sanity check - sector should have sectorSize bytes.
-	if int64(len(sector)) != sectorSize {
+	if uint64(len(sector)) != sectorSize {
 		build.Critical("incorrectly sized sector passed to addSector in the host")
 		return errors.New("incorrectly sized sector passed to addSector in the host")
 	}
@@ -486,16 +464,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 
 		// Determine if this sector is in the storage folder that's being
 		// shrunk.
-		var greatestScore *big.Int
-		var greatestSF int
-		for i, sf := range h.storageFolders {
-			score := types.Target(crypto.HashAll(sf.UID, sectorRoot)).Int()
-			score = score.Mul(score, big.NewInt(sf.Size))
-			if score.Cmp(greatestScore) > 0 {
-				greatestScore = score
-				greatestSF = i
-			}
-		}
+		greatestSF, _ := greatestStorageFolder(sectorRoot, h.storageFolders)
 		sectorPath := filepath.Join(h.persistDir, string(h.storageFolders[greatestSF].UID[:]))
 		return ioutil.WriteFile(sectorPath, sector, 0600)
 	})
@@ -547,16 +516,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		}
 
 		// Figure out which storage folder is holding the sector.
-		var greatestScore *big.Int
-		var greatestSF int
-		for i, sf := range h.storageFolders {
-			score := types.Target(crypto.HashAll(sf.UID, sectorRoot)).Int()
-			score = score.Mul(score, big.NewInt(sf.Size))
-			if score.Cmp(greatestScore) > 0 {
-				greatestScore = score
-				greatestSF = i
-			}
-		}
+		greatestSF, _ := greatestStorageFolder(sectorRoot, h.storageFolders)
 		sectorPath := filepath.Join(h.persistDir, string(h.storageFolders[greatestSF].UID[:]))
 		return os.Remove(sectorPath)
 	})

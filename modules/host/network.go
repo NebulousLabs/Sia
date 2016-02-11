@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -86,19 +85,19 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	switch id {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		err = h.managedRPCDownload(conn)
+		// err = h.managedRPCDownload(conn)
 	case modules.RPCRenew:
 		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		err = h.managedRPCRenew(conn)
+		// err = h.managedRPCRenew(conn)
 	case modules.RPCRevise:
 		atomic.AddUint64(&h.atomicReviseCalls, 1)
-		err = h.managedRPCRevise(conn)
+		// err = h.managedRPCRevise(conn)
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)
 	case modules.RPCUpload:
 		atomic.AddUint64(&h.atomicUploadCalls, 1)
-		err = h.managedRPCUpload(conn)
+		// err = h.managedRPCUpload(conn)
 	default:
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
 
@@ -134,8 +133,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 func (h *Host) threadedListen() {
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
-	if build.DEBUG && h.closed {
-		panic("threaded listen does not have access to host resources - is only called at startup")
+	if h.closed {
+		return
 	}
 
 	// Receive connections until an error is returned by the listener. When an

@@ -1,11 +1,9 @@
 package host
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -23,13 +21,11 @@ func TestEarlySaving(t *testing.T) {
 	// Store a few of the important fields.
 	var oldSK crypto.SecretKey
 	copy(oldSK[:], ht.host.secretKey[:])
-	oldFileCounter := ht.host.fileCounter
 	oldSpaceRemaining := ht.host.spaceRemaining
 	oldRevenue := ht.host.revenue
 
 	// Corrupt the fields.
 	ht.host.secretKey[0]++
-	ht.host.fileCounter += 7e6
 	ht.host.spaceRemaining += 25e9
 	ht.host.revenue = ht.host.revenue.Add(types.NewCurrency64(91e3))
 
@@ -43,9 +39,6 @@ func TestEarlySaving(t *testing.T) {
 	if ht.host.secretKey != oldSK {
 		t.Error("secret key not loaded correctly")
 	}
-	if ht.host.fileCounter != oldFileCounter {
-		t.Error("file counter not loaded correctly")
-	}
 	if ht.host.spaceRemaining != oldSpaceRemaining {
 		t.Error("space remaining not loaded correctly")
 	}
@@ -54,6 +47,7 @@ func TestEarlySaving(t *testing.T) {
 	}
 }
 
+/*
 // TestIntegrationValuePersistence verifies that changes made to the host persist between
 // loads.
 func TestIntegrationValuePersistence(t *testing.T) {
@@ -87,40 +81,4 @@ func TestIntegrationValuePersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-// TestUnitGetObligations checks that the getObligations method is correctly
-// compiling contract obligations within the host.
-func TestUnitGetObligations(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	ht, err := blankHostTester("TestUnitGetObligations")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Artificially fill the host with obligations to save.
-	ob1 := &contractObligation{
-		ID: types.FileContractID{1},
-	}
-	ob2 := &contractObligation{
-		ID: types.FileContractID{2},
-	}
-	ht.host.obligationsByID[ob1.ID] = ob1
-	ht.host.obligationsByID[ob2.ID] = ob2
-
-	// Get the obligations from the host and check that it's a match.
-	obligations := ht.host.getObligations()
-	if len(obligations) != 2 {
-		t.Fatal("getObligations did not fetch all of the obligations")
-	}
-	if obligations[0].ID == obligations[1].ID {
-		t.Fatal("same obligation was grabbed twice")
-	}
-	if obligations[0].ID != ob1.ID && obligations[1].ID != ob1.ID {
-		t.Fatal("ob1 not represented in fetched obligations")
-	}
-	if obligations[0].ID != ob2.ID && obligations[1].ID != ob2.ID {
-		t.Fatal("ob2 not represented in fetched obligations")
-	}
-}
+*/

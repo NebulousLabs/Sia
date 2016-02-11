@@ -16,21 +16,21 @@ func TestStorageObligationID(t *testing.T) {
 				ValidProofOutputs: []types.SiacoinOutput{
 					{
 						UnlockHash: types.UnlockHash{2, 1, 3},
-						Value: types.NewCurrency64(35),
+						Value:      types.NewCurrency64(35),
 					},
 					{
 						UnlockHash: types.UnlockHash{0, 1, 3},
-						Value: types.NewCurrency64(25),
+						Value:      types.NewCurrency64(25),
 					},
 				},
 				MissedProofOutputs: []types.SiacoinOutput{
 					{
 						UnlockHash: types.UnlockHash{110, 1, 3},
-						Value: types.NewCurrency64(3325),
+						Value:      types.NewCurrency64(3325),
 					},
 					{
 						UnlockHash: types.UnlockHash{110, 1, 3},
-						Value: types.NewCurrency64(8325),
+						Value:      types.NewCurrency64(8325),
 					},
 				},
 			}},
@@ -45,8 +45,8 @@ func TestStorageObligationID(t *testing.T) {
 		OriginTransactionSet: []types.Transaction{
 			{
 				SiacoinOutputs: []types.SiacoinOutput{{
-						UnlockHash: types.UnlockHash{1, 3, 2},
-						Value: types.NewCurrency64(5),
+					UnlockHash: types.UnlockHash{1, 3, 2},
+					Value:      types.NewCurrency64(5),
 				}},
 			},
 			{
@@ -54,21 +54,21 @@ func TestStorageObligationID(t *testing.T) {
 					ValidProofOutputs: []types.SiacoinOutput{
 						{
 							UnlockHash: types.UnlockHash{8, 11, 4},
-							Value: types.NewCurrency64(85),
+							Value:      types.NewCurrency64(85),
 						},
 						{
 							UnlockHash: types.UnlockHash{8, 11, 14},
-							Value: types.NewCurrency64(859),
+							Value:      types.NewCurrency64(859),
 						},
 					},
 					MissedProofOutputs: []types.SiacoinOutput{
 						{
 							UnlockHash: types.UnlockHash{8, 113, 4},
-							Value: types.NewCurrency64(853),
+							Value:      types.NewCurrency64(853),
 						},
 						{
 							UnlockHash: types.UnlockHash{8, 119, 14},
-							Value: types.NewCurrency64(9859),
+							Value:      types.NewCurrency64(9859),
 						},
 					},
 				}},
@@ -83,8 +83,8 @@ func TestStorageObligationID(t *testing.T) {
 	so3 := &storageObligation{
 		OriginTransactionSet: []types.Transaction{{
 			SiacoinOutputs: []types.SiacoinOutput{{
-					UnlockHash: types.UnlockHash{1, 3, 2},
-					Value: types.NewCurrency64(5),
+				UnlockHash: types.UnlockHash{1, 3, 2},
+				Value:      types.NewCurrency64(5),
 			}},
 		}},
 	}

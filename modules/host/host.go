@@ -18,8 +18,18 @@ import (
 )
 
 const (
-	defaultTotalStorage = 10e9         // 10 GB.
-	defaultMaxDuration  = 144 * 30 * 6 // 6 months.
+	// defaultMaxDuration defines the maximum number of blocks into the future
+	// that the host will accept for the duration of an incoming file contract
+	// obligation. 6 months is chosen because hosts are expected to be
+	// long-term entities, and because we want to have a set of hosts that
+	// support 6 month contracts when Sia leaves beta.
+	defaultMaxDuration = 144 * 30 * 6 // 6 months.
+
+	// resubmissionTimeout defines the number of blocks that a host will wait
+	// before attempting to resubmit a transaction to the blockchain.
+	// Typically, this transaction will contain either a file contract, a file
+	// contract revision, or a storage proof.
+	resubmissionTimeout = 3
 
 	// Names of the various persistent files in the host.
 	dbFilename   = modules.HostDir + ".db"
@@ -42,10 +52,30 @@ var (
 		Version: "0.5",
 	}
 
-	// defaultPrice defines the starting price for hosts selling storage. We
-	// try to match a number that is both reasonably profitable and reasonably
-	// competitive.
-	defaultPrice = modules.StoragePriceToConsensus(100e3) // 100 SC / GB / Month
+	// defaultContractPrice defines the default price of creating a contract
+	// with the host. The default is set to 50 siacoins, which means that the
+	// opening file contract can have 20 siacoins put towards it, the file
+	// contract revision can have 15 siacoins put towards it, and the storage
+	// proof can have 15 siacoins put towards it.
+	defaultContractPrice = types.NewCurrency64(50).Mul(types.SiacoinPrecision) // 50 siacoins
+
+	// defaultUploadBandwidthPrice defines the default price of upload
+	// bandwidth. The default is set to 1 siacoin per GB, because the host is
+	// presumed to have a large amount of downstream bandwidth. Furthermore,
+	// the host is typically only downloading data if it is planning to store
+	// the data, meaning that the host serves to profit from accepting the
+	// data.
+	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
+
+	// defaultDownloadBandwidthPrice defines the default price of upload
+	// bandwidth. The default is set to 25 siacoins per gigabyte, because
+	// download bandwidth is expected to be plentiful but also in-demand.
+	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(25e3) // 25 SC / GB
+
+	// defaultStoragePrice defines the starting price for hosts selling
+	// storage. We try to match a number that is both reasonably profitable and
+	// reasonably competitive.
+	defaultStoragePrice = modules.StoragePriceToConsensus(50e3) // 50 SC / GB / Month
 
 	// defaultCollateral defines the amount of money that the host puts up as
 	// collateral per-byte by default. Set to zero currently because neither of
@@ -57,36 +87,47 @@ var (
 	// has closed and buried under several confirmations.
 	defaultWindowSize = func() types.BlockHeight {
 		if build.Release == "dev" {
-			return 36
+			return 36 // 3.6 minutes.
 		}
 		if build.Release == "standard" {
-			return 144
+			return 144 // 1 day.
 		}
 		if build.Release == "testing" {
-			return 5
+			return 5 // 5 seconds.
 		}
 		panic("unrecognized release constant in host - defaultWindowSize")
 	}()
 
+	// minimumStorageFolderSize defines the smallest size that a storage folder
+	// is allowed to be.
+	minimumStorageFolderSize = func() uint64 {
+		if build.Release == "dev" {
+			return 1 << 25 // 32 MB
+		}
+		if build.Release == "standart" {
+			return 1 << 34 // 16 GB
+		}
+		if build.Release == "testing" {
+			return 1 << 15 // 32 KB
+		}
+		panic("unrecognized release constant in host - minimum storage folder size")
+	}
+
 	// sectorSize defines how large a sector should be in bytes. The sector
 	// size needs to be a power of two to be compatible with package
 	// merkletree.
-	sectorSize = func() int64 {
+	sectorSize = func() uint64 {
 		if build.Release == "dev" {
-			return 1048576 // 1 MB
+			return 1 << 20 // 1 MB
 		}
 		if build.Release == "standard" {
-			return 4194304 // 4 MB
+			return 1 << 22 // 4 MB
 		}
 		if build.Release == "testing" {
-			return 4096 // 4 KB
+			return 1 << 12 // 4 KB
 		}
-		panic("unrecognized release constant in host")
+		panic("unrecognized release constant in host - sectorSize")
 	}()
-
-	// errChangedUnlockHash is returned by SetSettings if the unlock hash has
-	// changed, an illegal operation.
-	errChangedUnlockHash = errors.New("cannot change the unlock hash in SetSettings")
 
 	// errHostClosed gets returned when a call is rejected due to the host
 	// having been closed.
@@ -153,15 +194,6 @@ type Host struct {
 	publicKey  types.SiaPublicKey
 	secretKey  crypto.SecretKey
 
-	// File Management - 'actionItems' lists a bunch of contract obligations
-	// that have 'todos' at a given height. The required action ranges from
-	// needed to resubmit a revision to handling a storage proof or getting
-	// pruned from the host.
-	//
-	// DEPRECATED v0.5.2
-	obligationsByID map[types.FileContractID]*contractObligation
-	actionItems     map[types.BlockHeight]map[types.FileContractID]*contractObligation
-
 	// Storage Obligation Management - different from file management in that
 	// the storage obligation management is the new way of handling storage
 	// obligations. Is a replacement for the contract obligation logic, but the
@@ -170,15 +202,18 @@ type Host struct {
 	// Storage is broken up into sectors. The sectors are distributed randomly
 	// across a set of storage folders, using rendevouz hashing to choose which
 	// folder holds each sector.
+	//
+	// TODO: These two items are the only unbounded items in the host struct.
+	// Checks need to be added to ensure that their growth is fundamentally
+	// limited, so that the RAM impact of siad can be kept to a minimum.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
 	storageFolders           []storageFolder
 
 	// Statistics
 	anticipatedRevenue types.Currency
-	fileCounter        int64
 	lostRevenue        types.Currency
 	revenue            types.Currency
-	spaceRemaining     int64
+	spaceRemaining     uint64
 
 	// Utilities.
 	db         *persist.BoltDatabase
@@ -196,6 +231,35 @@ type Host struct {
 	// accessing them have returned.
 	closed       bool
 	resourceLock sync.RWMutex
+}
+
+// establishDefaults configures the default settings for the host, overwriting
+// any existing settings.
+func (h *Host) establishDefaults() error {
+	// Configure the settings object.
+	h.settings = modules.HostSettings{
+		MaxDuration: defaultMaxDuration,
+		WindowSize:  defaultWindowSize,
+
+		Collateral:             defaultCollateral,
+		ContractPrice:          defaultContractPrice,
+		DownloadBandwidthPrice: defaultDownloadBandwidthPrice,
+		UploadBandwidthPrice:   defaultUploadBandwidthPrice,
+	}
+
+	// Generate signing key, for revising contracts.
+	sk, pk, err := crypto.GenerateKeyPair()
+	if err != nil {
+		return err
+	}
+	h.secretKey = sk
+	h.publicKey = types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
+
+	// Subscribe to the consensus set.
+	return h.initConsensusSubscription()
 }
 
 // initDB will check that the database has been initialized and if not, will
@@ -251,9 +315,9 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		wallet:       wallet,
 		dependencies: dependencies,
 
-		actionItems: make(map[types.BlockHeight]map[types.FileContractID]*contractObligation),
+		// actionItems: make(map[types.BlockHeight]map[types.FileContractID]*contractObligation),
 
-		obligationsByID: make(map[types.FileContractID]*contractObligation),
+		// obligationsByID: make(map[types.FileContractID]*contractObligation),
 
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 

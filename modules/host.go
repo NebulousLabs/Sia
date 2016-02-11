@@ -61,14 +61,18 @@ type (
 	// database.
 	HostSettings struct {
 		AcceptingContracts bool              `json:"acceptingcontracts"`
-		NetAddress         NetAddress        `json:"netaddress"`
-		TotalStorage       int64             `json:"totalstorage"`
-		MinDuration        types.BlockHeight `json:"minduration"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
+		NetAddress         NetAddress        `json:"netaddress"`
+		RemainingStorage   uint64            `json:"remainingstorage"` // Cannot be directly changed
+		TotalStorage       uint64            `json:"totalstorage"`     // Cannot be directly changed
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`       // Cannot be directly changed
 		WindowSize         types.BlockHeight `json:"windowsize"`
-		Price              types.Currency    `json:"price"`
-		Collateral         types.Currency    `json:"collateral"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
+
+		Collateral             types.Currency `json:"collateral"`
+		ContractPrice          types.Currency `json:"contractprice"`
+		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"` // The cost for a renter to download something (meaning the host is uploading).
+		StoragePrice           types.Currency `json:"storageprice"`
+		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"` // The cost for a renter to upload something (meaning the host is downloading).
 	}
 
 	// HostRPCMetrics reports the quantity of each type of RPC call that has
@@ -100,7 +104,7 @@ type (
 		// Capacity returns the amount of storage still available on the
 		// machine. The amount can be negative if the total capacity was
 		// reduced to below the active capacity.
-		Capacity() int64
+		Capacity() uint64
 
 		// Contracts returns the number of unresolved file contracts that the
 		// host is responsible for.
@@ -137,20 +141,45 @@ type (
 	}
 )
 
+// BandwidthPriceToConsensus converts a human bandwidth price, having the unit
+// 'Siacoins per Terabyte', to a consensus storage price, having the unit
+// 'Hastings per Byte'.
+func BandwidthPriceToConsensus(siacoinsTB uint64) (hastingsByte types.Currency) {
+	hastingsTB := types.NewCurrency64(siacoinsTB).Mul(types.SiacoinPrecision)
+	return hastingsTB.Div(types.NewCurrency64(1e12))
+}
+
+// BandwidthPriceToHuman converts a consensus bandwidth price, having the unit
+// 'Hastings per Byte' to a human bandwidth price, having the unit 'Siacoins
+// per Terabyte'.
+func BandwidthPriceToHuman(hastingsByte types.Currency) (siacoinsTB uint64, err error) {
+	hastingsTB := hastingsByte.Mul(types.NewCurrency64(1e12))
+	if hastingsTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
+		// The result of the final division is going to be less than 0.5,
+		// therefore 0 should be returned.
+		return 0, nil
+	}
+	if hastingsTB.Cmp(types.SiacoinPrecision) < 0 {
+		// The result of the final division is going to be greater than or
+		// equal to 0.5, but less than 1, therefore 1 should be returned.
+		return 1, nil
+	}
+	return hastingsTB.Div(types.SiacoinPrecision).Uint64()
+}
+
 // StoragePriceToConsensus converts a human storage price, having the unit
-// 'Siacoins Per Month Per Terabyte', to a consensus storage price, having the
-// unit 'Hastings Per Block Per Byte'.
+// 'Siacoins per Month per Terabyte', to a consensus storage price, having the
+// unit 'Hastings per Block per Byte'.
 func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Currency) {
 	// Perform multiplication first to preserve precision.
 	hastingsMonthTB := types.NewCurrency64(siacoinsMonthTB).Mul(types.SiacoinPrecision)
 	hastingsBlockTB := hastingsMonthTB.Div(types.NewCurrency64(4320))
-	hastingsBlockByte = hastingsBlockTB.Div(types.NewCurrency64(1e12))
-	return hastingsBlockByte
+	return hastingsBlockTB.Div(types.NewCurrency64(1e12))
 }
 
 // StoragePriceToHuman converts a consensus storage price, having the unit
-// 'Hastings Per Block Per Byte', to a human storage price, having the unit
-// 'Siacoins Per Month Per Terabyte'. An error is returned if the result would
+// 'Hastings per Block per Byte', to a human storage price, having the unit
+// 'Siacoins per Month per Terabyte'. An error is returned if the result would
 // overflow a uint64. If the result is between 0 and 1, the value is rounded to
 // the nearest value.
 func StoragePriceToHuman(hastingsBlockByte types.Currency) (siacoinsMonthTB uint64, err error) {

@@ -75,7 +75,7 @@ type storageObligation struct {
 	// has already been confirmed on the blockchain. Therefore, when trying to
 	// submit a transaction set it is important to try several subsets to rule
 	// out the possibility that the transaction set is partially confirmed.
-	AnticipatedRevenue       types.Currency
+	AnticipatedRevenue     types.Currency
 	RiskedCollateral       types.Currency
 	OriginTransactionSet   []types.Transaction
 	RevisionTransactionSet []types.Transaction

@@ -31,11 +31,7 @@ type persistence struct {
 	PublicKey  types.SiaPublicKey
 	SecretKey  crypto.SecretKey
 
-	// File Management.
-	Obligations []*contractObligation
-
 	// Statistics.
-	FileCounter int64
 	LostRevenue types.Currency
 	Revenue     types.Currency
 
@@ -43,6 +39,7 @@ type persistence struct {
 	Settings modules.HostSettings
 }
 
+/*
 // getObligations returns a slice containing all of the contract obligations
 // currently being tracked by the host.
 func (h *Host) getObligations() []*contractObligation {
@@ -52,6 +49,7 @@ func (h *Host) getObligations() []*contractObligation {
 	}
 	return cos
 }
+*/
 
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
@@ -74,11 +72,7 @@ func (h *Host) save() error {
 		PublicKey:  h.publicKey,
 		SecretKey:  h.secretKey,
 
-		// File Management.
-		Obligations: h.getObligations(),
-
 		// Statistics.
-		FileCounter: h.fileCounter,
 		LostRevenue: h.lostRevenue,
 		Revenue:     h.revenue,
 
@@ -88,47 +82,11 @@ func (h *Host) save() error {
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 }
 
-// establishDefaults configures the default settings for the host, overwriting
-// any existing settings.
-func (h *Host) establishDefaults() error {
-	// Configure the settings object.
-	h.settings = modules.HostSettings{
-		TotalStorage: defaultTotalStorage,
-		MaxDuration:  defaultMaxDuration,
-		WindowSize:   defaultWindowSize,
-		Price:        defaultPrice,
-		Collateral:   defaultCollateral,
-	}
-	h.spaceRemaining = h.settings.TotalStorage
-
-	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return err
-	}
-	h.secretKey = sk
-	h.publicKey = types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       pk[:],
-	}
-
-	// Subscribe to the consensus set.
-	err = h.initConsensusSubscription()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // load extrats the save data from disk and populates the host.
 func (h *Host) load() error {
 	p := new(persistence)
 	err := h.dependencies.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
-	if err == persist.ErrBadVersion {
-		// COMPATv0.4.8 - try the compatibility loader.
-		return h.compatibilityLoad()
-	} else if os.IsNotExist(err) {
+	if os.IsNotExist(err) {
 		// There is no host.json file, set up sane defaults.
 		return h.establishDefaults()
 	} else if err != nil {
@@ -163,28 +121,11 @@ func (h *Host) load() error {
 	// Copy over the file management. The space remaining is recalculated from
 	// disk instead of being saved, to maximize the potential usefulness of
 	// restarting Sia as a means of eliminating unkonwn errors.
-	h.fileCounter = p.FileCounter
 	h.spaceRemaining = p.Settings.TotalStorage
 
-	// Copy over the obligations and then subscribe to the consensus set.
-	for _, obligation := range p.Obligations {
-		// Store the obligation in the obligations list.
-		h.obligationsByID[obligation.ID] = obligation
-
-		// Update spaceRemaining to account for the storage held by this
-		// obligation.
-		h.spaceRemaining -= int64(obligation.fileSize())
-
-		// Update anticipated revenue to reflect the revenue in this file
-		// contract.
-		h.anticipatedRevenue = h.anticipatedRevenue.Add(obligation.value())
-	}
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
-	}
-	for _, obligation := range h.obligationsByID {
-		h.handleActionItem(obligation)
 	}
 	return nil
 }
