@@ -45,7 +45,6 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
 	if parentBytes == nil {
 		return errOrphan
 	}
-
 	var parent processedBlock
 	err := cs.marshaler.Unmarshal(parentBytes, &parent)
 	if err != nil {
@@ -61,6 +60,55 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
 func checkHeaderTarget(h types.BlockHeader, target types.Target) bool {
 	blockHash := h.ID()
 	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
+
+// validateHeader does some early, low computation verification on the header
+// to determine if the block should be downloaded. Callers should not assume
+// that validation will happen in a particular order.
+func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
+	// See if the block is known already.
+	id := h.ID()
+	_, exists := cs.dosBlocks[id]
+	if exists {
+		return errDoSBlock
+	}
+
+	// Check if the block is already known.
+	blockMap := tx.Bucket(BlockMap)
+	if blockMap == nil {
+		return errNoBlockMap
+	}
+	if blockMap.Get(id[:]) != nil {
+		return modules.ErrBlockKnown
+	}
+
+	// Check for the parent.
+	parentID := h.ParentID
+	parentBytes := blockMap.Get(parentID[:])
+	if parentBytes == nil {
+		return errOrphan
+	}
+	var parent processedBlock
+	err := cs.marshaler.Unmarshal(parentBytes, &parent)
+	if err != nil {
+		return err
+	}
+
+	// Check that the timestamp is not too far in the past to be acceptable.
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
+	if minTimestamp > h.Timestamp {
+		return errEarlyTimestamp
+	}
+
+	// Check that the target of the new block is sufficient.
+	if !checkHeaderTarget(h, parent.ChildTarget) {
+		return modules.ErrBlockUnsolved
+	}
+
+	// TODO: check if the block is in the extreme or near future, and return
+	// errExtremeFutureTimestamp or errFutureTimestamp, respectively.
+
+	return nil
 }
 
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
