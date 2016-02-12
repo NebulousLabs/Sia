@@ -1,5 +1,6 @@
 package host
 
+/*
 import (
 	"testing"
 
@@ -47,7 +48,6 @@ func TestEarlySaving(t *testing.T) {
 	}
 }
 
-/*
 // TestIntegrationValuePersistence verifies that changes made to the host persist between
 // loads.
 func TestIntegrationValuePersistence(t *testing.T) {

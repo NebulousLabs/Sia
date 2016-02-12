@@ -118,11 +118,6 @@ func (h *Host) load() error {
 	// Utilities.
 	h.settings = p.Settings
 
-	// Copy over the file management. The space remaining is recalculated from
-	// disk instead of being saved, to maximize the potential usefulness of
-	// restarting Sia as a means of eliminating unkonwn errors.
-	h.spaceRemaining = p.Settings.TotalStorage
-
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err

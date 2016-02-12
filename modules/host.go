@@ -91,6 +91,13 @@ type (
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
+		// AddStorageFolder adds a storage folder to the host. The host will
+		// allocate the input volume of storage for the storage folder, and
+		// will fill it up gradually as file contracts come in. The host will
+		// keep files balanced between the storage folders according to the
+		// total amount of storage available to the storage folder.
+		AddStorageFolder(path string, size uint64) error
+
 		// Announce submits a host announcement to the blockchain, returning an
 		// error if its external IP address is unknown. After announcing, the
 		// host will begin accepting contracts.
@@ -104,7 +111,7 @@ type (
 		// Capacity returns the amount of storage still available on the
 		// machine. The amount can be negative if the total capacity was
 		// reduced to below the active capacity.
-		Capacity() uint64
+		Capacity() (total uint64, remaining uint64, err error)
 
 		// Contracts returns the number of unresolved file contracts that the
 		// host is responsible for.

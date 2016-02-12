@@ -111,7 +111,7 @@ var (
 			return 1 << 15 // 32 KB
 		}
 		panic("unrecognized release constant in host - minimum storage folder size")
-	}
+	}()
 
 	// sectorSize defines how large a sector should be in bytes. The sector
 	// size needs to be a power of two to be compatible with package
@@ -213,7 +213,6 @@ type Host struct {
 	anticipatedRevenue types.Currency
 	lostRevenue        types.Currency
 	revenue            types.Currency
-	spaceRemaining     uint64
 
 	// Utilities.
 	db         *persist.BoltDatabase

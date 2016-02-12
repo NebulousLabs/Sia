@@ -24,13 +24,47 @@ var (
 	errChangedUnlockHash = errors.New("cannot change the unlock hash in SetSettings")
 )
 
+// capacity returns the amount of storage still available on the machine. The
+// amount can be negative if the total capacity was reduced to below the active
+// capacity.
+func (h *Host) capacity() (total uint64, remaining uint64, err error) {
+	// This call needs to access a database to count the amount of storage in
+	// use, so the resource lock must be acquired.
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return 0, 0, errHostClosed
+	}
+
+	// Total storage can be computed by summing the size of all the storage
+	// folders.
+	for _, sf := range h.storageFolders {
+		total += sf.Size
+	}
+	// Remaining storage can be computed by fetching the number of unique
+	// sectors in the host and subtracting their collective size from the total
+	// amount of storage.
+	err = h.db.View(func(tx *bolt.Tx) error {
+		// Each sector has the same size, and the total number of unique
+		// sectors can be determined by getting the number of keys in the
+		// sector usage bucket.
+		uniqueSectors := tx.Bucket(BucketSectorUsage).Stats().KeyN
+		remaining = total - (sectorSize * uint64(uniqueSectors))
+		return nil
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return total, remaining, nil
+}
+
 // Capacity returns the amount of storage still available on the machine. The
 // amount can be negative if the total capacity was reduced to below the active
 // capacity.
-func (h *Host) Capacity() uint64 {
+func (h *Host) Capacity() (total uint64, remaining uint64, err error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.spaceRemaining
+	return h.capacity()
 }
 
 // Contracts returns the number of unresolved file contracts that the host is
