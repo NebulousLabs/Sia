@@ -93,6 +93,8 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	chainExtended := false
 	defer func() {
 		if chainExtended {
+			// The last block received will be the current block since
+			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()
 			go cs.gateway.Broadcast("RelayBlock", currentBlock)
 		}
@@ -116,7 +118,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 			// every block.
 			acceptErr := cs.managedAcceptBlock(block)
-			// Only broadcast the last block if a block was accepted.
+			// Set a flag to indicate that we should broadcast the last block received.
 			if acceptErr == nil {
 				chainExtended = true
 			}
