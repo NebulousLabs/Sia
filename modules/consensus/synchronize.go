@@ -15,10 +15,16 @@ var (
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
 	MaxCatchUpBlocks = func() types.BlockHeight {
-		if build.Release == "testing" {
+		switch build.Release {
+		case "testing":
 			return 3
+		case "standard":
+			return 10
+		case "dev":
+			return 10
+		default:
+			panic("unrecognized build.Release")
 		}
-		return 10
 	}()
 )
 
