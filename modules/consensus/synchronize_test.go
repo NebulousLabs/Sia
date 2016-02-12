@@ -1,6 +1,9 @@
 package consensus
 
 import (
+	"errors"
+	"io"
+	"net"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -8,6 +11,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -644,5 +648,325 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// mock PeerConns for testing peer conns that fail reading or writing.
+type (
+	mockPeerConnFailingReader struct {
+		modules.PeerConn
+	}
+	mockPeerConnFailingWriter struct {
+		modules.PeerConn
+	}
+)
+
+var (
+	errFailingReader = errors.New("failing reader")
+	errFailingWriter = errors.New("failing writer")
+)
+
+// Read is a mock implementation of modules.PeerConn.Read that always returns
+// an error.
+func (mockPeerConnFailingReader) Read([]byte) (int, error) {
+	return 0, errFailingReader
+}
+
+// Write is a mock implementation of modules.PeerConn.Write that always returns
+// an error.
+func (mockPeerConnFailingWriter) Write([]byte) (int, error) {
+	return 0, errFailingWriter
+}
+
+// TestSend1Blk probes the ConsensusSet.send1Blk method and tests that it
+// correctly receives block ids and writes out the corresponding blocks.
+func TestSend1Blk(t *testing.T) {
+	cst, err := blankConsensusSetTester("TestSend1Blk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	p1, p2 := net.Pipe()
+	fnDone := make(chan struct{})
+
+	tests := []struct {
+		id      types.BlockID
+		conn    modules.PeerConn
+		fn      func() // handle reading and writing over the pipe to the mock conn.
+		errWant error
+		msg     string
+	}{
+		// Test with a failing reader.
+		{
+			conn:    mockPeerConnFailingReader{PeerConn: p1},
+			fn:      func() { fnDone <- struct{}{} },
+			errWant: errFailingReader,
+			msg:     "expected send1Blk to error with a failing reader conn",
+		},
+		// Test with a block id not found in the blockmap.
+		{
+			conn: p1,
+			fn: func() {
+				// Write a block id to the conn.
+				err := encoding.WriteObject(p2, types.BlockID{})
+				if err != nil {
+					t.Error(err)
+				}
+				fnDone <- struct{}{}
+			},
+			errWant: errNilItem,
+			msg:     "expected send1Blk to error with a nonexistent block id",
+		},
+		// TODO: Other sanity checks? e.g. test if getPath returns an error or pathID != pb.Block.ID().
+		// TODO: Test with an otherwise failing db?
+		// Test with a failing writer.
+		{
+			conn: mockPeerConnFailingWriter{PeerConn: p1},
+			fn: func() {
+				// Write a valid block id to the conn.
+				err := encoding.WriteObject(p2, types.GenesisBlock.ID())
+				if err != nil {
+					t.Error(err)
+				}
+				fnDone <- struct{}{}
+			},
+			errWant: errFailingWriter,
+			msg:     "expected send1Blk to error with a failing writer conn",
+		},
+		// Test with a valid conn and valid block.
+		{
+			conn: p1,
+			fn: func() {
+				// Write a valid block id to the conn.
+				if err := encoding.WriteObject(p2, types.GenesisBlock.ID()); err != nil {
+					t.Error(err)
+				}
+
+				// Read the block written to the conn.
+				var block types.Block
+				if err := encoding.ReadObject(p2, &block, types.BlockSizeLimit); err != nil {
+					t.Error(err)
+				}
+				// Verify the block is the expected block.
+				if block.ID() != types.GenesisBlock.ID() {
+					t.Errorf("send1Blk wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisBlock.ID(), block.ID())
+				}
+
+				fnDone <- struct{}{}
+			},
+			errWant: nil,
+			msg:     "expected send1Blk to succeed with a valid conn and valid block",
+		},
+	}
+	for _, tt := range tests {
+		go tt.fn()
+		err := cst.cs.send1Blk(tt.conn)
+		if err != tt.errWant {
+			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
+		}
+		<-fnDone
+	}
+}
+
+// TestThreadedReceiveBlock probes the RPCFunc returned by
+// cs.threadedReceiveBlock and tests that it correctly requests a block id and
+// receives a block. Also tests that the block is correctly (not) accepted into
+// the consensus set.
+func TestThreadedReceiveBlock(t *testing.T) {
+	cst, err := blankConsensusSetTester("TestThreadedReceiveBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	p1, p2 := net.Pipe()
+	fnDone := make(chan struct{})
+
+	tests := []struct {
+		id      types.BlockID
+		conn    modules.PeerConn
+		fn      func() // handle reading and writing over the pipe to the mock conn.
+		errWant error
+		msg     string
+	}{
+		// Test with failing writer.
+		{
+			conn:    mockPeerConnFailingWriter{PeerConn: p1},
+			fn:      func() { fnDone <- struct{}{} },
+			errWant: errFailingWriter,
+			msg:     "the function returned from threadedReceiveBlock should fail with a PeerConn with a failing writer",
+		},
+		// Test with failing reader.
+		{
+			conn: mockPeerConnFailingReader{PeerConn: p1},
+			fn: func() {
+				// Read the id written to conn.
+				var id types.BlockID
+				if err := encoding.ReadObject(p2, &id, crypto.HashSize); err != nil {
+					t.Error(err)
+				}
+				// Verify the id is the expected id.
+				expectedID := types.BlockID{}
+				if id != expectedID {
+					t.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
+				}
+				fnDone <- struct{}{}
+			},
+			errWant: errFailingReader,
+			msg:     "the function returned from threadedReceiveBlock should fail with a PeerConn with a failing reader",
+		},
+		// Test with a valid conn, but an invalid block.
+		{
+			id:   types.BlockID{1},
+			conn: p1,
+			fn: func() {
+				// Read the id written to conn.
+				var id types.BlockID
+				if err := encoding.ReadObject(p2, &id, crypto.HashSize); err != nil {
+					t.Error(err)
+				}
+				// Verify the id is the expected id.
+				expectedID := types.BlockID{1}
+				if id != expectedID {
+					t.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
+				}
+
+				// Write an invalid block to conn.
+				block := types.Block{}
+				if err := encoding.WriteObject(p2, block); err != nil {
+					t.Error(err)
+				}
+
+				fnDone <- struct{}{}
+			},
+			errWant: errOrphan,
+			msg:     "the function returned from threadedReceiveBlock should not accept an invalid block",
+		},
+		// Test with a valid conn and a valid block.
+		{
+			id:   types.BlockID{2},
+			conn: p1,
+			fn: func() {
+				// Read the id written to conn.
+				var id types.BlockID
+				if err := encoding.ReadObject(p2, &id, crypto.HashSize); err != nil {
+					t.Error(err)
+				}
+				// Verify the id is the expected id.
+				expectedID := types.BlockID{2}
+				if id != expectedID {
+					t.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
+				}
+
+				// Write a valid block to conn.
+				block, err := cst.miner.FindBlock()
+				if err != nil {
+					t.Error(err)
+				}
+				if err := encoding.WriteObject(p2, block); err != nil {
+					t.Error(err)
+				}
+
+				fnDone <- struct{}{}
+			},
+			errWant: nil,
+			msg:     "the function returned from manageddReceiveBlock should accept a valid block",
+		},
+	}
+	for _, tt := range tests {
+		managedReceiveFN := cst.cs.threadedReceiveBlock(tt.id)
+		go tt.fn()
+		err := managedReceiveFN(tt.conn)
+		if err != tt.errWant {
+			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
+		}
+		<-fnDone
+	}
+}
+
+// TestIntegrationSend1BlkRPC probes the Send1Blk RPC and tests that blocks are
+// correctly requested, received, and accepted into the consensus set.
+func TestIntegrationSend1BlkRPC(t *testing.T) {
+	cst1, err := blankConsensusSetTester("TestIntegrationSend1BlkRPC1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst1.Close()
+	cst2, err := blankConsensusSetTester("TestIntegrationSend1BlkRPC2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst2.Close()
+
+	err = cst1.cs.gateway.Connect(cst2.cs.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst2.cs.gateway.Connect(cst1.cs.gateway.Address()) // TODO: why is this Connect call necessary? Shouldn't they connect to eachother with one Connect?
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(types.GenesisBlock.ID()))
+	if err != modules.ErrBlockKnown {
+		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
+	}
+
+	// Test that cst2 errors when it doesn't recognize the requested block.
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(types.BlockID{}))
+	if err != io.EOF {
+		t.Errorf("cst2 shouldn't return a block it doesn't recognize: expected error '%v', got '%v'", io.EOF, err)
+	}
+
+	// Test that cst1 accepts a block that extends its longest chain.
+	block, err := cst2.miner.FindBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst2.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(block.ID()))
+	if err != nil {
+		t.Errorf("cst1 should accept a block that extends its longest chain: expected nil error, got '%v'", err)
+	}
+
+	// Test that cst2 accepts a block that extends its longest chain.
+	block, err = cst1.miner.FindBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst1.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst2.cs.gateway.RPC(cst1.cs.gateway.Address(), "Send1Blk", cst2.cs.threadedReceiveBlock(block.ID()))
+	if err != nil {
+		t.Errorf("cst2 should accept a block that extends its longest chain: expected nil error, got '%v'", err)
+	}
+
+	// Test that cst1 doesn't accept an orphan block.
+	block, err = cst2.miner.FindBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst2.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err = cst2.miner.FindBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst2.cs.managedAcceptBlock(block) // Call managedAcceptBlock so that the block isn't broadcast.
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(block.ID()))
+	if err != errOrphan {
+		t.Errorf("cst1 should not accept an orphan block: expected error '%v', got '%v'", errOrphan, err)
 	}
 }

@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -259,4 +261,63 @@ func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 		return err
 	}
 	return nil
+}
+
+// send1Blk is an RPC that sends the requested block to the requesting peer.
+func (cs *ConsensusSet) send1Blk(conn modules.PeerConn) error {
+	// Decode the block id from the conneciton.
+	var id types.BlockID
+	err := encoding.ReadObject(conn, &id, crypto.HashSize)
+	if err != nil {
+		return err
+	}
+	// Lookup the corresponding block.
+	var b types.Block
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		// TODO: are these sanity checks necessary?
+		pathID, err := getPath(tx, pb.Height)
+		if err != nil {
+			return err
+		}
+		if pathID != pb.Block.ID() {
+			return errors.New("pathID and processed block's ID do not match")
+		}
+		b = pb.Block
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// Encode and send the block to the caller.
+	err = encoding.WriteObject(conn, b)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// threadedReceiveBlock takes a block id and returns an RPCFunc that requests
+// that block and then calls AcceptBlock on it. The returned function should be
+// used as the calling end of the Send1Blk RPC. Note that although the function
+// itself does not do any locking, it is still prefixed with "threaded" because
+// the function it returns calls the exported method AcceptBlock.
+func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
+	managedFN := func(conn modules.PeerConn) error {
+		if err := encoding.WriteObject(conn, id); err != nil {
+			return err
+		}
+		var block types.Block
+		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
+			return err
+		}
+		if err := cs.AcceptBlock(block); err != nil {
+			return err
+		}
+		return nil
+	}
+	return managedFN
 }
