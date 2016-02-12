@@ -238,11 +238,11 @@ type mockGatewayCountBroadcasts struct {
 
 // Broadcast is a mock implementation of modules.Gateway.Broadcast that
 // increments a counter denoting the number of times it's been called.
-func (g *mockGatewayCountBroadcasts) Broadcast(string, interface{}) {
+func (g *mockGatewayCountBroadcasts) Broadcast(name string, obj interface{}) {
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	g.numBroadcasts++
-	return
+	g.mu.Unlock()
+	g.Gateway.Broadcast(name, obj)
 }
 
 // TestSendBlocksBroadcastsOnce tests that the SendBlocks RPC call only
