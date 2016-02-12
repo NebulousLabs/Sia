@@ -701,3 +701,67 @@ func TestTaxHardfork(t *testing.T) {
 		t.Fatal("siafund pool was not increased correctly")
 	}
 }
+
+// mockGatewayDoesBroadcast implements modules.Gateway to mock the Broadcast
+// method.
+type mockGatewayDoesBroadcast struct {
+	modules.Gateway
+	broadcastCalled chan struct{}
+}
+
+// Broadcast is a mock implementation of modules.Gateway.Broadcast that
+// sends a sentinel value down a channel to signal it's been called.
+func (g *mockGatewayDoesBroadcast) Broadcast(name string, obj interface{}) {
+	g.Gateway.Broadcast(name, obj)
+	g.broadcastCalled <- struct{}{}
+}
+
+// TestAcceptBlockBroadcasts tests that AcceptBlock broadcasts valid blocks and
+// that managedAcceptBlock does not.
+func TestAcceptBlockBroadcasts(t *testing.T) {
+	cst, err := blankConsensusSetTester("TestAcceptBlockBroadcasts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+	mg := &mockGatewayDoesBroadcast{
+		Gateway:         cst.cs.gateway,
+		broadcastCalled: make(chan struct{}),
+	}
+	cst.cs.gateway = mg
+
+	// Test that Broadcast is called for valid blocks.
+	b, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-mg.broadcastCalled:
+	case <-time.After(10 * time.Millisecond):
+		t.Error("expected AcceptBlock to broadcast a valid block")
+	}
+
+	// Test that Broadcast is not called for invalid blocks.
+	err = cst.cs.AcceptBlock(types.Block{})
+	if err == nil {
+		t.Fatal("expected AcceptBlock to error on an invalid block")
+	}
+	select {
+	case <-mg.broadcastCalled:
+		t.Error("AcceptBlock broadcasted an invalid block")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	// Test that Broadcast is not called in managedAcceptBlock.
+	b, _ = cst.miner.FindBlock()
+	err = cst.cs.managedAcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-mg.broadcastCalled:
+		t.Errorf("managedAcceptBlock should not broadcast blocks")
+	case <-time.After(10 * time.Millisecond):
+	}
+}

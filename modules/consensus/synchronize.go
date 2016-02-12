@@ -10,11 +10,22 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-const (
+var (
 	// MaxCatchUpBlocks is the maxiumum number of blocks that can be given to
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
-	MaxCatchUpBlocks = 10
+	MaxCatchUpBlocks = func() types.BlockHeight {
+		switch build.Release {
+		case "testing":
+			return 3
+		case "standard":
+			return 10
+		case "dev":
+			return 10
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
 )
 
 // blockHistory returns up to 32 block ids, starting with recent blocks and
@@ -76,13 +87,26 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 		return err
 	}
 
+	// Broadcast the last block accepted. This functionality is in a defer to
+	// ensure that a block is always broadcast if any blocks are accepted. This
+	// is to stop an attacker from preventing block broadcasts.
+	chainExtended := false
+	defer func() {
+		if chainExtended {
+			// The last block received will be the current block since
+			// managedAcceptBlock only returns nil if a block extends the longest chain.
+			currentBlock := cs.CurrentBlock()
+			go cs.gateway.Broadcast("RelayBlock", currentBlock)
+		}
+	}()
+
 	// Read blocks off of the wire and add them to the consensus set until
 	// there are no more blocks available.
 	moreAvailable := true
 	for moreAvailable {
 		// Read a slice of blocks from the wire.
 		var newBlocks []types.Block
-		if err := encoding.ReadObject(conn, &newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit); err != nil {
+		if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
 			return err
 		}
 		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
@@ -91,8 +115,13 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 
 		// Integrate the blocks into the consensus set.
 		for _, block := range newBlocks {
-			acceptErr := cs.AcceptBlock(block)
-
+			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
+			// every block.
+			acceptErr := cs.managedAcceptBlock(block)
+			// Set a flag to indicate that we should broadcast the last block received.
+			if acceptErr == nil {
+				chainExtended = true
+			}
 			// ErrNonExtendingBlock must be ignored until headers-first block
 			// sharing is implemented, block already in database should also be
 			// ignored.

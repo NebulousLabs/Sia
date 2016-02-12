@@ -120,11 +120,18 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 	return ce, nil
 }
 
-// AcceptBlock will add a block to the state, forking the blockchain if it is
-// on a fork that is heavier than the current fork. If the block is accepted,
-// it will be relayed to connected peers. This function should only be called
-// for new, untrusted blocks.
-func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
+// managedAcceptBlock will try to add a block to the consensus set. If the
+// block does not extend the longest currently known chain, an error is
+// returned but the block is still kept in memory. If the block extends a fork
+// such that the fork becomes the longest currently known chain, the consensus
+// set will reorganize itself to recognize the new longest fork. Accepted
+// blocks are not relayed.
+//
+// Typically AcceptBlock should be used so that the accepted block is relayed.
+// This method is typically only be used when there would otherwise be multiple
+// consecutive calls to AcceptBlock with each successive call accepting the
+// child block of the previous call.
+func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	// Grab a lock on the consensus set. Lock is demoted later in the function,
 	// failure to unlock before returning an error will cause a deadlock.
 	cs.mu.Lock()
@@ -179,9 +186,22 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	if len(changeEntry.AppliedBlocks) > 0 {
 		cs.readlockUpdateSubscribers(changeEntry)
 	}
+	return nil
+}
 
+// AcceptBlock will try to add a block to the consensus set. If the block does
+// not extend the longest currently known chain, an error is returned but the
+// block is still kept in memory. If the block extends a fork such that the
+// fork becomes the longest currently known chain, the consensus set will
+// reorganize itself to recognize the new longest fork. If a block is accepted
+// without error, it will be relayed to all connected peers. This function
+// should only be called for new blocks.
+func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
+	err := cs.managedAcceptBlock(b)
+	if err != nil {
+		return err
+	}
 	// Broadcast the new block to all peers.
 	go cs.gateway.Broadcast("RelayBlock", b)
-
 	return nil
 }

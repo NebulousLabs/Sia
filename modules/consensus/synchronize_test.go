@@ -1,9 +1,11 @@
 package consensus
 
 import (
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -222,6 +224,90 @@ func TestBlockHistory(t *testing.T) {
 	for i, id := range history[14:31] {
 		if id != emptyID {
 			t.Errorf("Expected empty ID at index %v, got %v", i+17, id)
+		}
+	}
+}
+
+// mockGatewayCountBroadcasts implements modules.Gateway to mock the Broadcast
+// method.
+type mockGatewayCountBroadcasts struct {
+	modules.Gateway
+	numBroadcasts int
+	mu            sync.RWMutex
+}
+
+// Broadcast is a mock implementation of modules.Gateway.Broadcast that
+// increments a counter denoting the number of times it's been called.
+func (g *mockGatewayCountBroadcasts) Broadcast(name string, obj interface{}) {
+	g.mu.Lock()
+	g.numBroadcasts++
+	g.mu.Unlock()
+	g.Gateway.Broadcast(name, obj)
+}
+
+// TestSendBlocksBroadcastsOnce tests that the SendBlocks RPC call only
+// Broadcasts one block, no matter how many blocks are sent. In the case 0
+// blocks are sent, tests that Broadcast is never called.
+func TestSendBlocksBroadcastsOnce(t *testing.T) {
+	// Setup consensus sets.
+	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst1.Close()
+	cst2, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst2.Close()
+	// Setup mock gateway.
+	mg := mockGatewayCountBroadcasts{Gateway: cst1.cs.gateway}
+	cst1.cs.gateway = &mg
+	err = cst1.cs.gateway.Connect(cst2.cs.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		blocksToMine          int
+		expectedNumBroadcasts int
+	}{
+		{0, 0},
+		{1, 1},
+		{2, 1},
+		{int(MaxCatchUpBlocks), 1},
+		{2 * int(MaxCatchUpBlocks), 1},
+		{2*int(MaxCatchUpBlocks) + 1, 1},
+	}
+	for _, test := range tests {
+		mg.mu.Lock()
+		mg.numBroadcasts = 0
+		mg.mu.Unlock()
+		for i := 0; i < test.blocksToMine; i++ {
+			b, minerErr := cst2.miner.FindBlock()
+			if minerErr != nil {
+				t.Fatal(minerErr)
+			}
+			// managedAcceptBlock is used here instead of AcceptBlock so as not to
+			// call Broadcast outside of the SendBlocks RPC.
+			err = cst2.cs.managedAcceptBlock(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlocks", cst1.cs.threadedReceiveBlocks)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Sleep to wait for possible calls to Broadcast to complete. We cannot
+		// wait on a channel because we don't know how many times broadcast has
+		// been called.
+		time.Sleep(10 * time.Millisecond)
+		mg.mu.RLock()
+		numBroadcasts := mg.numBroadcasts
+		mg.mu.RUnlock()
+		if numBroadcasts != test.expectedNumBroadcasts {
+			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, numBroadcasts)
 		}
 	}
 }
