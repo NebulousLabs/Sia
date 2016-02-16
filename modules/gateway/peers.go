@@ -198,10 +198,11 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		return err
-	} else if remoteVersion == "reject" {
-		return errors.New("peer rejected connection")
 	}
 	// decide whether to accept this version
+	if remoteVersion == "reject" {
+		return errors.New("peer rejected connection")
+	}
 	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
 		conn.Close()
 		return errors.New("unacceptable version: " + remoteVersion)
