@@ -40,20 +40,7 @@ func (h *Host) capacity() (total uint64, remaining uint64, err error) {
 	// folders.
 	for _, sf := range h.storageFolders {
 		total += sf.Size
-	}
-	// Remaining storage can be computed by fetching the number of unique
-	// sectors in the host and subtracting their collective size from the total
-	// amount of storage.
-	err = h.db.View(func(tx *bolt.Tx) error {
-		// Each sector has the same size, and the total number of unique
-		// sectors can be determined by getting the number of keys in the
-		// sector usage bucket.
-		uniqueSectors := tx.Bucket(BucketSectorUsage).Stats().KeyN
-		remaining = total - (sectorSize * uint64(uniqueSectors))
-		return nil
-	})
-	if err != nil {
-		return 0, 0, err
+		remaining += sf.SizeRemaining
 	}
 	return total, remaining, nil
 }
@@ -75,7 +62,7 @@ func (h *Host) Contracts() (uint64, error) {
 
 	var numContracts uint64
 	err := h.db.View(func(tx *bolt.Tx) error {
-		numContracts = uint64(tx.Bucket(BucketStorageObligations).Stats().KeyN)
+		numContracts = uint64(tx.Bucket(bucketStorageObligations).Stats().KeyN)
 		return nil
 	})
 	if err != nil {

@@ -118,7 +118,7 @@ func TestUnsuccessfulDBInit(t *testing.T) {
 	// cause errors to be returned when initialization tries to create existing
 	// buckets.
 	err = ht.host.db.Update(func(tx *bolt.Tx) error {
-		return tx.DeleteBucket(BucketStorageObligations)
+		return tx.DeleteBucket(bucketStorageObligations)
 	})
 	if err != nil {
 		t.Fatal(err)

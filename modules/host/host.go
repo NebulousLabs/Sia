@@ -3,6 +3,7 @@
 package host
 
 import (
+	"crypto/rand"
 	"errors"
 	"net"
 	"path/filepath"
@@ -24,6 +25,12 @@ const (
 	// long-term entities, and because we want to have a set of hosts that
 	// support 6 month contracts when Sia leaves beta.
 	defaultMaxDuration = 144 * 30 * 6 // 6 months.
+
+	// maximumStorageFolders indicates the maximum number of storage folders
+	// that the host allows. Some operations, such as creating a new storage
+	// folder, are linear in the number of storage folders. For this reason, a
+	// limit on the maximum number of storage folders has been set.
+	maximumStorageFolders = 256
 
 	// resubmissionTimeout defines the number of blocks that a host will wait
 	// before attempting to resubmit a transaction to the blockchain.
@@ -54,9 +61,11 @@ var (
 
 	// defaultContractPrice defines the default price of creating a contract
 	// with the host. The default is set to 50 siacoins, which means that the
-	// opening file contract can have 20 siacoins put towards it, the file
+	// opening file contract can have 5 siacoins put towards it, the file
 	// contract revision can have 15 siacoins put towards it, and the storage
-	// proof can have 15 siacoins put towards it.
+	// proof can have 15 siacoins put towards it, with 5 left over for the
+	// host, a sort of compensation for keeping and backing up the storage
+	// obligation data.
 	defaultContractPrice = types.NewCurrency64(50).Mul(types.SiacoinPrecision) // 50 siacoins
 
 	// defaultUploadBandwidthPrice defines the default price of upload
@@ -65,26 +74,43 @@ var (
 	// the host is typically only downloading data if it is planning to store
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
+	//
+	// TODO: The implementation of upload bandwidth cost should build the cost
+	// directly into the cost-of-strorage calculation when the inital
+	// upload/negotiation is happening.
 	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
-	// bandwidth. The default is set to 25 siacoins per gigabyte, because
+	// bandwidth. The default is set to 10 siacoins per gigabyte, because
 	// download bandwidth is expected to be plentiful but also in-demand.
-	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(25e3) // 25 SC / GB
+	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(10e3) // 10 SC / GB
 
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
-	defaultStoragePrice = modules.StoragePriceToConsensus(50e3) // 50 SC / GB / Month
+	defaultStoragePrice = modules.StoragePriceToConsensus(20e3) // 20 SC / GB / Month
 
 	// defaultCollateral defines the amount of money that the host puts up as
-	// collateral per-byte by default. Set to zero currently because neither of
-	// the negotiation protocols have logic to deal with non-zero collateral.
-	defaultCollateral = types.NewCurrency64(0)
+	// collateral per-byte by default. The collateral should be considered as
+	// an absolute instead of as a percentage, because low prices result in
+	// collaterals which may be significant by percentage, but insignificant
+	// overall. A default of 50 SC / GB / Month has been chosen, which is 2.5x
+	// the default price for storage. The host is expected to put up a
+	// significant amount of collateral as a commitment to faithfulness,
+	// because this guarantees that the incentives are aligned for the host to
+	// keep the data even if the price of siacoin fluctuates, the price of raw
+	// storage fluctuates, or the host realizes that there is unexpected
+	// opportunity cost in being a host.
+	defaultCollateral = types.NewCurrency64(50) // 50 SC / GB / Month
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
-	// has closed and buried under several confirmations.
+	// has closed and buried under several confirmations. For release builds,
+	// the default is set to 144 blocks, or about 1 day. This gives the host
+	// flexibility to experience downtime without losing file contracts. The
+	// optimal default, especially as the network matures, is probably closer
+	// to 36 blocks. An experienced or high powered host should not be
+	// frustrated by lost coins due to long periods of downtime.
 	defaultWindowSize = func() types.BlockHeight {
 		if build.Release == "dev" {
 			return 36 // 3.6 minutes.
@@ -98,14 +124,23 @@ var (
 		panic("unrecognized release constant in host - defaultWindowSize")
 	}()
 
+	// TODO: Define maximum storage size, which will help prevent integer
+	// overflows.
+
 	// minimumStorageFolderSize defines the smallest size that a storage folder
-	// is allowed to be.
+	// is allowed to be. The new design of the storage folder structure means
+	// that this limit is not as relevant as it was originally, but hosts with
+	// little storage capacity are not very useful to the network, and can
+	// actually frustrate price planning. 32 GB has been chosen as a minimum
+	// for the early days of the network, to allow people to experiment in the
+	// beta, but in the future I think something like 256GB would be much more
+	// appropraite.
 	minimumStorageFolderSize = func() uint64 {
 		if build.Release == "dev" {
 			return 1 << 25 // 32 MB
 		}
 		if build.Release == "standart" {
-			return 1 << 34 // 16 GB
+			return 1 << 35 // 32 GB
 		}
 		if build.Release == "testing" {
 			return 1 << 15 // 32 KB
@@ -115,7 +150,9 @@ var (
 
 	// sectorSize defines how large a sector should be in bytes. The sector
 	// size needs to be a power of two to be compatible with package
-	// merkletree.
+	// merkletree. 4MB has been chosen for the live network because large
+	// sectors significantly reduce the tracking overhead experienced by the
+	// renter and the host.
 	sectorSize = func() uint64 {
 		if build.Release == "dev" {
 			return 1 << 20 // 1 MB
@@ -127,6 +164,24 @@ var (
 			return 1 << 12 // 4 KB
 		}
 		panic("unrecognized release constant in host - sectorSize")
+	}()
+
+	// storageFolderUIDSize determines the number of bytes used to determine
+	// the storage folder UID. Production and development environments use 4
+	// bytes to minimize the possibility of accidental collisions, and testing
+	// environments use 1 byte so that collisions can be forced while using the
+	// live code.
+	storageFolderUIDSize = func() int {
+		if build.Release == "dev" {
+			return 4
+		}
+		if build.Release == "standard" {
+			return 4
+		}
+		if build.Release == "testing" {
+			return 1
+		}
+		panic("unrecognized release constant in host - storageFolderUIDSize")
 	}()
 
 	// errHostClosed gets returned when a call is rejected due to the host
@@ -142,7 +197,7 @@ var (
 // All of the following variables define the names of buckets used by the host
 // in the database.
 var (
-	// BucketActionItems maps a blockchain height to a list of storage
+	// bucketActionItems maps a blockchain height to a list of storage
 	// obligations that need to be managed in some way at that height. The
 	// height is stored as a big endian uint64, which means that bolt will
 	// store the heights sorted in numerical order. The action item itself is
@@ -150,20 +205,20 @@ var (
 	// out what the necessary actions for that item are based on the file
 	// contract id and the associated storage obligation that can be retreived
 	// using the id.
-	BucketActionItems = []byte("BucketActionItems")
+	bucketActionItems = []byte("BucketActionItems")
 
-	// BucketSectorUsage maps sector IDs to the number of times they are used
+	// bucketSectorUsage maps sector IDs to the number of times they are used
 	// in file contracts. If all data is correctly encrypted using a unique
 	// seed, each sector will be in use exactly one time. The host however
 	// cannot control this, and a user may upload unencrypted data or
 	// intentionally upload colliding sectors as a means of attack. The host
 	// can only delete a sector when it is in use zero times. The number of
 	// times a sector is in use is encoded as a big endian uint64.
-	BucketSectorUsage = []byte("BucketSectorUsage")
+	bucketSectorUsage = []byte("BucketSectorUsage")
 
-	// BucketStorageObligations contains a set of serialized
+	// bucketStorageObligations contains a set of serialized
 	// 'storageObligations' sorted by their file contract id.
-	BucketStorageObligations = []byte("BucketStorageObligations")
+	bucketStorageObligations = []byte("BucketStorageObligations")
 )
 
 // A Host contains all the fields necessary for storing files for clients and
@@ -193,6 +248,7 @@ type Host struct {
 	netAddress modules.NetAddress
 	publicKey  types.SiaPublicKey
 	secretKey  crypto.SecretKey
+	sectorSalt crypto.Hash
 
 	// Storage Obligation Management - different from file management in that
 	// the storage obligation management is the new way of handling storage
@@ -207,7 +263,7 @@ type Host struct {
 	// Checks need to be added to ensure that their growth is fundamentally
 	// limited, so that the RAM impact of siad can be kept to a minimum.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
-	storageFolders           []storageFolder
+	storageFolders           []*storageFolder
 
 	// Statistics
 	anticipatedRevenue types.Currency
@@ -256,6 +312,10 @@ func (h *Host) establishDefaults() error {
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],
 	}
+	_, err = rand.Read(h.sectorSalt[:])
+	if err != nil {
+		return err
+	}
 
 	// Subscribe to the consensus set.
 	return h.initConsensusSubscription()
@@ -268,7 +328,7 @@ func (h *Host) initDB() error {
 		// Return nil if the database is already initialized. The database can
 		// be safely assumed to be initialized if the storage obligation bucket
 		// exists.
-		bso := tx.Bucket(BucketStorageObligations)
+		bso := tx.Bucket(bucketStorageObligations)
 		if bso != nil {
 			return nil
 		}
@@ -276,9 +336,9 @@ func (h *Host) initDB() error {
 		// The storage obligation bucket does not exist, which means the
 		// database needs to be initialized. Create the database buckets.
 		buckets := [][]byte{
-			BucketActionItems,
-			BucketSectorUsage,
-			BucketStorageObligations,
+			bucketActionItems,
+			bucketSectorUsage,
+			bucketStorageObligations,
 		}
 		for _, bucket := range buckets {
 			_, err := tx.CreateBucket(bucket)

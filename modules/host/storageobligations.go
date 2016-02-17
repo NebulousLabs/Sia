@@ -158,7 +158,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 		binary.BigEndian.PutUint64(heightBytes, uint64(height))
 
 		// Get the list of action items already at this height and extend it.
-		bai := tx.Bucket(BucketActionItems)
+		bai := tx.Bucket(bucketActionItems)
 		existingItems := bai.Get(heightBytes)
 		existingItems = append(existingItems, id[:]...)
 		err := bai.Put(heightBytes, existingItems)
@@ -223,7 +223,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		// other conditions might cause problems. The check for duplicate file
 		// contract ids should happen during the negotiation phase, and not
 		// during the 'addStorageObligation' phase.
-		bso := tx.Bucket(BucketStorageObligations)
+		bso := tx.Bucket(bucketStorageObligations)
 		soBytes := bso.Get(soid[:])
 		if soBytes != nil {
 			h.log.Critical("host already has a save storage obligation for this file contract")
@@ -243,7 +243,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		// Expensive santiy check - all of the sectors in the obligation should
 		// already be represented in the sector usage bucket.
 		if build.DEBUG {
-			bsu := tx.Bucket(BucketSectorUsage)
+			bsu := tx.Bucket(bucketSectorUsage)
 			for _, root := range so.SectorRoots {
 				if bsu.Get(root[:]) == nil {
 					h.log.Critical("sector root information has not been correctly updated")
