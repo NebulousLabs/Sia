@@ -75,9 +75,9 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	if len(g.peers) > 0 {
 		r, _ := crypto.RandIntn(len(g.peers))
-		for addr, peer := range g.peers {
+		for addr, p := range g.peers {
 			// only select inbound peers
-			if !peer.inbound {
+			if !p.inbound {
 				continue
 			}
 			if r <= 0 {
