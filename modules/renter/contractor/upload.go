@@ -120,16 +120,8 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 // newHostUploader initiates the contract revision process with a host, and
 // returns a hostUploader, which satisfies the Uploader interface.
 func (c *Contractor) newHostUploader(hc hostContract) (*hostUploader, error) {
-	var price types.Currency
-	found := false
-	for _, host := range c.hdb.AllHosts() {
-		if host.NetAddress == hc.IP {
-			price = host.Price
-			found = true
-			break
-		}
-	}
-	if !found {
+	settings, ok := c.hdb.Host(hc.IP)
+	if !ok {
 		return nil, errors.New("no record of that host")
 	}
 	// TODO: check for excessive price again?
@@ -150,7 +142,7 @@ func (c *Contractor) newHostUploader(hc hostContract) (*hostUploader, error) {
 
 	hu := &hostUploader{
 		contract: hc,
-		price:    price,
+		price:    settings.Price,
 
 		conn:       conn,
 		contractor: c,

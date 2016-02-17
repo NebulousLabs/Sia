@@ -29,8 +29,8 @@ func (newStub) StartTransaction() modules.TransactionBuilder        { return nil
 func (newStub) AcceptTransactionSet([]types.Transaction) error { return nil }
 
 // hdb stubs
-func (newStub) AllHosts() []modules.HostSettings                             { return nil }
-func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostSettings { return nil }
+func (newStub) Host(modules.NetAddress) (settings modules.HostSettings, ok bool) { return }
+func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostSettings     { return nil }
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {

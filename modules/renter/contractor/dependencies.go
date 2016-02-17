@@ -40,7 +40,7 @@ type (
 	}
 
 	hostDB interface {
-		AllHosts() []modules.HostSettings
+		Host(modules.NetAddress) (modules.HostSettings, bool)
 		RandomHosts(n int, exclude []modules.NetAddress) []modules.HostSettings
 	}
 

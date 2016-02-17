@@ -16,23 +16,14 @@ func (c *Contractor) Renew(fcid types.FileContractID, newEndHeight types.BlockHe
 	c.mu.RLock()
 	height := c.blockHeight
 	hc, ok := c.contracts[fcid]
+	host, eok := c.hdb.Host(hc.IP)
 	c.mu.RUnlock()
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that contract")
+	} else if !eok {
+		return types.FileContractID{}, errors.New("no record of that host")
 	} else if newEndHeight < height {
 		return types.FileContractID{}, errors.New("cannot renew below current height")
-	}
-	var host modules.HostSettings
-	found := false
-	for _, h := range c.hdb.AllHosts() {
-		if h.NetAddress == hc.IP {
-			host = h
-			found = true
-			break
-		}
-	}
-	if !found {
-		return types.FileContractID{}, errors.New("no record of that host")
 	} else if host.Price.Cmp(maxPrice) > 0 {
 		return types.FileContractID{}, errTooExpensive
 	}
