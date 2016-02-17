@@ -30,6 +30,7 @@ type peer struct {
 	addr    modules.NetAddress
 	sess    muxado.Session
 	inbound bool
+	version string
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
@@ -163,7 +164,12 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		g.log.Printf("INFO: disconnected from %v to make room for %v", kick, addr)
 	}
 	// add the peer
-	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
+	g.addPeer(&peer{
+		addr:    addr,
+		sess:    muxado.Server(conn),
+		inbound: true,
+		version: remoteVersion,
+	})
 	g.mu.Unlock(id)
 
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
@@ -211,7 +217,12 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.log.Println("INFO: connected to new peer", addr)
 
 	id = g.mu.Lock()
-	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn), inbound: false})
+	g.addPeer(&peer{
+		addr:    addr,
+		sess:    muxado.Client(conn),
+		inbound: false,
+		version: remoteVersion,
+	})
 	g.mu.Unlock(id)
 
 	// call initRPCs
