@@ -1,7 +1,8 @@
-package hostdb
+package contractor
 
 import (
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -10,36 +11,38 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	modWallet "github.com/NebulousLabs/Sia/modules/wallet" // name conflicts with type
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// hostdbTester contains all of the modules that are used while testing the hostdb.
-type hostdbTester struct {
+// contractorTester contains all of the modules that are used while testing the contractor.
+type contractorTester struct {
 	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	miner     modules.TestMiner
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
+	hdb       hostDB
 
-	hostdb *HostDB
+	contractor *Contractor
 }
 
-// Close shuts down the hostdb tester.
-func (rt *hostdbTester) Close() error {
+// Close shuts down the contractor tester.
+func (rt *contractorTester) Close() error {
 	rt.wallet.Lock()
 	rt.cs.Close()
 	rt.gateway.Close()
 	return nil
 }
 
-// newHostDBTester creates a ready-to-use hostdb tester with money in the
+// newContractorTester creates a ready-to-use contractor tester with money in the
 // wallet.
-func newHostDBTester(name string) (*hostdbTester, error) {
+func newContractorTester(name string) (*contractorTester, error) {
 	// Create the modules.
-	testdir := build.TempDir("hostdb", name)
+	testdir := build.TempDir("contractor", name)
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
@@ -68,7 +71,7 @@ func newHostDBTester(name string) (*hostdbTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	hdb, err := New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	hdb, err := hostdb.New(cs, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
@@ -76,33 +79,38 @@ func newHostDBTester(name string) (*hostdbTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	c, err := New(cs, w, tp, hdb, filepath.Join(testdir, modules.RenterDir))
+	if err != nil {
+		return nil, err
+	}
 
-	// Assemble all pieces into a hostdb tester.
-	ht := &hostdbTester{
+	// Assemble all pieces into a contractor tester.
+	ct := &contractorTester{
 		cs:      cs,
 		gateway: g,
 		miner:   m,
 		tpool:   tp,
 		wallet:  w,
+		hdb:     hdb,
 
-		hostdb: hdb,
+		contractor: c,
 	}
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, err := ht.miner.AddBlock()
+		_, err := ct.miner.AddBlock()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return ht, nil
+	return ct, nil
 }
 
 func TestNegotiateContract(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := newHostDBTester("TestNegotiateContract")
+	ct, err := newContractorTester("TestNegotiateContract")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,12 +124,12 @@ func TestNegotiateContract(t *testing.T) {
 		WindowEnd:      1000,
 		Payout:         payout,
 		ValidProofOutputs: []types.SiacoinOutput{
-			{Value: types.PostTax(ht.hostdb.blockHeight, payout), UnlockHash: types.UnlockHash{}},
+			{Value: types.PostTax(ct.contractor.blockHeight, payout), UnlockHash: types.UnlockHash{}},
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// same as above
-			{Value: types.PostTax(ht.hostdb.blockHeight, payout), UnlockHash: types.UnlockHash{}},
+			{Value: types.PostTax(ct.contractor.blockHeight, payout), UnlockHash: types.UnlockHash{}},
 			// goes to the void, not the hostdb
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
@@ -129,7 +137,7 @@ func TestNegotiateContract(t *testing.T) {
 		RevisionNumber: 0,
 	}
 
-	txnBuilder := ht.wallet.StartTransaction()
+	txnBuilder := ct.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)
@@ -140,7 +148,7 @@ func TestNegotiateContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = ht.tpool.AcceptTransactionSet(signedTxnSet)
+	err = ct.tpool.AcceptTransactionSet(signedTxnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,13 +159,13 @@ func TestReviseContract(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := newHostDBTester("TestNegotiateContract")
+	ct, err := newContractorTester("TestNegotiateContract")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// get an address
-	ourAddr, err := ht.wallet.NextAddress()
+	ourAddr, err := ct.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +199,7 @@ func TestReviseContract(t *testing.T) {
 	}
 	// outputs need account for tax
 	fc.ValidProofOutputs = []types.SiacoinOutput{
-		{Value: types.PostTax(ht.hostdb.blockHeight, payout), UnlockHash: ourAddr.UnlockHash()},
+		{Value: types.PostTax(ct.contractor.blockHeight, payout), UnlockHash: ourAddr.UnlockHash()},
 		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}}, // no collateral
 	}
 	fc.MissedProofOutputs = []types.SiacoinOutput{
@@ -201,7 +209,7 @@ func TestReviseContract(t *testing.T) {
 		{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 	}
 
-	txnBuilder := ht.wallet.StartTransaction()
+	txnBuilder := ct.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +221,7 @@ func TestReviseContract(t *testing.T) {
 	}
 
 	// submit contract
-	err = ht.tpool.AcceptTransactionSet(signedTxnSet)
+	err = ct.tpool.AcceptTransactionSet(signedTxnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,13 +256,13 @@ func TestReviseContract(t *testing.T) {
 	}
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
-	err = signedTxn.StandaloneValid(ht.hostdb.blockHeight)
+	err = signedTxn.StandaloneValid(ct.contractor.blockHeight)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// submit revision
-	err = ht.tpool.AcceptTransactionSet([]types.Transaction{signedTxn})
+	err = ct.tpool.AcceptTransactionSet([]types.Transaction{signedTxn})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,6 +271,10 @@ func TestReviseContract(t *testing.T) {
 // TestUniqueHosts tests the UniqueHosts method of the pool type.
 // TODO: make pool safer to test, using real or mocked hostdb
 func TestUniqueHosts(t *testing.T) {
+	fakeAddr := func(n uint8) modules.NetAddress {
+		return modules.NetAddress("foo:" + strconv.Itoa(int(n)))
+	}
+
 	// create hosts
 	h1, h2, h3 := new(hostUploader), new(hostUploader), new(hostUploader)
 	h1.contract.IP = fakeAddr(1)

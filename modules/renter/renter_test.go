@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -103,11 +103,16 @@ func newRenterTester(name string) (*renterTester, error) {
 // of the hostDB's methods on every mock.
 type stubHostDB struct{}
 
-func (stubHostDB) ActiveHosts() []modules.HostSettings                        { return nil }
-func (stubHostDB) AllHosts() []modules.HostSettings                           { return nil }
-func (stubHostDB) AveragePrice() types.Currency                               { return types.Currency{} }
-func (stubHostDB) IsOffline(modules.NetAddress) bool                          { return true }
-func (stubHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) { return nil, nil }
-func (stubHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
+func (stubHostDB) ActiveHosts() []modules.HostSettings { return nil }
+func (stubHostDB) AllHosts() []modules.HostSettings    { return nil }
+func (stubHostDB) AveragePrice() types.Currency        { return types.Currency{} }
+func (stubHostDB) IsOffline(modules.NetAddress) bool   { return true }
+
+// stubContractor is the minimal implementation of the hostContractor
+// interface.
+type stubContractor struct{}
+
+func (stubContractor) NewPool(uint64, types.BlockHeight) (contractor.HostPool, error) { return nil, nil }
+func (stubContractor) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
 	return types.FileContractID{}, nil
 }

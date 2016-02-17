@@ -32,8 +32,8 @@ dependencies:
 run = Test
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/renter/hostdb \
-       ./modules/miner ./modules/renter ./modules/transactionpool ./modules/wallet \
-       ./persist ./siac ./siad ./sync ./types
+       ./modules/renter/contractor ./modules/miner ./modules/renter ./modules/wallet \
+       ./modules/transactionpool ./persist ./siac ./siad ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:

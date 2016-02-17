@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -24,18 +25,22 @@ type hostDB interface {
 
 	// IsOffline reports whether a host is consider offline.
 	IsOffline(modules.NetAddress) bool
+}
 
+// A hostContractor negotiates, revises, renews, and provides access to file
+// contracts.
+type hostContractor interface {
 	// NewPool returns a new HostPool, which can negotiate contracts with
 	// hosts. The size and duration of these contracts are supplied as
 	// arguments.
-	NewPool(filesize uint64, duration types.BlockHeight) (hostdb.HostPool, error)
+	NewPool(filesize uint64, duration types.BlockHeight) (contractor.HostPool, error)
 
 	// Renew renews a file contract, returning the new contract ID.
 	Renew(id types.FileContractID, newHeight types.BlockHeight) (types.FileContractID, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
-// Tracked files are actively repaired by the Renter.  By default, files
+// Tracked files are actively repaired by the Renter. By default, files
 // uploaded by the user are tracked, and files that are added (via loading a
 // .sia file) are not.
 type trackedFile struct {
@@ -55,8 +60,9 @@ type Renter struct {
 	wallet modules.Wallet
 
 	// resources
-	hostDB hostDB
-	log    *log.Logger
+	hostDB         hostDB
+	hostContractor hostContractor
+	log            *log.Logger
 
 	// variables
 	files         map[string]*file
@@ -71,15 +77,20 @@ type Renter struct {
 
 // New returns an empty renter.
 func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(cs, wallet, tpool, persistDir)
+	hdb, err := hostdb.New(cs, persistDir)
+	if err != nil {
+		return nil, err
+	}
+	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
 	if err != nil {
 		return nil, err
 	}
 
 	r := &Renter{
-		cs:     cs,
-		wallet: wallet,
-		hostDB: hdb,
+		cs:             cs,
+		wallet:         wallet,
+		hostDB:         hdb,
+		hostContractor: hc,
 
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),

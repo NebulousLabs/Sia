@@ -1,4 +1,4 @@
-package hostdb
+package contractor
 
 import (
 	"bytes"
@@ -42,8 +42,8 @@ type hostUploader struct {
 	contract hostContract
 
 	// resources
-	conn net.Conn
-	hdb  *HostDB
+	conn       net.Conn
+	contractor *Contractor
 }
 
 // Address returns the NetAddress of the host.
@@ -63,9 +63,9 @@ func (hu *hostUploader) Close() error {
 	encoding.WriteObject(hu.conn, types.Transaction{})
 	hu.conn.Close()
 	// submit the most recent revision to the blockchain
-	err := hu.hdb.tpool.AcceptTransactionSet([]types.Transaction{hu.contract.LastRevisionTxn})
+	err := hu.contractor.tpool.AcceptTransactionSet([]types.Transaction{hu.contract.LastRevisionTxn})
 	if err != nil && err != modules.ErrDuplicateTransactionSet {
-		hu.hdb.log.Println("WARN: transaction pool rejected revision transaction:", err)
+		hu.contractor.log.Println("WARN: transaction pool rejected revision transaction:", err)
 	}
 	return err
 }
@@ -77,9 +77,9 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	offset := hu.contract.LastRevision.NewFileSize
 
 	// calculate price
-	hu.hdb.mu.RLock()
-	height := hu.hdb.blockHeight
-	hu.hdb.mu.RUnlock()
+	hu.contractor.mu.RLock()
+	height := hu.contractor.blockHeight
+	hu.contractor.mu.RUnlock()
 	if height > hu.contract.FileContract.WindowStart {
 		return 0, errors.New("contract has already ended")
 	}
@@ -108,27 +108,34 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	hu.contract.LastRevision = rev
 	hu.contract.LastRevisionTxn = signedTxn
 	hu.contract.MerkleRoots = append(hu.contract.MerkleRoots, pieceRoot)
-	hu.hdb.mu.Lock()
-	hu.hdb.contracts[hu.contract.ID] = hu.contract
-	hu.hdb.save()
-	hu.hdb.mu.Unlock()
+
+	hu.contractor.mu.Lock()
+	hu.contractor.contracts[hu.contract.ID] = hu.contract
+	hu.contractor.save()
+	hu.contractor.mu.Unlock()
 
 	return offset, nil
 }
 
 // newHostUploader initiates the contract revision process with a host, and
 // returns a hostUploader, which satisfies the Uploader interface.
-func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
-	hdb.mu.RLock()
-	settings, ok := hdb.allHosts[hc.IP] // or activeHosts?
-	hdb.mu.RUnlock()
-	if !ok {
+func (c *Contractor) newHostUploader(hc hostContract) (*hostUploader, error) {
+	var price types.Currency
+	found := false
+	for _, host := range c.hdb.AllHosts() {
+		if host.NetAddress == hc.IP {
+			price = host.Price
+			found = true
+			break
+		}
+	}
+	if !found {
 		return nil, errors.New("no record of that host")
 	}
 	// TODO: check for excessive price again?
 
 	// initiate revision loop
-	conn, err := hdb.dialer.DialTimeout(hc.IP, 15*time.Second)
+	conn, err := c.dialer.DialTimeout(hc.IP, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +150,10 @@ func (hdb *HostDB) newHostUploader(hc hostContract) (*hostUploader, error) {
 
 	hu := &hostUploader{
 		contract: hc,
-		price:    settings.Price,
+		price:    price,
 
-		conn: conn,
-		hdb:  hdb,
+		conn:       conn,
+		contractor: c,
 	}
 
 	return hu, nil
@@ -169,9 +176,9 @@ type pool struct {
 	filesize uint64
 	duration types.BlockHeight
 
-	hosts     []*hostUploader
-	blacklist []modules.NetAddress
-	hdb       *HostDB
+	hosts      []*hostUploader
+	blacklist  []modules.NetAddress
+	contractor *Contractor
 }
 
 // Close closes all of the pool's open host connections, and submits their
@@ -220,21 +227,19 @@ outer:
 	if ask < 10 {
 		ask = 10
 	}
-	p.hdb.mu.Lock()
-	randHosts := p.hdb.randomHosts(ask, exclude)
-	p.hdb.mu.Unlock()
+	randHosts := p.contractor.hdb.RandomHosts(ask, exclude)
 
 	// Form new contracts with the randomly-picked hosts. If a contract can't
 	// be formed, add the host to the pool's blacklist.
 	var errs []error
 	for _, host := range randHosts {
-		contract, err := p.hdb.newContract(host, p.filesize, p.duration)
+		contract, err := p.contractor.newContract(host, p.filesize, p.duration)
 		if err != nil {
 			p.blacklist = append(p.blacklist, host.NetAddress)
 			errs = append(errs, err)
 			continue
 		}
-		hu, err := p.hdb.newHostUploader(contract)
+		hu, err := p.contractor.newHostUploader(contract)
 		if err != nil {
 			p.blacklist = append(p.blacklist, host.NetAddress)
 			continue
@@ -249,22 +254,16 @@ outer:
 	if len(errs) == len(randHosts) && len(errs) > 0 {
 		// Log the last error, since early errors are more likely to be
 		// host-specific.
-		p.hdb.log.Println("couldn't form any host contracts:", errs[len(errs)-1])
+		p.contractor.log.Println("couldn't form any host contracts:", errs[len(errs)-1])
 	}
 	return hosts
 }
 
-// NewPool returns an empty HostPool, unless the HostDB contains no hosts at
-// all.
-func (hdb *HostDB) NewPool(filesize uint64, duration types.BlockHeight) (HostPool, error) {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
-	if hdb.isEmpty() {
-		return nil, errors.New("HostDB is empty")
-	}
+// NewPool returns an empty HostPool.
+func (c *Contractor) NewPool(filesize uint64, duration types.BlockHeight) (HostPool, error) {
 	return &pool{
-		filesize: filesize,
-		duration: duration,
-		hdb:      hdb,
+		filesize:   filesize,
+		duration:   duration,
+		contractor: c,
 	}, nil
 }

@@ -84,13 +84,10 @@ func (hdb *HostDB) AllHosts() (allHosts []modules.HostSettings) {
 
 // AveragePrice returns the average price of a host.
 func (hdb *HostDB) AveragePrice() types.Currency {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
-
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
-	hosts := hdb.randomHosts(sampleSize, nil)
+	hosts := hdb.RandomHosts(sampleSize, nil)
 	if len(hosts) == 0 {
 		return totalPrice
 	}

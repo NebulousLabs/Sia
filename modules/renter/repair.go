@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -33,7 +33,7 @@ var renewThreshold = func() types.BlockHeight {
 
 // repair attempts to repair a file chunk by uploading its pieces to more
 // hosts.
-func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []hostdb.Uploader) error {
+func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []contractor.Uploader) error {
 	// read chunk data and encode
 	chunk := make([]byte, f.chunkSize())
 	_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
@@ -64,7 +64,7 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 		// each goroutine gets a different host, index, and piece, so there
 		// are no data race concerns
 		pIndex := missingPieces[i]
-		go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
+		go func(host contractor.Uploader, pieceIndex uint64, piece []byte) {
 			defer wg.Done()
 
 			// upload data to host
@@ -305,7 +305,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, duration types.BlockHeight) {
 	// create host pool
 	contractSize := (f.pieceSize + crypto.TwofishOverhead) * uint64(len(chunks)) // each host gets one piece of each chunk
-	pool, err := r.hostDB.NewPool(contractSize, duration)
+	pool, err := r.hostContractor.NewPool(contractSize, duration)
 	if err != nil {
 		r.log.Printf("failed to repair %v: %v", f.name, err)
 		return
@@ -344,7 +344,7 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 // in f with the new contract.
 func (r *Renter) renewContracts(f *file, contracts []fileContract, newHeight types.BlockHeight) {
 	for _, c := range contracts {
-		newID, err := r.hostDB.Renew(c.ID, newHeight)
+		newID, err := r.hostContractor.Renew(c.ID, newHeight)
 		if err != nil {
 			r.log.Printf("failed to renew contract %v: %v", c.ID, err)
 			continue

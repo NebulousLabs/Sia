@@ -1,4 +1,4 @@
-package hostdb
+package contractor
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	// the hostdb will not form contracts above this price
+	// the contractor will not form contracts above this price
 	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
 
 	errTooExpensive = errors.New("host price was too high")
@@ -151,33 +151,33 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 
 // newContract negotiates an initial file contract with the specified host
 // and returns a hostContract. The contract is also saved by the HostDB.
-func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, duration types.BlockHeight) (hostContract, error) {
+func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, duration types.BlockHeight) (hostContract, error) {
 	// reject hosts that are too expensive
 	if host.Price.Cmp(maxPrice) > 0 {
 		return hostContract{}, errTooExpensive
 	}
 
 	// get an address to use for negotiation
-	hdb.mu.Lock()
-	if hdb.cachedAddress == (types.UnlockHash{}) {
-		uc, err := hdb.wallet.NextAddress()
+	c.mu.Lock()
+	if c.cachedAddress == (types.UnlockHash{}) {
+		uc, err := c.wallet.NextAddress()
 		if err != nil {
-			hdb.mu.Unlock()
+			c.mu.Unlock()
 			return hostContract{}, err
 		}
-		hdb.cachedAddress = uc.UnlockHash()
+		c.cachedAddress = uc.UnlockHash()
 	}
-	ourAddress := hdb.cachedAddress
-	hdb.mu.Unlock()
+	ourAddress := c.cachedAddress
+	c.mu.Unlock()
 
 	// create file contract
 	renterCost := host.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
 
-	hdb.mu.RLock()
-	height := hdb.blockHeight
-	hdb.mu.RUnlock()
+	c.mu.RLock()
+	height := c.blockHeight
+	c.mu.RUnlock()
 
 	fc := types.FileContract{
 		FileSize:       0,
@@ -202,10 +202,10 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 	}
 
 	// create transaction builder
-	txnBuilder := hdb.wallet.StartTransaction()
+	txnBuilder := c.wallet.StartTransaction()
 
 	// initiate connection
-	conn, err := hdb.dialer.DialTimeout(host.NetAddress, 15*time.Second)
+	conn, err := c.dialer.DialTimeout(host.NetAddress, 15*time.Second)
 	if err != nil {
 		return hostContract{}, err
 	}
@@ -215,18 +215,18 @@ func (hdb *HostDB) newContract(host modules.HostSettings, filesize uint64, durat
 	}
 
 	// execute negotiation protocol
-	contract, err := negotiateContract(conn, host.NetAddress, fc, txnBuilder, hdb.tpool)
+	contract, err := negotiateContract(conn, host.NetAddress, fc, txnBuilder, c.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return hostContract{}, err
 	}
 
-	hdb.mu.Lock()
-	hdb.contracts[contract.ID] = contract
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
 	// clear the cached address
-	hdb.cachedAddress = types.UnlockHash{}
-	hdb.save()
-	hdb.mu.Unlock()
+	c.cachedAddress = types.UnlockHash{}
+	c.save()
+	c.mu.Unlock()
 
 	return contract, nil
 }
@@ -315,34 +315,43 @@ func newRevision(rev types.FileContractRevision, pieceLen uint64, merkleRoot cry
 // Renew negotiates a new contract for data already stored with a host. It
 // returns the ID of the new contract. This is a blocking call that performs
 // network I/O.
-func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
-	hdb.mu.RLock()
-	height := hdb.blockHeight
-	hc, ok := hdb.contracts[fcid]
-	host, eok := hdb.allHosts[hc.IP]
-	hdb.mu.RUnlock()
+func (c *Contractor) Renew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
+	c.mu.RLock()
+	height := c.blockHeight
+	hc, ok := c.contracts[fcid]
+	c.mu.RUnlock()
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that contract")
-	} else if !eok {
-		return types.FileContractID{}, errors.New("no record of that host")
 	} else if newEndHeight < height {
 		return types.FileContractID{}, errors.New("cannot renew below current height")
+	}
+	var host modules.HostSettings
+	found := false
+	for _, h := range c.hdb.AllHosts() {
+		if h.NetAddress == hc.IP {
+			host = h
+			found = true
+			break
+		}
+	}
+	if !found {
+		return types.FileContractID{}, errors.New("no record of that host")
 	} else if host.Price.Cmp(maxPrice) > 0 {
 		return types.FileContractID{}, errTooExpensive
 	}
 
 	// get an address to use for negotiation
-	hdb.mu.Lock()
-	if hdb.cachedAddress == (types.UnlockHash{}) {
-		uc, err := hdb.wallet.NextAddress()
+	c.mu.Lock()
+	if c.cachedAddress == (types.UnlockHash{}) {
+		uc, err := c.wallet.NextAddress()
 		if err != nil {
-			hdb.mu.Unlock()
+			c.mu.Unlock()
 			return types.FileContractID{}, err
 		}
-		hdb.cachedAddress = uc.UnlockHash()
+		c.cachedAddress = uc.UnlockHash()
 	}
-	ourAddress := hdb.cachedAddress
-	hdb.mu.Unlock()
+	ourAddress := c.cachedAddress
+	c.mu.Unlock()
 
 	renterCost := host.Price.Mul(types.NewCurrency64(hc.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
@@ -370,10 +379,10 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	}
 
 	// create transaction builder
-	txnBuilder := hdb.wallet.StartTransaction()
+	txnBuilder := c.wallet.StartTransaction()
 
 	// initiate connection
-	conn, err := hdb.dialer.DialTimeout(hc.IP, 15*time.Second)
+	conn, err := c.dialer.DialTimeout(hc.IP, 15*time.Second)
 	if err != nil {
 		return types.FileContractID{}, err
 	}
@@ -386,20 +395,20 @@ func (hdb *HostDB) Renew(fcid types.FileContractID, newEndHeight types.BlockHeig
 	}
 
 	// execute negotiation protocol
-	newContract, err := negotiateContract(conn, hc.IP, fc, txnBuilder, hdb.tpool)
+	newContract, err := negotiateContract(conn, hc.IP, fc, txnBuilder, c.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return types.FileContractID{}, err
 	}
 
 	// update host contract
-	hdb.mu.Lock()
-	hdb.contracts[newContract.ID] = newContract
-	hdb.cachedAddress = types.UnlockHash{} // clear cachedAddress
-	err = hdb.save()
-	hdb.mu.Unlock()
+	c.mu.Lock()
+	c.contracts[newContract.ID] = newContract
+	c.cachedAddress = types.UnlockHash{} // clear cachedAddress
+	err = c.save()
+	c.mu.Unlock()
 	if err != nil {
-		hdb.log.Println("WARN: failed to save the hostdb:", err)
+		c.log.Println("WARN: failed to save the hostdb:", err)
 	}
 
 	return newContract.ID, nil
