@@ -79,8 +79,8 @@ type (
 		RPC(NetAddress, string, RPCFunc) error
 
 		// Broadcast transmits obj, prefaced by the RPC name, to all of the
-		// Gateway's connected peers in parallel.
-		Broadcast(name string, obj interface{})
+		// given peers in parallel.
+		Broadcast(name string, obj interface{}, peers []Peer)
 
 		// Close safely stops the Gateway's listener process.
 		Close() error

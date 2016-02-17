@@ -286,7 +286,8 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	}
 
 	// Notify subscribers and broadcast the transaction set.
-	go tp.gateway.Broadcast("RelayTransactionSet", ts)
+	// TODO: only broadcast to peers v0.4.7 and above.
+	go tp.gateway.Broadcast("RelayTransactionSet", ts, nil)
 	tp.updateSubscribersTransactions()
 
 	return nil

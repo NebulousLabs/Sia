@@ -96,7 +96,8 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()
-			go cs.gateway.Broadcast("RelayBlock", currentBlock)
+			// TODO: only broadcast blocks to peers v0.5.1 and below and headers to peers v0.5.2 and above.
+			go cs.gateway.Broadcast("RelayBlock", currentBlock, nil)
 		}
 	}()
 

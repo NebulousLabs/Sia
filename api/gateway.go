@@ -9,15 +9,15 @@ import (
 )
 
 type GatewayInfo struct {
-	NetAddress modules.NetAddress   `json:"netaddress"`
-	Peers      []modules.NetAddress `json:"peers"`
+	NetAddress modules.NetAddress `json:"netaddress"`
+	Peers      []modules.Peer     `json:"peers"`
 }
 
 // gatewayHandler handles the API call asking for the gatway status.
 func (srv *Server) gatewayHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	peers := srv.gateway.Peers()
 	if peers == nil {
-		peers = make([]modules.NetAddress, 0)
+		peers = make([]modules.Peer, 0)
 	}
 	writeJSON(w, GatewayInfo{srv.gateway.Address(), peers})
 }
