@@ -3,7 +3,6 @@ package renter
 import (
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -58,43 +57,37 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	if len(hosts) < numPieces {
 		numPieces = len(hosts)
 	}
-	var wg sync.WaitGroup
-	wg.Add(numPieces)
 	for i := 0; i < numPieces; i++ {
-		// each goroutine gets a different host, index, and piece, so there
-		// are no data race concerns
-		pIndex := missingPieces[i]
-		go func(host contractor.Uploader, pieceIndex uint64, piece []byte) {
-			defer wg.Done()
+		pieceIndex := missingPieces[i]
+		host := hosts[i]
+		piece := pieces[pieceIndex]
 
-			// upload data to host
-			offset, err := host.Upload(piece)
-			if err != nil {
-				return
+		// upload data to host
+		offset, err := host.Upload(piece)
+		if err != nil {
+			continue
+		}
+
+		// create contract entry, if necessary
+		f.mu.Lock()
+		contract, ok := f.contracts[host.ContractID()]
+		if !ok {
+			contract = fileContract{
+				ID:          host.ContractID(),
+				IP:          host.Address(),
+				WindowStart: host.EndHeight(),
 			}
+		}
 
-			// create contract entry, if necessary
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			contract, ok := f.contracts[host.ContractID()]
-			if !ok {
-				contract = fileContract{
-					ID:          host.ContractID(),
-					IP:          host.Address(),
-					WindowStart: host.EndHeight(),
-				}
-			}
-
-			// update contract
-			contract.Pieces = append(contract.Pieces, pieceData{
-				Chunk:  chunkIndex,
-				Piece:  pieceIndex,
-				Offset: offset,
-			})
-			f.contracts[host.ContractID()] = contract
-		}(hosts[i], pIndex, pieces[pIndex])
+		// update contract
+		contract.Pieces = append(contract.Pieces, pieceData{
+			Chunk:  chunkIndex,
+			Piece:  pieceIndex,
+			Offset: offset,
+		})
+		f.contracts[host.ContractID()] = contract
+		f.mu.Unlock()
 	}
-	wg.Wait()
 
 	return nil
 }
@@ -188,15 +181,6 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairLoop() {
-	// Files are repaired concurrently. A repair worker must acquire a 'token'
-	// in order to run, and returns the token to the pool when it has
-	// finished.
-	tokenPool := make(chan struct{}, repairThreads)
-	// fill the tokenPool with tokens
-	for i := 0; i < repairThreads; i++ {
-		tokenPool <- struct{}{}
-	}
-
 	for {
 		time.Sleep(5 * time.Second)
 
@@ -212,19 +196,9 @@ func (r *Renter) threadedRepairLoop() {
 		}
 		r.mu.RUnlock(id)
 
-		var wg sync.WaitGroup
-		wg.Add(len(repairing))
 		for name, meta := range repairing {
-			go func(name string, meta trackedFile) {
-				defer wg.Done()
-				t := <-tokenPool                 // acquire token
-				r.threadedRepairFile(name, meta) // repair
-				tokenPool <- t                   // return token
-			}(name, meta)
+			r.threadedRepairFile(name, meta)
 		}
-		// wait for all repairs to complete before looping; otherwise we risk
-		// spawning multiple repair threads for the same file.
-		wg.Wait()
 	}
 }
 
