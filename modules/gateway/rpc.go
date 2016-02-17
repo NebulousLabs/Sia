@@ -142,7 +142,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
-	for _, addr := range peers {
+	for _, p := range peers {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
@@ -151,7 +151,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 				g.RPC(addr, name, fn)
 			}
 			wg.Done()
-		}(addr)
+		}(p.NetAddress)
 	}
 	wg.Wait()
 }

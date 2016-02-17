@@ -30,6 +30,12 @@ var (
 )
 
 type (
+	// Peer contains all the info necessary to Broadcast to a peer.
+	Peer struct {
+		NetAddress NetAddress `json:"netaddress"`
+		Version    string     `json:"version"`
+	}
+
 	// A PeerConn is the connection type used when communicating with peers during
 	// an RPC. For now it is identical to a net.Conn.
 	PeerConn interface {
@@ -58,7 +64,7 @@ type (
 		Address() NetAddress
 
 		// Peers returns the addresses that the Gateway is currently connected to.
-		Peers() []NetAddress
+		Peers() []Peer
 
 		// RegisterRPC registers a function to handle incoming connections that
 		// supply the given RPC ID.
