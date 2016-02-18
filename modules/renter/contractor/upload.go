@@ -44,7 +44,7 @@ type hostUploader struct {
 	price types.Currency
 
 	// updated after each revision
-	contract hostContract
+	contract Contract
 
 	// resources
 	conn       net.Conn
@@ -124,8 +124,8 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 
 // newHostUploader initiates the contract revision process with a host, and
 // returns a hostUploader, which satisfies the Uploader interface.
-func (c *Contractor) newHostUploader(hc hostContract) (*hostUploader, error) {
-	settings, ok := c.hdb.Host(hc.IP)
+func (c *Contractor) newHostUploader(contract Contract) (*hostUploader, error) {
+	settings, ok := c.hdb.Host(contract.IP)
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
@@ -143,21 +143,21 @@ func (c *Contractor) newHostUploader(hc hostContract) (*hostUploader, error) {
 	}
 
 	// initiate revision loop
-	conn, err := c.dialer.DialTimeout(hc.IP, 15*time.Second)
+	conn, err := c.dialer.DialTimeout(contract.IP, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
 	if err := encoding.WriteObject(conn, modules.RPCRevise); err != nil {
 		return nil, err
 	}
-	if err := encoding.WriteObject(conn, hc.ID); err != nil {
+	if err := encoding.WriteObject(conn, contract.ID); err != nil {
 		return nil, err
 	}
 	// TODO: some sort of acceptance would be good here, so that we know the
 	// uploader will actually work. Maybe send the Merkle root?
 
 	hu := &hostUploader{
-		contract: hc,
+		contract: contract,
 		price:    settings.Price,
 
 		conn:       conn,

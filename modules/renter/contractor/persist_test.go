@@ -18,12 +18,12 @@ func (m memPersist) load(data *contractorPersist) error { *data = contractorPers
 func TestSaveLoad(t *testing.T) {
 	// create contractor with mocked persist dependency
 	c := &Contractor{
-		contracts: make(map[types.FileContractID]hostContract),
+		contracts: make(map[types.FileContractID]Contract),
 	}
 	c.persist = new(memPersist)
 
 	// add some fake contracts
-	c.contracts = map[types.FileContractID]hostContract{
+	c.contracts = map[types.FileContractID]Contract{
 		{0}: {IP: "foo"},
 		{1}: {IP: "bar"},
 		{2}: {IP: "baz"},

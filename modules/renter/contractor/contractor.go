@@ -17,9 +17,9 @@ var (
 	errUnknownContract = errors.New("no record of that contract")
 )
 
-// a hostContract includes the original contract made with a host, along with
+// a Contract includes the original contract made with a host, along with
 // the most recent revision.
-type hostContract struct {
+type Contract struct {
 	IP              modules.NetAddress
 	ID              types.FileContractID
 	FileContract    types.FileContract
@@ -41,7 +41,7 @@ type Contractor struct {
 	wallet  wallet
 
 	blockHeight   types.BlockHeight
-	contracts     map[types.FileContractID]hostContract
+	contracts     map[types.FileContractID]Contract
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 
 	mu sync.RWMutex
@@ -86,7 +86,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d 
 		tpool:   tp,
 		wallet:  w,
 
-		contracts: make(map[types.FileContractID]hostContract),
+		contracts: make(map[types.FileContractID]Contract),
 	}
 
 	// Load the prior persistance structures.

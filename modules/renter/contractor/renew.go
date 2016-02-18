@@ -15,8 +15,8 @@ import (
 func (c *Contractor) Renew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
 	c.mu.RLock()
 	height := c.blockHeight
-	hc, ok := c.contracts[fcid]
-	host, eok := c.hdb.Host(hc.IP)
+	contract, ok := c.contracts[fcid]
+	host, eok := c.hdb.Host(contract.IP)
 	c.mu.RUnlock()
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that contract")
@@ -41,14 +41,14 @@ func (c *Contractor) Renew(fcid types.FileContractID, newEndHeight types.BlockHe
 	ourAddress := c.cachedAddress
 	c.mu.Unlock()
 
-	renterCost := host.Price.Mul(types.NewCurrency64(hc.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	renterCost := host.Price.Mul(types.NewCurrency64(contract.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
 
 	// create file contract
 	fc := types.FileContract{
-		FileSize:       hc.LastRevision.NewFileSize,
-		FileMerkleRoot: hc.LastRevision.NewFileMerkleRoot,
+		FileSize:       contract.LastRevision.NewFileSize,
+		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
 		WindowStart:    newEndHeight,
 		WindowEnd:      newEndHeight + host.WindowSize,
 		Payout:         payout,
@@ -70,7 +70,7 @@ func (c *Contractor) Renew(fcid types.FileContractID, newEndHeight types.BlockHe
 	txnBuilder := c.wallet.StartTransaction()
 
 	// initiate connection
-	conn, err := c.dialer.DialTimeout(hc.IP, 15*time.Second)
+	conn, err := c.dialer.DialTimeout(contract.IP, 15*time.Second)
 	if err != nil {
 		return types.FileContractID{}, err
 	}
@@ -83,7 +83,7 @@ func (c *Contractor) Renew(fcid types.FileContractID, newEndHeight types.BlockHe
 	}
 
 	// execute negotiation protocol
-	newContract, err := negotiateContract(conn, hc.IP, fc, txnBuilder, c.tpool)
+	newContract, err := negotiateContract(conn, contract.IP, fc, txnBuilder, c.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return types.FileContractID{}, err

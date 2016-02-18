@@ -2,14 +2,14 @@ package contractor
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Contracts []hostContract
+	Contracts []Contract
 }
 
 // save saves the hostdb persistence data to disk.
 func (c *Contractor) save() error {
 	var data contractorPersist
-	for _, hc := range c.contracts {
-		data.Contracts = append(data.Contracts, hc)
+	for _, contract := range c.contracts {
+		data.Contracts = append(data.Contracts, contract)
 	}
 	return c.persist.save(data)
 }
@@ -21,8 +21,8 @@ func (c *Contractor) load() error {
 	if err != nil {
 		return err
 	}
-	for _, hc := range data.Contracts {
-		c.contracts[hc.ID] = hc
+	for _, contract := range data.Contracts {
+		c.contracts[contract.ID] = contract
 	}
 	return nil
 }
