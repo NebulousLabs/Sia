@@ -122,9 +122,9 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 	return offset, nil
 }
 
-// newHostUploader initiates the contract revision process with a host, and
-// returns a hostUploader, which satisfies the Uploader interface.
-func (c *Contractor) newHostUploader(contract Contract) (*hostUploader, error) {
+// Uploader initiates the contract revision process with a host, and returns
+// an Uploader.
+func (c *Contractor) Uploader(contract Contract) (Uploader, error) {
 	settings, ok := c.hdb.Host(contract.IP)
 	if !ok {
 		return nil, errors.New("no record of that host")
@@ -165,113 +165,4 @@ func (c *Contractor) newHostUploader(contract Contract) (*hostUploader, error) {
 	}
 
 	return hu, nil
-}
-
-// A HostPool is a collection of hosts used to upload a file.
-type HostPool interface {
-	// UniqueHosts will return up to 'n' unique hosts that are not in 'old'.
-	UniqueHosts(n int, old []modules.NetAddress) []Uploader
-
-	// Close terminates all connections in the host pool.
-	Close() error
-}
-
-// A pool is a collection of hostUploaders that satisfies the HostPool
-// interface. New hosts are drawn from a HostDB, and contracts are negotiated
-// with them on demand.
-type pool struct {
-	// details of the contracts to be formed
-	filesize uint64
-	duration types.BlockHeight
-
-	hosts      []*hostUploader
-	blacklist  []modules.NetAddress
-	contractor *Contractor
-}
-
-// Close closes all of the pool's open host connections, and submits their
-// respective contract revisions to the transaction pool.
-func (p *pool) Close() error {
-	for _, h := range p.hosts {
-		h.Close()
-	}
-	return nil
-}
-
-// UniqueHosts will return up to 'n' unique hosts that are not in 'exclude'.
-// The pool draws from its set of active connections first, and then negotiates
-// new contracts if more hosts are required. Note that this latter case
-// requires network I/O, so the caller should always assume that UniqueHosts
-// will block.
-func (p *pool) UniqueHosts(n int, exclude []modules.NetAddress) (hosts []Uploader) {
-	if n == 0 {
-		return
-	}
-
-	// First reuse existing connections.
-outer:
-	for _, h := range p.hosts {
-		for _, ip := range exclude {
-			if h.Address() == ip {
-				continue outer
-			}
-		}
-		hosts = append(hosts, h)
-		if len(hosts) >= n {
-			return hosts
-		}
-	}
-
-	// Extend the exclude set with the hosts on the pool's blacklist and the
-	// hosts we're already connected to.
-	exclude = append(exclude, p.blacklist...)
-	for _, h := range p.hosts {
-		exclude = append(exclude, h.Address())
-	}
-
-	// Ask the hostdb for random hosts. We always ask for at least 10, to
-	// avoid selecting the same uncooperative hosts over and over.
-	ask := n * 2
-	if ask < 10 {
-		ask = 10
-	}
-	randHosts := p.contractor.hdb.RandomHosts(ask, exclude)
-
-	// Form new contracts with the randomly-picked hosts. If a contract can't
-	// be formed, add the host to the pool's blacklist.
-	var errs []error
-	for _, host := range randHosts {
-		contract, err := p.contractor.newContract(host, p.filesize, p.duration)
-		if err != nil {
-			p.blacklist = append(p.blacklist, host.NetAddress)
-			errs = append(errs, err)
-			continue
-		}
-		hu, err := p.contractor.newHostUploader(contract)
-		if err != nil {
-			p.blacklist = append(p.blacklist, host.NetAddress)
-			continue
-		}
-		hosts = append(hosts, hu)
-		p.hosts = append(p.hosts, hu)
-		if len(hosts) >= n {
-			break
-		}
-	}
-	// If all attempts failed, log the error.
-	if len(errs) == len(randHosts) && len(errs) > 0 {
-		// Log the last error, since early errors are more likely to be
-		// host-specific.
-		p.contractor.log.Println("couldn't form any host contracts:", errs[len(errs)-1])
-	}
-	return hosts
-}
-
-// NewPool returns an empty HostPool.
-func (c *Contractor) NewPool(filesize uint64, duration types.BlockHeight) (HostPool, error) {
-	return &pool{
-		filesize:   filesize,
-		duration:   duration,
-		contractor: c,
-	}, nil
 }

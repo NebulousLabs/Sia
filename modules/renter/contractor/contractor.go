@@ -47,6 +47,16 @@ type Contractor struct {
 	mu sync.RWMutex
 }
 
+// Contracts returns the contracts formed by the contractor.
+func (c *Contractor) Contracts() (cs []Contract) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, c := range c.contracts {
+		cs = append(cs, c)
+	}
+	return
+}
+
 // New returns a new Contractor.
 func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, persistDir string) (*Contractor, error) {
 	// Check for nil inputs.

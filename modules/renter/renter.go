@@ -30,10 +30,12 @@ type hostDB interface {
 // A hostContractor negotiates, revises, renews, and provides access to file
 // contracts.
 type hostContractor interface {
-	// NewPool returns a new HostPool, which can negotiate contracts with
-	// hosts. The size and duration of these contracts are supplied as
-	// arguments.
-	NewPool(filesize uint64, duration types.BlockHeight) (contractor.HostPool, error)
+	// Contracts returns the contracts formed by the contractor.
+	Contracts() []contractor.Contract
+
+	// Uploader creates an uploader from the specified contract, allowing it
+	// to be modified.
+	Uploader(contractor.Contract) (contractor.Uploader, error)
 
 	// Renew renews a file contract, returning the new contract ID.
 	Renew(id types.FileContractID, newHeight types.BlockHeight) (types.FileContractID, error)

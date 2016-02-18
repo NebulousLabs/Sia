@@ -279,7 +279,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, duration types.BlockHeight) {
 	// create host pool
 	contractSize := (f.pieceSize + crypto.TwofishOverhead) * uint64(len(chunks)) // each host gets one piece of each chunk
-	pool, err := r.hostContractor.NewPool(contractSize, duration)
+	pool, err := r.newHostPool(contractSize, duration)
 	if err != nil {
 		r.log.Printf("failed to repair %v: %v", f.name, err)
 		return
@@ -289,7 +289,7 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 	for chunk, pieces := range chunks {
 		// Determine host set. We want one host for each missing piece, and no
 		// repeats of other hosts of this chunk.
-		hosts := pool.UniqueHosts(len(pieces), f.chunkHosts(chunk))
+		hosts := pool.uniqueHosts(len(pieces), f.chunkHosts(chunk))
 		if len(hosts) == 0 {
 			r.log.Printf("aborting repair of %v: not enough hosts", f.name)
 			return
