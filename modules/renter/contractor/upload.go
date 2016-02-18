@@ -12,6 +12,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// SectorSize is the number of bytes in a sector.
+	SectorSize = 1 << 22 // 4 MiB
+)
+
 // An Uploader uploads data to a host.
 type Uploader interface {
 	// Upload revises the underlying contract to store the new data. It
@@ -124,7 +129,18 @@ func (c *Contractor) newHostUploader(hc hostContract) (*hostUploader, error) {
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
-	// TODO: check for excessive price again?
+	if settings.Price.Cmp(maxPrice) > 0 {
+		return nil, errTooExpensive
+	}
+
+	// check that contract has enough value to support an upload
+	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
+		return nil, errors.New("invalid contract")
+	}
+	bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(settings.Price).Uint64()
+	if errOverflow == nil && bytes < SectorSize {
+		return nil, errors.New("contract has insufficient capacity")
+	}
 
 	// initiate revision loop
 	conn, err := c.dialer.DialTimeout(hc.IP, 15*time.Second)
