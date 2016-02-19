@@ -122,10 +122,14 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// check that version is acceptable
+	// Check that version is acceptable.
+	//
+	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
+	// pre-hardfork.
+	//
 	// NOTE: this version must be bumped whenever the gateway or consensus
 	// breaks compatibility.
-	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
+	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		encoding.WriteObject(conn, "reject")
 		conn.Close()
 		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
@@ -209,7 +213,14 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if remoteVersion == "reject" {
 		return errors.New("peer rejected connection")
 	}
-	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
+	// Check that version is acceptable.
+	//
+	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
+	// pre-hardfork.
+	//
+	// NOTE: this version must be bumped whenever the gateway or consensus
+	// breaks compatibility.
+	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		conn.Close()
 		return errors.New("unacceptable version: " + remoteVersion)
 	}
