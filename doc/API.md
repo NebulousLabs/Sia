@@ -273,14 +273,17 @@ Response:
 ```
 struct {
 	netaddress string
-	peers      []string
+	peers      []struct {
+                netaddress string
+                version    string
+        }
 }
 ```
 'netaddress' is the network address of the Gateway, including its external IP
 address and the port Sia is listening on.
 
-'peers' is a list of the network addresses of peers that the Gateway is
-currently connected to.
+'peers' is a list of the network addresses and versions of peers that the
+Gateway is currently connected to.
 
 #### /gateway/add/{netaddress} [POST]
 

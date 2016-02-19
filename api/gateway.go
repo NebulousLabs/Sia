@@ -16,6 +16,9 @@ type GatewayInfo struct {
 // gatewayHandler handles the API call asking for the gatway status.
 func (srv *Server) gatewayHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	peers := srv.gateway.Peers()
+	// nil slices are marshalled as 'null' in JSON, whereas 0-length slices are
+	// marshalled as '[]'. The latter is preferred, indicating that the value
+	// exists but contains no elements.
 	if peers == nil {
 		peers = make([]modules.Peer, 0)
 	}
