@@ -108,6 +108,8 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 	// TODO: check if the block is in the extreme or near future, and return
 	// errExtremeFutureTimestamp or errFutureTimestamp, respectively.
 
+	// TODO: check if the block is a non extending block.
+
 	return nil
 }
 
@@ -210,6 +212,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
+					// TODO: log error returned by AcceptBlock if non-nill?
 					cs.AcceptBlock(b) // NOTE: Error is not handled.
 				}()
 			}

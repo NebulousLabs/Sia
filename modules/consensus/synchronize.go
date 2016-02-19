@@ -249,12 +249,13 @@ func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 		return err
 	}
 
-	// Submit the block to the consensus set.
+	// Submit the block to the consensus set and broadcast it.
 	err = cs.AcceptBlock(b)
 	if err == errOrphan {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
+		// TODO: log error returned if non-nill?
 		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 	}
 	if err != nil {
