@@ -36,6 +36,44 @@ type ActiveHosts struct {
 	Hosts []modules.HostSettings `json:"hosts"`
 }
 
+// renterAllowanceHandlerGET handles the API call to get the allowance.
+func (srv *Server) renterAllowanceHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	writeJSON(w, srv.renter.Allowance())
+}
+
+// renterAllowanceHandlerPOST handles the API call to set the allowance.
+func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// scan values
+	funds, ok := scanAmount(req.FormValue("funds"))
+	if !ok {
+		writeError(w, "Couldn't parse funds", http.StatusBadRequest)
+		return
+	}
+	var hosts uint // negative hosts not allowed
+	_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
+	if err != nil {
+		writeError(w, "Couldn't parse hosts: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var period types.BlockHeight
+	_, err = fmt.Sscan(req.FormValue("period"), &period)
+	if err != nil {
+		writeError(w, "Couldn't parse period: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = srv.renter.SetAllowance(modules.Allowance{
+		Funds:  funds,
+		Hosts:  int(hosts),
+		Period: period,
+	})
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
 // renterDownloadsHandler handles the API call to request the download queue.
 func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterDownloadQueue{

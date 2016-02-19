@@ -70,9 +70,9 @@ type DownloadInfo struct {
 // An Allowance dictates how much the Renter is allowed to spend in a given
 // period.
 type Allowance struct {
-	Funds  types.Currency
-	Period types.BlockHeight
-	Hosts  int
+	Funds  types.Currency    `json:"funds"`
+	Hosts  int               `json:"hosts"`
+	Period types.BlockHeight `json:"period"`
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
