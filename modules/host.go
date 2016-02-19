@@ -63,9 +63,10 @@ type (
 		AcceptingContracts bool              `json:"acceptingcontracts"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
 		NetAddress         NetAddress        `json:"netaddress"`
-		RemainingStorage   uint64            `json:"remainingstorage"` // Cannot be directly changed
-		TotalStorage       uint64            `json:"totalstorage"`     // Cannot be directly changed
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`       // Cannot be directly changed
+		RemainingStorage   uint64            `json:"remainingstorage"` // Cannot be directly changed.
+		SectorSize         uint64            `json:"sectorsize"`       // Currently cannot be changed (future support planned).
+		TotalStorage       uint64            `json:"totalstorage"`     // Cannot be directly changed.
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`       // Cannot be directly changed.
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
 		Collateral             types.Currency `json:"collateral"`

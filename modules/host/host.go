@@ -28,9 +28,10 @@ const (
 
 	// maximumStorageFolders indicates the maximum number of storage folders
 	// that the host allows. Some operations, such as creating a new storage
-	// folder, are linear in the number of storage folders. For this reason, a
-	// limit on the maximum number of storage folders has been set.
-	maximumStorageFolders = 256
+	// folder, take longer if there are more storage folders. Static RAM usage
+	// also increases as the number of storage folders increase. For this
+	// reason, a limit on the maximum number of storage folders has been set.
+	maximumStorageFolders = 100
 
 	// resubmissionTimeout defines the number of blocks that a host will wait
 	// before attempting to resubmit a transaction to the blockchain.
@@ -124,8 +125,25 @@ var (
 		panic("unrecognized release constant in host - defaultWindowSize")
 	}()
 
-	// TODO: Define maximum storage size, which will help prevent integer
-	// overflows.
+	// maximumStorageFolderSize sets an upper bound on how large storage
+	// folders in the host are allowed to be. It makes sure that inputs and
+	// constructions are sane. While it's conceivable that someone could create
+	// a rig with a single logical storage folder greater than 128 TiB in size
+	// in production, it's probably not a great idea, especially when you are
+	// allowed to use many storage folders. All told, a single host on today's
+	// constants can support up to ~10 PB of storage.
+	maximumStorageFolderSize = func() uint64 {
+		if build.Release == "dev" {
+			return 1 << 33 // 8 GiB
+		}
+		if build.Release == "standard" {
+			return 1 << 47 // 128 TiB
+		}
+		if build.Release == "testing" {
+			return 1 << 20 // 1 MiB
+		}
+		panic("unrecognized release constant in host - maximum storage folder size")
+	}()
 
 	// minimumStorageFolderSize defines the smallest size that a storage folder
 	// is allowed to be. The new design of the storage folder structure means
@@ -137,13 +155,13 @@ var (
 	// appropraite.
 	minimumStorageFolderSize = func() uint64 {
 		if build.Release == "dev" {
-			return 1 << 25 // 32 MB
+			return 1 << 25 // 32 MiB
 		}
-		if build.Release == "standart" {
-			return 1 << 35 // 32 GB
+		if build.Release == "standard" {
+			return 1 << 35 // 32 GiB
 		}
 		if build.Release == "testing" {
-			return 1 << 15 // 32 KB
+			return 1 << 15 // 32 KiB
 		}
 		panic("unrecognized release constant in host - minimum storage folder size")
 	}()
@@ -155,13 +173,13 @@ var (
 	// renter and the host.
 	sectorSize = func() uint64 {
 		if build.Release == "dev" {
-			return 1 << 20 // 1 MB
+			return 1 << 20 // 1 MiB
 		}
 		if build.Release == "standard" {
-			return 1 << 22 // 4 MB
+			return 1 << 22 // 4 MiB
 		}
 		if build.Release == "testing" {
-			return 1 << 12 // 4 KB
+			return 1 << 12 // 4 KiB
 		}
 		panic("unrecognized release constant in host - sectorSize")
 	}()
@@ -173,7 +191,7 @@ var (
 	// live code.
 	storageFolderUIDSize = func() int {
 		if build.Release == "dev" {
-			return 4
+			return 2
 		}
 		if build.Release == "standard" {
 			return 4

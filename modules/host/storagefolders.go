@@ -1,22 +1,104 @@
 package host
 
-// sectors.go is responsible for mananging sectors within the host. The host
-// outsources a lot of the management load to the filesystem by making each
-// sector a different file, where the filename is the Merkle root of the
-// sector. Multiple folder locations are supported, and sectors are sent to
-// each disk sector through a process of consistent hashing.
+// storgaefolder.go is responsible for managing the storage folders within the
+// host. Storage folders can be added, resized, or removed. There are several
+// features in place to make sure that the host is always using a reasonable
+// amount of resources. Sectors in the host are currently always 4MiB, though
+// support for different sizes is planned. Becaues of the reliance on the
+// cached Merkle trees, sector sizes are likely to always be a power of 2.
+//
+// Though storage folders each contain a bunch of sectors, there is no mapping
+// from a storage folder to the sectors that it contains. Instead, one must
+// either look at the filesystem or go through the sector usage database.
+// There is a mapping from a sector to the storage folder that it is in, so a
+// list of sectors for each storage folder can be obtained, though the
+// operation is expensive. It is not recommended that you try to look at the
+// filesystem to see all of the sectors in a storage folder, because all of the
+// golang implementations that let you do this load the whole directory into
+// memory at once, and these directories may contain millions of sectors.
+//
+// Strict resource limits are maintained, to make sure that any user behavior
+// which would strain the host will return an error instead of cause the user
+// problems. The number of storage folders is capped, the allowed size for a
+// storage folder has a range, and anything else that might have a linear or
+// nonconstant effect on resource consumption is capped.
+//
+// Sectors are meant to be spread out across the storage folders as evenly as
+// possible, but this is done in a very passive way. When a storage folder is
+// added, sectors are not moved from the other storage folder to optimize for a
+// quick operation. When a storage folder is reduced in size, sectors are only
+// moved if there is not enough room on the remainder of the storage folder to
+// hold all of the sectors.
+//
+// Storage folders are identified by an ID. This ID is short (4 bytes) and is
+// randomly generated but is guaranteed not to conflict with any other storage
+// folder IDs (if a conflict is generated randomly, a new random folder is
+// chosen). A counter was rejected because storage folders can be removed and
+// added arbitrarily, and there should be a firm difference between accessing a
+// storage folder by index vs. accessing a storage folder by id.
+//
+// Storage folders statically track how much of their storage is unused.
+// Because there is no mapping from a storage folder to the sectors that it
+// contains, a static mapping must be manually maintained. While it would be
+// possible to track which sectors are in each storage folder by using nested
+// buckets in the sector usage database, the implementation cost is high, and
+// is perceived to be higher than the implementation cost of statically
+// tracking the amount of storage remaining. Also the introduction of nested
+// buckets relies on fancier, less used features in the boltdb dependency,
+// which carries a higher error risk.
+
+// TODO: All exported functions should wrap the errors that they return so that
+// there is more context for the user + developer when something goes wrong.
+
+// TODO: Check carefully that the storage size maximums are enforced.
+
+// TODO: When calling 'addSector', if a write fails on a storage folder you
+// remove it from the slice and get the next emptiest storage folder. Make sure
+// to be testing the 'nil' returns that the function is capable of.
+
+// TODO: There should be some way for the host to warn the user if a drive
+// seems to be struggling.
+
+// TODO: There needs to be a way to forcibly remove a storage folder from the
+// host, meaning that it'll push through even if there are errors, and the
+// sectors that can't be migrated will just be deleted, causing financial
+// damage to the host.
+
+// TODO: Take the 'displace sectors' code and combine it into a single
+// function. When displacing sectors, keep track of how many failures occurred.
+// There should be some input indicating failure tolerance level.
+
+// TODO: Write a 'force remove' function that will push through a remove
+// operation even in the event of errors, meaning the failure tolerance level
+// is set to maximum (keep trying for every sector even with repeated
+// failures).
+
+// TODO: Keep stats on the failure rates of each storage folder.
+
+// TODO: Have a function to reset the stats.
+
+// TODO: Have a 'backup' function which will run a consistency + repair check
+// over the whole host and then, after performing repairs, will create a
+// backup. If everything seems to be in reasonable working order, the previous
+// backup will be replaced. If everything is not in reasonable order, a
+// high-prioirity error will be returned.
+
+// TODO: There needs to be some way for ferrying persistent/ongoing errors to
+// the user, like an error channel of some sort. I guess a log, but with more
+// than just debugging information. Should Sia have a global log that is used
+// to ferry important information to the user?
+
+// TODO: There's a bug where emptiestStorageFolder runs, and results error
+// being returned, meaning that the storage folder can't be used to save data.
+// But if it has low utilization, it can block the other storage folders from
+// being used, the host currently doesn't know to route around the blockage.
+// Therefore... host needs to keep some blacklist of storage folders that don't
+// seem to be responding when it's trying to figure out where to put something.
+
+// TODO: Need to test the os.Rename function when dealing with multiple disks.
 
 // TODO: Make sure all the persist is moving over. In particular, the sector
 // salt is important. Also, the sector salt needs to be documented.
-
-// TODO: Perhaps instead of doing os.Rename, it makes sense to utilize
-// 'addSector' and 'removeSector' - by doing that, you actually save rewriting
-// code.
-
-// TODO: Sector keys should be 12 bytes in the database. Actually, in general
-// sectors should have 12 byte identifiers and they should be saved on disk as
-// base64 to minimize the number of characters in the file name, to keep the
-// filesystem load as light as possible.
 
 // TODO: Storage folders must not conflict with eachother. Instead of having 32
 // byte random names, they can just have 4 byte random names and then not
@@ -24,6 +106,9 @@ package host
 // master key of 32 bytes can be kept which gets hashed against everything
 // else. Oh wait, that's not needed anymore because it's optimal-placement.
 // right.
+//
+// This todo can be replaced when there's a test which adds a bunch of storage
+// folders and makes sure that there's no conflict.
 
 // TODO: Cap the number of repeat sectors to something reasonable, like 10e3.
 
@@ -65,6 +150,9 @@ package host
 // this more subtle thing about persisting and staying in touch with the
 // consensus set.
 
+// TODO: Exported functions in the host should wrap their error messages so
+// that it's more clear which operation was causing an error.
+
 import (
 	"bytes"
 	"crypto/rand"
@@ -72,6 +160,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -85,6 +174,11 @@ var (
 	// that does not have the correct index.
 	errBadStorageFolderIndex = errors.New("no storage folder exists at that index")
 
+	// errIncompleteOffload is returned when the host is tasked with offloading
+	// sectors from a storage folder but is unable to offload the requested
+	// number - but is able to offload some of them.
+	errIncompleteOffload = errors.New("could not successfully offload specified number of sectors from storage folder")
+
 	// errInsufficientRemainingStorageForRemoval is returned if the remaining
 	// storage folders do not have enough space remaining to support being
 	// removed.
@@ -95,15 +189,9 @@ var (
 	// reduced in size.
 	errInsufficientRemainingStorageForShrink = errors.New("not enough storage remaining to support shrinking of disk")
 
-	// errInsufficientStorageForSector is returned if the host tries to add a
-	// sector when there is not enough storage remaining on the host to accept
-	// the sector.
-	//
-	// Ideally, the host will adjust pricing as the host starts to fill up, so
-	// this error should be pretty rare. Demand should drive the price up
-	// faster than the Host runs out of space, such that the host is always
-	// hovering around 95% capacity and rarely over 98% or under 90% capacity.
-	errInsufficientStorageForSector = errors.New("not enough storage remaining to accept sector")
+	// errLargeStorageFolder is returned if a new storage folder or a resized
+	// storage folder would exceed the maximum allowed size.
+	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v", maximumStorageFolderSize)
 
 	// errMaxStorageFolders indicates that the limit on the number of allowed
 	// storage folders has been reached.
@@ -122,54 +210,91 @@ var (
 	errStorageFolderNotFolder = errors.New("must use to an existing folder")
 )
 
-// storageFolder tracks the size and id of a folder that is being used to store
-// sectors.
+// storageFolder tracks a folder that is being used to store sectors. There is
+// a corresponding symlink in the host directory that points to whatever folder
+// the user has chosen for storing data (usually, a separate drive will be
+// mounted at that point).
 //
-// Each storage folder has a short UID that is used for indexing. A simple
-// counter did not seem sufficient because storage folders can be added and
-// removed at random, meaning a counter would not necessarily match the order
-// in which folders appear. The UID must be short because each entry in the
-// sector usage database points to the storage folder that holds the sector.
-// There are lots of sectors, which means a large name would blow up the size
-// of the sector usage database.
+// 'Size' is set by the user, indicating how much data can be placed into that
+// folder before the host should consider it full. Size is measured in bytes,
+// but only accounts for the actual raw data. Sia also places a nontrivial
+// amount of load on the filesystem, potentially to the tune of millions of
+// files. These files have long, cryptographic names and may take up as much as
+// a gigabyte of space in filesystem overhead, depending on how the filesystem
+// is architected. The host is programmed to gracefully handle full disks, so
+// wihle it might cause the user surprise that the host can't break past 99%
+// utilization, there should not be any issues if the user overestimates how
+// much storage is available in the folder they have offered to Sia. The host
+// will put the drive at 100% utilization, which may cause performance
+// slowdowns or other errors if non-Sia programs are also trying to use the
+// filesystem. If users are experiencing problems, having them set the storage
+// folder size to 98% of the actual drive size is probably going to fix most of
+// the issues.
 //
-// Because of the lookup, the random name, and the short name, there must be
-// logic to check that two storage folders are not generated with the same
-// name. This complicates testing, because 4 bytes is enough to make it
-// unfeasible to test, yet 1 byte does not seem reasonable for a production
-// value. Therefore, the size of the UID is different depending on the build.
+// 'SizeRemaining' is a variable that remembers how much storage is remaining
+// in the storage folder. It is managed manually, and is updated every time a
+// sector is added to or removed from the storage folder. Because there is no
+// property that inherently guarantees the correctness of 'SizeRemaining',
+// implementation must be careful to maintain consistency. TODO: Also create a
+// consistency check + repair tool to verify and restore the correctness of
+// 'SizeRemaining' in the event of divergence. Because there are only two
+// operations that involve moving sectors around (RemoveStorageFolder and
+// shrinkStorageFolder), the potential for accidental divergence is low.
+//
+// The UID of the storage folder is a small number of bytes that uniquely
+// identify the storage folder. The UID is generated randomly, but in such a
+// way as to guarantee that it will not collide with the ids of other storage
+// folders. The UID is used (via the uidString function) to determine the name
+// of the symlink which points to the folder holding the data for this storage
+// folder.
 type storageFolder struct {
 	Size          uint64
 	SizeRemaining uint64
 	UID           []byte
 }
 
-// uidString returns the string value of the storage folder's UID, 8 characters
-// of hex that represent the 4 byte UID.
+// uidString returns the string value of the storage folder's UID. This string
+// maps to the filename of the symlink that is used to point to the folder that
+// holds all of the sector data contained by the storage folder.
 func (sf *storageFolder) uidString() string {
 	if len(sf.UID) != storageFolderUIDSize {
-		build.Critical("sector UID is incorrect")
+		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
 	}
 	return hex.EncodeToString(sf.UID)
 }
 
-// emptiestStorageFolder returns the storage folder that has the lowest
-// utilization.
-func (h *Host) emptiestStorageFolder() *storageFolder {
-	if len(h.storageFolders) == 0 {
-		build.Critical("emptiest storage folder called when there are no storage folders at all")
-	}
+// emptiestStorageFolder takes a set of storage folders and returns the storage
+// folder with the lowest utilization by percentage. 'nil' is returned if there
+// are no storage folders provided with sufficient free space for a sector.
+//
+// Refusing to return a storage folder that does not have enough space prevents
+// the host from overfilling a storage folder.
+func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
+	lowestUtilization := float64(2) // Set higher than the max of 1 to protect against floating point imprecision.
+	winningIndex := -1              // Set to impossible value to prevent unintentionally returning the wrong storage folder.
+	winner := false
+	for i, sf := range sfs {
+		// Check that this storage folder has at least enough space to hold a
+		// new sector. Also perform a sanity check that the storage folder has
+		// a sane amount of storage remaining.
+		if sf.SizeRemaining < sectorSize || sf.Size < sf.SizeRemaining {
+			continue
+		}
+		winner = true // at least one storage folder has enough space for a new sector.
 
-	lowestUtilization := float64(1)
-	winningIndex := 0
-	for i, sf := range h.storageFolders {
+		// Check this storage folder against the current winning storage folder's utilization.
 		sfUtilization := float64(sf.Size-sf.SizeRemaining) / float64(sf.Size)
 		if sfUtilization < lowestUtilization {
 			lowestUtilization = sfUtilization
 			winningIndex = i
 		}
 	}
-	return h.storageFolders[winningIndex]
+	// Do not return any storage folder if none of them have enough room for a
+	// new sector.
+	if !winner {
+		return nil, -1
+	}
+	return sfs[winningIndex], winningIndex
 }
 
 // AddStorageFolder adds a storage folder to the host.
@@ -194,10 +319,12 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 
 	// Check that the storage folder being added meets the minimum requirement
 	// for the size of a storage folder.
+	if size > maximumStorageFolderSize {
+		return errLargeStorageFolder
+	}
 	if size < minimumStorageFolderSize {
 		return errSmallStorageFolder
 	}
-	// TODO: Add a check for breaking the maximum storage folder size.
 
 	// Check that the folder being linked to both exists and is a folder.
 	pathInfo, err := os.Stat(path)
@@ -250,8 +377,161 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 	return h.save()
 }
 
+// offloadStorageFolder takes sectors in a storage folder and moves them to
+// another storage folder.
+func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload uint64) error {
+	// The host is going to check every sector, using a different database tx
+	// for each sector. To be able to track progress, a starting point needs to
+	// be grabbed. This read grabs the starting point.
+	var currentSectorID []byte
+	var currentSectorBytes []byte
+	err := h.db.View(func(tx *bolt.Tx) error {
+		currentSectorID, currentSectorBytes = tx.Bucket(bucketSectorUsage).Cursor().First()
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create a list of available folders. As folders are filled up, this list
+	// will be pruned. Once all folders are full, the offload loop will quit
+	// and return with errIncompleteOffload.
+	availableFolders := make([]*storageFolder, 0, maximumStorageFolders)
+	for _, sf := range h.storageFolders {
+		if sf == offloadFolder {
+			// The offload folder is not an available folder.
+			continue
+		}
+		if sf.SizeRemaining < sectorSize {
+			// Folders that don't have enough room for a new sector are not
+			// available.
+			continue
+		}
+		availableFolders = append(availableFolders, sf)
+	}
+
+	// Go through the sectors one at a time. Sectors that are not a part of the
+	// provided storage folder are ignored. Sectors that are a part of the
+	// storage folder will be moved to a new storage folder. The loop will
+	// quick after 'dataToOffload' data has been moved from the storage folder.
+	dataOffloaded := uint64(0)
+	for currentSectorID != nil && dataOffloaded < dataToOffload && len(availableFolders) > 0 {
+		err = h.db.Update(func(tx *bolt.Tx) error {
+			// Determine whether the sector needs to be moved.
+			var usage sectorUsage
+			err = json.Unmarshal(currentSectorBytes, &usage)
+			if err != nil {
+				return err
+			}
+			if bytes.Compare(usage.StorageFolder, offloadFolder.UID) != 0 {
+				// The current sector is not in the offloading storage folder,
+				// try the next sector.
+				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
+				bsuc.Seek(currentSectorID)
+				currentSectorID, currentSectorBytes = bsuc.Next()
+				// Returning nil will advance to the next iteration of the
+				// loop.
+				return nil
+			}
+
+			// This sector is in the removal folder, and therefore needs to
+			// be moved to the next folder.
+			potentialFolders := availableFolders
+			emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
+			if emptiestFolder == nil {
+				// If 'emptiestFolder' is nil, there are no storage folders
+				// remaining that have enough storage to take on a new sector.
+				// There is no point iterating through more sectors. Returning
+				// nil will break out of this iteration, and setting available
+				// folders to 'nil' will terminate the loop.
+				availableFolders = nil
+				return nil
+			}
+
+			success := false
+			for emptiestFolder != nil {
+				oldSectorPath := filepath.Join(h.persistDir, offloadFolder.uidString(), string(currentSectorID))
+				// Try reading the sector from disk.
+				sectorData, err := ioutil.ReadFile(oldSectorPath)
+				if err != nil {
+					// TODO: Document the read error, so the user can see
+					// potential problems with the filesystem.
+
+					// Returning nil will move to the next sector. Though the
+					// current sector has failed to read, the host will keep
+					// trying future sectors in hopes of finishing the task.
+					return nil
+				}
+
+				newSectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(currentSectorID))
+				err = ioutil.WriteFile(newSectorPath, sectorData, 0700)
+				if err != nil {
+					// TODO: Document the write failure so that the user can be
+					// notified of shortcomings of his disk.
+
+					// Because the write failed, we should move on to the next
+					// storage folder and try that.
+					if emptiestIndex == len(potentialFolders)-1 {
+						potentialFolders = potentialFolders[:emptiestIndex-1]
+					} else {
+						potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
+					}
+					// Try the next folder.
+					emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
+					continue
+				}
+				err = os.Remove(oldSectorPath)
+				if err != nil {
+					// TODO: Document the delete failure so the user can be
+					// informed about disk strugglings. No need to return,
+					// however.
+				}
+
+				success = true
+				break
+			}
+			if !success {
+				// The sector failed to be written successfully, try moving to
+				// the next sector.
+				return nil
+			}
+
+			offloadFolder.SizeRemaining += sectorSize
+			emptiestFolder.SizeRemaining -= sectorSize
+			dataOffloaded += sectorSize
+
+			// Update the sector usage database to reflect the file movement.
+			// Because this cannot be done atomically, recovery tools are
+			// required to deal with outlier cases where the swap is fine but
+			// the database update is not.
+			usage.StorageFolder = emptiestFolder.UID
+			newUsageBytes, err := json.Marshal(usage)
+			if err != nil {
+				return err
+			}
+			err = tx.Bucket(bucketSectorUsage).Put(currentSectorID, newUsageBytes)
+			if err != nil {
+				return err
+			}
+
+			// Seek to the next sector.
+			bsuc := tx.Bucket(bucketSectorUsage).Cursor()
+			bsuc.Seek(currentSectorID)
+			currentSectorID, currentSectorBytes = bsuc.Next()
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if dataOffloaded < dataToOffload {
+		return errIncompleteOffload
+	}
+	return nil
+}
+
 // RemoveStorageFolder removes a storage folder from the host.
-func (h *Host) RemoveStorageFolder(removalIndex int) error {
+func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
 	// Lock the host for the duration of the remove operation - it is important
 	// that the host not be manipulated while sectors are being moved around.
 	h.mu.Lock()
@@ -264,107 +544,59 @@ func (h *Host) RemoveStorageFolder(removalIndex int) error {
 		return errHostClosed
 	}
 
-	// Check that the removal folder exists.
+	// Check that the removal folder exists, and create a shortcut to it.
 	if removalIndex >= len(h.storageFolders) || removalIndex < 0 {
 		return errBadStorageFolderIndex
 	}
-
-	// Create a shortcut variable for the storage folder being removed.
 	removalFolder := h.storageFolders[removalIndex]
 
-	// Check that there's enough room in the remaining disks to accept all of
-	// the data being moved off of this disk.
-	_, remainingStorage, err := h.capacity()
-	if err != nil {
-		return err
-	}
-	if remainingStorage < removalFolder.Size {
-		return errInsufficientRemainingStorageForRemoval
+	// Move all of the sectors in the storage folder to other storage folders.
+	usedSize := removalFolder.Size - removalFolder.SizeRemaining
+	offloadErr := h.offloadStorageFolder(removalFolder, usedSize)
+	// If 'force' is set, we want to ignore 'errIncopmleteOffload' and try to
+	// remove the storage folder anyway. For any other error, we want to halt
+	// and return the error.
+	if (offloadErr != nil && offloadErr != errIncompleteOffload) || (offloadErr != nil && !force) {
+		return offloadErr
 	}
 
-	// Create a new set of storage folders with the axed storage folder
-	// removed. This action must be performed before the sector moving loop
-	// begins, because the call to 'add sector' in the sector moving loop needs
-	// to see the updated storage folders.
+	// Remove the storage folder from the host and then save the host.
 	oldStorageFolders := h.storageFolders
 	if removalIndex == len(h.storageFolders)-1 {
 		h.storageFolders = h.storageFolders[0:removalIndex]
 	} else {
 		h.storageFolders = append(h.storageFolders[0:removalIndex], h.storageFolders[removalIndex+1:]...)
 	}
-
-	// First read is to get the size of the bucket, and the value of the
-	// first key. We are going to iterate through the bucket one key at a
-	// time and do the move operation one sector at a time. This is slow,
-	// but it means that if there is an error at any point, the host memory
-	// and the database will still be consistent.
-	var currentSectorID []byte
-	var currentSectorBytes []byte
-	err = h.db.View(func(tx *bolt.Tx) error {
-		currentSectorID, currentSectorBytes = tx.Bucket(bucketSectorUsage).Cursor().First()
-		return nil
-	})
+	err := h.save()
 	if err != nil {
-		// Need to reset the storage folders, because the removal has
-		// failed.
+		// Revert the storage folders to the old storage folders, since the
+		// save operation has failed. Cap the size of the removalFolder so that
+		// future negotiations will not try to use it to store sectors.
+		//
+		// This is done because a future save may succeed, but the host needs
+		// to be kept consistent.
 		h.storageFolders = oldStorageFolders
-		return err
-	}
+		removalFolder.Size = removalFolder.SizeRemaining
+		removalFolder.SizeRemaining = 0
 
-	// Go through the sectors one at a time until all sectors have been
-	// reached.
-	for currentSectorID != nil {
-		err = h.db.Update(func(tx *bolt.Tx) error {
-			// Determine whether the sector needs to be moved.
-			var usage sectorUsage
-			err = json.Unmarshal(currentSectorBytes, &usage)
-			if err != nil {
-				return err
-			}
-			if bytes.Compare(usage.StorageFolder, removalFolder.UID) != 0 {
-				// Move on to the next bucket.
-				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-				bsuc.Seek(currentSectorID)
-				currentSectorID, currentSectorBytes = bsuc.Next()
-				// Returning nil will advance to the next iteration of the
-				// loop.
-				return nil
-			}
-
-			// This sector is in the removal folder, and therefore needs to
-			// be moved to the next folder.
-			nextFolder := h.emptiestStorageFolder()
-			oldSectorPath := filepath.Join(h.persistDir, removalFolder.uidString(), string(currentSectorID))
-			newSectorPath := filepath.Join(h.persistDir, nextFolder.uidString(), string(currentSectorID))
-			err := os.Rename(oldSectorPath, newSectorPath)
-			if err != nil {
-				return err
-			}
-			removalFolder.SizeRemaining += sectorSize // for a later sanity check
-			nextFolder.SizeRemaining -= sectorSize
-			bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-			bsuc.Seek(currentSectorID)
-			currentSectorID, currentSectorBytes = bsuc.Next()
-			return nil
-		})
-		if err != nil {
-			// Need to reset the storage folders, because the removal has
-			// failed.
-			h.storageFolders = oldStorageFolders
-			return err
+		// Check if the offload error needs to be composed into the save error.
+		if offloadErr != nil {
+			// There was an error in the offloading process, and that needs to
+			// be composed into the return value.
+			return errors.New(offloadErr.Error() + " and " + err.Error())
 		}
-	}
-	// Sanity check - the removal folder should have no used space.
-	if removalFolder.Size != removalFolder.SizeRemaining {
-		build.Critical("storage folder removal process demonstrates divergence of storage tracking variables")
-	}
-
-	// Remove the symlink pointing to the old storage folder.
-	err = os.Remove(filepath.Join(h.persistDir, removalFolder.uidString()))
-	if err != nil {
 		return err
 	}
-	return h.save()
+
+	// Remove the symlink that points to the data folder.
+	err = os.Remove(filepath.Join(h.persistDir, removalFolder.uidString()))
+	if err != nil && offloadErr != nil {
+		// Need to compose the offload error with the remove error.
+		return errors.New(offloadErr.Error() + " and " + err.Error())
+	} else if err != nil {
+		return err
+	}
+	return offloadErr
 }
 
 // ResizeStorageFolder changes the amount of disk space that is going to be
@@ -382,15 +614,17 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 		return errHostClosed
 	}
 
-	// Complain if an invalid sector index is provided.
+	// Check that the inputs are valid.
 	if storageFolderIndex >= len(h.storageFolders) || storageFolderIndex < 0 {
 		return errBadStorageFolderIndex
 	}
 	resizeFolder := h.storageFolders[storageFolderIndex]
+	if newSize > maximumStorageFolderSize {
+		return errLargeStorageFolder
+	}
 	if newSize < minimumStorageFolderSize {
 		return errSmallStorageFolder
 	}
-	// TODO: Check the maximum size.
 	if resizeFolder.Size == newSize {
 		return errNoResize
 	}
@@ -398,7 +632,6 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 	// Sectors do not need to be moved onto or away from the resize folder if
 	// the folder is growing, or if after being shrunk the folder still has
 	// enough storage to house all of the sectors it currently tracks.
-	oldSize := resizeFolder.Size
 	resizeFolderSizeConsumed := resizeFolder.Size - resizeFolder.SizeRemaining
 	if resizeFolder.Size < newSize || resizeFolderSizeConsumed <= newSize {
 		resizeFolder.SizeRemaining = newSize - resizeFolderSizeConsumed
@@ -406,84 +639,22 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 		return h.save()
 	}
 
-	// Hitting this part of the function means that the folder is being reduced
-	// in size, and that sectors need to be moved around for the shrink to be
-	// successful.
-	//
-	// Determine how much storage needs to be reallocated, then figure out if
-	// the remaining storage folders have enough space for it.
-	_, remainingSpace, err := h.capacity()
-	if err != nil {
-		return err
+	// Calculate the number of sectors that need to be offloaded from the
+	// storage folder.
+	offloadSize := resizeFolderSizeConsumed - newSize
+	offloadErr := h.offloadStorageFolder(resizeFolder, offloadSize)
+	if offloadErr == errIncompleteOffload {
+		// Offloading has not fully succeeded, but may have partially
+		// succeeded. To prevent new sectors from being added to the storage
+		// folder, clamp the size of the storage folder to the current amount
+		// of storage in use.
+		resizeFolder.Size -= resizeFolder.SizeRemaining
+		resizeFolder.SizeRemaining = 0
+		return offloadErr
+	} else if offloadErr != nil {
+		return offloadErr
 	}
-	externalSpaceNeeded := resizeFolderSizeConsumed - newSize
-	externalSpaceAvailable := remainingSpace - resizeFolder.SizeRemaining
-	if externalSpaceAvailable < externalSpaceNeeded {
-		return errInsufficientRemainingStorageForShrink
-	}
-
-	// First read is to get the size of the bucket, and the value of the
-	// first key. We are going to iterate through the bucket one key at a
-	// time and do the move operation one sector at a time. This is slow,
-	// but it means that if there is an error at any point, the host memory
-	// and the database will still be consistent.
-	var currentSectorID []byte
-	var currentSectorBytes []byte
-	err = h.db.View(func(tx *bolt.Tx) error {
-		currentSectorID, currentSectorBytes = tx.Bucket(bucketSectorUsage).Cursor().First()
-		return nil
-	})
-	if err != nil {
-		// Need to reset the storage folders, because the removal has
-		// failed.
-		resizeFolder.Size = oldSize
-		return err
-	}
-
-	// Go through the sectors one at a time until all sectors have been
-	// reached.
-	for currentSectorID != nil && resizeFolderSizeConsumed > 0 {
-		err = h.db.Update(func(tx *bolt.Tx) error {
-			// Determine whether the sector needs to be moved.
-			var usage sectorUsage
-			err = json.Unmarshal(currentSectorBytes, &usage)
-			if err != nil {
-				return err
-			}
-			if bytes.Compare(usage.StorageFolder, resizeFolder.UID) != 0 {
-				// Move on to the next bucket.
-				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-				bsuc.Seek(currentSectorID)
-				currentSectorID, currentSectorBytes = bsuc.Next()
-				// Returning nil will advance to the next iteration of the
-				// loop.
-				return nil
-			}
-
-			// This sector is in the removal folder, and therefore needs to
-			// be moved to the next folder.
-			nextFolder := h.emptiestStorageFolder()
-			oldSectorPath := filepath.Join(h.persistDir, resizeFolder.uidString(), string(currentSectorID))
-			newSectorPath := filepath.Join(h.persistDir, nextFolder.uidString(), string(currentSectorID))
-			err := os.Rename(oldSectorPath, newSectorPath)
-			if err != nil {
-				return err
-			}
-			resizeFolder.SizeRemaining -= sectorSize
-			nextFolder.SizeRemaining += sectorSize
-			bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-			bsuc.Seek(currentSectorID)
-			currentSectorID, currentSectorBytes = bsuc.Next()
-			resizeFolderSizeConsumed -= sectorSize // The iteration will stop when enough sectors have been moved away from the folder.
-			return nil
-		})
-		if err != nil {
-			// Need to reset the storage folders, because the removal has
-			// failed.
-			resizeFolder.Size = oldSize
-			return err
-		}
-	}
-
+	resizeFolder.Size = newSize
+	resizeFolder.SizeRemaining = 0
 	return h.save()
 }

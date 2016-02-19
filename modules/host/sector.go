@@ -45,7 +45,25 @@ import (
 // The storage obligation database gets preference. Any missing sectors will be
 // treated as if they were filesystem problems.
 
+// TODO: Sanity checks that the host is not going over the allocated total
+// amount of storage at any point.
+
 var (
+	// errDiskTrouble is returned when the host is supposed to have enough
+	// storage to hold a new sector but failures that are likely related to the
+	// disk have prevented the host from successfully adding the sector.
+	errDiskTrouble = errors.New("host unable to add sector despite having the storage capacity to do so")
+
+	// errInsufficientStorageForSector is returned if the host tries to add a
+	// sector when there is not enough storage remaining on the host to accept
+	// the sector.
+	//
+	// Ideally, the host will adjust pricing as the host starts to fill up, so
+	// this error should be pretty rare. Demand should drive the price up
+	// faster than the Host runs out of space, such that the host is always
+	// hovering around 95% capacity and rarely over 98% or under 90% capacity.
+	errInsufficientStorageForSector = errors.New("not enough storage remaining to accept sector")
+
 	// errNoStorage is returned when there are no storage folders, meaning the
 	// host cannot support adding a new sector.
 	errNoStorage = errors.New("cannot add sector - there is no storage folder")
@@ -108,26 +126,36 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 		return errNoStorage
 	}
 
-	// Check that there is enough room for the sector.
-	_, remainingStorage, err := h.capacity()
-	if remainingStorage < sectorSize {
+	// Check that there is enough room for the sector in at least one storage
+	// folder.
+	enoughRoom := false
+	for _, sf := range h.storageFolders {
+		if sf.SizeRemaining >= sectorSize {
+			enoughRoom = true
+		}
+	}
+	if !enoughRoom {
 		return errInsufficientStorageForSector
 	}
 
 	// Determine which storage folder is going to receive the new sector.
-	err = h.db.Update(func(tx *bolt.Tx) error {
-		// Update the database to reflect the new sector.
-		bsu := tx.Bucket(bucketSectorUsage)
+	err := h.db.Update(func(tx *bolt.Tx) error {
+		// Check whether the sector is a virtual sector.
 		sectorKey := h.sectorID(sectorRoot[:])
+		bsu := tx.Bucket(bucketSectorUsage)
 		usageBytes := bsu.Get(sectorKey)
 		var usage sectorUsage
 		if usageBytes != nil {
-			// usageBytes is typically going to be nil, as sectors are unlikely
-			// to already be in the usage database.
+			// usageBytes != nil indicates that this sector is already a in the
+			// database, meaning it's a virtual sector. Add the expiration
+			// height to the list of expirations, and then return.
 			err := json.Unmarshal(usageBytes, &usage)
 			if err != nil {
 				return err
 			}
+			// TODO: check the limit on max number of virtual sector blowup
+			// before doing any more matings - maxVitualSecotrBlowup or
+			// something
 			usage.Expiry = append(usage.Expiry, expiryHeight)
 			usageBytes, err = json.Marshal(usage)
 			if err != nil {
@@ -135,22 +163,50 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 			}
 			return bsu.Put(h.sectorID(sectorRoot[:]), usageBytes)
 		}
-		usage.Expiry = append(usage.Expiry, expiryHeight)
 
-		sf := h.emptiestStorageFolder()
-		sectorPath := filepath.Join(h.persistDir, sf.uidString(), string(sectorKey))
-		err = ioutil.WriteFile(sectorPath, sectorData, 0700)
-		if err != nil {
-			return err
-		}
-		usage.StorageFolder = sf.UID
-		sf.SizeRemaining -= sectorSize
+		// Try adding the sector to disk. In the event of a failure, the host
+		// will try the next storage folder until there is either a success or
+		// until all options have been exhausted.
+		potentialFolders := h.storageFolders
+		emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
+		for emptiestFolder != nil {
+			sectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(sectorKey))
+			err := ioutil.WriteFile(sectorPath, sectorData, 0700)
+			if err != nil {
+				// Writing to the storage folder resulted in an error, try the
+				// next storage folder by removing the current folder from the
+				// set.
+				//
+				// TODO: Document the disk failure for user reporting purposes.
 
-		usageBytes, err = json.Marshal(usage)
-		if err != nil {
-			return err
+				// Remove the failed folder from the list of folders that can
+				// be tried.
+				if emptiestIndex == len(potentialFolders)-1 {
+					potentialFolders = potentialFolders[:emptiestIndex-1]
+				} else {
+					potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
+				}
+				// Try the next folder.
+				emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
+				continue
+			}
+
+			// Update the database to reflect the new sector.
+			usage := sectorUsage{
+				Expiry:        []types.BlockHeight{expiryHeight},
+				StorageFolder: emptiestFolder.UID,
+			}
+			emptiestFolder.SizeRemaining -= sectorSize
+			usageBytes, err = json.Marshal(usage)
+			if err != nil {
+				return err
+			}
+			return bsu.Put(sectorKey, usageBytes)
 		}
-		return bsu.Put(sectorKey, usageBytes)
+
+		// There is at least one disk that has room, but the write operation
+		// has failed.
+		return errDiskTrouble
 	})
 	if err != nil {
 		return err
@@ -173,6 +229,10 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		if err != nil {
 			return err
 		}
+
+		// If there are multiple entries in the expiry, the sector cannot be
+		// deleted from disk because there are other obligations relying on the
+		// sector.
 		if len(usage.Expiry) > 1 {
 			// Find any entry in the usage that's at the expiry height and
 			// remove it.
