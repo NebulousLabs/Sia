@@ -94,21 +94,31 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 		return err
 	}
 
+	// Check that the target of the new block is sufficient.
+	if !checkHeaderTarget(h, parent.ChildTarget) {
+		return modules.ErrBlockUnsolved
+	}
+
+	// TODO: check if the block is a non extending block.
+
 	// Check that the timestamp is not too far in the past to be acceptable.
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
 	if minTimestamp > h.Timestamp {
 		return errEarlyTimestamp
 	}
 
-	// Check that the target of the new block is sufficient.
-	if !checkHeaderTarget(h, parent.ChildTarget) {
-		return modules.ErrBlockUnsolved
+	// Check if the block is in the extreme future. We make a distinction between
+	// future and extreme future because there is an assumption that by the time
+	// the extreme future arrives, this block will no longer be a part of the
+	// longest fork because it will have been ignored by all of the miners.
+	if h.Timestamp > types.CurrentTimestamp()+types.ExtremeFutureThreshold {
+		return errExtremeFutureTimestamp
 	}
 
-	// TODO: check if the block is in the extreme or near future, and return
-	// errExtremeFutureTimestamp or errFutureTimestamp, respectively.
-
-	// TODO: check if the block is a non extending block.
+	// Check if the block is in the near future, but too far to be acceptable.
+	if h.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
+		return errFutureTimestamp
+	}
 
 	return nil
 }

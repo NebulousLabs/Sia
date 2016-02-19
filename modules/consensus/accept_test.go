@@ -408,7 +408,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			dosBlocks:              make(map[types.BlockID]struct{}),
 			blockMapPairs:          serializedParentBlockMap,
 			earliestValidTimestamp: mockValidBlock.Timestamp + 1,
-			marshaler:              parentBlockUnmarshaler,
+			marshaler:              parentBlockHighTargetUnmarshaler,
 			errWant:                errEarlyTimestamp,
 			msg:                    "validateHeader should fail when the header's timestamp is too early",
 		},
@@ -736,6 +736,10 @@ func TestFutureTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
+	if err != errFutureTimestamp {
+		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
+	}
 	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errFutureTimestamp {
 		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
@@ -757,6 +761,35 @@ func TestFutureTimestampHandling(t *testing.T) {
 		if err == errNilItem {
 			t.Error("waiting double long did not help.")
 		}
+	}
+}
+
+// TestExtremeFutureTimestampHandling checks that blocks in the extreme future
+// are rejected.
+func TestExtremeFutureTimestampHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestFutureTimestampHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Submit a block with a timestamp in the extreme future.
+	block, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
+	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
+	if err != errExtremeFutureTimestamp {
+		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
+	}
+	err = cst.cs.AcceptBlock(solvedBlock)
+	if err != errExtremeFutureTimestamp {
+		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
 	}
 }
 
