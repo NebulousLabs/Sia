@@ -1013,6 +1013,9 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 	}
 	select {
 	case <-mg.broadcastCalled:
+		// Broadcast is called twice, once to broadcast blocks to peers <= v0.5.1
+		// and once to broadcast block headers to peers > v0.5.1.
+		<-mg.broadcastCalled
 	case <-time.After(10 * time.Millisecond):
 		t.Error("expected AcceptBlock to broadcast a valid block")
 	}

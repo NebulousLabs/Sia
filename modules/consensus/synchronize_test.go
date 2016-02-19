@@ -282,11 +282,11 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 		expectedNumBroadcasts int
 	}{
 		{0, 0},
-		{1, 1},
-		{2, 1},
-		{int(MaxCatchUpBlocks), 1},
-		{2 * int(MaxCatchUpBlocks), 1},
-		{2*int(MaxCatchUpBlocks) + 1, 1},
+		{1, 2},
+		{2, 2},
+		{int(MaxCatchUpBlocks), 2},
+		{2 * int(MaxCatchUpBlocks), 2},
+		{2*int(MaxCatchUpBlocks) + 1, 2},
 	}
 	for _, test := range tests {
 		mg.mu.Lock()
@@ -1128,6 +1128,9 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	cst1.cs.gateway.Broadcast("RelayHeader", validBlock.Header(), cst1.cs.gateway.Peers())
 	select {
 	case <-mg.broadcastCalled:
+		// Broadcast is called twice, once to broadcast blocks to peers <= v0.5.1
+		// and once to broadcast block headers to peers > v0.5.1.
+		<-mg.broadcastCalled
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}

@@ -270,9 +270,17 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	if err != nil {
 		return err
 	}
-	// Broadcast the new block to all peers.
-	peers := cs.gateway.Peers()
-	go cs.gateway.Broadcast("RelayBlock", b, peers)
+	// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
+	var relayBlockPeers, relayHeaderPeers []modules.Peer
+	for _, p := range cs.gateway.Peers() {
+		if build.VersionCmp(p.Version, "0.5.1") <= 0 {
+			relayBlockPeers = append(relayBlockPeers, p)
+		} else {
+			relayHeaderPeers = append(relayHeaderPeers, p)
+		}
+	}
+	go cs.gateway.Broadcast("RelayBlock", b, relayBlockPeers)
+	go cs.gateway.Broadcast("RelayHeader", b.Header(), relayHeaderPeers)
 	return nil
 }
 
