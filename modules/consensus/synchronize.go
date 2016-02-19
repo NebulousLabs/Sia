@@ -264,6 +264,36 @@ func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 	return nil
 }
 
+// relayHeader is an RPC that accepts a block header from a peer.
+func (cs *ConsensusSet) relayHeader(conn modules.PeerConn) error {
+	// Decode the block header from the connection.
+	var h types.BlockHeader
+	err := encoding.ReadObject(conn, &h, types.BlockHeaderSize)
+	if err != nil {
+		return err
+	}
+
+	// Submit the header to the consensus set.
+	err = cs.managedAcceptHeader(h)
+	switch err {
+	case errOrphan:
+		// If the header is an orphan, try to find the parents.
+		// TODO: log error returned if non-nill?
+		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+	case errFutureTimestamp:
+		// Ignore errFutureTimestamp so that the block is downloaded and passed to
+		// managedAcceptHeader, which will spawn a go thread that waits until the
+		// timestamp would be valid before trying to accept it again.
+		fallthrough
+	case nil:
+		// If the header is valid and extends the heaviest chain, fetch, accept it,
+		// and broadcast it.
+		// TODO: log error returned if non-nill?
+		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "Send1Blk", cs.threadedReceiveBlock(h.ID()))
+	}
+	return err
+}
+
 // send1Blk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) send1Blk(conn modules.PeerConn) error {
 	// Decode the block id from the conneciton.

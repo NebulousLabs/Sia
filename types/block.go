@@ -13,6 +13,10 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
+const (
+	BlockHeaderSize = 80 // 32 (ParentID) + 8 (Nonce) + 8 (Timestamp) + 32 (MerkleRoot)
+)
+
 type (
 	// A Block is a summary of changes to the state that have occurred since the
 	// previous block. Blocks reference the ID of the previous block (their

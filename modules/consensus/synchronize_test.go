@@ -970,3 +970,165 @@ func TestIntegrationSend1BlkRPC(t *testing.T) {
 		t.Errorf("cst1 should not accept an orphan block: expected error '%v', got '%v'", errOrphan, err)
 	}
 }
+
+type mockGatewayCallsRPC struct {
+	modules.Gateway
+	rpcCalled chan string
+}
+
+func (g *mockGatewayCallsRPC) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	g.rpcCalled <- name
+	return nil
+}
+
+// TestRelayHeader tests that relayHeader requests the corresponding blocks to
+// valid headers with known parents, or requests the block history to orphan
+// headers.
+func TestRelayHeader(t *testing.T) {
+	cst, err := blankConsensusSetTester("TestRelayHeader")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	mg := &mockGatewayCallsRPC{
+		rpcCalled: make(chan string),
+	}
+	cst.cs.gateway = mg
+
+	p1, p2 := net.Pipe()
+
+	// Valid block that relayHeader should accept.
+	validBlock, err := cst.miner.FindBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A block in the near future that relayHeader return an error for, but still
+	// request the corresponding block.
+	block, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
+	futureBlock, _ := cst.miner.SolveBlock(block, target)
+
+	tests := []struct {
+		header  types.BlockHeader
+		errWant error
+		errMSG  string
+		rpcWant string
+		rpcMSG  string
+	}{
+		// Test that relayHeader rejects known blocks.
+		{
+			header:  types.GenesisBlock.Header(),
+			errWant: modules.ErrBlockKnown,
+			errMSG:  "relayHeader should reject known blocks",
+		},
+		// Test that relayHeader rejects orphan blocks.
+		{
+			header:  types.BlockHeader{},
+			errWant: errOrphan,
+			errMSG:  "relayHeader should reject orphan blocks",
+			rpcWant: "SendBlocks",
+			rpcMSG:  "relayHeader should request blocks when the relayed header is an orphan",
+		},
+		// Test that relayHeader accepts a valid header that extends the longest chain.
+		{
+			header:  validBlock.Header(),
+			errWant: nil,
+			errMSG:  "relayHeader should accept a valid block",
+			rpcWant: "Send1Blk",
+			rpcMSG:  "relayHeader should request the block of a valid header",
+		},
+		// Test that relayHeader requests a future, but otherwise valid block.
+		{
+			header:  futureBlock.Header(),
+			errWant: errFutureTimestamp,
+			errMSG:  "relayHeader should return an error for a future block",
+			rpcWant: "Send1Blk",
+			rpcMSG:  "relayHeader should request a future, but otherwise valid block",
+		},
+	}
+	for _, tt := range tests {
+		go func() {
+			encoding.WriteObject(p1, tt.header)
+		}()
+		err = cst.cs.relayHeader(p2)
+		if err != tt.errWant {
+			t.Errorf("%s: expected '%v', got '%v'", tt.errMSG, tt.errWant, err)
+		}
+		if tt.rpcWant == "" {
+			select {
+			case rpc := <-mg.rpcCalled:
+				t.Errorf("no RPC call expected, but '%v' was called", rpc)
+			case <-time.After(10 * time.Millisecond):
+			}
+		} else {
+			select {
+			case rpc := <-mg.rpcCalled:
+				if rpc != tt.rpcWant {
+					t.Errorf("%s: expected '%v', got '%v'", tt.rpcMSG, tt.rpcWant, rpc)
+				}
+			case <-time.After(10 * time.Millisecond):
+				t.Errorf("%s: expected '%v', but no RPC was called", tt.rpcMSG, tt.rpcWant)
+			}
+		}
+	}
+}
+
+// TestIntegrationBroadcastRelayHeader checks that broadcasting RelayHeader
+// causes peers to also broadcast the header (if the block is valid).
+func TestIntegrationBroadcastRelayHeader(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Setup consensus sets.
+	cst1, err := blankConsensusSetTester("TestIntegrationBroadcastRelayHeader1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst1.Close()
+	cst2, err := blankConsensusSetTester("TestIntegrationBroadcastRelayHeader2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst2.Close()
+	// Setup mock gateway.
+	mg := &mockGatewayDoesBroadcast{
+		Gateway:         cst2.cs.gateway,
+		broadcastCalled: make(chan struct{}),
+	}
+	cst2.cs.gateway = mg
+	err = cst1.cs.gateway.Connect(cst2.cs.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that broadcasting an invalid block header over RelayHeader on cst1.cs
+	// does not result in cst2.cs.gateway receiving a broadcast.
+	cst1.cs.gateway.Broadcast("RelayHeader", types.BlockHeader{}, cst1.cs.gateway.Peers())
+	select {
+	case <-mg.broadcastCalled:
+		t.Fatal("RelayHeader broadcasted an invalid block header")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// Test that broadcasting a valid block header over RelayHeader on cst1.cs
+	// causes cst2.cs.gateway to receive a broadcast.
+	validBlock, err := cst1.miner.FindBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst1.cs.managedAcceptBlock(validBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst1.cs.gateway.Broadcast("RelayHeader", validBlock.Header(), cst1.cs.gateway.Peers())
+	select {
+	case <-mg.broadcastCalled:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("RelayHeader didn't broadcast a valid block header")
+	}
+}
