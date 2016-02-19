@@ -45,9 +45,6 @@ type hostContractor interface {
 	// Uploader creates an uploader from the specified contract, allowing it
 	// to be modified.
 	Uploader(contractor.Contract) (contractor.Uploader, error)
-
-	// Renew renews a file contract, returning the new contract ID.
-	Renew(id types.FileContractID, newHeight types.BlockHeight) (types.FileContractID, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.

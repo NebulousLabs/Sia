@@ -271,13 +271,6 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 		}
 		r.repairChunks(f, handle, offlineChunks, duration)
 	}
-
-	// renew expiring contracts
-	if meta.Renew && len(expContracts) != 0 {
-		r.log.Printf("renewing %v contracts of %v", len(expContracts), f.name)
-		newHeight := height + defaultDuration
-		r.renewContracts(f, expContracts, newHeight)
-	}
 }
 
 // repairChunks uploads missing chunks of f to new hosts.
@@ -314,36 +307,6 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 			// If saving failed for this chunk, it will probably fail for the
 			// next chunk as well. Better to try again on the next cycle.
 			r.log.Printf("failed to save repaired file %v: %v", f.name, err)
-			return
-		}
-	}
-}
-
-// renewContracts renews each of the supplied contracts, replacing their entry
-// in f with the new contract.
-func (r *Renter) renewContracts(f *file, contracts []fileContract, newHeight types.BlockHeight) {
-	for _, c := range contracts {
-		newID, err := r.hostContractor.Renew(c.ID, newHeight)
-		if err != nil {
-			r.log.Printf("failed to renew contract %v: %v", c.ID, err)
-			continue
-		}
-		f.mu.Lock()
-		f.contracts[newID] = fileContract{
-			ID:          newID,
-			IP:          c.IP,
-			Pieces:      c.Pieces,
-			WindowStart: newHeight,
-		}
-		// need to delete the old contract; otherwise f.expiringContracts
-		// will continue to return it
-		delete(f.contracts, c.ID)
-
-		// save the updated contract
-		err = r.saveFile(f)
-		f.mu.Unlock()
-		if err != nil {
-			r.log.Printf("failed to save renewed file %v: %v", f.name, err)
 			return
 		}
 	}

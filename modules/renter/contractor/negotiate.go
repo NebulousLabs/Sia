@@ -151,7 +151,7 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 
 // newContract negotiates an initial file contract with the specified host
 // and returns a Contract. The contract is also saved by the HostDB.
-func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, duration types.BlockHeight) (Contract, error) {
+func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
 	if host.Price.Cmp(maxPrice) > 0 {
 		return Contract{}, errTooExpensive
@@ -168,22 +168,23 @@ func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, dur
 		c.cachedAddress = uc.UnlockHash()
 	}
 	ourAddress := c.cachedAddress
+	height := c.blockHeight
 	c.mu.Unlock()
+	if endHeight <= height {
+		return Contract{}, errors.New("contract cannot end in the past")
+	}
+	duration := endHeight - height
 
 	// create file contract
 	renterCost := host.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
 
-	c.mu.RLock()
-	height := c.blockHeight
-	c.mu.RUnlock()
-
 	fc := types.FileContract{
 		FileSize:       0,
 		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
-		WindowStart:    height + duration,
-		WindowEnd:      height + duration + host.WindowSize,
+		WindowStart:    endHeight,
+		WindowEnd:      endHeight + host.WindowSize,
 		Payout:         payout,
 		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
 		RevisionNumber: 0,
@@ -273,9 +274,12 @@ func (c *Contractor) formContracts(a, old modules.Allowance) error {
 	filesize := numSectors * SectorSize
 
 	// Form contracts with each host.
+	c.mu.RLock()
+	endHeight := c.blockHeight + a.Period
+	c.mu.RUnlock()
 	var numContracts int
 	for _, h := range hosts {
-		_, err := c.newContract(h, filesize, a.Period)
+		_, err := c.newContract(h, filesize, endHeight)
 		if err != nil {
 			// TODO: is there a better way to handle failure here? Should we
 			// prefer an all-or-nothing approach? We can't pick new hosts to
@@ -287,5 +291,8 @@ func (c *Contractor) formContracts(a, old modules.Allowance) error {
 			break
 		}
 	}
+	c.mu.Lock()
+	c.renewHeight = endHeight
+	c.mu.Unlock()
 	return nil
 }

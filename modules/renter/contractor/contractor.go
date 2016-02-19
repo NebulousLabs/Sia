@@ -41,6 +41,7 @@ type Contractor struct {
 	wallet  wallet
 
 	blockHeight   types.BlockHeight
+	renewHeight   types.BlockHeight
 	contracts     map[types.FileContractID]Contract
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 	allowance     modules.Allowance
