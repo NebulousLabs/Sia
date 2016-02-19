@@ -187,6 +187,7 @@ func TestBroadcast(t *testing.T) {
 	var g2Payload, g3Payload string
 	g2DoneChan := make(chan struct{})
 	g3DoneChan := make(chan struct{})
+	bothDoneChan := make(chan struct{})
 
 	g2.RegisterRPC("Recv", func(conn modules.PeerConn) error {
 		encoding.ReadObject(conn, &g2Payload, 100)
@@ -201,8 +202,17 @@ func TestBroadcast(t *testing.T) {
 
 	// Test that calling broadcast with nil peers broadcasts to all peers.
 	g1.Broadcast("Recv", "foo", nil)
-	<-g2DoneChan
-	<-g3DoneChan
+	go func() {
+		<-g2DoneChan
+		<-g3DoneChan
+		bothDoneChan <- struct{}{}
+	}()
+	select {
+	case <-bothDoneChan:
+		// Both g2 and g3 should receive the broadcast.
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("broadcasting with nil peers should broadcast to all peers")
+	}
 	if g2Payload != "foo" || g3Payload != "foo" {
 		t.Fatal("broadcast failed:", g2Payload, g3Payload)
 	}
@@ -210,8 +220,17 @@ func TestBroadcast(t *testing.T) {
 	// Test that broadcasting to all peers in g1.Peers() broadcasts to all peers.
 	peers := g1.Peers()
 	g1.Broadcast("Recv", "bar", peers)
-	<-g2DoneChan
-	<-g3DoneChan
+	go func() {
+		<-g2DoneChan
+		<-g3DoneChan
+		bothDoneChan <- struct{}{}
+	}()
+	select {
+	case <-bothDoneChan:
+		// Both g2 and g3 should receive the broadcast.
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("broadcasting to gateway.Peers() should broadcast to all peers")
+	}
 	if g2Payload != "bar" || g3Payload != "bar" {
 		t.Fatal("broadcast failed:", g2Payload, g3Payload)
 	}
@@ -225,11 +244,13 @@ func TestBroadcast(t *testing.T) {
 		}
 	}
 	g1.Broadcast("Recv", "baz", peers)
-	<-g2DoneChan
 	select {
+	case <-g2DoneChan:
+		// Only g2 should receive a broadcast.
 	case <-g3DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")
 	case <-time.After(10 * time.Millisecond):
+		t.Fatal("called broadcast with g2 in peers list, but g2 didn't receive it.")
 	}
 	if g2Payload != "baz" {
 		t.Fatal("broadcast failed:", g2Payload)
@@ -244,11 +265,13 @@ func TestBroadcast(t *testing.T) {
 		}
 	}
 	g1.Broadcast("Recv", "qux", peers)
-	<-g3DoneChan
 	select {
 	case <-g2DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-g3DoneChan:
+		// Only g3 should receive a broadcast.
 	case <-time.After(10 * time.Millisecond):
+		t.Fatal("called broadcast with g3 in peers list, but g3 didn't receive it.")
 	}
 	if g3Payload != "qux" {
 		t.Fatal("broadcast failed:", g3Payload)
@@ -264,5 +287,6 @@ func TestBroadcast(t *testing.T) {
 	case <-g3DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")
 	case <-time.After(10 * time.Millisecond):
+		// Neither peer should receive a broadcast.
 	}
 }
