@@ -198,7 +198,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
-			return errors.New("inconsistent database")
+			return errInconsistentSet
 		}
 
 		// Do some relatively inexpensive checks to validate the header and block.
@@ -264,4 +264,26 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	peers := cs.gateway.Peers()
 	go cs.gateway.Broadcast("RelayBlock", b, peers)
 	return nil
+}
+
+// managedAcceptHeader will validate a block header and see if it extends the
+// heaviest chain. If a header is valid and would extend the heaviest chain,
+// nil is returned. managedAcceptHeader does not fetch the corresponding block
+// and therefore can't accept the block itself. Just as managedAcceptBlock does
+// not broadcast the block, managedAcceptHeader does not broadcast the block
+// header.
+func (cs *ConsensusSet) managedAcceptHeader(h types.BlockHeader) error {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	// Start verification inside of a bolt View tx.
+	err := cs.db.View(func(tx *bolt.Tx) error {
+		// Do not accept a header if the database is inconsistent.
+		if inconsistencyDetected(tx) {
+			return errInconsistentSet
+		}
+
+		// Do some relatively inexpensive checks to validate the header
+		return cs.validateHeader(boltTxWrapper{tx}, h)
+	})
+	return err
 }

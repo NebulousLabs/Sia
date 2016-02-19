@@ -504,6 +504,10 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 	if err != errDoSBlock {
 		t.Fatalf("expected %v, got %v", errDoSBlock, err)
 	}
+	err = cst.cs.managedAcceptHeader(dosBlock.Header())
+	if err != errDoSBlock {
+		t.Fatalf("expected %v, got %v", errDoSBlock, err)
+	}
 }
 
 // TestBlockKnownHandling submits known blocks to the consensus set.
@@ -540,8 +544,12 @@ func TestBlockKnownHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Submit all the blocks again, looking for a 'stale block' error.
+	// Submit all the blocks and headers again, looking for a 'stale block' error.
 	err = cst.cs.AcceptBlock(block1)
+	if err != modules.ErrBlockKnown {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	}
+	err = cst.cs.managedAcceptHeader(block1.Header())
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -549,12 +557,20 @@ func TestBlockKnownHandling(t *testing.T) {
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
+	err = cst.cs.managedAcceptHeader(block2.Header())
+	if err != modules.ErrBlockKnown {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	}
 	err = cst.cs.AcceptBlock(staleBlock)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
+	err = cst.cs.managedAcceptHeader(staleBlock.Header())
+	if err != modules.ErrBlockKnown {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	}
 
-	// Try submitting the genesis block.
+	// Try submitting the genesis block and its header.
 	id, err := cst.cs.dbGetPath(0)
 	if err != nil {
 		t.Fatal(err)
@@ -564,6 +580,10 @@ func TestBlockKnownHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cst.cs.AcceptBlock(genesisBlock.Block)
+	if err != modules.ErrBlockKnown {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
+	}
+	err = cst.cs.managedAcceptHeader(genesisBlock.Block.Header())
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -589,6 +609,16 @@ func TestOrphanHandling(t *testing.T) {
 		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
 	err = cst.cs.AcceptBlock(orphan)
+	if err != errOrphan {
+		t.Fatalf("expected %v, got %v", errOrphan, err)
+	}
+	// Try submitting an orphan block's header.
+	// TODO: why is the test above duplicated?
+	err = cst.cs.managedAcceptHeader(orphan.Header())
+	if err != errOrphan {
+		t.Fatalf("expected %v, got %v", errOrphan, err)
+	}
+	err = cst.cs.managedAcceptHeader(orphan.Header())
 	if err != errOrphan {
 		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
@@ -620,6 +650,10 @@ func TestMissedTarget(t *testing.T) {
 	if err != modules.ErrBlockUnsolved {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
 	}
+	err = cst.cs.managedAcceptHeader(block.Header())
+	if err != modules.ErrBlockUnsolved {
+		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
+	}
 }
 
 // TestMinerPayoutHandling checks that blocks with incorrect payouts are
@@ -646,6 +680,39 @@ func TestMinerPayoutHandling(t *testing.T) {
 	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errBadMinerPayouts {
 		t.Fatalf("expected %v, got %v", errBadMinerPayouts, err)
+	}
+}
+
+// TestEarlyTimestampHandling checks that blocks too far in the past are
+// rejected.
+func TestEarlyTimestampHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestEarlyTimestampHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+	minTimestamp := types.CurrentTimestamp()
+	cst.cs.blockRuleHelper = mockBlockRuleHelper{
+		minTimestamp: minTimestamp,
+	}
+
+	// Submit a block with a timestamp in the past, before minTimestamp.
+	block, target, err := cst.miner.BlockForWork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block.Timestamp = minTimestamp - 1
+	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	err = cst.cs.AcceptBlock(solvedBlock)
+	if err != errEarlyTimestamp {
+		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
+	}
+	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
+	if err != errEarlyTimestamp {
+		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
 	}
 }
 
