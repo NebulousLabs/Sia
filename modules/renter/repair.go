@@ -188,6 +188,11 @@ func (r *Renter) threadedRepairLoop() {
 			continue
 		}
 
+		if len(r.hostContractor.Contracts()) == 0 {
+			// nothing to revise
+			continue
+		}
+
 		// make copy of repair set under lock
 		repairing := make(map[string]trackedFile)
 		id := r.mu.RLock()

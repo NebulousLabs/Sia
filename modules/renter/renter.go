@@ -30,6 +30,15 @@ type hostDB interface {
 // A hostContractor negotiates, revises, renews, and provides access to file
 // contracts.
 type hostContractor interface {
+	// SetAllowance sets the amount of money the contractor is allowed to
+	// spend on contracts over a given time period, divided among the number
+	// of hosts specified. Note that contractor can start forming contracts as
+	// soon as SetAllowance is called; that is, it may block.
+	SetAllowance(modules.Allowance) error
+
+	// Allowance returns the current allowance
+	Allowance() modules.Allowance
+
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []contractor.Contract
 
@@ -113,6 +122,10 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 // hostdb passthroughs
 func (r *Renter) ActiveHosts() []modules.HostSettings { return r.hostDB.ActiveHosts() }
 func (r *Renter) AllHosts() []modules.HostSettings    { return r.hostDB.AllHosts() }
+
+// contractor passthroughs
+func (r *Renter) Allowance() modules.Allowance           { return r.hostContractor.Allowance() }
+func (r *Renter) SetAllowance(a modules.Allowance) error { return r.hostContractor.SetAllowance(a) }
 
 // enforce that Renter satisfies the modules.Renter interface
 var _ modules.Renter = (*Renter)(nil)

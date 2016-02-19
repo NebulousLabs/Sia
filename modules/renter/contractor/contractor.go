@@ -43,8 +43,36 @@ type Contractor struct {
 	blockHeight   types.BlockHeight
 	contracts     map[types.FileContractID]Contract
 	cachedAddress types.UnlockHash // to prevent excessive address creation
+	allowance     modules.Allowance
 
 	mu sync.RWMutex
+}
+
+// Allowance returns the current allowance.
+func (c *Contractor) Allowance() modules.Allowance {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.allowance
+}
+
+// SetAllowance sets the amount of money the Contractor is allowed to spend on
+// contracts over a given time period, divided among the number of hosts
+// specified. Note that Contractor can start forming contracts as soon as
+// SetAllowance is called; that is, it may block.
+func (c *Contractor) SetAllowance(a modules.Allowance) error {
+	c.mu.RLock()
+	old := c.allowance
+	c.mu.RUnlock()
+	err := c.formContracts(a, old)
+	if err != nil {
+		return err
+	}
+	// set only if contract formation succeeded
+	// TODO: are the circumstances where we'd want to set anyway?
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.allowance = a
+	return nil
 }
 
 // Contracts returns the contracts formed by the contractor.

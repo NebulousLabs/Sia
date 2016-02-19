@@ -67,9 +67,20 @@ type DownloadInfo struct {
 	StartTime   time.Time `json:"starttime"`
 }
 
+// An Allowance dictates how much the Renter is allowed to spend in a given
+// period.
+type Allowance struct {
+	Funds  types.Currency
+	Period types.BlockHeight
+	Hosts  int
+}
+
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
+	// Allowance returns the current allowance.
+	Allowance() Allowance
+
 	// ActiveHosts returns the list of hosts that are actively being selected
 	// from.
 	ActiveHosts() []HostSettings
@@ -99,6 +110,12 @@ type Renter interface {
 
 	// Rename changes the path of a file.
 	RenameFile(path, newPath string) error
+
+	// SetAllowance sets the amount of money the Renter is allowed to spend on
+	// contracts over a given time period, divided among the number of hosts
+	// specified. Note that Renter can start forming contracts as soon as
+	// SetAllowance is called; that is, it may block.
+	SetAllowance(Allowance) error
 
 	// ShareFiles creates a '.sia' file that can be shared with others.
 	ShareFiles(paths []string, shareDest string) error

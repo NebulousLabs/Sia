@@ -230,3 +230,62 @@ func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, dur
 
 	return contract, nil
 }
+
+// formContracts determines whether to form new contracts given the old and
+// new allowances. If new contracts should be formed, formContracts forms
+// them. As such, formContracts should always be expected to block.
+func (c *Contractor) formContracts(a, old modules.Allowance) error {
+	// Get hosts.
+	hosts := c.hdb.RandomHosts(2*a.Hosts, nil)
+	if len(hosts) < a.Hosts {
+		return errors.New("not enough hosts")
+	}
+	// Calculate average host price
+	var sum types.Currency
+	for _, h := range hosts {
+		sum = sum.Add(h.Price)
+	}
+	avgPrice := sum.Div(types.NewCurrency64(uint64(len(hosts))))
+
+	// Check that allowance is sufficient to store at least one sector per
+	// host for the specified duration.
+	costPerSector := avgPrice.
+		Mul(types.NewCurrency64(uint64(a.Hosts))).
+		Mul(types.NewCurrency64(SectorSize)).
+		Mul(types.NewCurrency64(uint64(a.Period)))
+	if a.Funds.Cmp(costPerSector) < 0 {
+		return errors.New("insufficient funds")
+	}
+
+	// Only take action if the amount of funds has increased. Otherwise, we
+	// should just delay until the next renew cycle.
+	if a.Funds.Cmp(old.Funds) <= 0 {
+		return nil
+	}
+
+	// Calculate the filesize of the contracts by using the average host price
+	// and rounding down to the nearest sector.
+	numSectors, err := a.Funds.Div(costPerSector).Uint64()
+	if err != nil {
+		// if there was an overflow, something is definitely wrong
+		return errors.New("allowance resulted in unexpectedly large contract size")
+	}
+	filesize := numSectors * SectorSize
+
+	// Form contracts with each host.
+	var numContracts int
+	for _, h := range hosts {
+		_, err := c.newContract(h, filesize, a.Period)
+		if err != nil {
+			// TODO: is there a better way to handle failure here? Should we
+			// prefer an all-or-nothing approach? We can't pick new hosts to
+			// negotiate with because they'll probably be more expensive than
+			// we can afford.
+			c.log.Println("WARN: failed to negotiate contract:", h.NetAddress, err)
+		}
+		if numContracts++; numContracts >= a.Hosts {
+			break
+		}
+	}
+	return nil
+}
