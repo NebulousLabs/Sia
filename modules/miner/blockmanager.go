@@ -142,14 +142,10 @@ func (m *Miner) managedSubmitBlock(b types.Block) error {
 	var uc types.UnlockConditions
 	uc, err = m.wallet.NextAddress()
 	if err != nil {
-		err2 := m.save()
-		if err2 != nil {
-			err = errors.New(err.Error() + " -and- " + err2.Error())
-		}
 		return err
 	}
 	m.persist.Address = uc.UnlockHash()
-	return m.save()
+	return nil
 }
 
 // SubmitHeader accepts a block header.
