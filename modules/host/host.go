@@ -18,6 +18,13 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
+// TODO: The host is dependent on having up-to-date information about its
+// storage folders, and therefore serious hosts should have 2 or 3 different
+// disks on which they place all of the metadata. This allows for failures of
+// one of the core disks without putting the host at risk of losing data. The
+// management structures for the host should always be less than 10GB of data,
+// but may indeed reach up that high.
+
 const (
 	// defaultMaxDuration defines the maximum number of blocks into the future
 	// that the host will accept for the duration of an incoming file contract

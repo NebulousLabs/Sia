@@ -88,17 +88,84 @@ type (
 		UploadCalls       uint64 `json:"uploadcalls"`
 	}
 
+	// StorageFolderMetadata contians metadata about a storage folder that is
+	// tracked by the storage folder manager.
+	StorageFolderMetadata struct {
+		CapacityRemaining uint64
+		Path string
+		TotalCapacity uint64
+
+		// Successful and unsuccessful operations report the number of
+		// successful and unsuccessful disk operations that the storage manager
+		// has completed on the storage folder. A large number of unsuccessful
+		// operations can indicate that the space allocated for the storage
+		// folder is larger than the amount of actual free space on the disk.
+		// Things like filesystem overhead can reduce the amount of actual
+		// storage available on disk, but should ultimately be less than 1% of
+		// the total advertised capacity of a disk. A large number of
+		// unsuccessful operations can also indicate that the disk is failing
+		// and that it needs to be replaced.
+		SuccessfulOperations uint64
+		UnsuccessfulOperations uint64
+	}
+
+	// StorageFolderManager tracks and manipulates storage folders. Storage
+	// folders are used by the host to store the data that they contractually
+	// agree to manage.
+	StorageFolderManager interface {
+		// AddStorageFolder adds a storage folder to the host. The host may not
+		// check that there is enough space available on-disk to support as
+		// much storage as requested, though the host should gracefully handle
+		// running out of storage unexpectedly.
+		AddStorageFolder(path string, size uint64) error
+
+		// ForceRemoveStorageFolder removes a storage folder. The host will try
+		// to save the data on the storage folder by moving it to another
+		// storage folder, but if there are errors (such as not enough space)
+		// the host will forcibly remove the storage folder, discarding the
+		// data. This means that the host will be unable to provide storage
+		// proofs on the data, and is going to incur penalties.
+		ForceRemoveStorageFolder(index int) error
+
+		// ForceResizeStorageFolder resizes a storage folder. The host many not
+		// check that there is enough space available on-disk to support a size
+		// increase, but should gracefully handle running out of storage
+		// unexpectedly. If the size of the folder is being decreased, the host
+		// will try to move the storage in the folder to other storage folders.
+		// If there is no space in the other folders, the host will start
+		// deleting data. This means that the host will have lost the data and
+		// will suffer the penalties of losing data.
+		ForceResizeStorageFolder(index int, newSize uint64) error
+
+		// RemoveStorageFolder will remove a storage folder from the host. All
+		// storage on the folder will be moved to other storage folders,
+		// meaning that no data will be lost. If the host is unable to save
+		// data, an error will be returned and the operation will be stopped.
+		RemoveStorageFolder(index int) error
+
+		// ResetStorageFolderHealth will reset the health statistics on a
+		// storage folder.
+		ResetStorageFolderHealth(index int) error
+
+		// ResizeStorageFolder will grow or shrink a storage folder in the
+		// host. The host may not check that there is enough space on-disk to
+		// support growing the storage folder, but should gracefully handle
+		// running out of space unexpectedly. When shrinking a storage folder,
+		// any data in the folder that needs to be moved will be placed into
+		// other storage folders, meaning that no data will be lost. If the
+		// host is unable to migrate the data, an error will be returned and
+		// the operation will be stopped.
+		ResizeStorageFolder(index int, newSize uint64) error
+
+		// StorageFolders will return a list of storage folders tracked by the
+		// host.
+		StorageFolders() []StorageFolderMetadata
+	}
+
 	// Host can take storage from disk and offer it to the network, managing things
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// AddStorageFolder adds a storage folder to the host. The host will
-		// allocate the input volume of storage for the storage folder, and
-		// will fill it up gradually as file contracts come in. The host will
-		// keep files balanced between the storage folders according to the
-		// total amount of storage available to the storage folder.
-		AddStorageFolder(path string, size uint64) error
-
 		// Announce submits a host announcement to the blockchain, returning an
 		// error if its external IP address is unknown. After announcing, the
 		// host will begin accepting contracts.
@@ -108,11 +175,6 @@ type (
 		// specify the address announced. Like Announce, this will cause the
 		// host to start accepting contracts.
 		AnnounceAddress(NetAddress) error
-
-		// Capacity returns the amount of storage still available on the
-		// machine. The amount can be negative if the total capacity was
-		// reduced to below the active capacity.
-		Capacity() (total uint64, remaining uint64, err error)
 
 		// Contracts returns the number of unresolved file contracts that the
 		// host is responsible for.
@@ -146,6 +208,8 @@ type (
 
 		// Close saves the state of the host and stops its listener process.
 		Close() error
+
+		StorageFolderManager
 	}
 )
 
