@@ -22,21 +22,6 @@ const (
 )
 
 var (
-	// RPCSettings is the specifier for requesting settings from the host.
-	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
-
-	// RPCUpload is the specifier for initiating an upload with the host.
-	RPCUpload = types.Specifier{'U', 'p', 'l', 'o', 'a', 'd'}
-
-	// RPCRenew is the specifier to renewing an existing contract.
-	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w'}
-
-	// RPCRevise is the specifier for revising an existing file contract.
-	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e'}
-
-	// RPCDownload is the specifier for downloading a file from a host.
-	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
-
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
@@ -44,26 +29,35 @@ var (
 )
 
 type (
-	// BandwidthLimits sets the amount of uploading and downloading that is
-	// allowed to be performed by the host when serving to renters.
+	// BandwidthLimits set limits on the volume and speed of the uploading and
+	// downloading of the host. The limits have no bearings on the other
+	// modules. The data limits are in bytes per month, and the speed limits
+	// are in bytes per second.
 	BandwidthLimits struct {
-		DownloadDataLimit uint64
+		DownloadDataLimit  uint64
 		DownloadSpeedLimit uint64
-		UploadDataLimit uint64
-		UploadSpeedLimit uint64
-	}
-
-	// A DownloadRequest is used to retrieve a particular segment of a file from a
-	// host.
-	DownloadRequest struct {
-		Offset uint64
-		Length uint64
+		UploadDataLimit    uint64
+		UploadSpeedLimit   uint64
 	}
 
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
 	// address that can be used to contact the host.
 	HostAnnouncement struct {
 		IPAddress NetAddress
+	}
+
+	// HostFinancials provides statistics on the spendings and earnings of the
+	// host.
+	HostFinancials struct {
+		DownloadBandwidthRevenue           types.Currency
+		LockedCollateral                   types.Currency
+		LostCollateral                     types.Currency
+		LostRevenue                        types.Currency
+		PotentialStorageRevenue            types.Currency
+		StorageRevenue                     types.Currency
+		TransactionFeeExpenses             types.Currency // Amount spent on transaction fees total
+		UnsubsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renter did help pay for.
+		UploadBandwidthRevenue             types.Currency
 	}
 
 	// HostSettings are the parameters advertised by the host. These are the
@@ -89,6 +83,9 @@ type (
 	// HostRPCMetrics reports the quantity of each type of RPC call that has
 	// been made to the host.
 	HostRPCMetrics struct {
+		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
+		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
+
 		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
 		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 		DownloadCalls     uint64 `json:"downloadcalls"`
@@ -98,19 +95,12 @@ type (
 		UploadCalls       uint64 `json:"uploadcalls"`
 	}
 
-	// OpenFileContract holds information about a file contract that the host
-	// has open.
-	OpenFileContract struct {
-		OriginTransaction   types.Transaction
-		RevisionTransaction types.Transaction
-	}
-
 	// StorageFolderMetadata contians metadata about a storage folder that is
 	// tracked by the storage folder manager.
 	StorageFolderMetadata struct {
 		CapacityRemaining uint64
-		Path string
-		TotalCapacity uint64
+		Path              string
+		TotalCapacity     uint64
 
 		// Successful and unsuccessful operations report the number of
 		// successful and unsuccessful disk operations that the storage manager
@@ -122,7 +112,7 @@ type (
 		// the total advertised capacity of a disk. A large number of
 		// unsuccessful operations can also indicate that the disk is failing
 		// and that it needs to be replaced.
-		SuccessfulOperations uint64
+		SuccessfulOperations   uint64
 		UnsuccessfulOperations uint64
 	}
 
@@ -194,7 +184,8 @@ type (
 		AnnounceAddress(NetAddress) error
 
 		// ConfigureSmartPrices configures whether the host will automatically
-		// adjust prices based on supply and demand.
+		// adjust prices based on the network environment. The algorithms aim
+		// to be profit maximizing.
 		ConfigureSmartPrices(contractPricing bool, downloadPricing bool, storagePricing bool, uploadPricing bool) error
 
 		// ConsistencyCheckAndRepair runs a consistency check on the host,
@@ -214,25 +205,16 @@ type (
 		// that sector is chosen by the blockchain.
 		DeleteSector(sectorRoot crypto.Hash) error
 
-		// FileContract will return specific information about a file contract.
-		FileContract(types.FileContractID) OpenFileContract
-
 		// FileContracts returns a list of file contracts that the host
 		// currently has open, along with the volume of data tracked by each
 		// file contract.
 		FileContracts() ([]types.FileContractID, []uint64)
 
+		// Financials returns the financial statistics of the host.
+		Financials() HostFinancials
+
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
-
-		// Revenue returns the amount of revenue that the host has lined up,
-		// the amount of revenue the host has successfully captured, and the
-		// amount of revenue the host has lost.
-		//
-		// TODO: This function will eventually include two more numbers, one
-		// representing current collateral at risk, and one representing total
-		// collateral lost.
-		Revenue() (unresolved, resolved, lost types.Currency)
 
 		// RPCMetrics returns information on the types of RPC calls that have
 		// been made to the host.
