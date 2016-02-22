@@ -26,6 +26,16 @@ const (
 	minNodeListLen = 100
 )
 
+var errPeerRejectedConn = errors.New("peer rejected connection")
+
+// insufficientVersionError indicates a peer's version is insufficient.
+type insufficientVersionError string
+
+// Error implements the error interface for insufficientVersionError.
+func (s insufficientVersionError) Error() string {
+	return "unacceptable version: " + string(s)
+}
+
 type peer struct {
 	addr    modules.NetAddress
 	sess    muxado.Session
@@ -211,7 +221,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// decide whether to accept this version
 	if remoteVersion == "reject" {
-		return errors.New("peer rejected connection")
+		return errPeerRejectedConn
 	}
 	// Check that version is acceptable.
 	//
@@ -222,7 +232,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	// breaks compatibility.
 	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		conn.Close()
-		return errors.New("unacceptable version: " + remoteVersion)
+		return insufficientVersionError(remoteVersion)
 	}
 
 	g.log.Println("INFO: connected to new peer", addr)
