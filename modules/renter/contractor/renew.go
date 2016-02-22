@@ -9,10 +9,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// threadedRenew negotiates a new contract for data already stored with a
-// host. It returns the ID of the new contract. This is a blocking call that
+// managedRenew negotiates a new contract for data already stored with a host.
+// It returns the ID of the new contract. This is a blocking call that
 // performs network I/O.
-func (c *Contractor) threadedRenew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
+func (c *Contractor) managedRenew(fcid types.FileContractID, newEndHeight types.BlockHeight) (types.FileContractID, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	contract, ok := c.contracts[fcid]

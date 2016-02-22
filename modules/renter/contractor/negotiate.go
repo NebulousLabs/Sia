@@ -232,10 +232,8 @@ func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, end
 	return contract, nil
 }
 
-// formContracts determines whether to form new contracts given the old and
-// new allowances. If new contracts should be formed, formContracts forms
-// them. As such, formContracts should always be expected to block.
-func (c *Contractor) formContracts(a, old modules.Allowance) error {
+// formContracts forms contracts with hosts using the allowance parameters.
+func (c *Contractor) formContracts(a modules.Allowance) error {
 	// Get hosts.
 	hosts := c.hdb.RandomHosts(2*a.Hosts, nil)
 	if len(hosts) < a.Hosts {
@@ -256,12 +254,6 @@ func (c *Contractor) formContracts(a, old modules.Allowance) error {
 		Mul(types.NewCurrency64(uint64(a.Period)))
 	if a.Funds.Cmp(costPerSector) < 0 {
 		return errors.New("insufficient funds")
-	}
-
-	// Only take action if the amount of funds has increased. Otherwise, we
-	// should just delay until the next renew cycle.
-	if a.Funds.Cmp(old.Funds) <= 0 {
-		return nil
 	}
 
 	// Calculate the filesize of the contracts by using the average host price

@@ -40,11 +40,12 @@ type Contractor struct {
 	tpool   transactionPool
 	wallet  wallet
 
-	blockHeight   types.BlockHeight
-	renewHeight   types.BlockHeight
-	contracts     map[types.FileContractID]Contract
-	cachedAddress types.UnlockHash // to prevent excessive address creation
 	allowance     modules.Allowance
+	blockHeight   types.BlockHeight
+	cachedAddress types.UnlockHash // to prevent excessive address creation
+	contracts     map[types.FileContractID]Contract
+	newAllowance  modules.Allowance // if non-zero, form new contracts instead of renewing
+	renewHeight   types.BlockHeight // height at which to renew contracts
 
 	mu sync.RWMutex
 }
@@ -53,6 +54,10 @@ type Contractor struct {
 func (c *Contractor) Allowance() modules.Allowance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	// if the user set a new allowance, return that instead.
+	if c.newAllowance.Hosts != 0 {
+		return c.newAllowance
+	}
 	return c.allowance
 }
 
@@ -61,18 +66,45 @@ func (c *Contractor) Allowance() modules.Allowance {
 // specified. Note that Contractor can start forming contracts as soon as
 // SetAllowance is called; that is, it may block.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
-	c.mu.RLock()
-	old := c.allowance
-	c.mu.RUnlock()
-	err := c.formContracts(a, old)
-	if err != nil {
-		return err
+	// sanity checks
+	if a.Hosts == 0 {
+		return errors.New("hosts must be non-zero")
+	} else if a.Period == 0 {
+		return errors.New("period must be non-zero")
 	}
-	// set only if contract formation succeeded
-	// TODO: are the circumstances where we'd want to set anyway?
+
+	c.mu.RLock()
+	renewHeight := c.renewHeight
+	c.mu.RUnlock()
+
+	// If this is the first time the allowance has been set, form contracts
+	// immediately.
+	if renewHeight == 0 {
+		err := c.formContracts(a)
+		if err != nil {
+			return err
+		}
+		// set only if contract formation succeeded
+		c.mu.Lock()
+		c.allowance = a
+		c.mu.Unlock()
+		return nil
+	}
+
+	// Otherwise, set newAllowance, which instructs the Contractor to form
+	// contracts with the new allowance when the current contracts expire.
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.allowance = a
+	current := c.allowance
+	c.newAllowance = a
+	c.mu.Unlock()
+
+	// Finally, if the new allowance is "significantly different" (to be
+	// defined more precisely later), form intermediary contracts.
+	if a.Funds.Cmp(current.Funds) > 0 {
+		// not yet implemented
+		// c.formContracts(diff(a, old))
+	}
+
 	return nil
 }
 
