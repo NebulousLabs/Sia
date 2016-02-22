@@ -9,6 +9,7 @@ import (
 // TestStorageObligationID checks that the return function of the storage
 // obligation returns the correct value for the obligaiton id.
 func TestStorageObligationID(t *testing.T) {
+	t.Parallel()
 	// Try a transaction set with just a file contract.
 	so1 := &storageObligation{
 		OriginTransactionSet: []types.Transaction{{

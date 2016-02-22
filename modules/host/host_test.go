@@ -181,6 +181,7 @@ func TestHostInitialization(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Create a blank host tester and check that the height is zero.
 	bht, err := blankHostTester("TestHostInitialization")
 	if err != nil {
@@ -210,6 +211,7 @@ func TestNilValues(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestStartupRescan")
 	if err != nil {
 		t.Fatal(err)
@@ -315,6 +317,7 @@ func TestSetUnlockHash(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestSetUnlockHash")
 	if err != nil {
 		t.Fatal(err)

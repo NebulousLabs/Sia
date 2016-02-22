@@ -14,6 +14,7 @@ func TestAnnouncement(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestAnnouncement")
 	if err != nil {
 		t.Fatal(err)

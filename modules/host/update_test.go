@@ -17,6 +17,7 @@ func TestStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestStorageProof")
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +112,7 @@ func TestInitRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestInitRescan")
 	if err != nil {
 		t.Fatal(err)
@@ -144,6 +146,7 @@ func TestIntegrationAutoRescan(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestIntegrationAutoRescan")
 	if err != nil {
 		t.Fatal(err)

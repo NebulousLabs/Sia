@@ -79,6 +79,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestStorageFolderUsage")
 	if err != nil {
 		t.Fatal(err)

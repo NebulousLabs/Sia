@@ -27,6 +27,7 @@ func TestHostFailedMkdirAll(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestHostFailedMkdirAll")
 	if err != nil {
 		t.Fatal(err)
@@ -57,6 +58,7 @@ func TestHostFailedNewLogger(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestHostFailedNewLogger")
 	if err != nil {
 		t.Fatal(err)
@@ -87,6 +89,7 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestHostFailedOpenDatabase")
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +110,7 @@ func TestUnsuccessfulDBInit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Create a blank host tester so that all the host dependencies are
 	// available.
 	ht, err := blankHostTester("TestSetPersistentSettings")
@@ -151,6 +155,7 @@ func TestHostFailedLoadFile(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestHostFailedLoadFile")
 	if err != nil {
 		t.Fatal(err)
@@ -181,6 +186,7 @@ func TestHostFailedListen(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestHostFailedListen")
 	if err != nil {
 		t.Fatal(err)

@@ -10,6 +10,7 @@ func TestStorageFolderUIDString(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a series of uid->string mappings that represent the expected
 	// output of calling uidString on a storage folder.
@@ -55,6 +56,7 @@ func TestStorageFolderUIDStringSanity(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a storage folder with an illegal UID size.
 	sf := &storageFolder{
