@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -43,6 +44,15 @@ var (
 )
 
 type (
+	// BandwidthLimits sets the amount of uploading and downloading that is
+	// allowed to be performed by the host when serving to renters.
+	BandwidthLimits struct {
+		DownloadDataLimit uint64
+		DownloadSpeedLimit uint64
+		UploadDataLimit uint64
+		UploadSpeedLimit uint64
+	}
+
 	// A DownloadRequest is used to retrieve a particular segment of a file from a
 	// host.
 	DownloadRequest struct {
@@ -86,6 +96,13 @@ type (
 		ReviseCalls       uint64 `json:"revisecalls"`
 		SettingsCalls     uint64 `json:"settingscalls"`
 		UploadCalls       uint64 `json:"uploadcalls"`
+	}
+
+	// OpenFileContract holds information about a file contract that the host
+	// has open.
+	OpenFileContract struct {
+		OriginTransaction   types.Transaction
+		RevisionTransaction types.Transaction
 	}
 
 	// StorageFolderMetadata contians metadata about a storage folder that is
@@ -176,13 +193,34 @@ type (
 		// host to start accepting contracts.
 		AnnounceAddress(NetAddress) error
 
-		// Contracts returns the number of unresolved file contracts that the
-		// host is responsible for.
-		Contracts() uint64
+		// ConfigureSmartPrices configures whether the host will automatically
+		// adjust prices based on supply and demand.
+		ConfigureSmartPrices(contractPricing bool, downloadPricing bool, storagePricing bool, uploadPricing bool) error
 
-		// DeleteContract deletes a file contract. The revenue and collateral
-		// on the file contract will be lost, and the data will be removed.
-		DeleteContract(types.FileContractID) error
+		// ConsistencyCheckAndRepair runs a consistency check on the host,
+		// looking for places where some combination of disk errors, usage
+		// errors, and development errors have led to inconsistencies in the
+		// host. In cases where these inconsistencies can be repaired, the
+		// repairs are made.
+		ConsistencyCheckAndRepair() error
+
+		// DeleteFileContract deletes a file contract. The revenue and
+		// collateral on the file contract will be lost, and the data will be
+		// removed.
+		DeleteFileContract(types.FileContractID) error
+
+		// DeleteSector deletes a sector, meaning that the host will be unable
+		// to upload that sector and be unable to provide a storage proof if
+		// that sector is chosen by the blockchain.
+		DeleteSector(sectorRoot crypto.Hash) error
+
+		// FileContract will return specific information about a file contract.
+		FileContract(types.FileContractID) OpenFileContract
+
+		// FileContracts returns a list of file contracts that the host
+		// currently has open, along with the volume of data tracked by each
+		// file contract.
+		FileContracts() ([]types.FileContractID, []uint64)
 
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
@@ -199,6 +237,9 @@ type (
 		// RPCMetrics returns information on the types of RPC calls that have
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
+
+		// SetBandwidthLimits does exactly that.
+		SetBandwidthLimits(altruisticLimits, pricedLimits BandwidthLimits)
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error
