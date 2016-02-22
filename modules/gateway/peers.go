@@ -16,8 +16,6 @@ import (
 const (
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = 2 * time.Minute
-	// the gateway will sleep this long between incoming connections
-	acceptInterval = 3 * time.Second
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
@@ -26,7 +24,23 @@ const (
 	minNodeListLen = 100
 )
 
-var errPeerRejectedConn = errors.New("peer rejected connection")
+var (
+	// The gateway will sleep this long between incoming connections.
+	acceptInterval = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 3 * time.Second
+		case "standard":
+			return 3 * time.Second
+		case "testing":
+			return 10 * time.Millisecond
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
+
+	errPeerRejectedConn = errors.New("peer rejected connection")
+)
 
 // insufficientVersionError indicates a peer's version is insufficient.
 type insufficientVersionError string
