@@ -145,7 +145,7 @@ func (m *Miner) managedSubmitBlock(b types.Block) error {
 		return err
 	}
 	m.persist.Address = uc.UnlockHash()
-	return nil
+	return m.save()
 }
 
 // SubmitHeader accepts a block header.
