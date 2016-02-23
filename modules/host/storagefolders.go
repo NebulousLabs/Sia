@@ -47,31 +47,20 @@ package host
 // buckets relies on fancier, less used features in the boltdb dependency,
 // which carries a higher error risk.
 
+// TODO: Satisfy the the modules.Host interface.
+
 // TODO: All exported functions should wrap the errors that they return so that
 // there is more context for the user + developer when something goes wrong.
 
 // TODO: Check carefully that the storage size maximums are enforced.
 
-// TODO: When calling 'addSector', if a write fails on a storage folder you
-// remove it from the slice and get the next emptiest storage folder. Make sure
-// to be testing the 'nil' returns that the function is capable of.
-
 // TODO: There should be some way for the host to warn the user if a drive
 // seems to be struggling.
 
-// TODO: There needs to be a way to forcibly remove a storage folder from the
-// host, meaning that it'll push through even if there are errors, and the
-// sectors that can't be migrated will just be deleted, causing financial
+// TODO: There needs to be a way to forcibly remove and shrink a storage folder
+// from the host, meaning that it'll push through even if there are errors, and
+// the sectors that can't be migrated will just be deleted, causing financial
 // damage to the host.
-
-// TODO: Take the 'displace sectors' code and combine it into a single
-// function. When displacing sectors, keep track of how many failures occurred.
-// There should be some input indicating failure tolerance level.
-
-// TODO: Write a 'force remove' function that will push through a remove
-// operation even in the event of errors, meaning the failure tolerance level
-// is set to maximum (keep trying for every sector even with repeated
-// failures).
 
 // TODO: Keep stats on the failure rates of each storage folder.
 
@@ -97,42 +86,10 @@ package host
 // will still serve all the files it has and will not crash or malignantly
 // handle any of the files it does not have.
 
-// TODO: During renew, a host will grant a discount because some of the storage
-// is repeated. But the host needs to know during an edit that it's not
-// incurring extra cost. The host needs to know the end time of each sector, so
-// that when a sector is edited it can tell how much money the renter owes. If
-// a piece is being edited but does not affect the delete date of the sector,
-// the edit must be paid for in full. But if the edit removes the need for the
-// old piece entirely, only bandwidth and copy costs need to be paid, because
-// no additional storage is actually being added. An extra level of trickiness
-// occurs because the renter needs some way to konw if its getting all of the
-// discounts that it is expecting. The renter can track 'optimal' and 'distance
-// from optimal', and rate a host by how closely they are sticking to their
-// advertised price in the optimal case. Hosts giving 80% discounts, etc. on
-// moving things around will factor into their 'optimal distance' ratings,
-// which will influence their weight for renewal.
-//
-// In sum, hosts need only track how much extra storage is being added during
-// an edit and then can propose the fee for that operation. But now we have a
-// problem with DoS vectors where hosts can reuse sectors a limited number of
-// times, becuase the header object for the sector now has a size that grows
-// linearly with the number of times that sector is used by various file
-// contracts. Renters control the id of sectors, and therefore can manipulate
-// the host to end up with large sectors. My solution is to limit sector reuse
-// to 100x, beyond which the host will reject the sector and force the user to
-// use some type of encryption.
-
 // TODO: Need to add some command to 'siad' that will correctly repoint a
 // storage folder to a new mountpoint. As best I can tell, this needs to happen
 // while siad is not running. Either that, or 'siac' needs to do the whole
 // shutdown thing itself? Still unclear.
-
-// TODO: All modules should support load-backup-restore-close. And then there's
-// this more subtle thing about persisting and staying in touch with the
-// consensus set.
-
-// TODO: Exported functions in the host should wrap their error messages so
-// that it's more clear which operation was causing an error.
 
 import (
 	"bytes"
@@ -216,11 +173,7 @@ var (
 // in the storage folder. It is managed manually, and is updated every time a
 // sector is added to or removed from the storage folder. Because there is no
 // property that inherently guarantees the correctness of 'SizeRemaining',
-// implementation must be careful to maintain consistency. TODO: Also create a
-// consistency check + repair tool to verify and restore the correctness of
-// 'SizeRemaining' in the event of divergence. Because there are only two
-// operations that involve moving sectors around (RemoveStorageFolder and
-// shrinkStorageFolder), the potential for accidental divergence is low.
+// implementation must be careful to maintain consistency.
 //
 // The UID of the storage folder is a small number of bytes that uniquely
 // identify the storage folder. The UID is generated randomly, but in such a

@@ -83,35 +83,37 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	}
 
 	switch id {
-	case modules.RPCDownload:
-		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		// err = h.managedRPCDownload(conn)
-	case modules.RPCRenew:
-		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		// err = h.managedRPCRenew(conn)
-	case modules.RPCRevise:
-		atomic.AddUint64(&h.atomicReviseCalls, 1)
-		// err = h.managedRPCRevise(conn)
-	case modules.RPCSettings:
-		atomic.AddUint64(&h.atomicSettingsCalls, 1)
-		err = h.managedRPCSettings(conn)
-	case modules.RPCUpload:
-		atomic.AddUint64(&h.atomicUploadCalls, 1)
-		// err = h.managedRPCUpload(conn)
-	default:
-		atomic.AddUint64(&h.atomicErroredCalls, 1)
+	/*
+		case modules.RPCDownload:
+			atomic.AddUint64(&h.atomicDownloadCalls, 1)
+			// err = h.managedRPCDownload(conn)
+		case modules.RPCRenew:
+			atomic.AddUint64(&h.atomicRenewCalls, 1)
+			// err = h.managedRPCRenew(conn)
+		case modules.RPCRevise:
+			atomic.AddUint64(&h.atomicReviseCalls, 1)
+			// err = h.managedRPCRevise(conn)
+		case modules.RPCSettings:
+			atomic.AddUint64(&h.atomicSettingsCalls, 1)
+			err = h.managedRPCSettings(conn)
+		case modules.RPCUpload:
+			atomic.AddUint64(&h.atomicUploadCalls, 1)
+			// err = h.managedRPCUpload(conn)
+		default:
+			atomic.AddUint64(&h.atomicErroredCalls, 1)
 
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
-		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
-			h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
-		}
-		return
+			// Don't clutter the logs with repeat messages - after 1000 messages
+			// have been printed, only print 1-in-200.
+			randInt, randErr := crypto.RandIntn(200)
+			if randErr != nil {
+				return
+			}
+			erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
+			if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
+				h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+			}
+	*/
+	default:
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)

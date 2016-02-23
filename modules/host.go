@@ -6,9 +6,6 @@ import (
 )
 
 const (
-	// AcceptResponse defines the response that is sent to a successful RPC.
-	AcceptResponse = "accept"
-
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
 
@@ -25,7 +22,7 @@ var (
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
-	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
+	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', '2'}
 )
 
 type (
@@ -44,6 +41,7 @@ type (
 	// address that can be used to contact the host.
 	HostAnnouncement struct {
 		IPAddress NetAddress
+		PublicKey crypto.PublicKey
 	}
 
 	// HostFinancials provides statistics on the spendings and earnings of the
@@ -134,16 +132,6 @@ type (
 		// proofs on the data, and is going to incur penalties.
 		ForceRemoveStorageFolder(index int) error
 
-		// ForceResizeStorageFolder resizes a storage folder. The host many not
-		// check that there is enough space available on-disk to support a size
-		// increase, but should gracefully handle running out of storage
-		// unexpectedly. If the size of the folder is being decreased, the host
-		// will try to move the storage in the folder to other storage folders.
-		// If there is no space in the other folders, the host will start
-		// deleting data. This means that the host will have lost the data and
-		// will suffer the penalties of losing data.
-		ForceResizeStorageFolder(index int, newSize uint64) error
-
 		// RemoveStorageFolder will remove a storage folder from the host. All
 		// storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the host is unable to save
@@ -173,15 +161,9 @@ type (
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// Announce submits a host announcement to the blockchain, returning an
-		// error if its external IP address is unknown. After announcing, the
-		// host will begin accepting contracts.
-		Announce() error
-
-		// AnnounceAddress behaves like Announce, but allows the caller to
-		// specify the address announced. Like Announce, this will cause the
-		// host to start accepting contracts.
-		AnnounceAddress(NetAddress) error
+		// Announce submits a host announcement to the blockchain.  After
+		// announcing, the host will begin accepting contracts.
+		Announce(NetAddress) error
 
 		// ConfigureSmartPrices configures whether the host will automatically
 		// adjust prices based on the network environment. The algorithms aim
@@ -193,12 +175,7 @@ type (
 		// errors, and development errors have led to inconsistencies in the
 		// host. In cases where these inconsistencies can be repaired, the
 		// repairs are made.
-		ConsistencyCheckAndRepair() error
-
-		// DeleteFileContract deletes a file contract. The revenue and
-		// collateral on the file contract will be lost, and the data will be
-		// removed.
-		DeleteFileContract(types.FileContractID) error
+		// TODO: ConsistencyCheckAndRepair() error
 
 		// DeleteSector deletes a sector, meaning that the host will be unable
 		// to upload that sector and be unable to provide a storage proof if

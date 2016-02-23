@@ -281,9 +281,9 @@ type Host struct {
 	// across a set of storage folders, using rendevouz hashing to choose which
 	// folder holds each sector.
 	//
-	// TODO: These two items are the only unbounded items in the host struct.
-	// Checks need to be added to ensure that their growth is fundamentally
-	// limited, so that the RAM impact of siad can be kept to a minimum.
+	// TODO: lockedStorageObligations is currently unbounded. A safety needs to
+	// be added that makes sure the number of simultaneous locked obligations
+	// stays below 5e3.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
 	storageFolders           []*storageFolder
 
