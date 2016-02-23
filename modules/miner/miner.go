@@ -179,6 +179,13 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	}
 
 	m.tpool.TransactionPoolSubscribe(m)
+
+	// Save after synchronizing with consensus
+	err = m.save()
+	if err != nil {
+		return nil, errors.New("miner could not save during startup: " + err.Error())
+	}
+
 	return m, nil
 }
 
