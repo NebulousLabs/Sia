@@ -88,27 +88,8 @@ package host
 // than just debugging information. Should Sia have a global log that is used
 // to ferry important information to the user?
 
-// TODO: There's a bug where emptiestStorageFolder runs, and results error
-// being returned, meaning that the storage folder can't be used to save data.
-// But if it has low utilization, it can block the other storage folders from
-// being used, the host currently doesn't know to route around the blockage.
-// Therefore... host needs to keep some blacklist of storage folders that don't
-// seem to be responding when it's trying to figure out where to put something.
-
-// TODO: Need to test the os.Rename function when dealing with multiple disks.
-
 // TODO: Make sure all the persist is moving over. In particular, the sector
 // salt is important. Also, the sector salt needs to be documented.
-
-// TODO: Storage folders must not conflict with eachother. Instead of having 32
-// byte random names, they can just have 4 byte random names and then not
-// conflict at all. To preserve cryptographic integrity with the hashing, a
-// master key of 32 bytes can be kept which gets hashed against everything
-// else. Oh wait, that's not needed anymore because it's optimal-placement.
-// right.
-//
-// This todo can be replaced when there's a test which adds a bunch of storage
-// folders and makes sure that there's no conflict.
 
 // TODO: Cap the number of repeat sectors to something reasonable, like 10e3.
 

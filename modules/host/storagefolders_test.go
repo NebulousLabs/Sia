@@ -71,3 +71,46 @@ func TestStorageFolderUIDStringSanity(t *testing.T) {
 	}()
 	_ = sf.uidString()
 }
+
+// TestAddStorageFolderUIDCollisions checks that storage folders can be added
+// with no risk of producing collisions in the storage folder UIDs. This test
+// relies on (explicitly checked) assumptions about the size of the name and
+// the number of allowed storage folders.
+func TestAddStorageFolderUIDCollisions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester("TestAddStorageFolderUIDCollisions")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the environment requirements for the test have been met.
+	if storageFolderUIDSize != 1 {
+		t.Fatal("For this test, the host must be using storage folder UIDs that are 1 byte")
+	}
+	if maximumStorageFolders < 100 {
+		t.Fatal("For this test, the host must be allowed to have at least 100 storage folders")
+	}
+
+	// Create 100 storage folders, and check that there are no collisions
+	// between any of them. Because the UID is only using 1 byte, once there
+	// are more than 64 there will be at least 1/4 chance of a collision for
+	// each randomly selected UID. Running into collisions is virtually
+	// guaranteed, and running into repeated collisions (where two UIDs
+	// consecutively collide with existing UIDs) are highly likely.
+	for i := 0; i < 100; i++ {
+		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+	}
+
+	// Check that there are no collisions.
+	uidMap := make(map[uint8]struct{})
+	for _, sf := range ht.host.storageFolders {
+		_, exists := uidMap[uint8(sf.UID[0])]
+		if exists {
+			t.Error("Collision")
+		}
+		uidMap[uint8(sf.UID[0])] = struct{}{}
+	}
+}
