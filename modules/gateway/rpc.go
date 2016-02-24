@@ -126,12 +126,15 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	}
 }
 
-// Broadcast calls an RPC on all of the peers in the Gateway's peer list. The
-// calls are run in parallel. Broadcasts are restricted to "one-way" RPCs,
-// which simply write an object and disconnect. This is why Broadcast takes an
-// interface{} instead of an RPCFunc.
-func (g *Gateway) Broadcast(name string, obj interface{}) {
-	peers := g.Peers()
+// Broadcast calls an RPC on all of the specified peers. If peers is nil, the
+// RPC is called on all of the gateway's peer. The calls are run in parallel.
+// Broadcasts are restricted to "one-way" RPCs, which simply write an object
+// and disconnect. This is why Broadcast takes an interface{} instead of an
+// RPCFunc.
+func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) {
+	if peers == nil {
+		peers = g.Peers()
+	}
 	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
@@ -142,7 +145,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
-	for _, addr := range peers {
+	for _, p := range peers {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
@@ -151,7 +154,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 				g.RPC(addr, name, fn)
 			}
 			wg.Done()
-		}(addr)
+		}(p.NetAddress)
 	}
 	wg.Wait()
 }

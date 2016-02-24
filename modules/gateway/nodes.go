@@ -99,7 +99,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 	}
 	g.save()
 	// relay
-	go g.Broadcast("RelayNode", addr)
+	go g.Broadcast("RelayNode", addr, nil)
 	return nil
 }
 

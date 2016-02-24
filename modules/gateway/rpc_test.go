@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -163,6 +164,9 @@ func TestThreadedHandleConn(t *testing.T) {
 	}
 }
 
+// TestBroadcast tests that calling broadcast with a slice of peers only
+// broadcasts to those peers. Also tests that calling broadcast with nil peers
+// broadcasts to all peers.
 func TestBroadcast(t *testing.T) {
 	g1 := newTestingGateway("TestBroadcast1", t)
 	defer g1.Close()
@@ -181,22 +185,108 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	var g2Payload, g3Payload string
-	doneChan := make(chan struct{})
+	g2DoneChan := make(chan struct{})
+	g3DoneChan := make(chan struct{})
+	bothDoneChan := make(chan struct{})
+
 	g2.RegisterRPC("Recv", func(conn modules.PeerConn) error {
 		encoding.ReadObject(conn, &g2Payload, 100)
-		doneChan <- struct{}{}
+		g2DoneChan <- struct{}{}
 		return nil
 	})
 	g3.RegisterRPC("Recv", func(conn modules.PeerConn) error {
 		encoding.ReadObject(conn, &g3Payload, 100)
-		doneChan <- struct{}{}
+		g3DoneChan <- struct{}{}
 		return nil
 	})
 
-	g1.Broadcast("Recv", "foo")
-	<-doneChan
-	<-doneChan
+	// Test that calling broadcast with nil peers broadcasts to all peers.
+	g1.Broadcast("Recv", "foo", nil)
+	go func() {
+		<-g2DoneChan
+		<-g3DoneChan
+		bothDoneChan <- struct{}{}
+	}()
+	select {
+	case <-bothDoneChan:
+		// Both g2 and g3 should receive the broadcast.
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("broadcasting with nil peers should broadcast to all peers")
+	}
 	if g2Payload != "foo" || g3Payload != "foo" {
 		t.Fatal("broadcast failed:", g2Payload, g3Payload)
+	}
+
+	// Test that broadcasting to all peers in g1.Peers() broadcasts to all peers.
+	peers := g1.Peers()
+	g1.Broadcast("Recv", "bar", peers)
+	go func() {
+		<-g2DoneChan
+		<-g3DoneChan
+		bothDoneChan <- struct{}{}
+	}()
+	select {
+	case <-bothDoneChan:
+		// Both g2 and g3 should receive the broadcast.
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("broadcasting to gateway.Peers() should broadcast to all peers")
+	}
+	if g2Payload != "bar" || g3Payload != "bar" {
+		t.Fatal("broadcast failed:", g2Payload, g3Payload)
+	}
+
+	// Test that broadcasting to only g2 does not broadcast to g3.
+	peers = make([]modules.Peer, 0)
+	for _, p := range g1.Peers() {
+		if p.NetAddress == g2.Address() {
+			peers = append(peers, p)
+			break
+		}
+	}
+	g1.Broadcast("Recv", "baz", peers)
+	select {
+	case <-g2DoneChan:
+		// Only g2 should receive a broadcast.
+	case <-g3DoneChan:
+		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("called broadcast with g2 in peers list, but g2 didn't receive it.")
+	}
+	if g2Payload != "baz" {
+		t.Fatal("broadcast failed:", g2Payload)
+	}
+
+	// Test that broadcasting to only g3 does not broadcast to g2.
+	peers = make([]modules.Peer, 0)
+	for _, p := range g1.Peers() {
+		if p.NetAddress == g3.Address() {
+			peers = append(peers, p)
+			break
+		}
+	}
+	g1.Broadcast("Recv", "qux", peers)
+	select {
+	case <-g2DoneChan:
+		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-g3DoneChan:
+		// Only g3 should receive a broadcast.
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("called broadcast with g3 in peers list, but g3 didn't receive it.")
+	}
+	if g3Payload != "qux" {
+		t.Fatal("broadcast failed:", g3Payload)
+	}
+
+	// Test that broadcasting to an empty slice (but not nil!) does not broadcast
+	// to either g2 or g3.
+	peers = make([]modules.Peer, 0)
+	g1.Broadcast("Recv", "quux", peers)
+	select {
+	case <-g2DoneChan:
+		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-g3DoneChan:
+		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-time.After(10 * time.Millisecond):
+		// Neither peer should receive a broadcast.
 	}
 }

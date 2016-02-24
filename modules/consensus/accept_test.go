@@ -711,8 +711,8 @@ type mockGatewayDoesBroadcast struct {
 
 // Broadcast is a mock implementation of modules.Gateway.Broadcast that
 // sends a sentinel value down a channel to signal it's been called.
-func (g *mockGatewayDoesBroadcast) Broadcast(name string, obj interface{}) {
-	g.Gateway.Broadcast(name, obj)
+func (g *mockGatewayDoesBroadcast) Broadcast(name string, obj interface{}, peers []modules.Peer) {
+	g.Gateway.Broadcast(name, obj, peers)
 	g.broadcastCalled <- struct{}{}
 }
 

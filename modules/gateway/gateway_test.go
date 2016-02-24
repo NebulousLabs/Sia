@@ -48,7 +48,7 @@ func TestPeers(t *testing.T) {
 		t.Fatal("failed to connect:", err)
 	}
 	peers := g1.Peers()
-	if len(peers) != 1 || peers[0] != g2.Address() {
+	if len(peers) != 1 || peers[0].NetAddress != g2.Address() {
 		t.Fatal("g1 has bad peer list:", peers)
 	}
 	err = g1.Disconnect(g2.Address())

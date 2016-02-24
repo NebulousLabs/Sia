@@ -40,7 +40,7 @@ func TestGatewayPeerAdd(t *testing.T) {
 
 	var info GatewayInfo
 	st.getAPI("/gateway", &info)
-	if len(info.Peers) != 1 || info.Peers[0] != peer.Address() {
+	if len(info.Peers) != 1 || info.Peers[0].NetAddress != peer.Address() {
 		t.Fatal("/gateway/add did not add peer", peer.Address())
 	}
 }
@@ -62,7 +62,7 @@ func TestGatewayPeerRemove(t *testing.T) {
 
 	var info GatewayInfo
 	st.getAPI("/gateway", &info)
-	if len(info.Peers) != 1 || info.Peers[0] != peer.Address() {
+	if len(info.Peers) != 1 || info.Peers[0].NetAddress != peer.Address() {
 		t.Fatal("/gateway/add did not add peer", peer.Address())
 	}
 
