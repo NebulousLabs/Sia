@@ -277,9 +277,12 @@ type Host struct {
 	// obligations. Is a replacement for the contract obligation logic, but the
 	// old logic is being kept for compatibility purposes.
 	//
-	// Storage is broken up into sectors. The sectors are distributed randomly
-	// across a set of storage folders, using rendevouz hashing to choose which
-	// folder holds each sector.
+	// Storage is broken up into sectors. The sectors are distributed across a
+	// set of storage folders using a strategy that tries to create even
+	// distributions, but not aggressively. Uneven distributions could be
+	// manufactured by an attacker given sufficent knowledge about the disk
+	// layout (knowledge which should be unavailable), but a limited amount of
+	// damage can be done even with this attack.
 	//
 	// TODO: lockedStorageObligations is currently unbounded. A safety needs to
 	// be added that makes sure the number of simultaneous locked obligations
