@@ -61,10 +61,6 @@ var (
 	// errMaxVirtualSectors is returned when a sector cannot be added because
 	// the maximum number of virtual sectors for that sector id already exist.
 	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
-
-	// errNoStorage is returned when there are no storage folders, meaning the
-	// host cannot support adding a new sector.
-	errNoStorage = errors.New("cannot add sector - there is no storage folder")
 )
 
 // sectorUsage indicates how a sector is being used. Each block height
@@ -117,15 +113,8 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 		return errors.New("incorrectly sized sector passed to addSector in the host")
 	}
 
-	// Check that there is a storage folder. Though this problem would also be
-	// caught by checking the amount of remaining storage, it is better to
-	// explicit about what is wrong.
-	if len(h.storageFolders) < 1 {
-		return errNoStorage
-	}
-
 	// Check that there is enough room for the sector in at least one storage
-	// folder.
+	// folder - check will also guarantee that there is at least one storage folder.
 	enoughRoom := false
 	for _, sf := range h.storageFolders {
 		if sf.SizeRemaining >= sectorSize {
@@ -198,7 +187,8 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 			}
 			emptiestFolder.SuccessfulWrites++
 
-			// Update the database to reflect the new sector.
+			// File write succeeded - add the sector to the sector usage
+			// database and return.
 			usage := sectorUsage{
 				Expiry:        []types.BlockHeight{expiryHeight},
 				StorageFolder: emptiestFolder.UID,
@@ -227,7 +217,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error {
 	// Open the database so that the sector usage information can be updated.
 	return h.db.Update(func(tx *bolt.Tx) error {
-		// Update the database to reflect the new sector.
+		// Grab the existing sector usage information from the database.
 		bsu := tx.Bucket(bucketSectorUsage)
 		sectorKey := h.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
@@ -237,12 +227,13 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 			return err
 		}
 
-		// If there are multiple entries in the expiry, the sector cannot be
-		// deleted from disk because there are other obligations relying on the
-		// sector.
+		// If there are multiple entries in the usage expiry, it means that the
+		// physcial data is in use by other sectors ('virtual sectors'). This
+		// sector can be removed from the usage expiry, but the physical data
+		// needs to remain.
 		if len(usage.Expiry) > 1 {
-			// Find any entry in the usage that's at the expiry height and
-			// remove it.
+			// Find any single entry in the usage that's at the expiry height
+			// and remove it.
 			var i int
 			for i := 0; i < len(usage.Expiry); i++ {
 				if usage.Expiry[i] == expiryHeight {
@@ -252,46 +243,43 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 			if i == len(usage.Expiry) {
 				return errors.New("removing a sector that doesn't seem to exist")
 			}
-			if i == len(usage.Expiry)-1 {
-				usage.Expiry = append(usage.Expiry[0:i])
-			} else {
-				usage.Expiry = append(usage.Expiry[0:i], usage.Expiry[i+1:]...)
-			}
+			usage.Expiry = append(usage.Expiry[0:i], usage.Expiry[i+1:]...)
+
+			// Update the database with the new usage expiry.
 			sectorUsageBytes, err = json.Marshal(usage)
 			if err != nil {
 				return err
 			}
 			return bsu.Put(sectorKey, sectorUsageBytes)
 		}
-		// Delete the sector from the bucket - there are no more instances of
-		// this sector in the host.
-		err = bsu.Delete(h.sectorID(sectorRoot[:]))
-		if err != nil {
-			return err
+
+		// Get the storage folder that contains the phsyical sector.
+		var folder *storageFolder
+		for _, sf := range h.storageFolders {
+			if bytes.Equal(sf.UID, usage.StorageFolder) {
+				folder = sf
+			}
 		}
 
+		// Remove the sector from the physical disk.
 		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
 		err = h.dependencies.Remove(sectorPath)
 		if err != nil {
 			// Indicate that the storage folder is having write troubles.
-			for _, sf := range h.storageFolders {
-				if bytes.Equal(sf.UID, usage.StorageFolder) {
-					sf.FailedWrites++
-					break
-				}
-			}
-
+			folder.FailedWrites++
 			return err
 		}
 
 		// Find the storage folder that contains the sector.
-		for _, sf := range h.storageFolders {
-			if bytes.Equal(sf.UID, usage.StorageFolder) {
-				sf.SizeRemaining += sectorSize
-				sf.SuccessfulWrites++
-				break
-			}
+		folder.SizeRemaining += sectorSize
+		folder.SuccessfulWrites++
+		err = h.save()
+		if err != nil {
+			return err
 		}
-		return h.save()
+
+		// Delete the sector from the bucket - there are no more instances of
+		// this sector in the host.
+		return bsu.Delete(h.sectorID(sectorRoot[:]))
 	})
 }
