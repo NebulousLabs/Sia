@@ -79,10 +79,6 @@ var (
 	// the host is typically only downloading data if it is planning to store
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
-	//
-	// TODO: The implementation of upload bandwidth cost should build the cost
-	// directly into the cost-of-strorage calculation when the inital
-	// upload/negotiation is happening.
 	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
 
 	// defaultDownloadBandwidthPrice defines the default price of upload

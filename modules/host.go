@@ -1,5 +1,11 @@
 package modules
 
+// TODO: Split HostSettings into HostInternalSettings and HostExternalSettings.
+
+// TODO: Reconsider the method by which bandwidth limits, storage limits, and
+// prices are set. Want to enable flexibility for the client - probably belongs
+// with internal settings.
+
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -196,7 +202,7 @@ type (
 		// will tolerate. Altruistic limits indicate how much data the host is
 		// willing to transfer for free, and priced limits indicate how much
 		// data the host is willing to transfer when the host is getting paid.
-		SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
+		// TODO: SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error

@@ -42,9 +42,6 @@ import (
 // The storage obligation database gets preference. Any missing sectors will be
 // treated as if they were filesystem problems.
 
-// TODO: Sanity checks that the host is not going over the allocated total
-// amount of storage at any point.
-
 var (
 	// errDiskTrouble is returned when the host is supposed to have enough
 	// storage to hold a new sector but failures that are likely related to the
@@ -174,13 +171,15 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 				// trouble.
 				emptiestFolder.FailedWrites++
 
+				// Remove the attempted write - an an incomplete write can
+				// leave a partial file on disk. Error is not checked, we
+				// already know the disk is having trouble.
+				_ = os.Remove(sectorPath)
+
 				// Remove the failed folder from the list of folders that can
 				// be tried.
-				if emptiestIndex == len(potentialFolders)-1 {
-					potentialFolders = potentialFolders[:emptiestIndex-1]
-				} else {
-					potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
-				}
+				potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
+
 				// Try the next folder.
 				emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
 				continue
@@ -264,7 +263,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		if err != nil {
 			// Indicate that the storage folder is having write troubles.
 			for _, sf := range h.storageFolders {
-				if bytes.Compare(sf.UID, usage.StorageFolder) == 0 {
+				if bytes.Equal(sf.UID, usage.StorageFolder) {
 					sf.FailedWrites++
 					break
 				}
@@ -275,7 +274,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 
 		// Find the storage folder that contains the sector.
 		for _, sf := range h.storageFolders {
-			if bytes.Compare(sf.UID, usage.StorageFolder) == 0 {
+			if bytes.Equal(sf.UID, usage.StorageFolder) {
 				sf.SizeRemaining += sectorSize
 				sf.SuccessfulWrites++
 				break

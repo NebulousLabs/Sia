@@ -52,14 +52,6 @@ package host
 // TODO: All exported functions should wrap the errors that they return so that
 // there is more context for the user + developer when something goes wrong.
 
-// TODO: Check carefully that the storage size maximums are enforced.
-
-// TODO: Have a 'backup' function which will run a consistency + repair check
-// over the whole host and then, after performing repairs, will create a
-// backup. If everything seems to be in reasonable working order, the previous
-// backup will be replaced. If everything is not in reasonable order, a
-// high-prioirity error will be returned.
-
 // TODO: There needs to be some way for ferrying persistent/ongoing errors to
 // the user, like an error channel of some sort. I guess a log, but with more
 // than just debugging information. Should Sia have a global log that is used
@@ -67,12 +59,6 @@ package host
 
 // TODO: Make sure all the persist is moving over. In particular, the sector
 // salt is important. Also, the sector salt needs to be documented.
-
-// TODO: Cap the number of repeat sectors to something reasonable, like 10e3.
-
-// TODO: Test simulating a disk failure, see what the host does. Hopefully,
-// will still serve all the files it has and will not crash or malignantly
-// handle any of the files it does not have.
 
 // TODO: Need to add some command to 'siad' that will correctly repoint a
 // storage folder to a new mountpoint. As best I can tell, this needs to happen
@@ -282,7 +268,7 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 		// 256.
 		safe := true
 		for _, sf := range h.storageFolders {
-			if bytes.Compare(newSF.UID, sf.UID) == 0 {
+			if bytes.Equal(newSF.UID, sf.UID) {
 				safe = false
 				break
 			}
@@ -323,7 +309,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 	// Create a list of available folders. As folders are filled up, this list
 	// will be pruned. Once all folders are full, the offload loop will quit
 	// and return with errIncompleteOffload.
-	availableFolders := make([]*storageFolder, 0, maximumStorageFolders)
+	availableFolders := make([]*storageFolder, 0)
 	for _, sf := range h.storageFolders {
 		if sf == offloadFolder {
 			// The offload folder is not an available folder.
@@ -350,7 +336,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 			if err != nil {
 				return err
 			}
-			if bytes.Compare(usage.StorageFolder, offloadFolder.UID) != 0 {
+			if !bytes.Equal(usage.StorageFolder, offloadFolder.UID) {
 				// The current sector is not in the offloading storage folder,
 				// try the next sector.
 				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
@@ -402,11 +388,8 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 
 					// Because the write failed, we should move on to the next
 					// storage folder and try that.
-					if emptiestIndex == len(potentialFolders)-1 {
-						potentialFolders = potentialFolders[:emptiestIndex-1]
-					} else {
-						potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
-					}
+					potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
+
 					// Try the next folder.
 					emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
 					continue
@@ -490,17 +473,16 @@ func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
 	// If 'force' is set, we want to ignore 'errIncopmleteOffload' and try to
 	// remove the storage folder anyway. For any other error, we want to halt
 	// and return the error.
-	if (offloadErr != nil && offloadErr != errIncompleteOffload) || (offloadErr != nil && !force) {
+	if force && offloadErr == errIncompleteOffload {
+		offloadErr = nil
+	}
+	if offloadErr != nil {
 		return offloadErr
 	}
 
 	// Remove the storage folder from the host and then save the host.
 	oldStorageFolders := h.storageFolders
-	if removalIndex == len(h.storageFolders)-1 {
-		h.storageFolders = h.storageFolders[0:removalIndex]
-	} else {
-		h.storageFolders = append(h.storageFolders[0:removalIndex], h.storageFolders[removalIndex+1:]...)
-	}
+	h.storageFolders = append(h.storageFolders[0:removalIndex], h.storageFolders[removalIndex+1:]...)
 	err := h.save()
 	if err != nil {
 		// Revert the storage folders to the old storage folders, since the
@@ -567,7 +549,7 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 	// the folder is growing, or if after being shrunk the folder still has
 	// enough storage to house all of the sectors it currently tracks.
 	resizeFolderSizeConsumed := resizeFolder.Size - resizeFolder.SizeRemaining
-	if resizeFolder.Size < newSize || resizeFolderSizeConsumed <= newSize {
+	if resizeFolderSizeConsumed <= newSize {
 		resizeFolder.SizeRemaining = newSize - resizeFolderSizeConsumed
 		resizeFolder.Size = newSize
 		return h.save()
