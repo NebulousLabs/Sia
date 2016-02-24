@@ -26,11 +26,11 @@ var (
 )
 
 type (
-	// BandwidthLimits set limits on the volume and speed of the uploading and
-	// downloading of the host. The limits have no bearings on the other
+	// HostBandwidthLimits set limits on the volume and speed of the uploading
+	// and downloading of the host. The limits have no bearings on the other
 	// modules. The data limits are in bytes per month, and the speed limits
 	// are in bytes per second.
-	BandwidthLimits struct {
+	HostBandwidthLimits struct {
 		DownloadDataLimit  uint64
 		DownloadSpeedLimit uint64
 		UploadDataLimit    uint64
@@ -44,9 +44,9 @@ type (
 		PublicKey crypto.PublicKey
 	}
 
-	// HostFinancials provides statistics on the spendings and earnings of the
-	// host.
-	HostFinancials struct {
+	// HostFinancialMetrics provides statistics on the spendings and earnings
+	// of the host.
+	HostFinancialMetrics struct {
 		DownloadBandwidthRevenue           types.Currency
 		LockedCollateral                   types.Currency
 		LostCollateral                     types.Currency
@@ -165,11 +165,6 @@ type (
 		// announcing, the host will begin accepting contracts.
 		Announce(NetAddress) error
 
-		// ConfigureSmartPrices configures whether the host will automatically
-		// adjust prices based on the network environment. The algorithms aim
-		// to be profit maximizing.
-		ConfigureSmartPrices(contractPricing bool, downloadPricing bool, storagePricing bool, uploadPricing bool) error
-
 		// ConsistencyCheckAndRepair runs a consistency check on the host,
 		// looking for places where some combination of disk errors, usage
 		// errors, and development errors have led to inconsistencies in the
@@ -187,8 +182,8 @@ type (
 		// file contract.
 		FileContracts() ([]types.FileContractID, []uint64)
 
-		// Financials returns the financial statistics of the host.
-		Financials() HostFinancials
+		// FinancialMetrics returns the financial statistics of the host.
+		FinancialMetrics() HostFinancialMetrics
 
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
@@ -197,8 +192,11 @@ type (
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
 
-		// SetBandwidthLimits does exactly that.
-		SetBandwidthLimits(altruisticLimits, pricedLimits BandwidthLimits)
+		// SetBandwidthLimits puts a limit on how much data transfer the host
+		// will tolerate. Altruistic limits indicate how much data the host is
+		// willing to transfer for free, and priced limits indicate how much
+		// data the host is willing to transfer when the host is getting paid.
+		SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error
