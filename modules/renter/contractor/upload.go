@@ -66,13 +66,7 @@ func (hu *hostUploader) EndHeight() types.BlockHeight { return hu.contract.FileC
 func (hu *hostUploader) Close() error {
 	// send an empty revision to indicate that we are finished
 	encoding.WriteObject(hu.conn, types.Transaction{})
-	hu.conn.Close()
-	// submit the most recent revision to the blockchain
-	err := hu.contractor.tpool.AcceptTransactionSet([]types.Transaction{hu.contract.LastRevisionTxn})
-	if err != nil && err != modules.ErrDuplicateTransactionSet {
-		hu.contractor.log.Println("WARN: transaction pool rejected revision transaction:", err)
-	}
-	return err
+	return hu.conn.Close()
 }
 
 // Upload revises an existing file contract with a host, and then uploads a
