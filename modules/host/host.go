@@ -493,8 +493,27 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
 }
 
+// composeErrors will take two errors and compose them into a single errors with
+// a longer message.
+//
+// TODO: It may make sense to move this function to the build package. When
+// moving it, the testing function should follow.
+func composeErrors(es ...error) error {
+	// Check for nil/empty input.
+	if len(es) <= 0 {
+		return nil
+	}
+
+	// Combine all of the input erros into a single larger error.
+	err := es[0]
+	for i := 1; i < len(es); i++ {
+		err = errors.New(err.Error() + " and " + es[i].Error())
+	}
+	return err
+}
+
 // Close shuts down the host, preparing it for garbage collection.
-func (h *Host) Close() error {
+func (h *Host) Close() (composedError error) {
 	// Unsubscribe the host from the consensus set. Call will not terminate
 	// until the last consensus update has been sent to the host.
 	// Unsubscription must happen before any resources are released or
@@ -507,7 +526,7 @@ func (h *Host) Close() error {
 	// disabled, as incoming connections will want to use the hosts resources.
 	err := h.listener.Close()
 	if err != nil {
-		return err
+		composedError = composeErrors(composedError, err)
 	}
 
 	// Grab the resource lock and indicate that the host is closing. Concurrent
@@ -521,14 +540,14 @@ func (h *Host) Close() error {
 	// Close the bolt database.
 	err = h.db.Close()
 	if err != nil {
-		return err
+		composedError = composeErrors(composedError, err)
 	}
 
 	// Clear the port that was forwarded at startup. The port handling must
 	// happen before the logger is closed, as it leaves a logging message.
 	err = h.clearPort(h.netAddress.Port())
 	if err != nil {
-		return err
+		composedError = composeErrors(composedError, err)
 	}
 
 	// Save the latest host state.
@@ -536,14 +555,14 @@ func (h *Host) Close() error {
 	err = h.save()
 	h.mu.Unlock()
 	if err != nil {
-		return err
+		composedError = composeErrors(composedError, err)
 	}
 
 	// Close the logger. The logger should be the last thing to shut down so
 	// that all other objects have access to logging while closing.
 	err = h.log.Close()
 	if err != nil {
-		return err
+		composedError = composeErrors(composedError, err)
 	}
-	return nil
+	return composedError
 }
