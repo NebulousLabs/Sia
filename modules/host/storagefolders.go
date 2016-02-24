@@ -54,18 +54,6 @@ package host
 
 // TODO: Check carefully that the storage size maximums are enforced.
 
-// TODO: There should be some way for the host to warn the user if a drive
-// seems to be struggling.
-
-// TODO: There needs to be a way to forcibly remove and shrink a storage folder
-// from the host, meaning that it'll push through even if there are errors, and
-// the sectors that can't be migrated will just be deleted, causing financial
-// damage to the host.
-
-// TODO: Keep stats on the failure rates of each storage folder.
-
-// TODO: Have a function to reset the stats.
-
 // TODO: Have a 'backup' function which will run a consistency + repair check
 // over the whole host and then, after performing repairs, will create a
 // backup. If everything seems to be in reasonable working order, the previous
@@ -182,9 +170,15 @@ var (
 // of the symlink which points to the folder holding the data for this storage
 // folder.
 type storageFolder struct {
+	UID []byte
+
 	Size          uint64
 	SizeRemaining uint64
-	UID           []byte
+
+	FailedReads      uint64
+	FailedWrites     uint64
+	SuccessfulReads  uint64
+	SuccessfulWrites uint64
 }
 
 // uidString returns the string value of the storage folder's UID. This string
@@ -388,20 +382,24 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				// Try reading the sector from disk.
 				sectorData, err := ioutil.ReadFile(oldSectorPath)
 				if err != nil {
-					// TODO: Document the read error, so the user can see
-					// potential problems with the filesystem.
+					// Inidicate that the storage folder is having read
+					// troubles.
+					offloadFolder.FailedReads++
 
 					// Returning nil will move to the next sector. Though the
 					// current sector has failed to read, the host will keep
 					// trying future sectors in hopes of finishing the task.
 					return nil
 				}
+				// Indicate that the storage folder did a successful read.
+				offloadFolder.SuccessfulReads++
 
 				newSectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(currentSectorID))
 				err = ioutil.WriteFile(newSectorPath, sectorData, 0700)
 				if err != nil {
-					// TODO: Document the write failure so that the user can be
-					// notified of shortcomings of his disk.
+					// Indicate that the storage folder is having write
+					// troubles.
+					emptiestFolder.FailedWrites++
 
 					// Because the write failed, we should move on to the next
 					// storage folder and try that.
@@ -414,12 +412,15 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 					emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
 					continue
 				}
+				// Indicate that the storage folder is doing successful writes.
+				emptiestFolder.SuccessfulWrites++
 				err = os.Remove(oldSectorPath)
 				if err != nil {
-					// TODO: Document the delete failure so the user can be
-					// informed about disk strugglings. No need to return,
-					// however.
+					// Indicate that the storage folder is having write
+					// troubles.
+					offloadFolder.FailedWrites++
 				}
+				offloadFolder.SuccessfulWrites++
 
 				success = true
 				break

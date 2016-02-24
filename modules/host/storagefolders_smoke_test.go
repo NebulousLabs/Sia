@@ -207,6 +207,13 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Error("Does not appear that the sympath was removed from disk:", err)
 	}
 
+	// No sectors added yet, the storage folder statistics should all be clean.
+	for _, sf := range ht.host.storageFolders {
+		if sf.SuccessfulReads != 0 || sf.SuccessfulWrites != 0 || sf.FailedReads != 0 || sf.FailedWrites != 0 {
+			t.Error("storage folder does not have blank health stats")
+		}
+	}
+
 	// Retry adding the sector, the add should succeed and the amount of
 	// remaining storage should be updated.
 	sectorExpiry := types.BlockHeight(10)
@@ -270,6 +277,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Check that the disk health stats match the expected values.
+	for _, sf := range ht.host.storageFolders {
+		if sf.SuccessfulReads != 0 || sf.SuccessfulWrites != 1 || sf.FailedReads != 0 || sf.FailedWrites != 0 {
+			t.Error("storage folder does not have blank health stats")
+		}
 	}
 
 	// Try to resize the storage folder. While resizing the storage folder, try
@@ -792,6 +805,36 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal("expecting 16 sectors in storage folder three")
 	}
 
+	// Do some resizing, to cause sectors to be moved around. Every storage
+	// folder should have sectors that get moved off of it.
+	err = ht.host.ResizeStorageFolder(1, minimumStorageFolderSize*6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(2, minimumStorageFolderSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(1, minimumStorageFolderSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that all storage folders are reporting successful reads and
+	// writes, with no failures.
+	for _, sf := range ht.host.storageFolders {
+		if sf.SuccessfulWrites <= 0 || sf.SuccessfulReads <= 0 || sf.FailedWrites > 0 || sf.FailedReads > 0 {
+			t.Error("disk stats aren't making sense")
+		}
+	}
+
 	// Remove all of the sectors.
 	i := 0
 	for sectorRoot, expiryHeights := range sectorUsageMap {
@@ -856,6 +899,13 @@ func TestStorageFolderUsage(t *testing.T) {
 			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
 		}
 		i++
+	}
+	// Check that all storage folders have successful writes, and no failed
+	// reads or writes.
+	for _, sf := range ht.host.storageFolders {
+		if sf.SuccessfulWrites <= 0 || sf.SuccessfulReads <= 0 || sf.FailedWrites > 0 || sf.FailedReads > 0 {
+			t.Error("disk stats aren't making sense")
+		}
 	}
 
 	// Remove all of the storage folders.

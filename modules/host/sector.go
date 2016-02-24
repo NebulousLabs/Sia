@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -115,7 +114,7 @@ func (h *Host) sectorID(sectorRootBytes []byte) []byte {
 func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error {
 	// Sanity check - sector should have sectorSize bytes.
 	if uint64(len(sectorData)) != sectorSize {
-		build.Critical("incorrectly sized sector passed to addSector in the host")
+		h.log.Critical("incorrectly sized sector passed to addSector in the host")
 		return errors.New("incorrectly sized sector passed to addSector in the host")
 	}
 
@@ -173,11 +172,9 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 			sectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(sectorKey))
 			err := ioutil.WriteFile(sectorPath, sectorData, 0700)
 			if err != nil {
-				// Writing to the storage folder resulted in an error, try the
-				// next storage folder by removing the current folder from the
-				// set.
-				//
-				// TODO: Document the disk failure for user reporting purposes.
+				// Indicate to the user that the storage folder is having write
+				// trouble.
+				emptiestFolder.FailedWrites++
 
 				// Remove the failed folder from the list of folders that can
 				// be tried.
@@ -190,6 +187,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 				emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
 				continue
 			}
+			emptiestFolder.SuccessfulWrites++
 
 			// Update the database to reflect the new sector.
 			usage := sectorUsage{
@@ -266,6 +264,14 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
 		err = os.Remove(sectorPath)
 		if err != nil {
+			// Indicate that the storage folder is having write troubles.
+			for _, sf := range h.storageFolders {
+				if bytes.Compare(sf.UID, usage.StorageFolder) == 0 {
+					sf.FailedWrites++
+					break
+				}
+			}
+
 			return err
 		}
 
@@ -273,6 +279,8 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		for _, sf := range h.storageFolders {
 			if bytes.Compare(sf.UID, usage.StorageFolder) == 0 {
 				sf.SizeRemaining += sectorSize
+				sf.SuccessfulWrites++
+				break
 			}
 		}
 		return h.save()
