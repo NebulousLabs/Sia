@@ -83,7 +83,6 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 		return 0, errors.New("contract has already ended")
 	}
 	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(hu.contract.FileContract.WindowStart - height))).Mul(hu.price)
-	piecePrice = piecePrice.MulFloat(1.02) // COMPATv0.4.8 -- hosts reject exact prices
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
 	pieceRoot, _ := crypto.ReaderMerkleRoot(bytes.NewReader(data))
@@ -119,6 +118,12 @@ func (hu *hostUploader) Upload(data []byte) (uint64, error) {
 // Uploader initiates the contract revision process with a host, and returns
 // an Uploader.
 func (c *Contractor) Uploader(contract Contract) (Uploader, error) {
+	c.mu.RLock()
+	height := c.blockHeight
+	c.mu.RUnlock()
+	if height > contract.FileContract.WindowStart {
+		return nil, errors.New("contract has already ended")
+	}
 	settings, ok := c.hdb.Host(contract.IP)
 	if !ok {
 		return nil, errors.New("no record of that host")
@@ -131,9 +136,11 @@ func (c *Contractor) Uploader(contract Contract) (Uploader, error) {
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
-	bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(settings.Price).Uint64()
-	if errOverflow == nil && bytes < SectorSize {
-		return nil, errors.New("contract has insufficient capacity")
+	if !settings.Price.IsZero() {
+		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(settings.Price).Uint64()
+		if errOverflow == nil && bytes < SectorSize {
+			return nil, errors.New("contract has insufficient capacity")
+		}
 	}
 
 	// initiate revision loop
