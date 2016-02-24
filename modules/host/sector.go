@@ -58,6 +58,10 @@ var (
 	// hovering around 95% capacity and rarely over 98% or under 90% capacity.
 	errInsufficientStorageForSector = errors.New("not enough storage remaining to accept sector")
 
+	// errMaxVirtualSectors is returned when a sector cannot be added because
+	// the maximum number of virtual sectors for that sector id already exist.
+	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
+
 	// errNoStorage is returned when there are no storage folders, meaning the
 	// host cannot support adding a new sector.
 	errNoStorage = errors.New("cannot add sector - there is no storage folder")
@@ -99,7 +103,7 @@ type sectorUsage struct {
 // millions of sectors in a single folder.
 func (h *Host) sectorID(sectorRootBytes []byte) []byte {
 	saltedRoot := crypto.HashAll(sectorRootBytes, h.sectorSalt)
-	id := make([]byte, 16)
+	id := make([]byte, base64.RawURLEncoding.EncodedLen(12))
 	base64.RawURLEncoding.Encode(id, saltedRoot[:12])
 	return id
 }
@@ -147,9 +151,17 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 			if err != nil {
 				return err
 			}
-			// TODO: check the limit on max number of virtual sector blowup
-			// before doing any more matings - maxVitualSecotrBlowup or
-			// something
+			// If the sector already has the maximum number of virtual sectors,
+			// return an error. The host handles virtual sectors differently
+			// from physical sectors and therefore needs to limit the number of
+			// times that the same data can be uploaded to the host. For
+			// renters that are properly using encryption and are using
+			// sane/reasonable file contract renewal practices, this limit will
+			// never be reached (sane behavior will cause 3-5 at an absolute
+			// maximum, but the limit is substantially higher).
+			if len(usage.Expiry) >= maximumVirtualSectors {
+				return errMaxVirtualSectors
+			}
 			usage.Expiry = append(usage.Expiry, expiryHeight)
 			usageBytes, err = json.Marshal(usage)
 			if err != nil {
@@ -174,7 +186,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 				// Remove the attempted write - an an incomplete write can
 				// leave a partial file on disk. Error is not checked, we
 				// already know the disk is having trouble.
-				_ = os.Remove(sectorPath)
+				_ = h.dependencies.Remove(sectorPath)
 
 				// Remove the failed folder from the list of folders that can
 				// be tried.

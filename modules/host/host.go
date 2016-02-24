@@ -145,6 +145,39 @@ var (
 		panic("unrecognized release constant in host - maximum storage folder size")
 	}()
 
+	// maximumVirtualSectors defines the maximum number of virtual sectors that
+	// can be tied to each physical sector.
+	maximumVirtualSectors = func() int {
+		if build.Release == "dev" {
+			// The testing value is at 35 to provide flexibility. The
+			// development value is at 5 because hitting the virtual sector
+			// limit in a sane development environment is more difficult than
+			// hitting the virtual sector limit in a controlled testing
+			// environment (dev environment doesn't have access to private
+			// methods such as 'addSector'.
+			return 5
+		}
+		if build.Release == "standard" {
+			// Each virtual sector adds about 8 bytes of load to the host
+			// persistence structures, and additionally adds 8 bytes of load
+			// when reading or modifying a sector. Though a few virtual sectors
+			// with 10e3 or even 100e3 virtual sectors would not be too
+			// detrimental to the host, tens of thousands of physical sectors
+			// that each have ten thousand virtual sectors could pose a problem
+			// for the host. In most situations, a renter will not need more 2
+			// or 3 virtual sectors when manipulating data, so 250 is generous
+			// as long as the renter is properly encrypting data. 250 is
+			// unlikely to cause the host problems, even if an attacker is
+			// creating hundreds of thousands of phsyical sectors (an expensive
+			// action!) each with 250 vitrual sectors.
+			return 250
+		}
+		if build.Release == "testing" {
+			return 35
+		}
+		panic("unrecognized release constant in host - maximum virtual sector size")
+	}()
+
 	// minimumStorageFolderSize defines the smallest size that a storage folder
 	// is allowed to be. The new design of the storage folder structure means
 	// that this limit is not as relevant as it was originally, but hosts with
