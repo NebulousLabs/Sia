@@ -296,6 +296,9 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 	// The host is going to check every sector, using a different database tx
 	// for each sector. To be able to track progress, a starting point needs to
 	// be grabbed. This read grabs the starting point.
+	//
+	// It is expected that the host is under lock for the whole operation -
+	// this function should be the only function with access to the database.
 	var currentSectorID []byte
 	var currentSectorBytes []byte
 	err := h.db.View(func(tx *bolt.Tx) error {
@@ -325,8 +328,8 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 
 	// Go through the sectors one at a time. Sectors that are not a part of the
 	// provided storage folder are ignored. Sectors that are a part of the
-	// storage folder will be moved to a new storage folder. The loop will
-	// quick after 'dataToOffload' data has been moved from the storage folder.
+	// storage folder will be moved to a new storage folder. The loop will quit
+	// after 'dataToOffload' data has been moved from the storage folder.
 	dataOffloaded := uint64(0)
 	for currentSectorID != nil && dataOffloaded < dataToOffload && len(availableFolders) > 0 {
 		err = h.db.Update(func(tx *bolt.Tx) error {
@@ -349,8 +352,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 
 			// This sector is in the removal folder, and therefore needs to
 			// be moved to the next folder.
-			potentialFolders := availableFolders
-			emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
+			emptiestFolder, emptiestIndex := emptiestStorageFolder(availableFolders)
 			if emptiestFolder == nil {
 				// If 'emptiestFolder' is nil, there are no storage folders
 				// remaining that have enough storage to take on a new sector.
@@ -379,6 +381,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				// Indicate that the storage folder did a successful read.
 				offloadFolder.SuccessfulReads++
 
+				// Try writing the sector to the emptiest storage folder.
 				newSectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(currentSectorID))
 				err = h.dependencies.WriteFile(newSectorPath, sectorData, 0700)
 				if err != nil {
@@ -387,11 +390,12 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 					emptiestFolder.FailedWrites++
 
 					// Because the write failed, we should move on to the next
-					// storage folder and try that.
-					potentialFolders = append(potentialFolders[0:emptiestIndex], potentialFolders[emptiestIndex+1:]...)
+					// storage folder, and remove the current storage folder
+					// from the list of available folders.
+					availableFolders = append(availableFolders[0:emptiestIndex], availableFolders[emptiestIndex+1:]...)
 
 					// Try the next folder.
-					emptiestFolder, emptiestIndex = emptiestStorageFolder(potentialFolders)
+					emptiestFolder, emptiestIndex = emptiestStorageFolder(availableFolders)
 					continue
 				}
 				// Indicate that the storage folder is doing successful writes.

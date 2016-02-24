@@ -105,7 +105,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	ht.host.mu.Lock()
 	err = ht.host.addSector(sectorRoot, 10, sectorData)
 	ht.host.mu.Unlock()
-	if err != errNoStorage {
+	if err != errInsufficientStorageForSector {
 		t.Fatal(err)
 	}
 

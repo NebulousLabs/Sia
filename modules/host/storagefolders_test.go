@@ -2,6 +2,8 @@ package host
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // TestStorageFolderUIDString probes the uidString method of the storage
@@ -103,9 +105,33 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
 	}
-
 	// Check that there are no collisions.
 	uidMap := make(map[uint8]struct{})
+	for _, sf := range ht.host.storageFolders {
+		_, exists := uidMap[uint8(sf.UID[0])]
+		if exists {
+			t.Error("Collision")
+		}
+		uidMap[uint8(sf.UID[0])] = struct{}{}
+	}
+
+	// Try again, this time removing a random storage folder and then adding
+	// another one repeatedly - enough times to exceed the 256 possible folder
+	// UIDs that be chosen in the testing environment.
+	for i := 0; i < 300; i++ {
+		// Repalce the very first storage folder.
+		ht.host.RemoveStorageFolder(0, false)
+		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+
+		// Replace a random storage folder.
+		n, err := crypto.RandIntn(100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ht.host.RemoveStorageFolder(n, false)
+		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+	}
+	uidMap = make(map[uint8]struct{})
 	for _, sf := range ht.host.storageFolders {
 		_, exists := uidMap[uint8(sf.UID[0])]
 		if exists {
