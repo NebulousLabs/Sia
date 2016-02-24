@@ -2,6 +2,7 @@ package host
 
 import (
 	"errors"
+	"io/ioutil"
 	"net"
 	"os"
 
@@ -41,6 +42,15 @@ type (
 		// OpenDatabase creates a database that the host can use to interact
 		// with large volumes of persistent data.
 		OpenDatabase(persist.Metadata, string) (*persist.BoltDatabase, error)
+
+		// ReadFile reads a file in full from the filesystem.
+		ReadFile(string) ([]byte, error)
+
+		// Remove removes a file from file filesystem.
+		Remove(string) error
+
+		// WriteFile writes data to the filesystem using the provided filename.
+		WriteFile(string, []byte, os.FileMode) error
 	}
 )
 
@@ -76,4 +86,19 @@ func (productionDependencies) NewLogger(s string) (*persist.Logger, error) {
 // volumes of persistent data.
 func (productionDependencies) OpenDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
 	return persist.OpenDatabase(m, s)
+}
+
+// ReadFile reads a file from the filesystem.
+func (productionDependencies) ReadFile(s string) ([]byte, error) {
+	return ioutil.ReadFile(s)
+}
+
+// Remove removes a file from the filesystem.
+func (productionDependencies) Remove(s string) error {
+	return os.Remove(s)
+}
+
+// WriteFile writes a file to the filesystem.
+func (productionDependencies) WriteFile(s string, b []byte, fm os.FileMode) error {
+	return ioutil.WriteFile(s, b, fm)
 }

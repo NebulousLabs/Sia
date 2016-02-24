@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -170,7 +168,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 		emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
 		for emptiestFolder != nil {
 			sectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(sectorKey))
-			err := ioutil.WriteFile(sectorPath, sectorData, 0700)
+			err := h.dependencies.WriteFile(sectorPath, sectorData, 0700)
 			if err != nil {
 				// Indicate to the user that the storage folder is having write
 				// trouble.
@@ -262,7 +260,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		}
 
 		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
-		err = os.Remove(sectorPath)
+		err = h.dependencies.Remove(sectorPath)
 		if err != nil {
 			// Indicate that the storage folder is having write troubles.
 			for _, sf := range h.storageFolders {

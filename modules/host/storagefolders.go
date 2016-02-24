@@ -86,7 +86,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -380,7 +379,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 			for emptiestFolder != nil {
 				oldSectorPath := filepath.Join(h.persistDir, offloadFolder.uidString(), string(currentSectorID))
 				// Try reading the sector from disk.
-				sectorData, err := ioutil.ReadFile(oldSectorPath)
+				sectorData, err := h.dependencies.ReadFile(oldSectorPath)
 				if err != nil {
 					// Inidicate that the storage folder is having read
 					// troubles.
@@ -395,7 +394,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				offloadFolder.SuccessfulReads++
 
 				newSectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(currentSectorID))
-				err = ioutil.WriteFile(newSectorPath, sectorData, 0700)
+				err = h.dependencies.WriteFile(newSectorPath, sectorData, 0700)
 				if err != nil {
 					// Indicate that the storage folder is having write
 					// troubles.
@@ -414,7 +413,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				}
 				// Indicate that the storage folder is doing successful writes.
 				emptiestFolder.SuccessfulWrites++
-				err = os.Remove(oldSectorPath)
+				err = h.dependencies.Remove(oldSectorPath)
 				if err != nil {
 					// Indicate that the storage folder is having write
 					// troubles.
@@ -524,7 +523,7 @@ func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
 	}
 
 	// Remove the symlink that points to the data folder.
-	err = os.Remove(filepath.Join(h.persistDir, removalFolder.uidString()))
+	err = h.dependencies.Remove(filepath.Join(h.persistDir, removalFolder.uidString()))
 	if err != nil && offloadErr != nil {
 		// Need to compose the offload error with the remove error.
 		return errors.New(offloadErr.Error() + " and " + err.Error())
