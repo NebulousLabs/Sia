@@ -89,6 +89,94 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// TestContracts tests the Contracts method.
+func TestContracts(t *testing.T) {
+	c := &Contractor{
+		contracts: map[types.FileContractID]Contract{
+			{1}: Contract{ID: types.FileContractID{1}, IP: "foo"},
+			{2}: Contract{ID: types.FileContractID{2}, IP: "bar"},
+			{3}: Contract{ID: types.FileContractID{3}, IP: "baz"},
+		},
+	}
+	for _, contract := range c.Contracts() {
+		if exp := c.contracts[contract.ID]; exp.IP != contract.IP {
+			t.Errorf("contract does not match: expected %v, got %v", exp.IP, contract.IP)
+		}
+	}
+}
+
+// TestAllowance tests the Allowance method.
+func TestAllowance(t *testing.T) {
+	c := &Contractor{
+		allowance: modules.Allowance{
+			Funds:  types.NewCurrency64(1),
+			Period: 2,
+			Hosts:  3,
+		},
+	}
+	a := c.Allowance()
+	if a.Funds.Cmp(c.allowance.Funds) != 0 ||
+		a.Period != c.allowance.Period ||
+		a.Hosts != c.allowance.Hosts {
+		t.Fatal("Allowance did not return correct allowance:", a, c.allowance)
+	}
+
+	// newAllowance should override allowance
+	c.newAllowance = modules.Allowance{
+		Funds:  types.NewCurrency64(4),
+		Period: 5,
+		Hosts:  6,
+	}
+
+	a = c.Allowance()
+	if a.Funds.Cmp(c.newAllowance.Funds) != 0 ||
+		a.Period != c.newAllowance.Period ||
+		a.Hosts != c.newAllowance.Hosts {
+		t.Fatal("Allowance did not return correct allowance:", a, c.newAllowance)
+	}
+}
+
+// stubHostDB mocks the hostDB dependency using zero-valued implementations of
+// its methods.
+type stubHostDB struct{}
+
+func (stubHostDB) Host(modules.NetAddress) (h modules.HostSettings, ok bool)         { return }
+func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostSettings) { return }
+
+// TestSetAllowance tests the SetAllowance method.
+func TestSetAllowance(t *testing.T) {
+	c := &Contractor{
+		// an empty hostDB ensures that calls to formContracts will always fail
+		hdb: stubHostDB{},
+	}
+
+	err := c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 0, Hosts: 3})
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 0})
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+
+	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
+	if err == nil {
+		t.Error("expected error, got nil")
+	} else if c.allowance.Hosts != 0 {
+		t.Error("allowance should not be affected when SetAllowance returns an error")
+	}
+
+	// set renewHeight manually; this will cause SetAllowance to set
+	// nextAllowance instead
+	c.renewHeight = 50
+	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
+	if err != nil {
+		t.Error(err)
+	} else if c.newAllowance.Hosts != 3 {
+		t.Error("newAllowance was not set:", c.newAllowance)
+	}
+}
+
 // testWalletShim is used to test the walletBridge type.
 type testWalletShim struct {
 	nextAddressCalled bool
