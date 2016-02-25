@@ -92,14 +92,25 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 		return err
 	}
 	// add node
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
-	if err := g.addNode(addr); err != nil {
+	err := func() error {
+		// We wrap this logic in an anonymous function so we can defer Unlock to
+		// avoid managing locks across branching.
+		id := g.mu.Lock()
+		defer g.mu.Unlock(id)
+		if err := g.addNode(addr); err != nil {
+			return err
+		}
+		if err := g.save(); err != nil {
+			return err
+		}
+		return nil
+	}()
+	if err != nil {
 		return err
 	}
-	g.save()
 	// relay
-	go g.Broadcast("RelayNode", addr, nil)
+	peers := g.Peers()
+	go g.Broadcast("RelayNode", addr, peers)
 	return nil
 }
 
