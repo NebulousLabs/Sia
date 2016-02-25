@@ -120,20 +120,6 @@ func TestAllowance(t *testing.T) {
 		a.Hosts != c.allowance.Hosts {
 		t.Fatal("Allowance did not return correct allowance:", a, c.allowance)
 	}
-
-	// newAllowance should override allowance
-	c.newAllowance = modules.Allowance{
-		Funds:  types.NewCurrency64(4),
-		Period: 5,
-		Hosts:  6,
-	}
-
-	a = c.Allowance()
-	if a.Funds.Cmp(c.newAllowance.Funds) != 0 ||
-		a.Period != c.newAllowance.Period ||
-		a.Hosts != c.newAllowance.Hosts {
-		t.Fatal("Allowance did not return correct allowance:", a, c.newAllowance)
-	}
 }
 
 // stubHostDB mocks the hostDB dependency using zero-valued implementations of
@@ -150,6 +136,7 @@ func TestSetAllowance(t *testing.T) {
 		hdb: stubHostDB{},
 	}
 
+	// bad args
 	err := c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 0, Hosts: 3})
 	if err == nil {
 		t.Error("expected error, got nil")
@@ -159,11 +146,10 @@ func TestSetAllowance(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 
+	// formContracts should fail (no hosts)
 	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
 	if err == nil {
 		t.Error("expected error, got nil")
-	} else if c.allowance.Hosts != 0 {
-		t.Error("allowance should not be affected when SetAllowance returns an error")
 	}
 
 	// set renewHeight manually; this will cause SetAllowance to set
@@ -172,8 +158,8 @@ func TestSetAllowance(t *testing.T) {
 	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
 	if err != nil {
 		t.Error(err)
-	} else if c.newAllowance.Hosts != 3 {
-		t.Error("newAllowance was not set:", c.newAllowance)
+	} else if c.allowance.Hosts != 3 {
+		t.Error("allowance was not set:", c.allowance)
 	}
 }
 

@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -100,4 +101,27 @@ func (c *Contractor) managedRenew(fcid types.FileContractID, newEndHeight types.
 	}
 
 	return newContract.ID, nil
+}
+
+// threadedRenewContracts renews the Contractor's contracts according to the
+// specified allowance and at the specified height.
+func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeight types.BlockHeight) {
+	var wg sync.WaitGroup
+	c.mu.RLock()
+	wg.Add(len(c.contracts))
+	for _, contract := range c.contracts {
+		if contract.FileContract.WindowStart < newHeight {
+			go func() {
+				defer wg.Done()
+				_, err := c.managedRenew(contract.ID, newHeight)
+				if err != nil {
+					c.log.Println("WARN: failed to renew contract", contract.ID, ":", err)
+				}
+			}()
+		}
+	}
+	c.mu.RUnlock()
+	wg.Wait()
+
+	// TODO: reset renewHeight if too many rewewals failed.
 }

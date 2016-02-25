@@ -7,10 +7,9 @@ import (
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance    modules.Allowance
-	Contracts    []Contract
-	NewAllowance modules.Allowance
-	RenewHeight  types.BlockHeight
+	Allowance   modules.Allowance
+	Contracts   []Contract
+	RenewHeight types.BlockHeight
 }
 
 // save saves the hostdb persistence data to disk.
@@ -21,7 +20,6 @@ func (c *Contractor) save() error {
 		data.Contracts = append(data.Contracts, contract)
 	}
 	data.RenewHeight = c.renewHeight
-	data.NewAllowance = c.newAllowance
 	return c.persist.save(data)
 }
 
@@ -37,6 +35,5 @@ func (c *Contractor) load() error {
 		c.contracts[contract.ID] = contract
 	}
 	c.renewHeight = data.RenewHeight
-	c.newAllowance = data.NewAllowance
 	return nil
 }
