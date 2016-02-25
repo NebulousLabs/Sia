@@ -32,7 +32,8 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// However, this means those goroutines must reset the renewHeight
 		// manually if they fail.
 		oldHeight := c.renewHeight
-		c.renewHeight += c.allowance.Period
+		newHeight := oldHeight + c.allowance.Period
+		c.renewHeight = newHeight
 
 		// if newAllowance is set, use the new allowance to form new
 		// contracts. Otherwise, renew existing contracts.
@@ -55,7 +56,6 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}()
 		} else {
 			go func() {
-				newHeight := c.renewHeight + c.allowance.Period
 				for _, contract := range c.contracts {
 					if contract.FileContract.WindowStart == c.renewHeight {
 						_, err := c.managedRenew(contract.ID, newHeight)
