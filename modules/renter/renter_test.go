@@ -112,7 +112,7 @@ func (stubHostDB) IsOffline(modules.NetAddress) bool   { return true }
 // interface.
 type stubContractor struct{}
 
-func (stubContractor) NewPool(uint64, types.BlockHeight) (contractor.HostPool, error) { return nil, nil }
-func (stubContractor) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
-	return types.FileContractID{}, nil
-}
+func (stubContractor) SetAllowance(modules.Allowance) error                      { return nil }
+func (stubContractor) Allowance() modules.Allowance                              { return modules.Allowance{} }
+func (stubContractor) Contracts() []contractor.Contract                          { return nil }
+func (stubContractor) Uploader(contractor.Contract) (contractor.Uploader, error) { return nil, nil }

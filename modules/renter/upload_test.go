@@ -12,26 +12,20 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// uploadContractor is a mocked hostContracto, contractor.HostPool, and
-// contractor.Uploader. It is used for testing the uploading and repairing
-// functions of the renter.
+// uploadContractor is a mocked hostContractor and contractor.Uploader. It is
+// used for testing the uploading and repairing functions of the renter.
 type uploadContractor struct {
 	stubContractor
 }
 
-// NewPool returns a new mock HostPool. Since uploadContractor implements the
-// HostPool interface, it can simply return itself.
-func (hdb uploadContractor) NewPool(uint64, types.BlockHeight) (contractor.HostPool, error) {
-	return hdb, nil
+func (uploadContractor) Contracts() []contractor.Contract {
+	return make([]contractor.Contract, 24) // exact number shouldn't matter, as long as its large enough
 }
 
-// UniqueHosts returns a set of mocked Uploaders. Since uploadContractor
-// implements the Uploader interface, it can simply return itself.
-func (hdb uploadContractor) UniqueHosts(n int, _ []modules.NetAddress) (ups []contractor.Uploader) {
-	for i := 0; i < n; i++ {
-		ups = append(ups, hdb)
-	}
-	return
+// Uploader simply returns the uploadContractor, since it also implements the
+// Uploader interface.
+func (uc *uploadContractor) Uploader(contractor.Contract) (contractor.Uploader, error) {
+	return uc, nil
 }
 
 // Upload simulates a successful data upload.
