@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
@@ -201,14 +200,17 @@ func (r *Renter) threadedRepairLoop() {
 		}
 		r.mu.RUnlock(id)
 
+		// create host pool
+		pool := r.newHostPool()
 		for name, meta := range repairing {
-			r.threadedRepairFile(name, meta)
+			r.threadedRepairFile(name, meta, pool)
 		}
+		pool.Close() // heh
 	}
 }
 
 // threadedRepairFile repairs and saves an individual file.
-func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
+func (r *Renter) threadedRepairFile(name string, meta trackedFile, pool *hostPool) {
 	// helper function
 	logAndRemove := func(fmt string, args ...interface{}) {
 		r.log.Printf(fmt, args...)
@@ -234,9 +236,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 
 	// determine if there is any work to do
 	incChunks := f.incompleteChunks()
-	offlineChunks := f.offlineChunks(r.hostDB)
-	expContracts := f.expiringContracts(height)
-	if len(incChunks) == 0 && len(offlineChunks) == 0 && (!meta.Renew || len(expContracts) == 0) {
+	if len(incChunks) == 0 {
 		return
 	}
 
@@ -251,39 +251,12 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// repair incomplete chunks
 	if len(incChunks) != 0 {
 		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
-		var duration types.BlockHeight
-		if meta.Renew {
-			duration = defaultDuration
-		} else {
-			duration = meta.EndHeight - height
-		}
-		r.repairChunks(f, handle, incChunks, duration)
-	}
-
-	// repair offline chunks
-	if len(offlineChunks) != 0 {
-		r.log.Printf("reuploading %v offline chunks of %v", len(offlineChunks), f.name)
-		var duration types.BlockHeight
-		if meta.Renew {
-			duration = defaultDuration
-		} else {
-			duration = meta.EndHeight - height
-		}
-		r.repairChunks(f, handle, offlineChunks, duration)
+		r.repairChunks(f, handle, incChunks, pool)
 	}
 }
 
 // repairChunks uploads missing chunks of f to new hosts.
-func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, duration types.BlockHeight) {
-	// create host pool
-	contractSize := (f.pieceSize + crypto.TwofishOverhead) * uint64(len(chunks)) // each host gets one piece of each chunk
-	pool, err := r.newHostPool(contractSize, duration)
-	if err != nil {
-		r.log.Printf("failed to repair %v: %v", f.name, err)
-		return
-	}
-	defer pool.Close() // heh
-
+func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, pool *hostPool) {
 	for chunk, pieces := range chunks {
 		// Determine host set. We want one host for each missing piece, and no
 		// repeats of other hosts of this chunk.
@@ -293,7 +266,7 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 			return
 		}
 		// upload to new hosts
-		err = f.repair(chunk, pieces, handle, hosts)
+		err := f.repair(chunk, pieces, handle, hosts)
 		if err != nil {
 			r.log.Printf("aborting repair of %v: %v", f.name, err)
 			return

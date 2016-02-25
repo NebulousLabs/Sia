@@ -3,7 +3,6 @@ package renter
 import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // A hostPool is a collection of hosts that can store data. New hosts are
@@ -80,9 +79,9 @@ func (p *hostPool) uniqueHosts(n int, exclude []modules.NetAddress) (hosts []con
 }
 
 // newHostPool returns an empty hostPool.
-func (r *Renter) newHostPool(filesize uint64, duration types.BlockHeight) (*hostPool, error) {
+func (r *Renter) newHostPool() *hostPool {
 	return &hostPool{
 		hostContractor: r.hostContractor,
 		hdb:            r.hostDB,
-	}, nil
+	}
 }
