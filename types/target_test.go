@@ -41,6 +41,27 @@ func TestTargetCmp(t *testing.T) {
 	}
 }
 
+// TestTargetDifficulty probes the Difficulty function of the target type.
+func TestTargetDifficulty(t *testing.T) {
+	var target1, target2, target3 Target
+	target2[crypto.HashSize-1] = 1
+	target3[crypto.HashSize-1] = 2
+
+	expDifficulty1 := NewCurrency(RootDepth.Int())
+	expDifficulty2 := NewCurrency(RootDepth.Int())
+	expDifficulty3 := NewCurrency(RootDepth.Int()).Div(NewCurrency64(2))
+
+	if difficulty := target1.Difficulty(); difficulty.Cmp(expDifficulty1) != 0 {
+		t.Errorf("Expected difficulty %v, got %v", expDifficulty1, difficulty)
+	}
+	if difficulty := target2.Difficulty(); difficulty.Cmp(expDifficulty2) != 0 {
+		t.Errorf("Expected difficulty %v, got %v", expDifficulty2, difficulty)
+	}
+	if difficulty := target3.Difficulty(); difficulty.Cmp(expDifficulty3) != 0 {
+		t.Errorf("Expected difficulty %v, got %v", expDifficulty3, difficulty)
+	}
+}
+
 // TestTargetInt probes the Int function of the target type.
 func TestTargetInt(t *testing.T) {
 	var target Target
