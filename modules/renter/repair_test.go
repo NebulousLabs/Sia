@@ -86,7 +86,7 @@ func TestRepair(t *testing.T) {
 		}
 	}
 	// make one host really slow
-	//hosts[0].(*testHost).delay = 100 * time.Millisecond
+	hosts[0].(*testHost).delay = 100 * time.Millisecond
 	// make one host always fail
 	hosts[1].(*testHost).failRate = 1
 

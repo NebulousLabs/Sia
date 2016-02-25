@@ -3,6 +3,7 @@ package renter
 import (
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -56,37 +57,39 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	if len(hosts) < numPieces {
 		numPieces = len(hosts)
 	}
+	var wg sync.WaitGroup
+	wg.Add(numPieces)
 	for i := 0; i < numPieces; i++ {
-		pieceIndex := missingPieces[i]
-		host := hosts[i]
-		piece := pieces[pieceIndex]
-
-		// upload data to host
-		offset, err := host.Upload(piece)
-		if err != nil {
-			continue
-		}
-
-		// create contract entry, if necessary
-		f.mu.Lock()
-		contract, ok := f.contracts[host.ContractID()]
-		if !ok {
-			contract = fileContract{
-				ID:          host.ContractID(),
-				IP:          host.Address(),
-				WindowStart: host.EndHeight(),
+		go func(pieceIndex uint64, host contractor.Uploader) {
+			defer wg.Done()
+			// upload data to host
+			offset, err := host.Upload(pieces[pieceIndex])
+			if err != nil {
+				return
 			}
-		}
 
-		// update contract
-		contract.Pieces = append(contract.Pieces, pieceData{
-			Chunk:  chunkIndex,
-			Piece:  pieceIndex,
-			Offset: offset,
-		})
-		f.contracts[host.ContractID()] = contract
-		f.mu.Unlock()
+			// create contract entry, if necessary
+			f.mu.Lock()
+			contract, ok := f.contracts[host.ContractID()]
+			if !ok {
+				contract = fileContract{
+					ID:          host.ContractID(),
+					IP:          host.Address(),
+					WindowStart: host.EndHeight(),
+				}
+			}
+
+			// update contract
+			contract.Pieces = append(contract.Pieces, pieceData{
+				Chunk:  chunkIndex,
+				Piece:  pieceIndex,
+				Offset: offset,
+			})
+			f.contracts[host.ContractID()] = contract
+			f.mu.Unlock()
+		}(missingPieces[i], hosts[i])
 	}
+	wg.Wait()
 
 	return nil
 }
