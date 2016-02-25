@@ -11,28 +11,28 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// uploaderHostDB is used to test the Uploader method.
-type uploaderHostDB struct {
+// editorHostDB is used to test the Editor method.
+type editorHostDB struct {
 	stubHostDB
 	hosts map[modules.NetAddress]modules.HostSettings
 }
 
-func (hdb uploaderHostDB) Host(addr modules.NetAddress) (modules.HostSettings, bool) {
+func (hdb editorHostDB) Host(addr modules.NetAddress) (modules.HostSettings, bool) {
 	h, ok := hdb.hosts[addr]
 	return h, ok
 }
 
-// uploaderDialer is used to test the Uploader method.
-type uploaderDialer func() (net.Conn, error)
+// editorDialer is used to test the Editor method.
+type editorDialer func() (net.Conn, error)
 
-func (dial uploaderDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
+func (dial editorDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
 	return dial()
 }
 
-// TestUploader tests the Uploader method.
-func TestUploader(t *testing.T) {
+// TestEditor tests the Editor method.
+func TestEditor(t *testing.T) {
 	// use a mock hostdb to supply hosts
-	hdb := &uploaderHostDB{
+	hdb := &editorHostDB{
 		hosts: make(map[modules.NetAddress]modules.HostSettings),
 	}
 	c := &Contractor{
@@ -40,14 +40,14 @@ func TestUploader(t *testing.T) {
 	}
 
 	// empty contract
-	_, err := c.Uploader(Contract{})
+	_, err := c.Editor(Contract{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// expired contract
 	c.blockHeight = 3
-	_, err = c.Uploader(Contract{})
+	_, err = c.Editor(Contract{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -55,14 +55,14 @@ func TestUploader(t *testing.T) {
 
 	// expensive host
 	hdb.hosts["foo"] = modules.HostSettings{Price: types.NewCurrency64(^uint64(0))}
-	_, err = c.Uploader(Contract{IP: "foo"})
+	_, err = c.Editor(Contract{IP: "foo"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// invalid contract
 	hdb.hosts["bar"] = modules.HostSettings{Price: types.NewCurrency64(500)}
-	_, err = c.Uploader(Contract{IP: "bar"})
+	_, err = c.Editor(Contract{IP: "bar"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -77,7 +77,7 @@ func TestUploader(t *testing.T) {
 			},
 		},
 	}
-	_, err = c.Uploader(contract)
+	_, err = c.Editor(contract)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -86,27 +86,27 @@ func TestUploader(t *testing.T) {
 	contract.LastRevision.NewValidProofOutputs[0].Value = types.NewCurrency64(SectorSize * 500)
 
 	// contract with unresponsive host
-	c.dialer = uploaderDialer(func() (net.Conn, error) {
+	c.dialer = editorDialer(func() (net.Conn, error) {
 		return nil, net.ErrWriteToConnected
 	})
-	_, err = c.Uploader(contract)
+	_, err = c.Editor(contract)
 	if err != net.ErrWriteToConnected {
 		t.Error("expected ErrWriteToConnected, got", err)
 	}
 
 	// contract with a disconnecting host
-	c.dialer = uploaderDialer(func() (net.Conn, error) {
+	c.dialer = editorDialer(func() (net.Conn, error) {
 		ourPipe, theirPipe := net.Pipe()
 		ourPipe.Close()
 		return theirPipe, nil
 	})
-	_, err = c.Uploader(contract)
+	_, err = c.Editor(contract)
 	if err == nil {
 		t.Errorf("expected err, got nil")
 	}
 
 	// contract with a disconnecting host
-	c.dialer = uploaderDialer(func() (net.Conn, error) {
+	c.dialer = editorDialer(func() (net.Conn, error) {
 		// create an in-memory conn and spawn a goroutine to handle our half
 		ourConn, theirConn := net.Pipe()
 		go func() {
@@ -116,13 +116,13 @@ func TestUploader(t *testing.T) {
 		}()
 		return theirConn, nil
 	})
-	_, err = c.Uploader(contract)
+	_, err = c.Editor(contract)
 	if err == nil {
 		t.Error("expected err, got nil")
 	}
 
 	// contract with a valid host
-	c.dialer = uploaderDialer(func() (net.Conn, error) {
+	c.dialer = editorDialer(func() (net.Conn, error) {
 		// create an in-memory conn and spawn a goroutine to handle our half
 		ourConn, theirConn := net.Pipe()
 		go func() {
@@ -132,7 +132,7 @@ func TestUploader(t *testing.T) {
 		}()
 		return theirConn, nil
 	})
-	_, err = c.Uploader(contract)
+	_, err = c.Editor(contract)
 	if err != nil {
 		t.Error(err)
 	}

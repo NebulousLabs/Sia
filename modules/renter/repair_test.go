@@ -16,7 +16,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// a testHost simulates a host. It implements the contractor.Uploader interface.
+// a testHost simulates a host. It implements the contractor.Editor interface.
 type testHost struct {
 	ip   modules.NetAddress
 	data []byte
@@ -28,7 +28,7 @@ type testHost struct {
 	sync.Mutex
 }
 
-// stub implementations of the contractor.Uploader methods
+// stub implementations of the contractor.Editor methods
 func (h *testHost) Address() modules.NetAddress  { return h.ip }
 func (h *testHost) EndHeight() types.BlockHeight { return 0 }
 func (h *testHost) Close() error                 { return nil }
@@ -77,7 +77,7 @@ func TestRepair(t *testing.T) {
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]contractor.Uploader, rsc.NumPieces())
+	hosts := make([]contractor.Editor, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
 			ip:       modules.NetAddress(strconv.Itoa(i)),

@@ -8,7 +8,7 @@ import (
 // A hostPool is a collection of hosts that can store data. New hosts are
 // drawn from a HostDB, and contracts are negotiated with them on demand.
 type hostPool struct {
-	hosts          []contractor.Uploader
+	hosts          []contractor.Editor
 	blacklist      []modules.NetAddress
 	hostContractor hostContractor
 	hdb            hostDB
@@ -22,14 +22,14 @@ func (p *hostPool) Close() error {
 	return nil
 }
 
-// add adds a contract's host to the hostPool and returns it as an Uploader.
-func (p *hostPool) add(contract contractor.Contract) (contractor.Uploader, error) {
+// add adds a contract's host to the hostPool and returns it as an Editor.
+func (p *hostPool) add(contract contractor.Contract) (contractor.Editor, error) {
 	for _, h := range p.hosts {
 		if h.Address() == contract.IP {
 			return h, nil
 		}
 	}
-	hu, err := p.hostContractor.Uploader(contract)
+	hu, err := p.hostContractor.Editor(contract)
 	if err != nil {
 		p.blacklist = append(p.blacklist, contract.IP)
 		return nil, err
@@ -43,7 +43,7 @@ func (p *hostPool) add(contract contractor.Contract) (contractor.Uploader, error
 // new contracts if more hosts are required. Note that this latter case
 // requires network I/O, so the caller should always assume that uniqueHosts
 // will block.
-func (p *hostPool) uniqueHosts(n int, exclude []modules.NetAddress) (hosts []contractor.Uploader) {
+func (p *hostPool) uniqueHosts(n int, exclude []modules.NetAddress) (hosts []contractor.Editor) {
 	if n == 0 {
 		return
 	}

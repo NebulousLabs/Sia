@@ -12,7 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// uploadContractor is a mocked hostContractor and contractor.Uploader. It is
+// uploadContractor is a mocked hostContractor and contractor.Editor. It is
 // used for testing the uploading and repairing functions of the renter.
 type uploadContractor struct {
 	stubContractor
@@ -22,16 +22,16 @@ func (uploadContractor) Contracts() []contractor.Contract {
 	return make([]contractor.Contract, 24) // exact number shouldn't matter, as long as its large enough
 }
 
-// Uploader simply returns the uploadContractor, since it also implements the
-// Uploader interface.
-func (uc *uploadContractor) Uploader(contractor.Contract) (contractor.Uploader, error) {
+// Editor simply returns the uploadContractor, since it also implements the
+// Editor interface.
+func (uc *uploadContractor) Editor(contractor.Contract) (contractor.Editor, error) {
 	return uc, nil
 }
 
 // Upload simulates a successful data upload.
 func (uploadContractor) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
 
-// stub implementations of the contractor.Uploader methods
+// stub implementations of the contractor.Editor methods
 func (uploadContractor) Address() modules.NetAddress      { return "" }
 func (uploadContractor) ContractID() types.FileContractID { return types.FileContractID{} }
 func (uploadContractor) EndHeight() types.BlockHeight     { return 10000 }

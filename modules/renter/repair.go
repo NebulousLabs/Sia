@@ -32,7 +32,7 @@ var renewThreshold = func() types.BlockHeight {
 
 // repair attempts to repair a file chunk by uploading its pieces to more
 // hosts.
-func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []contractor.Uploader) error {
+func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []contractor.Editor) error {
 	// read chunk data and encode
 	chunk := make([]byte, f.chunkSize())
 	_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
@@ -60,7 +60,7 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	var wg sync.WaitGroup
 	wg.Add(numPieces)
 	for i := 0; i < numPieces; i++ {
-		go func(pieceIndex uint64, host contractor.Uploader) {
+		go func(pieceIndex uint64, host contractor.Editor) {
 			defer wg.Done()
 			// upload data to host
 			offset, err := host.Upload(pieces[pieceIndex])

@@ -42,9 +42,9 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []contractor.Contract
 
-	// Uploader creates an uploader from the specified contract, allowing it
-	// to be modified.
-	Uploader(contractor.Contract) (contractor.Uploader, error)
+	// Editor creates an Editor from the specified contract, allowing it to be
+	// modified.
+	Editor(contractor.Contract) (contractor.Editor, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
