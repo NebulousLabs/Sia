@@ -49,14 +49,6 @@ package host
 
 // TODO: Satisfy the the modules.Host interface.
 
-// TODO: All exported functions should wrap the errors that they return so that
-// there is more context for the user + developer when something goes wrong.
-
-// TODO: There needs to be some way for ferrying persistent/ongoing errors to
-// the user, like an error channel of some sort. I guess a log, but with more
-// than just debugging information. Should Sia have a global log that is used
-// to ferry important information to the user?
-
 // TODO: Make sure all the persist is moving over. In particular, the sector
 // salt is important. Also, the sector salt needs to be documented.
 
@@ -257,7 +249,7 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 	newSF.UID = make([]byte, storageFolderUIDSize)
 	for {
 		// Generate an attempt UID for the storage folder.
-		_, err = h.dependencies.Read(newSF.UID)
+		_, err = h.dependencies.randRead(newSF.UID)
 		if err != nil {
 			return err
 		}
@@ -279,7 +271,7 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 
 	// Symlink the path for the data to the UID location of the host.
 	symPath := filepath.Join(h.persistDir, newSF.uidString())
-	err = os.Symlink(path, symPath)
+	err = h.dependencies.symlink(path, symPath)
 	if err != nil {
 		return err
 	}
@@ -332,6 +324,13 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 	dataOffloaded := uint64(0)
 	for currentSectorID != nil && dataOffloaded < dataToOffload && len(availableFolders) > 0 {
 		err = h.db.Update(func(tx *bolt.Tx) error {
+			// Defer seeking to the next sector.
+			defer func() {
+				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
+				bsuc.Seek(currentSectorID)
+				currentSectorID, currentSectorBytes = bsuc.Next()
+			}()
+
 			// Determine whether the sector needs to be moved.
 			var usage sectorUsage
 			err = json.Unmarshal(currentSectorBytes, &usage)
@@ -340,33 +339,19 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 			}
 			if !bytes.Equal(usage.StorageFolder, offloadFolder.UID) {
 				// The current sector is not in the offloading storage folder,
-				// try the next sector.
-				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-				bsuc.Seek(currentSectorID)
-				currentSectorID, currentSectorBytes = bsuc.Next()
-				// Returning nil will advance to the next iteration of the
-				// loop.
+				// try the next sector. Returning nil will advance to the next
+				// iteration of the loop.
 				return nil
 			}
 
 			// This sector is in the removal folder, and therefore needs to
 			// be moved to the next folder.
-			emptiestFolder, emptiestIndex := emptiestStorageFolder(availableFolders)
-			if emptiestFolder == nil {
-				// If 'emptiestFolder' is nil, there are no storage folders
-				// remaining that have enough storage to take on a new sector.
-				// There is no point iterating through more sectors. Returning
-				// nil will break out of this iteration, and setting available
-				// folders to 'nil' will terminate the loop.
-				availableFolders = nil
-				return nil
-			}
-
 			success := false
+			emptiestFolder, emptiestIndex := emptiestStorageFolder(availableFolders)
 			for emptiestFolder != nil {
 				oldSectorPath := filepath.Join(h.persistDir, offloadFolder.uidString(), string(currentSectorID))
 				// Try reading the sector from disk.
-				sectorData, err := h.dependencies.ReadFile(oldSectorPath)
+				sectorData, err := h.dependencies.readFile(oldSectorPath)
 				if err != nil {
 					// Inidicate that the storage folder is having read
 					// troubles.
@@ -382,7 +367,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 
 				// Try writing the sector to the emptiest storage folder.
 				newSectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(currentSectorID))
-				err = h.dependencies.WriteFile(newSectorPath, sectorData, 0700)
+				err = h.dependencies.writeFile(newSectorPath, sectorData, 0700)
 				if err != nil {
 					// Indicate that the storage folder is having write
 					// troubles.
@@ -399,13 +384,14 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				}
 				// Indicate that the storage folder is doing successful writes.
 				emptiestFolder.SuccessfulWrites++
-				err = h.dependencies.Remove(oldSectorPath)
+				err = h.dependencies.removeFile(oldSectorPath)
 				if err != nil {
 					// Indicate that the storage folder is having write
 					// troubles.
 					offloadFolder.FailedWrites++
+				} else {
+					offloadFolder.SuccessfulWrites++
 				}
-				offloadFolder.SuccessfulWrites++
 
 				success = true
 				break
@@ -435,9 +421,6 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 			}
 
 			// Seek to the next sector.
-			bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-			bsuc.Seek(currentSectorID)
-			currentSectorID, currentSectorBytes = bsuc.Next()
 			return nil
 		})
 		if err != nil {
@@ -484,38 +467,10 @@ func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
 	}
 
 	// Remove the storage folder from the host and then save the host.
-	oldStorageFolders := h.storageFolders
 	h.storageFolders = append(h.storageFolders[0:removalIndex], h.storageFolders[removalIndex+1:]...)
-	err := h.save()
-	if err != nil {
-		// Revert the storage folders to the old storage folders, since the
-		// save operation has failed. Cap the size of the removalFolder so that
-		// future negotiations will not try to use it to store sectors.
-		//
-		// This is done because a future save may succeed, but the host needs
-		// to be kept consistent.
-		h.storageFolders = oldStorageFolders
-		removalFolder.Size = removalFolder.SizeRemaining
-		removalFolder.SizeRemaining = 0
-
-		// Check if the offload error needs to be composed into the save error.
-		if offloadErr != nil {
-			// There was an error in the offloading process, and that needs to
-			// be composed into the return value.
-			return errors.New(offloadErr.Error() + " and " + err.Error())
-		}
-		return err
-	}
-
-	// Remove the symlink that points to the data folder.
-	err = h.dependencies.Remove(filepath.Join(h.persistDir, removalFolder.uidString()))
-	if err != nil && offloadErr != nil {
-		// Need to compose the offload error with the remove error.
-		return errors.New(offloadErr.Error() + " and " + err.Error())
-	} else if err != nil {
-		return err
-	}
-	return offloadErr
+	removeErr := h.dependencies.removeFile(filepath.Join(h.persistDir, removalFolder.uidString()))
+	saveErr := h.save()
+	return composeErrors(saveErr, removeErr)
 }
 
 // ResizeStorageFolder changes the amount of disk space that is going to be

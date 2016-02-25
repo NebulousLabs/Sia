@@ -16,7 +16,7 @@ import (
 func (h *Host) initNetworking(address string) error {
 	// Create listener and set address.
 	var err error
-	h.listener, err = h.dependencies.Listen("tcp", address)
+	h.listener, err = h.dependencies.listen("tcp", address)
 	if err != nil {
 		return err
 	}

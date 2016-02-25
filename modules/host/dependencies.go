@@ -18,6 +18,10 @@ var (
 	mockErrMkdirAll     = errors.New("simulated MkdirAll failure")
 	mockErrNewLogger    = errors.New("simulated NewLogger failure")
 	mockErrOpenDatabase = errors.New("simulated OpenDatabase failure")
+	mockErrReadFile     = errors.New("simulated ReadFile failure")
+	mockErrRemoveFile   = errors.New("simulated RemoveFile faulure")
+	mockErrSymlink      = errors.New("simulated Symlink failure")
+	mockErrWriteFile    = errors.New("simulated WriteFile failure")
 )
 
 // These interfaces define the Host's dependencies. Mocking implementation
@@ -26,35 +30,38 @@ var (
 type (
 	// dependencies defines all of the dependencies of the Host.
 	dependencies interface {
-		// Listen gives the host the ability to receive incoming connections.
-		Listen(string, string) (net.Listener, error)
+		// listen gives the host the ability to receive incoming connections.
+		listen(string, string) (net.Listener, error)
 
-		// LoadFile allows the host to load a persistence structure form disk.
-		LoadFile(persist.Metadata, interface{}, string) error
+		// loadFile allows the host to load a persistence structure form disk.
+		loadFile(persist.Metadata, interface{}, string) error
 
-		// MkdirAll gives the host the ability to create chains of folders
+		// mkdirAll gives the host the ability to create chains of folders
 		// within the filesystem.
-		MkdirAll(string, os.FileMode) error
+		mkdirAll(string, os.FileMode) error
 
-		// NewLogger creates a logger that the host can use to log messages and
+		// newLogger creates a logger that the host can use to log messages and
 		// write critical statements.
-		NewLogger(string) (*persist.Logger, error)
+		newLogger(string) (*persist.Logger, error)
 
-		// OpenDatabase creates a database that the host can use to interact
+		// openDatabase creates a database that the host can use to interact
 		// with large volumes of persistent data.
-		OpenDatabase(persist.Metadata, string) (*persist.BoltDatabase, error)
+		openDatabase(persist.Metadata, string) (*persist.BoltDatabase, error)
 
-		// Read fills the input bytes with random data.
-		Read([]byte) (int, error)
+		// randRead fills the input bytes with random data.
+		randRead([]byte) (int, error)
 
-		// ReadFile reads a file in full from the filesystem.
-		ReadFile(string) ([]byte, error)
+		// readFile reads a file in full from the filesystem.
+		readFile(string) ([]byte, error)
 
-		// Remove removes a file from file filesystem.
-		Remove(string) error
+		// removeFile removes a file from file filesystem.
+		removeFile(string) error
 
-		// WriteFile writes data to the filesystem using the provided filename.
-		WriteFile(string, []byte, os.FileMode) error
+		// symlink creates a sym link between a source and a destination.
+		symlink(s1, s2 string) error
+
+		// writeFile writes data to the filesystem using the provided filename.
+		writeFile(string, []byte, os.FileMode) error
 	}
 )
 
@@ -64,50 +71,55 @@ type (
 	productionDependencies struct{}
 )
 
-// Listen gives the host the ability to receive incoming connections.
-func (productionDependencies) Listen(s1, s2 string) (net.Listener, error) {
+// listen gives the host the ability to receive incoming connections.
+func (productionDependencies) listen(s1, s2 string) (net.Listener, error) {
 	return net.Listen(s1, s2)
 }
 
-// LoadFile allows the host to load a persistence structure form disk.
-func (productionDependencies) LoadFile(m persist.Metadata, i interface{}, s string) error {
+// loadFile allows the host to load a persistence structure form disk.
+func (productionDependencies) loadFile(m persist.Metadata, i interface{}, s string) error {
 	return persist.LoadFile(m, i, s)
 }
 
-// MkdirAll gives the host the ability to create chains of folders within the
+// mkdirAll gives the host the ability to create chains of folders within the
 // filesystem.
-func (productionDependencies) MkdirAll(s string, fm os.FileMode) error {
+func (productionDependencies) mkdirAll(s string, fm os.FileMode) error {
 	return os.MkdirAll(s, fm)
 }
 
-// NewLogger creates a logger that the host can use to log messages and write
+// newLogger creates a logger that the host can use to log messages and write
 // critical statements.
-func (productionDependencies) NewLogger(s string) (*persist.Logger, error) {
+func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
 	return persist.NewLogger(s)
 }
 
-// OpenDatabase creates a database that the host can use to interact with large
+// openDatabase creates a database that the host can use to interact with large
 // volumes of persistent data.
-func (productionDependencies) OpenDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
+func (productionDependencies) openDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
 	return persist.OpenDatabase(m, s)
 }
 
-// Read fills the input bytes with random data.
-func (productionDependencies) Read(b []byte) (int, error) {
+// randRead fills the input bytes with random data.
+func (productionDependencies) randRead(b []byte) (int, error) {
 	return rand.Read(b)
 }
 
-// ReadFile reads a file from the filesystem.
-func (productionDependencies) ReadFile(s string) ([]byte, error) {
+// readFile reads a file from the filesystem.
+func (productionDependencies) readFile(s string) ([]byte, error) {
 	return ioutil.ReadFile(s)
 }
 
-// Remove removes a file from the filesystem.
-func (productionDependencies) Remove(s string) error {
+// removeFile removes a file from the filesystem.
+func (productionDependencies) removeFile(s string) error {
 	return os.Remove(s)
 }
 
-// WriteFile writes a file to the filesystem.
-func (productionDependencies) WriteFile(s string, b []byte, fm os.FileMode) error {
+// symlink creates a symlink between a source and a destination file.
+func (productionDependencies) symlink(s1, s2 string) error {
+	return os.Symlink(s1, s2)
+}
+
+// writeFile writes a file to the filesystem.
+func (productionDependencies) writeFile(s string, b []byte, fm os.FileMode) error {
 	return ioutil.WriteFile(s, b, fm)
 }

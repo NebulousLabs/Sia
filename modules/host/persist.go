@@ -85,7 +85,7 @@ func (h *Host) save() error {
 // load extrats the save data from disk and populates the host.
 func (h *Host) load() error {
 	p := new(persistence)
-	err := h.dependencies.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+	err := h.dependencies.loadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 	if os.IsNotExist(err) {
 		// There is no host.json file, set up sane defaults.
 		return h.establishDefaults()

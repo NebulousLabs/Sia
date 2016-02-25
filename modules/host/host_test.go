@@ -430,6 +430,33 @@ func TestComposeErrors(t *testing.T) {
 			false,
 			"first error and second error and third error",
 		},
+		{
+			[]error{
+				nil,
+				errors.New("second error"),
+				errors.New("third error"),
+			},
+			false,
+			"second error and third error",
+		},
+		{
+			[]error{
+				errors.New("first error"),
+				nil,
+				nil,
+			},
+			false,
+			"first error",
+		},
+		{
+			[]error{
+				nil,
+				nil,
+				nil,
+			},
+			true,
+			"",
+		},
 	}
 	for _, trial := range trials {
 		err := composeErrors(trial.inputErrors...)

@@ -41,6 +41,12 @@ import (
 // storage obligation database, and should be patched if there's a mismatch.
 // The storage obligation database gets preference. Any missing sectors will be
 // treated as if they were filesystem problems.
+//
+// The consistency check should be wary of 'SizeRemaining' when it is trying to
+// do cleanup - if sector removals fail, SizeRemaining should not update as
+// though the sectors are gone (but should also be correct such that it's the
+// size of the real sectors + the size of the unremovable files - calculated,
+// not relative)
 
 var (
 	// errDiskTrouble is returned when the host is supposed to have enough
@@ -166,7 +172,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 		emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
 		for emptiestFolder != nil {
 			sectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(sectorKey))
-			err := h.dependencies.WriteFile(sectorPath, sectorData, 0700)
+			err := h.dependencies.writeFile(sectorPath, sectorData, 0700)
 			if err != nil {
 				// Indicate to the user that the storage folder is having write
 				// trouble.
@@ -175,7 +181,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 				// Remove the attempted write - an an incomplete write can
 				// leave a partial file on disk. Error is not checked, we
 				// already know the disk is having trouble.
-				_ = h.dependencies.Remove(sectorPath)
+				_ = h.dependencies.removeFile(sectorPath)
 
 				// Remove the failed folder from the list of folders that can
 				// be tried.
@@ -263,7 +269,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 
 		// Remove the sector from the physical disk.
 		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
-		err = h.dependencies.Remove(sectorPath)
+		err = h.dependencies.removeFile(sectorPath)
 		if err != nil {
 			// Indicate that the storage folder is having write troubles.
 			folder.FailedWrites++

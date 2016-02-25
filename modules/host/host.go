@@ -438,20 +438,20 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	// Create the perist directory if it does not yet exist.
-	err := dependencies.MkdirAll(h.persistDir, 0700)
+	err := dependencies.mkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the logger. Logging should be initialized ASAP, because the
 	// rest of the initialization makes use of the logger.
-	h.log, err = dependencies.NewLogger(filepath.Join(h.persistDir, logFile))
+	h.log, err = dependencies.newLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
 
 	// Open the database containing the host's storage obligation metadata.
-	h.db, err = dependencies.OpenDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	h.db, err = dependencies.openDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
 	if err != nil {
 		// An error will be returned if the database has the wrong version, but
 		// as of writing there was only one version of the database and all
@@ -493,21 +493,30 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
 }
 
-// composeErrors will take two errors and compose them into a single errors with
-// a longer message.
+// composeErrors will take two errors and compose them into a single errors
+// with a longer message. Any nil errors used as inputs will be stripped out,
+// and if there are zero non-nil inputs then 'nil' will be returned.
 //
 // TODO: It may make sense to move this function to the build package. When
 // moving it, the testing function should follow.
-func composeErrors(es ...error) error {
-	// Check for nil/empty input.
-	if len(es) <= 0 {
+func composeErrors(errs ...error) error {
+	// Strip out any nil errors.
+	var filteredErrs []error
+	for _, err := range errs {
+		if err != nil {
+			filteredErrs = append(filteredErrs, err)
+		}
+	}
+
+	// Return nil if there are no non-nil errors in the input.
+	if len(filteredErrs) <= 0 {
 		return nil
 	}
 
-	// Combine all of the input erros into a single larger error.
-	err := es[0]
-	for i := 1; i < len(es); i++ {
-		err = errors.New(err.Error() + " and " + es[i].Error())
+	// Combine all of the non-nil errors into one larger return value.
+	err := filteredErrs[0]
+	for i := 1; i < len(filteredErrs); i++ {
+		err = errors.New(err.Error() + " and " + filteredErrs[i].Error())
 	}
 	return err
 }
