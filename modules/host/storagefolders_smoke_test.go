@@ -118,6 +118,11 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != errSmallStorageFolder {
 		t.Fatal("expecting errSmallStorageFolder:", err)
 	}
+	// Try a file size that is too large.
+	err = ht.host.AddStorageFolder(storageFolderOne, maximumStorageFolderSize+1)
+	if err != errLargeStorageFolder {
+		t.Fatal("expecting errLargeStorageFolder:", err)
+	}
 	// Try linking to a storage folder that does not exist.
 	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err == nil {
@@ -299,8 +304,16 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != errSmallStorageFolder {
 		t.Error(err)
 	}
+	err = ht.host.ResizeStorageFolder(0, maximumStorageFolderSize+1)
+	if err != errLargeStorageFolder {
+		t.Error(err)
+	}
 	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*10)
 	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*10)
+	if err != errNoResize {
 		t.Fatal(err)
 	}
 	// Host should be able to support having uneven storage sizes.

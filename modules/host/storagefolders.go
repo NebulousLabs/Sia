@@ -102,7 +102,7 @@ var (
 
 	// errLargeStorageFolder is returned if a new storage folder or a resized
 	// storage folder would exceed the maximum allowed size.
-	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v", maximumStorageFolderSize)
+	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumStorageFolderSize)
 
 	// errMaxStorageFolders indicates that the limit on the number of allowed
 	// storage folders has been reached.
@@ -114,7 +114,7 @@ var (
 
 	// errSmallStorageFolder is returned if a new storage folder is not large
 	// enough to meet the requirements for the minimum storage folder size.
-	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v", minimumStorageFolderSize)
+	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
 
 	// errStorageFolderNotFolder is returned if a storage folder gets added
 	// that is not a folder.

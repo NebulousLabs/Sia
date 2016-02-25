@@ -102,8 +102,11 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	// each randomly selected UID. Running into collisions is virtually
 	// guaranteed, and running into repeated collisions (where two UIDs
 	// consecutively collide with existing UIDs) are highly likely.
-	for i := 0; i < 100; i++ {
-		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+	for i := 0; i < maximumStorageFolders; i++ {
+		err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Check that there are no collisions.
 	uidMap := make(map[uint8]struct{})
@@ -114,22 +117,40 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		}
 		uidMap[uint8(sf.UID[0])] = struct{}{}
 	}
+	// For coverage purposes, try adding a storage folder after the maximum
+	// number of storage folders has been reached.
+	err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+	if err != errMaxStorageFolders {
+		t.Fatal("expecting errMaxStorageFolders:", err)
+	}
 
 	// Try again, this time removing a random storage folder and then adding
 	// another one repeatedly - enough times to exceed the 256 possible folder
 	// UIDs that be chosen in the testing environment.
 	for i := 0; i < 300; i++ {
 		// Repalce the very first storage folder.
-		ht.host.RemoveStorageFolder(0, false)
-		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		err = ht.host.RemoveStorageFolder(0, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// Replace a random storage folder.
 		n, err := crypto.RandIntn(100)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ht.host.RemoveStorageFolder(n, false)
-		ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		err = ht.host.RemoveStorageFolder(n, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	uidMap = make(map[uint8]struct{})
 	for _, sf := range ht.host.storageFolders {
