@@ -67,7 +67,6 @@ package host
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -258,7 +257,7 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 	newSF.UID = make([]byte, storageFolderUIDSize)
 	for {
 		// Generate an attempt UID for the storage folder.
-		_, err = rand.Read(newSF.UID)
+		_, err = h.dependencies.Read(newSF.UID)
 		if err != nil {
 			return err
 		}

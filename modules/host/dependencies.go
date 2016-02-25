@@ -1,6 +1,7 @@
 package host
 
 import (
+	"crypto/rand"
 	"errors"
 	"io/ioutil"
 	"net"
@@ -42,6 +43,9 @@ type (
 		// OpenDatabase creates a database that the host can use to interact
 		// with large volumes of persistent data.
 		OpenDatabase(persist.Metadata, string) (*persist.BoltDatabase, error)
+
+		// Read fills the input bytes with random data.
+		Read([]byte) (int, error)
 
 		// ReadFile reads a file in full from the filesystem.
 		ReadFile(string) ([]byte, error)
@@ -86,6 +90,11 @@ func (productionDependencies) NewLogger(s string) (*persist.Logger, error) {
 // volumes of persistent data.
 func (productionDependencies) OpenDatabase(m persist.Metadata, s string) (*persist.BoltDatabase, error) {
 	return persist.OpenDatabase(m, s)
+}
+
+// Read fills the input bytes with random data.
+func (productionDependencies) Read(b []byte) (int, error) {
+	return rand.Read(b)
 }
 
 // ReadFile reads a file from the filesystem.
