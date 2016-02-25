@@ -140,3 +140,178 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		uidMap[uint8(sf.UID[0])] = struct{}{}
 	}
 }
+
+// TestEmptiestStorageFolder checks that emptiestStorageFolder will correctly
+// select the emptiest storage folder out of a provided list of storage
+// folders.
+func TestEmptiestStorageFolder(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create a series of uid->string mappings that represent the expected
+	// output of calling uidString on a storage folder.
+	trials := []struct {
+		folders       []*storageFolder
+		emptiestIndex int
+	}{
+		// Empty input.
+		{
+			[]*storageFolder{},
+			-1,
+		},
+		// Single valid storage folder.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: minimumStorageFolderSize,
+				},
+			},
+			0,
+		},
+		// Single full storage folder.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: 0,
+				},
+			},
+			-1,
+		},
+		// Single nearly full storage folder.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize - 1,
+				},
+			},
+			-1,
+		},
+		// Two valid storage folders, first is emptier.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize + 1,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize,
+				},
+			},
+			0,
+		},
+		// Two valid storage folders, second is emptier.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize + 1,
+				},
+			},
+			1,
+		},
+		// Two valid storage folders, first is emptier by percentage but can't
+		// hold a new sector.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize - 1,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 5,
+					SizeRemaining: sectorSize,
+				},
+			},
+			1,
+		},
+		// Two valid storage folders, first is emptier by volume but not
+		// percentage.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 4,
+					SizeRemaining: sectorSize * 2,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize,
+				},
+			},
+			1,
+		},
+		// Two valid storage folders, second is emptier by volume but not
+		// percentage.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 4,
+					SizeRemaining: sectorSize * 2,
+				},
+			},
+			0,
+		},
+		// Three valid storage folders, second is emptier by percentage but not
+		// volume.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 4,
+					SizeRemaining: sectorSize * 2,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: sectorSize,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 4,
+					SizeRemaining: sectorSize * 2,
+				},
+			},
+			1,
+		},
+		// Three storage folders, none have room for a sector.
+		{
+			[]*storageFolder{
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 4,
+					SizeRemaining: sectorSize - 1,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize,
+					SizeRemaining: 0,
+				},
+				&storageFolder{
+					Size:          minimumStorageFolderSize * 4,
+					SizeRemaining: 1,
+				},
+			},
+			-1,
+		},
+	}
+	for i, trial := range trials {
+		sf, index := emptiestStorageFolder(trial.folders)
+		if index != trial.emptiestIndex {
+			t.Error("trial", i, "index mismatch")
+		}
+		if index > 0 && sf != trial.folders[index] {
+			t.Error("trial", i, "folder mismatch")
+		}
+		if index < 0 && sf != nil {
+			t.Error("non-nil storage folder returned but there was no winner")
+		}
+	}
+}

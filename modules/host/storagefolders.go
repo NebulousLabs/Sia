@@ -183,8 +183,8 @@ func (sf *storageFolder) uidString() string {
 // Refusing to return a storage folder that does not have enough space prevents
 // the host from overfilling a storage folder.
 func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
-	lowestUtilization := float64(2) // Set higher than the max of 1 to protect against floating point imprecision.
-	winningIndex := -1              // Set to impossible value to prevent unintentionally returning the wrong storage folder.
+	mostFree := float64(-1) // Set lower than the min amount available to protect from floating point imprecision.
+	winningIndex := -1      // Set to impossible value to prevent unintentionally returning the wrong storage folder.
 	winner := false
 	for i, sf := range sfs {
 		// Check that this storage folder has at least enough space to hold a
@@ -196,9 +196,9 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 		winner = true // at least one storage folder has enough space for a new sector.
 
 		// Check this storage folder against the current winning storage folder's utilization.
-		sfUtilization := float64(sf.Size-sf.SizeRemaining) / float64(sf.Size)
-		if sfUtilization < lowestUtilization {
-			lowestUtilization = sfUtilization
+		sfFree := float64(sf.SizeRemaining) / float64(sf.Size)
+		if mostFree < sfFree {
+			mostFree = sfFree
 			winningIndex = i
 		}
 	}

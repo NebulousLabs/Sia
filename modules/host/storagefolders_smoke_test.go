@@ -925,31 +925,3 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Error("unexpected number of files in the host directory")
 	}
 }
-
-/*
-// faultyFS is a mocked filesystem which can be configured to fail for certain
-// files and folders.
-type faultyFS struct {
-	// brokenSubstrings is a list of substrings that, when appearing in a
-	// filepath, will cause the call to fail.
-	brokenSubstrings []string
-}
-
-// TestStorageFolderTolerance tests the tolerance of storage folders in the
-// presense of disk failures. Disk failures should be recorded, and the
-// failures should be handled gracefully - nonfailing disks should not have
-// problems.
-func TestStorageFolderTolerance(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-	ht, err := newHostTester("TestStorageFolderTolerance")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Try the simple case of adding a storage folder when the filesystem is
-	// failing.
-}
-*/
