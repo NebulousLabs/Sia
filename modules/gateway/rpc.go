@@ -122,7 +122,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		err = nil
 	}
 	if err != nil {
-		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+		g.log.Printf("WARN: incoming RPC \"%v\" from conn %v failed: %v", id, conn.RemoteAddr(), err)
 	}
 }
 
