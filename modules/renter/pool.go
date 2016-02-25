@@ -22,6 +22,22 @@ func (p *hostPool) Close() error {
 	return nil
 }
 
+// add adds a contract's host to the hostPool and returns it as an Uploader.
+func (p *hostPool) add(contract contractor.Contract) (contractor.Uploader, error) {
+	for _, h := range p.hosts {
+		if h.Address() == contract.IP {
+			return h, nil
+		}
+	}
+	hu, err := p.hostContractor.Uploader(contract)
+	if err != nil {
+		p.blacklist = append(p.blacklist, contract.IP)
+		return nil, err
+	}
+	p.hosts = append(p.hosts, hu)
+	return hu, nil
+}
+
 // uniqueHosts will return up to 'n' unique hosts that are not in 'exclude'.
 // The pool draws from its set of active connections first, and then negotiates
 // new contracts if more hosts are required. Note that this latter case
@@ -63,13 +79,11 @@ func (p *hostPool) uniqueHosts(n int, exclude []modules.NetAddress) (hosts []con
 		if _, ok := excludeSet[contract.IP]; ok {
 			continue
 		}
-		hu, err := p.hostContractor.Uploader(contract)
+		hu, err := p.add(contract)
 		if err != nil {
-			p.blacklist = append(p.blacklist, contract.IP)
 			continue
 		}
 		hosts = append(hosts, hu)
-		p.hosts = append(p.hosts, hu)
 		if len(hosts) >= n {
 			break
 		}
