@@ -30,6 +30,10 @@ type persistence struct {
 	NetAddress modules.NetAddress
 	PublicKey  types.SiaPublicKey
 	SecretKey  crypto.SecretKey
+	SectorSalt crypto.Hash
+
+	// Storage Folders.
+	StorageFolders []*storageFolder
 
 	// Statistics.
 	LostRevenue types.Currency
@@ -71,6 +75,10 @@ func (h *Host) save() error {
 		NetAddress: h.netAddress,
 		PublicKey:  h.publicKey,
 		SecretKey:  h.secretKey,
+		SectorSalt: h.sectorSalt,
+
+		// Storage Folders.
+		StorageFolders: h.storageFolders,
 
 		// Statistics.
 		LostRevenue: h.lostRevenue,
@@ -110,6 +118,10 @@ func (h *Host) load() error {
 	h.netAddress = p.NetAddress
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
+	h.sectorSalt = p.SectorSalt
+
+	// Copy over storage folders.
+	h.storageFolders = p.StorageFolders
 
 	// Copy over statistics.
 	h.revenue = p.Revenue

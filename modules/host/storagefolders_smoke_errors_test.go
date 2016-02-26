@@ -135,6 +135,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Check the filesystem - there should be one sector in the storage folder.
 	infos, err := ioutil.ReadDir(storageFolderOne)
 	if err != nil {
@@ -178,6 +184,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Trigger read errors in storage folder one, which means the storage
 	// folder is not going to be able to be deleted successfully.
@@ -218,6 +230,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != errIncompleteOffload {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Check that the storage folder was not removed.
 	if len(ht.host.storageFolders) != 2 {
 		t.Fatal("expecting two storage folders after failed remove")
@@ -251,6 +269,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Check that the storage folder was removed.
 	if len(ht.host.storageFolders) != 1 {
 		t.Fatal("expecting two storage folders after failed remove")
@@ -270,6 +294,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// Add a storage folder with room for sectors. Because storageFolderOne has
 	// leftover sectors that the program was unable to clean up (due to disk
 	// failure), a third storage folder will be created.
+	ffs.brokenSubstrings = nil
 	storageFolderThree := filepath.Join(ht.persistDir, "driveThree")
 	err = os.Mkdir(storageFolderThree, 0700)
 	if err != nil {
@@ -279,9 +304,15 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Fill up the second storage folder, so that resizes can be attempted with
-	// failing disks. storageFolderOne has enough space to storage the sectors,
+	// failing disks. storageFolderOne has enough space to store the sectors,
 	// but is having disk troubles.
 	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[1].uidString())}
 	numSectors := (minimumStorageFolderSize * 3) / sectorSize
@@ -293,6 +324,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 		ht.host.mu.Lock()
 		err = ht.host.addSector(sectorRoot, 11, sectorData)
 		ht.host.mu.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Do a probabilistic reset of the host, to verify that the persistence
+		// structures can reboot without causing issues.
+		err = ht.probabilisticReset()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -325,6 +362,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != errDiskTrouble {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Check the filesystem - storage folder one is having disk issues and
 	// should have no sectors. Storage folder two should be full.
 	infos, err = ioutil.ReadDir(storageFolderThree)
@@ -354,7 +397,19 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,6 +448,12 @@ func TestStorageFolderTolerance(t *testing.T) {
 	}
 	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != errIncompleteOffload {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the sizes of the storage folders have been updated correctly.

@@ -10,10 +10,42 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
 )
+
+// probabilisticReset will probabilistically reboot the host before continuing.
+// This helps to verify that the persistence is working correctly. The reset is
+// probabilistic to make sure that the test is not passing because of the
+// reset.
+func (ht *hostTester) probabilisticReset() error {
+	rand, err := crypto.RandIntn(3)
+	if err != nil {
+		return err
+	}
+	if rand == 1 {
+		// Grab the potentially faulty dependencies and replace them with good
+		// dependencies so that closing happens without issues.
+		deps := ht.host.dependencies
+		ht.host.dependencies = productionDependencies{}
+		// Close the host, then create a new host to replace it.
+		err = ht.host.Close()
+		if err != nil {
+			return err
+		}
+		// Open the host with production dependencies so that there are no
+		// errors.
+		h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+		if err != nil {
+			return err
+		}
+		h.dependencies = deps
+		ht.host = h
+	}
+	return nil
+}
 
 // createSector makes a random, unique sector that can be inserted into the
 // host.
@@ -150,6 +182,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Check that the host has correctly updated the amount of total storage.
 	totalStorage, remainingStorage, err = ht.host.Capacity()
 	if err != nil {
@@ -167,6 +205,12 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,6 +240,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	ht.host.mu.Unlock()
 	// Remove the storage folder.
 	err = ht.host.RemoveStorageFolder(1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,6 +366,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != errNoResize {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Host should be able to support having uneven storage sizes.
 	oddStorageSize := (minimumStorageFolderSize) + sectorSize*3 + 3
 	err = ht.host.ResizeStorageFolder(0, oddStorageSize)
@@ -353,6 +409,12 @@ func TestStorageFolderUsage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Do a probabilistic reset of the host, to verify that the persistence
+		// structures can reboot without causing issues.
+		err = ht.probabilisticReset()
+		if err != nil {
+			t.Fatal(err)
+		}
 		// Now that there is a sector usage map, it must be kept consistent
 		// with the sector usage in the host.
 		sectorUsageMap[sectorRoot] = []types.BlockHeight{86 + types.BlockHeight(i)}
@@ -386,6 +448,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	// enough space remaining in the first folder for the removal to be
 	// successful.
 	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,6 +578,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Check the filesystem.
 	infos, err = ioutil.ReadDir(storageFolderTwo)
 	if err != nil {
@@ -563,6 +637,12 @@ func TestStorageFolderUsage(t *testing.T) {
 				} else {
 					sectorUsageMap[sectorRoot] = []types.BlockHeight{10 + j + k}
 				}
+			}
+			// Do a probabilistic reset of the host, to verify that the persistence
+			// structures can reboot without causing issues.
+			err = ht.probabilisticReset()
+			if err != nil {
+				t.Fatal(err)
 			}
 		}
 	}
@@ -621,6 +701,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	sectorPath = filepath.Join(storageFolderOne, string(ht.host.sectorID(sectorRoot[:])))
 	err = ht.host.removeSector(sectorRoot, 81)
 	ht.host.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -744,6 +830,12 @@ func TestStorageFolderUsage(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		// Do a probabilistic reset of the host, to verify that the persistence
+		// structures can reboot without causing issues.
+		err = ht.probabilisticReset()
+		if err != nil {
+			t.Fatal(err)
+		}
 		// Check that the remaining storage is still the same.
 		_, remainingStorage, err := ht.host.Capacity()
 		if err != nil {
@@ -805,6 +897,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	err = ht.host.addSector(sectorRoot, 36, sectorData)
 	ht.host.mu.Unlock()
 	if err != errInsufficientStorageForSector {
+		t.Fatal(err)
+	}
+	// Do a probabilistic reset of the host, to verify that the persistence
+	// structures can reboot without causing issues.
+	err = ht.probabilisticReset()
+	if err != nil {
 		t.Fatal(err)
 	}
 	_, remainingStorage, err = ht.host.Capacity()
@@ -925,6 +1023,12 @@ func TestStorageFolderUsage(t *testing.T) {
 				t.Error(len(infos)+len(infos2)+len(infos3), i, bonus)
 				t.Fatal("sector count is incorrect while managing virtual sectors")
 			}
+		}
+		// Do a probabilistic reset of the host, to verify that the persistence
+		// structures can reboot without causing issues.
+		err = ht.probabilisticReset()
+		if err != nil {
+			t.Fatal(err)
 		}
 		// Check that the remaining storage is still the same.
 		_, remainingStorage, err := ht.host.Capacity()

@@ -47,11 +47,6 @@ package host
 // buckets relies on fancier, less used features in the boltdb dependency,
 // which carries a higher error risk.
 
-// TODO: Satisfy the the modules.Host interface.
-
-// TODO: Make sure all the persist is moving over. In particular, the sector
-// salt is important. Also, the sector salt needs to be documented.
-
 // TODO: Need to add some command to 'siad' that will correctly repoint a
 // storage folder to a new mountpoint. As best I can tell, this needs to happen
 // while siad is not running. Either that, or 'siac' needs to do the whole
