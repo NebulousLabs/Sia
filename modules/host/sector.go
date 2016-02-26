@@ -67,6 +67,9 @@ var (
 	// errMaxVirtualSectors is returned when a sector cannot be added because
 	// the maximum number of virtual sectors for that sector id already exist.
 	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
+
+	// errSectorNotFound is returned when a lookup for a sector fails.
+	errSectorNotFound = errors.New("could not find the desired sector")
 )
 
 // sectorUsage indicates how a sector is being used. Each block height
@@ -227,10 +230,20 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		bsu := tx.Bucket(bucketSectorUsage)
 		sectorKey := h.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
+		if sectorUsageBytes == nil {
+			return errSectorNotFound
+		}
 		var usage sectorUsage
 		err := json.Unmarshal(sectorUsageBytes, &usage)
 		if err != nil {
 			return err
+		}
+		if len(usage.Expiry) == 0 {
+			h.log.Critical("sector recorded in database, but has no expirations")
+			return errSectorNotFound
+		}
+		if len(usage.Expiry) == 1 && usage.Expiry[0] != expiryHeight {
+			return errSectorNotFound
 		}
 
 		// If there are multiple entries in the usage expiry, it means that the
@@ -241,13 +254,15 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 			// Find any single entry in the usage that's at the expiry height
 			// and remove it.
 			var i int
-			for i := 0; i < len(usage.Expiry); i++ {
+			found := false
+			for i = 0; i < len(usage.Expiry); i++ {
 				if usage.Expiry[i] == expiryHeight {
+					found = true
 					break
 				}
 			}
-			if i == len(usage.Expiry) {
-				return errors.New("removing a sector that doesn't seem to exist")
+			if !found {
+				return errSectorNotFound
 			}
 			usage.Expiry = append(usage.Expiry[0:i], usage.Expiry[i+1:]...)
 

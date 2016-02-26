@@ -596,15 +596,30 @@ func TestStorageFolderUsage(t *testing.T) {
 	if len(infos) != 5 {
 		t.Fatal("there should be 5 sectors in storage folder one")
 	}
-
 	// Try removing a non-repeat sector.
 	expiryHeights, exists := sectorUsageMap[sectorRoot]
 	if !exists || len(expiryHeights) != 1 {
 		t.Fatal("sector map doesn't match testing assumptions")
 	}
+	// Try some illegal sector removal operations before trying a legal one.
+	ht.host.mu.Lock()
+	err = ht.host.removeSector(sectorRoot, sectorExpiry+50e6)
+	ht.host.mu.Unlock()
+	if err != errSectorNotFound {
+		t.Fatal("wrong error when removing illegal sector:", err)
+	}
+	alteredRoot := sectorRoot
+	alteredRoot[0]++
+	ht.host.mu.Lock()
+	err = ht.host.removeSector(alteredRoot, 81)
+	ht.host.mu.Unlock()
+	if err != errSectorNotFound {
+		t.Fatal("wrong error when removing illegal sector:", err)
+	}
+	// Now try the legal sector removal.
 	ht.host.mu.Lock()
 	sectorPath = filepath.Join(storageFolderOne, string(ht.host.sectorID(sectorRoot[:])))
-	err = ht.host.removeSector(sectorRoot, sectorExpiry)
+	err = ht.host.removeSector(sectorRoot, 81)
 	ht.host.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
@@ -677,6 +692,14 @@ func TestStorageFolderUsage(t *testing.T) {
 			}
 			if remainingStorage != initialRemainingStorage {
 				t.Fatal("host is changing the amount of storage remaining when removing virtual sectors")
+			}
+
+			// Try to remove the sector using a wildcard expiry height.
+			ht.host.mu.Lock()
+			err = ht.host.removeSector(root, expiryHeights[0]+548e6)
+			ht.host.mu.Unlock()
+			if err != errSectorNotFound {
+				t.Fatal(err)
 			}
 
 			// Remove the sector from the host.

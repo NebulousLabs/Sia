@@ -49,8 +49,22 @@ func (ffs faultyFS) symlink(s1, s2 string) error {
 // from a file that has a substring which matches the ffs list of broken
 // substrings.
 func (ffs faultyFS) writeFile(s string, b []byte, fm os.FileMode) error {
+	// The partial write reqires that there be at least a few bytes, so that a
+	// partial write can be properly simulated.
+	if len(b) < 2 {
+		panic("mocked writeFile requires file data that's at least 2 bytes in length")
+	}
+
 	for _, bs := range ffs.brokenSubstrings {
 		if strings.Contains(s, bs) {
+			// Do a partial write, so that garbase is left on the filesystem
+			// that the code should be trying to clean up.
+			err := ioutil.WriteFile(s, b[:len(b)/2], fm)
+			if err != nil {
+				return err
+			}
+
+			// Return a simulated failure, as the full slice was not written.
 			return mockErrWriteFile
 		}
 	}
@@ -59,7 +73,9 @@ func (ffs faultyFS) writeFile(s string, b []byte, fm os.FileMode) error {
 
 // faultyRemove is a mocked set of dependencies that operates as normal except
 // that removeFile will fail.
-type faultyRemove struct{}
+type faultyRemove struct {
+	productionDependencies
+}
 
 // removeFile fails to remove a file from the filesystem.
 func (faultyRemove) removeFile(s string) error {
@@ -119,6 +135,37 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Check the filesystem - there should be one sector in the storage folder.
+	infos, err := ioutil.ReadDir(storageFolderOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 1 {
+		t.Fatal("expecting at least one sector in storage folder one")
+	}
+
+	// Replace the host dependencies with the faulty remove, and then try to
+	// remove the sector.
+	ht.host.dependencies = faultyRemove{}
+	err = ht.host.removeSector(sectorRoot, 10)
+	if err != mockErrRemoveFile {
+		t.Fatal(err)
+	}
+	// Check that the failed write count was incremented for the storage
+	// folder.
+	if ht.host.storageFolders[0].FailedWrites != 1 {
+		t.Fatal("failed writes counter is not incrementing properly")
+	}
+	// Check the filesystem - sector should still be in the storage folder.
+	infos, err = ioutil.ReadDir(storageFolderOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 1 {
+		t.Fatal("expecting at least one sector in storage folder one")
+	}
+	// Put 'ffs' back as the set of dependencies.
+	ht.host.dependencies = ffs
 
 	// Add a second storage folder, which can receive the sector when the first
 	// storage folder is deleted.
@@ -127,7 +174,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize)
+	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,6 +194,22 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if ht.host.storageFolders[0].FailedReads != 1 {
 		t.Error("expecting a read failure to be reported:", ht.host.storageFolders[0].FailedReads)
 	}
+	// Check the filesystem - there should be one sector in the storage folder,
+	// and none in storage folder two.
+	infos, err = ioutil.ReadDir(storageFolderOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 1 {
+		t.Fatal("expecting at least one sector in storage folder one")
+	}
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder two")
+	}
 
 	// Switch the failure from a read error in the source folder to a write
 	// error in the destination folder.
@@ -162,6 +225,22 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// Check that the read failure was documented.
 	if ht.host.storageFolders[1].FailedWrites != 1 {
 		t.Error("expecting a read failure to be reported:", ht.host.storageFolders[1].FailedWrites)
+	}
+	// Check the filesystem - there should be one sector in the storage folder,
+	// and none in storage folder two.
+	infos, err = ioutil.ReadDir(storageFolderOne)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 1 {
+		t.Fatal("expecting at least one sector in storage folder one")
+	}
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder two")
 	}
 
 	// Try to forcibly remove the first storage folder, while in the presence
@@ -179,9 +258,172 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if !bytes.Equal(uid2, ht.host.storageFolders[0].UID) {
 		t.Fatal("storage folder was not removed correctly")
 	}
+	// Check the filesystem - there should be no sectors in storage folder two.
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder two")
+	}
 
-	// TODO: resize a storage folder where the filesystem fails for the first
-	// read and not any of the others.
+	// Add a storage folder with room for sectors. Because storageFolderOne has
+	// leftover sectors that the program was unable to clean up (due to disk
+	// failure), a third storage folder will be created.
+	storageFolderThree := filepath.Join(ht.persistDir, "driveThree")
+	err = os.Mkdir(storageFolderThree, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.AddStorageFolder(storageFolderThree, minimumStorageFolderSize+sectorSize)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// TODO: add a sector when the emptiest drive is having write failures.
+	// Fill up the second storage folder, so that resizes can be attempted with
+	// failing disks. storageFolderOne has enough space to storage the sectors,
+	// but is having disk troubles.
+	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[1].uidString())}
+	numSectors := (minimumStorageFolderSize * 3) / sectorSize
+	for i := uint64(0); i < numSectors; i++ {
+		sectorRoot, sectorData, err := createSector()
+		if err != nil {
+			t.Fatal(err)
+		}
+		ht.host.mu.Lock()
+		err = ht.host.addSector(sectorRoot, 11, sectorData)
+		ht.host.mu.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Check the filesystem - storage folder one is having disk issues and
+	// should have no sectors. Storage folder two should be full.
+	infos, err = ioutil.ReadDir(storageFolderThree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder one")
+	}
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != int(numSectors) {
+		t.Fatal("expecting", numSectors, "sectors in storage folder two")
+	}
+	// Try adding another sector, there should be an error because the one disk
+	// is full and the other is having disk troubles.
+	sectorRoot, sectorData, err = createSector()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ht.host.mu.Lock()
+	err = ht.host.addSector(sectorRoot, 11, sectorData)
+	ht.host.mu.Unlock()
+	if err != errDiskTrouble {
+		t.Fatal(err)
+	}
+	// Check the filesystem - storage folder one is having disk issues and
+	// should have no sectors. Storage folder two should be full.
+	infos, err = ioutil.ReadDir(storageFolderThree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder one")
+	}
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != int(numSectors) {
+		t.Fatal("expecting", numSectors, "sectors in storage folder two")
+	}
+
+	// Add a third storage folder. Then try to resize the second storage folder
+	// such that both storageFolderThree and storageFolderFour have room for
+	// the data, but only storageFolderFour is not haivng disk troubles.
+	storageFolderFour := filepath.Join(ht.persistDir, "driveFour")
+	err = os.Mkdir(storageFolderFour, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.AddStorageFolder(storageFolderFour, minimumStorageFolderSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check the filesystem - storageFolderTwo should have
+	// minimumStorageFolderSize*2 worth of sectors, and storageFolderFour
+	// should have minimumStorageFolderSize worth of sectors.
+	infos, err = ioutil.ReadDir(storageFolderThree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder three")
+	}
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != int(numSectors)-int(minimumStorageFolderSize/sectorSize) {
+		t.Fatal("expecting", numSectors, "sectors in storage folder two")
+	}
+	infos, err = ioutil.ReadDir(storageFolderFour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != int(minimumStorageFolderSize/sectorSize) {
+		t.Fatal("expecting to have 8 sectors in storageFolderFour")
+	}
+
+	// Trigger an incomplete disk transfer by adding room for one more sector
+	// to storageFolderFour, but then trying to remove a bunch of sectors from
+	// storageFolderTwo. There is enough room on storage folder 3 to make the
+	// operation successful, but it is having disk troubles.
+	err = ht.host.ResizeStorageFolder(2, minimumStorageFolderSize+sectorSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	if err != errIncompleteOffload {
+		t.Fatal(err)
+	}
+	// Check that the sizes of the storage folders have been updated correctly.
+	if ht.host.storageFolders[0].Size != minimumStorageFolderSize*2-sectorSize {
+		t.Error("storage folder size was not decreased correctly during the shrink operation")
+	}
+	if ht.host.storageFolders[0].SizeRemaining != 0 {
+		t.Error("storage folder size remaining was not updated correctly after failed shrink operation")
+	}
+	// Check the filesystem - there should be one less sector in
+	// storageFolderTwo from the previous check, and one more sector in
+	// storageFolderFour.
+	infos, err = ioutil.ReadDir(storageFolderThree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 0 {
+		t.Fatal("expecting zero sectors in storage folder three")
+	}
+	infos, err = ioutil.ReadDir(storageFolderTwo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != int(numSectors)-int(minimumStorageFolderSize/sectorSize)-1 {
+		t.Fatal("expecting", numSectors, "sectors in storage folder two")
+	}
+	infos, err = ioutil.ReadDir(storageFolderFour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != int(minimumStorageFolderSize/sectorSize)+1 {
+		t.Fatal("filesystem consistency error")
+	}
 }

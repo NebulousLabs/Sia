@@ -373,6 +373,11 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 					// troubles.
 					emptiestFolder.FailedWrites++
 
+					// After the failed write, try removing any garbage that
+					// may have gotten left behind. The error is not checked,
+					// as it is known that the disk is having write troubles.
+					_ = h.dependencies.removeFile(newSectorPath)
+
 					// Because the write failed, we should move on to the next
 					// storage folder, and remove the current storage folder
 					// from the list of available folders.
