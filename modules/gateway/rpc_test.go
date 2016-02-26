@@ -165,8 +165,7 @@ func TestThreadedHandleConn(t *testing.T) {
 }
 
 // TestBroadcast tests that calling broadcast with a slice of peers only
-// broadcasts to those peers. Also tests that calling broadcast with nil peers
-// broadcasts to all peers.
+// broadcasts to those peers.
 func TestBroadcast(t *testing.T) {
 	g1 := newTestingGateway("TestBroadcast1", t)
 	defer g1.Close()
@@ -199,23 +198,6 @@ func TestBroadcast(t *testing.T) {
 		g3DoneChan <- struct{}{}
 		return nil
 	})
-
-	// Test that calling broadcast with nil peers broadcasts to all peers.
-	g1.Broadcast("Recv", "foo", nil)
-	go func() {
-		<-g2DoneChan
-		<-g3DoneChan
-		bothDoneChan <- struct{}{}
-	}()
-	select {
-	case <-bothDoneChan:
-		// Both g2 and g3 should receive the broadcast.
-	case <-time.After(10 * time.Millisecond):
-		t.Fatal("broadcasting with nil peers should broadcast to all peers")
-	}
-	if g2Payload != "foo" || g3Payload != "foo" {
-		t.Fatal("broadcast failed:", g2Payload, g3Payload)
-	}
 
 	// Test that broadcasting to all peers in g1.Peers() broadcasts to all peers.
 	peers := g1.Peers()
@@ -278,9 +260,20 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	// Test that broadcasting to an empty slice (but not nil!) does not broadcast
-	// to either g2 or g3.
+	// to g2 or g3.
 	peers = make([]modules.Peer, 0)
 	g1.Broadcast("Recv", "quux", peers)
+	select {
+	case <-g2DoneChan:
+		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-g3DoneChan:
+		t.Error("broadcast broadcasted to peers not in the peers arg")
+	case <-time.After(10 * time.Millisecond):
+		// Neither peer should receive a broadcast.
+	}
+
+	// Test that calling broadcast with nil peers does not broadcast to g2 or g3.
+	g1.Broadcast("Recv", "foo", nil)
 	select {
 	case <-g2DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")

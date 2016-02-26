@@ -202,6 +202,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 		return err
 	}
 	// Broadcast the new block to all peers.
-	go cs.gateway.Broadcast("RelayBlock", b, nil)
+	peers := cs.gateway.Peers()
+	go cs.gateway.Broadcast("RelayBlock", b, peers)
 	return nil
 }
