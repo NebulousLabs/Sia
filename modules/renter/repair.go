@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
@@ -233,7 +234,14 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile, pool *hostPoo
 	// check for expiration
 	height := r.cs.Height()
 	if !meta.Renew && meta.EndHeight < height {
-		logAndRemove("removing %v from repair set: storage period has ended", name)
+		err := r.deleteContractData(f, pool)
+		if err != nil {
+			// don't remove from tracking set until contract data has been deleted
+			// TODO: this may be problematic if hosts go permanently offline
+			r.log.Println("failed to delete contract data of", f.name)
+		} else {
+			logAndRemove("removing %v from repair set: storage period has ended", name)
+		}
 		return
 	}
 
@@ -286,4 +294,37 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 			return
 		}
 	}
+}
+
+// deleteContractData deletes the data associated with f on all of f's hosts.
+func (r *Renter) deleteContractData(f *file, pool *hostPool) error {
+	// convert contract map to slice so that we can modify the map during
+	// iteration
+	f.mu.RLock()
+	var contracts []fileContract
+	for _, c := range f.contracts {
+		contracts = append(contracts, c)
+	}
+	f.mu.RUnlock()
+	var err error
+	for _, c := range contracts {
+		editor, editorErr := pool.add(contractor.Contract{}) // TODO: pass the actual contract
+		if editorErr != nil {
+			// TODO: check for "already deleted err"
+			err = editorErr
+			continue
+		}
+		for range c.Pieces {
+			deleteErr := editor.Delete(crypto.Hash{}) // TODO: pass the actual hash
+			if deleteErr != nil {
+				err = deleteErr
+				continue
+			}
+		}
+		f.mu.Lock()
+		delete(f.contracts, c.ID)
+		r.saveFile(f)
+		f.mu.Unlock()
+	}
+	return err
 }

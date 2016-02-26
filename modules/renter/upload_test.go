@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
@@ -33,6 +34,7 @@ func (uploadContractor) Upload(data []byte) (uint64, error) { return uint64(len(
 
 // stub implementations of the contractor.Editor methods
 func (uploadContractor) Address() modules.NetAddress      { return "" }
+func (uploadContractor) Delete(crypto.Hash) error         { return nil }
 func (uploadContractor) ContractID() types.FileContractID { return types.FileContractID{} }
 func (uploadContractor) EndHeight() types.BlockHeight     { return 10000 }
 func (uploadContractor) Close() error                     { return nil }

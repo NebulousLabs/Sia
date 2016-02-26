@@ -23,6 +23,9 @@ type Editor interface {
 	// returns the offset of the data in the stored file.
 	Upload(data []byte) (offset uint64, err error)
 
+	// Delete removes a sector from the underlying contract.
+	Delete(crypto.Hash) error
+
 	// Address returns the address of the host.
 	Address() modules.NetAddress
 
@@ -113,6 +116,43 @@ func (he *hostEditor) Upload(data []byte) (uint64, error) {
 	he.contractor.mu.Unlock()
 
 	return offset, nil
+}
+
+// Delete deletes a sector in a contract.
+// TODO: implement
+func (he *hostEditor) Delete(root crypto.Hash) error {
+	// calculate the new total Merkle root
+	// var newRoots []crypto.Hash
+	// for _, h := range he.contract.MerkleRoots {
+	// 	if h != root {
+	// 		newRoots = append(newRoots, h)
+	// 	}
+	// }
+	// tree := crypto.NewCachedTree(0) // height is not relevant here
+	// for _, h := range newRoots {
+	// 	tree.Push(h[:])
+	// }
+	// merkleRoot := tree.Root()
+
+	// // send 'delete' action, sector root, and new Merkle root
+	// encoding.WriteObject(he.conn, modules.RPCDelete)
+	// encoding.WriteObject(he.conn, root)
+	// encoding.WriteObject(he.conn, merkleRoot)
+
+	// // read ok
+	// encoding.ReadObject(he.conn, &ok)
+
+	// // update host contract
+	// he.contract.LastRevision = rev
+	// he.contract.LastRevisionTxn = signedTxn
+	// he.contract.MerkleRoots = newRoots
+
+	// he.contractor.mu.Lock()
+	// he.contractor.contracts[he.contract.ID] = he.contract
+	// he.contractor.save()
+	// he.contractor.mu.Unlock()
+
+	return nil
 }
 
 // Editor initiates the contract revision process with a host, and returns
