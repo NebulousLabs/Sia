@@ -34,6 +34,7 @@ type (
 	Peer struct {
 		NetAddress NetAddress `json:"netaddress"`
 		Version    string     `json:"version"`
+		Inbound    bool       `json:"inbound"`
 	}
 
 	// A PeerConn is the connection type used when communicating with peers during

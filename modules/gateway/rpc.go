@@ -88,14 +88,14 @@ func (g *Gateway) listenPeer(p *peer) {
 	for {
 		conn, err := p.accept()
 		if err != nil {
-			g.log.Println("WARN: lost connection to peer", p.addr)
+			g.log.Println("WARN: lost connection to peer", p.NetAddress)
 			break
 		}
 
 		// it is the handler's responsibility to close the connection
 		go g.threadedHandleConn(conn)
 	}
-	g.Disconnect(p.addr)
+	g.Disconnect(p.NetAddress)
 }
 
 // threadedHandleConn reads header data from a connection, then routes it to the

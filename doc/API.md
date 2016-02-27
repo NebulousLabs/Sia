@@ -276,6 +276,7 @@ struct {
 	peers      []struct {
                 netaddress string
                 version    string
+                inbound    bool
         }
 }
 ```

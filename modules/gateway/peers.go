@@ -51,10 +51,8 @@ func (s insufficientVersionError) Error() string {
 }
 
 type peer struct {
-	addr    modules.NetAddress
-	sess    muxado.Session
-	inbound bool
-	version string
+	modules.Peer
+	sess muxado.Session
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
@@ -76,7 +74,7 @@ func (p *peer) accept() (modules.PeerConn, error) {
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
-	g.peers[p.addr] = p
+	g.peers[p.NetAddress] = p
 	go g.listenPeer(p)
 }
 
@@ -101,7 +99,7 @@ func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 		r, _ := crypto.RandIntn(len(g.peers))
 		for addr, p := range g.peers {
 			// only select inbound peers
-			if !p.inbound {
+			if !p.Inbound {
 				continue
 			}
 			if r <= 0 {
@@ -193,10 +191,12 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 	// add the peer
 	g.addPeer(&peer{
-		addr:    addr,
-		sess:    muxado.Server(conn),
-		inbound: true,
-		version: remoteVersion,
+		Peer: modules.Peer{
+			NetAddress: addr,
+			Inbound:    true,
+			Version:    remoteVersion,
+		},
+		sess: muxado.Server(conn),
 	})
 	g.mu.Unlock(id)
 
@@ -253,10 +253,12 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 
 	id = g.mu.Lock()
 	g.addPeer(&peer{
-		addr:    addr,
-		sess:    muxado.Client(conn),
-		inbound: false,
-		version: remoteVersion,
+		Peer: modules.Peer{
+			NetAddress: addr,
+			Inbound:    false,
+			Version:    remoteVersion,
+		},
+		sess: muxado.Client(conn),
 	})
 	g.mu.Unlock(id)
 
@@ -297,7 +299,7 @@ func (g *Gateway) threadedPeerManager() {
 		id := g.mu.RLock()
 		numOutboundPeers := 0
 		for _, p := range g.peers {
-			if !p.inbound {
+			if !p.Inbound {
 				numOutboundPeers++
 			}
 		}
@@ -332,7 +334,7 @@ func (g *Gateway) Peers() []modules.Peer {
 	defer g.mu.RUnlock(id)
 	var peers []modules.Peer
 	for _, p := range g.peers {
-		peers = append(peers, modules.Peer{NetAddress: p.addr, Version: p.version})
+		peers = append(peers, p.Peer)
 	}
 	return peers
 }
