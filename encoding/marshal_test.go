@@ -216,15 +216,55 @@ func TestEncodeDecode(t *testing.T) {
 	}
 }
 
+func TestEncodeAll(t *testing.T) {
+	var expected []byte
+	for i := range testStructs {
+		expected = append(expected, Marshal(testStructs[i])...)
+	}
+
+	b := new(bytes.Buffer)
+	NewEncoder(b).EncodeAll(testStructs...)
+	if !bytes.Equal(b.Bytes(), expected) {
+		t.Errorf("expected %v, got %v", expected, b.Bytes())
+	}
+}
+
+func TestDecodeAll(t *testing.T) {
+	b := new(bytes.Buffer)
+	enc := NewEncoder(b)
+	for i := range testStructs {
+		enc.Encode(testStructs[i])
+	}
+
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
+	err := NewDecoder(b).DecodeAll(emptyStructs...)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestMarshalAll(t *testing.T) {
+	var expected []byte
+	for i := range testStructs {
+		expected = append(expected, Marshal(testStructs[i])...)
+	}
+
+	b := MarshalAll(testStructs...)
+	if !bytes.Equal(b, expected) {
+		t.Errorf("expected %v, got %v", expected, b)
+	}
+}
+
+func TestUnmarshalAll(t *testing.T) {
 	var b []byte
 	for i := range testStructs {
 		b = append(b, Marshal(testStructs[i])...)
 	}
 
-	expected := MarshalAll(testStructs...)
-	if !bytes.Equal(b, expected) {
-		t.Errorf("expected %v, got %v", expected, b)
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
+	err := UnmarshalAll(b, emptyStructs...)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
