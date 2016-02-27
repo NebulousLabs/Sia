@@ -1,13 +1,17 @@
 package modules
 
+// TODO: Split HostSettings into HostInternalSettings and HostExternalSettings.
+
+// TODO: Reconsider the method by which bandwidth limits, storage limits, and
+// prices are set. Want to enable flexibility for the client - probably belongs
+// with internal settings.
+
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	// AcceptResponse defines the response that is sent to a successful RPC.
-	AcceptResponse = "accept"
-
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
 
@@ -21,39 +25,43 @@ const (
 )
 
 var (
-	// RPCSettings is the specifier for requesting settings from the host.
-	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
-
-	// RPCUpload is the specifier for initiating an upload with the host.
-	RPCUpload = types.Specifier{'U', 'p', 'l', 'o', 'a', 'd'}
-
-	// RPCRenew is the specifier to renewing an existing contract.
-	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w'}
-
-	// RPCRevise is the specifier for revising an existing file contract.
-	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e'}
-
-	// RPCDownload is the specifier for downloading a file from a host.
-	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
-
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
-	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
+	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', '2'}
 )
 
 type (
-	// A DownloadRequest is used to retrieve a particular segment of a file from a
-	// host.
-	DownloadRequest struct {
-		Offset uint64
-		Length uint64
+	// HostBandwidthLimits set limits on the volume and speed of the uploading
+	// and downloading of the host. The limits have no bearings on the other
+	// modules. The data limits are in bytes per month, and the speed limits
+	// are in bytes per second.
+	HostBandwidthLimits struct {
+		DownloadDataLimit  uint64
+		DownloadSpeedLimit uint64
+		UploadDataLimit    uint64
+		UploadSpeedLimit   uint64
 	}
 
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
 	// address that can be used to contact the host.
 	HostAnnouncement struct {
 		IPAddress NetAddress
+		PublicKey crypto.PublicKey
+	}
+
+	// HostFinancialMetrics provides statistics on the spendings and earnings
+	// of the host.
+	HostFinancialMetrics struct {
+		DownloadBandwidthRevenue           types.Currency
+		LockedCollateral                   types.Currency
+		LostCollateral                     types.Currency
+		LostRevenue                        types.Currency
+		PotentialStorageRevenue            types.Currency
+		StorageRevenue                     types.Currency
+		TransactionFeeExpenses             types.Currency // Amount spent on transaction fees total
+		UnsubsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renter did help pay for.
+		UploadBandwidthRevenue             types.Currency
 	}
 
 	// HostSettings are the parameters advertised by the host. These are the
@@ -61,19 +69,27 @@ type (
 	// database.
 	HostSettings struct {
 		AcceptingContracts bool              `json:"acceptingcontracts"`
-		NetAddress         NetAddress        `json:"netaddress"`
-		TotalStorage       int64             `json:"totalstorage"`
-		MinDuration        types.BlockHeight `json:"minduration"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
+		NetAddress         NetAddress        `json:"netaddress"`
+		RemainingStorage   uint64            `json:"remainingstorage"` // Cannot be directly changed.
+		SectorSize         uint64            `json:"sectorsize"`       // Currently cannot be changed (future support planned).
+		TotalStorage       uint64            `json:"totalstorage"`     // Cannot be directly changed.
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`       // Cannot be directly changed.
 		WindowSize         types.BlockHeight `json:"windowsize"`
-		Price              types.Currency    `json:"price"`
-		Collateral         types.Currency    `json:"collateral"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
+
+		Collateral             types.Currency `json:"collateral"`
+		ContractPrice          types.Currency `json:"contractprice"`
+		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"` // The cost for a renter to download something (meaning the host is uploading).
+		StoragePrice           types.Currency `json:"storageprice"`
+		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"` // The cost for a renter to upload something (meaning the host is downloading).
 	}
 
 	// HostRPCMetrics reports the quantity of each type of RPC call that has
 	// been made to the host.
 	HostRPCMetrics struct {
+		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
+		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
+
 		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
 		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 		DownloadCalls     uint64 `json:"downloadcalls"`
@@ -83,48 +99,110 @@ type (
 		UploadCalls       uint64 `json:"uploadcalls"`
 	}
 
+	// StorageFolderMetadata contians metadata about a storage folder that is
+	// tracked by the storage folder manager.
+	StorageFolderMetadata struct {
+		CapacityRemaining uint64
+		Path              string
+		TotalCapacity     uint64
+
+		// Successful and unsuccessful operations report the number of
+		// successful and unsuccessful disk operations that the storage manager
+		// has completed on the storage folder. A large number of unsuccessful
+		// operations can indicate that the space allocated for the storage
+		// folder is larger than the amount of actual free space on the disk.
+		// Things like filesystem overhead can reduce the amount of actual
+		// storage available on disk, but should ultimately be less than 1% of
+		// the total advertised capacity of a disk. A large number of
+		// unsuccessful operations can also indicate that the disk is failing
+		// and that it needs to be replaced.
+		SuccessfulOperations   uint64
+		UnsuccessfulOperations uint64
+	}
+
+	// StorageFolderManager tracks and manipulates storage folders. Storage
+	// folders are used by the host to store the data that they contractually
+	// agree to manage.
+	StorageFolderManager interface {
+		// AddStorageFolder adds a storage folder to the host. The host may not
+		// check that there is enough space available on-disk to support as
+		// much storage as requested, though the host should gracefully handle
+		// running out of storage unexpectedly.
+		AddStorageFolder(path string, size uint64) error
+
+		// ForceRemoveStorageFolder removes a storage folder. The host will try
+		// to save the data on the storage folder by moving it to another
+		// storage folder, but if there are errors (such as not enough space)
+		// the host will forcibly remove the storage folder, discarding the
+		// data. This means that the host will be unable to provide storage
+		// proofs on the data, and is going to incur penalties.
+		ForceRemoveStorageFolder(index int) error
+
+		// RemoveStorageFolder will remove a storage folder from the host. All
+		// storage on the folder will be moved to other storage folders,
+		// meaning that no data will be lost. If the host is unable to save
+		// data, an error will be returned and the operation will be stopped.
+		RemoveStorageFolder(index int) error
+
+		// ResetStorageFolderHealth will reset the health statistics on a
+		// storage folder.
+		ResetStorageFolderHealth(index int) error
+
+		// ResizeStorageFolder will grow or shrink a storage folder in the
+		// host. The host may not check that there is enough space on-disk to
+		// support growing the storage folder, but should gracefully handle
+		// running out of space unexpectedly. When shrinking a storage folder,
+		// any data in the folder that needs to be moved will be placed into
+		// other storage folders, meaning that no data will be lost. If the
+		// host is unable to migrate the data, an error will be returned and
+		// the operation will be stopped.
+		ResizeStorageFolder(index int, newSize uint64) error
+
+		// StorageFolders will return a list of storage folders tracked by the
+		// host.
+		StorageFolders() []StorageFolderMetadata
+	}
+
 	// Host can take storage from disk and offer it to the network, managing things
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// Announce submits a host announcement to the blockchain, returning an
-		// error if its external IP address is unknown. After announcing, the
-		// host will begin accepting contracts.
-		Announce() error
+		// Announce submits a host announcement to the blockchain.  After
+		// announcing, the host will begin accepting contracts.
+		Announce(NetAddress) error
 
-		// AnnounceAddress behaves like Announce, but allows the caller to
-		// specify the address announced. Like Announce, this will cause the
-		// host to start accepting contracts.
-		AnnounceAddress(NetAddress) error
+		// ConsistencyCheckAndRepair runs a consistency check on the host,
+		// looking for places where some combination of disk errors, usage
+		// errors, and development errors have led to inconsistencies in the
+		// host. In cases where these inconsistencies can be repaired, the
+		// repairs are made.
+		// TODO: ConsistencyCheckAndRepair() error
 
-		// Capacity returns the amount of storage still available on the
-		// machine. The amount can be negative if the total capacity was
-		// reduced to below the active capacity.
-		Capacity() int64
+		// DeleteSector deletes a sector, meaning that the host will be unable
+		// to upload that sector and be unable to provide a storage proof if
+		// that sector is chosen by the blockchain.
+		DeleteSector(sectorRoot crypto.Hash) error
 
-		// Contracts returns the number of unresolved file contracts that the
-		// host is responsible for.
-		Contracts() uint64
+		// FileContracts returns a list of file contracts that the host
+		// currently has open, along with the volume of data tracked by each
+		// file contract.
+		FileContracts() ([]types.FileContractID, []uint64)
 
-		// DeleteContract deletes a file contract. The revenue and collateral
-		// on the file contract will be lost, and the data will be removed.
-		DeleteContract(types.FileContractID) error
+		// FinancialMetrics returns the financial statistics of the host.
+		FinancialMetrics() HostFinancialMetrics
 
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
 
-		// Revenue returns the amount of revenue that the host has lined up,
-		// the amount of revenue the host has successfully captured, and the
-		// amount of revenue the host has lost.
-		//
-		// TODO: This function will eventually include two more numbers, one
-		// representing current collateral at risk, and one representing total
-		// collateral lost.
-		Revenue() (unresolved, resolved, lost types.Currency)
-
 		// RPCMetrics returns information on the types of RPC calls that have
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
+
+		// SetBandwidthLimits puts a limit on how much data transfer the host
+		// will tolerate. Altruistic limits indicate how much data the host is
+		// willing to transfer for free, and priced limits indicate how much
+		// data the host is willing to transfer when the host is getting paid.
+		// TODO: SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
 
 		// SetConfig sets the hosting parameters of the host.
 		SetSettings(HostSettings) error
@@ -134,23 +212,50 @@ type (
 
 		// Close saves the state of the host and stops its listener process.
 		Close() error
+
+		StorageFolderManager
 	}
 )
 
+// BandwidthPriceToConsensus converts a human bandwidth price, having the unit
+// 'Siacoins per Terabyte', to a consensus storage price, having the unit
+// 'Hastings per Byte'.
+func BandwidthPriceToConsensus(siacoinsTB uint64) (hastingsByte types.Currency) {
+	hastingsTB := types.NewCurrency64(siacoinsTB).Mul(types.SiacoinPrecision)
+	return hastingsTB.Div(types.NewCurrency64(1e12))
+}
+
+// BandwidthPriceToHuman converts a consensus bandwidth price, having the unit
+// 'Hastings per Byte' to a human bandwidth price, having the unit 'Siacoins
+// per Terabyte'.
+func BandwidthPriceToHuman(hastingsByte types.Currency) (siacoinsTB uint64, err error) {
+	hastingsTB := hastingsByte.Mul(types.NewCurrency64(1e12))
+	if hastingsTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
+		// The result of the final division is going to be less than 0.5,
+		// therefore 0 should be returned.
+		return 0, nil
+	}
+	if hastingsTB.Cmp(types.SiacoinPrecision) < 0 {
+		// The result of the final division is going to be greater than or
+		// equal to 0.5, but less than 1, therefore 1 should be returned.
+		return 1, nil
+	}
+	return hastingsTB.Div(types.SiacoinPrecision).Uint64()
+}
+
 // StoragePriceToConsensus converts a human storage price, having the unit
-// 'Siacoins Per Month Per Terabyte', to a consensus storage price, having the
-// unit 'Hastings Per Block Per Byte'.
+// 'Siacoins per Month per Terabyte', to a consensus storage price, having the
+// unit 'Hastings per Block per Byte'.
 func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Currency) {
 	// Perform multiplication first to preserve precision.
 	hastingsMonthTB := types.NewCurrency64(siacoinsMonthTB).Mul(types.SiacoinPrecision)
 	hastingsBlockTB := hastingsMonthTB.Div(types.NewCurrency64(4320))
-	hastingsBlockByte = hastingsBlockTB.Div(types.NewCurrency64(1e12))
-	return hastingsBlockByte
+	return hastingsBlockTB.Div(types.NewCurrency64(1e12))
 }
 
 // StoragePriceToHuman converts a consensus storage price, having the unit
-// 'Hastings Per Block Per Byte', to a human storage price, having the unit
-// 'Siacoins Per Month Per Terabyte'. An error is returned if the result would
+// 'Hastings per Block per Byte', to a human storage price, having the unit
+// 'Siacoins per Month per Terabyte'. An error is returned if the result would
 // overflow a uint64. If the result is between 0 and 1, the value is rounded to
 // the nearest value.
 func StoragePriceToHuman(hastingsBlockByte types.Currency) (siacoinsMonthTB uint64, err error) {

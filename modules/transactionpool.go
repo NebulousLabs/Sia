@@ -66,6 +66,14 @@ type TransactionPool interface {
 	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
+	// FeeEstimation returns an estimation for how high the transaction fee
+	// needs to be per byte. The minimum recommended targets getting accepted
+	// in ~3 blocks, and the maximum recommended targets getting accepted
+	// immediately. Taking the average has a moderate chance of being accepted
+	// within one block. The minimum has a strong chance of getting accepted
+	// within 10 blocks.
+	FeeEstimation() (minimumRecommended, maximumRecommended types.Currency)
+
 	// IsStandardTransaction returns `err = nil` if the transaction is
 	// standard, otherwise it returns an error explaining what is not standard.
 	IsStandardTransaction(types.Transaction) error

@@ -37,12 +37,24 @@ type ConsensusSet struct {
 	// Subscribers to the consensus set will receive a changelog every time
 	// there is an update to the consensus set. At initialization, they receive
 	// all changes that they are missing.
+	//
+	// Memory: A consensus set typically has fewer than 10 subscribers, and
+	// subscription typically happens entirely at startup. This slice is
+	// unlikely to grow beyond 1kb, and cannot by manipulated by an attacker as
+	// the function of adding a subscriber should not be exposed.
 	subscribers []modules.ConsensusSetSubscriber
 
 	// dosBlocks are blocks that are invalid, but the invalidity is only
 	// discoverable during an expensive step of validation. These blocks are
 	// recorded to eliminate a DoS vector where an expensive-to-validate block
 	// is submitted to the consensus set repeatedly.
+	//
+	// TODO: dosBlocks needs to be moved into the database, and if there's some
+	// reason it can't be in THE database, it should be in a separate database.
+	// dosBlocks is an unbounded map that an attacker can manipulate, though
+	// iirc manipulations are expensive, to the tune of creating a blockchain
+	// PoW per DoS block (though the attacker could conceivably build off of
+	// the genesis block, meaning the PoW is not very expensive.
 	dosBlocks map[types.BlockID]struct{}
 
 	// checkingConsistency is a bool indicating whether or not a consistency
@@ -60,8 +72,8 @@ type ConsensusSet struct {
 
 	// Utilities
 	db         *persist.BoltDatabase
-	persistDir string
 	mu         demotemutex.DemoteMutex
+	persistDir string
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If

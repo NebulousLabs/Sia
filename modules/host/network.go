@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -17,7 +16,7 @@ import (
 func (h *Host) initNetworking(address string) error {
 	// Create listener and set address.
 	var err error
-	h.listener, err = net.Listen("tcp", address)
+	h.listener, err = h.dependencies.listen("tcp", address)
 	if err != nil {
 		return err
 	}
@@ -84,35 +83,37 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	}
 
 	switch id {
-	case modules.RPCDownload:
-		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		err = h.managedRPCDownload(conn)
-	case modules.RPCRenew:
-		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		err = h.managedRPCRenew(conn)
-	case modules.RPCRevise:
-		atomic.AddUint64(&h.atomicReviseCalls, 1)
-		err = h.managedRPCRevise(conn)
-	case modules.RPCSettings:
-		atomic.AddUint64(&h.atomicSettingsCalls, 1)
-		err = h.managedRPCSettings(conn)
-	case modules.RPCUpload:
-		atomic.AddUint64(&h.atomicUploadCalls, 1)
-		err = h.managedRPCUpload(conn)
-	default:
-		atomic.AddUint64(&h.atomicErroredCalls, 1)
+	/*
+		case modules.RPCDownload:
+			atomic.AddUint64(&h.atomicDownloadCalls, 1)
+			// err = h.managedRPCDownload(conn)
+		case modules.RPCRenew:
+			atomic.AddUint64(&h.atomicRenewCalls, 1)
+			// err = h.managedRPCRenew(conn)
+		case modules.RPCRevise:
+			atomic.AddUint64(&h.atomicReviseCalls, 1)
+			// err = h.managedRPCRevise(conn)
+		case modules.RPCSettings:
+			atomic.AddUint64(&h.atomicSettingsCalls, 1)
+			err = h.managedRPCSettings(conn)
+		case modules.RPCUpload:
+			atomic.AddUint64(&h.atomicUploadCalls, 1)
+			// err = h.managedRPCUpload(conn)
+		default:
+			atomic.AddUint64(&h.atomicErroredCalls, 1)
 
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
-		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
-			h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
-		}
-		return
+			// Don't clutter the logs with repeat messages - after 1000 messages
+			// have been printed, only print 1-in-200.
+			randInt, randErr := crypto.RandIntn(200)
+			if randErr != nil {
+				return
+			}
+			erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
+			if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
+				h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+			}
+	*/
+	default:
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
@@ -134,8 +135,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 func (h *Host) threadedListen() {
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
-	if build.DEBUG && h.closed {
-		panic("threaded listen does not have access to host resources - is only called at startup")
+	if h.closed {
+		return
 	}
 
 	// Receive connections until an error is returned by the listener. When an

@@ -9,8 +9,8 @@ import (
 // which case panic will be called instead.
 func Critical(v ...interface{}) {
 	s := fmt.Sprintln(v...)
-	os.Stderr.WriteString(s)
 	if DEBUG {
 		panic(s)
 	}
+	os.Stderr.WriteString(s)
 }

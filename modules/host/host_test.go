@@ -4,7 +4,6 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -12,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/renter"
+	// "github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -21,10 +20,10 @@ import (
 // A hostTester is the helper object for host testing, including helper modules
 // and methods for controlling synchronization.
 type hostTester struct {
-	cs        modules.ConsensusSet
-	gateway   modules.Gateway
-	miner     modules.TestMiner
-	renter    modules.Renter
+	cs      modules.ConsensusSet
+	gateway modules.Gateway
+	miner   modules.TestMiner
+	// renter    modules.Renter
 	renting   bool
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
@@ -35,6 +34,7 @@ type hostTester struct {
 	persistDir string
 }
 
+/*
 // initRenting prepares the host tester for uploads and downloads by announcing
 // the host to the network and performing other preparational tasks.
 // initRenting takes a while because the renter needs to process the host
@@ -76,6 +76,7 @@ func (ht *hostTester) initRenting() error {
 	ht.renting = true
 	return nil
 }
+*/
 
 // initWallet creates a wallet key, initializes the host wallet, unlocks it,
 // and then stores the key in the host tester.
@@ -128,19 +129,21 @@ func blankHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
-	if err != nil {
-		return nil, err
-	}
+	/*
+		r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+		if err != nil {
+			return nil, err
+		}
+	*/
 
 	// Assemble all objects into a hostTester
 	ht := &hostTester{
 		cs:      cs,
 		gateway: g,
 		miner:   m,
-		renter:  r,
-		tpool:   tp,
-		wallet:  w,
+		// renter:  r,
+		tpool:  tp,
+		wallet: w,
 
 		host: h,
 
@@ -179,6 +182,7 @@ func TestHostInitialization(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Create a blank host tester and check that the height is zero.
 	bht, err := blankHostTester("TestHostInitialization")
 	if err != nil {
@@ -208,6 +212,7 @@ func TestNilValues(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestStartupRescan")
 	if err != nil {
 		t.Fatal(err)
@@ -228,6 +233,7 @@ func TestNilValues(t *testing.T) {
 	}
 }
 
+/*
 // TestSetAndGetSettings checks that the functions for interacting with the
 // hosts settings object are working as expected.
 func TestSetAndGetSettings(t *testing.T) {
@@ -241,9 +247,6 @@ func TestSetAndGetSettings(t *testing.T) {
 
 	// Check the default settings get returned at first call.
 	settings := ht.host.Settings()
-	if settings.TotalStorage != defaultTotalStorage {
-		t.Error("settings retrieval did not return default value:", settings.TotalStorage, defaultTotalStorage)
-	}
 	if settings.MaxDuration != defaultMaxDuration {
 		t.Error("settings retrieval did not return default value")
 	}
@@ -268,9 +271,6 @@ func TestSetAndGetSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	newSettings := ht.host.Settings()
-	if settings.TotalStorage != newSettings.TotalStorage {
-		t.Error("settings retrieval did not return updated value")
-	}
 	if settings.MaxDuration != newSettings.MaxDuration {
 		t.Error("settings retrieval did not return updated value")
 	}
@@ -310,6 +310,7 @@ func TestSetAndGetSettings(t *testing.T) {
 		t.Error("settings retrieval did not return updated value")
 	}
 }
+*/
 
 // TestSetUnlockHash tries setting the unlock hash using SetSettings, an error
 // should be returned.
@@ -317,6 +318,7 @@ func TestSetUnlockHash(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestSetUnlockHash")
 	if err != nil {
 		t.Fatal(err)
@@ -331,6 +333,7 @@ func TestSetUnlockHash(t *testing.T) {
 	}
 }
 
+/*
 // TestPersistentSettings checks that settings persist between instances of the
 // host.
 func TestPersistentSettings(t *testing.T) {
@@ -378,5 +381,96 @@ func TestPersistentSettings(t *testing.T) {
 	}
 	if settings.Collateral.Cmp(newSettings.Collateral) != 0 {
 		t.Error("settings retrieval did not return updated value")
+	}
+}
+*/
+
+// TestComposeErrors checks that composeErrors is correctly composing errors
+// and handling edge cases.
+func TestComposeErrors(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	trials := []struct {
+		inputErrors           []error
+		nilReturn             bool
+		expectedComposedError string
+	}{
+		{
+			nil,
+			true,
+			"",
+		},
+		{
+			make([]error, 0),
+			true,
+			"",
+		},
+		{
+			[]error{errors.New("single error")},
+			false,
+			"single error",
+		},
+		{
+			[]error{
+				errors.New("first error"),
+				errors.New("second error"),
+			},
+			false,
+			"first error; second error",
+		},
+		{
+			[]error{
+				errors.New("first error"),
+				errors.New("second error"),
+				errors.New("third error"),
+			},
+			false,
+			"first error; second error; third error",
+		},
+		{
+			[]error{
+				nil,
+				errors.New("second error"),
+				errors.New("third error"),
+			},
+			false,
+			"second error; third error",
+		},
+		{
+			[]error{
+				errors.New("first error"),
+				nil,
+				nil,
+			},
+			false,
+			"first error",
+		},
+		{
+			[]error{
+				nil,
+				nil,
+				nil,
+			},
+			true,
+			"",
+		},
+	}
+	for _, trial := range trials {
+		err := composeErrors(trial.inputErrors...)
+		if trial.nilReturn {
+			if err != nil {
+				t.Error("composeError failed a test, expecting nil, got", err)
+			}
+		} else {
+			if err == nil {
+				t.Error("not expecting a nil error when doing composition")
+			}
+			if err.Error() != trial.expectedComposedError {
+				t.Error("composeError failed a test, expecting", trial.expectedComposedError, "got", err.Error())
+			}
+		}
 	}
 }

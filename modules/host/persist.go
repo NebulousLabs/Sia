@@ -11,19 +11,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// logFile establishes the name of the file that gets used for logging.
-	settingsFile = "settings.json"
-	logFile      = modules.HostDir + ".log"
-)
-
-// persistMetadata is the header that gets written to the persist file, and is
-// used to recognize other persist files.
-var persistMetadata = persist.Metadata{
-	Header:  "Sia Host",
-	Version: "0.5",
-}
-
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
 	// RPC Metrics.
@@ -43,12 +30,12 @@ type persistence struct {
 	NetAddress modules.NetAddress
 	PublicKey  types.SiaPublicKey
 	SecretKey  crypto.SecretKey
+	SectorSalt crypto.Hash
 
-	// File Management.
-	Obligations []*contractObligation
+	// Storage Folders.
+	StorageFolders []*storageFolder
 
 	// Statistics.
-	FileCounter int64
 	LostRevenue types.Currency
 	Revenue     types.Currency
 
@@ -56,6 +43,7 @@ type persistence struct {
 	Settings modules.HostSettings
 }
 
+/*
 // getObligations returns a slice containing all of the contract obligations
 // currently being tracked by the host.
 func (h *Host) getObligations() []*contractObligation {
@@ -65,6 +53,7 @@ func (h *Host) getObligations() []*contractObligation {
 	}
 	return cos
 }
+*/
 
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
@@ -86,12 +75,12 @@ func (h *Host) save() error {
 		NetAddress: h.netAddress,
 		PublicKey:  h.publicKey,
 		SecretKey:  h.secretKey,
+		SectorSalt: h.sectorSalt,
 
-		// File Management.
-		Obligations: h.getObligations(),
+		// Storage Folders.
+		StorageFolders: h.storageFolders,
 
 		// Statistics.
-		FileCounter: h.fileCounter,
 		LostRevenue: h.lostRevenue,
 		Revenue:     h.revenue,
 
@@ -101,47 +90,11 @@ func (h *Host) save() error {
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 }
 
-// establishDefaults configures the default settings for the host, overwriting
-// any existing settings.
-func (h *Host) establishDefaults() error {
-	// Configure the settings object.
-	h.settings = modules.HostSettings{
-		TotalStorage: defaultTotalStorage,
-		MaxDuration:  defaultMaxDuration,
-		WindowSize:   defaultWindowSize,
-		Price:        defaultPrice,
-		Collateral:   defaultCollateral,
-	}
-	h.spaceRemaining = h.settings.TotalStorage
-
-	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return err
-	}
-	h.secretKey = sk
-	h.publicKey = types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       pk[:],
-	}
-
-	// Subscribe to the consensus set.
-	err = h.initConsensusSubscription()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // load extrats the save data from disk and populates the host.
 func (h *Host) load() error {
 	p := new(persistence)
-	err := persist.LoadFile(persistMetadata, p, filepath.Join(h.persistDir, "settings.json"))
-	if err == persist.ErrBadVersion {
-		// COMPATv0.4.8 - try the compatibility loader.
-		return h.compatibilityLoad()
-	} else if os.IsNotExist(err) {
+	err := h.dependencies.loadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+	if os.IsNotExist(err) {
 		// There is no host.json file, set up sane defaults.
 		return h.establishDefaults()
 	} else if err != nil {
@@ -165,6 +118,10 @@ func (h *Host) load() error {
 	h.netAddress = p.NetAddress
 	h.publicKey = p.PublicKey
 	h.secretKey = p.SecretKey
+	h.sectorSalt = p.SectorSalt
+
+	// Copy over storage folders.
+	h.storageFolders = p.StorageFolders
 
 	// Copy over statistics.
 	h.revenue = p.Revenue
@@ -173,31 +130,9 @@ func (h *Host) load() error {
 	// Utilities.
 	h.settings = p.Settings
 
-	// Copy over the file management. The space remaining is recalculated from
-	// disk instead of being saved, to maximize the potential usefulness of
-	// restarting Sia as a means of eliminating unkonwn errors.
-	h.fileCounter = p.FileCounter
-	h.spaceRemaining = p.Settings.TotalStorage
-
-	// Copy over the obligations and then subscribe to the consensus set.
-	for _, obligation := range p.Obligations {
-		// Store the obligation in the obligations list.
-		h.obligationsByID[obligation.ID] = obligation
-
-		// Update spaceRemaining to account for the storage held by this
-		// obligation.
-		h.spaceRemaining -= int64(obligation.fileSize())
-
-		// Update anticipated revenue to reflect the revenue in this file
-		// contract.
-		h.anticipatedRevenue = h.anticipatedRevenue.Add(obligation.value())
-	}
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
-	}
-	for _, obligation := range h.obligationsByID {
-		h.handleActionItem(obligation)
 	}
 	return nil
 }
