@@ -1,7 +1,9 @@
 package crypto
 
 import (
+	"bytes"
 	"errors"
+	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/ed25519"
@@ -70,27 +72,43 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	return nil
 }
 
+// WriteSignedObject writes a length-prefixed object followed by its signature.
+func WriteSignedObject(w io.Writer, obj interface{}, sk SecretKey) error {
+	encObj := encoding.Marshal(obj)
+	sig, _ := SignHash(HashBytes(encObj), sk) // no error possible
+	return encoding.NewEncoder(w).EncodeAll(encObj, sig)
+}
+
+// ReadSignedObject reads a length-prefixed object followed by its signature,
+// and verifies the signature.
+func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) error {
+	// read the encoded object and signature
+	var encObj []byte
+	var sig Signature
+	err := encoding.NewDecoder(r).DecodeAll(&encObj, &sig)
+	if err != nil {
+		return err
+	}
+	// verify the signature
+	if err := VerifyHash(HashBytes(encObj), pk, sig); err != nil {
+		return err
+	}
+	// decode the object
+	return encoding.Unmarshal(encObj, obj)
+}
+
 // SignObject encodes an object and its signature.
 func SignObject(obj interface{}, sk SecretKey) []byte {
-	b := encoding.Marshal(obj)
-	sig, _ := SignHash(HashBytes(b), sk) // no error possible
-	return encoding.MarshalAll(b, sig)
+	b := new(bytes.Buffer)
+	WriteSignedObject(b, obj, sk) // no error possible with bytes.Buffer
+	return b.Bytes()
 }
 
 // VerifyObject decodes an object and verifies its signature.
 func VerifyObject(data []byte, obj interface{}, pk PublicKey) error {
-	// split data into encoded object and signature
-	var objData []byte
-	var sig Signature
-	if err := encoding.UnmarshalAll(data, &objData, &sig); err != nil {
-		return err
-	}
-	// verify the signature
-	if err := VerifyHash(HashBytes(objData), pk, sig); err != nil {
-		return err
-	}
-	// decode the object
-	return encoding.Unmarshal(objData, obj)
+	r := bytes.NewReader(data)
+	// since object is already in memory, no need to enforce a maxLen
+	return ReadSignedObject(r, obj, ^uint64(0), pk)
 }
 
 // PublicKey returns the public key that corresponds to a secret key.
