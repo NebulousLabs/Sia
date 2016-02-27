@@ -419,7 +419,7 @@ func TestComposeErrors(t *testing.T) {
 				errors.New("second error"),
 			},
 			false,
-			"first error and second error",
+			"first error; second error",
 		},
 		{
 			[]error{
@@ -428,7 +428,7 @@ func TestComposeErrors(t *testing.T) {
 				errors.New("third error"),
 			},
 			false,
-			"first error and second error and third error",
+			"first error; second error; third error",
 		},
 		{
 			[]error{
@@ -437,7 +437,7 @@ func TestComposeErrors(t *testing.T) {
 				errors.New("third error"),
 			},
 			false,
-			"second error and third error",
+			"second error; third error",
 		},
 		{
 			[]error{

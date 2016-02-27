@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -496,29 +497,22 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 // composeErrors will take two errors and compose them into a single errors
 // with a longer message. Any nil errors used as inputs will be stripped out,
 // and if there are zero non-nil inputs then 'nil' will be returned.
-//
-// TODO: It may make sense to move this function to the build package. When
-// moving it, the testing function should follow.
 func composeErrors(errs ...error) error {
 	// Strip out any nil errors.
-	var filteredErrs []error
+	var errStrings []string
 	for _, err := range errs {
 		if err != nil {
-			filteredErrs = append(filteredErrs, err)
+			errStrings = append(errStrings, err.Error())
 		}
 	}
 
 	// Return nil if there are no non-nil errors in the input.
-	if len(filteredErrs) <= 0 {
+	if len(errStrings) <= 0 {
 		return nil
 	}
 
 	// Combine all of the non-nil errors into one larger return value.
-	err := filteredErrs[0]
-	for i := 1; i < len(filteredErrs); i++ {
-		err = errors.New(err.Error() + " and " + filteredErrs[i].Error())
-	}
-	return err
+	return errors.New(strings.Join(errStrings, "; "))
 }
 
 // Close shuts down the host, preparing it for garbage collection.

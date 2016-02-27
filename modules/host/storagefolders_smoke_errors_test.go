@@ -30,7 +30,7 @@ func (ffs faultyFS) readFile(s string) ([]byte, error) {
 			return nil, mockErrReadFile
 		}
 	}
-	return ioutil.ReadFile(s)
+	return ffs.productionDependencies.readFile(s)
 }
 
 // symlink creates a symlink between a source and a destination file, but will
@@ -42,7 +42,7 @@ func (ffs faultyFS) symlink(s1, s2 string) error {
 			return mockErrSymlink
 		}
 	}
-	return os.Symlink(s1, s2)
+	return ffs.productionDependencies.symlink(s1, s2)
 }
 
 // writeFile reads a file from the filesystem. The call will fail if reading
