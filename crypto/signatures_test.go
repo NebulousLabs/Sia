@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
-	"io"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -278,54 +277,44 @@ func TestIntegrationSigKeyGeneration(t *testing.T) {
 	}
 }
 
-// TestReadWriteSignedObject tests the WriteSignedObject and ReadSignedObject
-// functions, which are inverses of each other.
-func TestReadWriteSignedObject(t *testing.T) {
+// TestSignVerifyObject tests the SignObject and VerifyObject functions, which
+// are inverses of each other.
+func TestSignVerifyObject(t *testing.T) {
 	sk, pk, err := GenerateKeyPair()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// write signed object
-	b := new(bytes.Buffer)
-	if err = WriteSignedData(b, "foo", sk); err != nil {
-		t.Fatal(err)
-	}
+	// create signed object
+	signedObj := SignObject("foo", sk)
 
-	// read signed object
+	// verify signed object
 	var read string
-	err = ReadSignedData(b, &read, 11, pk)
+	err = VerifyObject(signedObj, &read, pk)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if read != "foo" {
-		t.Fatal("encode/decode mismatch: expected 'foo', got", read)
+		t.Fatal("encode/decode mismatch: expected 'foo', got", []byte(read))
 	}
 
 	// corrupt signature
-	if err = WriteSignedData(b, "foo", sk); err != nil {
-		t.Fatal(err)
-	}
-	buf := b.Bytes()
-	_, err = rand.Read(buf[11:])
+	_, err = rand.Read(signedObj[11:])
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ReadSignedData(b, &read, 11, pk)
+	err = VerifyObject(signedObj, &read, pk)
 	if err != errInvalidSignature {
 		t.Fatal("expected errInvalidSignature, got", err)
 	}
 
 	// not enough object data
-	err = ReadSignedData(b, &read, 11, pk)
-	if err != io.EOF {
-		t.Fatal("expected EOF, got", err)
+	err = VerifyObject(signedObj[:0], &read, pk)
+	if err == nil || err.Error() != "could not decode type []uint8: EOF" {
+		t.Fatal("expected decode error, got", err)
 	}
 	// not enough signature data
-	if err := encoding.WriteObject(b, "foo"); err != nil {
-		t.Fatal(err)
-	}
-	err = ReadSignedData(b, &read, 11, pk)
+	err = VerifyObject(signedObj[:19], &read, pk)
 	if err == nil || err.Error() != "could not decode type crypto.Signature: EOF" {
 		t.Fatal("expected decode error, got", err)
 	}

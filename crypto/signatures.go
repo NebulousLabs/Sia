@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"errors"
-	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/ed25519"
@@ -71,31 +70,27 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	return nil
 }
 
-// WriteSignedData writes a length-prefixed object followed by its signature.
-func WriteSignedData(w io.Writer, obj interface{}, sk SecretKey) error {
+// SignObject encodes an object and its signature.
+func SignObject(obj interface{}, sk SecretKey) []byte {
 	b := encoding.Marshal(obj)
 	sig, _ := SignHash(HashBytes(b), sk) // no error possible
-	return encoding.NewEncoder(w).EncodeAll(b, sig)
+	return encoding.MarshalAll(b, sig)
 }
 
-// ReadSignedData reads a length-prefixed object followed by its signature,
-// and verifies the signature.
-func ReadSignedData(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) error {
-	// read the encoded data and signature
-	data, err := encoding.ReadPrefix(r, maxLen)
-	if err != nil {
-		return err
-	}
+// VerifyObject decodes an object and verifies its signature.
+func VerifyObject(data []byte, obj interface{}, pk PublicKey) error {
+	// split data into encoded object and signature
+	var objData []byte
 	var sig Signature
-	if err := encoding.NewDecoder(r).Decode(&sig); err != nil {
+	if err := encoding.UnmarshalAll(data, &objData, &sig); err != nil {
 		return err
 	}
 	// verify the signature
-	if err := VerifyHash(HashBytes(data), pk, sig); err != nil {
+	if err := VerifyHash(HashBytes(objData), pk, sig); err != nil {
 		return err
 	}
 	// decode the object
-	return encoding.Unmarshal(data, obj)
+	return encoding.Unmarshal(objData, obj)
 }
 
 // PublicKey returns the public key that corresponds to a secret key.
