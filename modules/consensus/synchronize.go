@@ -1,6 +1,10 @@
 package consensus
 
 import (
+	"errors"
+	"net"
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -16,16 +20,31 @@ var (
 	// download.
 	MaxCatchUpBlocks = func() types.BlockHeight {
 		switch build.Release {
-		case "testing":
-			return 3
-		case "standard":
-			return 10
 		case "dev":
 			return 10
+		case "standard":
+			return 10
+		case "testing":
+			return 3
 		default:
 			panic("unrecognized build.Release")
 		}
 	}()
+	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
+	sendBlocksTimeout = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 5 * time.Minute
+		case "standard":
+			return 5 * time.Minute
+		case "testing":
+			return 5 * time.Second
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
+
+	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
 
 // blockHistory returns up to 32 block ids, starting with recent blocks and
@@ -84,6 +103,9 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 
 	// Send the block ids.
 	if err := encoding.WriteObject(conn, history); err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return errSendBlocksStalled
+		}
 		return err
 	}
 
@@ -113,12 +135,17 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	// Read blocks off of the wire and add them to the consensus set until
 	// there are no more blocks available.
 	moreAvailable := true
+	receivedBlocks := false
 	for moreAvailable {
 		// Read a slice of blocks from the wire.
 		var newBlocks []types.Block
 		if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !receivedBlocks {
+				return errSendBlocksStalled
+			}
 			return err
 		}
+		receivedBlocks = true
 		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
 			return err
 		}
@@ -152,6 +179,11 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
+	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
+	// SendBlocks will timeout. This is by design so that IBD switches peers to
+	// prevent any one peer from stalling IBD.
+	conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
