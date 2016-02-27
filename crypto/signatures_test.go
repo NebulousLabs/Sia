@@ -330,3 +330,14 @@ func TestReadWriteSignedObject(t *testing.T) {
 		t.Fatal("expected decode error, got", err)
 	}
 }
+
+// TestPublicKey tests the PublicKey method
+func TestPublicKey(t *testing.T) {
+	sk, pk, err := GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sk.PublicKey() != pk {
+		t.Fatal("PublicKey does not match actual public key:", pk, sk.PublicKey())
+	}
+}

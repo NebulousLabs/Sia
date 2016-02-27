@@ -25,14 +25,14 @@ const (
 
 type (
 	// PublicKey is an object that can be used to verify signatures.
-	PublicKey [ed25519.PublicKeySize]byte
+	PublicKey [PublicKeySize]byte
 
 	// SecretKey can be used to sign data for the corresponding public key.
-	SecretKey [ed25519.SecretKeySize]byte
+	SecretKey [SecretKeySize]byte
 
 	// Signature proves that data was signed by the owner of a particular
 	// public key's corresponding secret key.
-	Signature [ed25519.SignatureSize]byte
+	Signature [SignatureSize]byte
 )
 
 var (
@@ -100,6 +100,6 @@ func ReadSignedData(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) e
 
 // PublicKey returns the public key that corresponds to a secret key.
 func (sk SecretKey) PublicKey() (pk PublicKey) {
-	copy(pk[:], sk[32:])
+	copy(pk[:], sk[SecretKeySize-PublicKeySize:])
 	return
 }
