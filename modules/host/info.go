@@ -83,7 +83,7 @@ func (h *Host) NetAddress() modules.NetAddress {
 func (h *Host) Revenue() (unresolved, resolved, lost types.Currency) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.anticipatedRevenue, h.revenue, h.lostRevenue
+	return h.potentialStorageRevenue, h.storageRevenue, h.lostStorageRevenue
 }
 
 // RPCMetrics returns information about the types of rpc calls that have been

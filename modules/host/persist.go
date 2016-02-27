@@ -49,9 +49,16 @@ type persistence struct {
 	// Storage Folders.
 	StorageFolders []*storageFolder
 
-	// Statistics.
-	LostRevenue types.Currency
-	Revenue     types.Currency
+	// Financial Metrics.
+	DownloadBandwidthRevenue           types.Currency
+	LockedStorageCollateral            types.Currency
+	LostStorageCollateral              types.Currency
+	LostStorageRevenue                 types.Currency
+	PotentialStorageRevenue            types.Currency
+	StorageRevenue                     types.Currency
+	TransactionFeeExpenses             types.Currency
+	UnsubsidizedTransactionFeeExpenses types.Currency
+	UploadBandwidthRevenue             types.Currency
 
 	// Utilities.
 	Settings modules.HostSettings
@@ -94,9 +101,16 @@ func (h *Host) save() error {
 		// Storage Folders.
 		StorageFolders: h.storageFolders,
 
-		// Statistics.
-		LostRevenue: h.lostRevenue,
-		Revenue:     h.revenue,
+		// Financial Metrics.
+		DownloadBandwidthRevenue:           h.downloadBandwidthRevenue,
+		LockedStorageCollateral:            h.lockedStorageCollateral,
+		LostStorageCollateral:              h.lostStorageCollateral,
+		LostStorageRevenue:                 h.lostStorageRevenue,
+		PotentialStorageRevenue:            h.potentialStorageRevenue,
+		StorageRevenue:                     h.storageRevenue,
+		TransactionFeeExpenses:             h.transactionFeeExpenses,
+		UnsubsidizedTransactionFeeExpenses: h.unsubsidizedTransactionFeeExpenses,
+		UploadBandwidthRevenue:             h.uploadBandwidthRevenue,
 
 		// Utilities.
 		Settings: h.settings,
@@ -137,9 +151,16 @@ func (h *Host) load() error {
 	// Copy over storage folders.
 	h.storageFolders = p.StorageFolders
 
-	// Copy over statistics.
-	h.revenue = p.Revenue
-	h.lostRevenue = p.LostRevenue
+	// Copy over financial metrics.
+	h.downloadBandwidthRevenue = p.DownloadBandwidthRevenue
+	h.lockedStorageCollateral = p.LockedStorageCollateral
+	h.lostStorageCollateral = p.LostStorageCollateral
+	h.lostStorageRevenue = p.LostStorageRevenue
+	h.potentialStorageRevenue = p.PotentialStorageRevenue
+	h.storageRevenue = p.StorageRevenue
+	h.transactionFeeExpenses = p.TransactionFeeExpenses
+	h.unsubsidizedTransactionFeeExpenses = p.UnsubsidizedTransactionFeeExpenses
+	h.uploadBandwidthRevenue = p.UploadBandwidthRevenue
 
 	// Utilities.
 	h.settings = p.Settings

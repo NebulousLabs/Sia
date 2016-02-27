@@ -45,7 +45,7 @@ func (h *Host) initConsensusSubscription() error {
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id that the host
 		// has is unrecognized by the consensus set. This will typically only
-		// happen if the user has been replacing files inside the folder
+		// happen if the user has been replacing files inside the Sia folder
 		// structure.
 		return h.initRescan()
 	}
@@ -61,6 +61,10 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.RevertedBlocks {
 		// TODO: Look for transactions relevant to open storage obligations.
 
+		// Height is not adjusted when dealing with the genesis block because
+		// the default height is 0 and the genesis block height is 0. If
+		// removing the genesis block, height will already be at height 0 and
+		// should not update, lest an underflow occur.
 		if block.ID() != types.GenesisBlock.ID() {
 			h.blockHeight--
 		}
@@ -68,12 +72,10 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		// TODO: Look for transactions relevant to open storage obligations.
 
-		// Adjust the height of the host. The host height is initialized to
-		// zero, but the genesis block is actually height zero. For the genesis
-		// block only, the height will be left at zero.
-		//
-		// Checking the height here eliminates the need to initialize the host
-		// to and underflowed types.BlockHeight.
+		// Height is not adjusted when dealing with the genesis block because
+		// the default height is 0 and the genesis block height is 0. If adding
+		// the genesis block, height will already be at height 0 and should not
+		// update.
 		if block.ID() != types.GenesisBlock.ID() {
 			h.blockHeight++
 		}

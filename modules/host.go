@@ -89,9 +89,9 @@ type (
 	// of the host.
 	HostFinancialMetrics struct {
 		DownloadBandwidthRevenue           types.Currency
-		LockedCollateral                   types.Currency
-		LostCollateral                     types.Currency
-		LostRevenue                        types.Currency
+		LockedStorageCollateral            types.Currency
+		LostStorageCollateral              types.Currency
+		LostStorageRevenue                 types.Currency
 		PotentialStorageRevenue            types.Currency
 		StorageRevenue                     types.Currency
 		TransactionFeeExpenses             types.Currency // Amount spent on transaction fees total
@@ -104,6 +104,7 @@ type (
 	// database.
 	HostSettings struct {
 		AcceptingContracts bool              `json:"acceptingcontracts"`
+		MaxBatchSize       uint64            `json:"maxbatchsize"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
 		NetAddress         NetAddress        `json:"netaddress"`
 		RemainingStorage   uint64            `json:"remainingstorage"` // Cannot be directly changed.
@@ -117,6 +118,9 @@ type (
 		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"` // The cost for a renter to download something (meaning the host is uploading).
 		StoragePrice           types.Currency `json:"storageprice"`
 		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"` // The cost for a renter to upload something (meaning the host is downloading).
+
+		RevisionNumber uint64 `json:"revisionnumber"`
+		Version        string `json:"version"`
 	}
 
 	// HostRPCMetrics reports the quantity of each type of RPC call that has

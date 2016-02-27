@@ -200,6 +200,22 @@ var (
 		panic("unrecognized release constant in host - minimum storage folder size")
 	}()
 
+	// revisionSubmissionBuffer describes the number of blocks ahead of time
+	// that the host will submit a file contract revision. The host will not
+	// accept any more revisions once inside the submission buffer.
+	revisionSubmissionBuffer = func() types.BlockHeight {
+		if build.Release == "dev" {
+			return 20 // About 2 minutes
+		}
+		if build.Release == "standard" {
+			return 288 // 2 days.
+		}
+		if build.Release == "testing" {
+			return 4
+		}
+		panic("unrecognized release constant in host - revision submission buffer")
+	}
+
 	// sectorSize defines how large a sector should be in bytes. The sector
 	// size needs to be a power of two to be compatible with package
 	// merkletree. 4MB has been chosen for the live network because large
@@ -320,10 +336,16 @@ type Host struct {
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
 	storageFolders           []*storageFolder
 
-	// Statistics
-	anticipatedRevenue types.Currency
-	lostRevenue        types.Currency
-	revenue            types.Currency
+	// Financial Metrics
+	downloadBandwidthRevenue           types.Currency
+	lockedStorageCollateral            types.Currency
+	lostStorageCollateral              types.Currency
+	lostStorageRevenue                 types.Currency
+	potentialStorageRevenue            types.Currency
+	storageRevenue                     types.Currency
+	transactionFeeExpenses             types.Currency // Amount spent on transaction fees total
+	unsubsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renter did help pay for.
+	uploadBandwidthRevenue             types.Currency
 
 	// Utilities.
 	db         *persist.BoltDatabase
