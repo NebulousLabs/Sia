@@ -322,11 +322,13 @@ func TestSignVerifyObject(t *testing.T) {
 
 // TestPublicKey tests the PublicKey method
 func TestPublicKey(t *testing.T) {
-	sk, pk, err := GenerateKeyPair()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sk.PublicKey() != pk {
-		t.Fatal("PublicKey does not match actual public key:", pk, sk.PublicKey())
+	for i := 0; i < 1000; i++ {
+		sk, pk, err := GenerateKeyPair()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sk.PublicKey() != pk {
+			t.Error("PublicKey does not match actual public key:", pk, sk.PublicKey())
+		}
 	}
 }
