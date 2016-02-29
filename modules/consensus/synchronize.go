@@ -14,6 +14,12 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
+const (
+	// minNumOutbound is the minimum number of outbound peers required before ibd
+	// is confident we are synced.
+	minNumOutbound = 4
+)
+
 var (
 	// MaxCatchUpBlocks is the maxiumum number of blocks that can be given to
 	// the consensus set in a single iteration during the initial blockchain
@@ -386,4 +392,67 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		return nil
 	}
 	return managedFN
+}
+
+// threadedInitialBlockchainDownload performs the IBD on outbound peers. Blocks
+// are downloaded from one peer at a time in 5 minute intervals, so as to
+// prevent any one peer from significantly slowing down IBD.
+//
+// NOTE: IBD will succeed right now when each peer has a different blockchain.
+// The height and the block id of the remote peers' current blocks are not
+// checked to be the same. This can cause issues if you are connected to
+// outbound peers <= v0.5.1 that are stalled in IBD.
+func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
+	for {
+		numOutbound := 0
+		numOutboundSynced := 0
+		// Cache gateway.Peers() so we can compare peers to gateway.Peers() after
+		// this for loop, to see if any additional outbound peers were added while we
+		// were syncing.
+		peers := cs.gateway.Peers()
+		for _, p := range peers {
+			// We only sync on outbound peers at first to make IBD less susceptible to
+			// fast-mining and other attacks, as outbound peers are more difficult to
+			// manipulate.
+			if p.Inbound {
+				continue
+			}
+			numOutbound++
+
+			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
+			if err == nil {
+				numOutboundSynced++
+				continue
+			}
+			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+				// TODO: log the error returned by RPC.
+
+				// Disconnect if there is an unexpected error (not a timeout). This
+				// includes errSendBlocksStalled.
+				//
+				// We disconnect so that these peers are removed from gateway.Peers() and
+				// do not prevent us from marking ourselves as fully synced.
+				cs.gateway.Disconnect(p.NetAddress)
+				// TODO: log error returned by Disconnect
+			}
+		}
+
+		// Count the number of outbound peers. If we connected to more outbound peers
+		// during the previous SendBlocks, we want to sync with the new peers too.
+		newNumOutbound := 0
+		for _, p := range cs.gateway.Peers() {
+			if !p.Inbound {
+				newNumOutbound++
+			}
+		}
+
+		if numOutbound >= minNumOutbound && // Need a minimum number of outbound peers to call ourselves synced.
+			numOutbound >= newNumOutbound && // If we got more outbound peers while we were syncing, sync with them too.
+			((numOutbound == modules.WellConnectedThreshold && numOutboundSynced > (2/3*modules.WellConnectedThreshold)) ||
+				(numOutbound != modules.WellConnectedThreshold && numOutboundSynced == numOutbound)) { // Super majority.
+			break
+		}
+	}
+
+	// TODO: log IBD done.
 }

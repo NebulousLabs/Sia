@@ -16,8 +16,6 @@ import (
 const (
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = 2 * time.Minute
-	// the gateway will not make outbound connections above this threshold
-	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
 	fullyConnectedThreshold = 128
 	// the gateway will ask for more addresses below this threshold
@@ -305,7 +303,7 @@ func (g *Gateway) threadedPeerManager() {
 		}
 		addr, err := g.randomNode()
 		g.mu.RUnlock(id)
-		if numOutboundPeers >= wellConnectedThreshold {
+		if numOutboundPeers >= modules.WellConnectedThreshold {
 			select {
 			case <-time.After(5 * time.Minute):
 			case <-g.closeChan:
