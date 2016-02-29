@@ -187,10 +187,10 @@ func TestUnitSigning(t *testing.T) {
 	iterations := 200
 	for i := 0; i < iterations; i++ {
 		// Create dummy key pair.
-		var entropy [EntropySize]byte
-		entropy[0] = 5
-		entropy[1] = 8
-		sk, pk := stdKeyGen.generateDeterministic(entropy)
+		sk, pk, err := GenerateKeyPair()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// Generate and sign the data.
 		var randData Hash
@@ -320,8 +320,8 @@ func TestSignVerifyObject(t *testing.T) {
 	}
 }
 
-// TestPublicKey tests the PublicKey method
-func TestPublicKey(t *testing.T) {
+// TestUnitPublicKey tests the PublicKey method
+func TestUnitPublicKey(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		sk, pk, err := GenerateKeyPair()
 		if err != nil {
