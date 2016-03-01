@@ -107,7 +107,7 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// TODO: The fee estimation tool should look at the recent blocks and use
 	// them to guage what sort of fee should be required, as opposed to just
 	// guessing blindly.
-	return types.NewCurrency64(2), types.NewCurrency64(3)
+	return types.NewCurrency64(3).Div(types.NewCurrency64(1e3)), types.NewCurrency64(5).Div(types.NewCurrency64(1e3))
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.

@@ -329,8 +329,6 @@ type (
 
 		// RegisterTransaction takes a transaction and its parents and returns
 		// a TransactionBuilder which can be used to expand the transaction.
-		// The most typical call is 'RegisterTransaction(types.Transaction{},
-		// nil)', which registers a new transaction without parents.
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
 		// StartTransaction is a convenience method that calls

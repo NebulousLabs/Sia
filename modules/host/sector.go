@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -240,6 +241,32 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 		return err
 	}
 	return h.save()
+}
+
+// readSector will pull a sector from disk into memory.
+func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error) {
+	err = h.db.View(func(tx *bolt.Tx) error {
+		bsu := tx.Bucket(bucketSectorUsage)
+		sectorKey := h.sectorID(sectorRoot[:])
+		sectorUsageBytes := bsu.Get(sectorKey)
+		if sectorUsageBytes == nil {
+			return errSectorNotFound
+		}
+		var su sectorUsage
+		err = json.Unmarshal(sectorUsageBytes, &su)
+		if sectorUsageBytes == nil {
+			return err
+		}
+
+		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(su.StorageFolder), string(sectorKey))
+		sectorBytes, err = ioutil.ReadFile(sectorPath)
+		if err != nil {
+			// TODO: Mark the read failure in the sector?
+			return err
+		}
+		return nil
+	})
+	return
 }
 
 // removeSector will remove a sector from the host at the given expiry height.

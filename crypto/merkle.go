@@ -95,6 +95,21 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base []byte, hashSet []Ha
 	return
 }
 
+// BuildMerkleProof will build a proof that the segment at
+func BuildMerkleProof(sourceData []byte, proofIndex uint64) (proofSet [][]byte, err error) {
+	// Get the proof set for the sourceData and proofIndex.
+	tree := merkletree.New(NewHash())
+	err = tree.SetIndex(proofIndex)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(sourceData); i += SegmentSize {
+		tree.Push(sourceData[i : i+SegmentSize])
+	}
+	_, proofSet, _, _ = tree.Prove()
+	return proofSet, nil
+}
+
 // VerifySegment will verify that a segment, given the proof, is a part of a
 // Merkle root.
 func VerifySegment(base []byte, hashSet []Hash, numSegments, proofIndex uint64, root Hash) bool {

@@ -1,8 +1,14 @@
 package host
 
 import (
+	"encoding/binary"
+	"encoding/json"
+
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // initRescan is a helper funtion of initConsensusSubscribe, and is called when
@@ -11,6 +17,7 @@ import (
 // in the consensus set or the host.
 func (h *Host) initRescan() error {
 	// Reset all of the variables that have relevance to the consensus set.
+	var allObligations []*storageObligation
 	err := func() error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -18,7 +25,34 @@ func (h *Host) initRescan() error {
 		// Reset all of the consensus-relevant variables in the host.
 		h.blockHeight = 0
 
-		// TODO: Need to reset all of the storage obligations.
+		// Reset all of the storage obligations.
+		err := h.db.Update(func(tx *bolt.Tx) error {
+			bsu := tx.Bucket(bucketStorageObligations)
+			c := bsu.Cursor()
+			for k, soBytes := c.First(); soBytes != nil; k, soBytes = c.Next() {
+				var so storageObligation
+				err := json.Unmarshal(soBytes, &so)
+				if err != nil {
+					return err
+				}
+				so.OriginConfirmed = false
+				so.RevisionConfirmed = false
+				so.ProofConfirmed = false
+				allObligations = append(allObligations, &so)
+				soBytes, err = json.Marshal(so)
+				if err != nil {
+					return err
+				}
+				err = bsu.Put(k, soBytes)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 
 		return h.save()
 	}()
@@ -33,9 +67,18 @@ func (h *Host) initRescan() error {
 		return err
 	}
 
-	// TODO: Need to re-queue all of the action items for the storage
-	// obligations.
-
+	// Re-queue all of the action items for the storage obligations.
+	for _, so := range allObligations {
+		soid := so.id()
+		err0 := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
+		err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
+		err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
+		err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
+		err = composeErrors(err0, err1, err2, err3)
+		if err != nil {
+			return composeErrors(err, h.removeStorageObligation(so))
+		}
+	}
 	return nil
 }
 
@@ -58,29 +101,245 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	for _, block := range cc.RevertedBlocks {
-		// TODO: Look for transactions relevant to open storage obligations.
+	// Wrap the whole parsing into a single large database tx to keep things
+	// efficient.
+	var actionItems []*storageObligation
+	err := h.db.Update(func(tx *bolt.Tx) error {
+		for _, block := range cc.RevertedBlocks {
+			// Look for transactions relevant to open storage obligations.
+			for i, txn := range block.Transactions {
+				// Check for file contracts.
+				if len(txn.FileContracts) > 0 {
+					for _ = range txn.FileContracts {
+						bso := tx.Bucket(bucketStorageObligations)
+						var so storageObligation
+						fcid := txn.FileContractID(uint64(i))
+						soBytes := bso.Get(fcid[:])
+						if soBytes == nil {
+							// This file contract is not relevant to the host.
+							continue
+						}
+						err := json.Unmarshal(soBytes, &so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						so.OriginConfirmed = false
+						soBytes, err = json.Marshal(so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						err = bso.Put(fcid[:], soBytes)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+					}
+				}
 
-		// Height is not adjusted when dealing with the genesis block because
-		// the default height is 0 and the genesis block height is 0. If
-		// removing the genesis block, height will already be at height 0 and
-		// should not update, lest an underflow occur.
-		if block.ID() != types.GenesisBlock.ID() {
-			h.blockHeight--
+				// Check for file contract revisions.
+				if len(txn.FileContractRevisions) > 0 {
+					for _, fcr := range txn.FileContractRevisions {
+						// Check database for relevant revisions.
+						bso := tx.Bucket(bucketStorageObligations)
+						var so storageObligation
+						soBytes := bso.Get(fcr.ParentID[:])
+						if soBytes == nil {
+							// This file contract is not relevant to the host.
+							continue
+						}
+						err := json.Unmarshal(soBytes, &so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						so.RevisionConfirmed = false
+						soBytes, err = json.Marshal(so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						err = bso.Put(fcr.ParentID[:], soBytes)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+					}
+				}
+
+				// Check for storage proofs.
+				if len(txn.StorageProofs) > 0 {
+					for _, sp := range txn.StorageProofs {
+						// Check database for relevant storage proofs.
+						bso := tx.Bucket(bucketStorageObligations)
+						var so storageObligation
+						soBytes := bso.Get(sp.ParentID[:])
+						if soBytes == nil {
+							// This file contract is not relevant to the host.
+							continue
+						}
+						err := json.Unmarshal(soBytes, &so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						so.ProofConfirmed = false
+						soBytes, err = json.Marshal(so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						err = bso.Put(sp.ParentID[:], soBytes)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+					}
+				}
+			}
+
+			// Height is not adjusted when dealing with the genesis block because
+			// the default height is 0 and the genesis block height is 0. If
+			// removing the genesis block, height will already be at height 0 and
+			// should not update, lest an underflow occur.
+			if block.ID() != types.GenesisBlock.ID() {
+				h.blockHeight--
+			}
 		}
+		for _, block := range cc.AppliedBlocks {
+			// Look for transactions relevant to open storage obligations.
+			for _, txn := range block.Transactions {
+				// Check for file contracts.
+				if len(txn.FileContracts) > 0 {
+					for i := range txn.FileContracts {
+						bso := tx.Bucket(bucketStorageObligations)
+						var so storageObligation
+						fcid := txn.FileContractID(uint64(i))
+						soBytes := bso.Get(fcid[:])
+						if soBytes == nil {
+							// This file contract is not relevant to the host.
+							continue
+						}
+						err := json.Unmarshal(soBytes, &so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						so.OriginConfirmed = true
+						soBytes, err = json.Marshal(so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						err = bso.Put(fcid[:], soBytes)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+					}
+				}
+
+				// Check for file contract revisions.
+				if len(txn.FileContractRevisions) > 0 {
+					for _, fcr := range txn.FileContractRevisions {
+						// Check database for relevant revisions.
+						bso := tx.Bucket(bucketStorageObligations)
+						var so storageObligation
+						soBytes := bso.Get(fcr.ParentID[:])
+						if soBytes == nil {
+							// This file contract is not relevant to the host.
+							continue
+						}
+						err := json.Unmarshal(soBytes, &so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						so.RevisionConfirmed = true
+						soBytes, err = json.Marshal(so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						err = bso.Put(fcr.ParentID[:], soBytes)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+					}
+				}
+
+				// Check for storage proofs.
+				if len(txn.StorageProofs) > 0 {
+					for _, sp := range txn.StorageProofs {
+						// Check database for relevant storage proofs.
+						bso := tx.Bucket(bucketStorageObligations)
+						var so storageObligation
+						soBytes := bso.Get(sp.ParentID[:])
+						if soBytes == nil {
+							// This file contract is not relevant to the host.
+							continue
+						}
+						err := json.Unmarshal(soBytes, &so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						so.ProofConfirmed = true
+						soBytes, err = json.Marshal(so)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+						err = bso.Put(sp.ParentID[:], soBytes)
+						if err != nil {
+							h.log.Println(err)
+							continue
+						}
+					}
+				}
+			}
+
+			// Height is not adjusted when dealing with the genesis block because
+			// the default height is 0 and the genesis block height is 0. If adding
+			// the genesis block, height will already be at height 0 and should not
+			// update.
+			if block.ID() != types.GenesisBlock.ID() {
+				h.blockHeight++
+			}
+
+			// Handle any action items relevant to the current height.
+			bai := tx.Bucket(bucketActionItems)
+			heightBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(heightBytes, uint64(h.blockHeight))
+			existingItems := bai.Get(heightBytes)
+
+			// From the existing items, pull out a storage obligation.
+			obligationIDs := make([]types.FileContractID, len(existingItems)/crypto.HashSize)
+			for i := 0; i < len(existingItems); i += crypto.HashSize {
+				copy(obligationIDs[i/crypto.HashSize][:], existingItems[i:i+crypto.HashSize])
+			}
+			bso := tx.Bucket(bucketStorageObligations)
+			for _, soid := range obligationIDs {
+				soBytes := bso.Get(soid[:])
+				var so storageObligation
+				err := json.Unmarshal(soBytes, &so)
+				if err != nil {
+					return err
+				}
+				actionItems = append(actionItems, &so)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		h.log.Println(err)
 	}
-	for _, block := range cc.AppliedBlocks {
-		// TODO: Look for transactions relevant to open storage obligations.
 
-		// Height is not adjusted when dealing with the genesis block because
-		// the default height is 0 and the genesis block height is 0. If adding
-		// the genesis block, height will already be at height 0 and should not
-		// update.
-		if block.ID() != types.GenesisBlock.ID() {
-			h.blockHeight++
-		}
-
-		// TODO: Handle any action items relevant to the current height.
+	// Handle the list of action items.
+	for _, ai := range actionItems {
+		h.handleActionItem(ai)
 	}
 
 	// Update the host's recent change pointer to point to the most recent
@@ -88,7 +347,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.recentChange = cc.ID
 
 	// Save the host.
-	err := h.save()
+	err = h.save()
 	if err != nil {
 		h.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
 	}

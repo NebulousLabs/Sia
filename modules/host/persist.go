@@ -50,31 +50,19 @@ type persistence struct {
 	StorageFolders []*storageFolder
 
 	// Financial Metrics.
-	DownloadBandwidthRevenue           types.Currency
-	LockedStorageCollateral            types.Currency
-	LostStorageCollateral              types.Currency
-	LostStorageRevenue                 types.Currency
-	PotentialStorageRevenue            types.Currency
-	StorageRevenue                     types.Currency
-	TransactionFeeExpenses             types.Currency
-	UnsubsidizedTransactionFeeExpenses types.Currency
-	UploadBandwidthRevenue             types.Currency
+	DownloadBandwidthRevenue         types.Currency
+	LockedStorageCollateral          types.Currency
+	LostStorageCollateral            types.Currency
+	LostStorageRevenue               types.Currency
+	PotentialStorageRevenue          types.Currency
+	StorageRevenue                   types.Currency
+	TransactionFeeExpenses           types.Currency
+	SubsidizedTransactionFeeExpenses types.Currency
+	UploadBandwidthRevenue           types.Currency
 
 	// Utilities.
 	Settings modules.HostSettings
 }
-
-/*
-// getObligations returns a slice containing all of the contract obligations
-// currently being tracked by the host.
-func (h *Host) getObligations() []*contractObligation {
-	cos := make([]*contractObligation, 0, len(h.obligationsByID))
-	for _, ob := range h.obligationsByID {
-		cos = append(cos, ob)
-	}
-	return cos
-}
-*/
 
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
@@ -102,15 +90,15 @@ func (h *Host) save() error {
 		StorageFolders: h.storageFolders,
 
 		// Financial Metrics.
-		DownloadBandwidthRevenue:           h.downloadBandwidthRevenue,
-		LockedStorageCollateral:            h.lockedStorageCollateral,
-		LostStorageCollateral:              h.lostStorageCollateral,
-		LostStorageRevenue:                 h.lostStorageRevenue,
-		PotentialStorageRevenue:            h.potentialStorageRevenue,
-		StorageRevenue:                     h.storageRevenue,
-		TransactionFeeExpenses:             h.transactionFeeExpenses,
-		UnsubsidizedTransactionFeeExpenses: h.unsubsidizedTransactionFeeExpenses,
-		UploadBandwidthRevenue:             h.uploadBandwidthRevenue,
+		DownloadBandwidthRevenue:         h.downloadBandwidthRevenue,
+		LockedStorageCollateral:          h.lockedStorageCollateral,
+		LostStorageCollateral:            h.lostStorageCollateral,
+		LostStorageRevenue:               h.lostStorageRevenue,
+		PotentialStorageRevenue:          h.potentialStorageRevenue,
+		StorageRevenue:                   h.storageRevenue,
+		TransactionFeeExpenses:           h.transactionFeeExpenses,
+		SubsidizedTransactionFeeExpenses: h.subsidizedTransactionFeeExpenses,
+		UploadBandwidthRevenue:           h.uploadBandwidthRevenue,
 
 		// Utilities.
 		Settings: h.settings,
@@ -159,7 +147,7 @@ func (h *Host) load() error {
 	h.potentialStorageRevenue = p.PotentialStorageRevenue
 	h.storageRevenue = p.StorageRevenue
 	h.transactionFeeExpenses = p.TransactionFeeExpenses
-	h.unsubsidizedTransactionFeeExpenses = p.UnsubsidizedTransactionFeeExpenses
+	h.subsidizedTransactionFeeExpenses = p.SubsidizedTransactionFeeExpenses
 	h.uploadBandwidthRevenue = p.UploadBandwidthRevenue
 
 	// Utilities.

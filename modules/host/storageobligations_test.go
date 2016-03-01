@@ -79,22 +79,4 @@ func TestStorageObligationID(t *testing.T) {
 	if so2.id() != so2.OriginTransactionSet[1].FileContractID(0) {
 		t.Error("id function of storage obligation incorrect for file contracts with dependencies")
 	}
-
-	// Try to get the id of an insane storage obligation (no file contracts).
-	so3 := &storageObligation{
-		OriginTransactionSet: []types.Transaction{{
-			SiacoinOutputs: []types.SiacoinOutput{{
-				UnlockHash: types.UnlockHash{1, 3, 2},
-				Value:      types.NewCurrency64(5),
-			}},
-		}},
-	}
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("insane file contract not caught by sanity check:", r)
-		}
-	}()
-	// Trigger the anticipated panic.
-	_ = so3.id()
 }

@@ -214,7 +214,7 @@ var (
 			return 4
 		}
 		panic("unrecognized release constant in host - revision submission buffer")
-	}
+	}()
 
 	// sectorSize defines how large a sector should be in bytes. The sector
 	// size needs to be a power of two to be compatible with package
@@ -250,6 +250,21 @@ var (
 			return 1
 		}
 		panic("unrecognized release constant in host - storageFolderUIDSize")
+	}()
+
+	// storageProofConfirmations determines the number of confirmations for a
+	// storage proof that the host will wait before
+	storageProofConfirmations = func() int {
+		if build.Release == "dev" {
+			return 20 // About 2 minutes
+		}
+		if build.Release == "standard" {
+			return 72 // About 12 hours
+		}
+		if build.Release == "testing" {
+			return 3
+		}
+		panic("unrecognized release constant in host - storageProofConfirmations")
 	}()
 
 	// errHostClosed gets returned when a call is rejected due to the host
@@ -337,15 +352,15 @@ type Host struct {
 	storageFolders           []*storageFolder
 
 	// Financial Metrics
-	downloadBandwidthRevenue           types.Currency
-	lockedStorageCollateral            types.Currency
-	lostStorageCollateral              types.Currency
-	lostStorageRevenue                 types.Currency
-	potentialStorageRevenue            types.Currency
-	storageRevenue                     types.Currency
-	transactionFeeExpenses             types.Currency // Amount spent on transaction fees total
-	unsubsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renter did help pay for.
-	uploadBandwidthRevenue             types.Currency
+	downloadBandwidthRevenue         types.Currency
+	lockedStorageCollateral          types.Currency
+	lostStorageCollateral            types.Currency
+	lostStorageRevenue               types.Currency
+	potentialStorageRevenue          types.Currency
+	storageRevenue                   types.Currency
+	transactionFeeExpenses           types.Currency // Amount spent on transaction fees total.
+	subsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renters paid for.
+	uploadBandwidthRevenue           types.Currency
 
 	// Utilities.
 	db         *persist.BoltDatabase
