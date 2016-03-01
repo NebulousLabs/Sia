@@ -176,6 +176,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			found = true
 			// Start from the child of the common block.
 			start = pb.Height + 1
+			break
 		}
 		return nil
 	})
