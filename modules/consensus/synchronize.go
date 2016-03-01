@@ -215,7 +215,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 				}
 				blocks = append(blocks, pb.Block)
 			}
-			moreAvailable = start+MaxCatchUpBlocks < height
+			moreAvailable = start+MaxCatchUpBlocks <= height
 			start += MaxCatchUpBlocks
 			return nil
 		})
