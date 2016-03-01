@@ -1,11 +1,14 @@
 package consensus
 
 import (
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -308,6 +311,84 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 		mg.mu.RUnlock()
 		if numBroadcasts != test.expectedNumBroadcasts {
 			t.Errorf("expected %d number of broadcasts, got %d", test.expectedNumBroadcasts, numBroadcasts)
+		}
+	}
+}
+
+// TestRPCSendBlocks tests that the SendBlocks RPC correctly synchronizes with
+// peers.
+func TestRPCSendBlocks(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create the "remote" peer.
+	cst, err := blankConsensusSetTester("TestRPCSendBlocks - remote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+	// Create the "local" peer.
+	//
+	// We create this peer manually (not using blankConsensusSetTester) so that we
+	// can connect it to the remote peer before calling consensus.New so as to
+	// prevent SendBlocks from triggering on Connect.
+	testdir := build.TempDir(modules.ConsensusDir, "TestRPCSendBlocks - local")
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = g.Connect(cst.cs.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blocksToMine := []types.BlockHeight{
+		0,                    // Try syncing when peers are at the same current block.
+		MaxCatchUpBlocks + 1, // There was a bug that caused SendBlocks to be one block behind when its peer was ahead by (k * MaxCatchUpBlocks) + 1 blocks.
+		0,                    // Sync again to let cs catch up in case it is behind.
+		MaxCatchUpBlocks + 2,
+		0,
+		MaxCatchUpBlocks,
+		0,
+		MaxCatchUpBlocks - 1,
+		0,
+		MaxCatchUpBlocks - 2,
+		0,
+		2*MaxCatchUpBlocks + 1,
+		0,
+		1,
+		2,
+		10,
+		11,
+		12,
+	}
+
+	for _, n := range blocksToMine {
+		for i := types.BlockHeight(0); i < n; i++ {
+			b, err := cst.miner.FindBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cst.cs.managedAcceptBlock(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		err = cs.gateway.RPC(cst.cs.gateway.Address(), "SendBlocks", cs.threadedReceiveBlocks)
+		if err != nil {
+			t.Error(err)
+		}
+		if cs.Height() != cst.cs.Height() {
+			t.Errorf("heights not equal after call to SendBlocks when peer was ahead by %v blocks: expected %v, got %v", n, cst.cs.Height(), cs.Height())
+		}
+		if cs.CurrentBlock().ID() != cst.cs.CurrentBlock().ID() {
+			t.Errorf("current block ids not equal after call to SendBlocks when peer was ahead by %v blocks: expected %v, got %v", n, cst.cs.CurrentBlock().ID(), cs.CurrentBlock().ID())
 		}
 	}
 }
