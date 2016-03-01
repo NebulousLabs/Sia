@@ -56,7 +56,7 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 		if i >= 9 {
 			step *= 2
 		}
-		if height < step {
+		if height <= step {
 			break
 		}
 		height -= step
