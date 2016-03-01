@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -317,14 +315,6 @@ func (cs *ConsensusSet) send1Blk(conn modules.PeerConn) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
 			return err
-		}
-		// TODO: are these sanity checks necessary?
-		pathID, err := getPath(tx, pb.Height)
-		if err != nil {
-			return err
-		}
-		if pathID != pb.Block.ID() {
-			return errors.New("pathID and processed block's ID do not match")
 		}
 		b = pb.Block
 		return nil

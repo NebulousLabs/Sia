@@ -697,6 +697,7 @@ func TestSend1Blk(t *testing.T) {
 		errWant error
 		msg     string
 	}{
+		// TODO: Test with a failing database.
 		// Test with a failing reader.
 		{
 			conn:    mockPeerConnFailingReader{PeerConn: p1},
@@ -718,8 +719,6 @@ func TestSend1Blk(t *testing.T) {
 			errWant: errNilItem,
 			msg:     "expected send1Blk to error with a nonexistent block id",
 		},
-		// TODO: Other sanity checks? e.g. test if getPath returns an error or pathID != pb.Block.ID().
-		// TODO: Test with an otherwise failing db?
 		// Test with a failing writer.
 		{
 			conn: mockPeerConnFailingWriter{PeerConn: p1},
