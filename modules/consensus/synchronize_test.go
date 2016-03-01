@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/types"
@@ -390,5 +391,121 @@ func TestRPCSendBlocks(t *testing.T) {
 		if cs.CurrentBlock().ID() != cst.cs.CurrentBlock().ID() {
 			t.Errorf("current block ids not equal after call to SendBlocks when peer was ahead by %v blocks: expected %v, got %v", n, cst.cs.CurrentBlock().ID(), cs.CurrentBlock().ID())
 		}
+	}
+}
+
+// TestRPCSendBlockSendsOnlyNecessaryBlocks tests that the SendBlocks RPC only
+// sends blocks that the caller does not have and that are part of the longest
+// chain.
+func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create the "remote" peer.
+	cst, err := blankConsensusSetTester("TestRPCSendBlockSendsOnlyNecessaryBlocks - remote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+	// Create the "local" peer.
+	//
+	// We create this peer manually (not using blankConsensusSetTester) so that we
+	// can connect it to the remote peer before calling consensus.New so as to
+	// prevent SendBlocks from triggering on Connect.
+	testdir := build.TempDir(modules.ConsensusDir, "TestRPCSendBlockSendsOnlyNecessaryBlocks - local")
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = g.Connect(cst.cs.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a few initial blocks to both consensus sets. These are the blocks we
+	// want to make sure SendBlocks is not sending unnecessarily as both parties
+	// already have them.
+	knownBlocks := make(map[types.BlockID]struct{})
+	for i := 0; i < 20; i++ {
+		b, err := cst.miner.FindBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cst.cs.managedAcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cs.managedAcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		knownBlocks[b.ID()] = struct{}{}
+	}
+
+	// Add a few blocks to only the remote peer and store which blocks we add.
+	addedBlocks := make(map[types.BlockID]struct{})
+	for i := 0; i < 20; i++ {
+		b, err := cst.miner.FindBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cst.cs.managedAcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addedBlocks[b.ID()] = struct{}{}
+	}
+
+	err = cs.gateway.RPC(cst.cs.gateway.Address(), "SendBlocks", func(conn modules.PeerConn) error {
+		// Get blockIDs to send.
+		var history [32]types.BlockID
+		cs.mu.RLock()
+		err := cs.db.View(func(tx *bolt.Tx) error {
+			history = blockHistory(tx)
+			return nil
+		})
+		cs.mu.RUnlock()
+		if err != nil {
+			return err
+		}
+
+		// Send the block ids.
+		if err := encoding.WriteObject(conn, history); err != nil {
+			return err
+		}
+
+		moreAvailable := true
+		for moreAvailable {
+			// Read a slice of blocks from the wire.
+			var newBlocks []types.Block
+			if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
+				return err
+			}
+			if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
+				return err
+			}
+
+			// Check if the block needed to be sent.
+			for _, newB := range newBlocks {
+				_, ok := knownBlocks[newB.ID()]
+				if ok {
+					t.Error("SendBlocks sent an unnecessary block that the caller already had")
+					continue
+				}
+				_, ok = addedBlocks[newB.ID()]
+				if !ok {
+					t.Error("SendBlocks sent an unnecessary block that the caller did not have")
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
