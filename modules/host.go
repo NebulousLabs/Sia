@@ -12,6 +12,11 @@ import (
 )
 
 const (
+	// Some RPCs allow for acceptance or rejection. AcceptResponse is the
+	// response given to indicate acceptance. (Any other string indicates
+	// rejection, and describes the reason for rejection.)
+	AcceptResponse = "accept"
+
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
 
@@ -25,6 +30,22 @@ const (
 )
 
 var (
+
+	// RPCSettings is the specifier for requesting settings from the host.
+	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
+
+	// RPCNegotiate is the specifier for negotiating a contract with a host.
+	RPCNegotiate = types.Specifier{'N', 'e', 'g', 'o', 't', 'i', 'a', 't', 'e', 2}
+
+	// RPCRenew is the specifier to renewing an existing contract.
+	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w', 2}
+
+	// RPCRevise is the specifier for revising an existing file contract.
+	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 2}
+
+	// RPCDownload is the specifier for downloading a file from a host.
+	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
+
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
