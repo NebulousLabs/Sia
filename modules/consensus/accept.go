@@ -23,7 +23,8 @@ var (
 // block. Callers should not assume that validation will happen in a particular
 // order.
 func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
-	// See if the block is known already.
+	// Check if the block is a DoS block - a known invalid block that is expensive
+	// to validate.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
@@ -56,7 +57,7 @@ func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
 	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1)
 }
 
-// checkTarget returns true if the header's ID meets the given target.
+// checkHeaderTarget returns true if the header's ID meets the given target.
 func checkHeaderTarget(h types.BlockHeader, target types.Target) bool {
 	blockHash := h.ID()
 	return bytes.Compare(target[:], blockHash[:]) >= 0
@@ -66,7 +67,8 @@ func checkHeaderTarget(h types.BlockHeader, target types.Target) bool {
 // to determine if the block should be downloaded. Callers should not assume
 // that validation will happen in a particular order.
 func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
-	// See if the block is known already.
+	// Check if the block is a DoS block - a known invalid block that is expensive
+	// to validate.
 	id := h.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
@@ -99,7 +101,8 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 		return modules.ErrBlockUnsolved
 	}
 
-	// TODO: check if the block is a non extending block.
+	// TODO: check if the block is a non extending block once headers-first
+	// downloads are implemented.
 
 	// Check that the timestamp is not too far in the past to be acceptable.
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
@@ -219,10 +222,20 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			// If the block is in the near future, but too far to be acceptable, then
 			// save the block and add it to the consensus set after it is no longer
 			// too far in the future.
+			//
+			// TODO: an attacker could mine many blocks off the genesis block all in the
+			// future and we would spawn a goroutine per each block. To fix this, either
+			// ban peers that send lots of future blocks OR stop spawning goroutines
+			// after we are already waiting on a large number of future blocks.
+			//
+			// TODO: an attacker could broadcast a future block many times and we would
+			// spawn a goroutine for each broadcast. To fix this we should create a
+			// cache of future blocks, like we already do for DoS blocks, and only spawn
+			// a goroutine if we haven't already spawned one for that block.
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-					// TODO: log error returned by AcceptBlock if non-nill?
+					// TODO: log error returned by AcceptBlock if non-nill
 					cs.AcceptBlock(b) // NOTE: Error is not handled.
 				}()
 			}

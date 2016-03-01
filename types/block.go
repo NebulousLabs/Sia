@@ -14,7 +14,9 @@ import (
 )
 
 const (
-	BlockHeaderSize = 80 // 32 (ParentID) + 8 (Nonce) + 8 (Timestamp) + 32 (MerkleRoot)
+	// BlockHeaderSize is the size, in bytes, of a block header.
+	// 32 (ParentID) + 8 (Nonce) + 8 (Timestamp) + 32 (MerkleRoot)
+	BlockHeaderSize = 80
 )
 
 type (
@@ -103,9 +105,7 @@ func (b Block) ID() BlockID {
 	return BlockID(crypto.HashObject(b.Header()))
 }
 
-// ID returns the ID of a Block, which is calculated by hashing the
-// concatenation of the block's parent's ID, nonce, and the result of the
-// b.MerkleRoot().
+// ID returns the ID of a Block, which is calculated by hashing the header.
 func (h BlockHeader) ID() BlockID {
 	return BlockID(crypto.HashObject(h))
 }

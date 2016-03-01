@@ -613,7 +613,6 @@ func TestOrphanHandling(t *testing.T) {
 		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
 	// Try submitting an orphan block's header.
-	// TODO: why is the test above duplicated?
 	err = cst.cs.managedAcceptHeader(orphan.Header())
 	if err != errOrphan {
 		t.Fatalf("expected %v, got %v", errOrphan, err)

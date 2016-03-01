@@ -1023,9 +1023,9 @@ func TestRelayHeader(t *testing.T) {
 		{
 			header:  types.GenesisBlock.Header(),
 			errWant: modules.ErrBlockKnown,
-			errMSG:  "relayHeader should reject known blocks",
+			errMSG:  "relayHeader should reject headers to known blocks",
 		},
-		// Test that relayHeader rejects orphan blocks.
+		// Test that relayHeader requests the parent blocks of orphan headers.
 		{
 			header:  types.BlockHeader{},
 			errWant: errOrphan,
@@ -1037,7 +1037,7 @@ func TestRelayHeader(t *testing.T) {
 		{
 			header:  validBlock.Header(),
 			errWant: nil,
-			errMSG:  "relayHeader should accept a valid block",
+			errMSG:  "relayHeader should accept a valid header",
 			rpcWant: "Send1Blk",
 			rpcMSG:  "relayHeader should request the block of a valid header",
 		},
@@ -1045,9 +1045,9 @@ func TestRelayHeader(t *testing.T) {
 		{
 			header:  futureBlock.Header(),
 			errWant: errFutureTimestamp,
-			errMSG:  "relayHeader should return an error for a future block",
+			errMSG:  "relayHeader should return an error for a future header",
 			rpcWant: "Send1Blk",
-			rpcMSG:  "relayHeader should request a future, but otherwise valid block",
+			rpcMSG:  "relayHeader should request the corresponding block to a future, but otherwise valid header",
 		},
 	}
 	for _, tt := range tests {
