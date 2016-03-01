@@ -79,11 +79,13 @@ var (
 )
 
 const (
-	obligationConfused  = iota // Indicatees that an unitialized value was used.
-	obligationRejected         // Indicates that the obligation never got started, no revenue gained or lost.
-	obligationSucceeded        // Indicates that the obligation was completed, revenues were gained.
-	obligationFailed           // Indicates that the obligation failed, revenues and collateral were lost.
+	obligationConfused  storageObligationStatus = iota // Indicatees that an unitialized value was used.
+	obligationRejected                                 // Indicates that the obligation never got started, no revenue gained or lost.
+	obligationSucceeded                                // Indicates that the obligation was completed, revenues were gained.
+	obligationFailed                                   // Indicates that the obligation failed, revenues and collateral were lost.
 )
+
+type storageObligationStatus int
 
 // storageObligation contains all of the metadata related to a file contract
 // and the storage contained by the file contract.
@@ -301,7 +303,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
 	err = composeErrors(err0, err1, err2, err3)
 	if err != nil {
-		return composeErrors(err, h.removeStorageObligation(so))
+		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
 	return nil
 }
@@ -389,12 +391,32 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 
 // removeStorageObligation will remove a storage obligation from the host,
 // either due to failure or success.
-func (h *Host) removeStorageObligation(so *storageObligation) error {
+func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligationStatus) error {
 	// Call removeSector for every sector in the storage obligation.
 	for _, root := range so.SectorRoots {
 		// Error is not checked, we want to call remove on every sector even if
 		// there are problems - disk health information will be updated.
 		_ = h.removeSector(root, so.expiration())
+	}
+
+	// Update the host revenue metrics based on the status of the obligation.
+	if sos == obligationConfused {
+		h.log.Critical("storage obligation confused!")
+	}
+	if sos == obligationRejected {
+		h.potentialStorageRevenue = h.potentialStorageRevenue.Sub(so.AnticipatedRevenue)
+		h.lockedStorageCollateral = h.lockedStorageCollateral.Sub(so.RiskedCollateral)
+	}
+	if sos == obligationSucceeded {
+		h.potentialStorageRevenue = h.potentialStorageRevenue.Sub(so.AnticipatedRevenue)
+		h.lockedStorageCollateral = h.lockedStorageCollateral.Sub(so.RiskedCollateral)
+		h.storageRevenue = h.storageRevenue.Add(so.AnticipatedRevenue)
+	}
+	if sos == obligationFailed {
+		h.potentialStorageRevenue = h.potentialStorageRevenue.Sub(so.AnticipatedRevenue)
+		h.lockedStorageCollateral = h.lockedStorageCollateral.Sub(so.RiskedCollateral)
+		h.lostStorageCollateral = h.lostStorageCollateral.Add(so.RiskedCollateral)
+		h.lostStorageRevenue = h.lostStorageRevenue.Add(so.AnticipatedRevenue)
 	}
 
 	// Delete the storage obligation from the database.
@@ -423,7 +445,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// after logging the errror so that the function can quit.
 		_, t := err.(modules.ConsensusConflict)
 		if t {
-			err = h.removeStorageObligation(so)
+			err = h.removeStorageObligation(so, obligationRejected)
 			if err != nil {
 				h.log.Println(err)
 			}
@@ -450,7 +472,12 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// Check if the revision has failed to submit correctly.
 		if so.expiration() > h.blockHeight {
 			// TODO: Check this error.
-			h.removeStorageObligation(so)
+			//
+			// TODO: this is not quite right, because a previous revision may
+			// be confirmed, and the origin transaction may be confirmed, which
+			// would confuse the revenue stuff a bit. Might happen frequently
+			// due to the dynamic fee pool.
+			h.removeStorageObligation(so, obligationRejected)
 			return
 		}
 
@@ -501,7 +528,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
 		if so.proofDeadline() < h.blockHeight {
-			err := h.removeStorageObligation(so)
+			err := h.removeStorageObligation(so, obligationFailed)
 			if err != nil {
 				h.log.Println(err)
 			}
@@ -613,7 +640,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 	// Check if all items have succeded with the required confirmations. Report
 	// success, delete the obligation.
 	if so.ProofConfirmed && so.expiration()+types.BlockHeight(storageProofConfirmations) < h.blockHeight {
-		h.removeStorageObligation(so)
+		h.removeStorageObligation(so, obligationSucceeded)
 		return
 	}
 }

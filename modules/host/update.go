@@ -76,7 +76,7 @@ func (h *Host) initRescan() error {
 		err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
 		err = composeErrors(err0, err1, err2, err3)
 		if err != nil {
-			return composeErrors(err, h.removeStorageObligation(so))
+			return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 		}
 	}
 	return nil
