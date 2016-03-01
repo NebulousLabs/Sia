@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -277,6 +278,41 @@ func TestIntegrationSigKeyGeneration(t *testing.T) {
 	}
 }
 
+// TestReadWriteSignedObject tests the ReadSignObject and WriteSignedObject
+// functions, which are inverses of each other.
+func TestReadWriteSignedObject(t *testing.T) {
+	sk, pk, err := GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write signed object into buffer
+	b := new(bytes.Buffer)
+	err = WriteSignedObject(b, "foo", sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// keep a copy of b's bytes
+	buf := b.Bytes()
+
+	// read and verify object
+	var read string
+	err = ReadSignedObject(b, &read, 11, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read != "foo" {
+		t.Fatal("encode/decode mismatch: expected 'foo', got", []byte(read))
+	}
+
+	// enforce maxLen
+	b = bytes.NewBuffer(buf) // reset b
+	err = ReadSignedObject(b, &read, 10, pk)
+	if err == nil || err.Error() != "length 11 exceeds maxLen of 10" {
+		t.Fatal("expected length error, got", err)
+	}
+}
+
 // TestSignVerifyObject tests the SignObject and VerifyObject functions, which
 // are inverses of each other.
 func TestSignVerifyObject(t *testing.T) {
@@ -310,8 +346,8 @@ func TestSignVerifyObject(t *testing.T) {
 
 	// not enough object data
 	err = VerifyObject(signedObj[:0], &read, pk)
-	if err == nil || err.Error() != "could not decode type []uint8: EOF" {
-		t.Fatal("expected decode error, got", err)
+	if err != io.EOF {
+		t.Fatal("expected EOF, got", err)
 	}
 	// not enough signature data
 	err = VerifyObject(signedObj[:19], &read, pk)

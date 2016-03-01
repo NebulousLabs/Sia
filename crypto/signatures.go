@@ -82,10 +82,14 @@ func WriteSignedObject(w io.Writer, obj interface{}, sk SecretKey) error {
 // ReadSignedObject reads a length-prefixed object followed by its signature,
 // and verifies the signature.
 func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) error {
-	// read the encoded object and signature
-	var encObj []byte
+	// read the encoded object
+	encObj, err := encoding.ReadPrefix(r, maxLen)
+	if err != nil {
+		return err
+	}
+	// read the signature
 	var sig Signature
-	err := encoding.NewDecoder(r).DecodeAll(&encObj, &sig)
+	err = encoding.NewDecoder(r).Decode(&sig)
 	if err != nil {
 		return err
 	}
