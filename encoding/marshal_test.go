@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -224,35 +225,71 @@ func TestEncodeDecode(t *testing.T) {
 
 // TestEncodeAll tests the EncodeAll function.
 func TestEncodeAll(t *testing.T) {
-	var expected []byte
+	// EncodeAll should produce the same result as individually encoding each
+	// object
+	exp := new(bytes.Buffer)
+	enc := NewEncoder(exp)
 	for i := range testStructs {
-		expected = append(expected, Marshal(testStructs[i])...)
+		enc.Encode(testStructs[i])
 	}
 
 	b := new(bytes.Buffer)
 	NewEncoder(b).EncodeAll(testStructs...)
-	if !bytes.Equal(b.Bytes(), expected) {
-		t.Errorf("expected %v, got %v", expected, b.Bytes())
+	if !bytes.Equal(b.Bytes(), exp.Bytes()) {
+		t.Errorf("expected %v, got %v", exp.Bytes(), b.Bytes())
+	}
+
+	// hardcoded check
+	exp.Reset()
+	exp.Write([]byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 'f', 'o', 'o', 1})
+
+	b.Reset()
+	NewEncoder(b).EncodeAll(1, 2, "foo", true)
+	if !bytes.Equal(b.Bytes(), exp.Bytes()) {
+		t.Errorf("expected %v, got %v", exp.Bytes(), b.Bytes())
 	}
 }
 
 // TestDecodeAll tests the DecodeAll function.
 func TestDecodeAll(t *testing.T) {
 	b := new(bytes.Buffer)
-	enc := NewEncoder(b)
-	for i := range testStructs {
-		enc.Encode(testStructs[i])
-	}
+	NewEncoder(b).EncodeAll(testStructs...)
 
 	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
 	err := NewDecoder(b).DecodeAll(emptyStructs...)
 	if err != nil {
 		t.Error(err)
 	}
+	empty0 := *emptyStructs[0].(*test0)
+	if !reflect.DeepEqual(empty0, testStructs[0]) {
+		t.Error("deep equal:", empty0, testStructs[0])
+	}
+	empty6 := emptyStructs[6].(*test6)
+	if !reflect.DeepEqual(empty6, testStructs[6]) {
+		t.Error("deep equal:", empty6, testStructs[6])
+	}
+
+	// hardcoded check
+	b.Reset()
+	b.Write([]byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 'f', 'o', 'o', 1})
+
+	var (
+		one, two uint64
+		foo      string
+		tru      bool
+	)
+	err = NewDecoder(b).DecodeAll(&one, &two, &foo, &tru)
+	if err != nil {
+		t.Fatal(err)
+	} else if one != 1 || two != 2 || foo != "foo" || tru != true {
+		t.Error("values were not decoded correctly:", one, two, foo, tru)
+	}
 }
 
 // TestMarshalAll tests the MarshalAll function.
 func TestMarshalAll(t *testing.T) {
+	// MarshalAll should produce the same result as individually marshalling
+	// each object
 	var expected []byte
 	for i := range testStructs {
 		expected = append(expected, Marshal(testStructs[i])...)
@@ -262,19 +299,45 @@ func TestMarshalAll(t *testing.T) {
 	if !bytes.Equal(b, expected) {
 		t.Errorf("expected %v, got %v", expected, b)
 	}
+
+	// hardcoded check
+	exp := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 'f', 'o', 'o', 1}
+	b = MarshalAll(1, 2, "foo", true)
+	if !bytes.Equal(b, exp) {
+		t.Errorf("expected %v, got %v", exp, b)
+	}
 }
 
 // TestUnmarshalAll tests the UnmarshalAll function.
 func TestUnmarshalAll(t *testing.T) {
-	var b []byte
-	for i := range testStructs {
-		b = append(b, Marshal(testStructs[i])...)
-	}
+	b := MarshalAll(testStructs...)
 
 	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
 	err := UnmarshalAll(b, emptyStructs...)
 	if err != nil {
 		t.Error(err)
+	}
+	empty1 := *emptyStructs[1].(*test1)
+	if !reflect.DeepEqual(empty1, testStructs[1]) {
+		t.Error("deep equal:", empty1, testStructs[1])
+	}
+	empty5 := *emptyStructs[5].(*test5)
+	if !reflect.DeepEqual(empty5, testStructs[5]) {
+		t.Error("deep equal:", empty5, testStructs[5])
+	}
+
+	// hardcoded check
+	b = []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 'f', 'o', 'o', 1}
+	var (
+		one, two uint64
+		foo      string
+		tru      bool
+	)
+	err = UnmarshalAll(b, &one, &two, &foo, &tru)
+	if err != nil {
+		t.Fatal(err)
+	} else if one != 1 || two != 2 || foo != "foo" || tru != true {
+		t.Error("values were not decoded correctly:", one, two, foo, tru)
 	}
 }
 
