@@ -93,6 +93,7 @@ var testEncodings = [][]byte{
 	{3, 0, 0, 0, 0, 0, 0, 0, 'f', 'o', 'o'},
 }
 
+// TestEncode tests the Encode function.
 func TestEncode(t *testing.T) {
 	// use Marshal for convenience
 	for i := range testStructs {
@@ -125,6 +126,7 @@ func TestEncode(t *testing.T) {
 	enc.Encode(map[int]int{})
 }
 
+// TestDecode tests the Decode function.
 func TestDecode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -191,6 +193,8 @@ func TestDecode(t *testing.T) {
 
 }
 
+// TestMarshalUnmarshal tests the Marshal and Unmarshal functions, which are
+// inverses of each other.
 func TestMarshalUnmarshal(t *testing.T) {
 	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
 	for i := range testStructs {
@@ -202,6 +206,8 @@ func TestMarshalUnmarshal(t *testing.T) {
 	}
 }
 
+// TestEncodeDecode tests the Encode and Decode functions, which are inverses
+// of each other.
 func TestEncodeDecode(t *testing.T) {
 	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
 	b := new(bytes.Buffer)
@@ -216,6 +222,7 @@ func TestEncodeDecode(t *testing.T) {
 	}
 }
 
+// TestEncodeAll tests the EncodeAll function.
 func TestEncodeAll(t *testing.T) {
 	var expected []byte
 	for i := range testStructs {
@@ -229,6 +236,7 @@ func TestEncodeAll(t *testing.T) {
 	}
 }
 
+// TestDecodeAll tests the DecodeAll function.
 func TestDecodeAll(t *testing.T) {
 	b := new(bytes.Buffer)
 	enc := NewEncoder(b)
@@ -243,6 +251,7 @@ func TestDecodeAll(t *testing.T) {
 	}
 }
 
+// TestMarshalAll tests the MarshalAll function.
 func TestMarshalAll(t *testing.T) {
 	var expected []byte
 	for i := range testStructs {
@@ -255,6 +264,7 @@ func TestMarshalAll(t *testing.T) {
 	}
 }
 
+// TestUnmarshalAll tests the UnmarshalAll function.
 func TestUnmarshalAll(t *testing.T) {
 	var b []byte
 	for i := range testStructs {
@@ -268,6 +278,8 @@ func TestUnmarshalAll(t *testing.T) {
 	}
 }
 
+// TestReadWriteFile tests the ReadFiles and WriteFile functions, which are
+// inverses of each other.
 func TestReadWriteFile(t *testing.T) {
 	// standard
 	os.MkdirAll(build.TempDir("encoding"), 0777)
