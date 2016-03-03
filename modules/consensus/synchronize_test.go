@@ -1049,13 +1049,18 @@ func TestRelayHeader(t *testing.T) {
 			rpcMSG:  "rpcRelayHeader should request the corresponding block to a future, but otherwise valid header",
 		},
 	}
+	errChan := make(chan error)
 	for _, tt := range tests {
 		go func() {
-			encoding.WriteObject(p1, tt.header)
+			errChan <- encoding.WriteObject(p1, tt.header)
 		}()
 		err = cst.cs.rpcRelayHeader(p2)
 		if err != tt.errWant {
 			t.Errorf("%s: expected '%v', got '%v'", tt.errMSG, tt.errWant, err)
+		}
+		err = <-errChan
+		if err != nil {
+			t.Fatal(err)
 		}
 		if tt.rpcWant == "" {
 			select {
