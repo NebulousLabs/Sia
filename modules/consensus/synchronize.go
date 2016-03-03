@@ -146,12 +146,12 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// sendBlocks is the receiving end of the SendBlocks RPC. It returns a
+// rpcSendBlocks is the receiving end of the SendBlocks RPC. It returns a
 // sequential set of blocks based on the 32 input block IDs. The most recent
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
-func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
+func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
@@ -247,8 +247,8 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// relayBlock is an RPC that accepts a block from a peer.
-func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
+// rpcRelayBlock is an RPC that accepts a block from a peer.
+func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
@@ -274,8 +274,8 @@ func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 	return nil
 }
 
-// relayHeader is an RPC that accepts a block header from a peer.
-func (cs *ConsensusSet) relayHeader(conn modules.PeerConn) error {
+// rpcRelayHeader is an RPC that accepts a block header from a peer.
+func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	// Decode the block header from the connection.
 	var h types.BlockHeader
 	err := encoding.ReadObject(conn, &h, types.BlockHeaderSize)

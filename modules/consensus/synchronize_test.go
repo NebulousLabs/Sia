@@ -980,8 +980,8 @@ func (g *mockGatewayCallsRPC) RPC(addr modules.NetAddress, name string, fn modul
 	return nil
 }
 
-// TestRelayHeader tests that relayHeader requests the corresponding blocks to
-// valid headers with known parents, or requests the block history to orphan
+// TestRelayHeader tests that rpcRelayHeader requests the corresponding blocks
+// to valid headers with known parents, or requests the block history to orphan
 // headers.
 func TestRelayHeader(t *testing.T) {
 	cst, err := blankConsensusSetTester("TestRelayHeader")
@@ -997,14 +997,14 @@ func TestRelayHeader(t *testing.T) {
 
 	p1, p2 := net.Pipe()
 
-	// Valid block that relayHeader should accept.
+	// Valid block that rpcRelayHeader should accept.
 	validBlock, err := cst.miner.FindBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// A block in the near future that relayHeader return an error for, but still
-	// request the corresponding block.
+	// A block in the near future that rpcRelayHeader return an error for, but
+	// still request the corresponding block.
 	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
 		t.Fatal(err)
@@ -1019,42 +1019,42 @@ func TestRelayHeader(t *testing.T) {
 		rpcWant string
 		rpcMSG  string
 	}{
-		// Test that relayHeader rejects known blocks.
+		// Test that rpcRelayHeader rejects known blocks.
 		{
 			header:  types.GenesisBlock.Header(),
 			errWant: modules.ErrBlockKnown,
-			errMSG:  "relayHeader should reject headers to known blocks",
+			errMSG:  "rpcRelayHeader should reject headers to known blocks",
 		},
-		// Test that relayHeader requests the parent blocks of orphan headers.
+		// Test that rpcRelayHeader requests the parent blocks of orphan headers.
 		{
 			header:  types.BlockHeader{},
 			errWant: nil,
-			errMSG:  "relayHeader should not return an error for orphan headers",
+			errMSG:  "rpcRelayHeader should not return an error for orphan headers",
 			rpcWant: "SendBlocks",
-			rpcMSG:  "relayHeader should request blocks when the relayed header is an orphan",
+			rpcMSG:  "rpcRelayHeader should request blocks when the relayed header is an orphan",
 		},
-		// Test that relayHeader accepts a valid header that extends the longest chain.
+		// Test that rpcRelayHeader accepts a valid header that extends the longest chain.
 		{
 			header:  validBlock.Header(),
 			errWant: nil,
-			errMSG:  "relayHeader should accept a valid header",
+			errMSG:  "rpcRelayHeader should accept a valid header",
 			rpcWant: "BlockID",
-			rpcMSG:  "relayHeader should request the block of a valid header",
+			rpcMSG:  "rpcRelayHeader should request the block of a valid header",
 		},
-		// Test that relayHeader requests a future, but otherwise valid block.
+		// Test that rpcRelayHeader requests a future, but otherwise valid block.
 		{
 			header:  futureBlock.Header(),
 			errWant: nil,
-			errMSG:  "relayHeader should not return an error for a future header",
+			errMSG:  "rpcRelayHeader should not return an error for a future header",
 			rpcWant: "BlockID",
-			rpcMSG:  "relayHeader should request the corresponding block to a future, but otherwise valid header",
+			rpcMSG:  "rpcRelayHeader should request the corresponding block to a future, but otherwise valid header",
 		},
 	}
 	for _, tt := range tests {
 		go func() {
 			encoding.WriteObject(p1, tt.header)
 		}()
-		err = cst.cs.relayHeader(p2)
+		err = cst.cs.rpcRelayHeader(p2)
 		if err != tt.errWant {
 			t.Errorf("%s: expected '%v', got '%v'", tt.errMSG, tt.errWant, err)
 		}
