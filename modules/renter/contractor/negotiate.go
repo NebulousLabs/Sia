@@ -13,7 +13,7 @@ import (
 
 var (
 	// the contractor will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
+	maxPrice = modules.StoragePriceToConsensus(500000) // 500k SC / TB / Month
 
 	errTooExpensive = errors.New("host price was too high")
 )

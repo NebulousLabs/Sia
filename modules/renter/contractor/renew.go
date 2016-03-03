@@ -49,8 +49,7 @@ func (c *Contractor) managedRenew(fcid types.FileContractID, newEndHeight types.
 	}
 
 	renterCost := host.ContractPrice.Mul(types.NewCurrency64(contract.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
-	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
-	payout := renterCost                   // no collateral
+	payout := renterCost // no collateral
 
 	// create file contract
 	fc := types.FileContract{
