@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -316,80 +317,216 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 	}
 }
 
-// TestRPCSendBlocks tests that the SendBlocks RPC correctly synchronizes with
-// peers.
-func TestRPCSendBlocks(t *testing.T) {
+// TestIntegrationRPCSendBlocks tests that the SendBlocks RPC adds blocks to
+// the consensus set, and that the consensus set catches with the remote peer
+// and possibly reorgs.
+func TestIntegrationRPCSendBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	// Create the "remote" peer.
-	cst, err := blankConsensusSetTester("TestRPCSendBlocks - remote")
-	if err != nil {
-		t.Fatal(err)
+	type sendBlocksTest struct {
+		commonBlocksToMine types.BlockHeight
+		localBlocksToMine  types.BlockHeight
+		remoteBlocksToMine types.BlockHeight
+		msg                string
 	}
-	defer cst.Close()
-	// Create the "local" peer.
-	//
-	// We create this peer manually (not using blankConsensusSetTester) so that we
-	// can connect it to the remote peer before calling consensus.New so as to
-	// prevent SendBlocks from triggering on Connect.
-	testdir := build.TempDir(modules.ConsensusDir, "TestRPCSendBlocks - local")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
-	if err != nil {
-		t.Fatal(err)
+	tests := []sendBlocksTest{
+		{
+			msg: "SendBlocks shouldn't do anything when both CSs are at the genesis block",
+		},
+		{
+			commonBlocksToMine: 10,
+			msg:                "SendBlocks shouldn't do anything when both CSs are at the same block",
+		},
+		{
+			commonBlocksToMine: 10,
+			localBlocksToMine:  5,
+			msg:                "SendBlocks shouldn't do anything when the remote CS is behind the local CS",
+		},
+		{
+			commonBlocksToMine: 10,
+			remoteBlocksToMine: 5,
+			msg:                "SendBlocks should catch up the local CS to the remote CS when it is behind",
+		},
+		{
+			remoteBlocksToMine: 10,
+			localBlocksToMine:  5,
+			msg:                "SendBlocks should reorg the local CS when the remote CS's chain is longer",
+		},
+		{
+			commonBlocksToMine: 10,
+			remoteBlocksToMine: 10,
+			localBlocksToMine:  5,
+			msg:                "SendBlocks should reorg the local CS when the remote CS's chain is longer",
+		},
+		{
+			remoteBlocksToMine: MaxCatchUpBlocks - 1,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: MaxCatchUpBlocks - 1,
+			localBlocksToMine:  MaxCatchUpBlocks - 2,
+			msg:                "SendBlocks should reorg the local CS when the remote CS's chain is longer",
+		},
+		{
+			remoteBlocksToMine: MaxCatchUpBlocks,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: MaxCatchUpBlocks,
+			localBlocksToMine:  MaxCatchUpBlocks - 2,
+			msg:                "SendBlocks should reorg the local CS when the remote CS's chain is longer",
+		},
+		{
+			remoteBlocksToMine: MaxCatchUpBlocks + 1, // There was a bug that caused SendBlocks to be one block behind when its peer was ahead by (k * MaxCatchUpBlocks) + 1 blocks.
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: MaxCatchUpBlocks + 1, // There was a bug that caused SendBlocks to be one block behind when its peer was ahead by (k * MaxCatchUpBlocks) + 1 blocks.
+			localBlocksToMine:  MaxCatchUpBlocks - 2,
+			msg:                "SendBlocks should reorg the local CS when the remote CS's chain is longer",
+		},
+		{
+			remoteBlocksToMine: 2*MaxCatchUpBlocks + 1,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 2*MaxCatchUpBlocks + 1,
+			localBlocksToMine:  2*MaxCatchUpBlocks - 2,
+			msg:                "SendBlocks should reorg the local CS when the remote CS's chain is longer",
+		},
+		{
+			remoteBlocksToMine: 12,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 15,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 16,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 17,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 23,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 31,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 32,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
+		{
+			remoteBlocksToMine: 33,
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		},
 	}
-	err = g.Connect(cst.cs.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
-	if err != nil {
-		t.Fatal(err)
+	for i := 1; i < 10; i++ {
+		tests = append(tests, sendBlocksTest{
+			remoteBlocksToMine: types.BlockHeight(i),
+			msg:                "SendBlocks should catch up when the remote CS is ahead",
+		})
 	}
 
-	blocksToMine := []types.BlockHeight{
-		0,                    // Try syncing when peers are at the same current block.
-		MaxCatchUpBlocks + 1, // There was a bug that caused SendBlocks to be one block behind when its peer was ahead by (k * MaxCatchUpBlocks) + 1 blocks.
-		0,                    // Sync again to let cs catch up in case it is behind.
-		MaxCatchUpBlocks + 2,
-		0,
-		MaxCatchUpBlocks,
-		0,
-		MaxCatchUpBlocks - 1,
-		0,
-		MaxCatchUpBlocks - 2,
-		0,
-		2*MaxCatchUpBlocks + 1,
-		0,
-		1,
-		2,
-		10,
-		11,
-		12,
-	}
+	for i, tt := range tests {
+		// Create the "remote" peer.
+		remoteCST, err := blankConsensusSetTester(filepath.Join("TestRPCSendBlocks - remote", strconv.Itoa(i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Create the "local" peer.
+		localCST, err := blankConsensusSetTester(filepath.Join("TestRPCSendBlocks - local", strconv.Itoa(i)))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	for _, n := range blocksToMine {
-		for i := types.BlockHeight(0); i < n; i++ {
-			b, err := cst.miner.FindBlock()
+		localCST.cs.gateway.Connect(remoteCST.cs.gateway.Address())
+		// Wait a second to let the OnConnectRPCs finish
+		time.Sleep(100 * time.Millisecond)
+
+		// Mine blocks.
+		for i := types.BlockHeight(0); i < tt.commonBlocksToMine; i++ {
+			b, err := remoteCST.miner.FindBlock()
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = cst.cs.managedAcceptBlock(b)
+			err = remoteCST.cs.managedAcceptBlock(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = localCST.cs.managedAcceptBlock(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := types.BlockHeight(0); i < tt.remoteBlocksToMine; i++ {
+			b, err := remoteCST.miner.FindBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = remoteCST.cs.managedAcceptBlock(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := types.BlockHeight(0); i < tt.localBlocksToMine; i++ {
+			b, err := localCST.miner.FindBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = localCST.cs.managedAcceptBlock(b)
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		err = cs.gateway.RPC(cst.cs.gateway.Address(), "SendBlocks", cs.threadedReceiveBlocks)
+		localCurrentBlockID := localCST.cs.CurrentBlock().ID()
+		remoteCurrentBlockID := remoteCST.cs.CurrentBlock().ID()
+
+		err = localCST.cs.gateway.RPC(remoteCST.cs.gateway.Address(), "SendBlocks", localCST.cs.threadedReceiveBlocks)
 		if err != nil {
 			t.Error(err)
 		}
-		if cs.Height() != cst.cs.Height() {
-			t.Errorf("heights not equal after call to SendBlocks when peer was ahead by %v blocks: expected %v, got %v", n, cst.cs.Height(), cs.Height())
+
+		// Assume that if remoteBlocksToMine is greater than localBlocksToMine, then
+		// the local CS must have received the new blocks (and reorged).
+		if tt.remoteBlocksToMine > tt.localBlocksToMine {
+			// Verify that the remote cs did not change.
+			if remoteCST.cs.CurrentBlock().ID() != remoteCurrentBlockID {
+				t.Errorf("%v: the remote CS is at a different current block than before SendBlocks", tt.msg)
+			}
+			// Verify that the local cs got the new blocks.
+			if localCST.cs.Height() != remoteCST.cs.Height() {
+				t.Errorf("%v: expected height %v, got %v", tt.msg, remoteCST.cs.Height(), localCST.cs.Height())
+			}
+			if localCST.cs.CurrentBlock().ID() != remoteCST.cs.CurrentBlock().ID() {
+				t.Errorf("%v: remote and local CSTs have different current blocks", tt.msg)
+			}
+		} else {
+			// Verify that the local cs did not change.
+			if localCST.cs.CurrentBlock().ID() != localCurrentBlockID {
+				t.Errorf("%v: the local CS is at a different current block than before SendBlocks", tt.msg)
+			}
 		}
-		if cs.CurrentBlock().ID() != cst.cs.CurrentBlock().ID() {
-			t.Errorf("current block ids not equal after call to SendBlocks when peer was ahead by %v blocks: expected %v, got %v", n, cst.cs.CurrentBlock().ID(), cs.CurrentBlock().ID())
+
+		// Cleanup.
+		localCST.cs.gateway.Disconnect(remoteCST.cs.gateway.Address())
+		remoteCST.cs.gateway.Disconnect(localCST.cs.gateway.Address())
+		err = localCST.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = remoteCST.Close()
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
