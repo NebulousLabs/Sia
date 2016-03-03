@@ -114,6 +114,8 @@ func (c *Contractor) managedRenew(contract Contract, newEndHeight types.BlockHei
 	// update host contract
 	c.mu.Lock()
 	c.contracts[newContract.ID] = newContract
+	c.spentPeriod = c.spentPeriod.Add(fc.Payout)
+	c.spentTotal = c.spentTotal.Add(fc.Payout)
 	c.cachedAddress = types.UnlockHash{} // clear cachedAddress
 	err = c.save()
 	c.mu.Unlock()

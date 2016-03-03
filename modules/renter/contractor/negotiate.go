@@ -214,8 +214,9 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
-	// clear the cached address
-	c.cachedAddress = types.UnlockHash{}
+	c.spentPeriod = c.spentPeriod.Add(fc.Payout)
+	c.spentTotal = c.spentTotal.Add(fc.Payout)
+	c.cachedAddress = types.UnlockHash{} // clear the cached address
 	c.save()
 	c.mu.Unlock()
 
