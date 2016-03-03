@@ -224,13 +224,16 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			//
 			// TODO: an attacker could mine many blocks off the genesis block all in the
 			// future and we would spawn a goroutine per each block. To fix this, either
-			// ban peers that send lots of future blocks OR stop spawning goroutines
+			// ban peers that send lots of future blocks and stop spawning goroutines
 			// after we are already waiting on a large number of future blocks.
 			//
 			// TODO: an attacker could broadcast a future block many times and we would
 			// spawn a goroutine for each broadcast. To fix this we should create a
 			// cache of future blocks, like we already do for DoS blocks, and only spawn
-			// a goroutine if we haven't already spawned one for that block.
+			// a goroutine if we haven't already spawned one for that block. To limit
+			// the size of the cache of future blocks, make it a constant size (say 50)
+			// over which we would evict the block furthest in the future before adding
+			// a new block to the cache.
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
