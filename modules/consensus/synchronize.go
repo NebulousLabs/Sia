@@ -56,7 +56,7 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 		if i >= 9 {
 			step *= 2
 		}
-		if height < step {
+		if height <= step {
 			break
 		}
 		height -= step
@@ -176,6 +176,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			found = true
 			// Start from the child of the common block.
 			start = pb.Height + 1
+			break
 		}
 		return nil
 	})
@@ -215,7 +216,7 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 				}
 				blocks = append(blocks, pb.Block)
 			}
-			moreAvailable = start+MaxCatchUpBlocks < height
+			moreAvailable = start+MaxCatchUpBlocks <= height
 			start += MaxCatchUpBlocks
 			return nil
 		})
