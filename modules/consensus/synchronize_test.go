@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"path/filepath"
@@ -688,7 +689,7 @@ func TestBlockID(t *testing.T) {
 	defer cst.Close()
 
 	p1, p2 := net.Pipe()
-	fnDone := make(chan struct{})
+	fnErr := make(chan error)
 
 	tests := []struct {
 		id      types.BlockID
@@ -701,7 +702,7 @@ func TestBlockID(t *testing.T) {
 		// Test with a failing reader.
 		{
 			conn:    mockPeerConnFailingReader{PeerConn: p1},
-			fn:      func() { fnDone <- struct{}{} },
+			fn:      func() { fnErr <- nil },
 			errWant: errFailingReader,
 			msg:     "expected rpcBlockID to error with a failing reader conn",
 		},
@@ -710,11 +711,7 @@ func TestBlockID(t *testing.T) {
 			conn: p1,
 			fn: func() {
 				// Write a block id to the conn.
-				err := encoding.WriteObject(p2, types.BlockID{})
-				if err != nil {
-					t.Error(err)
-				}
-				fnDone <- struct{}{}
+				fnErr <- encoding.WriteObject(p2, types.BlockID{})
 			},
 			errWant: errNilItem,
 			msg:     "expected rpcBlockID to error with a nonexistent block id",
@@ -724,11 +721,7 @@ func TestBlockID(t *testing.T) {
 			conn: mockPeerConnFailingWriter{PeerConn: p1},
 			fn: func() {
 				// Write a valid block id to the conn.
-				err := encoding.WriteObject(p2, types.GenesisBlock.ID())
-				if err != nil {
-					t.Error(err)
-				}
-				fnDone <- struct{}{}
+				fnErr <- encoding.WriteObject(p2, types.GenesisBlock.ID())
 			},
 			errWant: errFailingWriter,
 			msg:     "expected rpcBlockID to error with a failing writer conn",
@@ -739,20 +732,20 @@ func TestBlockID(t *testing.T) {
 			fn: func() {
 				// Write a valid block id to the conn.
 				if err := encoding.WriteObject(p2, types.GenesisBlock.ID()); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 
 				// Read the block written to the conn.
 				var block types.Block
 				if err := encoding.ReadObject(p2, &block, types.BlockSizeLimit); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 				// Verify the block is the expected block.
 				if block.ID() != types.GenesisBlock.ID() {
-					t.Errorf("rpcBlockID wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisBlock.ID(), block.ID())
+					fnErr <- fmt.Errorf("rpcBlockID wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisBlock.ID(), block.ID())
 				}
 
-				fnDone <- struct{}{}
+				fnErr <- nil
 			},
 			errWant: nil,
 			msg:     "expected rpcBlockID to succeed with a valid conn and valid block",
@@ -764,7 +757,10 @@ func TestBlockID(t *testing.T) {
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}
-		<-fnDone
+		err = <-fnErr
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -780,7 +776,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	defer cst.Close()
 
 	p1, p2 := net.Pipe()
-	fnDone := make(chan struct{})
+	fnErr := make(chan error)
 
 	tests := []struct {
 		id      types.BlockID
@@ -792,7 +788,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 		// Test with failing writer.
 		{
 			conn:    mockPeerConnFailingWriter{PeerConn: p1},
-			fn:      func() { fnDone <- struct{}{} },
+			fn:      func() { fnErr <- nil },
 			errWant: errFailingWriter,
 			msg:     "the function returned from threadedReceiveBlock should fail with a PeerConn with a failing writer",
 		},
@@ -803,14 +799,14 @@ func TestThreadedReceiveBlock(t *testing.T) {
 				// Read the id written to conn.
 				var id types.BlockID
 				if err := encoding.ReadObject(p2, &id, crypto.HashSize); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 				// Verify the id is the expected id.
 				expectedID := types.BlockID{}
 				if id != expectedID {
-					t.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
+					fnErr <- fmt.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
 				}
-				fnDone <- struct{}{}
+				fnErr <- nil
 			},
 			errWant: errFailingReader,
 			msg:     "the function returned from threadedReceiveBlock should fail with a PeerConn with a failing reader",
@@ -823,21 +819,21 @@ func TestThreadedReceiveBlock(t *testing.T) {
 				// Read the id written to conn.
 				var id types.BlockID
 				if err := encoding.ReadObject(p2, &id, crypto.HashSize); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 				// Verify the id is the expected id.
 				expectedID := types.BlockID{1}
 				if id != expectedID {
-					t.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
+					fnErr <- fmt.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
 				}
 
 				// Write an invalid block to conn.
 				block := types.Block{}
 				if err := encoding.WriteObject(p2, block); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 
-				fnDone <- struct{}{}
+				fnErr <- nil
 			},
 			errWant: errOrphan,
 			msg:     "the function returned from threadedReceiveBlock should not accept an invalid block",
@@ -850,24 +846,24 @@ func TestThreadedReceiveBlock(t *testing.T) {
 				// Read the id written to conn.
 				var id types.BlockID
 				if err := encoding.ReadObject(p2, &id, crypto.HashSize); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 				// Verify the id is the expected id.
 				expectedID := types.BlockID{2}
 				if id != expectedID {
-					t.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
+					fnErr <- fmt.Errorf("id written to conn was %v, but id received was %v", expectedID, id)
 				}
 
 				// Write a valid block to conn.
 				block, err := cst.miner.FindBlock()
 				if err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 				if err := encoding.WriteObject(p2, block); err != nil {
-					t.Error(err)
+					fnErr <- err
 				}
 
-				fnDone <- struct{}{}
+				fnErr <- nil
 			},
 			errWant: nil,
 			msg:     "the function returned from manageddReceiveBlock should accept a valid block",
@@ -880,7 +876,10 @@ func TestThreadedReceiveBlock(t *testing.T) {
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}
-		<-fnDone
+		err = <-fnErr
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
