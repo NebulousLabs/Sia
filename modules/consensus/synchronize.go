@@ -286,11 +286,6 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	// Start verification inside of a bolt View tx.
 	cs.mu.RLock()
 	err = cs.db.View(func(tx *bolt.Tx) error {
-		// Do not accept a header if the database is inconsistent.
-		if inconsistencyDetected(tx) {
-			return errInconsistentSet
-		}
-
 		// Do some relatively inexpensive checks to validate the header
 		return cs.validateHeader(boltTxWrapper{tx}, h)
 	})
