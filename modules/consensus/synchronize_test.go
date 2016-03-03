@@ -678,10 +678,10 @@ func (mockPeerConnFailingWriter) Write([]byte) (int, error) {
 	return 0, errFailingWriter
 }
 
-// TestSend1Blk probes the ConsensusSet.send1Blk method and tests that it
+// TestBlockID probes the ConsensusSet.rpcBlockID method and tests that it
 // correctly receives block ids and writes out the corresponding blocks.
-func TestSend1Blk(t *testing.T) {
-	cst, err := blankConsensusSetTester("TestSend1Blk")
+func TestBlockID(t *testing.T) {
+	cst, err := blankConsensusSetTester("TestBlockID")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +703,7 @@ func TestSend1Blk(t *testing.T) {
 			conn:    mockPeerConnFailingReader{PeerConn: p1},
 			fn:      func() { fnDone <- struct{}{} },
 			errWant: errFailingReader,
-			msg:     "expected send1Blk to error with a failing reader conn",
+			msg:     "expected rpcBlockID to error with a failing reader conn",
 		},
 		// Test with a block id not found in the blockmap.
 		{
@@ -717,7 +717,7 @@ func TestSend1Blk(t *testing.T) {
 				fnDone <- struct{}{}
 			},
 			errWant: errNilItem,
-			msg:     "expected send1Blk to error with a nonexistent block id",
+			msg:     "expected rpcBlockID to error with a nonexistent block id",
 		},
 		// Test with a failing writer.
 		{
@@ -731,7 +731,7 @@ func TestSend1Blk(t *testing.T) {
 				fnDone <- struct{}{}
 			},
 			errWant: errFailingWriter,
-			msg:     "expected send1Blk to error with a failing writer conn",
+			msg:     "expected rpcBlockID to error with a failing writer conn",
 		},
 		// Test with a valid conn and valid block.
 		{
@@ -749,18 +749,18 @@ func TestSend1Blk(t *testing.T) {
 				}
 				// Verify the block is the expected block.
 				if block.ID() != types.GenesisBlock.ID() {
-					t.Errorf("send1Blk wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisBlock.ID(), block.ID())
+					t.Errorf("rpcBlockID wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisBlock.ID(), block.ID())
 				}
 
 				fnDone <- struct{}{}
 			},
 			errWant: nil,
-			msg:     "expected send1Blk to succeed with a valid conn and valid block",
+			msg:     "expected rpcBlockID to succeed with a valid conn and valid block",
 		},
 	}
 	for _, tt := range tests {
 		go tt.fn()
-		err := cst.cs.send1Blk(tt.conn)
+		err := cst.cs.rpcBlockID(tt.conn)
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}
@@ -884,15 +884,15 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	}
 }
 
-// TestIntegrationSend1BlkRPC probes the Send1Blk RPC and tests that blocks are
+// TestIntegrationBlockIDRPC probes the BlockID RPC and tests that blocks are
 // correctly requested, received, and accepted into the consensus set.
-func TestIntegrationSend1BlkRPC(t *testing.T) {
-	cst1, err := blankConsensusSetTester("TestIntegrationSend1BlkRPC1")
+func TestIntegrationBlockIDRPC(t *testing.T) {
+	cst1, err := blankConsensusSetTester("TestIntegrationBlockIDRPC1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cst1.Close()
-	cst2, err := blankConsensusSetTester("TestIntegrationSend1BlkRPC2")
+	cst2, err := blankConsensusSetTester("TestIntegrationBlockIDRPC2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -908,13 +908,13 @@ func TestIntegrationSend1BlkRPC(t *testing.T) {
 	}
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(types.GenesisBlock.ID()))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "BlockID", cst1.cs.threadedReceiveBlock(types.GenesisBlock.ID()))
 	if err != modules.ErrBlockKnown {
 		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
 	}
 
 	// Test that cst2 errors when it doesn't recognize the requested block.
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(types.BlockID{}))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "BlockID", cst1.cs.threadedReceiveBlock(types.BlockID{}))
 	if err != io.EOF {
 		t.Errorf("cst2 shouldn't return a block it doesn't recognize: expected error '%v', got '%v'", io.EOF, err)
 	}
@@ -928,7 +928,7 @@ func TestIntegrationSend1BlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(block.ID()))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "BlockID", cst1.cs.threadedReceiveBlock(block.ID()))
 	if err != nil {
 		t.Errorf("cst1 should accept a block that extends its longest chain: expected nil error, got '%v'", err)
 	}
@@ -942,7 +942,7 @@ func TestIntegrationSend1BlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.gateway.RPC(cst1.cs.gateway.Address(), "Send1Blk", cst2.cs.threadedReceiveBlock(block.ID()))
+	err = cst2.cs.gateway.RPC(cst1.cs.gateway.Address(), "BlockID", cst2.cs.threadedReceiveBlock(block.ID()))
 	if err != nil {
 		t.Errorf("cst2 should accept a block that extends its longest chain: expected nil error, got '%v'", err)
 	}
@@ -964,7 +964,7 @@ func TestIntegrationSend1BlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "Send1Blk", cst1.cs.threadedReceiveBlock(block.ID()))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "BlockID", cst1.cs.threadedReceiveBlock(block.ID()))
 	if err != errOrphan {
 		t.Errorf("cst1 should not accept an orphan block: expected error '%v', got '%v'", errOrphan, err)
 	}
@@ -1038,7 +1038,7 @@ func TestRelayHeader(t *testing.T) {
 			header:  validBlock.Header(),
 			errWant: nil,
 			errMSG:  "relayHeader should accept a valid header",
-			rpcWant: "Send1Blk",
+			rpcWant: "BlockID",
 			rpcMSG:  "relayHeader should request the block of a valid header",
 		},
 		// Test that relayHeader requests a future, but otherwise valid block.
@@ -1046,7 +1046,7 @@ func TestRelayHeader(t *testing.T) {
 			header:  futureBlock.Header(),
 			errWant: errFutureTimestamp,
 			errMSG:  "relayHeader should return an error for a future header",
-			rpcWant: "Send1Blk",
+			rpcWant: "BlockID",
 			rpcMSG:  "relayHeader should request the corresponding block to a future, but otherwise valid header",
 		},
 	}
