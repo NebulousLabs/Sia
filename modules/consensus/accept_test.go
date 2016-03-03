@@ -339,6 +339,7 @@ func TestCheckHeaderTarget(t *testing.T) {
 // TestUnitValidateHeader runs a series of unit tests for validateHeader.
 func TestUnitValidateHeader(t *testing.T) {
 	mockValidBlockID := mockValidBlock.ID()
+
 	var tests = []struct {
 		header                 types.BlockHeader
 		dosBlocks              map[types.BlockID]struct{}
@@ -411,6 +412,30 @@ func TestUnitValidateHeader(t *testing.T) {
 			marshaler:              parentBlockHighTargetUnmarshaler,
 			errWant:                errEarlyTimestamp,
 			msg:                    "validateHeader should fail when the header's timestamp is too early",
+		},
+		// Test that headers in the extreme future are rejected.
+		{
+			header: types.BlockHeader{
+				Timestamp: types.CurrentTimestamp() + types.ExtremeFutureThreshold + 2,
+				ParentID:  mockParentID(),
+			},
+			dosBlocks:     make(map[types.BlockID]struct{}),
+			blockMapPairs: serializedParentBlockMap,
+			marshaler:     parentBlockHighTargetUnmarshaler,
+			errWant:       errExtremeFutureTimestamp,
+			msg:           "validateHeader should fail when the header's timestamp is in the extreme future",
+		},
+		// Test that headers in the near future are not rejected.
+		{
+			header: types.BlockHeader{
+				Timestamp: types.CurrentTimestamp() + types.FutureThreshold + 2,
+				ParentID:  mockParentID(),
+			},
+			dosBlocks:     make(map[types.BlockID]struct{}),
+			blockMapPairs: serializedParentBlockMap,
+			marshaler:     parentBlockHighTargetUnmarshaler,
+			errWant:       nil,
+			msg:           "validateHeader should not reject headers whose timestamps are in the near future",
 		},
 		// Test that blocks with too large of a target are rejected.
 		{
@@ -735,9 +760,10 @@ func TestFutureTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	// managedAcceptHeader should not error when the block is in the near future.
 	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
-	if err != errFutureTimestamp {
-		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
+	if err != nil {
+		t.Fatalf("expected %v, got %v", nil, err)
 	}
 	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errFutureTimestamp {

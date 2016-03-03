@@ -285,12 +285,6 @@ func (cs *ConsensusSet) relayHeader(conn modules.PeerConn) error {
 
 	// Submit the header to the consensus set.
 	err = cs.managedAcceptHeader(h)
-	if err == errFutureTimestamp {
-		// Ignore errFutureTimestamp so that the block is downloaded and passed to
-		// managedAcceptHeader, which will spawn a go thread that waits until the
-		// timestamp would be valid before trying to accept it again.
-		err = nil
-	}
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
 		//
@@ -299,8 +293,7 @@ func (cs *ConsensusSet) relayHeader(conn modules.PeerConn) error {
 		// from inside another RPC?
 		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 		return nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return err
 	}
 	// If the header is valid and extends the heaviest chain, fetch, accept it,

@@ -118,10 +118,9 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
 		return errExtremeFutureTimestamp
 	}
 
-	// Check if the block is in the near future, but too far to be acceptable.
-	if h.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
-		return errFutureTimestamp
-	}
+	// We do not check if the header is in the near future here, because we want
+	// to get the corresponding block as soon as possible, even if the block is in
+	// the near future.
 
 	return nil
 }
