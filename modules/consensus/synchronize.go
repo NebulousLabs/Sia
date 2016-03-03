@@ -301,12 +301,12 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	// and broadcast it.
 	//
 	// TODO: log error returned if non-nill.
-	go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "BlockID", cs.threadedReceiveBlock(h.ID()))
+	go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
 	return nil
 }
 
-// rpcBlockID is an RPC that sends the requested block to the requesting peer.
-func (cs *ConsensusSet) rpcBlockID(conn modules.PeerConn) error {
+// rpcSendBlk is an RPC that sends the requested block to the requesting peer.
+func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	// Decode the block id from the conneciton.
 	var id types.BlockID
 	err := encoding.ReadObject(conn, &id, crypto.HashSize)
@@ -336,7 +336,7 @@ func (cs *ConsensusSet) rpcBlockID(conn modules.PeerConn) error {
 
 // threadedReceiveBlock takes a block id and returns an RPCFunc that requests
 // that block and then calls AcceptBlock on it. The returned function should be
-// used as the calling end of the BlockID RPC. Note that although the function
+// used as the calling end of the SendBlk RPC. Note that although the function
 // itself does not do any locking, it is still prefixed with "threaded" because
 // the function it returns calls the exported method AcceptBlock.
 func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
