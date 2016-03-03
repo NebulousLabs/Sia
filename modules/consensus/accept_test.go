@@ -529,10 +529,6 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 	if err != errDoSBlock {
 		t.Fatalf("expected %v, got %v", errDoSBlock, err)
 	}
-	err = cst.cs.managedAcceptHeader(dosBlock.Header())
-	if err != errDoSBlock {
-		t.Fatalf("expected %v, got %v", errDoSBlock, err)
-	}
 }
 
 // TestBlockKnownHandling submits known blocks to the consensus set.
@@ -569,12 +565,8 @@ func TestBlockKnownHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Submit all the blocks and headers again, looking for a 'stale block' error.
+	// Submit all the blocks again, looking for a 'stale block' error.
 	err = cst.cs.AcceptBlock(block1)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
-	}
-	err = cst.cs.managedAcceptHeader(block1.Header())
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -582,20 +574,12 @@ func TestBlockKnownHandling(t *testing.T) {
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
-	err = cst.cs.managedAcceptHeader(block2.Header())
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
-	}
 	err = cst.cs.AcceptBlock(staleBlock)
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
-	err = cst.cs.managedAcceptHeader(staleBlock.Header())
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
-	}
 
-	// Try submitting the genesis block and its header.
+	// Try submitting the genesis block.
 	id, err := cst.cs.dbGetPath(0)
 	if err != nil {
 		t.Fatal(err)
@@ -605,10 +589,6 @@ func TestBlockKnownHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cst.cs.AcceptBlock(genesisBlock.Block)
-	if err != modules.ErrBlockKnown {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
-	}
-	err = cst.cs.managedAcceptHeader(genesisBlock.Block.Header())
 	if err != modules.ErrBlockKnown {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockKnown, err)
 	}
@@ -637,15 +617,6 @@ func TestOrphanHandling(t *testing.T) {
 	if err != errOrphan {
 		t.Fatalf("expected %v, got %v", errOrphan, err)
 	}
-	// Try submitting an orphan block's header.
-	err = cst.cs.managedAcceptHeader(orphan.Header())
-	if err != errOrphan {
-		t.Fatalf("expected %v, got %v", errOrphan, err)
-	}
-	err = cst.cs.managedAcceptHeader(orphan.Header())
-	if err != errOrphan {
-		t.Fatalf("expected %v, got %v", errOrphan, err)
-	}
 }
 
 // TestMissedTarget submits a block that does not meet the required target.
@@ -671,10 +642,6 @@ func TestMissedTarget(t *testing.T) {
 		t.Fatal("unable to find a failing target")
 	}
 	err = cst.cs.AcceptBlock(block)
-	if err != modules.ErrBlockUnsolved {
-		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
-	}
-	err = cst.cs.managedAcceptHeader(block.Header())
 	if err != modules.ErrBlockUnsolved {
 		t.Fatalf("expected %v, got %v", modules.ErrBlockUnsolved, err)
 	}
@@ -734,10 +701,6 @@ func TestEarlyTimestampHandling(t *testing.T) {
 	if err != errEarlyTimestamp {
 		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
 	}
-	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
-	if err != errEarlyTimestamp {
-		t.Fatalf("expected %v, got %v", errEarlyTimestamp, err)
-	}
 }
 
 // testFutureTimestampHandling checks that blocks in the future (but not
@@ -760,11 +723,6 @@ func TestFutureTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	// managedAcceptHeader should not error when the block is in the near future.
-	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
-	if err != nil {
-		t.Fatalf("expected %v, got %v", nil, err)
-	}
 	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errFutureTimestamp {
 		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
@@ -808,10 +766,6 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	}
 	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
 	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	err = cst.cs.managedAcceptHeader(solvedBlock.Header())
-	if err != errExtremeFutureTimestamp {
-		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
-	}
 	err = cst.cs.AcceptBlock(solvedBlock)
 	if err != errExtremeFutureTimestamp {
 		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)

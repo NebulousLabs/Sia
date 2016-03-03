@@ -283,8 +283,18 @@ func (cs *ConsensusSet) relayHeader(conn modules.PeerConn) error {
 		return err
 	}
 
-	// Submit the header to the consensus set.
-	err = cs.managedAcceptHeader(h)
+	// Start verification inside of a bolt View tx.
+	cs.mu.RLock()
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		// Do not accept a header if the database is inconsistent.
+		if inconsistencyDetected(tx) {
+			return errInconsistentSet
+		}
+
+		// Do some relatively inexpensive checks to validate the header
+		return cs.validateHeader(boltTxWrapper{tx}, h)
+	})
+	cs.mu.RUnlock()
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
 		//
