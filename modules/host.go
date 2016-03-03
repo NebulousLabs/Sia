@@ -30,6 +30,13 @@ const (
 )
 
 var (
+	// ActionInsert is the specifier for a RevisionAction that modifies sector
+	// data.
+	ActionInsert = types.Specifier{'I', 'n', 's', 'e', 'r', 't'}
+
+	// ActionDelete is the specifier for a RevisionAction that deletes a
+	// sector.
+	ActionDelete = types.Specifier{'D', 'e', 'l', 'e', 't', 'e'}
 
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
@@ -53,6 +60,13 @@ var (
 )
 
 type (
+	// A RevisionAction is a description of an edit to be performed on a
+	// contract.
+	RevisionAction struct {
+		Type        types.Specifier
+		SectorIndex uint64
+	}
+
 	// HostBandwidthLimits set limits on the volume and speed of the uploading
 	// and downloading of the host. The limits have no bearings on the other
 	// modules. The data limits are in bytes per month, and the speed limits
