@@ -262,7 +262,10 @@ func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
-		// TODO: log error returned if non-nill?
+		//
+		// TODO: log error returned if non-nill? OR we could not use a goroutine and
+		// just return the result of the RPC call. Is it back practice to call an RPC
+		// from inside another RPC?
 		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 	}
 	if err != nil {
@@ -282,23 +285,32 @@ func (cs *ConsensusSet) relayHeader(conn modules.PeerConn) error {
 
 	// Submit the header to the consensus set.
 	err = cs.managedAcceptHeader(h)
-	switch err {
-	case errOrphan:
-		// If the header is an orphan, try to find the parents.
-		// TODO: log error returned if non-nill?
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
-	case errFutureTimestamp:
+	if err == errFutureTimestamp {
 		// Ignore errFutureTimestamp so that the block is downloaded and passed to
 		// managedAcceptHeader, which will spawn a go thread that waits until the
 		// timestamp would be valid before trying to accept it again.
-		fallthrough
-	case nil:
-		// If the header is valid and extends the heaviest chain, fetch, accept it,
-		// and broadcast it.
-		// TODO: log error returned if non-nill?
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "BlockID", cs.threadedReceiveBlock(h.ID()))
+		err = nil
 	}
-	return err
+	if err == errOrphan {
+		// If the header is an orphan, try to find the parents.
+		//
+		// TODO: log error returned if non-nill? OR we could not use a goroutine and
+		// just return the result of the RPC call. Is it back practice to call an RPC
+		// from inside another RPC?
+		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	// If the header is valid and extends the heaviest chain, fetch, accept it,
+	// and broadcast it.
+	//
+	// TODO: log error returned if non-nill? OR we could not use a goroutine and
+	// just return the result of the RPC call. Is it back practice to call an RPC
+	// from inside another RPC?
+	go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "BlockID", cs.threadedReceiveBlock(h.ID()))
+	return nil
 }
 
 // rpcBlockID is an RPC that sends the requested block to the requesting peer.

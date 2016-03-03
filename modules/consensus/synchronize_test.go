@@ -1028,8 +1028,8 @@ func TestRelayHeader(t *testing.T) {
 		// Test that relayHeader requests the parent blocks of orphan headers.
 		{
 			header:  types.BlockHeader{},
-			errWant: errOrphan,
-			errMSG:  "relayHeader should reject orphan blocks",
+			errWant: nil,
+			errMSG:  "relayHeader should not return an error for orphan headers",
 			rpcWant: "SendBlocks",
 			rpcMSG:  "relayHeader should request blocks when the relayed header is an orphan",
 		},
@@ -1044,8 +1044,8 @@ func TestRelayHeader(t *testing.T) {
 		// Test that relayHeader requests a future, but otherwise valid block.
 		{
 			header:  futureBlock.Header(),
-			errWant: errFutureTimestamp,
-			errMSG:  "relayHeader should return an error for a future header",
+			errWant: nil,
+			errMSG:  "relayHeader should not return an error for a future header",
 			rpcWant: "BlockID",
 			rpcMSG:  "relayHeader should request the corresponding block to a future, but otherwise valid header",
 		},
