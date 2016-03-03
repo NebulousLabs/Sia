@@ -1,11 +1,5 @@
 package modules
 
-// TODO: Split HostSettings into HostInternalSettings and HostExternalSettings.
-
-// TODO: Reconsider the method by which bandwidth limits, storage limits, and
-// prices are set. Want to enable flexibility for the client - probably belongs
-// with internal settings.
-
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -72,10 +66,10 @@ type (
 	// modules. The data limits are in bytes per month, and the speed limits
 	// are in bytes per second.
 	HostBandwidthLimits struct {
-		DownloadDataLimit  uint64
-		DownloadSpeedLimit uint64
-		UploadDataLimit    uint64
-		UploadSpeedLimit   uint64
+		DownloadDataLimit  uint64 `json:"downloaddatalimit"`
+		DownloadSpeedLimit uint64 `json:"downloadspeedlimit"`
+		UploadDataLimit    uint64 `json:uploaddatalimit"`
+		UploadSpeedLimit   uint64 `json:uploadspeedlimit"`
 	}
 
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
@@ -99,10 +93,10 @@ type (
 		UploadBandwidthRevenue             types.Currency
 	}
 
-	// HostSettings are the parameters advertised by the host. These are the
-	// values that the renter will request from the host in order to build its
-	// database.
-	HostSettings struct {
+	// HostExternalSettings are the parameters advertised by the host. These
+	// are the values that the renter will request from the host in order to
+	// build its database.
+	HostExternalSettings struct {
 		AcceptingContracts bool              `json:"acceptingcontracts"`
 		MaxBatchSize       uint64            `json:"maxbatchsize"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
@@ -121,6 +115,21 @@ type (
 
 		RevisionNumber uint64 `json:"revisionnumber"`
 		Version        string `json:"version"`
+	}
+
+	// HostInternalSettings contains a list of settings that can be changed.
+	HostInternalSettings struct {
+		AcceptingContracts bool              `json:"acceptingcontracts"`
+		MaxBatchSize       uint64            `json:"maxbatchsize"`
+		MaxDuration        types.BlockHeight `json:"maxduration"`
+		NetAddress         NetAddress        `json:"netaddress"`
+		WindowSize         types.BlockHeight `json:"windowsize"`
+
+		Collateral                    types.Currency `json:"collateral"`
+		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
+		MinimumStoragePrice           types.Currency `json:"storageprice"`
+		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
+		// TODO: HostBandwidthLimits - can't be added until dynamic pricing is in place.
 	}
 
 	// HostRPCMetrics reports the quantity of each type of RPC call that has
@@ -243,10 +252,10 @@ type (
 		// data the host is willing to transfer when the host is getting paid.
 		// TODO: SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
 
-		// SetConfig sets the hosting parameters of the host.
-		SetSettings(HostSettings) error
+		// SetInternalSettings sets the hosting parameters of the host.
+		SetInternalSettings(HostInternalSettings) error
 
-		// Settings returns the host's settings.
+		// Settings returns the host's internal settings.
 		Settings() HostSettings
 
 		// Close saves the state of the host and stops its listener process.

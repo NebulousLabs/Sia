@@ -49,26 +49,7 @@ import (
 // size of the real sectors + the size of the unremovable files - calculated,
 // not relative)
 
-// TODO: The host should be able to tell whether or not a sector has been
-// corrupted. The host operates under the assumption that there have been no
-// corruption issues, but if there have been that will cause problems when the
-// host is trying to perform storage proofs, because the host is liable to
-// renew anything, even things with missing sectors.
-//
-// Fixing this requires having the host mark a sector as 'absent' by setting
-// the storage folder to nil or to empty. This must be done in a way which
-// doesn't upset the other parts of the host. The host should block any
-// contract renewal that uses missing sectors, and there should be some method
-// built into the renewal scheme that allows the host to select only a subset
-// of sectors.
-//
-// We probably want to add more strict awareness to the host for which sectors
-// are unavailable when we add the consistency checks and repair tools. It does
-// not seem too extreme to require a user to run consistency checks
-// infrequently, especially in the face of disk damage. They should not be
-// needed otherwise. Adding them during force-remove is something that we
-// should do eventually, but for now the programming overhead is more than is
-// justified.
+// TODO: Write an RPC that lets the host share which sectors it has lost.
 
 var (
 	// errDiskTrouble is returned when the host is supposed to have enough
