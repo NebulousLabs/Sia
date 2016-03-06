@@ -283,3 +283,49 @@ func TestBroadcast(t *testing.T) {
 		// Neither peer should receive a broadcast.
 	}
 }
+
+// TestOutboundAndInboundRPCs tests that both inbound and outbound connections
+// can successfully make RPC calls.
+func TestOutboundAndInboundRPCs(t *testing.T) {
+	g1 := newTestingGateway("TestRPC1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestRPC2", t)
+	defer g2.Close()
+
+	rpcChanG1 := make(chan struct{})
+	rpcChanG2 := make(chan struct{})
+
+	g1.RegisterRPC("recv", func(conn modules.PeerConn) error {
+		rpcChanG1 <- struct{}{}
+		return nil
+	})
+	g2.RegisterRPC("recv", func(conn modules.PeerConn) error {
+		rpcChanG2 <- struct{}{}
+		return nil
+	})
+
+	err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(10 * time.Millisecond)
+
+	err = g1.RPC(g2.Address(), "recv", func(conn modules.PeerConn) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-rpcChanG2
+
+	// Call the "recv" RPC on g1. We don't know g1's address as g2 sees it, so we
+	// get it from the first address in g2's peer list.
+	var addr modules.NetAddress
+	for p_addr, _ := range g2.peers {
+		addr = p_addr
+		break
+	}
+	err = g2.RPC(addr, "recv", func(conn modules.PeerConn) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-rpcChanG1
+}
