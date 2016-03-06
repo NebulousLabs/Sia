@@ -34,7 +34,7 @@ type explorerTester struct {
 func createExplorerTester(name string) (*explorerTester, error) {
 	// Create and assemble the dependencies.
 	testdir := build.TempDir(modules.ExplorerDir, name)
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (et *explorerTester) reorgToBlank() error {
 	dir := et.testdir + " - " + persist.RandomSuffix()
 
 	// Create a miner and all dependencies to create an alternate chain.
-	g, err := gateway.New(":0", filepath.Join(dir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(dir, modules.GatewayDir))
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func TestNilExplorerDependencies(t *testing.T) {
 func TestExplorerGenesisHeight(t *testing.T) {
 	// Create the dependencies.
 	testdir := build.TempDir(modules.HostDir, "TestExplorerGenesisHeight")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -192,7 +192,7 @@ func TestConnectRejects(t *testing.T) {
 	g := newTestingGateway("TestConnectRejects", t)
 	// Setup a listener that mocks Gateway.acceptConn, but sends the
 	// version sent over mockVersionChan instead of build.Version.
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +456,7 @@ func TestDisconnect(t *testing.T) {
 	}
 
 	// dummy listener to accept connection
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal("couldn't start listener:", err)
 	}

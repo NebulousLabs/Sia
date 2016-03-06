@@ -13,7 +13,7 @@ import (
 
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(name string, t *testing.T) *Gateway {
-	g, err := New(":0", build.TempDir("gateway", name))
+	g, err := New("localhost:0", build.TempDir("gateway", name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestNew(t *testing.T) {
 	if _, err := New("", ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
-	if _, err := New(":0", ""); err == nil {
+	if _, err := New("localhost:0", ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
 	if g, err := New("foo", build.TempDir("gateway", "TestNew1")); err == nil {
@@ -78,7 +78,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatal("couldn't create corrupted file:", err)
 	}
-	if _, err := New(":0", dir); err == nil {
+	if _, err := New("localhost:0", dir); err == nil {
 		t.Fatal("expected load error, got nil")
 	}
 }

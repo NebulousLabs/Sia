@@ -23,7 +23,7 @@ func TestIntegrationMinimumValidChildTimestamp(t *testing.T) {
 
 	// Create a custom consnesus set to control the blocks.
 	testdir := build.TempDir(modules.ConsensusDir, "TestIntegrationMinimumValidChildTimestamp")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}

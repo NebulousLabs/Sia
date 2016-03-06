@@ -12,7 +12,7 @@ func TestLoad(t *testing.T) {
 	g.mu.Unlock(id)
 	g.Close()
 
-	g2, err := New(":0", g.persistDir)
+	g2, err := New("localhost:0", g.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}

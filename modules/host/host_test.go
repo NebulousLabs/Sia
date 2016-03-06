@@ -104,7 +104,7 @@ func blankHostTester(name string) (*hostTester, error) {
 	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the modules.
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func blankHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
+	h, err := New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
@@ -214,15 +214,15 @@ func TestNilValues(t *testing.T) {
 	}
 
 	hostDir := filepath.Join(ht.persistDir, modules.HostDir)
-	_, err = New(nil, ht.tpool, ht.wallet, ":0", hostDir)
+	_, err = New(nil, ht.tpool, ht.wallet, "localhost:0", hostDir)
 	if err != errNilCS {
 		t.Fatal("could not trigger errNilCS")
 	}
-	_, err = New(ht.cs, nil, ht.wallet, ":0", hostDir)
+	_, err = New(ht.cs, nil, ht.wallet, "localhost:0", hostDir)
 	if err != errNilTpool {
 		t.Fatal("could not trigger errNilTpool")
 	}
-	_, err = New(ht.cs, ht.tpool, nil, ":0", hostDir)
+	_, err = New(ht.cs, ht.tpool, nil, "localhost:0", hostDir)
 	if err != errNilWallet {
 		t.Fatal("Could not trigger errNilWallet")
 	}
@@ -289,7 +289,7 @@ func TestSetAndGetSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +359,7 @@ func TestPersistentSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	h, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

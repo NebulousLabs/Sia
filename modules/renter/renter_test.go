@@ -39,7 +39,7 @@ func (rt *renterTester) Close() error {
 func newRenterTester(name string) (*renterTester, error) {
 	// Create the modules.
 	testdir := build.TempDir("renter", name)
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}

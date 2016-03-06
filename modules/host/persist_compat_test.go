@@ -69,7 +69,7 @@ func TestPersistCompat04(t *testing.T) {
 	}
 
 	// Re-open the host, which will be loading from the compatibility file.
-	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
