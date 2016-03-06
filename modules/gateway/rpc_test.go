@@ -329,3 +329,53 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 	}
 	<-rpcChanG1
 }
+
+// TestCallingRPCFromRPC tests that calling an RPC from an RPC works.
+func TestCallingRPCFromRPC(t *testing.T) {
+	g1 := newTestingGateway("TestCallingRPCFromRPC1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestCallingRPCFromRPC2", t)
+	defer g2.Close()
+
+	errChan := make(chan error)
+	g1.RegisterRPC("FOO", func(conn modules.PeerConn) error {
+		err := g1.RPC(modules.NetAddress(conn.RemoteAddr().String()), "BAR", func(conn modules.PeerConn) error { return nil })
+		errChan <- err
+		return err
+	})
+
+	barChan := make(chan struct{})
+	g2.RegisterRPC("BAR", func(conn modules.PeerConn) error {
+		barChan <- struct{}{}
+		return nil
+	})
+
+	err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Call the "FOO" RPC on g1. We don't know g1's address as g2 sees it, so we
+	// get it from the first address in g2's peer list.
+	var addr modules.NetAddress
+	for _, p := range g2.Peers() {
+		addr = p.NetAddress
+		break
+	}
+	err = g2.RPC(addr, "FOO", func(conn modules.PeerConn) error { return nil })
+
+	select {
+	case err = <-errChan:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected FOO RPC to be called")
+	}
+
+	select {
+	case <-barChan:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected BAR RPC to be called")
+	}
+}
