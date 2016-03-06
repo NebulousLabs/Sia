@@ -29,4 +29,6 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// reset the spentPeriod metric
 		c.spentPeriod = types.ZeroCurrency
 	}
+
+	c.lastChange = cc.ID
 }

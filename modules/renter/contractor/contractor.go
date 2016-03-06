@@ -44,6 +44,7 @@ type Contractor struct {
 	blockHeight   types.BlockHeight
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 	contracts     map[types.FileContractID]Contract
+	lastChange    modules.ConsensusChangeID
 	renewHeight   types.BlockHeight // height at which to renew contracts
 	spentPeriod   types.Currency    // number of coins spent on file contracts this period
 	spentTotal    types.Currency    // number of coins spent on file contracts ever
@@ -161,7 +162,16 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d 
 		return nil, err
 	}
 
-	cs.ConsensusSetPersistentSubscribe(c, modules.ConsensusChangeID{})
+	err = cs.ConsensusSetPersistentSubscribe(c, c.lastChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		c.lastChange = modules.ConsensusChangeID{}
+		// ??? fix things ???
+		// subscribe again using the new ID
+		err = cs.ConsensusSetPersistentSubscribe(c, c.lastChange)
+	}
+	if err != nil {
+		return nil, errors.New("contractor subscription failed: " + err.Error())
+	}
 
 	return c, nil
 }

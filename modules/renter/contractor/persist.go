@@ -9,6 +9,7 @@ import (
 type contractorPersist struct {
 	Allowance   modules.Allowance
 	Contracts   []Contract
+	LastChange  modules.ConsensusChangeID
 	RenewHeight types.BlockHeight
 	SpentPeriod types.Currency
 	SpentTotal  types.Currency
@@ -18,6 +19,7 @@ type contractorPersist struct {
 func (c *Contractor) save() error {
 	data := contractorPersist{
 		Allowance:   c.allowance,
+		LastChange:  c.lastChange,
 		RenewHeight: c.renewHeight,
 		SpentPeriod: c.spentPeriod,
 		SpentTotal:  c.spentTotal,
@@ -39,6 +41,7 @@ func (c *Contractor) load() error {
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
 	}
+	c.lastChange = data.LastChange
 	c.renewHeight = data.RenewHeight
 	c.spentPeriod = data.SpentPeriod
 	c.spentTotal = data.SpentTotal
