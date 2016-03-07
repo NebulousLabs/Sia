@@ -1115,7 +1115,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	select {
 	case <-mg.broadcastCalled:
 		t.Fatal("RelayHeader broadcasted an invalid block header")
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 	}
 
 	// Test that broadcasting a valid block header over RelayHeader on cst1.cs
@@ -1134,7 +1134,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 		// Broadcast is called twice, once to broadcast blocks to peers <= v0.5.1
 		// and once to broadcast block headers to peers > v0.5.1.
 		<-mg.broadcastCalled
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}
 }
