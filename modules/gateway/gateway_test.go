@@ -25,16 +25,25 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	return g
 }
 
+// TestAddress tests that Gateway.Address returns the address of its listener.
+// Also tests that the address is not unspecified and is a loopback address.
+// The address must be a loopback address for testing.
 func TestAddress(t *testing.T) {
 	g := newTestingGateway("TestAddress", t)
 	defer g.Close()
 	if g.Address() != g.myAddr {
 		t.Fatal("Address does not return g.myAddr")
 	}
-	port := modules.NetAddress(g.listener.Addr().String()).Port()
-	expAddr := modules.NetAddress(net.JoinHostPort("::", port))
-	if g.Address() != expAddr {
-		t.Fatalf("Wrong address: expected %v, got %v", expAddr, g.Address())
+	if g.Address() != modules.NetAddress(g.listener.Addr().String()) {
+		t.Fatalf("wrong address: expected %v, got %v", g.listener.Addr(), g.Address())
+	}
+	host := modules.NetAddress(g.listener.Addr().String()).Host()
+	ip := net.ParseIP(host)
+	if ip.IsUnspecified() {
+		t.Fatal("expected a non-unspecified address")
+	}
+	if !ip.IsLoopback() {
+		t.Fatal("expected a loopback address")
 	}
 }
 
