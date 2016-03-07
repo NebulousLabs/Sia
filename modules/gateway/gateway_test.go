@@ -13,7 +13,7 @@ import (
 
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(name string, t *testing.T) *Gateway {
-	g, err := New(":0", build.TempDir("gateway", name))
+	g, err := New("localhost:0", build.TempDir("gateway", name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,16 +25,25 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	return g
 }
 
+// TestAddress tests that Gateway.Address returns the address of its listener.
+// Also tests that the address is not unspecified and is a loopback address.
+// The address must be a loopback address for testing.
 func TestAddress(t *testing.T) {
 	g := newTestingGateway("TestAddress", t)
 	defer g.Close()
 	if g.Address() != g.myAddr {
 		t.Fatal("Address does not return g.myAddr")
 	}
-	port := modules.NetAddress(g.listener.Addr().String()).Port()
-	expAddr := modules.NetAddress(net.JoinHostPort("::", port))
-	if g.Address() != expAddr {
-		t.Fatalf("Wrong address: expected %v, got %v", expAddr, g.Address())
+	if g.Address() != modules.NetAddress(g.listener.Addr().String()) {
+		t.Fatalf("wrong address: expected %v, got %v", g.listener.Addr(), g.Address())
+	}
+	host := modules.NetAddress(g.listener.Addr().String()).Host()
+	ip := net.ParseIP(host)
+	if ip.IsUnspecified() {
+		t.Fatal("expected a non-unspecified address")
+	}
+	if !ip.IsLoopback() {
+		t.Fatal("expected a loopback address")
 	}
 }
 
@@ -65,7 +74,7 @@ func TestNew(t *testing.T) {
 	if _, err := New("", ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
-	if _, err := New(":0", ""); err == nil {
+	if _, err := New("localhost:0", ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
 	if g, err := New("foo", build.TempDir("gateway", "TestNew1")); err == nil {
@@ -78,7 +87,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatal("couldn't create corrupted file:", err)
 	}
-	if _, err := New(":0", dir); err == nil {
+	if _, err := New("localhost:0", dir); err == nil {
 		t.Fatal("expected load error, got nil")
 	}
 }

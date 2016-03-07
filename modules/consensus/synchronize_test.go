@@ -551,7 +551,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	// can connect it to the remote peer before calling consensus.New so as to
 	// prevent SendBlocks from triggering on Connect.
 	testdir := build.TempDir(modules.ConsensusDir, "TestRPCSendBlockSendsOnlyNecessaryBlocks - local")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
