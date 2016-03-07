@@ -1138,3 +1138,92 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}
 }
+
+// TestIntegrationRelaySynchronize tests that blocks are relayed as they are
+// accepted and that peers stay synchronized. This test is header/block
+// broadcast agnostic.  When build.Version <= 0.5.1 block relaying will be
+// tested. When build.Version > 0.5.1 header relaying will be tested.
+func TestIntegrationRelaySynchronize(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cst1, err := blankConsensusSetTester("TestRelaySynchronize1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst1.Close()
+	cst2, err := blankConsensusSetTester("TestRelaySynchronize2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst2.Close()
+	cst3, err := blankConsensusSetTester("TestRelaySynchronize3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst3.Close()
+
+	// Connect them like so: cst1 <-> cst2 <-> cst3
+	err = cst1.gateway.Connect(cst2.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst2.gateway.Connect(cst3.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure cst1 is not connected to cst3.
+	cst1.gateway.Disconnect(cst3.gateway.Address())
+	cst3.gateway.Disconnect(cst1.gateway.Address())
+	// Give the gateway's time for all of the OnConnectRPCs to complete.
+	time.Sleep(100 * time.Millisecond)
+
+	// Mine a block on cst1.
+	b, err := cst1.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sleep to allow the block to propogate.
+	time.Sleep(100 * time.Millisecond)
+	// Check that cst1 relayed it to cst2.
+	if cst2.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("cst1 did not relay the block to cst2")
+	}
+	// Check that cst2 relayed it to cst3.
+	if cst3.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("cst2 did not relay the block to cst3")
+	}
+
+	// Mine a block on cst2.
+	b, err = cst2.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sleep to allow the block to propogate.
+	time.Sleep(100 * time.Millisecond)
+	// Check that cst2 relayed it to cst1.
+	if cst1.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("cst2 did not relay the block to cst1")
+	}
+	// Check that cst2 relayed it to cst3.
+	if cst3.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("cst2 did not relay the block to cst3")
+	}
+
+	// Mine a block on cst3.
+	b, err = cst3.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sleep to allow the block to propogate.
+	time.Sleep(100 * time.Millisecond)
+	// Check that cst3 relayed it to cst2.
+	if cst2.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("cst3 did not relay the block to cst2")
+	}
+	// Check that cst2 relayed it to cst1.
+	if cst1.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("cst2 did not relay the block to cst1")
+	}
+}
