@@ -97,9 +97,21 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
 func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
+	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
+	// SendBlocks will timeout. This is by design so that IBD switches peers to
+	// prevent any one peer from stalling IBD.
+	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
+	// testing.
+	if build.Release != "testing" {
+		if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" {
+			return err
+		}
+	}
+
 	// Get blockIDs to send.
 	var history [32]types.BlockID
-	err := cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx *bolt.Tx) error {
 		history = blockHistory(tx)
 		return nil
 	})
@@ -185,11 +197,6 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
-	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
-	// SendBlocks will timeout. This is by design so that IBD switches peers to
-	// prevent any one peer from stalling IBD.
-	conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
-
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
