@@ -96,8 +96,17 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()
-			peers := cs.gateway.Peers()
-			go cs.gateway.Broadcast("RelayBlock", currentBlock, peers)
+			// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
+			var relayBlockPeers, relayHeaderPeers []modules.Peer
+			for _, p := range cs.gateway.Peers() {
+				if build.VersionCmp(p.Version, "0.5.1") <= 0 {
+					relayBlockPeers = append(relayBlockPeers, p)
+				} else {
+					relayHeaderPeers = append(relayHeaderPeers, p)
+				}
+			}
+			go cs.gateway.Broadcast("RelayBlock", currentBlock, relayBlockPeers)
+			go cs.gateway.Broadcast("RelayHeader", currentBlock.Header(), relayHeaderPeers)
 		}
 	}()
 
@@ -137,12 +146,12 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// sendBlocks is the receiving end of the SendBlocks RPC. It returns a
+// rpcSendBlocks is the receiving end of the SendBlocks RPC. It returns a
 // sequential set of blocks based on the 32 input block IDs. The most recent
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
-func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
+func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
@@ -238,8 +247,8 @@ func (cs *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// relayBlock is an RPC that accepts a block from a peer.
-func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
+// rpcRelayBlock is an RPC that accepts a block from a peer.
+func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
@@ -247,16 +256,102 @@ func (cs *ConsensusSet) relayBlock(conn modules.PeerConn) error {
 		return err
 	}
 
-	// Submit the block to the consensus set.
+	// Submit the block to the consensus set and broadcast it.
 	err = cs.AcceptBlock(b)
 	if err == errOrphan {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
+		//
+		// TODO: log error returned if non-nill.
 		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 	}
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+// rpcRelayHeader is an RPC that accepts a block header from a peer.
+func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
+	// Decode the block header from the connection.
+	var h types.BlockHeader
+	err := encoding.ReadObject(conn, &h, types.BlockHeaderSize)
+	if err != nil {
+		return err
+	}
+
+	// Start verification inside of a bolt View tx.
+	cs.mu.RLock()
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		// Do some relatively inexpensive checks to validate the header
+		return cs.validateHeader(boltTxWrapper{tx}, h)
+	})
+	cs.mu.RUnlock()
+	if err == errOrphan {
+		// If the header is an orphan, try to find the parents.
+		//
+		// TODO: log error returned if non-nill.
+		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+		return nil
+	} else if err != nil {
+		return err
+	}
+	// If the header is valid and extends the heaviest chain, fetch, accept it,
+	// and broadcast it.
+	//
+	// TODO: log error returned if non-nill.
+	go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+	return nil
+}
+
+// rpcSendBlk is an RPC that sends the requested block to the requesting peer.
+func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
+	// Decode the block id from the conneciton.
+	var id types.BlockID
+	err := encoding.ReadObject(conn, &id, crypto.HashSize)
+	if err != nil {
+		return err
+	}
+	// Lookup the corresponding block.
+	var b types.Block
+	err = cs.db.View(func(tx *bolt.Tx) error {
+		pb, err := getBlockMap(tx, id)
+		if err != nil {
+			return err
+		}
+		b = pb.Block
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// Encode and send the block to the caller.
+	err = encoding.WriteObject(conn, b)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// threadedReceiveBlock takes a block id and returns an RPCFunc that requests
+// that block and then calls AcceptBlock on it. The returned function should be
+// used as the calling end of the SendBlk RPC. Note that although the function
+// itself does not do any locking, it is still prefixed with "threaded" because
+// the function it returns calls the exported method AcceptBlock.
+func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
+	managedFN := func(conn modules.PeerConn) error {
+		if err := encoding.WriteObject(conn, id); err != nil {
+			return err
+		}
+		var block types.Block
+		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
+			return err
+		}
+		if err := cs.AcceptBlock(block); err != nil {
+			return err
+		}
+		return nil
+	}
+	return managedFN
 }

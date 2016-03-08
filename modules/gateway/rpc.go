@@ -114,6 +114,9 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
+	if build.DEBUG {
+		g.log.Printf("INFO: incoming conn %v requested RPC \"%v\"", conn.RemoteAddr(), id)
+	}
 
 	// call fn
 	err := fn(conn)

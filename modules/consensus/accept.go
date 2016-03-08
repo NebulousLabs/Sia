@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
@@ -18,10 +19,12 @@ var (
 	errOrphan          = errors.New("block has no known parent")
 )
 
-// validateHeader does some early, low computation verification on the block.
-// Callers should not assume that validation will happen in a particular order.
-func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
-	// See if the block is known already.
+// validateHeaderAndBlock does some early, low computation verification on the
+// block. Callers should not assume that validation will happen in a particular
+// order.
+func (cs *ConsensusSet) validateHeaderAndBlock(tx dbTx, b types.Block) error {
+	// Check if the block is a DoS block - a known invalid block that is expensive
+	// to validate.
 	id := b.ID()
 	_, exists := cs.dosBlocks[id]
 	if exists {
@@ -43,7 +46,6 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
 	if parentBytes == nil {
 		return errOrphan
 	}
-
 	var parent processedBlock
 	err := cs.marshaler.Unmarshal(parentBytes, &parent)
 	if err != nil {
@@ -53,6 +55,74 @@ func (cs *ConsensusSet) validateHeader(tx dbTx, b types.Block) error {
 	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
 
 	return cs.blockValidator.ValidateBlock(b, minTimestamp, parent.ChildTarget, parent.Height+1)
+}
+
+// checkHeaderTarget returns true if the header's ID meets the given target.
+func checkHeaderTarget(h types.BlockHeader, target types.Target) bool {
+	blockHash := h.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
+
+// validateHeader does some early, low computation verification on the header
+// to determine if the block should be downloaded. Callers should not assume
+// that validation will happen in a particular order.
+func (cs *ConsensusSet) validateHeader(tx dbTx, h types.BlockHeader) error {
+	// Check if the block is a DoS block - a known invalid block that is expensive
+	// to validate.
+	id := h.ID()
+	_, exists := cs.dosBlocks[id]
+	if exists {
+		return errDoSBlock
+	}
+
+	// Check if the block is already known.
+	blockMap := tx.Bucket(BlockMap)
+	if blockMap == nil {
+		return errNoBlockMap
+	}
+	if blockMap.Get(id[:]) != nil {
+		return modules.ErrBlockKnown
+	}
+
+	// Check for the parent.
+	parentID := h.ParentID
+	parentBytes := blockMap.Get(parentID[:])
+	if parentBytes == nil {
+		return errOrphan
+	}
+	var parent processedBlock
+	err := cs.marshaler.Unmarshal(parentBytes, &parent)
+	if err != nil {
+		return err
+	}
+
+	// Check that the target of the new block is sufficient.
+	if !checkHeaderTarget(h, parent.ChildTarget) {
+		return modules.ErrBlockUnsolved
+	}
+
+	// TODO: check if the block is a non extending block once headers-first
+	// downloads are implemented.
+
+	// Check that the timestamp is not too far in the past to be acceptable.
+	minTimestamp := cs.blockRuleHelper.minimumValidChildTimestamp(blockMap, &parent)
+	if minTimestamp > h.Timestamp {
+		return errEarlyTimestamp
+	}
+
+	// Check if the block is in the extreme future. We make a distinction between
+	// future and extreme future because there is an assumption that by the time
+	// the extreme future arrives, this block will no longer be a part of the
+	// longest fork because it will have been ignored by all of the miners.
+	if h.Timestamp > types.CurrentTimestamp()+types.ExtremeFutureThreshold {
+		return errExtremeFutureTimestamp
+	}
+
+	// We do not check if the header is in the near future here, because we want
+	// to get the corresponding block as soon as possible, even if the block is in
+	// the near future.
+
+	return nil
 }
 
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
@@ -140,20 +210,34 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 	err := cs.db.View(func(tx *bolt.Tx) error {
 		// Do not accept a block if the database is inconsistent.
 		if inconsistencyDetected(tx) {
-			return errors.New("inconsistent database")
+			return errInconsistentSet
 		}
 
-		// Check that the header is valid. The header is checked first because it
-		// is not computationally expensive to verify, but it is computationally
-		// expensive to create.
-		err := cs.validateHeader(boltTxWrapper{tx}, b)
+		// Do some relatively inexpensive checks to validate the header and block.
+		// Validation generally occurs in the order of least expensive validation
+		// first.
+		err := cs.validateHeaderAndBlock(boltTxWrapper{tx}, b)
 		if err != nil {
 			// If the block is in the near future, but too far to be acceptable, then
 			// save the block and add it to the consensus set after it is no longer
 			// too far in the future.
+			//
+			// TODO: an attacker could mine many blocks off the genesis block all in the
+			// future and we would spawn a goroutine per each block. To fix this, either
+			// ban peers that send lots of future blocks and stop spawning goroutines
+			// after we are already waiting on a large number of future blocks.
+			//
+			// TODO: an attacker could broadcast a future block many times and we would
+			// spawn a goroutine for each broadcast. To fix this we should create a
+			// cache of future blocks, like we already do for DoS blocks, and only spawn
+			// a goroutine if we haven't already spawned one for that block. To limit
+			// the size of the cache of future blocks, make it a constant size (say 50)
+			// over which we would evict the block furthest in the future before adding
+			// a new block to the cache.
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
+					// TODO: log error returned by AcceptBlock if non-nill
 					cs.AcceptBlock(b) // NOTE: Error is not handled.
 				}()
 			}
@@ -201,8 +285,16 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	if err != nil {
 		return err
 	}
-	// Broadcast the new block to all peers.
-	peers := cs.gateway.Peers()
-	go cs.gateway.Broadcast("RelayBlock", b, peers)
+	// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
+	var relayBlockPeers, relayHeaderPeers []modules.Peer
+	for _, p := range cs.gateway.Peers() {
+		if build.VersionCmp(p.Version, "0.5.1") <= 0 {
+			relayBlockPeers = append(relayBlockPeers, p)
+		} else {
+			relayHeaderPeers = append(relayHeaderPeers, p)
+		}
+	}
+	go cs.gateway.Broadcast("RelayBlock", b, relayBlockPeers)
+	go cs.gateway.Broadcast("RelayHeader", b.Header(), relayHeaderPeers)
 	return nil
 }

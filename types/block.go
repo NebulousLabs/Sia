@@ -13,6 +13,12 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
+const (
+	// BlockHeaderSize is the size, in bytes, of a block header.
+	// 32 (ParentID) + 8 (Nonce) + 8 (Timestamp) + 32 (MerkleRoot)
+	BlockHeaderSize = 80
+)
+
 type (
 	// A Block is a summary of changes to the state that have occurred since the
 	// previous block. Blocks reference the ID of the previous block (their
@@ -70,6 +76,11 @@ func CalculateNumSiacoins(height BlockHeight) Currency {
 	return deflationSiacoins.Add(trailingSiacoins)
 }
 
+// ID returns the ID of a Block, which is calculated by hashing the header.
+func (h BlockHeader) ID() BlockID {
+	return BlockID(crypto.HashObject(h))
+}
+
 // CalculateSubsidy takes a block and a height and determines the block
 // subsidy.
 func (b Block) CalculateSubsidy(height BlockHeight) Currency {
@@ -94,9 +105,9 @@ func (b Block) Header() BlockHeader {
 
 // ID returns the ID of a Block, which is calculated by hashing the
 // concatenation of the block's parent's ID, nonce, and the result of the
-// b.MerkleRoot().
+// b.MerkleRoot(). It is equivalent to calling block.Header().ID()
 func (b Block) ID() BlockID {
-	return BlockID(crypto.HashObject(b.Header()))
+	return b.Header().ID()
 }
 
 // MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
