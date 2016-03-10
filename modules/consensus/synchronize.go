@@ -17,7 +17,7 @@ import (
 const (
 	// minNumOutbound is the minimum number of outbound peers required before ibd
 	// is confident we are synced.
-	minNumOutbound = 4
+	minNumOutbound = 5
 )
 
 var (
@@ -27,7 +27,7 @@ var (
 	MaxCatchUpBlocks = func() types.BlockHeight {
 		switch build.Release {
 		case "dev":
-			return 10
+			return 50
 		case "standard":
 			return 10
 		case "testing":
@@ -40,7 +40,7 @@ var (
 	sendBlocksTimeout = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 5 * time.Minute
+			return 40 * time.Second
 		case "standard":
 			return 5 * time.Minute
 		case "testing":
