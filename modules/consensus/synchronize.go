@@ -49,6 +49,20 @@ var (
 			panic("unrecognized build.Release")
 		}
 	}()
+	// minIBDWaitTime is the time threadedInitialBlockchainDownload waits before
+	// exiting if there are >= 1 and <= minNumOutbound peers synced.
+	minIBDWaitTime = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 80 * time.Second
+		case "standard":
+			return 10 * time.Minute
+		case "testing":
+			return 10 * time.Second
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
 
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
@@ -418,7 +432,7 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 	// Set the deadline 10 minutes in the future. After this deadline, we will say
 	// IBD is done as long as there is at least one outbound peer synced.
-	deadline := time.Now().Add(10 * time.Minute)
+	deadline := time.Now().Add(minIBDWaitTime)
 	for {
 		numOutboundSynced := 0
 		for _, p := range cs.gateway.Peers() {
@@ -454,7 +468,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 			break
 		} else {
 			// Sleep so we don't hammer the network with SendBlock requests.
-			time.Sleep(30 * time.Second)
+			time.Sleep(minIBDWaitTime / 10)
 		}
 	}
 
