@@ -71,7 +71,7 @@ type DownloadInfo struct {
 // period.
 type Allowance struct {
 	Funds  types.Currency    `json:"funds"`
-	Hosts  int               `json:"hosts"`
+	Hosts  uint64            `json:"hosts"`
 	Period types.BlockHeight `json:"period"`
 }
 

@@ -235,8 +235,8 @@ func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, end
 // formContracts forms contracts with hosts using the allowance parameters.
 func (c *Contractor) formContracts(a modules.Allowance) error {
 	// Get hosts.
-	hosts := c.hdb.RandomHosts(2*a.Hosts, nil)
-	if len(hosts) < a.Hosts {
+	hosts := c.hdb.RandomHosts(int(2*a.Hosts), nil)
+	if uint64(len(hosts)) < a.Hosts {
 		return errors.New("not enough hosts")
 	}
 	// Calculate average host price
@@ -249,7 +249,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.
 	costPerSector := avgPrice.
-		Mul(types.NewCurrency64(uint64(a.Hosts))).
+		Mul(types.NewCurrency64(a.Hosts)).
 		Mul(types.NewCurrency64(SectorSize)).
 		Mul(types.NewCurrency64(uint64(a.Period)))
 	if a.Funds.Cmp(costPerSector) < 0 {
@@ -269,7 +269,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	c.mu.RLock()
 	endHeight := c.blockHeight + a.Period
 	c.mu.RUnlock()
-	var numContracts int
+	var numContracts uint64
 	for _, h := range hosts {
 		_, err := c.newContract(h, filesize, endHeight)
 		if err != nil {

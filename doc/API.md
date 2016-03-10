@@ -589,7 +589,7 @@ Response:
 ```
 struct {
 	funds  types.Currency    (string)
-	hosts  int
+	hosts  uint64
 	period types.BlockHeight (uint64)
 }
 ```
@@ -607,7 +607,7 @@ Function: Sets the contract allowance.
 Parameters: none
 ```
 funds  types.Currency    (string)
-hosts  int
+hosts  uint64
 period types.BlockHeight (uint64)
 ```
 'funds' is the number of hastings allocated for file contracts in the given

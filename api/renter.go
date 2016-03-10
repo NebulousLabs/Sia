@@ -49,7 +49,7 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 		writeError(w, "Couldn't parse funds", http.StatusBadRequest)
 		return
 	}
-	var hosts uint // negative hosts not allowed
+	var hosts uint64
 	_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
 	if err != nil {
 		writeError(w, "Couldn't parse hosts: "+err.Error(), http.StatusBadRequest)
@@ -64,7 +64,7 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 
 	err = srv.renter.SetAllowance(modules.Allowance{
 		Funds:  funds,
-		Hosts:  int(hosts),
+		Hosts:  hosts,
 		Period: period,
 	})
 	if err != nil {
