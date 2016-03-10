@@ -51,10 +51,8 @@ contracts will be renewed for the full 200-block duration. The new contract
 set will thus consist of 20 contracts, 20 hosts, 20 sectors, 200 blocks.
 
 On the other hand, if the allowance is decreased, no immediate action is
-taken. Why? Because the contracts have already been paid for. However, this
-may change if we add proper "refund" support.
-TODO: problematic if full capacity has been used; can't refund that (easily)
-TODO: what if the duration is decreased? Can that be refunded?
+taken. Why? Because the contracts have already been paid for. The new
+allowance will only take effect upon the next renewal.
 
 Modifications to file contracts are mediated through the Editor interface. An
 Editor maintains a network connection to a host, over which is sends
