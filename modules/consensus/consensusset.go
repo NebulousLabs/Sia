@@ -126,6 +126,8 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+
+		// TODO: change flag to indicate IBD done.
 	}()
 
 	return cs, nil

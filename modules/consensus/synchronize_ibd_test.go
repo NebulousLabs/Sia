@@ -209,6 +209,10 @@ func (g *mockGatewayRPCError) RPC(addr modules.NetAddress, name string, fn modul
 // threadedInitialBlockchainDownload only disconnects from peers that error
 // with anything but a timeout.
 func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDisconnects")
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
@@ -277,6 +281,10 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 //  - at least minNumOutbound synced outbound peers
 //  - or at least 1 synced outbound peer and minIBDWaitTime has passed since beginning IBD.
 func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
