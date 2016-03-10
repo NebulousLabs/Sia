@@ -61,11 +61,18 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 		writeError(w, "Couldn't parse period: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	var renewWindow types.BlockHeight
+	_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
+	if err != nil {
+		writeError(w, "Couldn't parse renewwindow: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	err = srv.renter.SetAllowance(modules.Allowance{
-		Funds:  funds,
-		Hosts:  hosts,
-		Period: period,
+		Funds:       funds,
+		Hosts:       hosts,
+		Period:      period,
+		RenewWindow: renewWindow,
 	})
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)

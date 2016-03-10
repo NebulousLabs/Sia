@@ -22,14 +22,13 @@ same storage capacity, and they should all end at the same height. Hosts are
 selected from the HostDB; there is no support for manually specifying hosts.
 
 Contracts are automatically renewed by the contractor at a safe threshold
-before they are set to expire. (Currently, the threshold is determined
-automatically, but making it user-configurable may be preferable.) The
-contractor maintains a renewHeight variable that indicates when its current
-set of contracts will expire. When contracts are renewed, they are renewed
-with the current allowance, which may differ from the allowance that was used
-to form the initial contracts. In general, this means that allowance
-modifications only take effect upon the next "contract cycle" (the exception
-being "sufficiently greater" modifications, as defined above).
+before they are set to expire. The contractor maintains a renewHeight variable
+that indicates when its current set of contracts will expire. When contracts
+are renewed, they are renewed with the current allowance, which may differ
+from the allowance that was used to form the initial contracts. In general,
+this means that allowance modifications only take effect upon the next
+"contract cycle" (the exception being "sufficiently greater" modifications, as
+defined above).
 
 As an example, imagine that the user first sets an allowance that will cover 5
 contracts of 10 sectors each for 100 blocks. The contractor will immediately

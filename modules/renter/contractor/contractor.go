@@ -66,6 +66,10 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errors.New("hosts must be non-zero")
 	} else if a.Period == 0 {
 		return errors.New("period must be non-zero")
+	} else if a.RenewWindow == 0 {
+		return errors.New("renew window must be non-zero")
+	} else if a.RenewWindow >= a.Period {
+		return errors.New("renew window must be less than period")
 	}
 
 	// Set the allowance.
