@@ -1393,3 +1393,33 @@ func TestThreadedReceiveBlocksStalls(t *testing.T) {
 
 	// TODO: Test that threadedReceiveBlocks doesn't error with errSendBlocksStalled if it successfully received one block.
 }
+
+// TestIntegrationSendBlocksStalls tests that the SendBlocks RPC fails with
+// errSendBlockStalled when the RPC timesout and the requesting end has
+// received 0 blocks.
+func TestIntegrationSendBlocksStalls(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cstLocal, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstLocal.Close()
+	cstRemote, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - remote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstRemote.Close()
+
+	cstLocal.cs.gateway.Connect(cstRemote.cs.gateway.Address())
+
+	// Lock the remote CST so that SendBlocks blocks and timesout.
+	cstRemote.cs.mu.Lock()
+	defer cstRemote.cs.mu.Unlock()
+	err = cstLocal.cs.gateway.RPC(cstRemote.cs.gateway.Address(), "SendBlocks", cstLocal.cs.threadedReceiveBlocks)
+	if err != errSendBlocksStalled {
+		t.Fatal(err)
+	}
+}
