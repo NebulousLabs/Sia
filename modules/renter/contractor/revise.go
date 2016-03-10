@@ -14,7 +14,7 @@ import (
 // negotiateRevision sends the revision and new piece data to the host.
 func negotiateRevision(conn net.Conn, rev types.FileContractRevision, piece []byte, secretKey crypto.SecretKey) (types.Transaction, error) {
 	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
-	defer conn.SetDeadline(time.Time{})               // reset timeout after each revision
+	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
 
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
