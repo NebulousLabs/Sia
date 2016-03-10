@@ -1295,14 +1295,14 @@ func TestThreadedReceiveBlocksStalls(t *testing.T) {
 	writeTimeoutConn := mockConnMockReadWrite{
 		Conn: p2,
 		writeErr: mockNetError{
-			error:   errors.New("mock write timeout err"),
+			error:   errors.New("Write timeout"),
 			timeout: true,
 		},
 	}
 	readTimeoutConn := mockConnMockReadWrite{
 		Conn: p2,
 		readErr: mockNetError{
-			error:   errors.New("mock read timeout err"),
+			error:   errors.New("Read timeout"),
 			timeout: true,
 		},
 	}

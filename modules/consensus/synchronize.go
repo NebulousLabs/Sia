@@ -96,18 +96,31 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 }
 
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
-func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
+func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
 	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
 	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
 	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
 	// testing.
-	if build.Release != "testing" {
-		if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" {
-			return err
-		}
+	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
+		err = nil
 	}
+	if err != nil {
+		return err
+	}
+	stalled := true
+	defer func() {
+		// TODO: Timeout errors returned by muxado do not conform to the net.Error
+		// interface and therefore we cannot check if the error is a timeout using
+		// the Timeout() method. Once muxado issue #14 is resolved change the below
+		// condition to:
+		//     if netErr, ok := returnErr.(net.Error); ok && netErr.Timeout() && stalled { ... }
+		if stalled && returnErr != nil && (returnErr.Error() == "Read timeout" || returnErr.Error() == "Write timeout") {
+			returnErr = errSendBlocksStalled
+		}
+	}()
 
 	// Get blockIDs to send.
 	var history [32]types.BlockID
@@ -121,9 +134,6 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 
 	// Send the block ids.
 	if err := encoding.WriteObject(conn, history); err != nil {
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return errSendBlocksStalled
-		}
 		return err
 	}
 
@@ -153,23 +163,19 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 	// Read blocks off of the wire and add them to the consensus set until
 	// there are no more blocks available.
 	moreAvailable := true
-	receivedBlocks := false
 	for moreAvailable {
 		// Read a slice of blocks from the wire.
 		var newBlocks []types.Block
 		if err := encoding.ReadObject(conn, &newBlocks, uint64(MaxCatchUpBlocks)*types.BlockSizeLimit); err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !receivedBlocks {
-				return errSendBlocksStalled
-			}
 			return err
 		}
-		receivedBlocks = true
 		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
 			return err
 		}
 
 		// Integrate the blocks into the consensus set.
 		for _, block := range newBlocks {
+			stalled = false
 			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 			// every block.
 			acceptErr := cs.managedAcceptBlock(block)
