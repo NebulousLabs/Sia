@@ -30,12 +30,12 @@ this means that allowance modifications only take effect upon the next
 "contract cycle" (the exception being "sufficiently greater" modifications, as
 defined above).
 
-As an example, imagine that the user first sets an allowance that will cover 5
-contracts of 10 sectors each for 100 blocks. The contractor will immediately
-form contracts with 5 hosts, paying each host enough to cover 10 sectors for
-100 blocks. Then, 20 blocks later, the user increases the allowance, such that
-it now covers 10 contracts of 20 sectors for 200 blocks. The contractor will
-immediately form contracts as follows:
+As an example, imagine that the user first sets an allowance that will cover
+10 contracts of 10 sectors each for 100 blocks. The contractor will
+immediately form contracts with 10 hosts, paying each host enough to cover 10
+sectors for 100 blocks. Then, 20 blocks later, the user increases the
+allowance, such that it now covers 10 contracts of 20 sectors for 200 blocks.
+The contractor will immediately form contracts as follows:
 
 - 10 contracts will be formed with the current hosts, each covering 10 sectors
   for 80 blocks.
