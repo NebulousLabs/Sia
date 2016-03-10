@@ -1,9 +1,18 @@
 package consensus
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"net"
+	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
 // TestSimpleInitialBlockchainDownload tests that
@@ -179,5 +188,80 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	}
 	if localCST.cs.CurrentBlock().ID() == remoteCSTs[0].cs.CurrentBlock().ID() {
 		t.Fatalf("ibd syncing is one way, and a longer fork on the local cs should not cause a reorg on the remote cs's")
+	}
+}
+
+type mockGatewayRPCError struct {
+	modules.Gateway
+	rpcErrs map[modules.NetAddress]error
+}
+
+func (g *mockGatewayRPCError) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	return g.rpcErrs[addr]
+}
+
+// TestInitialBlockChainDownloadDisconnects tests that
+// threadedInitialBlockchainDownload only disconnects from peers that error
+// with anything but a timeout.
+func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
+	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDisconnects")
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	mg := mockGatewayRPCError{
+		Gateway: g,
+		rpcErrs: make(map[modules.NetAddress]error),
+	}
+	localCS, err := New(&mg, filepath.Join(testdir, "local", modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer localCS.Close()
+
+	rpcErrs := []error{
+		// rpcErrs that should cause a a disconnect.
+		io.EOF,
+		errors.New("random error"),
+		errSendBlocksStalled,
+		// rpcErrs that should not cause a disconnect.
+		mockNetError{
+			error:   errors.New("mock timeout error"),
+			timeout: true,
+		},
+		// Need at least minNumOutbound peers that return nil for
+		// threadedInitialBlockchainDownload to mark IBD done.
+		nil, nil, nil, nil, nil,
+	}
+	for i, rpcErr := range rpcErrs {
+		g, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - "+strconv.Itoa(i), modules.GatewayDir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer g.Close()
+		err = localCS.gateway.Connect(g.Address())
+		if err != nil {
+			t.Fatal(err)
+		}
+		mg.rpcErrs[g.Address()] = rpcErr
+	}
+	// Sleep to to give the OnConnectRPCs time to finish.
+	time.Sleep(500 * time.Millisecond)
+	// Do IBD.
+	localCS.threadedInitialBlockchainDownload()
+	// Check that localCS disconnected from peers that errored but did not time out during SendBlocks.
+	for _, p := range localCS.gateway.Peers() {
+		err = mg.rpcErrs[p.NetAddress]
+		if err == nil {
+			continue
+		}
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			continue
+		}
+		t.Fatalf("threadedInitialBlockchainDownload didn't disconnect from a peer that returned '%v'", err)
+	}
+	if len(localCS.gateway.Peers()) != 6 {
+		t.Error("threadedInitialBlockchainDownload disconnected from peers that timedout or didn't error")
 	}
 }
