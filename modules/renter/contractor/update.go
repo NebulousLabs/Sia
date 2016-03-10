@@ -20,9 +20,15 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisBlock.ID() {
-		c.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-		c.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	for _, block := range cc.RevertedBlocks {
+		if block.ID() != types.GenesisBlock.ID() {
+			c.blockHeight--
+		}
+	}
+	for _, block := range cc.AppliedBlocks {
+		if block.ID() != types.GenesisBlock.ID() {
+			c.blockHeight++
+		}
 	}
 
 	// renew/replace contracts
