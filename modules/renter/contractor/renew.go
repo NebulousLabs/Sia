@@ -30,17 +30,23 @@ func (c *Contractor) managedRenew(fcid types.FileContractID, newEndHeight types.
 	}
 
 	// get an address to use for negotiation
-	c.mu.Lock()
-	if c.cachedAddress == (types.UnlockHash{}) {
-		uc, err := c.wallet.NextAddress()
-		if err != nil {
-			c.mu.Unlock()
-			return types.FileContractID{}, err
+	var ourAddress types.UnlockHash
+	err := func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.cachedAddress == (types.UnlockHash{}) {
+			uc, err := c.wallet.NextAddress()
+			if err != nil {
+				return err
+			}
+			c.cachedAddress = uc.UnlockHash()
 		}
-		c.cachedAddress = uc.UnlockHash()
+		ourAddress = c.cachedAddress
+		return nil
+	}()
+	if err != nil {
+		return types.FileContractID{}, err
 	}
-	ourAddress := c.cachedAddress
-	c.mu.Unlock()
 
 	renterCost := host.Price.Mul(types.NewCurrency64(contract.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
