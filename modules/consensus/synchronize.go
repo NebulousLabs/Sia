@@ -411,7 +411,7 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // outbound peers <= v0.5.1 that are stalled in IBD.
 func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 	for {
-		numOutbound := 0
+		outbound := make(map[modules.NetAddress]struct{})
 		numOutboundSynced := 0
 		// Cache gateway.Peers() so we can compare peers to gateway.Peers() after
 		// this for loop, to see if any additional outbound peers were added while we
@@ -424,7 +424,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 			if p.Inbound {
 				continue
 			}
-			numOutbound++
+			outbound[p.NetAddress] = struct{}{}
 
 			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
 			if err == nil {
@@ -446,17 +446,24 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 
 		// Count the number of outbound peers. If we connected to more outbound peers
 		// during the previous SendBlocks, we want to sync with the new peers too.
+		newOutbound := false
 		newNumOutbound := 0
 		for _, p := range cs.gateway.Peers() {
 			if !p.Inbound {
 				newNumOutbound++
+				if _, ok := outbound[p.NetAddress]; !ok {
+					newOutbound = true
+				}
 			}
 		}
+		if len(outbound) != newNumOutbound {
+			newOutbound = true
+		}
 
-		if numOutbound >= minNumOutbound && // Need a minimum number of outbound peers to call ourselves synced.
-			numOutbound >= newNumOutbound && // If we got more outbound peers while we were syncing, sync with them too.
-			((numOutbound == modules.WellConnectedThreshold && numOutboundSynced > (2/3*modules.WellConnectedThreshold)) ||
-				(numOutbound != modules.WellConnectedThreshold && numOutboundSynced == numOutbound)) { // Super majority.
+		if len(outbound) >= minNumOutbound && // Need a minimum number of outbound peers to call ourselves synced.
+			!newOutbound && // If we get new outbound peers while we were syncing, sync with them too.
+			((len(outbound) == modules.WellConnectedThreshold && numOutboundSynced > (modules.WellConnectedThreshold*3/2)) ||
+				(len(outbound) != modules.WellConnectedThreshold && numOutboundSynced == len(outbound))) { // Super majority.
 			break
 		}
 	}
