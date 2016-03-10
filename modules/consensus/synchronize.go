@@ -410,21 +410,18 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // checked to be the same. This can cause issues if you are connected to
 // outbound peers <= v0.5.1 that are stalled in IBD.
 func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
+	// Set the deadline 10 minutes in the future. After this deadline, we will say
+	// IBD is done as long as there is at least one outbound peer synced.
+	deadline := time.Now().Add(10 * time.Minute)
 	for {
-		outbound := make(map[modules.NetAddress]struct{})
 		numOutboundSynced := 0
-		// Cache gateway.Peers() so we can compare peers to gateway.Peers() after
-		// this for loop, to see if any additional outbound peers were added while we
-		// were syncing.
-		peers := cs.gateway.Peers()
-		for _, p := range peers {
+		for _, p := range cs.gateway.Peers() {
 			// We only sync on outbound peers at first to make IBD less susceptible to
 			// fast-mining and other attacks, as outbound peers are more difficult to
 			// manipulate.
 			if p.Inbound {
 				continue
 			}
-			outbound[p.NetAddress] = struct{}{}
 
 			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
 			if err == nil {
@@ -444,27 +441,14 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 			}
 		}
 
-		// Count the number of outbound peers. If we connected to more outbound peers
-		// during the previous SendBlocks, we want to sync with the new peers too.
-		newOutbound := false
-		newNumOutbound := 0
-		for _, p := range cs.gateway.Peers() {
-			if !p.Inbound {
-				newNumOutbound++
-				if _, ok := outbound[p.NetAddress]; !ok {
-					newOutbound = true
-				}
-			}
-		}
-		if len(outbound) != newNumOutbound {
-			newOutbound = true
-		}
-
-		if len(outbound) >= minNumOutbound && // Need a minimum number of outbound peers to call ourselves synced.
-			!newOutbound && // If we get new outbound peers while we were syncing, sync with them too.
-			((len(outbound) == modules.WellConnectedThreshold && numOutboundSynced > (modules.WellConnectedThreshold*3/2)) ||
-				(len(outbound) != modules.WellConnectedThreshold && numOutboundSynced == len(outbound))) { // Super majority.
+		// If we have minNumOutbound peers synced, we are done. Otherwise, don't say
+		// we are synced until we've been doing ibd for 10 minutes and we are synced
+		// with at least one peer.
+		if numOutboundSynced >= minNumOutbound || (numOutboundSynced > 0 && time.Now().After(deadline)) {
 			break
+		} else {
+			// Sleep so we don't hammer the network with SendBlock requests.
+			time.Sleep(30 * time.Second)
 		}
 	}
 
