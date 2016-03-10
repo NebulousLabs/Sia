@@ -15,9 +15,7 @@ dependencies:
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
-	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/inconshreveable/muxado
-	go get -u github.com/kardianos/osext
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/julienschmidt/httprouter
 	# Frontend Dependencies

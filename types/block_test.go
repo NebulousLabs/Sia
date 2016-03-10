@@ -113,6 +113,44 @@ func TestBlockID(t *testing.T) {
 	}
 }
 
+// TestHeaderID probes the ID function of the BlockHeader type.
+func TestHeaderID(t *testing.T) {
+	// Create a bunch of different blocks and check that all of them have
+	// unique ids.
+	var blocks []Block
+	var b Block
+
+	blocks = append(blocks, b)
+	b.ParentID[0] = 1
+	blocks = append(blocks, b)
+	b.Nonce[0] = 45
+	blocks = append(blocks, b)
+	b.Timestamp = CurrentTimestamp()
+	blocks = append(blocks, b)
+	b.MinerPayouts = append(b.MinerPayouts, SiacoinOutput{Value: CalculateCoinbase(0)})
+	blocks = append(blocks, b)
+	b.MinerPayouts = append(b.MinerPayouts, SiacoinOutput{Value: CalculateCoinbase(0)})
+	blocks = append(blocks, b)
+	b.Transactions = append(b.Transactions, Transaction{MinerFees: []Currency{CalculateCoinbase(1)}})
+	blocks = append(blocks, b)
+	b.Transactions = append(b.Transactions, Transaction{MinerFees: []Currency{CalculateCoinbase(1)}})
+	blocks = append(blocks, b)
+
+	knownIDs := make(map[BlockID]struct{})
+	for i, block := range blocks {
+		blockID := block.ID()
+		headerID := block.Header().ID()
+		if blockID != headerID {
+			t.Error("headerID does not match blockID for index", i)
+		}
+		_, exists := knownIDs[headerID]
+		if exists {
+			t.Error("id repeat for index", i)
+		}
+		knownIDs[headerID] = struct{}{}
+	}
+}
+
 // TestBlockCalculateSubsidy probes the CalculateSubsidy function of the block
 // type.
 func TestBlockCalculateSubsidy(t *testing.T) {

@@ -14,7 +14,7 @@ import (
 // fakeAddr returns a modules.NetAddress to be used in a HostEntry. Such
 // addresses are needed in order to satisfy the HostDB's "1 host per IP" rule.
 func fakeAddr(n uint8) modules.NetAddress {
-	return modules.NetAddress("127.0.0." + strconv.Itoa(int(n)) + ":0")
+	return modules.NetAddress("127.0.0." + strconv.Itoa(int(n)) + "localhost:0")
 }
 
 // uniformTreeVerification checks that everything makes sense in the tree given

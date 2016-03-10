@@ -31,7 +31,7 @@ type tpoolTester struct {
 func createTpoolTester(name string) (*tpoolTester, error) {
 	// Initialize the modules.
 	testdir := build.TempDir(modules.TransactionPoolDir, name)
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 func TestIntegrationNewNilInputs(t *testing.T) {
 	// Create a gateway and consensus set.
 	testdir := build.TempDir(modules.TransactionPoolDir, "TestNewNilInputs")
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}

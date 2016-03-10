@@ -16,8 +16,6 @@ import (
 const (
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = 2 * time.Minute
-	// the gateway will sleep this long between incoming connections
-	acceptInterval = 3 * time.Second
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
@@ -26,10 +24,37 @@ const (
 	minNodeListLen = 100
 )
 
+var (
+	// The gateway will sleep this long between incoming connections.
+	acceptInterval = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 3 * time.Second
+		case "standard":
+			return 3 * time.Second
+		case "testing":
+			return 10 * time.Millisecond
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
+
+	errPeerRejectedConn = errors.New("peer rejected connection")
+)
+
+// insufficientVersionError indicates a peer's version is insufficient.
+type insufficientVersionError string
+
+// Error implements the error interface for insufficientVersionError.
+func (s insufficientVersionError) Error() string {
+	return "unacceptable version: " + string(s)
+}
+
 type peer struct {
 	addr    modules.NetAddress
 	sess    muxado.Session
 	inbound bool
+	version string
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
@@ -74,9 +99,9 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	if len(g.peers) > 0 {
 		r, _ := crypto.RandIntn(len(g.peers))
-		for addr, peer := range g.peers {
+		for addr, p := range g.peers {
 			// only select inbound peers
-			if !peer.inbound {
+			if !p.inbound {
 				continue
 			}
 			if r <= 0 {
@@ -121,10 +146,14 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// check that version is acceptable
+	// Check that version is acceptable.
+	//
+	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
+	// pre-hardfork.
+	//
 	// NOTE: this version must be bumped whenever the gateway or consensus
 	// breaks compatibility.
-	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
+	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		encoding.WriteObject(conn, "reject")
 		conn.Close()
 		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
@@ -163,7 +192,12 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		g.log.Printf("INFO: disconnected from %v to make room for %v", kick, addr)
 	}
 	// add the peer
-	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
+	g.addPeer(&peer{
+		addr:    addr,
+		sess:    muxado.Server(conn),
+		inbound: true,
+		version: remoteVersion,
+	})
 	g.mu.Unlock(id)
 
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
@@ -198,19 +232,32 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		return err
-	} else if remoteVersion == "reject" {
-		return errors.New("peer rejected connection")
 	}
 	// decide whether to accept this version
-	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
+	if remoteVersion == "reject" {
+		return errPeerRejectedConn
+	}
+	// Check that version is acceptable.
+	//
+	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
+	// pre-hardfork.
+	//
+	// NOTE: this version must be bumped whenever the gateway or consensus
+	// breaks compatibility.
+	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		conn.Close()
-		return errors.New("unacceptable version: " + remoteVersion)
+		return insufficientVersionError(remoteVersion)
 	}
 
 	g.log.Println("INFO: connected to new peer", addr)
 
 	id = g.mu.Lock()
-	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn), inbound: false})
+	g.addPeer(&peer{
+		addr:    addr,
+		sess:    muxado.Client(conn),
+		inbound: false,
+		version: remoteVersion,
+	})
 	g.mu.Unlock(id)
 
 	// call initRPCs
@@ -280,12 +327,12 @@ func (g *Gateway) threadedPeerManager() {
 }
 
 // Peers returns the addresses currently connected to the Gateway.
-func (g *Gateway) Peers() []modules.NetAddress {
+func (g *Gateway) Peers() []modules.Peer {
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)
-	var peers []modules.NetAddress
-	for addr := range g.peers {
-		peers = append(peers, addr)
+	var peers []modules.Peer
+	for _, p := range g.peers {
+		peers = append(peers, modules.Peer{NetAddress: p.addr, Version: p.version})
 	}
 	return peers
 }

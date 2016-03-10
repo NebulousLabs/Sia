@@ -58,8 +58,8 @@ func (e *Encoder) Encode(v interface{}) error {
 
 // EncodeAll encodes a variable number of arguments.
 func (e *Encoder) EncodeAll(vs ...interface{}) error {
-	for i := range vs {
-		if err := e.Encode(vs[i]); err != nil {
+	for _, v := range vs {
+		if err := e.Encode(v); err != nil {
 			return err
 		}
 	}
@@ -160,11 +160,12 @@ func Marshal(v interface{}) []byte {
 }
 
 // MarshalAll encodes all of its inputs and returns their concatenation.
-func MarshalAll(v ...interface{}) []byte {
+func MarshalAll(vs ...interface{}) []byte {
 	b := new(bytes.Buffer)
 	enc := NewEncoder(b)
-	for i := range v {
-		enc.Encode(v[i]) // no error possible when using a bytes.Buffer
+	// can't encode with EncodeAll (type information is lost)
+	for _, v := range vs {
+		enc.Encode(v)
 	}
 	return b.Bytes()
 }
@@ -228,8 +229,8 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 
 // DecodeAll decodes a variable number of arguments.
 func (d *Decoder) DecodeAll(vs ...interface{}) error {
-	for i := range vs {
-		if err := d.Decode(vs[i]); err != nil {
+	for _, v := range vs {
+		if err := d.Decode(v); err != nil {
 			return err
 		}
 	}
@@ -345,6 +346,19 @@ func NewDecoder(r io.Reader) *Decoder {
 func Unmarshal(b []byte, v interface{}) error {
 	r := bytes.NewReader(b)
 	return NewDecoder(r).Decode(v)
+}
+
+// UnmarshalAll decodes the encoded values in b and stores them in vs, which
+// must be pointers.
+func UnmarshalAll(b []byte, vs ...interface{}) error {
+	dec := NewDecoder(bytes.NewReader(b))
+	// can't use DecodeAll (type information is lost)
+	for _, v := range vs {
+		if err := dec.Decode(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ReadFile reads the contents of a file and decodes them into v.

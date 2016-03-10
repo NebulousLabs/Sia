@@ -40,12 +40,6 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// the stale rate as low as possible.
 	m.newSourceBlock()
 	m.persist.RecentChange = cc.ID
-
-	// Save the new consensus information.
-	err := m.save()
-	if err != nil {
-		m.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
-	}
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed

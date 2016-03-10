@@ -46,7 +46,7 @@ type serverTester struct {
 // server tester, without creating any directories or mining any blocks.
 func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester, error) {
 	// Create the modules.
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	h, err := host.New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", "Sia-Agent", cs, e, g, h, m, r, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", cs, e, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 // is disabled.
 func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	// Create the modules.
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer(":0", "", cs, e, g, nil, nil, nil, nil, nil)
+	srv, err := NewServer("localhost:0", "", cs, e, g, nil, nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}

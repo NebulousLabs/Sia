@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -108,7 +110,10 @@ func gatewaylistcmd() {
 		return
 	}
 	fmt.Println(len(info.Peers), "active peers:")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Address\tVersion")
 	for _, peer := range info.Peers {
-		fmt.Println("\t", peer)
+		fmt.Fprintf(w, "  %v\t%v\n", peer.NetAddress, peer.Version)
 	}
+	w.Flush()
 }

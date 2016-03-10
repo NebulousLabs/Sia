@@ -34,9 +34,15 @@ func ReadObject(r io.Reader, obj interface{}, maxLen uint64) error {
 
 // WritePrefix writes a length-prefixed byte slice to w.
 func WritePrefix(w io.Writer, data []byte) error {
-	n, err := w.Write(append(EncUint64(uint64(len(data))), data...))
-	if n != len(data)+8 && err == nil {
+	n, err := w.Write(EncUint64(uint64(len(data))))
+	if err != nil {
+		return err
+	} else if n != 8 {
 		return io.ErrShortWrite
+	}
+	n, err = w.Write(data)
+	if err == nil && n != len(data) {
+		err = io.ErrShortWrite
 	}
 	return err
 }

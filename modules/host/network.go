@@ -155,7 +155,5 @@ func (h *Host) threadedListen() {
 
 // managedRPCSettings is an rpc that returns the host's settings.
 func (h *Host) managedRPCSettings(conn net.Conn) error {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
 	return encoding.WriteObject(conn, h.Settings())
 }

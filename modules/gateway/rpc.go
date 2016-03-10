@@ -114,6 +114,9 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
+	if build.DEBUG {
+		g.log.Printf("INFO: incoming conn %v requested RPC \"%v\"", conn.RemoteAddr(), id)
+	}
 
 	// call fn
 	err := fn(conn)
@@ -122,16 +125,15 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		err = nil
 	}
 	if err != nil {
-		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+		g.log.Printf("WARN: incoming RPC \"%v\" from conn %v failed: %v", id, conn.RemoteAddr(), err)
 	}
 }
 
-// Broadcast calls an RPC on all of the peers in the Gateway's peer list. The
-// calls are run in parallel. Broadcasts are restricted to "one-way" RPCs,
-// which simply write an object and disconnect. This is why Broadcast takes an
-// interface{} instead of an RPCFunc.
-func (g *Gateway) Broadcast(name string, obj interface{}) {
-	peers := g.Peers()
+// Broadcast calls an RPC on all of the specified peers. The calls are run in
+// parallel. Broadcasts are restricted to "one-way" RPCs, which simply write an
+// object and disconnect. This is why Broadcast takes an interface{} instead of
+// an RPCFunc.
+func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) {
 	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
@@ -142,7 +144,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
-	for _, addr := range peers {
+	for _, p := range peers {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
@@ -151,7 +153,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 				g.RPC(addr, name, fn)
 			}
 			wg.Done()
-		}(addr)
+		}(p.NetAddress)
 	}
 	wg.Wait()
 }

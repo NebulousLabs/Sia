@@ -8,6 +8,64 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// mockGatewayCheckBroadcast is a mock implementation of modules.Gateway that
+// enables testing of selective broadcasting by mocking the Peers and Broadcast
+// methods.
+type mockGatewayCheckBroadcast struct {
+	modules.Gateway
+	peers            []modules.Peer
+	broadcastedPeers chan []modules.Peer
+}
+
+// Peers is a mock implementation of Gateway.Peers that returns the mocked
+// peers.
+func (g *mockGatewayCheckBroadcast) Peers() []modules.Peer {
+	return g.peers
+}
+
+// Broadcast is a mock implementation of Gateway.Broadcast that writes the
+// peers it receives as an argument to the broadcastedPeers channel.
+func (g *mockGatewayCheckBroadcast) Broadcast(_ string, _ interface{}, peers []modules.Peer) {
+	g.broadcastedPeers <- peers
+}
+
+// TestAcceptTransactionSetBroadcasts tests that AcceptTransactionSet only
+// broadcasts to peers v0.4.7 and above.
+func TestAcceptTransactionSetBroadcasts(t *testing.T) {
+	tpt, err := createTpoolTester("TestAcceptTransactionSetBroadcasts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mockPeers := []modules.Peer{
+		modules.Peer{Version: "0.0.0"},
+		modules.Peer{Version: "0.4.6"},
+		modules.Peer{Version: "0.4.7"},
+		modules.Peer{Version: "9.9.9"},
+	}
+	mg := &mockGatewayCheckBroadcast{
+		Gateway:          tpt.tpool.gateway,
+		peers:            mockPeers,
+		broadcastedPeers: make(chan []modules.Peer),
+	}
+	tpt.tpool.gateway = mg
+
+	go func() {
+		err = tpt.tpool.AcceptTransactionSet([]types.Transaction{{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	broadcastedPeers := <-mg.broadcastedPeers
+	if len(broadcastedPeers) != 2 {
+		t.Fatalf("only 2 peers have version >= v0.4.7, but AcceptTransactionSet relayed the transaction set to %v peers", len(broadcastedPeers))
+	}
+	for _, bp := range broadcastedPeers {
+		if bp.Version != "0.4.7" && bp.Version != "9.9.9" {
+			t.Fatalf("AcceptTransactionSet relayed the transaction to a peer with version < v0.4.7 (%v)", bp.Version)
+		}
+	}
+}
+
 // TestIntegrationAcceptTransactionSet probes the AcceptTransactionSet method
 // of the transaction pool.
 func TestIntegrationAcceptTransactionSet(t *testing.T) {

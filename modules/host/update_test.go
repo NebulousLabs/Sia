@@ -170,7 +170,7 @@ func TestIntegrationAutoRescan(t *testing.T) {
 
 	// Create a new host and check that the persist variables have correctly
 	// reset.
-	h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	h, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

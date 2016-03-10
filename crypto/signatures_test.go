@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -187,10 +188,10 @@ func TestUnitSigning(t *testing.T) {
 	iterations := 200
 	for i := 0; i < iterations; i++ {
 		// Create dummy key pair.
-		var entropy [EntropySize]byte
-		entropy[0] = 5
-		entropy[1] = 8
-		sk, pk := stdKeyGen.generateDeterministic(entropy)
+		sk, pk, err := GenerateKeyPair()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// Generate and sign the data.
 		var randData Hash
@@ -274,5 +275,96 @@ func TestIntegrationSigKeyGeneration(t *testing.T) {
 	err = VerifyHash(message, detPubKey, sig)
 	if err == nil {
 		t.Error("corruption failed")
+	}
+}
+
+// TestReadWriteSignedObject tests the ReadSignObject and WriteSignedObject
+// functions, which are inverses of each other.
+func TestReadWriteSignedObject(t *testing.T) {
+	sk, pk, err := GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write signed object into buffer
+	b := new(bytes.Buffer)
+	err = WriteSignedObject(b, "foo", sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// keep a copy of b's bytes
+	buf := b.Bytes()
+
+	// read and verify object
+	var read string
+	err = ReadSignedObject(b, &read, 11, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read != "foo" {
+		t.Fatal("encode/decode mismatch: expected 'foo', got", []byte(read))
+	}
+
+	// enforce maxLen
+	b = bytes.NewBuffer(buf) // reset b
+	err = ReadSignedObject(b, &read, 10, pk)
+	if err == nil || err.Error() != "length 11 exceeds maxLen of 10" {
+		t.Fatal("expected length error, got", err)
+	}
+}
+
+// TestSignVerifyObject tests the SignObject and VerifyObject functions, which
+// are inverses of each other.
+func TestSignVerifyObject(t *testing.T) {
+	sk, pk, err := GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create signed object
+	signedObj := SignObject("foo", sk)
+
+	// verify signed object
+	var read string
+	err = VerifyObject(signedObj, &read, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read != "foo" {
+		t.Fatal("encode/decode mismatch: expected 'foo', got", []byte(read))
+	}
+
+	// corrupt signature
+	_, err = rand.Read(signedObj[11:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = VerifyObject(signedObj, &read, pk)
+	if err != errInvalidSignature {
+		t.Fatal("expected errInvalidSignature, got", err)
+	}
+
+	// not enough object data
+	err = VerifyObject(signedObj[:0], &read, pk)
+	if err != io.EOF {
+		t.Fatal("expected EOF, got", err)
+	}
+	// not enough signature data
+	err = VerifyObject(signedObj[:19], &read, pk)
+	if err == nil || err.Error() != "could not decode type crypto.Signature: EOF" {
+		t.Fatal("expected decode error, got", err)
+	}
+}
+
+// TestUnitPublicKey tests the PublicKey method
+func TestUnitPublicKey(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		sk, pk, err := GenerateKeyPair()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sk.PublicKey() != pk {
+			t.Error("PublicKey does not match actual public key:", pk, sk.PublicKey())
+		}
 	}
 }

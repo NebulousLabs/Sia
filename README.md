@@ -69,27 +69,14 @@ Troubleshooting
   9981 and 9982. The specific instructions for forwarding a port vary by
   router. For more information, consult [this guide](http://portfoward.com).
 
-  In future versions, we will add support for UPnP, which may allow you to
-  skip this step if your router supports it.
-
-- I'm 100% sure my ports are open, but Sia won't let me announce as a host.
-
-  siad tries to verify your connectivity by pinging your external IPv4 address.
-  This method is sufficient for most people, but for unusual setups it may
-  report false negatives. To override this check, you can "force" the
-  announcement by running `siac host announce [ip:port]`. You can determine
-  your external IP by running `siac gateway` or using a 3rd-party service.
+  Sia currently has support for UPnP. While not all routers support UPnP, a
+  majority of users should have their ports automatically forwarded by UPnP.
 
 - I mined a block, but I didn't receive any money.
 
   There is a 144-block confirmation delay before you will receive siacoins from
   mined blocks. If you still have not received the block reward after 144
   blocks, it means your block did not made it into the blockchain.
-
-- siad complains about "locks held too long."
-
-  This is debugging output, and should not occur during normal use. Please
-  contact us if this happens.
 
 If your issue is not addressed above, you can get in touch with us personally:
 

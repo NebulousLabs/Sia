@@ -72,7 +72,7 @@ func TestIntegrationValuePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newHost, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	newHost, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

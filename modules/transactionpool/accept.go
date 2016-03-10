@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -286,7 +287,16 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	}
 
 	// Notify subscribers and broadcast the transaction set.
-	go tp.gateway.Broadcast("RelayTransactionSet", ts)
+	// NOTE: The transaction set is only broadcast to v0.4.7 peers and above.
+	// v0.4.7-v0.5.1 broadcasted both transaction sets and individual transactions
+	// and those versions act as a bridge between v0.5.2+ and older versions.
+	var v047AndAbove []modules.Peer
+	for _, p := range tp.gateway.Peers() {
+		if build.VersionCmp(p.Version, "0.4.7") >= 0 {
+			v047AndAbove = append(v047AndAbove, p)
+		}
+	}
+	go tp.gateway.Broadcast("RelayTransactionSet", ts, v047AndAbove)
 	tp.updateSubscribersTransactions()
 
 	return nil

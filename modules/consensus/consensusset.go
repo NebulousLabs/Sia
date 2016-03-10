@@ -124,8 +124,10 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	}
 
 	// Register RPCs
-	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
-	gateway.RegisterRPC("RelayBlock", cs.relayBlock)
+	gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
+	gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock)
+	gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
+	gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 	gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 
 	return cs, nil

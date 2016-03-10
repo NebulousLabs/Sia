@@ -183,6 +183,270 @@ func TestConnect(t *testing.T) {
 	g.mu.RUnlock(id)
 }
 
+// TestConnectRejects tests that Gateway.Connect only accepts peers with
+// sufficient and valid versions.
+func TestConnectRejects(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	g := newTestingGateway("TestConnectRejects", t)
+	// Setup a listener that mocks Gateway.acceptConn, but sends the
+	// version sent over mockVersionChan instead of build.Version.
+	listener, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mockVersionChan := make(chan string)
+	go func() {
+		for {
+			mockVersion := <-mockVersionChan
+			conn, err := listener.Accept()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Read remote peer version.
+			var remoteVersion string
+			if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+				t.Fatal(err)
+			}
+			// Write our mock version.
+			if err := encoding.WriteObject(conn, mockVersion); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}()
+
+	tests := []struct {
+		version             string
+		errWant             error
+		insufficientVersion bool
+		msg                 string
+	}{
+		// Test that Connect fails when the remote peer's version is "reject".
+		{
+			version: "reject",
+			errWant: errPeerRejectedConn,
+			msg:     "Connect should fail when the remote peer rejects the connection",
+		},
+		// Test that Connect fails when the remote peer's version is ascii gibberish.
+		{
+			version:             "foobar",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is ascii gibberish",
+		},
+		// Test that Connect fails when the remote peer's version is utf8 gibberish.
+		{
+			version:             "世界",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is utf8 gibberish",
+		},
+		// Test that Connect fails when the remote peer's version is < 0.4.0 (0).
+		{
+			version:             "0",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is 0",
+		},
+		{
+			version:             "0.0.0",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is 0.0.0",
+		},
+		{
+			version:             "0000.0000.0000",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is 0000.0000.0000",
+		},
+		{
+			version:             "0.3.9",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is 0.3.9",
+		},
+		{
+			version:             "0.3.9999",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is 0.3.9999",
+		},
+		{
+			version:             "0.3.9.9.9",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is 0.3.9.9.9",
+		},
+		// Test that Connect succeeds when the remote peer's version is 0.4.0.
+		{
+			version: "0.4.0",
+			msg:     "Connect should succeed when the remote peer's version is 0.4.0",
+		},
+		// Test that Connect succeeds when the remote peer's version is > 0.4.0.
+		{
+			version: "9",
+			msg:     "Connect should succeed when the remote peer's version is 9",
+		},
+		{
+			version: "9.9.9",
+			msg:     "Connect should succeed when the remote peer's version is 9.9.9",
+		},
+		{
+			version: "9999.9999.9999",
+			msg:     "Connect should succeed when the remote peer's version is 9999.9999.9999",
+		},
+	}
+	for _, tt := range tests {
+		mockVersionChan <- tt.version
+		err = g.Connect(modules.NetAddress(listener.Addr().String()))
+		if tt.insufficientVersion {
+			// Check that the error is the expected type.
+			if _, ok := err.(insufficientVersionError); !ok {
+				t.Fatalf("expected Connect to error with insufficientVersionError: %s", tt.msg)
+			}
+		} else {
+			// Check that the error is the expected error.
+			if err != tt.errWant {
+				t.Fatalf("expected Connect to error with '%v', but got '%v': %s", tt.errWant, err, tt.msg)
+			}
+		}
+		g.Disconnect(modules.NetAddress(listener.Addr().String()))
+	}
+	listener.Close()
+}
+
+// mockGatewayWithVersion is a mock implementation of Gateway that sends a mock
+// version on Connect instead of build.Version.
+type mockGatewayWithVersion struct {
+	*Gateway
+	version    string
+	versionACK chan string
+}
+
+// Connect is a mock implementation of modules.Gateway.Connect that provides a
+// mock version to peers it connects to instead of build.Version. The version
+// ack written by the remote peer is written to the versionACK channel.
+func (g mockGatewayWithVersion) Connect(addr modules.NetAddress) error {
+	conn, err := net.DialTimeout("tcp", string(addr), dialTimeout)
+	if err != nil {
+		return err
+	}
+	// send mocked version
+	if err := encoding.WriteObject(conn, g.version); err != nil {
+		return err
+	}
+	// read version ack
+	var remoteVersion string
+	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+		return err
+	}
+	g.versionACK <- remoteVersion
+
+	return nil
+}
+
+// TestAcceptConnRejects tests that Gateway.acceptConn only accepts peers with
+// sufficient and valid versions.
+func TestAcceptConnRejects(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	g := newTestingGateway("TestAcceptConnRejects1", t)
+	defer g.Close()
+	mg := mockGatewayWithVersion{
+		Gateway:    newTestingGateway("TestAcceptConnRejects2", t),
+		versionACK: make(chan string),
+	}
+	defer mg.Close()
+
+	tests := []struct {
+		remoteVersion       string
+		versionResponseWant string
+		msg                 string
+	}{
+		// Test that acceptConn fails when the remote peer's version is "reject".
+		{
+			remoteVersion:       "reject",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is \"reject\"",
+		},
+		// Test that acceptConn fails when the remote peer's version is ascii gibberish.
+		{
+			remoteVersion:       "foobar",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is ascii giberish",
+		},
+		// Test that acceptConn fails when the remote peer's version is utf8 gibberish.
+		{
+			remoteVersion:       "世界",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is utf8 giberish",
+		},
+		// Test that acceptConn fails when the remote peer's version is < 0.4.0 (0).
+		{
+			remoteVersion:       "0",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0",
+		},
+		{
+			remoteVersion:       "0.0.0",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0.0.0",
+		},
+		{
+			remoteVersion:       "0000.0000.0000",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0000.000.000",
+		},
+		{
+			remoteVersion:       "0.3.9",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0.3.9",
+		},
+		{
+			remoteVersion:       "0.3.9999",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0.3.9999",
+		},
+		{
+			remoteVersion:       "0.3.9.9.9",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is 0.3.9.9.9",
+		},
+		// Test that acceptConn succeeds when the remote peer's version is 0.4.0.
+		{
+			remoteVersion:       "0.4.0",
+			versionResponseWant: build.Version,
+			msg:                 "acceptConn should accept a remote peer whose version is 0.4.0",
+		},
+		// Test that acceptConn succeeds when the remote peer's version is > 0.4.0.
+		{
+			remoteVersion:       "9",
+			versionResponseWant: build.Version,
+			msg:                 "acceptConn should accept a remote peer whose version is 9",
+		},
+		{
+			remoteVersion:       "9.9.9",
+			versionResponseWant: build.Version,
+			msg:                 "acceptConn should accept a remote peer whose version is 9.9.9",
+		},
+		{
+			remoteVersion:       "9999.9999.9999",
+			versionResponseWant: build.Version,
+			msg:                 "acceptConn should accept a remote peer whose version is 9999.9999.9999",
+		},
+	}
+	for _, tt := range tests {
+		mg.version = tt.remoteVersion
+		go func() {
+			err := mg.Connect(g.Address())
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+		remoteVersion := <-mg.versionACK
+		if remoteVersion != tt.versionResponseWant {
+			t.Fatalf(tt.msg)
+		}
+		g.Disconnect(mg.Address())
+		mg.Disconnect(g.Address())
+	}
+}
+
 func TestDisconnect(t *testing.T) {
 	g := newTestingGateway("TestDisconnect", t)
 	defer g.Close()
@@ -192,7 +456,7 @@ func TestDisconnect(t *testing.T) {
 	}
 
 	// dummy listener to accept connection
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal("couldn't start listener:", err)
 	}
