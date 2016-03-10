@@ -17,7 +17,9 @@ const (
 	SectorSize = 1 << 22 // 4 MiB
 )
 
-// An Editor modifies a Contract by communicating with a host.
+// An Editor modifies a Contract by communicating with a host. It uses the
+// contract revision protocol to send modification requests to the host.
+// Editors are the means by which the renter uploads data to hosts.
 type Editor interface {
 	// Upload revises the underlying contract to store the new data. It
 	// returns the offset of the data in the stored file.

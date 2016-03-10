@@ -5,8 +5,10 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 )
 
-// A hostPool is a collection of hosts that can store data. New hosts are
-// drawn from a HostDB, and contracts are negotiated with them on demand.
+// A hostPool is a collection of active host connections, in the form of
+// Editors. The renter uses a hostPool to prevent connecting to the same host
+// more than once. This is more efficient, and also makes it easier to
+// serialize contract revisions.
 type hostPool struct {
 	hosts          []contractor.Editor
 	blacklist      []modules.NetAddress
