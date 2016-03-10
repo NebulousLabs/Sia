@@ -564,6 +564,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer g.Close()
 	err = g.Connect(cst.cs.gateway.Address())
 	if err != nil {
 		t.Fatal(err)
@@ -572,6 +573,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cs.Close()
 
 	// Add a few initial blocks to both consensus sets. These are the blocks we
 	// want to make sure SendBlocks is not sending unnecessarily as both parties
