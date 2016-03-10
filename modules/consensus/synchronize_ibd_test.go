@@ -27,10 +27,10 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	remoteCSTs := make([]*consensusSetTester, 8)
 	for i := range remoteCSTs {
 		cst, err := blankConsensusSetTester(fmt.Sprintf("TestSimpleInitialBlockchainDownload - %v", i))
-		defer cst.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer cst.Close()
 		remoteCSTs[i] = cst
 	}
 	// Create the "local" peer.
@@ -38,6 +38,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer localCST.Close()
 	for _, cst := range remoteCSTs {
 		err = localCST.cs.gateway.Connect(cst.cs.gateway.Address())
 		if err != nil {
