@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -120,8 +121,8 @@ func (h *Host) sectorID(sectorRootBytes []byte) []byte {
 // addSector will add a data sector to the host, correctly selecting the
 // storage folder in which the sector belongs.
 func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error {
-	// Sanity check - sector should have sectorSize bytes.
-	if uint64(len(sectorData)) != sectorSize {
+	// Sanity check - sector should have modules.SectorSize bytes.
+	if uint64(len(sectorData)) != modules.SectorSize {
 		h.log.Critical("incorrectly sized sector passed to addSector in the host")
 		return errors.New("incorrectly sized sector passed to addSector in the host")
 	}
@@ -130,7 +131,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 	// folder - check will also guarantee that there is at least one storage folder.
 	enoughRoom := false
 	for _, sf := range h.storageFolders {
-		if sf.SizeRemaining >= sectorSize {
+		if sf.SizeRemaining >= modules.SectorSize {
 			enoughRoom = true
 		}
 	}
@@ -206,7 +207,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 				Expiry:        []types.BlockHeight{expiryHeight},
 				StorageFolder: emptiestFolder.UID,
 			}
-			emptiestFolder.SizeRemaining -= sectorSize
+			emptiestFolder.SizeRemaining -= modules.SectorSize
 			usageBytes, err = json.Marshal(usage)
 			if err != nil {
 				return err
@@ -242,7 +243,9 @@ func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error
 		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(su.StorageFolder), string(sectorKey))
 		sectorBytes, err = ioutil.ReadFile(sectorPath)
 		if err != nil {
-			// TODO: Mark the read failure in the sector?
+			// Mark the read failure in the sector.
+			sf := h.storageFolder(su.StorageFolder)
+			sf.FailedReads++
 			return err
 		}
 		return nil
@@ -322,7 +325,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		}
 
 		// Find the storage folder that contains the sector.
-		folder.SizeRemaining += sectorSize
+		folder.SizeRemaining += modules.SectorSize
 		folder.SuccessfulWrites++
 		err = h.save()
 		if err != nil {

@@ -328,9 +328,9 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		h.log.Critical("modifying a revision with garbage sector data", len(sectorsGained), len(gainedSectorData))
 		return errInsaneStorageObligationRevision
 	}
-	// Sanity check - all of the sector data should be sectorSize
+	// Sanity check - all of the sector data should be modules.SectorSize
 	for _, data := range gainedSectorData {
-		if uint64(len(data)) != sectorSize {
+		if uint64(len(data)) != modules.SectorSize {
 			h.log.Critical("modifying a revision with garbase sector sizes", len(data))
 			return errInsaneStorageObligationRevision
 		}
@@ -546,7 +546,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// {
 		// Pull the full sector into memory to build a storage proof on that
 		// sector.
-		sectorIndex := segmentIndex / (sectorSize / crypto.SegmentSize)
+		sectorIndex := segmentIndex / (modules.SectorSize / crypto.SegmentSize)
 		// Sanity check - sectorIndex should be less than the len of the sector
 		// roots in the storage obligation.
 		if sectorIndex >= uint64(len(so.SectorRoots)) {
@@ -559,14 +559,14 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			return
 		}
 		// Build the storage proof for just the sector.
-		sectorSegment := (sectorSize / crypto.SegmentSize) % segmentIndex
+		sectorSegment := (modules.SectorSize / crypto.SegmentSize) % segmentIndex
 		sourceProof, err := crypto.BuildMerkleProof(sectorBytes, sectorSegment)
 		if err != nil {
 			return
 		}
 		// Using the sector, build a cached root.
 		log2SectorSize := uint64(0)
-		for 1<<log2SectorSize < sectorSize {
+		for 1<<log2SectorSize < modules.SectorSize {
 			log2SectorSize++
 		}
 		ct := merkletree.NewCachedTree(crypto.NewHash(), log2SectorSize)

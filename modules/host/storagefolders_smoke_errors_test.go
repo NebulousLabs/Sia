@@ -300,7 +300,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderThree, minimumStorageFolderSize+sectorSize)
+	err = ht.host.AddStorageFolder(storageFolderThree, minimumStorageFolderSize+modules.SectorSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +315,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// failing disks. storageFolderOne has enough space to store the sectors,
 	// but is having disk troubles.
 	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[1].uidString())}
-	numSectors := (minimumStorageFolderSize * 3) / sectorSize
+	numSectors := (minimumStorageFolderSize * 3) / modules.SectorSize
 	for i := uint64(0); i < numSectors; i++ {
 		sectorRoot, sectorData, err := createSector()
 		if err != nil {
@@ -427,14 +427,14 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(infos) != int(numSectors)-int(minimumStorageFolderSize/sectorSize) {
+	if len(infos) != int(numSectors)-int(minimumStorageFolderSize/modules.SectorSize) {
 		t.Fatal("expecting", numSectors, "sectors in storage folder two")
 	}
 	infos, err = ioutil.ReadDir(storageFolderFour)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(infos) != int(minimumStorageFolderSize/sectorSize) {
+	if len(infos) != int(minimumStorageFolderSize/modules.SectorSize) {
 		t.Fatal("expecting to have 8 sectors in storageFolderFour")
 	}
 
@@ -442,7 +442,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// to storageFolderFour, but then trying to remove a bunch of sectors from
 	// storageFolderTwo. There is enough room on storage folder 3 to make the
 	// operation successful, but it is having disk troubles.
-	err = ht.host.ResizeStorageFolder(2, minimumStorageFolderSize+sectorSize)
+	err = ht.host.ResizeStorageFolder(2, minimumStorageFolderSize+modules.SectorSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +457,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the sizes of the storage folders have been updated correctly.
-	if ht.host.storageFolders[0].Size != minimumStorageFolderSize*2-sectorSize {
+	if ht.host.storageFolders[0].Size != minimumStorageFolderSize*2-modules.SectorSize {
 		t.Error("storage folder size was not decreased correctly during the shrink operation")
 	}
 	if ht.host.storageFolders[0].SizeRemaining != 0 {
@@ -477,14 +477,14 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(infos) != int(numSectors)-int(minimumStorageFolderSize/sectorSize)-1 {
+	if len(infos) != int(numSectors)-int(minimumStorageFolderSize/modules.SectorSize)-1 {
 		t.Fatal("expecting", numSectors, "sectors in storage folder two")
 	}
 	infos, err = ioutil.ReadDir(storageFolderFour)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(infos) != int(minimumStorageFolderSize/sectorSize)+1 {
+	if len(infos) != int(minimumStorageFolderSize/modules.SectorSize)+1 {
 		t.Fatal("filesystem consistency error")
 	}
 }

@@ -310,30 +310,7 @@ func TestSetAndGetSettings(t *testing.T) {
 		t.Error("settings retrieval did not return updated value")
 	}
 }
-*/
 
-// TestSetUnlockHash tries setting the unlock hash using SetSettings, an error
-// should be returned.
-func TestSetUnlockHash(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-	ht, err := newHostTester("TestSetUnlockHash")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Get the settings and try changing the unlock hash.
-	settings := ht.host.Settings()
-	settings.UnlockHash[0]++
-	err = ht.host.SetSettings(settings)
-	if err != errChangedUnlockHash {
-		t.Error("unlock hash was changed by SetSettings")
-	}
-}
-
-/*
 // TestPersistentSettings checks that settings persist between instances of the
 // host.
 func TestPersistentSettings(t *testing.T) {

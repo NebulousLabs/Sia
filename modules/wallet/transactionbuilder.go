@@ -1,5 +1,9 @@
 package wallet
 
+// TODO: Need to be certain that the wallet is not trying to do opeerations
+// while locked - signatures, etc. may start to fail silently in the current
+// implementation.
+
 import (
 	"bytes"
 	"sort"

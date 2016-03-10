@@ -100,34 +100,8 @@ func (h *Host) RPCMetrics() modules.HostRPCMetrics {
 	}
 }
 
-// SetSettings updates the host's internal HostSettings object.
-func (h *Host) SetSettings(settings modules.HostSettings) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	// Resource lock is grabbed for the save function.
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
-	}
-
-	// Check that none of the illegal fields have been modified.
-	if settings.RemainingStorage != h.settings.RemainingStorage {
-		return errChangedRemainingStorage
-	}
-	if settings.TotalStorage != h.settings.TotalStorage {
-		return errChangedTotalStorage
-	}
-	if settings.UnlockHash != h.settings.UnlockHash {
-		return errChangedUnlockHash
-	}
-
-	h.settings = settings
-	return h.save()
-}
-
 // Settings returns the settings of a host.
-func (h *Host) Settings() modules.HostSettings {
+func (h *Host) Settings() modules.HostInternalSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.settings

@@ -84,10 +84,10 @@ type Renter interface {
 
 	// ActiveHosts returns the list of hosts that are actively being selected
 	// from.
-	ActiveHosts() []HostSettings
+	ActiveHosts() []HostExternalSettings
 
 	// AllHosts returns the full list of hosts known to the renter.
-	AllHosts() []HostSettings
+	AllHosts() []HostExternalSettings
 
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error

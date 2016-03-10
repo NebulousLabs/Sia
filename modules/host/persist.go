@@ -61,7 +61,7 @@ type persistence struct {
 	UploadBandwidthRevenue           types.Currency
 
 	// Utilities.
-	Settings modules.HostSettings
+	Settings modules.HostInternalSettings
 }
 
 // save stores all of the persist data to disk.

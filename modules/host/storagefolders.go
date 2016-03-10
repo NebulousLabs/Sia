@@ -62,6 +62,7 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -152,16 +153,6 @@ type storageFolder struct {
 	SuccessfulWrites uint64
 }
 
-// uidString returns the string value of the storage folder's UID. This string
-// maps to the filename of the symlink that is used to point to the folder that
-// holds all of the sector data contained by the storage folder.
-func (sf *storageFolder) uidString() string {
-	if len(sf.UID) != storageFolderUIDSize {
-		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
-	}
-	return hex.EncodeToString(sf.UID)
-}
-
 // emptiestStorageFolder takes a set of storage folders and returns the storage
 // folder with the lowest utilization by percentage. 'nil' is returned if there
 // are no storage folders provided with sufficient free space for a sector.
@@ -176,7 +167,7 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 		// Check that this storage folder has at least enough space to hold a
 		// new sector. Also perform a sanity check that the storage folder has
 		// a sane amount of storage remaining.
-		if sf.SizeRemaining < sectorSize || sf.Size < sf.SizeRemaining {
+		if sf.SizeRemaining < modules.SectorSize || sf.Size < sf.SizeRemaining {
 			continue
 		}
 		winner = true // at least one storage folder has enough space for a new sector.
@@ -194,6 +185,27 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 		return nil, -1
 	}
 	return sfs[winningIndex], winningIndex
+}
+
+// uidString returns the string value of the storage folder's UID. This string
+// maps to the filename of the symlink that is used to point to the folder that
+// holds all of the sector data contained by the storage folder.
+func (sf *storageFolder) uidString() string {
+	if len(sf.UID) != storageFolderUIDSize {
+		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
+	}
+	return hex.EncodeToString(sf.UID)
+}
+
+// storageFolder returns the storage folder in the host with the input uid. If
+// the storage folder is not found, nil is returned.
+func (h *Host) storageFolder(uid []byte) *storageFolder {
+	for _, sf := range h.storageFolders {
+		if bytes.Equal(uid, sf.UID) {
+			return sf
+		}
+	}
+	return nil
 }
 
 // AddStorageFolder adds a storage folder to the host.
@@ -304,7 +316,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 			// The offload folder is not an available folder.
 			continue
 		}
-		if sf.SizeRemaining < sectorSize {
+		if sf.SizeRemaining < modules.SectorSize {
 			// Folders that don't have enough room for a new sector are not
 			// available.
 			continue
@@ -402,9 +414,9 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				return nil
 			}
 
-			offloadFolder.SizeRemaining += sectorSize
-			emptiestFolder.SizeRemaining -= sectorSize
-			dataOffloaded += sectorSize
+			offloadFolder.SizeRemaining += modules.SectorSize
+			emptiestFolder.SizeRemaining -= modules.SectorSize
+			dataOffloaded += modules.SectorSize
 
 			// Update the sector usage database to reflect the file movement.
 			// Because this cannot be done atomically, recovery tools are

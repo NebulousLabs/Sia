@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -47,6 +48,26 @@ var (
 	// RPCDownload is the specifier for downloading a file from a host.
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
 
+	// SectorSize defines how large a sector should be in bytes. The sector
+	// size needs to be a power of two to be compatible with package
+	// merkletree. 4MB has been chosen for the live network because large
+	// sectors significantly reduce the tracking overhead experienced by the
+	// renter and the host.
+	SectorSize = func() uint64 {
+		if build.Release == "dev" {
+			return 1 << 20 // 1 MiB
+		}
+		if build.Release == "standard" {
+			return 1 << 22 // 4 MiB
+		}
+		if build.Release == "testing" {
+			return 1 << 12 // 4 KiB
+		}
+		panic("unrecognized release constant in host - sectorSize")
+	}()
+)
+
+var (
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
@@ -76,7 +97,7 @@ type (
 	// address that can be used to contact the host.
 	HostAnnouncement struct {
 		IPAddress NetAddress
-		PublicKey crypto.PublicKey
+		PublicKey types.SiaPublicKey
 	}
 
 	// HostFinancialMetrics provides statistics on the spendings and earnings
@@ -101,17 +122,17 @@ type (
 		MaxBatchSize       uint64            `json:"maxbatchsize"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
 		NetAddress         NetAddress        `json:"netaddress"`
-		RemainingStorage   uint64            `json:"remainingstorage"` // Cannot be directly changed.
-		SectorSize         uint64            `json:"sectorsize"`       // Currently cannot be changed (future support planned).
-		TotalStorage       uint64            `json:"totalstorage"`     // Cannot be directly changed.
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`       // Cannot be directly changed.
+		RemainingStorage   uint64            `json:"remainingstorage"`
+		SectorSize         uint64            `json:"sectorsize"`
+		TotalStorage       uint64            `json:"totalstorage"`
+		UnlockHash         types.UnlockHash  `json:"unlockhash"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
 		Collateral             types.Currency `json:"collateral"`
 		ContractPrice          types.Currency `json:"contractprice"`
-		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"` // The cost for a renter to download something (meaning the host is uploading).
+		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`
 		StoragePrice           types.Currency `json:"storageprice"`
-		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"` // The cost for a renter to upload something (meaning the host is downloading).
+		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"`
 
 		RevisionNumber uint64 `json:"revisionnumber"`
 		Version        string `json:"version"`
@@ -126,6 +147,7 @@ type (
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
 		Collateral                    types.Currency `json:"collateral"`
+		MinimumContractPrice          types.Currency `json:"contractprice"`
 		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
 		MinimumStoragePrice           types.Currency `json:"storageprice"`
 		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
@@ -256,7 +278,7 @@ type (
 		SetInternalSettings(HostInternalSettings) error
 
 		// Settings returns the host's internal settings.
-		Settings() HostSettings
+		Settings() HostInternalSettings
 
 		// Close saves the state of the host and stops its listener process.
 		Close() error

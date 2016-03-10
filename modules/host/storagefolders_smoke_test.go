@@ -50,7 +50,7 @@ func (ht *hostTester) probabilisticReset() error {
 // createSector makes a random, unique sector that can be inserted into the
 // host.
 func createSector() (sectorRoot crypto.Hash, sectorData []byte, err error) {
-	sectorData, err = crypto.RandBytes(int(sectorSize))
+	sectorData, err = crypto.RandBytes(int(modules.SectorSize))
 	if err != nil {
 		return crypto.Hash{}, nil, err
 	}
@@ -283,7 +283,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize-sectorSize {
+	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize-modules.SectorSize {
 		t.Error("host capacity has not been correctly updated after adding a sector", totalStorage, remainingStorage)
 	}
 	// Check that the sector has been added to the filesystem correctly - the
@@ -297,7 +297,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if uint64(fileInfo.Size()) != sectorSize {
+		if uint64(fileInfo.Size()) != modules.SectorSize {
 			return errors.New("scanned sector is not the right size")
 		}
 		readSectorData, err := ioutil.ReadAll(sectorFile)
@@ -373,7 +373,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Host should be able to support having uneven storage sizes.
-	oddStorageSize := (minimumStorageFolderSize) + sectorSize*3 + 3
+	oddStorageSize := (minimumStorageFolderSize) + modules.SectorSize*3 + 3
 	err = ht.host.ResizeStorageFolder(0, oddStorageSize)
 	if err != nil {
 		t.Fatal(err)
@@ -389,7 +389,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if totalStorage != remainingStorage+sectorSize {
+	if totalStorage != remainingStorage+modules.SectorSize {
 		t.Fatal("host is not empty at the moment of creating the in-memory sector usage map")
 	}
 	// Verify that the inital sector usage map was created correctly.
@@ -400,7 +400,7 @@ func TestStorageFolderUsage(t *testing.T) {
 
 	// Fill the storage folder above the minimum size, then try to shrink it to
 	// the minimum size.
-	for i := uint64(0); i <= minimumStorageFolderSize/sectorSize; i++ {
+	for i := uint64(0); i <= minimumStorageFolderSize/modules.SectorSize; i++ {
 		sectorRoot, sectorData, err := createSector()
 		if err != nil {
 			t.Fatal(err)
@@ -471,7 +471,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	ht.host.mu.Lock()
 	folderTwoUsage := ht.host.storageFolders[1].Size - ht.host.storageFolders[1].SizeRemaining
 	ht.host.mu.Unlock()
-	if folderTwoUsage != sectorSize {
+	if folderTwoUsage != modules.SectorSize {
 		t.Error("sector did not appear to land in the right storage folder")
 	}
 	// Check the filesystem. The folder for storage folder 1 should have 10
@@ -652,8 +652,8 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-sectorSize*21 {
-		t.Fatal("Host not reporting expected storage capacity:", totalStorage, remainingStorage, minimumStorageFolderSize*4, minimumStorageFolderSize*4-sectorSize*21)
+	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-modules.SectorSize*21 {
+		t.Fatal("Host not reporting expected storage capacity:", totalStorage, remainingStorage, minimumStorageFolderSize*4, minimumStorageFolderSize*4-modules.SectorSize*21)
 	}
 	// Check that the internal sector usage database of the host has been
 	// updated correctly.
@@ -717,7 +717,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-sectorSize*20 {
+	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-modules.SectorSize*20 {
 		t.Fatal("Host not reporting expected storage capacity:")
 	}
 	// Run a sector usage check to make sure the host is properly handling the
@@ -841,7 +841,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if remainingStorage != initialRemainingStorage+sectorSize {
+		if remainingStorage != initialRemainingStorage+modules.SectorSize {
 			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
 		}
 	}
@@ -874,7 +874,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	remainingSectors := remainingStorage / sectorSize
+	remainingSectors := remainingStorage / modules.SectorSize
 	for i := uint64(0); i < remainingSectors; i++ {
 		sectorRoot, sectorData, err := createSector()
 		if err != nil {
@@ -909,7 +909,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if remainingStorage >= sectorSize {
+	if remainingStorage >= modules.SectorSize {
 		t.Error("remaining storage is reporting incorrect result - should report that there is not enough room for another sector")
 	}
 	err = ht.sectorUsageCheck(sectorUsageMap)
@@ -1035,7 +1035,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if remainingStorage != initialRemainingStorage+sectorSize {
+		if remainingStorage != initialRemainingStorage+modules.SectorSize {
 			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
 		}
 		i++

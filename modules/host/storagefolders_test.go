@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TestStorageFolderUIDString probes the uidString method of the storage
@@ -207,7 +208,7 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize - 1,
+					SizeRemaining: modules.SectorSize - 1,
 				},
 			},
 			-1,
@@ -217,11 +218,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize + 1,
+					SizeRemaining: modules.SectorSize + 1,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize,
+					SizeRemaining: modules.SectorSize,
 				},
 			},
 			0,
@@ -231,11 +232,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize,
+					SizeRemaining: modules.SectorSize,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize + 1,
+					SizeRemaining: modules.SectorSize + 1,
 				},
 			},
 			1,
@@ -246,11 +247,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize - 1,
+					SizeRemaining: modules.SectorSize - 1,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize * 5,
-					SizeRemaining: sectorSize,
+					SizeRemaining: modules.SectorSize,
 				},
 			},
 			1,
@@ -261,11 +262,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize * 4,
-					SizeRemaining: sectorSize * 2,
+					SizeRemaining: modules.SectorSize * 2,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize,
+					SizeRemaining: modules.SectorSize,
 				},
 			},
 			1,
@@ -276,11 +277,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize,
+					SizeRemaining: modules.SectorSize,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize * 4,
-					SizeRemaining: sectorSize * 2,
+					SizeRemaining: modules.SectorSize * 2,
 				},
 			},
 			0,
@@ -291,15 +292,15 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize * 4,
-					SizeRemaining: sectorSize * 2,
+					SizeRemaining: modules.SectorSize * 2,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize,
-					SizeRemaining: sectorSize,
+					SizeRemaining: modules.SectorSize,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize * 4,
-					SizeRemaining: sectorSize * 2,
+					SizeRemaining: modules.SectorSize * 2,
 				},
 			},
 			1,
@@ -309,7 +310,7 @@ func TestEmptiestStorageFolder(t *testing.T) {
 			[]*storageFolder{
 				&storageFolder{
 					Size:          minimumStorageFolderSize * 4,
-					SizeRemaining: sectorSize - 1,
+					SizeRemaining: modules.SectorSize - 1,
 				},
 				&storageFolder{
 					Size:          minimumStorageFolderSize,

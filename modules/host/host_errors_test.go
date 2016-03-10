@@ -8,7 +8,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/bolt"
 )
 
 // dependencyErrMkdirAll is a dependency set that returns an error when MkdirAll
@@ -101,41 +100,6 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 	_, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrOpenDatabase {
 		t.Fatal(err)
-	}
-}
-
-// TestUnsuccessfulDBInit sets the stage for an error to be triggered when the
-// host tries to initialize the database. The host should return the error.
-func TestUnsuccessfulDBInit(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-	// Create a blank host tester so that all the host dependencies are
-	// available.
-	ht, err := blankHostTester("TestSetPersistentSettings")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Corrupt the host database by deleting BucketStorageObligations, which is
-	// used to tell whether the host has been initialized or not. This will
-	// cause errors to be returned when initialization tries to create existing
-	// buckets.
-	err = ht.host.db.Update(func(tx *bolt.Tx) error {
-		return tx.DeleteBucket(bucketStorageObligations)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Close the host so a new host can be created after the database has been
-	// corrupted.
-	err = ht.host.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
-	if err == nil {
-		t.Fatal("expecting initDB to fail")
 	}
 }
 

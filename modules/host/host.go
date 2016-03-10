@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -19,31 +18,7 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// TODO: Write a document on how to use the host, suggest that RAID0 be used to
-// protect the core files from drive failure, emphasize that the host is pretty
-// relient on having information that is not outdated.
-
 const (
-	// defaultMaxDuration defines the maximum number of blocks into the future
-	// that the host will accept for the duration of an incoming file contract
-	// obligation. 6 months is chosen because hosts are expected to be
-	// long-term entities, and because we want to have a set of hosts that
-	// support 6 month contracts when Sia leaves beta.
-	defaultMaxDuration = 144 * 30 * 6 // 6 months.
-
-	// maximumStorageFolders indicates the maximum number of storage folders
-	// that the host allows. Some operations, such as creating a new storage
-	// folder, take longer if there are more storage folders. Static RAM usage
-	// also increases as the number of storage folders increase. For this
-	// reason, a limit on the maximum number of storage folders has been set.
-	maximumStorageFolders = 100
-
-	// resubmissionTimeout defines the number of blocks that a host will wait
-	// before attempting to resubmit a transaction to the blockchain.
-	// Typically, this transaction will contain either a file contract, a file
-	// contract revision, or a storage proof.
-	resubmissionTimeout = 3
-
 	// Names of the various persistent files in the host.
 	dbFilename   = modules.HostDir + ".db"
 	logFile      = modules.HostDir + ".log"
@@ -65,208 +40,6 @@ var (
 		Version: "0.5",
 	}
 
-	// defaultContractPrice defines the default price of creating a contract
-	// with the host. The default is set to 50 siacoins, which means that the
-	// opening file contract can have 5 siacoins put towards it, the file
-	// contract revision can have 15 siacoins put towards it, and the storage
-	// proof can have 15 siacoins put towards it, with 5 left over for the
-	// host, a sort of compensation for keeping and backing up the storage
-	// obligation data.
-	defaultContractPrice = types.NewCurrency64(50).Mul(types.SiacoinPrecision) // 50 siacoins
-
-	// defaultUploadBandwidthPrice defines the default price of upload
-	// bandwidth. The default is set to 1 siacoin per GB, because the host is
-	// presumed to have a large amount of downstream bandwidth. Furthermore,
-	// the host is typically only downloading data if it is planning to store
-	// the data, meaning that the host serves to profit from accepting the
-	// data.
-	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
-
-	// defaultDownloadBandwidthPrice defines the default price of upload
-	// bandwidth. The default is set to 10 siacoins per gigabyte, because
-	// download bandwidth is expected to be plentiful but also in-demand.
-	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(10e3) // 10 SC / GB
-
-	// defaultStoragePrice defines the starting price for hosts selling
-	// storage. We try to match a number that is both reasonably profitable and
-	// reasonably competitive.
-	defaultStoragePrice = modules.StoragePriceToConsensus(20e3) // 20 SC / GB / Month
-
-	// defaultCollateral defines the amount of money that the host puts up as
-	// collateral per-byte by default. The collateral should be considered as
-	// an absolute instead of as a percentage, because low prices result in
-	// collaterals which may be significant by percentage, but insignificant
-	// overall. A default of 50 SC / GB / Month has been chosen, which is 2.5x
-	// the default price for storage. The host is expected to put up a
-	// significant amount of collateral as a commitment to faithfulness,
-	// because this guarantees that the incentives are aligned for the host to
-	// keep the data even if the price of siacoin fluctuates, the price of raw
-	// storage fluctuates, or the host realizes that there is unexpected
-	// opportunity cost in being a host.
-	defaultCollateral = types.NewCurrency64(50) // 50 SC / GB / Month
-
-	// defaultWindowSize is the size of the proof of storage window requested
-	// by the host. The host will not delete any obligations until the window
-	// has closed and buried under several confirmations. For release builds,
-	// the default is set to 144 blocks, or about 1 day. This gives the host
-	// flexibility to experience downtime without losing file contracts. The
-	// optimal default, especially as the network matures, is probably closer
-	// to 36 blocks. An experienced or high powered host should not be
-	// frustrated by lost coins due to long periods of downtime.
-	defaultWindowSize = func() types.BlockHeight {
-		if build.Release == "dev" {
-			return 36 // 3.6 minutes.
-		}
-		if build.Release == "standard" {
-			return 144 // 1 day.
-		}
-		if build.Release == "testing" {
-			return 5 // 5 seconds.
-		}
-		panic("unrecognized release constant in host - defaultWindowSize")
-	}()
-
-	// maximumStorageFolderSize sets an upper bound on how large storage
-	// folders in the host are allowed to be. It makes sure that inputs and
-	// constructions are sane. While it's conceivable that someone could create
-	// a rig with a single logical storage folder greater than 128 TiB in size
-	// in production, it's probably not a great idea, especially when you are
-	// allowed to use many storage folders. All told, a single host on today's
-	// constants can support up to ~10 PB of storage.
-	maximumStorageFolderSize = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 33 // 8 GiB
-		}
-		if build.Release == "standard" {
-			return 1 << 47 // 128 TiB
-		}
-		if build.Release == "testing" {
-			return 1 << 20 // 1 MiB
-		}
-		panic("unrecognized release constant in host - maximum storage folder size")
-	}()
-
-	// maximumVirtualSectors defines the maximum number of virtual sectors that
-	// can be tied to each physical sector.
-	maximumVirtualSectors = func() int {
-		if build.Release == "dev" {
-			// The testing value is at 35 to provide flexibility. The
-			// development value is at 5 because hitting the virtual sector
-			// limit in a sane development environment is more difficult than
-			// hitting the virtual sector limit in a controlled testing
-			// environment (dev environment doesn't have access to private
-			// methods such as 'addSector'.
-			return 5
-		}
-		if build.Release == "standard" {
-			// Each virtual sector adds about 8 bytes of load to the host
-			// persistence structures, and additionally adds 8 bytes of load
-			// when reading or modifying a sector. Though a few virtual sectors
-			// with 10e3 or even 100e3 virtual sectors would not be too
-			// detrimental to the host, tens of thousands of physical sectors
-			// that each have ten thousand virtual sectors could pose a problem
-			// for the host. In most situations, a renter will not need more 2
-			// or 3 virtual sectors when manipulating data, so 250 is generous
-			// as long as the renter is properly encrypting data. 250 is
-			// unlikely to cause the host problems, even if an attacker is
-			// creating hundreds of thousands of phsyical sectors (an expensive
-			// action!) each with 250 vitrual sectors.
-			return 250
-		}
-		if build.Release == "testing" {
-			return 35
-		}
-		panic("unrecognized release constant in host - maximum virtual sector size")
-	}()
-
-	// minimumStorageFolderSize defines the smallest size that a storage folder
-	// is allowed to be. The new design of the storage folder structure means
-	// that this limit is not as relevant as it was originally, but hosts with
-	// little storage capacity are not very useful to the network, and can
-	// actually frustrate price planning. 32 GB has been chosen as a minimum
-	// for the early days of the network, to allow people to experiment in the
-	// beta, but in the future I think something like 256GB would be much more
-	// appropraite.
-	minimumStorageFolderSize = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 25 // 32 MiB
-		}
-		if build.Release == "standard" {
-			return 1 << 35 // 32 GiB
-		}
-		if build.Release == "testing" {
-			return 1 << 15 // 32 KiB
-		}
-		panic("unrecognized release constant in host - minimum storage folder size")
-	}()
-
-	// revisionSubmissionBuffer describes the number of blocks ahead of time
-	// that the host will submit a file contract revision. The host will not
-	// accept any more revisions once inside the submission buffer.
-	revisionSubmissionBuffer = func() types.BlockHeight {
-		if build.Release == "dev" {
-			return 20 // About 2 minutes
-		}
-		if build.Release == "standard" {
-			return 288 // 2 days.
-		}
-		if build.Release == "testing" {
-			return 4
-		}
-		panic("unrecognized release constant in host - revision submission buffer")
-	}()
-
-	// sectorSize defines how large a sector should be in bytes. The sector
-	// size needs to be a power of two to be compatible with package
-	// merkletree. 4MB has been chosen for the live network because large
-	// sectors significantly reduce the tracking overhead experienced by the
-	// renter and the host.
-	sectorSize = func() uint64 {
-		if build.Release == "dev" {
-			return 1 << 20 // 1 MiB
-		}
-		if build.Release == "standard" {
-			return 1 << 22 // 4 MiB
-		}
-		if build.Release == "testing" {
-			return 1 << 12 // 4 KiB
-		}
-		panic("unrecognized release constant in host - sectorSize")
-	}()
-
-	// storageFolderUIDSize determines the number of bytes used to determine
-	// the storage folder UID. Production and development environments use 4
-	// bytes to minimize the possibility of accidental collisions, and testing
-	// environments use 1 byte so that collisions can be forced while using the
-	// live code.
-	storageFolderUIDSize = func() int {
-		if build.Release == "dev" {
-			return 2
-		}
-		if build.Release == "standard" {
-			return 4
-		}
-		if build.Release == "testing" {
-			return 1
-		}
-		panic("unrecognized release constant in host - storageFolderUIDSize")
-	}()
-
-	// storageProofConfirmations determines the number of confirmations for a
-	// storage proof that the host will wait before
-	storageProofConfirmations = func() int {
-		if build.Release == "dev" {
-			return 20 // About 2 minutes
-		}
-		if build.Release == "standard" {
-			return 72 // About 12 hours
-		}
-		if build.Release == "testing" {
-			return 3
-		}
-		panic("unrecognized release constant in host - storageProofConfirmations")
-	}()
-
 	// errHostClosed gets returned when a call is rejected due to the host
 	// having been closed.
 	errHostClosed = errors.New("call is disabled because the host is closed")
@@ -275,33 +48,6 @@ var (
 	errNilCS     = errors.New("host cannot use a nil state")
 	errNilTpool  = errors.New("host cannot use a nil transaction pool")
 	errNilWallet = errors.New("host cannot use a nil wallet")
-)
-
-// All of the following variables define the names of buckets used by the host
-// in the database.
-var (
-	// bucketActionItems maps a blockchain height to a list of storage
-	// obligations that need to be managed in some way at that height. The
-	// height is stored as a big endian uint64, which means that bolt will
-	// store the heights sorted in numerical order. The action item itself is
-	// an array of file contract ids. The host is able to contextually figure
-	// out what the necessary actions for that item are based on the file
-	// contract id and the associated storage obligation that can be retreived
-	// using the id.
-	bucketActionItems = []byte("BucketActionItems")
-
-	// bucketSectorUsage maps sector IDs to the number of times they are used
-	// in file contracts. If all data is correctly encrypted using a unique
-	// seed, each sector will be in use exactly one time. The host however
-	// cannot control this, and a user may upload unencrypted data or
-	// intentionally upload colliding sectors as a means of attack. The host
-	// can only delete a sector when it is in use zero times. The number of
-	// times a sector is in use is encoded as a big endian uint64.
-	bucketSectorUsage = []byte("BucketSectorUsage")
-
-	// bucketStorageObligations contains a set of serialized
-	// 'storageObligations' sorted by their file contract id.
-	bucketStorageObligations = []byte("BucketStorageObligations")
 )
 
 // A Host contains all the fields necessary for storing files for clients and
@@ -328,10 +74,12 @@ type Host struct {
 	recentChange modules.ConsensusChangeID
 
 	// Host Identity
-	netAddress modules.NetAddress
-	publicKey  types.SiaPublicKey
-	secretKey  crypto.SecretKey
-	sectorSalt crypto.Hash
+	netAddress     modules.NetAddress
+	publicKey      types.SiaPublicKey
+	revisionNumber uint64
+	secretKey      crypto.SecretKey
+	sectorSalt     crypto.Hash
+	unlockHash     types.UnlockHash
 
 	// Storage Obligation Management - different from file management in that
 	// the storage obligation management is the new way of handling storage
@@ -344,10 +92,6 @@ type Host struct {
 	// manufactured by an attacker given sufficent knowledge about the disk
 	// layout (knowledge which should be unavailable), but a limited amount of
 	// damage can be done even with this attack.
-	//
-	// TODO: lockedStorageObligations is currently unbounded. A safety needs to
-	// be added that makes sure the number of simultaneous locked obligations
-	// stays below 5e3.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
 	storageFolders           []*storageFolder
 
@@ -368,7 +112,7 @@ type Host struct {
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
-	settings   modules.HostSettings
+	settings   modules.HostInternalSettings
 
 	// The resource lock is held by threaded functions for the duration of
 	// their operation. Functions should grab the resource lock as a read lock
@@ -380,18 +124,41 @@ type Host struct {
 	resourceLock sync.RWMutex
 }
 
+// checkUnlockHash will check that the host has an unlock hash. If the host
+// does not have an unlock hash, an attempt will be made to get an unlock hash
+// from the wallet. That may fail due to the wallet being locked, in which case
+// an error is returned.
+func (h *Host) checkUnlockHash() error {
+	if h.unlockHash == (types.UnlockHash{}) {
+		uc, err := h.wallet.NextAddress()
+		if err != nil {
+			return err
+		}
+
+		// Set the unlock hash and save the host. Saving is important, because
+		// the host will be using this unlock hash to establish identity, and
+		// losing it will mean silently losing part of the host identity.
+		h.unlockHash = uc.UnlockHash()
+		err = h.save()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // establishDefaults configures the default settings for the host, overwriting
 // any existing settings.
 func (h *Host) establishDefaults() error {
 	// Configure the settings object.
-	h.settings = modules.HostSettings{
+	h.settings = modules.HostInternalSettings{
 		MaxDuration: defaultMaxDuration,
 		WindowSize:  defaultWindowSize,
 
-		Collateral:             defaultCollateral,
-		ContractPrice:          defaultContractPrice,
-		DownloadBandwidthPrice: defaultDownloadBandwidthPrice,
-		UploadBandwidthPrice:   defaultUploadBandwidthPrice,
+		Collateral:                    defaultCollateral,
+		MinimumContractPrice:          defaultContractPrice,
+		MinimumDownloadBandwidthPrice: defaultDownloadBandwidthPrice,
+		MinimumUploadBandwidthPrice:   defaultUploadBandwidthPrice,
 	}
 
 	// Generate signing key, for revising contracts.
@@ -410,21 +177,17 @@ func (h *Host) establishDefaults() error {
 	}
 
 	// Subscribe to the consensus set.
-	return h.initConsensusSubscription()
+	err = h.initConsensusSubscription()
+	if err != nil {
+		return err
+	}
+	return h.save()
 }
 
 // initDB will check that the database has been initialized and if not, will
 // initialize the database.
 func (h *Host) initDB() error {
 	return h.db.Update(func(tx *bolt.Tx) error {
-		// Return nil if the database is already initialized. The database can
-		// be safely assumed to be initialized if the storage obligation bucket
-		// exists.
-		bso := tx.Bucket(bucketStorageObligations)
-		if bso != nil {
-			return nil
-		}
-
 		// The storage obligation bucket does not exist, which means the
 		// database needs to be initialized. Create the database buckets.
 		buckets := [][]byte{
@@ -433,7 +196,7 @@ func (h *Host) initDB() error {
 			bucketStorageObligations,
 		}
 		for _, bucket := range buckets {
-			_, err := tx.CreateBucket(bucket)
+			_, err := tx.CreateBucketIfNotExists(bucket)
 			if err != nil {
 				return err
 			}
@@ -465,10 +228,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		tpool:        tpool,
 		wallet:       wallet,
 		dependencies: dependencies,
-
-		// actionItems: make(map[types.BlockHeight]map[types.FileContractID]*contractObligation),
-
-		// obligationsByID: make(map[types.FileContractID]*contractObligation),
 
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 
@@ -605,4 +364,28 @@ func (h *Host) Close() (composedError error) {
 		composedError = composeErrors(composedError, err)
 	}
 	return composedError
+}
+
+// SetSettings updates the host's internal HostInternalSettings object.
+func (h *Host) SetSettings(settings modules.HostInternalSettings) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
+
+	// The host should not be accepting file contracts if it does not have an
+	// unlock hash.
+	if settings.AcceptingContracts {
+		err := h.checkUnlockHash()
+		if err != nil {
+			return err
+		}
+	}
+
+	h.settings = settings
+	h.revisionNumber++
+	return h.save()
 }
