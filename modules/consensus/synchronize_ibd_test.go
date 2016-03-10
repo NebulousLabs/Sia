@@ -7,6 +7,7 @@ import (
 	"net"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -195,9 +196,12 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 type mockGatewayRPCError struct {
 	modules.Gateway
 	rpcErrs map[modules.NetAddress]error
+	mu      sync.Mutex
 }
 
 func (g *mockGatewayRPCError) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return g.rpcErrs[addr]
 }
 
@@ -264,5 +268,161 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 	}
 	if len(localCS.gateway.Peers()) != 6 {
 		t.Error("threadedInitialBlockchainDownload disconnected from peers that timedout or didn't error")
+	}
+}
+
+// TestInitialBlockchainDownloadDoneRules tests that
+// threadedInitialBlockchainDownload only terminates under the appropriate
+// conditions. Appropriate conditions are:
+//  - at least minNumOutbound synced outbound peers
+//  - or at least 1 synced outbound peer and minIBDWaitTime has passed since beginning IBD.
+func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
+	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	mg := mockGatewayRPCError{
+		Gateway: g,
+		rpcErrs: make(map[modules.NetAddress]error),
+	}
+	cs, err := New(&mg, filepath.Join(testdir, "local", modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	doneChan := make(chan struct{})
+
+	// Test when there are 0 peers.
+	go func() {
+		cs.threadedInitialBlockchainDownload()
+		doneChan <- struct{}{}
+	}()
+	select {
+	case <-doneChan:
+		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
+	case <-time.After(minIBDWaitTime * 11 / 10):
+	}
+
+	// Test when there are only inbound peers.
+	inboundCSTs := make([]*consensusSetTester, 8)
+	for i := 0; i < len(inboundCSTs); i++ {
+		inboundCST, err := blankConsensusSetTester(filepath.Join("TestInitialBlockchainDownloadDoneRules", fmt.Sprintf("remote - inbound %v", i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer inboundCST.Close()
+
+		inboundCST.cs.gateway.Connect(cs.gateway.Address())
+	}
+	select {
+	case <-doneChan:
+		t.Error("threadedInitialBlockchainDownload finished with only inbound peers")
+	case <-time.After(minIBDWaitTime * 11 / 10):
+	}
+
+	// Test when there is 1 peer that isn't synced.
+	gatewayTimesout, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - timesout", modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gatewayTimesout.Close()
+	mg.mu.Lock()
+	mg.rpcErrs[gatewayTimesout.Address()] = mockNetError{
+		error:   errors.New("mock timeout error"),
+		timeout: true,
+	}
+	mg.mu.Unlock()
+	err = cs.gateway.Connect(gatewayTimesout.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-doneChan:
+		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
+	case <-time.After(minIBDWaitTime * 11 / 10):
+	}
+
+	// Test when there is 1 peer that is synced and one that is not synced.
+	gatewayNoTimeout, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gatewayNoTimeout.Close()
+	mg.mu.Lock()
+	mg.rpcErrs[gatewayNoTimeout.Address()] = nil
+	mg.mu.Unlock()
+	err = cs.gateway.Connect(gatewayNoTimeout.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-doneChan:
+	case <-time.After(minIBDWaitTime * 11 / 10):
+		t.Fatal("threadedInitialBlockchainDownload never finished with 1 synced peer")
+	}
+
+	// Test when there are >= minNumOutbound peers, but < minNumOutbound peers are synced.
+	gatewayTimesouts := make([]modules.Gateway, minNumOutbound-1)
+	for i := 0; i < len(gatewayTimesouts); i++ {
+		tmpG, err := gateway.New("localhost:0", filepath.Join(testdir, fmt.Sprintf("remote - timesout %v", i), modules.GatewayDir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tmpG.Close()
+		mg.mu.Lock()
+		mg.rpcErrs[tmpG.Address()] = mockNetError{
+			error:   errors.New("mock timeout error"),
+			timeout: true,
+		}
+		mg.mu.Unlock()
+		gatewayTimesouts[i] = tmpG
+		err = cs.gateway.Connect(gatewayTimesouts[i].Address())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	go func() {
+		cs.threadedInitialBlockchainDownload()
+		doneChan <- struct{}{}
+	}()
+	select {
+	case <-doneChan:
+		t.Fatal("threadedInitialBlockchainDownload finished before minIBDWaitTime")
+	case <-time.After(minIBDWaitTime):
+	}
+	select {
+	case <-doneChan:
+	case <-time.After(minIBDWaitTime):
+		t.Fatal("threadedInitialBlockchainDownload didn't finish after minIBDWaitTime")
+	}
+
+	// Test when there are >= minNumOutbound peers and >= minNumOutbound peers are synced.
+	gatewayNoTimeouts := make([]modules.Gateway, minNumOutbound-1)
+	for i := 0; i < len(gatewayNoTimeouts); i++ {
+		tmpG, err := gateway.New("localhost:0", filepath.Join(testdir, fmt.Sprintf("remote - no timeout %v", i), modules.GatewayDir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tmpG.Close()
+		mg.mu.Lock()
+		mg.rpcErrs[tmpG.Address()] = nil
+		mg.mu.Unlock()
+		gatewayNoTimeouts[i] = tmpG
+		err = cs.gateway.Connect(gatewayNoTimeouts[i].Address())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	go func() {
+		cs.threadedInitialBlockchainDownload()
+		doneChan <- struct{}{}
+	}()
+	select {
+	case <-doneChan:
+	case <-time.After(minIBDWaitTime):
+		t.Fatal("threadedInitialBlockchainDownload didn't finish in less than minIBDWaitTime")
 	}
 }
