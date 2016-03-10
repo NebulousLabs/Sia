@@ -2,6 +2,7 @@ package hostdb
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -43,43 +44,36 @@ func TestFindHostAnnouncements(t *testing.T) {
 // TestReceiveConsensusSetUpdate probes the ReveiveConsensusSetUpdate method of
 // the hostdb type.
 func TestReceiveConsensusSetUpdate(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	ht, err := newHostDBTester("TestFindHostAnnouncements")
-	if err != nil {
-		t.Fatal(err)
+	// create hostdb
+	hdb := bareHostDB()
+
+	// Put a host announcement into a block.
+	announceBytes := encoding.MarshalAll(
+		modules.PrefixHostAnnouncement,
+		modules.HostAnnouncement{
+			IPAddress: "foo:1234",
+		},
+	)
+	cc := modules.ConsensusChange{
+		AppliedBlocks: []types.Block{{
+			Transactions: []types.Transaction{{
+				ArbitraryData: [][]byte{announceBytes},
+			}},
+		}},
 	}
 
-	// Put a host announcement into the blockchain.
-	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: ht.gateway.Address(),
-	})
-	txnBuilder := ht.wallet.StartTransaction()
-	txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], announcement...))
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ht.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// call ProcessConsensusChange
+	hdb.ProcessConsensusChange(cc)
 
-	// Check that, prior to mining, the hostdb has no hosts.
-	if len(ht.hostdb.AllHosts()) != 0 {
-		t.Fatal("Hostdb should not yet have any hosts")
-	}
-
-	// Mine a block to get the transaction into the consensus set.
-	b, _ := ht.miner.FindBlock()
-	err = ht.cs.AcceptBlock(b)
-	if err != nil {
-		t.Fatal(err)
+	// host should be sent to scanPool
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("announcement not seen")
+	case <-hdb.scanPool:
 	}
 
 	// Check that there is now a host in the hostdb.
-	if len(ht.hostdb.AllHosts()) != 1 {
+	if len(hdb.AllHosts()) != 1 {
 		t.Fatal("hostdb should have a host after getting a host announcement transcation")
 	}
 }

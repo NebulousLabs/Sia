@@ -12,11 +12,11 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// a testHost simulates a host. It implements the hostdb.Uploader interface.
+// a testHost simulates a host. It implements the contractor.Editor interface.
 type testHost struct {
 	ip   modules.NetAddress
 	data []byte
@@ -28,8 +28,9 @@ type testHost struct {
 	sync.Mutex
 }
 
-// stub implementations of the hostdb.Uploader methods
+// stub implementations of the contractor.Editor methods
 func (h *testHost) Address() modules.NetAddress  { return h.ip }
+func (h *testHost) Delete(crypto.Hash) error     { return nil }
 func (h *testHost) EndHeight() types.BlockHeight { return 0 }
 func (h *testHost) Close() error                 { return nil }
 
@@ -77,7 +78,7 @@ func TestRepair(t *testing.T) {
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]hostdb.Uploader, rsc.NumPieces())
+	hosts := make([]contractor.Editor, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
 			ip:       modules.NetAddress(strconv.Itoa(i)),
@@ -150,29 +151,25 @@ func TestRepair(t *testing.T) {
 // offlineHostDB is a mocked hostDB, used for testing the offlineChunks method
 // of the file type. It is implemented as a map from NetAddresses to booleans,
 // where the bool indicates whether the host is active.
-type offlineHostDB map[modules.NetAddress]bool
-
-// IsOffline is a stub implementation of the IsOffline method.
-func (hdb offlineHostDB) IsOffline(addr modules.NetAddress) bool {
-	return !hdb[addr]
+type offlineHostDB struct {
+	stubHostDB
+	hosts map[modules.NetAddress]bool
 }
 
-// Stub implementations of other hostDB methods.
-func (offlineHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) { return nil, nil }
-func (offlineHostDB) ActiveHosts() []modules.HostSettings                        { return nil }
-func (offlineHostDB) AllHosts() []modules.HostSettings                           { return nil }
-func (offlineHostDB) AveragePrice() types.Currency                               { return types.Currency{} }
-func (offlineHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
-	return types.FileContractID{}, nil
+// IsOffline is a stub implementation of the IsOffline method.
+func (hdb *offlineHostDB) IsOffline(addr modules.NetAddress) bool {
+	return !hdb.hosts[addr]
 }
 
 // TestOfflineChunks tests the offlineChunks method of the file type.
 func TestOfflineChunks(t *testing.T) {
 	// Create a mock hostdb.
 	hdb := &offlineHostDB{
-		"foo": false,
-		"bar": false,
-		"baz": true,
+		hosts: map[modules.NetAddress]bool{
+			"foo": false,
+			"bar": false,
+			"baz": true,
+		},
 	}
 	rsc, _ := NewRSCode(1, 1)
 	f := &file{

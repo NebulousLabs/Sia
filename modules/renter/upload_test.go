@@ -7,47 +7,37 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// uploadHostDB is a mocked hostDB, hostdb.HostPool, and hostdb.Uploader. It
-// is used for testing the uploading and repairing functions of the renter.
-type uploadHostDB struct{}
-
-// NewPool returns a new mock HostPool. Since uploadHostDB implements the
-// HostPool interface, it can simply return itself.
-func (hdb uploadHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) {
-	return hdb, nil
+// uploadContractor is a mocked hostContractor and contractor.Editor. It is
+// used for testing the uploading and repairing functions of the renter.
+type uploadContractor struct {
+	stubContractor
 }
 
-// UniqueHosts returns a set of mocked Uploaders. Since uploadHostDB
-// implements the Uploader interface, it can simply return itself.
-func (hdb uploadHostDB) UniqueHosts(n int, _ []modules.NetAddress) (ups []hostdb.Uploader) {
-	for i := 0; i < n; i++ {
-		ups = append(ups, hdb)
-	}
-	return
+func (uploadContractor) Contracts() []contractor.Contract {
+	return make([]contractor.Contract, 24) // exact number shouldn't matter, as long as its large enough
+}
+
+// Editor simply returns the uploadContractor, since it also implements the
+// Editor interface.
+func (uc *uploadContractor) Editor(contractor.Contract) (contractor.Editor, error) {
+	return uc, nil
 }
 
 // Upload simulates a successful data upload.
-func (uploadHostDB) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
+func (uploadContractor) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
 
-// stub implementations of the hostdb.Uploader methods
-func (uploadHostDB) Address() modules.NetAddress      { return "" }
-func (uploadHostDB) ContractID() types.FileContractID { return types.FileContractID{} }
-func (uploadHostDB) EndHeight() types.BlockHeight     { return 10000 }
-func (uploadHostDB) Close() error                     { return nil }
-
-// stub implementations of the hostDB methods
-func (uploadHostDB) ActiveHosts() []modules.HostSettings { return nil }
-func (uploadHostDB) AllHosts() []modules.HostSettings    { return nil }
-func (uploadHostDB) AveragePrice() types.Currency        { return types.Currency{} }
-func (uploadHostDB) IsOffline(modules.NetAddress) bool   { return true }
-func (uploadHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
-	return types.FileContractID{}, nil
-}
+// stub implementations of the contractor.Editor methods
+func (uploadContractor) Address() modules.NetAddress      { return "" }
+func (uploadContractor) Delete(crypto.Hash) error         { return nil }
+func (uploadContractor) ContractID() types.FileContractID { return types.FileContractID{} }
+func (uploadContractor) EndHeight() types.BlockHeight     { return 10000 }
+func (uploadContractor) Close() error                     { return nil }
 
 // TestUpload tests the uploading and repairing functions. The hostDB is
 // mocked, isolating the upload/repair logic from the negotation logic.
@@ -61,8 +51,8 @@ func TestUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// swap in our own hostdb
-	rt.renter.hostDB = &uploadHostDB{}
+	// swap in our own contractor
+	rt.renter.hostContractor = &uploadContractor{}
 
 	// create a file
 	source := filepath.Join(build.SiaTestingDir, "renter", "TestUpload", "test.dat")

@@ -154,12 +154,14 @@ func (hdb *HostDB) isEmpty() bool {
 	return hdb.hostTree == nil || hdb.hostTree.weight.IsZero()
 }
 
-// randomHosts will pull up to 'n' random hosts from the hostdb. There will be
+// RandomHosts will pull up to 'n' random hosts from the hostdb. There will be
 // no repeats, but the length of the slice returned may be less than 'n', and
 // may even be 0. The hosts that get returned first have the higher priority.
 // Hosts specified in 'ignore' will not be considered; pass 'nil' if no
 // blacklist is desired.
-func (hdb *HostDB) randomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostSettings) {
+func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostSettings) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	if hdb.isEmpty() {
 		return
 	}

@@ -13,9 +13,6 @@ func TestTreeBuilder(t *testing.T) {
 	tree.PushObject("b")
 	_ = tree.Root()
 
-	bytes := [][]byte{{1}, {2}}
-	_ = MerkleRoot(bytes)
-
 	// Correctness is assumed, as it's tested by the merkletree package. This
 	// function is really for code coverage.
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -96,3 +97,22 @@ func newRenterTester(name string) (*renterTester, error) {
 	}
 	return rt, nil
 }
+
+// stubHostDB is the minimal implemention of the hostDB interface. It can be
+// embedded in other mock hostDB types, removing the need to reimplement all
+// of the hostDB's methods on every mock.
+type stubHostDB struct{}
+
+func (stubHostDB) ActiveHosts() []modules.HostSettings { return nil }
+func (stubHostDB) AllHosts() []modules.HostSettings    { return nil }
+func (stubHostDB) AveragePrice() types.Currency        { return types.Currency{} }
+func (stubHostDB) IsOffline(modules.NetAddress) bool   { return true }
+
+// stubContractor is the minimal implementation of the hostContractor
+// interface.
+type stubContractor struct{}
+
+func (stubContractor) SetAllowance(modules.Allowance) error                  { return nil }
+func (stubContractor) Allowance() modules.Allowance                          { return modules.Allowance{} }
+func (stubContractor) Contracts() []contractor.Contract                      { return nil }
+func (stubContractor) Editor(contractor.Contract) (contractor.Editor, error) { return nil, nil }

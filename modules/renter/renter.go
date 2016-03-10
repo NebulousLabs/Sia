@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -24,18 +25,30 @@ type hostDB interface {
 
 	// IsOffline reports whether a host is consider offline.
 	IsOffline(modules.NetAddress) bool
+}
 
-	// NewPool returns a new HostPool, which can negotiate contracts with
-	// hosts. The size and duration of these contracts are supplied as
-	// arguments.
-	NewPool(filesize uint64, duration types.BlockHeight) (hostdb.HostPool, error)
+// A hostContractor negotiates, revises, renews, and provides access to file
+// contracts.
+type hostContractor interface {
+	// SetAllowance sets the amount of money the contractor is allowed to
+	// spend on contracts over a given time period, divided among the number
+	// of hosts specified. Note that contractor can start forming contracts as
+	// soon as SetAllowance is called; that is, it may block.
+	SetAllowance(modules.Allowance) error
 
-	// Renew renews a file contract, returning the new contract ID.
-	Renew(id types.FileContractID, newHeight types.BlockHeight) (types.FileContractID, error)
+	// Allowance returns the current allowance
+	Allowance() modules.Allowance
+
+	// Contracts returns the contracts formed by the contractor.
+	Contracts() []contractor.Contract
+
+	// Editor creates an Editor from the specified contract, allowing it to be
+	// modified.
+	Editor(contractor.Contract) (contractor.Editor, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
-// Tracked files are actively repaired by the Renter.  By default, files
+// Tracked files are actively repaired by the Renter. By default, files
 // uploaded by the user are tracked, and files that are added (via loading a
 // .sia file) are not.
 type trackedFile struct {
@@ -55,8 +68,9 @@ type Renter struct {
 	wallet modules.Wallet
 
 	// resources
-	hostDB hostDB
-	log    *log.Logger
+	hostDB         hostDB
+	hostContractor hostContractor
+	log            *log.Logger
 
 	// variables
 	files         map[string]*file
@@ -71,15 +85,20 @@ type Renter struct {
 
 // New returns an empty renter.
 func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
-	hdb, err := hostdb.New(cs, wallet, tpool, persistDir)
+	hdb, err := hostdb.New(cs, persistDir)
+	if err != nil {
+		return nil, err
+	}
+	hc, err := contractor.New(cs, wallet, tpool, hdb, persistDir)
 	if err != nil {
 		return nil, err
 	}
 
 	r := &Renter{
-		cs:     cs,
-		wallet: wallet,
-		hostDB: hdb,
+		cs:             cs,
+		wallet:         wallet,
+		hostDB:         hdb,
+		hostContractor: hc,
 
 		files:    make(map[string]*file),
 		tracking: make(map[string]trackedFile),
@@ -100,6 +119,10 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 // hostdb passthroughs
 func (r *Renter) ActiveHosts() []modules.HostSettings { return r.hostDB.ActiveHosts() }
 func (r *Renter) AllHosts() []modules.HostSettings    { return r.hostDB.AllHosts() }
+
+// contractor passthroughs
+func (r *Renter) Allowance() modules.Allowance           { return r.hostContractor.Allowance() }
+func (r *Renter) SetAllowance(a modules.Allowance) error { return r.hostContractor.SetAllowance(a) }
 
 // enforce that Renter satisfies the modules.Renter interface
 var _ modules.Renter = (*Renter)(nil)

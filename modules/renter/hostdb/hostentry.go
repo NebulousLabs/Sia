@@ -58,6 +58,18 @@ func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 	return nil
 }
 
+// Host returns the HostSettings associated with the specified NetAddress. If
+// no matching host is found, Host returns false.
+func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostSettings, bool) {
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
+	entry, ok := hdb.allHosts[addr]
+	if !ok || entry == nil {
+		return modules.HostSettings{}, false
+	}
+	return entry.HostSettings, true
+}
+
 // ActiveHosts returns the hosts that can be randomly selected out of the
 // hostdb.
 func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostSettings) {
@@ -84,13 +96,10 @@ func (hdb *HostDB) AllHosts() (allHosts []modules.HostSettings) {
 
 // AveragePrice returns the average price of a host.
 func (hdb *HostDB) AveragePrice() types.Currency {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
-
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
-	hosts := hdb.randomHosts(sampleSize, nil)
+	hosts := hdb.RandomHosts(sampleSize, nil)
 	if len(hosts) == 0 {
 		return totalPrice
 	}
