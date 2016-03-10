@@ -20,16 +20,17 @@ var (
 
 // verifySettings reads a signed HostSettings object from conn, validates the
 // signature, and checks for discrepancies between the known settings and the
-// received settings. If there is a discrepancy, the hostDB is notified.
-func verifySettings(conn net.Conn, knownSettings modules.HostExternalSettings, hdb hostDB) error {
+// received settings. If there is a discrepancy, the hostDB is notified. The
+// received settings are returned.
+func verifySettings(conn net.Conn, knownSettings modules.HostExternalSettings, hdb hostDB) (modules.HostExternalSettings, error) {
 	// read signed host settings
 	var recvSettings modules.HostExternalSettings
 	if err := crypto.ReadSignedObject(conn, &recvSettings, 2048, knownSettings.PublicKey); err != nil { // ??? how large?
-		return errors.New("couldn't read host's settings: " + err.Error())
+		return modules.HostExternalSettings{}, errors.New("couldn't read host's settings: " + err.Error())
 	}
 	// TODO: check settings. If there is a discrepancy, write the error to
 	// conn and update the hostdb
-	return nil
+	return recvSettings, nil
 }
 
 // negotiateContract establishes a connection to a host and negotiates an
@@ -197,7 +198,7 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 	}
 
 	// verify the host's settings and confirm its identity
-	err = verifySettings(conn, host, c.hdb)
+	host, err = verifySettings(conn, host, c.hdb)
 	if err != nil {
 		return Contract{}, err
 	}

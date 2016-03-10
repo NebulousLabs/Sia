@@ -230,7 +230,7 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	}
 
 	// verify the host's settings and confirm its identity
-	err = verifySettings(conn, host, c.hdb)
+	host, err = verifySettings(conn, host, c.hdb)
 	if err != nil {
 		return nil, err
 	}

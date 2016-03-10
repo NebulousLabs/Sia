@@ -82,7 +82,7 @@ func (c *Contractor) managedRenew(contract Contract, newEndHeight types.BlockHei
 	}
 
 	// verify the host's settings and confirm its identity
-	err = verifySettings(conn, host, c.hdb)
+	host, err = verifySettings(conn, host, c.hdb)
 	if err != nil {
 		return types.FileContractID{}, err
 	}

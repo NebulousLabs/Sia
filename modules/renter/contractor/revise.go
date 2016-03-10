@@ -56,7 +56,8 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	return signedHostTxn, nil
 }
 
-// newRevision revises the current revision to incorporate new data.
+// newRevision revises the current revision to cover a different number of
+// sectors.
 func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSectors uint64, sectorPrice types.Currency) types.FileContractRevision {
 	// move safely moves n coins from src to dest, avoiding negative currency
 	// panics. The new values of src and dest are returned.
