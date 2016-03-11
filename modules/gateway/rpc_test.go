@@ -369,13 +369,13 @@ func TestCallingRPCFromRPC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected FOO RPC to be called")
 	}
 
 	select {
 	case <-barChan:
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("expected BAR RPC to be called")
 	}
 }

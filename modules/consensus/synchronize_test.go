@@ -259,6 +259,10 @@ func (g *mockGatewayCountBroadcasts) Broadcast(name string, obj interface{}, pee
 // Broadcasts one block, no matter how many blocks are sent. In the case 0
 // blocks are sent, tests that Broadcast is never called.
 func TestSendBlocksBroadcastsOnce(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Setup consensus sets.
 	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
 	if err != nil {
