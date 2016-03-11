@@ -59,8 +59,8 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 		// TODO: should panic here
 		return
 	}
-	entry.reliability = entry.reliability.Sub(penalty)
-	entry.online = false
+	entry.Reliability = entry.Reliability.Sub(penalty)
+	entry.Online = false
 
 	// If the entry is in the active database, remove it from the active
 	// database.
@@ -72,7 +72,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 
 	// If the reliability has fallen to 0, remove the host from the
 	// database entirely.
-	if entry.reliability.IsZero() {
+	if entry.Reliability.IsZero() {
 		delete(hdb.allHosts, addr)
 	}
 }
@@ -120,9 +120,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			// must be preserved.
 			settings.NetAddress = hostEntry.HostExternalSettings.NetAddress
 			hostEntry.HostExternalSettings = settings
-			hostEntry.reliability = MaxReliability
-			hostEntry.weight = calculateHostWeight(*hostEntry)
-			hostEntry.online = true
+			hostEntry.Reliability = MaxReliability
+			hostEntry.Weight = calculateHostWeight(*hostEntry)
+			hostEntry.Online = true
 
 			// If 'maxActiveHosts' has not been reached, add the host to the
 			// activeHosts tree.
