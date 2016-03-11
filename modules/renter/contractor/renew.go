@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -15,15 +14,16 @@ import (
 // It returns the ID of the new contract. This is a blocking call that
 // performs network I/O.
 // TODO: take an allowance and renew with those parameters
-func (c *Contractor) managedRenew(contract Contract, newEndHeight types.BlockHeight) (types.FileContractID, error) {
+func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeight types.BlockHeight) (types.FileContractID, error) {
 	c.mu.RLock()
 	height := c.blockHeight
-	host, ok := c.hdb.Host(contract.IP)
 	c.mu.RUnlock()
+	if newEndHeight < height {
+		return types.FileContractID{}, errors.New("cannot renew below current height")
+	}
+	host, ok := c.hdb.Host(contract.IP)
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that host")
-	} else if newEndHeight < height {
-		return types.FileContractID{}, errors.New("cannot renew below current height")
 	} else if host.ContractPrice.Cmp(maxPrice) > 0 {
 		return types.FileContractID{}, errTooExpensive
 	}
@@ -47,12 +47,13 @@ func (c *Contractor) managedRenew(contract Contract, newEndHeight types.BlockHei
 		return types.FileContractID{}, err
 	}
 
-	renterCost := host.ContractPrice.Mul(types.NewCurrency64(contract.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	// TODO: what if this isn't enough money??
+	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	payout := renterCost // no collateral
 
 	// create file contract
 	fc := types.FileContract{
-		FileSize:       contract.LastRevision.NewFileSize,
+		FileSize:       contract.LastRevision.NewFileSize, // filesize is not modified; only the payout is
 		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
 		WindowStart:    newEndHeight,
 		WindowEnd:      newEndHeight + host.WindowSize,
@@ -144,22 +145,45 @@ func (c *Contractor) managedRenew(contract Contract, newEndHeight types.BlockHei
 // threadedRenewContracts renews the Contractor's contracts according to the
 // specified allowance and at the specified height.
 func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeight types.BlockHeight) {
-	var wg sync.WaitGroup
-	c.mu.RLock()
-	wg.Add(len(c.contracts))
-	for _, contract := range c.contracts {
-		if contract.FileContract.WindowStart < newHeight {
-			go func() {
-				defer wg.Done()
-				_, err := c.managedRenew(contract, newHeight)
-				if err != nil {
-					c.log.Println("WARN: failed to renew contract", contract.ID, ":", err)
-				}
-			}()
+	// calculate filesize using new allowance
+	contracts := c.Contracts()
+	var sum types.Currency
+	var numHosts uint64
+	for _, contract := range contracts {
+		if h, ok := c.hdb.Host(contract.IP); ok {
+			sum = sum.Add(h.Price)
+			numHosts++
 		}
 	}
-	c.mu.RUnlock()
-	wg.Wait()
+	if numHosts < allowance.Hosts {
+		// ??? get more
+	}
+	avgPrice := sum.Div(types.NewCurrency64(numHosts))
+
+	costPerSector := avgPrice.
+		Mul(types.NewCurrency64(allowance.Hosts)).
+		Mul(types.NewCurrency64(SectorSize)).
+		Mul(types.NewCurrency64(uint64(allowance.Period)))
+	if allowance.Funds.Cmp(costPerSector) < 0 {
+		// errors.New("insufficient funds")
+	}
+
+	// Calculate the filesize of the contracts by using the average host price
+	// and rounding down to the nearest sector.
+	numSectors, err := allowance.Funds.Div(costPerSector).Uint64()
+	if err != nil {
+		// errors.New("allowance resulted in unexpectedly large contract size")
+	}
+	filesize := numSectors * SectorSize
+
+	for _, contract := range contracts {
+		if contract.FileContract.WindowStart < newHeight {
+			_, err := c.managedRenew(contract, filesize, newHeight)
+			if err != nil {
+				c.log.Println("WARN: failed to renew contract", contract.ID, ":", err)
+			}
+		}
+	}
 
 	// TODO: reset renewHeight if too many rewewals failed.
 	// TODO: form more contracts if numRenewed < allowance.Hosts
