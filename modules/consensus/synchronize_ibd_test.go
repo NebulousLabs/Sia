@@ -285,6 +285,14 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		t.SkipNow()
 	}
 
+	// Set minIBDWaitTime to 1s for just this test because no blocks are
+	// transfered between peers so the wait time can be very short.
+	actualMinIBDWaitTime := minIBDWaitTime
+	defer func() {
+		minIBDWaitTime = actualMinIBDWaitTime
+	}()
+	minIBDWaitTime = 1 * time.Second
+
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
