@@ -474,3 +474,10 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 
 	// TODO: log IBD done.
 }
+
+// Synced returns true if the consensus set is synced with the network.
+func (cs *ConsensusSet) Synced() bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.synced
+}
