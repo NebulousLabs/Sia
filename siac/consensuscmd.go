@@ -32,8 +32,9 @@ func consensuscmd() {
 	if err != nil {
 		die("Could not get current consensus state:", err)
 	}
-	fmt.Printf(`Block:  %v
+	fmt.Printf(`Synced: %v
+Block:  %v
 Height: %v
 Target: %v
-`, cg.CurrentBlock, cg.Height, cg.Target)
+`, yesNo(cg.Synced), cg.CurrentBlock, cg.Height, cg.Target)
 }
