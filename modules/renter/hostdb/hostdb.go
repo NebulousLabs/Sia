@@ -112,6 +112,9 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 	err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		hdb.lastChange = modules.ConsensusChangeID{}
+		// clear the host sets
+		hdb.activeHosts = make(map[modules.NetAddress]*hostNode)
+		hdb.allHosts = make(map[modules.NetAddress]*hostEntry)
 		// subscribe again using the new ID
 		err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
 	}
