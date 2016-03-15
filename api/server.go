@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -27,6 +28,11 @@ type Server struct {
 	apiServer         *http.Server
 	listener          net.Listener
 	requiredUserAgent string
+
+	// wg is used to block Close() from returning until Serve() has finished. A
+	// WaitGroup is used instead of a chan struct{} so that Close() can be called
+	// without necessarily calling Serve() first.
+	wg sync.WaitGroup
 }
 
 // NewServer creates a new API server from the provided modules.
@@ -56,8 +62,12 @@ func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet
 	return srv, nil
 }
 
-// Serve listens for and handles API calls. It a blocking function.
+// Serve listens for and handles API calls. It is a blocking function.
 func (srv *Server) Serve() error {
+	// Block the Close() method until Serve() has finished.
+	srv.wg.Add(1)
+	defer srv.wg.Done()
+
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
@@ -68,17 +78,31 @@ func (srv *Server) Serve() error {
 		srv.listener.Close()
 	}()
 
-	var errStrs []string
-
 	// The server will run until an error is encountered or the listener is
 	// closed, via either the Close method or the signal handling above.
 	// Closing the listener will result in the benign error handled below.
 	err := srv.apiServer.Serve(srv.listener)
 	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
-		errStrs = append(errStrs, fmt.Sprintf("serve err: %v", err))
+		return err
+	}
+	return nil
+}
+
+// Close closes the Server's listener, causing the HTTP server to shut down.
+func (srv *Server) Close() error {
+	var errStrs []string
+
+	// Close the listener, which will cause Server.Serve() to return.
+	if err := srv.listener.Close(); err != nil {
+		errStrs = append(errStrs, fmt.Sprintf("listener err: %v", err))
 	}
 
-	// safely close each module
+	// Wait for Server.Serve() to exit. We wait so that it's guaranteed that the
+	// server has completely closed after Close() returns. This is particularly
+	// useful during testing so that we don't exit a test before Serve() finishes.
+	srv.wg.Wait()
+
+	// Safely close each module.
 	if srv.host != nil {
 		if err := srv.host.Close(); err != nil {
 			errStrs = append(errStrs, fmt.Sprintf("host err: %v", err))
@@ -115,9 +139,4 @@ func (srv *Server) Serve() error {
 		return errors.New(strings.Join(errStrs, "\n"))
 	}
 	return nil
-}
-
-// Close closes the Server's listener, causing the HTTP server to shut down.
-func (srv *Server) Close() error {
-	return srv.listener.Close()
 }
