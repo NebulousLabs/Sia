@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 )
@@ -14,10 +15,13 @@ import (
 type closeableFile struct {
 	*os.File
 	closed bool
+	mu     sync.RWMutex
 }
 
 // Close closes the file and sets the closed flag.
 func (cf *closeableFile) Close() error {
+	cf.mu.Lock()
+	defer cf.mu.Unlock()
 	// Sanity check - close should not have been called yet.
 	if cf.closed {
 		build.Critical("cannot close the file; already closed")
@@ -32,6 +36,8 @@ func (cf *closeableFile) Close() error {
 
 // Write takes the input data and writes it to the file.
 func (cf *closeableFile) Write(b []byte) (int, error) {
+	cf.mu.RLock()
+	defer cf.mu.RUnlock()
 	// Sanity check - close should not have been called yet.
 	if cf.closed {
 		build.Critical("cannot write to the file after it has been closed")
