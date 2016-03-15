@@ -120,7 +120,11 @@ func (srv *Server) Close() error {
 			errStrs = append(errStrs, fmt.Sprintf("explorer err: %v", err))
 		}
 	}
-	// TODO: close miner
+	if srv.miner != nil {
+		if err := srv.miner.Close(); err != nil {
+			errStrs = append(errStrs, fmt.Sprintf("miner err: %v", err))
+		}
+	}
 	if srv.wallet != nil {
 		// TODO: close wallet and lock the wallet in the wallet's Close method.
 		if srv.wallet.Unlocked() {
