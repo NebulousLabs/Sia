@@ -2,12 +2,15 @@ package gateway
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 )
 
@@ -38,7 +41,7 @@ type Gateway struct {
 
 	persistDir string
 
-	log *log.Logger
+	log *persist.Logger
 	mu  *sync.RWMutex
 }
 
@@ -51,10 +54,12 @@ func (g *Gateway) Address() modules.NetAddress {
 
 // Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
+	var errStrs []string
+
 	id := g.mu.RLock()
 	// save the latest gateway state
 	if err := g.save(); err != nil {
-		return err
+		errStrs = append(errStrs, fmt.Sprintf("save error: %v", err))
 	}
 	g.mu.RUnlock(id)
 	// send close signal
@@ -62,19 +67,24 @@ func (g *Gateway) Close() error {
 	// clear the port mapping (no effect if UPnP not supported)
 	g.clearPort(g.myAddr.Port())
 	// shut down the listener
-	return g.listener.Close()
+	if err := g.listener.Close(); err != nil {
+		errStrs = append(errStrs, fmt.Sprintf("listener error: %v", err))
+	}
+	// Close the logger.
+	if err := g.log.Close(); err != nil {
+		errStrs = append(errStrs, fmt.Sprintf("log error: %v", err))
+	}
+
+	if len(errStrs) > 0 {
+		return errors.New(strings.Join(errStrs, "; "))
+	}
+	return nil
 }
 
 // New returns an initialized Gateway.
 func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Create the directory if it doesn't exist.
 	err = os.MkdirAll(persistDir, 0700)
-	if err != nil {
-		return
-	}
-
-	// Create the logger.
-	logger, err := makeLogger(persistDir)
 	if err != nil {
 		return
 	}
@@ -87,7 +97,12 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 2),
-		log:        logger,
+	}
+
+	// Create the logger.
+	g.log, err = persist.NewLogger(filepath.Join(g.persistDir, logFile))
+	if err != nil {
+		return nil, err
 	}
 
 	// Register RPCs.

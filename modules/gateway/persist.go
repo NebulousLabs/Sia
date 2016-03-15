@@ -1,12 +1,17 @@
 package gateway
 
 import (
-	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+)
+
+const (
+	// nodesFile is the name of the file that contains all seen nodes.
+	nodesFile = "nodes.json"
+	// logFile is the name of the log file.
+	logFile = modules.GatewayDir + ".log"
 )
 
 var persistMetadata = persist.Metadata{
@@ -19,12 +24,12 @@ func (g *Gateway) save() error {
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
-	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.persistDir, "nodes.json"))
+	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.persistDir, nodesFile))
 }
 
 func (g *Gateway) load() error {
 	var nodes []modules.NetAddress
-	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.persistDir, "nodes.json"))
+	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
 	if err != nil {
 		return err
 	}
@@ -32,13 +37,4 @@ func (g *Gateway) load() error {
 		g.addNode(node)
 	}
 	return nil
-}
-
-func makeLogger(persistDir string) (*log.Logger, error) {
-	// if the log file already exists, append to it
-	logFile, err := os.OpenFile(filepath.Join(persistDir, "gateway.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
-	if err != nil {
-		return nil, err
-	}
-	return log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile), nil
 }
