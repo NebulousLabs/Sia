@@ -76,14 +76,20 @@ func (srv *Server) Serve() error {
 	}
 
 	// safely close each module
+	if srv.host != nil {
+		srv.host.Close()
+	}
+	if srv.explorer != nil {
+		srv.explorer.Close()
+	}
+	if srv.wallet != nil {
+		srv.wallet.Lock()
+	}
 	if srv.cs != nil {
 		srv.cs.Close()
 	}
 	if srv.gateway != nil {
 		srv.gateway.Close()
-	}
-	if srv.wallet != nil {
-		srv.wallet.Lock()
 	}
 
 	return nil
