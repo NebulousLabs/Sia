@@ -54,10 +54,15 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 
 		server: srv,
 	}
+	errChan := make(chan error)
 	go func() {
 		listenErr := srv.Serve()
-		if listenErr != nil {
-			t.Fatal("API server quit:", listenErr)
+		errChan <- listenErr
+	}()
+	defer func() {
+		err := <-errChan
+		if err != nil {
+			t.Fatalf("API server quit: %v", err)
 		}
 	}()
 	defer st.server.Close()
