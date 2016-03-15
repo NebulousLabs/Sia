@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -70,7 +71,19 @@ func (g *Gateway) Close() error {
 	if err := g.listener.Close(); err != nil {
 		errStrs = append(errStrs, fmt.Sprintf("listener error: %v", err))
 	}
-	// Close the logger.
+	// Disconnect from peers.
+	for _, p := range g.Peers() {
+		if err := g.Disconnect(p.NetAddress); err != nil {
+			errStrs = append(errStrs, fmt.Sprintf("peer error: %v", err))
+		}
+	}
+	// Sleep to give time for all goroutines to exit. This is necessary because
+	// some goroutines write to the logger so we must give them time to exit
+	// before closing the logger.
+	// TODO: block until goroutines exit instead of sleeping.
+	time.Sleep(100 * time.Millisecond)
+	// Close the logger. The logger should be the last thing to shut down so that
+	// all other objects have access to logging while closing.
 	if err := g.log.Close(); err != nil {
 		errStrs = append(errStrs, fmt.Sprintf("log error: %v", err))
 	}
