@@ -69,13 +69,19 @@ func (srv *Server) Serve() error {
 	defer srv.wg.Done()
 
 	// stop the server if a kill signal is caught
-	sigChan := make(chan os.Signal)
+	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
-	defer signal.Reset(os.Interrupt, os.Kill)
+	defer signal.Stop(sigChan)
+	stop := make(chan struct{})
+	defer close(stop)
 	go func() {
-		<-sigChan
-		fmt.Println("\rCaught stop signal, quitting...")
-		srv.listener.Close()
+		select {
+		case <-sigChan:
+			fmt.Println("\rCaught stop signal, quitting...")
+			srv.listener.Close()
+		case <-stop:
+			// Don't leave a dangling goroutine.
+		}
 	}()
 
 	// The server will run until an error is encountered or the listener is
