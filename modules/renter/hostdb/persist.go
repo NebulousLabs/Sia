@@ -1,9 +1,14 @@
 package hostdb
 
+import (
+	"github.com/NebulousLabs/Sia/modules"
+)
+
 // hdbPersist defines what HostDB data persists across sessions.
 type hdbPersist struct {
 	AllHosts    []hostEntry
 	ActiveHosts []hostEntry
+	LastChange  modules.ConsensusChangeID
 }
 
 // save saves the hostdb persistence data to disk.
@@ -15,6 +20,7 @@ func (hdb *HostDB) save() error {
 	for _, node := range hdb.activeHosts {
 		data.ActiveHosts = append(data.ActiveHosts, *node.hostEntry)
 	}
+	data.LastChange = hdb.lastChange
 	return hdb.persist.save(data)
 }
 
@@ -31,5 +37,6 @@ func (hdb *HostDB) load() error {
 	for _, entry := range data.ActiveHosts {
 		hdb.insertNode(&entry)
 	}
+	hdb.lastChange = data.LastChange
 	return nil
 }

@@ -53,6 +53,7 @@ type HostDB struct {
 	scanPool chan *hostEntry
 
 	blockHeight types.BlockHeight
+	lastChange  modules.ConsensusChangeID
 
 	mu sync.RWMutex
 }
@@ -108,7 +109,12 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 	}
 	go hdb.threadedScan()
 
-	err = cs.ConsensusSetPersistentSubscribe(hdb, modules.ConsensusChangeID{})
+	err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		hdb.lastChange = modules.ConsensusChangeID{}
+		// subscribe again using the new ID
+		err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
+	}
 	if err != nil {
 		return nil, errors.New("hostdb subscription failed: " + err.Error())
 	}
