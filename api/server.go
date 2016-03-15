@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -67,31 +68,52 @@ func (srv *Server) Serve() error {
 		srv.listener.Close()
 	}()
 
+	var errStrs []string
+
 	// The server will run until an error is encountered or the listener is
 	// closed, via either the Close method or the signal handling above.
 	// Closing the listener will result in the benign error handled below.
 	err := srv.apiServer.Serve(srv.listener)
 	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
-		return err
+		errStrs = append(errStrs, fmt.Sprintf("serve err: %v", err))
 	}
 
 	// safely close each module
 	if srv.host != nil {
-		srv.host.Close()
+		if err := srv.host.Close(); err != nil {
+			errStrs = append(errStrs, fmt.Sprintf("host err: %v", err))
+		}
 	}
+	// TODO: close renter (which should close hostdb as well)
 	if srv.explorer != nil {
-		srv.explorer.Close()
+		if err := srv.explorer.Close(); err != nil {
+			errStrs = append(errStrs, fmt.Sprintf("explorer err: %v", err))
+		}
 	}
+	// TODO: close miner
 	if srv.wallet != nil {
-		srv.wallet.Lock()
+		// TODO: close wallet and lock the wallet in the wallet's Close method.
+		if srv.wallet.Unlocked() {
+			if err := srv.wallet.Lock(); err != nil {
+				errStrs = append(errStrs, fmt.Sprintf("wallet err: %v", err))
+			}
+		}
 	}
+	// TODO: close transaction pool
 	if srv.cs != nil {
-		srv.cs.Close()
+		if err := srv.cs.Close(); err != nil {
+			errStrs = append(errStrs, fmt.Sprintf("consensus err: %v", err))
+		}
 	}
 	if srv.gateway != nil {
-		srv.gateway.Close()
+		if err := srv.gateway.Close(); err != nil {
+			errStrs = append(errStrs, fmt.Sprintf("gateway err: %v", err))
+		}
 	}
 
+	if len(errStrs) > 0 {
+		return errors.New(strings.Join(errStrs, "\n"))
+	}
 	return nil
 }
 
