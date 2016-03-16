@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"crypto/rand"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -77,19 +76,6 @@ func (w *Wallet) saveSettings() error {
 	return persist.SaveFile(settingsMetadata, w.persist, filepath.Join(w.persistDir, settingsFile))
 }
 
-// initLog begins logging the wallet, appending to any existing wallet file and
-// writing a startup message to indicate that a new logging instance has been
-// created.
-func (w *Wallet) initLog() error {
-	logFile, err := os.OpenFile(filepath.Join(w.persistDir, logFile), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
-	if err != nil {
-		return err
-	}
-	w.log = log.New(logFile, "", modules.LogSettings)
-	w.log.Println("STARTUP: Wallet logging has started.")
-	return nil
-}
-
 // initSettings creates the settings object at startup. If a settings file
 // exists, the settings file will be loaded into memory. If the settings file
 // does not exist, a new.persist file will be created.
@@ -122,7 +108,7 @@ func (w *Wallet) initPersist() error {
 	}
 
 	// Start logging.
-	err = w.initLog()
+	w.log, err = persist.NewLogger(filepath.Join(w.persistDir, logFile))
 	if err != nil {
 		return err
 	}
