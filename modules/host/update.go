@@ -131,28 +131,17 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				// Check for file contract revisions.
 				if len(txn.FileContractRevisions) > 0 {
 					for _, fcr := range txn.FileContractRevisions {
-						// Check database for relevant revisions.
-						bso := tx.Bucket(bucketStorageObligations)
-						var so storageObligation
-						soBytes := bso.Get(fcr.ParentID[:])
-						if soBytes == nil {
-							// This file contract is not relevant to the host.
-							continue
-						}
-						err := json.Unmarshal(soBytes, &so)
+						so, err := getStorageObligation(tx, fcr.ParentID)
 						if err != nil {
-							h.log.Println(err)
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
 							continue
 						}
 						so.RevisionConfirmed = false
-						soBytes, err = json.Marshal(so)
+						err = putStorageObligation(tx, so)
 						if err != nil {
-							h.log.Println(err)
-							continue
-						}
-						err = bso.Put(fcr.ParentID[:], soBytes)
-						if err != nil {
-							h.log.Println(err)
 							continue
 						}
 					}
@@ -162,27 +151,17 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				if len(txn.StorageProofs) > 0 {
 					for _, sp := range txn.StorageProofs {
 						// Check database for relevant storage proofs.
-						bso := tx.Bucket(bucketStorageObligations)
-						var so storageObligation
-						soBytes := bso.Get(sp.ParentID[:])
-						if soBytes == nil {
-							// This file contract is not relevant to the host.
-							continue
-						}
-						err := json.Unmarshal(soBytes, &so)
+						so, err := getStorageObligation(tx, sp.ParentID)
 						if err != nil {
-							h.log.Println(err)
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
 							continue
 						}
 						so.ProofConfirmed = false
-						soBytes, err = json.Marshal(so)
+						err = putStorageObligation(tx, so)
 						if err != nil {
-							h.log.Println(err)
-							continue
-						}
-						err = bso.Put(sp.ParentID[:], soBytes)
-						if err != nil {
-							h.log.Println(err)
 							continue
 						}
 					}
@@ -203,28 +182,18 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				// Check for file contracts.
 				if len(txn.FileContracts) > 0 {
 					for i := range txn.FileContracts {
-						bso := tx.Bucket(bucketStorageObligations)
-						var so storageObligation
 						fcid := txn.FileContractID(uint64(i))
-						soBytes := bso.Get(fcid[:])
-						if soBytes == nil {
-							// This file contract is not relevant to the host.
-							continue
-						}
-						err := json.Unmarshal(soBytes, &so)
+						so, err := getStorageObligation(tx, fcid)
 						if err != nil {
-							h.log.Println(err)
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
 							continue
 						}
 						so.OriginConfirmed = true
-						soBytes, err = json.Marshal(so)
+						err = putStorageObligation(tx, so)
 						if err != nil {
-							h.log.Println(err)
-							continue
-						}
-						err = bso.Put(fcid[:], soBytes)
-						if err != nil {
-							h.log.Println(err)
 							continue
 						}
 					}
@@ -233,28 +202,17 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				// Check for file contract revisions.
 				if len(txn.FileContractRevisions) > 0 {
 					for _, fcr := range txn.FileContractRevisions {
-						// Check database for relevant revisions.
-						bso := tx.Bucket(bucketStorageObligations)
-						var so storageObligation
-						soBytes := bso.Get(fcr.ParentID[:])
-						if soBytes == nil {
-							// This file contract is not relevant to the host.
-							continue
-						}
-						err := json.Unmarshal(soBytes, &so)
+						so, err := getStorageObligation(tx, fcr.ParentID)
 						if err != nil {
-							h.log.Println(err)
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
 							continue
 						}
 						so.RevisionConfirmed = true
-						soBytes, err = json.Marshal(so)
+						err = putStorageObligation(tx, so)
 						if err != nil {
-							h.log.Println(err)
-							continue
-						}
-						err = bso.Put(fcr.ParentID[:], soBytes)
-						if err != nil {
-							h.log.Println(err)
 							continue
 						}
 					}
@@ -263,28 +221,17 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				// Check for storage proofs.
 				if len(txn.StorageProofs) > 0 {
 					for _, sp := range txn.StorageProofs {
-						// Check database for relevant storage proofs.
-						bso := tx.Bucket(bucketStorageObligations)
-						var so storageObligation
-						soBytes := bso.Get(sp.ParentID[:])
-						if soBytes == nil {
-							// This file contract is not relevant to the host.
-							continue
-						}
-						err := json.Unmarshal(soBytes, &so)
+						so, err := getStorageObligation(tx, sp.ParentID)
 						if err != nil {
-							h.log.Println(err)
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
 							continue
 						}
 						so.ProofConfirmed = true
-						soBytes, err = json.Marshal(so)
+						err = putStorageObligation(tx, so)
 						if err != nil {
-							h.log.Println(err)
-							continue
-						}
-						err = bso.Put(sp.ParentID[:], soBytes)
-						if err != nil {
-							h.log.Println(err)
 							continue
 						}
 					}
