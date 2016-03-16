@@ -2,6 +2,8 @@
 // storing data and advertising available storage to the network.
 package host
 
+// TODO: There may need to be limitations on the window start.
+
 import (
 	"crypto/rand"
 	"errors"
@@ -205,11 +207,11 @@ func (h *Host) initDB() error {
 	})
 }
 
-// newHost returns an initialized Host, taking a series of dependencies in as
-// arguments. By making the dependencies arguments of the 'new' call, the host
-// can be mocked such that the dependencies can return unexpected errors or
-// unique behaviors during testing, enabling easier testing of the failure
-// modes of the Host.
+// newHost returns an initialized Host, taking a set of dependencies as input.
+// By making the dependencies an argument of the 'new' call, the host can be
+// mocked such that the dependencies can return unexpected errors or unique
+// behaviors during testing, enabling easier testing of the failure modes of
+// the Host.
 func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {

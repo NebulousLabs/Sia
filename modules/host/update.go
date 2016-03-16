@@ -111,28 +111,18 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				// Check for file contracts.
 				if len(txn.FileContracts) > 0 {
 					for _ = range txn.FileContracts {
-						bso := tx.Bucket(bucketStorageObligations)
-						var so storageObligation
 						fcid := txn.FileContractID(uint64(i))
-						soBytes := bso.Get(fcid[:])
-						if soBytes == nil {
-							// This file contract is not relevant to the host.
-							continue
-						}
-						err := json.Unmarshal(soBytes, &so)
+						so, err := getStorageObligation(tx, fcid)
 						if err != nil {
-							h.log.Println(err)
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
 							continue
 						}
 						so.OriginConfirmed = false
-						soBytes, err = json.Marshal(so)
+						err = putStorageObligation(tx, so)
 						if err != nil {
-							h.log.Println(err)
-							continue
-						}
-						err = bso.Put(fcid[:], soBytes)
-						if err != nil {
-							h.log.Println(err)
 							continue
 						}
 					}

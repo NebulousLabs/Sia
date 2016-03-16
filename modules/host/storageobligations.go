@@ -12,10 +12,6 @@ package host
 // should not support changing the storage proof window, especially to further
 // in the future.
 
-// TODO: Have the storage obligations operations update the revenue metrics in
-// the host, but let negotiation decide what the revenue metrics are inside of
-// the storage obligation.
-
 import (
 	"encoding/binary"
 	"encoding/json"
@@ -29,6 +25,13 @@ import (
 
 	"github.com/NebulousLabs/bolt"
 	"github.com/NebulousLabs/merkletree"
+)
+
+const (
+	obligationConfused  storageObligationStatus = iota // Indicatees that an unitialized value was used.
+	obligationRejected                                 // Indicates that the obligation never got started, no revenue gained or lost.
+	obligationSucceeded                                // Indicates that the obligation was completed, revenues were gained.
+	obligationFailed                                   // Indicates that the obligation failed, revenues and collateral were lost.
 )
 
 var (
@@ -72,17 +75,22 @@ var (
 	// inputs.
 	errInsaneStorageObligationRevisionData = errors.New("revision to storage obligation has insane data")
 
+	// errObligationLocked is returned when a storage obligation is being put
+	// under lock, but is already locked.
+	errObligationLocked = errors.New("storage obligation is locked, and is unavailable for editing")
+
+	// errObligationUnlocked is returned when a storage obligation is being
+	// removed from lock, but is already unlocked.
+	errObligationUnlocked = errors.New("storage obligation is unlocked, and should not be getting unlocked")
+
 	// errNoBuffer is returned if there is an attempted storage obligation
 	// revision that is acting on a storage obligation which needs to have the
 	// storage proof submitted in less than revisionSubmissionBuffer blocks.
 	errNoBuffer = errors.New("file contract modification rejected because storage proof window is too close")
-)
 
-const (
-	obligationConfused  storageObligationStatus = iota // Indicatees that an unitialized value was used.
-	obligationRejected                                 // Indicates that the obligation never got started, no revenue gained or lost.
-	obligationSucceeded                                // Indicates that the obligation was completed, revenues were gained.
-	obligationFailed                                   // Indicates that the obligation failed, revenues and collateral were lost.
+	// errNoStorageObligation is returned if the requested storage obligation
+	// is not found in the database.
+	errNoStorageObligation = errors.New("storage obligation not found in database")
 )
 
 type storageObligationStatus int
@@ -119,6 +127,30 @@ type storageObligation struct {
 	OriginConfirmed   bool
 	RevisionConfirmed bool
 	ProofConfirmed    bool
+}
+
+// getStorageObligation fetches a storage obligation from the database tx.
+func getStorageObligation(tx *bolt.Tx, soid types.FileContractID) (so storageObligation, err error) {
+	soBytes := tx.Bucket(bucketStorageObligations).Get(soid[:])
+	if soBytes == nil {
+		return storageObligation{}, errNoStorageObligation
+	}
+	err = json.Unmarshal(soBytes, &so)
+	if err != nil {
+		return storageObligation{}, err
+	}
+	return so, nil
+}
+
+// putStorageObligation places a storage obligation into the database,
+// overwriting the existing storage obligation if there is one.
+func putStorageObligation(tx *bolt.Tx, so storageObligation) error {
+	soBytes, err := json.Marshal(so)
+	if err != nil {
+		return err
+	}
+	soid := so.id()
+	return tx.Bucket(bucketStorageObligations).Put(soid[:], soBytes)
 }
 
 // expiration returns the height at which the storage obligation expires.
@@ -305,6 +337,16 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	if err != nil {
 		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
+	return nil
+}
+
+// lockStorageObligation puts a storage obligation under lock in the host.
+func (h *Host) lockStorageObligation(so *storageObligation) error {
+	_, exists := h.lockedStorageObligations[so.id()]
+	if exists {
+		return errObligationLocked
+	}
+	h.lockedStorageObligations[so.id()] = struct{}{}
 	return nil
 }
 
@@ -643,4 +685,16 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		h.removeStorageObligation(so, obligationSucceeded)
 		return
 	}
+}
+
+// unlockStorageObligation takes a storage obligation out from under lock in
+// the host.
+func (h *Host) unlockStorageObligation(so *storageObligation) error {
+	_, exists := h.lockedStorageObligations[so.id()]
+	if !exists {
+		build.Critical(errObligationUnlocked)
+		return errObligationUnlocked
+	}
+	delete(h.lockedStorageObligations, so.id())
+	return nil
 }

@@ -60,9 +60,13 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		}
 		outputPortion := PostTax(currentHeight, fc.Payout)
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
+			println("valid proof problems")
 			return ErrFileContractOutputSumViolation
 		}
 		if missedProofOutputSum.Cmp(outputPortion) != 0 {
+			println("missed proof problems")
+			println(missedProofOutputSum.String())
+			println(outputPortion.String())
 			return ErrFileContractOutputSumViolation
 		}
 	}

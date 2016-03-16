@@ -54,7 +54,7 @@ type (
 	// UnlockHash of the parent file contract. The Payout of the file contract
 	// cannot be changed, but all other fields are allowed to be changed. The
 	// sum of the outputs must match the original payout (taking into account
-	// the fee for valid proof payouts.) A revision number is included. When
+	// the fee for the proof payouts.) A revision number is included. When
 	// getting accepted, the revision number of the revision must be higher
 	// than any previously seen revision number for that file contract.
 	//
