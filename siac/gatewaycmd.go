@@ -111,9 +111,9 @@ func gatewaylistcmd() {
 	}
 	fmt.Println(len(info.Peers), "active peers:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Address\tVersion")
+	fmt.Fprintln(w, "Version\tOutbound\tAddress")
 	for _, peer := range info.Peers {
-		fmt.Fprintf(w, "  %v\t%v\n", peer.NetAddress, peer.Version)
+		fmt.Fprintf(w, "%v\t%v\t%v\n", peer.Version, yesNo(!peer.Inbound), peer.NetAddress)
 	}
 	w.Flush()
 }
