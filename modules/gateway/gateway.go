@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -55,12 +54,12 @@ func (g *Gateway) Address() modules.NetAddress {
 
 // Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
-	var errStrs []string
+	var errs []error
 
-	id := g.mu.RLock()
 	// save the latest gateway state
+	id := g.mu.RLock()
 	if err := g.save(); err != nil {
-		errStrs = append(errStrs, fmt.Sprintf("save error: %v", err))
+		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	g.mu.RUnlock(id)
 	// send close signal
@@ -69,12 +68,12 @@ func (g *Gateway) Close() error {
 	g.clearPort(g.myAddr.Port())
 	// shut down the listener
 	if err := g.listener.Close(); err != nil {
-		errStrs = append(errStrs, fmt.Sprintf("listener error: %v", err))
+		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
 	}
 	// Disconnect from peers.
 	for _, p := range g.Peers() {
 		if err := g.Disconnect(p.NetAddress); err != nil {
-			errStrs = append(errStrs, fmt.Sprintf("peer error: %v", err))
+			errs = append(errs, fmt.Errorf("Disconnect failed: %v", err))
 		}
 	}
 	// Sleep to give time for all goroutines to exit. This is necessary because
@@ -85,13 +84,10 @@ func (g *Gateway) Close() error {
 	// Close the logger. The logger should be the last thing to shut down so that
 	// all other objects have access to logging while closing.
 	if err := g.log.Close(); err != nil {
-		errStrs = append(errStrs, fmt.Sprintf("log error: %v", err))
+		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
 	}
 
-	if len(errStrs) > 0 {
-		return errors.New(strings.Join(errStrs, "; "))
-	}
-	return nil
+	return build.JoinErrors(errs, "; ")
 }
 
 // New returns an initialized Gateway.

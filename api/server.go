@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -96,11 +96,11 @@ func (srv *Server) Serve() error {
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *Server) Close() error {
-	var errStrs []string
+	var errs []error
 
 	// Close the listener, which will cause Server.Serve() to return.
 	if err := srv.listener.Close(); err != nil {
-		errStrs = append(errStrs, fmt.Sprintf("listener err: %v", err))
+		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
 	}
 
 	// Wait for Server.Serve() to exit. We wait so that it's guaranteed that the
@@ -111,42 +111,39 @@ func (srv *Server) Close() error {
 	// Safely close each module.
 	if srv.host != nil {
 		if err := srv.host.Close(); err != nil {
-			errStrs = append(errStrs, fmt.Sprintf("host err: %v", err))
+			errs = append(errs, fmt.Errorf("host.Close failed: %v", err))
 		}
 	}
 	// TODO: close renter (which should close hostdb as well)
 	if srv.explorer != nil {
 		if err := srv.explorer.Close(); err != nil {
-			errStrs = append(errStrs, fmt.Sprintf("explorer err: %v", err))
+			errs = append(errs, fmt.Errorf("explorer.Close failed: %v", err))
 		}
 	}
 	if srv.miner != nil {
 		if err := srv.miner.Close(); err != nil {
-			errStrs = append(errStrs, fmt.Sprintf("miner err: %v", err))
+			errs = append(errs, fmt.Errorf("miner.Close failed: %v", err))
 		}
 	}
 	if srv.wallet != nil {
 		// TODO: close wallet and lock the wallet in the wallet's Close method.
 		if srv.wallet.Unlocked() {
 			if err := srv.wallet.Lock(); err != nil {
-				errStrs = append(errStrs, fmt.Sprintf("wallet err: %v", err))
+				errs = append(errs, fmt.Errorf("wallet.Lock failed: %v", err))
 			}
 		}
 	}
 	// TODO: close transaction pool
 	if srv.cs != nil {
 		if err := srv.cs.Close(); err != nil {
-			errStrs = append(errStrs, fmt.Sprintf("consensus err: %v", err))
+			errs = append(errs, fmt.Errorf("consensusset.Close failed: %v", err))
 		}
 	}
 	if srv.gateway != nil {
 		if err := srv.gateway.Close(); err != nil {
-			errStrs = append(errStrs, fmt.Sprintf("gateway err: %v", err))
+			errs = append(errs, fmt.Errorf("gateway.Close failed: %v", err))
 		}
 	}
 
-	if len(errStrs) > 0 {
-		return errors.New(strings.Join(errStrs, "\n"))
-	}
-	return nil
+	return build.JoinErrors(errs, "\n")
 }
