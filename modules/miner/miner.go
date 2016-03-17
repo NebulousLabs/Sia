@@ -2,6 +2,8 @@ package miner
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -192,16 +194,27 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 // Close terminates all ongoing processes involving the miner, enabling garbage
 // collection.
 func (m *Miner) Close() error {
+	var errStrs []string
+
 	// Save the latest miner state.
 	m.mu.RLock()
 	err := m.save()
 	m.mu.RUnlock()
 	if err != nil {
-		return err
+		errStrs = append(errStrs, fmt.Sprintf("save error: %v", err))
 	}
 
 	m.cs.Unsubscribe(m)
-	return m.log.Close()
+
+	err = m.log.Close()
+	if err != nil {
+		errStrs = append(errStrs, fmt.Sprintf("logger error: %v", err))
+	}
+
+	if len(errStrs) > 0 {
+		return errors.New(strings.Join(errStrs, "; "))
+	}
+	return nil
 }
 
 // checkAddress checks that the miner has an address, fetching an address from

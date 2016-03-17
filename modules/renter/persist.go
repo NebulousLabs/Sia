@@ -6,13 +6,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -20,6 +20,7 @@ import (
 const (
 	PersistFilename = "renter.json"
 	ShareExtension  = ".sia"
+	logFile         = modules.RenterDir + ".log"
 )
 
 var (
@@ -403,12 +404,10 @@ func (r *Renter) initPersist() error {
 	}
 
 	// Initialize the logger.
-	logFile, err := os.OpenFile(filepath.Join(r.persistDir, "renter.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+	r.log, err = persist.NewLogger(filepath.Join(r.persistDir, logFile))
 	if err != nil {
 		return err
 	}
-	r.log = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
-	r.log.Println("STARTUP: Renter has started logging")
 
 	// Load the prior persistance structures.
 	err = r.load()

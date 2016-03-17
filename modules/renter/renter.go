@@ -1,10 +1,9 @@
 package renter
 
 import (
-	"log"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -56,7 +55,7 @@ type Renter struct {
 
 	// resources
 	hostDB hostDB
-	log    *log.Logger
+	log    *persist.Logger
 
 	// variables
 	files         map[string]*file

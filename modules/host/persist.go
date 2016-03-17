@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	// logFile establishes the name of the file that gets used for logging.
+	// settingsFile is the name of the file that stores host settings.
 	settingsFile = "settings.json"
-	logFile      = modules.HostDir + ".log"
+	// logFile establishes the name of the file that gets used for logging.
+	logFile = modules.HostDir + ".log"
 )
 
 // persistMetadata is the header that gets written to the persist file, and is

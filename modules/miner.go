@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"io"
+
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -71,4 +73,5 @@ type TestMiner interface {
 type Miner interface {
 	BlockManager
 	CPUMiner
+	io.Closer
 }

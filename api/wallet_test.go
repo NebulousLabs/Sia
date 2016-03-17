@@ -54,10 +54,15 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 
 		server: srv,
 	}
+	errChan := make(chan error)
 	go func() {
 		listenErr := srv.Serve()
-		if listenErr != nil {
-			t.Fatal("API server quit:", listenErr)
+		errChan <- listenErr
+	}()
+	defer func() {
+		err := <-errChan
+		if err != nil {
+			t.Fatalf("API server quit: %v", err)
 		}
 	}()
 	defer st.server.Close()
@@ -68,7 +73,7 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 		t.Fatal(err)
 	}
 	if wg.Encrypted {
-		t.Error("Wallet has never been unlocked")
+		t.Error("Wallet has never been encrypted")
 	}
 	if wg.Unlocked {
 		t.Error("Wallet has never been unlocked")
@@ -240,7 +245,7 @@ func TestIntegrationWalletTransactionGETid(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestIntegrationWalletGETSiacoins")
+	st, err := createServerTester("TestIntegrationWalletTransactionGETid")
 	if err != nil {
 		t.Fatal(err)
 	}

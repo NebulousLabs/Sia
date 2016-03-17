@@ -7,7 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-var (
+const (
 	// RenterDir is the name of the directory that is used to store the
 	// renter's persistent data.
 	RenterDir = "renter"
