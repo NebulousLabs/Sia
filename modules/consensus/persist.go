@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -13,7 +15,8 @@ import (
 const (
 	// DatabaseFilename contains the filename of the database that will be used
 	// when managing consensus.
-	DatabaseFilename = "consensus.db"
+	DatabaseFilename = modules.ConsensusDir + ".db"
+	logFile          = modules.ConsensusDir + ".log"
 )
 
 // loadDB pulls all the blocks that have been saved to disk into memory, using
@@ -55,6 +58,12 @@ func (cs *ConsensusSet) loadDB() error {
 func (cs *ConsensusSet) initPersist() error {
 	// Create the consensus directory.
 	err := os.MkdirAll(cs.persistDir, 0700)
+	if err != nil {
+		return err
+	}
+
+	// Initialize the logger.
+	cs.log, err = persist.NewLogger(filepath.Join(cs.persistDir, logFile))
 	if err != nil {
 		return err
 	}
