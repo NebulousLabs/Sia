@@ -237,8 +237,10 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-					// TODO: log error returned by AcceptBlock if non-nill
-					cs.AcceptBlock(b) // NOTE: Error is not handled.
+					err := cs.AcceptBlock(b)
+					if err != nil {
+						cs.log.Println("WARN: failed to accept a future block:", err)
+					}
 				}()
 			}
 			return err

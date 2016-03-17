@@ -328,9 +328,12 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
-		//
-		// TODO: log error returned if non-nill.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+		go func() {
+			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+			if err != nil {
+				cs.log.Println("WARN: failed to get parents of orphan block:", err)
+			}
+		}()
 	}
 	if err != nil {
 		return err
@@ -356,18 +359,24 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	cs.mu.RUnlock()
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
-		//
-		// TODO: log error returned if non-nill.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+		go func() {
+			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+			if err != nil {
+				cs.log.Println("WARN: failed to get parents of orphan header:", err)
+			}
+		}()
 		return nil
 	} else if err != nil {
 		return err
 	}
 	// If the header is valid and extends the heaviest chain, fetch, accept it,
 	// and broadcast it.
-	//
-	// TODO: log error returned if non-nill.
-	go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+	go func() {
+		err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+		if err != nil {
+			cs.log.Println("WARN: failed to get header's corresponding block:", err)
+		}
+	}()
 	return nil
 }
 
@@ -455,15 +464,16 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 			// condition to:
 			//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
 			if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
-				// TODO: log the error returned by RPC.
-
+				cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
 				// Disconnect if there is an unexpected error (not a timeout). This
 				// includes errSendBlocksStalled.
 				//
 				// We disconnect so that these peers are removed from gateway.Peers() and
 				// do not prevent us from marking ourselves as fully synced.
-				cs.gateway.Disconnect(p.NetAddress)
-				// TODO: log error returned by Disconnect
+				err := cs.gateway.Disconnect(p.NetAddress)
+				if err != nil {
+					cs.log.Printf("WARN: disconnecting from peer %v failed: %v", p.NetAddress, err)
+				}
 			}
 		}
 
@@ -478,7 +488,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 		}
 	}
 
-	// TODO: log IBD done.
+	cs.log.Println("INFO: IBD done")
 }
 
 // Synced returns true if the consensus set is synced with the network.
