@@ -182,6 +182,9 @@ type (
 		// Height returns the current height of consensus.
 		Height() types.BlockHeight
 
+		// Synced returns true if the consensus set is synced with the network.
+		Synced() bool
+
 		// InCurrentPath returns true if the block id presented is found in the
 		// current path, false otherwise.
 		InCurrentPath(types.BlockID) bool

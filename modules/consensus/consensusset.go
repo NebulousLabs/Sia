@@ -54,6 +54,10 @@ type ConsensusSet struct {
 	// block.
 	checkingConsistency bool
 
+	// synced is true if initial blockchain download has finished. It indicates
+	// whether the consensus set is synced with the network.
+	synced bool
+
 	// Interfaces to abstract the dependencies of the ConsensusSet.
 	marshaler       encoding.GenericMarshaler
 	blockRuleHelper blockRuleHelper
@@ -127,7 +131,10 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 
-		// TODO: change flag to indicate IBD done.
+		// Mark that we are synced with the network.
+		cs.mu.Lock()
+		cs.synced = true
+		cs.mu.Unlock()
 	}()
 
 	return cs, nil

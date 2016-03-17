@@ -146,11 +146,15 @@ Parameters: none
 Response:
 ```
 struct {
+	synced       types.BlockHeight (bool)
 	height       types.BlockHeight (uint64)
 	currentblock types.BlockID     (string)
 	target       types.Target      (byte array)
 }
 ```
+'synced' is a bool that indicates if the consensus set is synced with the
+network. Will be false during initial blockchain download and true after.
+
 'height' is the number of blocks in the blockchain.
 
 'currentblock' is the hash of the current block.
