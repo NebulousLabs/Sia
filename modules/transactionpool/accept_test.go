@@ -382,3 +382,60 @@ func TestIntegrationNilAccept(t *testing.T) {
 		t.Error("no error returned when submitting nothing to the transaction pool")
 	}
 }
+
+// TestAcceptFCAndConflictingRevision checks that the transaction pool
+// correctly accepts a file contract in a transaction set followed by a correct
+// revision to that file contract in the a following transaction set, with no
+// block separating them. This test was caught by a severe bug in production,
+// which had significantly impacted the renter's functioning in a negative way.
+func TestAcceptFCAndConflictingRevision(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	tpt, err := createTpoolTester("TestAcceptFCAndConflictingRevision")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and fund a valid file contract.
+	builder := tpt.wallet.StartTransaction()
+	payout := types.NewCurrency64(1e9)
+	err = builder.FundSiacoins(payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder.AddFileContract(types.FileContract{
+		WindowStart:        tpt.cs.Height() + 2,
+		WindowEnd:          tpt.cs.Height() + 5,
+		Payout:             payout,
+		ValidProofOutputs:  []types.SiacoinOutput{{Value: types.PostTax(tpt.cs.Height(), payout)}},
+		MissedProofOutputs: []types.SiacoinOutput{{Value: types.PostTax(tpt.cs.Height(), payout)}},
+		UnlockHash:         types.UnlockConditions{}.UnlockHash(),
+	})
+	tSet, err := builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(tSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fcid := tSet[len(tSet)-1].FileContractID(0)
+
+	// Create a file contract revision and submit it.
+	rSet := []types.Transaction{{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID:          fcid,
+			NewRevisionNumber: 2,
+
+			NewWindowStart:        tpt.cs.Height() + 2,
+			NewWindowEnd:          tpt.cs.Height() + 5,
+			NewValidProofOutputs:  []types.SiacoinOutput{{Value: types.PostTax(tpt.cs.Height(), payout)}},
+			NewMissedProofOutputs: []types.SiacoinOutput{{Value: types.PostTax(tpt.cs.Height(), payout)}},
+		}},
+	}}
+	err = tpt.tpool.AcceptTransactionSet(rSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
