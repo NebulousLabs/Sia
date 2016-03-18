@@ -106,5 +106,12 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ h
 	// can't write after we stop the server, so lie a bit.
 	writeSuccess(w)
 
+	// need to flush the response before shutting down the server
+	f, ok := w.(http.Flusher)
+	if !ok {
+		panic("Server does not support flushing")
+	}
+	f.Flush()
+
 	srv.Close()
 }
