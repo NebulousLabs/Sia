@@ -1,5 +1,8 @@
 package host
 
+// TODO: Need to check that 'RevisionConfirmed' is sensitive to whether or not
+// it was the *most recent* revision that got confirmed.
+
 import (
 	"encoding/binary"
 	"encoding/json"
