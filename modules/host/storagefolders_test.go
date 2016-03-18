@@ -84,7 +84,7 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newHostTester("TestAddStorageFolderUIDCollisions")
+	ht, err := blankHostTester("TestAddStorageFolderUIDCollisions")
 	if err != nil {
 		t.Fatal(err)
 	}

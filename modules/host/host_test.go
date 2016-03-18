@@ -2,6 +2,7 @@ package host
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -172,6 +173,27 @@ func newHostTester(name string) (*hostTester, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Create two storage folder for the host, one the minimum size and one
+	// twice the minimum size.
+	storageFolderOne := filepath.Join(ht.persistDir, "hostTesterStorageFolderOne")
+	err = os.Mkdir(storageFolderOne, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	if err != nil {
+		return nil, err
+	}
+	storageFolderTwo := filepath.Join(ht.persistDir, "hostTesterStorageFolderTwo")
+	err = os.Mkdir(storageFolderTwo, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	if err != nil {
+		return nil, err
 	}
 	return ht, nil
 }

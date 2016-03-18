@@ -257,3 +257,14 @@ var (
 	// 'storageObligations' sorted by their file contract id.
 	bucketStorageObligations = []byte("BucketStorageObligations")
 )
+
+// init runs a series of sanity checks to verify that the constants have sane
+// values.
+func init() {
+	// The revision submission buffer should be greater than the resubmission
+	// timeout, because there should be time to perform resubmission if the
+	// first attempt to submit the revision fails.
+	if revisionSubmissionBuffer < resubmissionTimeout {
+		build.Critical("revision submission buffer needs to be larger than or equal to the resubmission timeout")
+	}
+}

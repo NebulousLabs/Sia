@@ -116,6 +116,14 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Remove the storage folders so that the smoke test can start from a
+	// blank state.
+	for i := 0; i < 2; i++ {
+		err = ht.host.RemoveStorageFolder(0, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	// Start by checking that the initial state of the host has no storage
 	// added to it.

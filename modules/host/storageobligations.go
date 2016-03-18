@@ -12,6 +12,22 @@ package host
 // should not support changing the storage proof window, especially to further
 // in the future.
 
+// TODO: Need to queue the action item for checking on the submission status of
+// the file contract revision. Also need to make sure that multiple actions are
+// being taken if needed.
+
+// TODO: Document mistakes that got made when constructing the Sia consensus
+// code. The first is not putting timeouts on keys including signatures? The
+// second was using floating point values in consensus code. The third is that
+// you can't build a concise storage proof (e.g. 0 bytes) for a file contract
+// with a size of 0.
+
+// TODO: Make sure that the origin tranasction set is not submitted to the
+// transaction pool before addSO is called - if it is, there will be a
+// duplicate transaction error, and then the storage obligation will return an
+// error, which is bad. Well, or perhas we just need to have better logic
+// handling.
+
 import (
 	"encoding/binary"
 	"encoding/json"
@@ -83,10 +99,10 @@ var (
 	// removed from lock, but is already unlocked.
 	errObligationUnlocked = errors.New("storage obligation is unlocked, and should not be getting unlocked")
 
-	// errNoBuffer is returned if there is an attempted storage obligation
-	// revision that is acting on a storage obligation which needs to have the
-	// storage proof submitted in less than revisionSubmissionBuffer blocks.
-	errNoBuffer = errors.New("file contract modification rejected because storage proof window is too close")
+	// errNoBuffer is returned if there is an attempted storage obligation that
+	// needs to have the storage proof submitted in less than
+	// revisionSubmissionBuffer blocks.
+	errNoBuffer = errors.New("file contract rejected because storage proof window is too close")
 
 	// errNoStorageObligation is returned if the requested storage obligation
 	// is not found in the database.
@@ -155,12 +171,10 @@ func putStorageObligation(tx *bolt.Tx, so storageObligation) error {
 
 // expiration returns the height at which the storage obligation expires.
 func (so *storageObligation) expiration() types.BlockHeight {
-	originExpiration := so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].WindowStart
 	if len(so.RevisionTransactionSet) > 0 {
-		expiration := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowStart
-		return expiration
+		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowStart
 	}
-	return originExpiration
+	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].WindowStart
 }
 
 // id returns the id of the storage obligation, which is definied by the file
@@ -219,20 +233,39 @@ func (so *storageObligation) isSane() error {
 	return nil
 }
 
+// payous returns the set of valid payouts and missed payouts that represent
+// the latest revision for the storage obligation.
+func (so *storageObligation) payouts() (valid []types.SiacoinOutput, missed []types.SiacoinOutput) {
+	valid = make([]types.SiacoinOutput, 2)
+	missed = make([]types.SiacoinOutput, 2)
+	if len(so.RevisionTransactionSet) > 0 {
+		copy(valid, so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewValidProofOutputs)
+		copy(missed, so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewMissedProofOutputs)
+		return
+	}
+	copy(valid, so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].ValidProofOutputs)
+	copy(missed, so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].MissedProofOutputs)
+	return
+}
+
 // proofDeadline returns the height by which the storage proof must be
 // submitted.
 func (so *storageObligation) proofDeadline() types.BlockHeight {
-	originDeadline := so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].WindowEnd
 	if len(so.RevisionTransactionSet) > 0 {
 		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowEnd
 	}
-	return originDeadline
+	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].WindowEnd
 }
 
 // queueActionItem adds an action item to the host at the input height so that
 // the host knows to perform maintenance on the associated storage obligation
 // when that height is reached.
 func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID) error {
+	// Sanity check - action item should be at a higher height than the current
+	// block height.
+	if height <= h.blockHeight {
+		build.Critical("action item queued improperly")
+	}
 	return h.db.Update(func(tx *bolt.Tx) error {
 		// Translate the height into a byte slice.
 		heightBytes := make([]byte, 8)
@@ -264,6 +297,18 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	_, exists := h.lockedStorageObligations[soid]
 	if !exists {
 		h.log.Critical("addStorageObligation called with an obligation that is not locked")
+	}
+	// Sanity check - There needs to be enough time left on the file contract
+	// for the host to safely submit the file contract revision.
+	if so.expiration()-resubmissionTimeout <= h.blockHeight {
+		h.log.Critical("submission window was not verified before trying to submit a storage obligation")
+		return errNoBuffer
+	}
+	// Sanity check - the resubmission timeout needs to be smaller than storage
+	// proof window.
+	if so.proofDeadline()-so.expiration() <= resubmissionTimeout {
+		h.log.Critical("host is misconfigured - the storage proof window needs to be long enough to resubmit if needed")
+		return errors.New("fill me in")
 	}
 
 	// Add the storage obligation information to the database. Different code
@@ -330,10 +375,12 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	// contract revision to the blockchain, and another to submit the storage
 	// proof.
 	err0 := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
+	// The file contract was already submitted to the blockchain, need to check
+	// after the resubmission timeout that it was submitted successfully.
 	err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
-	err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
-	err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-	err = composeErrors(err0, err1, err2, err3)
+	// The storage proof should be submitted
+	err2 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
+	err = composeErrors(err0, err1, err2)
 	if err != nil {
 		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
@@ -351,7 +398,13 @@ func (h *Host) lockStorageObligation(so *storageObligation) error {
 }
 
 // modifyStorageObligation will take an updated storage obligation along with a
-// list of sector changes and update the database to account for all of it.
+// list of sector changes and update the database to account for all of it. The
+// sector modifications are only used to update the sector database, they will
+// not be used to modify the storage obligation (most importantly, this means
+// that sectorRoots needs to be updated by the calling function). Virtual
+// sectors will be removed the number of times that they are listed, to remove
+// multiple instances of the same virtual sector, the virtural sector will need
+// to appear in 'sectorsRemoved' multiple times. Same with 'sectorsGained'.
 func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []crypto.Hash, sectorsGained []crypto.Hash, gainedSectorData [][]byte) error {
 	// Sanity check - obligation should be under lock while being modified.
 	soid := so.id()
@@ -359,8 +412,8 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 	if !exists {
 		h.log.Critical("modifyStorageObligation called with an obligation that is not locked")
 	}
-	// Sanity check - the height of the revision should be less than the
-	// expiration minus the submission buffer.
+	// Sanity check - there needs to be enough time to submit the file contract
+	// revision to the blockchain.
 	if so.expiration()-revisionSubmissionBuffer <= h.blockHeight {
 		h.log.Critical("revision submission window was not verified before trying to modify a storage obligation")
 		return errNoBuffer
@@ -503,7 +556,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 	}
 
 	// Check if the file contract revision is ready for submission. Check for death.
-	if !so.RevisionConfirmed && so.expiration() < h.blockHeight-revisionSubmissionBuffer {
+	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && so.expiration() < h.blockHeight-revisionSubmissionBuffer {
 		// Sanity check - there should be a file contract revision.
 		rtsLen := len(so.RevisionTransactionSet)
 		if rtsLen < 1 || len(so.RevisionTransactionSet[rtsLen-1].FileContractRevisions) != 1 {
@@ -566,10 +619,11 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 	// Check whether a storage proof is ready to be provided, and whether it
 	// has been accepted. Check for death.
-	if !so.ProofConfirmed && so.expiration()+resubmissionTimeout < h.blockHeight {
+	// TODO: I'm not 100% certain why this is supposed to be triggering.
+	if !so.ProofConfirmed && so.expiration()+resubmissionTimeout >= h.blockHeight {
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
-		if so.proofDeadline() < h.blockHeight {
+		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
 			err := h.removeStorageObligation(so, obligationFailed)
 			if err != nil {
 				h.log.Println(err)
@@ -577,35 +631,27 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			return
 		}
 
-		// Get the segment index that should be used to build the storage
-		// proof.
+		// Get the index of the segment, and the index of the sector containing
+		// the segment.
 		segmentIndex, err := h.cs.StorageProofSegment(so.id())
 		if err != nil {
 			return
 		}
-		// Get the segment within the sector that should be used for the
-		// storage proof.
-		// {
-		// Pull the full sector into memory to build a storage proof on that
-		// sector.
 		sectorIndex := segmentIndex / (modules.SectorSize / crypto.SegmentSize)
-		// Sanity check - sectorIndex should be less than the len of the sector
-		// roots in the storage obligation.
-		if sectorIndex >= uint64(len(so.SectorRoots)) {
-			build.Critical("trying to prove storage on a sector that doesn't seem to exist")
-			return
-		}
+		// Pull the corresponding sector into memory.
 		sectorRoot := so.SectorRoots[sectorIndex]
 		sectorBytes, err := h.readSector(sectorRoot)
 		if err != nil {
 			return
 		}
+
 		// Build the storage proof for just the sector.
-		sectorSegment := (modules.SectorSize / crypto.SegmentSize) % segmentIndex
-		sourceProof, err := crypto.BuildMerkleProof(sectorBytes, sectorSegment)
+		sectorSegment := segmentIndex % (modules.SectorSize / crypto.SegmentSize)
+		proofSet, err := crypto.BuildMerkleProof(sectorBytes, sectorSegment)
 		if err != nil {
 			return
 		}
+
 		// Using the sector, build a cached root.
 		log2SectorSize := uint64(0)
 		for 1<<log2SectorSize < modules.SectorSize {
@@ -616,7 +662,8 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		for _, root := range so.SectorRoots {
 			ct.Push(root[:])
 		}
-		_, proofSet, _, _ := ct.Prove(sourceProof)
+		_, proofSet, _, _ = ct.Prove(proofSet)
+
 		// convert proofSet to base and hashSet
 		base := proofSet[0]
 		hashSet := make([]crypto.Hash, len(proofSet)-1)
@@ -644,15 +691,14 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			return
 		}
 		builder.AddMinerFee(requiredFee)
-		if err != nil {
-			return
-		}
+		builder.AddStorageProof(sp)
 		storageProofSet, err := builder.Sign(true)
 		if err != nil {
 			return
 		}
 		err = h.tpool.AcceptTransactionSet(storageProofSet)
 		if err != nil {
+			println(err.Error())
 			return
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
