@@ -11,6 +11,20 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// settingsFile is the name of the file that stores host settings.
+	settingsFile = "settings.json"
+	// logFile establishes the name of the file that gets used for logging.
+	logFile = modules.HostDir + ".log"
+)
+
+// persistMetadata is the header that gets written to the persist file, and is
+// used to recognize other persist files.
+var persistMetadata = persist.Metadata{
+	Header:  "Sia Host",
+	Version: "0.5.2",
+}
+
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
 	// RPC Metrics.

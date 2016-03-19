@@ -2,12 +2,15 @@ package gateway
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"net"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 )
 
@@ -38,7 +41,7 @@ type Gateway struct {
 
 	persistDir string
 
-	log *log.Logger
+	log *persist.Logger
 	mu  *sync.RWMutex
 }
 
@@ -51,10 +54,12 @@ func (g *Gateway) Address() modules.NetAddress {
 
 // Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
-	id := g.mu.RLock()
+	var errs []error
+
 	// save the latest gateway state
+	id := g.mu.RLock()
 	if err := g.save(); err != nil {
-		return err
+		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	g.mu.RUnlock(id)
 	// send close signal
@@ -62,19 +67,33 @@ func (g *Gateway) Close() error {
 	// clear the port mapping (no effect if UPnP not supported)
 	g.clearPort(g.myAddr.Port())
 	// shut down the listener
-	return g.listener.Close()
+	if err := g.listener.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
+	}
+	// Disconnect from peers.
+	for _, p := range g.Peers() {
+		if err := g.Disconnect(p.NetAddress); err != nil {
+			errs = append(errs, fmt.Errorf("Disconnect failed: %v", err))
+		}
+	}
+	// Sleep to give time for all goroutines to exit. This is necessary because
+	// some goroutines write to the logger so we must give them time to exit
+	// before closing the logger.
+	// TODO: block until goroutines exit instead of sleeping.
+	time.Sleep(100 * time.Millisecond)
+	// Close the logger. The logger should be the last thing to shut down so that
+	// all other objects have access to logging while closing.
+	if err := g.log.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
+	}
+
+	return build.JoinErrors(errs, "; ")
 }
 
 // New returns an initialized Gateway.
 func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Create the directory if it doesn't exist.
 	err = os.MkdirAll(persistDir, 0700)
-	if err != nil {
-		return
-	}
-
-	// Create the logger.
-	logger, err := makeLogger(persistDir)
 	if err != nil {
 		return
 	}
@@ -87,7 +106,12 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 2),
-		log:        logger,
+	}
+
+	// Create the logger.
+	g.log, err = persist.NewLogger(filepath.Join(g.persistDir, logFile))
+	if err != nil {
+		return nil, err
 	}
 
 	// Register RPCs.

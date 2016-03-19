@@ -1,11 +1,10 @@
 package renter
 
 import (
-	"log"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )

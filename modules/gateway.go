@@ -8,6 +8,9 @@ const (
 	// GatewayDir is the name of the directory used to store the gateway's
 	// persistent data.
 	GatewayDir = "gateway"
+	// WellConnectedThreshold is the number of outbound connections at which the
+	// gateway will not attempt to make new outbound connections.
+	WellConnectedThreshold = 8
 )
 
 // TODO: Move this and it's functionality into the gateway package.
@@ -34,6 +37,7 @@ type (
 	Peer struct {
 		NetAddress NetAddress `json:"netaddress"`
 		Version    string     `json:"version"`
+		Inbound    bool       `json:"inbound"`
 	}
 
 	// A PeerConn is the connection type used when communicating with peers during

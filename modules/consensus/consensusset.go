@@ -9,6 +9,7 @@ package consensus
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -64,6 +65,10 @@ type ConsensusSet struct {
 	// performed after a full reorg, but now they are performed after every
 	// block.
 	checkingConsistency bool
+
+	// synced is true if initial blockchain download has finished. It indicates
+	// whether the consensus set is synced with the network.
+	synced bool
 
 	// Interfaces to abstract the dependencies of the ConsensusSet.
 	marshaler       encoding.GenericMarshaler
@@ -123,12 +128,26 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
-	// Register RPCs
-	gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
-	gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock)
-	gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
-	gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
-	gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+	go func() {
+		// Sync with the network. Don't sync if we are testing because typically we
+		// don't have any mock peers to synchronize with in testing.
+		// TODO: figure out a better way to conditionally do IBD. Otherwise this block will never be tested.
+		if build.Release != "testing" {
+			cs.threadedInitialBlockchainDownload()
+		}
+
+		// Register RPCs
+		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
+		gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock)
+		gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
+		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
+		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+
+		// Mark that we are synced with the network.
+		cs.mu.Lock()
+		cs.synced = true
+		cs.mu.Unlock()
+	}()
 
 	return cs, nil
 }

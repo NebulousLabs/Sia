@@ -259,6 +259,10 @@ func (g *mockGatewayCountBroadcasts) Broadcast(name string, obj interface{}, pee
 // Broadcasts one block, no matter how many blocks are sent. In the case 0
 // blocks are sent, tests that Broadcast is never called.
 func TestSendBlocksBroadcastsOnce(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Setup consensus sets.
 	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
 	if err != nil {
@@ -560,6 +564,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer g.Close()
 	err = g.Connect(cst.cs.gateway.Address())
 	if err != nil {
 		t.Fatal(err)
@@ -568,6 +573,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cs.Close()
 
 	// Add a few initial blocks to both consensus sets. These are the blocks we
 	// want to make sure SendBlocks is not sending unnecessarily as both parties
@@ -1225,5 +1231,195 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// Check that cst2 relayed it to cst1.
 	if cst1.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("cst2 did not relay the block to cst1")
+	}
+}
+
+// mockConnMockReadWrite is a mock implementation of net.Conn that returns
+// fails reading or writing if readErr or writeErr is non-nil, respectively.
+type mockConnMockReadWrite struct {
+	net.Conn
+	readErr  error
+	writeErr error
+}
+
+// Read is a mock implementation of conn.Read that fails with the mock error if
+// readErr != nil.
+func (conn mockConnMockReadWrite) Read(b []byte) (n int, err error) {
+	if conn.readErr != nil {
+		return 0, conn.readErr
+	}
+	return conn.Conn.Read(b)
+}
+
+// Write is a mock implementation of conn.Write that fails with the mock error
+// if writeErr != nil.
+func (conn mockConnMockReadWrite) Write(b []byte) (n int, err error) {
+	if conn.writeErr != nil {
+		return 0, conn.writeErr
+	}
+	return conn.Conn.Write(b)
+}
+
+// mockNetError is a mock net.Error.
+type mockNetError struct {
+	error
+	timeout   bool
+	temporary bool
+}
+
+// Timeout is a mock implementation of net.Error.Timeout.
+func (err mockNetError) Timeout() bool {
+	return err.timeout
+}
+
+// Temporary is a mock implementation of net.Error.Temporary.
+func (err mockNetError) Temporary() bool {
+	return err.temporary
+}
+
+// TestThreadedReceiveBlocksStalls tests that threadedReceiveBlocks returns
+// errSendBlocksStalled when the connection times out before a block is
+// received.
+func TestThreadedReceiveBlocksStalls(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cst, err := blankConsensusSetTester("TestThreadedReceiveBlocksStalls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	p1, p2 := net.Pipe()
+	writeTimeoutConn := mockConnMockReadWrite{
+		Conn: p2,
+		writeErr: mockNetError{
+			error:   errors.New("Write timeout"),
+			timeout: true,
+		},
+	}
+	readTimeoutConn := mockConnMockReadWrite{
+		Conn: p2,
+		readErr: mockNetError{
+			error:   errors.New("Read timeout"),
+			timeout: true,
+		},
+	}
+
+	readNetErrConn := mockConnMockReadWrite{
+		Conn: p2,
+		readErr: mockNetError{
+			error: errors.New("mock read net.Error"),
+		},
+	}
+	writeNetErrConn := mockConnMockReadWrite{
+		Conn: p2,
+		writeErr: mockNetError{
+			error: errors.New("mock write net.Error"),
+		},
+	}
+
+	readErrConn := mockConnMockReadWrite{
+		Conn:    p2,
+		readErr: errors.New("mock read err"),
+	}
+	writeErrConn := mockConnMockReadWrite{
+		Conn:     p2,
+		writeErr: errors.New("mock write err"),
+	}
+
+	// Test that threadedReceiveBlocks errors with errSendBlocksStalled when 0
+	// blocks have been sent and the conn times out.
+	err = cst.cs.threadedReceiveBlocks(writeTimeoutConn)
+	if err != errSendBlocksStalled {
+		t.Errorf("expected threadedReceiveBlocks to err with \"%v\", got \"%v\"", errSendBlocksStalled, err)
+	}
+	errChan := make(chan error)
+	go func() {
+		var knownBlocks [32]types.BlockID
+		errChan <- encoding.ReadObject(p1, &knownBlocks, 32*crypto.HashSize)
+	}()
+	err = cst.cs.threadedReceiveBlocks(readTimeoutConn)
+	if err != errSendBlocksStalled {
+		t.Errorf("expected threadedReceiveBlocks to err with \"%v\", got \"%v\"", errSendBlocksStalled, err)
+	}
+	err = <-errChan
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that threadedReceiveBlocks errors when writing the block history fails.
+	// Test with an error of type net.Error.
+	err = cst.cs.threadedReceiveBlocks(writeNetErrConn)
+	if err != writeNetErrConn.writeErr {
+		t.Errorf("expected threadedReceiveBlocks to err with \"%v\", got \"%v\"", writeNetErrConn.writeErr, err)
+	}
+	// Test with an error of type error.
+	err = cst.cs.threadedReceiveBlocks(writeErrConn)
+	if err != writeErrConn.writeErr {
+		t.Errorf("expected threadedReceiveBlocks to err with \"%v\", got \"%v\"", writeErrConn.writeErr, err)
+	}
+
+	// Test that threadedReceiveBlocks errors when reading blocks fails.
+	// Test with an error of type net.Error.
+	go func() {
+		var knownBlocks [32]types.BlockID
+		errChan <- encoding.ReadObject(p1, &knownBlocks, 32*crypto.HashSize)
+	}()
+	err = cst.cs.threadedReceiveBlocks(readNetErrConn)
+	if err != readNetErrConn.readErr {
+		t.Errorf("expected threadedReceiveBlocks to err with \"%v\", got \"%v\"", readNetErrConn.readErr, err)
+	}
+	err = <-errChan
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test with an error of type error.
+	go func() {
+		var knownBlocks [32]types.BlockID
+		errChan <- encoding.ReadObject(p1, &knownBlocks, 32*crypto.HashSize)
+	}()
+	err = cst.cs.threadedReceiveBlocks(readErrConn)
+	if err != readErrConn.readErr {
+		t.Errorf("expected threadedReceiveBlocks to err with \"%v\", got \"%v\"", readErrConn.readErr, err)
+	}
+	err = <-errChan
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: Test that threadedReceiveBlocks doesn't error with a timeout if it has received one block before this timed out read/write.
+
+	// TODO: Test that threadedReceiveBlocks doesn't error with errSendBlocksStalled if it successfully received one block.
+}
+
+// TestIntegrationSendBlocksStalls tests that the SendBlocks RPC fails with
+// errSendBlockStalled when the RPC timesout and the requesting end has
+// received 0 blocks.
+func TestIntegrationSendBlocksStalls(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cstLocal, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstLocal.Close()
+	cstRemote, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - remote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cstRemote.Close()
+
+	cstLocal.cs.gateway.Connect(cstRemote.cs.gateway.Address())
+
+	// Lock the remote CST so that SendBlocks blocks and timesout.
+	cstRemote.cs.mu.Lock()
+	defer cstRemote.cs.mu.Unlock()
+	err = cstLocal.cs.gateway.RPC(cstRemote.cs.gateway.Address(), "SendBlocks", cstLocal.cs.threadedReceiveBlocks)
+	if err != errSendBlocksStalled {
+		t.Fatal(err)
 	}
 }

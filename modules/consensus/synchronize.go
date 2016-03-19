@@ -1,6 +1,10 @@
 package consensus
 
 import (
+	"errors"
+	"net"
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -10,22 +14,57 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
+const (
+	// minNumOutbound is the minimum number of outbound peers required before ibd
+	// is confident we are synced.
+	minNumOutbound = 5
+)
+
 var (
 	// MaxCatchUpBlocks is the maxiumum number of blocks that can be given to
 	// the consensus set in a single iteration during the initial blockchain
 	// download.
 	MaxCatchUpBlocks = func() types.BlockHeight {
 		switch build.Release {
-		case "testing":
-			return 3
+		case "dev":
+			return 50
 		case "standard":
 			return 10
-		case "dev":
-			return 10
+		case "testing":
+			return 3
 		default:
 			panic("unrecognized build.Release")
 		}
 	}()
+	// sendBlocksTimeout is the timeout for the SendBlocks RPC.
+	sendBlocksTimeout = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 40 * time.Second
+		case "standard":
+			return 5 * time.Minute
+		case "testing":
+			return 5 * time.Second
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
+	// minIBDWaitTime is the time threadedInitialBlockchainDownload waits before
+	// exiting if there are >= 1 and <= minNumOutbound peers synced.
+	minIBDWaitTime = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 80 * time.Second
+		case "standard":
+			return 10 * time.Minute
+		case "testing":
+			return 10 * time.Second
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
+
+	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
 
 // blockHistory returns up to 32 block ids, starting with recent blocks and
@@ -71,10 +110,35 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 }
 
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
-func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
+func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
+	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
+	// SendBlocks will timeout. This is by design so that IBD switches peers to
+	// prevent any one peer from stalling IBD.
+	err := conn.SetDeadline(time.Now().Add(sendBlocksTimeout))
+	// Ignore errors returned by SetDeadline if the conn is a pipe in testing.
+	// Pipes do not support Set{,Read,Write}Deadline and should only be used in
+	// testing.
+	if opErr, ok := err.(*net.OpError); ok && opErr.Op == "set" && opErr.Net == "pipe" && build.Release == "testing" {
+		err = nil
+	}
+	if err != nil {
+		return err
+	}
+	stalled := true
+	defer func() {
+		// TODO: Timeout errors returned by muxado do not conform to the net.Error
+		// interface and therefore we cannot check if the error is a timeout using
+		// the Timeout() method. Once muxado issue #14 is resolved change the below
+		// condition to:
+		//     if netErr, ok := returnErr.(net.Error); ok && netErr.Timeout() && stalled { ... }
+		if stalled && returnErr != nil && (returnErr.Error() == "Read timeout" || returnErr.Error() == "Write timeout") {
+			returnErr = errSendBlocksStalled
+		}
+	}()
+
 	// Get blockIDs to send.
 	var history [32]types.BlockID
-	err := cs.db.View(func(tx *bolt.Tx) error {
+	err = cs.db.View(func(tx *bolt.Tx) error {
 		history = blockHistory(tx)
 		return nil
 	})
@@ -125,6 +189,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 
 		// Integrate the blocks into the consensus set.
 		for _, block := range newBlocks {
+			stalled = false
 			// Call managedAcceptBlock instead of AcceptBlock so as not to broadcast
 			// every block.
 			acceptErr := cs.managedAcceptBlock(block)
@@ -354,4 +419,65 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		return nil
 	}
 	return managedFN
+}
+
+// threadedInitialBlockchainDownload performs the IBD on outbound peers. Blocks
+// are downloaded from one peer at a time in 5 minute intervals, so as to
+// prevent any one peer from significantly slowing down IBD.
+//
+// NOTE: IBD will succeed right now when each peer has a different blockchain.
+// The height and the block id of the remote peers' current blocks are not
+// checked to be the same. This can cause issues if you are connected to
+// outbound peers <= v0.5.1 that are stalled in IBD.
+func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
+	// Set the deadline 10 minutes in the future. After this deadline, we will say
+	// IBD is done as long as there is at least one outbound peer synced.
+	deadline := time.Now().Add(minIBDWaitTime)
+	for {
+		numOutboundSynced := 0
+		for _, p := range cs.gateway.Peers() {
+			// We only sync on outbound peers at first to make IBD less susceptible to
+			// fast-mining and other attacks, as outbound peers are more difficult to
+			// manipulate.
+			if p.Inbound {
+				continue
+			}
+
+			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
+			if err == nil {
+				numOutboundSynced++
+				continue
+			}
+			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+				// TODO: log the error returned by RPC.
+
+				// Disconnect if there is an unexpected error (not a timeout). This
+				// includes errSendBlocksStalled.
+				//
+				// We disconnect so that these peers are removed from gateway.Peers() and
+				// do not prevent us from marking ourselves as fully synced.
+				cs.gateway.Disconnect(p.NetAddress)
+				// TODO: log error returned by Disconnect
+			}
+		}
+
+		// If we have minNumOutbound peers synced, we are done. Otherwise, don't say
+		// we are synced until we've been doing ibd for 10 minutes and we are synced
+		// with at least one peer.
+		if numOutboundSynced >= minNumOutbound || (numOutboundSynced > 0 && time.Now().After(deadline)) {
+			break
+		} else {
+			// Sleep so we don't hammer the network with SendBlock requests.
+			time.Sleep(minIBDWaitTime / 10)
+		}
+	}
+
+	// TODO: log IBD done.
+}
+
+// Synced returns true if the consensus set is synced with the network.
+func (cs *ConsensusSet) Synced() bool {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	return cs.synced
 }

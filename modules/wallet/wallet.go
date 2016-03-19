@@ -2,12 +2,12 @@ package wallet
 
 import (
 	"errors"
-	"log"
 	"sort"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -93,7 +93,7 @@ type Wallet struct {
 	historicClaimStarts map[types.SiafundOutputID]types.Currency
 
 	persistDir string
-	log        *log.Logger
+	log        *persist.Logger
 	mu         sync.RWMutex
 }
 
