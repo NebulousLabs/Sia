@@ -386,8 +386,7 @@ func TestIntegrationNilAccept(t *testing.T) {
 // TestAcceptFCAndConflictingRevision checks that the transaction pool
 // correctly accepts a file contract in a transaction set followed by a correct
 // revision to that file contract in the a following transaction set, with no
-// block separating them. This test was caught by a severe bug in production,
-// which had significantly impacted the renter's functioning in a negative way.
+// block separating them.
 func TestAcceptFCAndConflictingRevision(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
