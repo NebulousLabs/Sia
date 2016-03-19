@@ -285,7 +285,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	if err != nil {
 		return err
 	}
-	// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
+	// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
 	var relayBlockPeers, relayHeaderPeers []modules.Peer
 	for _, p := range cs.gateway.Peers() {
 		if build.VersionCmp(p.Version, "0.5.1") <= 0 {

@@ -160,7 +160,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()
-			// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
+			// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
 			var relayBlockPeers, relayHeaderPeers []modules.Peer
 			for _, p := range cs.gateway.Peers() {
 				if build.VersionCmp(p.Version, "0.5.1") <= 0 {
@@ -313,6 +313,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 }
 
 // rpcRelayBlock is an RPC that accepts a block from a peer.
+// COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
