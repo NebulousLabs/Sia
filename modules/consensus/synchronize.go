@@ -448,7 +448,12 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 				numOutboundSynced++
 				continue
 			}
-			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+			// TODO: Timeout errors returned by muxado do not conform to the net.Error
+			// interface and therefore we cannot check if the error is a timeout using
+			// the Timeout() method. Once muxado issue #14 is resolved change the below
+			// condition to:
+			//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
+			if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
 				// TODO: log the error returned by RPC.
 
 				// Disconnect if there is an unexpected error (not a timeout). This
