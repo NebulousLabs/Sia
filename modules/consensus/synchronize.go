@@ -443,8 +443,9 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 	// Set the deadline 10 minutes in the future. After this deadline, we will say
 	// IBD is done as long as there is at least one outbound peer synced.
 	deadline := time.Now().Add(minIBDWaitTime)
+	numOutboundSynced := 0
 	for {
-		numOutboundSynced := 0
+		numOutboundSynced = 0
 		for _, p := range cs.gateway.Peers() {
 			// We only sync on outbound peers at first to make IBD less susceptible to
 			// fast-mining and other attacks, as outbound peers are more difficult to
@@ -488,7 +489,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 		}
 	}
 
-	cs.log.Println("INFO: IBD done")
+	cs.log.Printf("INFO: IBD done, synced with %v peers", numOutboundSynced)
 }
 
 // Synced returns true if the consensus set is synced with the network.
