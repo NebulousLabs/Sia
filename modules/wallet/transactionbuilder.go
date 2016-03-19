@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -500,9 +501,26 @@ func (tb *transactionBuilder) View() (types.Transaction, []types.Transaction) {
 // typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
 // registers a new transaction without parents.
 func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
+	// Create a deep copy of the transaction and parents by encoding them. A
+	// deep copy ensures that there are no pointer or slice related errors -
+	// the builder will be working directly on the transaction, and the
+	// transaction may be in use elsewhere (in this case, the host is using the
+	// transaction.
+	pBytes := encoding.Marshal(parents)
+	var pCopy []types.Transaction
+	err := encoding.Unmarshal(pBytes, &pCopy)
+	if err != nil {
+		panic(err)
+	}
+	tBytes := encoding.Marshal(t)
+	var tCopy types.Transaction
+	err = encoding.Unmarshal(tBytes, &tCopy)
+	if err != nil {
+		panic(err)
+	}
 	return &transactionBuilder{
-		parents:     parents,
-		transaction: t,
+		parents:     pCopy,
+		transaction: tCopy,
 
 		wallet: w,
 	}

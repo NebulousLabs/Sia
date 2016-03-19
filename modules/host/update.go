@@ -113,8 +113,8 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			for i, txn := range block.Transactions {
 				// Check for file contracts.
 				if len(txn.FileContracts) > 0 {
-					for _ = range txn.FileContracts {
-						fcid := txn.FileContractID(uint64(i))
+					for j = range txn.FileContracts {
+						fcid := txn.FileContractID(uint64(j))
 						so, err := getStorageObligation(tx, fcid)
 						if err != nil {
 							// The storage folder may not exist, or the disk
@@ -256,6 +256,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			existingItems := bai.Get(heightBytes)
 
 			// From the existing items, pull out a storage obligation.
+			knownActionItems := make(map[types.FileContractID]struct{})
 			obligationIDs := make([]types.FileContractID, len(existingItems)/crypto.HashSize)
 			for i := 0; i < len(existingItems); i += crypto.HashSize {
 				copy(obligationIDs[i/crypto.HashSize][:], existingItems[i:i+crypto.HashSize])
@@ -268,7 +269,11 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 				if err != nil {
 					return err
 				}
-				actionItems = append(actionItems, &so)
+				_, exists := knownActionItems[soid]
+				if !exists {
+					actionItems = append(actionItems, &so)
+					knownActionItems[soid] = struct{}{}
+				}
 			}
 		}
 		return nil

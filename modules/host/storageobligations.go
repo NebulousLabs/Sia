@@ -28,6 +28,8 @@ package host
 // error, which is bad. Well, or perhas we just need to have better logic
 // handling.
 
+// TODO: Make sure that not too many action items are being created.
+
 import (
 	"encoding/binary"
 	"encoding/json"
@@ -274,8 +276,10 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 		// Get the list of action items already at this height and extend it.
 		bai := tx.Bucket(bucketActionItems)
 		existingItems := bai.Get(heightBytes)
-		existingItems = append(existingItems, id[:]...)
-		return bai.Put(heightBytes, existingItems)
+		var extendedItems = make([]byte, len(existingItems), len(existingItems)+len(id[:]))
+		copy(extendedItems, existingItems)
+		extendedItems = append(extendedItems, id[:]...)
+		return bai.Put(heightBytes, extendedItems)
 	})
 }
 
@@ -378,9 +382,13 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	// The file contract was already submitted to the blockchain, need to check
 	// after the resubmission timeout that it was submitted successfully.
 	err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
+	// Queue an action item to submit the file contract revision - if there is
+	// never a file contract revision, the handling of this action item will be
+	// a no-op.
+	err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
 	// The storage proof should be submitted
-	err2 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
-	err = composeErrors(err0, err1, err2)
+	err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
+	err = composeErrors(err0, err1, err2, err3)
 	if err != nil {
 		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
@@ -552,11 +560,10 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		if err != nil {
 			h.log.Println(err)
 		}
-		return
 	}
 
 	// Check if the file contract revision is ready for submission. Check for death.
-	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && so.expiration() < h.blockHeight-revisionSubmissionBuffer {
+	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && h.blockHeight > so.expiration()-revisionSubmissionBuffer {
 		// Sanity check - there should be a file contract revision.
 		rtsLen := len(so.RevisionTransactionSet)
 		if rtsLen < 1 || len(so.RevisionTransactionSet[rtsLen-1].FileContractRevisions) != 1 {
@@ -565,7 +572,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		}
 
 		// Check if the revision has failed to submit correctly.
-		if so.expiration() > h.blockHeight {
+		if h.blockHeight > so.expiration() {
 			// TODO: Check this error.
 			//
 			// TODO: this is not quite right, because a previous revision may
@@ -614,13 +621,13 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			h.log.Println(err)
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
-		return
+		// return
 	}
 
 	// Check whether a storage proof is ready to be provided, and whether it
 	// has been accepted. Check for death.
 	// TODO: I'm not 100% certain why this is supposed to be triggering.
-	if !so.ProofConfirmed && so.expiration()+resubmissionTimeout >= h.blockHeight {
+	if !so.ProofConfirmed && h.blockHeight < so.expiration()+resubmissionTimeout {
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
 		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
@@ -698,18 +705,16 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		}
 		err = h.tpool.AcceptTransactionSet(storageProofSet)
 		if err != nil {
-			println(err.Error())
 			return
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
 
 		// Queue another action item to check whether there the storage proof
 		// got confirmed.
-		err = h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
+		err = h.queueActionItem(h.blockHeight+types.BlockHeight(storageProofConfirmations), so.id())
 		if err != nil {
 			h.log.Println(err)
 		}
-		return
 	}
 
 	// Save the storage obligation to account for any fee changes.
@@ -727,9 +732,10 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 	// Check if all items have succeded with the required confirmations. Report
 	// success, delete the obligation.
-	if so.ProofConfirmed && so.expiration()+types.BlockHeight(storageProofConfirmations) < h.blockHeight {
+	//
+	// TODO: This doesn't actually wait enough blocks?
+	if so.ProofConfirmed && h.blockHeight >= so.expiration()+types.BlockHeight(storageProofConfirmations) {
 		h.removeStorageObligation(so, obligationSucceeded)
-		return
 	}
 }
 

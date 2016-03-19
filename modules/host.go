@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	// Some RPCs allow for acceptance or rejection. AcceptResponse is the
-	// response given to indicate acceptance. (Any other string indicates
-	// rejection, and describes the reason for rejection.)
+	// AcceptResponse is the response given to an RPC call to indicate
+	// acceptance. (Any other string indicates rejection, and describes the
+	// reason for rejection.)
 	AcceptResponse = "accept"
 
 	// HostDir names the directory that contains the host persistence.
@@ -89,8 +89,8 @@ type (
 	HostBandwidthLimits struct {
 		DownloadDataLimit  uint64 `json:"downloaddatalimit"`
 		DownloadSpeedLimit uint64 `json:"downloadspeedlimit"`
-		UploadDataLimit    uint64 `json:uploaddatalimit"`
-		UploadSpeedLimit   uint64 `json:uploadspeedlimit"`
+		UploadDataLimit    uint64 `json:"uploaddatalimit"`
+		UploadSpeedLimit   uint64 `json:"uploadspeedlimit"`
 	}
 
 	// HostAnnouncement declares a nodes intent to be a host, providing a net

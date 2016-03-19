@@ -44,11 +44,7 @@ func (ht *hostTester) newTesterStorageObligation() (*storageObligation, error) {
 		return nil, err
 	}
 	// Add the file contract that consumes the funds.
-	emptyRoot := crypto.MerkleRoot(nil)
 	_ = builder.AddFileContract(types.FileContract{
-		FileSize:       0,
-		FileMerkleRoot: emptyRoot,
-
 		// Because this file contract needs to be able to accept file contract
 		// revisions, the expiration is put more than
 		// 'revisionSubmissionBuffer' blocks into the future.
@@ -559,6 +555,143 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ht.host.storageRevenue.Cmp(sectorCost.Add(sectorCost2)) != 0 {
+		t.Fatal("the host should be reporting revenue after a successful storage proof")
+	}
+}
+
+// TestAutoRevisionSubmission checks that the host correctly submits a file
+// contract revision to the consensus set.
+func TestAutoRevisionSubmission(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester("TestAutoRevisionSubmission")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start by adding a storage obligation to the host. To emulate conditions
+	// of a renter creating the first contract, the storage obligation has no
+	// data, but does have money.
+	so, err := ht.newTesterStorageObligation()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.lockStorageObligation(so)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.addStorageObligation(so)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.unlockStorageObligation(so)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Storage obligation should not be marked as having the transaction
+	// confirmed on the blockchain.
+	if so.OriginConfirmed {
+		t.Fatal("storage obligation should not yet be marked as confirmed, confirmation is on the way")
+	}
+
+	// Add a file contract revision, moving over a small amount of money to pay
+	// for the file contract.
+	sectorRoot, sectorData, err := randSector()
+	if err != nil {
+		t.Fatal(err)
+	}
+	so.SectorRoots = []crypto.Hash{sectorRoot}
+	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
+	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
+	ht.host.potentialStorageRevenue = ht.host.potentialStorageRevenue.Add(sectorCost)
+	validPayouts, missedPayouts := so.payouts()
+	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)
+	validPayouts[1].Value = validPayouts[1].Value.Add(sectorCost)
+	missedPayouts[0].Value = missedPayouts[0].Value.Sub(sectorCost)
+	missedPayouts[1].Value = missedPayouts[1].Value.Add(sectorCost)
+	revisionSet := []types.Transaction{{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID:          so.id(),
+			UnlockConditions:  types.UnlockConditions{},
+			NewRevisionNumber: 1,
+
+			NewFileSize:           uint64(len(sectorData)),
+			NewFileMerkleRoot:     sectorRoot,
+			NewWindowStart:        so.expiration(),
+			NewWindowEnd:          so.proofDeadline(),
+			NewValidProofOutputs:  validPayouts,
+			NewMissedProofOutputs: missedPayouts,
+			NewUnlockHash:         types.UnlockConditions{}.UnlockHash(),
+		}},
+	}}
+	so.RevisionTransactionSet = revisionSet
+	err = ht.host.lockStorageObligation(so)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.modifyStorageObligation(so, nil, []crypto.Hash{sectorRoot}, [][]byte{sectorData})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.unlockStorageObligation(so)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Unlike the other tests, this test does not submit the file contract
+	// revision to the transaction pool for the host, the host is expected to
+	// do it automatically.
+
+	// Mine until the host submits a storage proof.
+	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+3; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = ht.host.db.View(func(tx *bolt.Tx) error {
+		*so, err = getStorageObligation(tx, so.id())
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !so.OriginConfirmed {
+		t.Fatal("origin transaction for storage obligation was not confirmed after blocks were mined")
+	}
+	if !so.RevisionConfirmed {
+		t.Fatal("revision transaction for storage obligation was not confirmed after blocks were mined")
+	}
+	if !so.ProofConfirmed {
+		t.Fatal("storage obligation is not saying that the storage proof was confirmed on the blockchain")
+	}
+
+	// Mine blocks until the storage proof has enough confirmations that the
+	// host will delete the file entirely.
+	for i := 0; i <= storageProofConfirmations; i++ {
+		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = ht.host.db.View(func(tx *bolt.Tx) error {
+		*so, err = getStorageObligation(tx, so.id())
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != errNoStorageObligation {
+		t.Error(so.OriginConfirmed)
+		t.Error(so.RevisionConfirmed)
+		t.Error(so.ProofConfirmed)
+		t.Fatal(err)
+	}
+	if ht.host.storageRevenue.Cmp(sectorCost) != 0 {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }

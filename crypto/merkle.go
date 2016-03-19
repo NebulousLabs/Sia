@@ -95,7 +95,8 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base []byte, hashSet []Ha
 	return
 }
 
-// BuildMerkleProof will build a proof that the segment at
+// BuildMerkleProof will build a proof that the segment at the provided proof
+// index is a part of the provided data.
 func BuildMerkleProof(sourceData []byte, proofIndex uint64) (proofSet [][]byte, err error) {
 	// Get the proof set for the sourceData and proofIndex.
 	tree := merkletree.New(NewHash())
