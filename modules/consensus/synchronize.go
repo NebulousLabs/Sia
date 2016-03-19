@@ -156,7 +156,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 	// is to stop an attacker from preventing block broadcasts.
 	chainExtended := false
 	defer func() {
-		if chainExtended {
+		if chainExtended && cs.Synced() {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()

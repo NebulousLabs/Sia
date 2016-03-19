@@ -285,15 +285,60 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 	tests := []struct {
 		blocksToMine          int
 		expectedNumBroadcasts int
+		synced                bool
 	}{
-		{0, 0},
-		{1, 2},
-		{2, 2},
-		{int(MaxCatchUpBlocks), 2},
-		{2 * int(MaxCatchUpBlocks), 2},
-		{2*int(MaxCatchUpBlocks) + 1, 2},
+		// Test that no blocks are broadcast during IBD.
+		{
+			blocksToMine:          0,
+			expectedNumBroadcasts: 0,
+			synced:                false,
+		},
+		{
+			blocksToMine:          1,
+			expectedNumBroadcasts: 0,
+			synced:                false,
+		},
+		{
+			blocksToMine:          2,
+			expectedNumBroadcasts: 0,
+			synced:                false,
+		},
+		// Test that only one blocks is broadcast when IBD is done.
+		{
+			blocksToMine:          0,
+			expectedNumBroadcasts: 0,
+			synced:                true,
+		},
+		{
+			blocksToMine:          1,
+			expectedNumBroadcasts: 2,
+			synced:                true,
+		},
+		{
+			blocksToMine:          2,
+			expectedNumBroadcasts: 2,
+			synced:                true,
+		},
+		{
+			blocksToMine:          int(MaxCatchUpBlocks),
+			expectedNumBroadcasts: 2,
+			synced:                true,
+		},
+		{
+			blocksToMine:          2 * int(MaxCatchUpBlocks),
+			expectedNumBroadcasts: 2,
+			synced:                true,
+		},
+		{
+			blocksToMine:          2*int(MaxCatchUpBlocks) + 1,
+			expectedNumBroadcasts: 2,
+			synced:                true,
+		},
 	}
 	for _, test := range tests {
+		cst1.cs.mu.Lock()
+		cst1.cs.synced = test.synced
+		cst1.cs.mu.Unlock()
 		mg.mu.Lock()
 		mg.numBroadcasts = 0
 		mg.mu.Unlock()
