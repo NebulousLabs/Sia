@@ -92,3 +92,93 @@ func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
 		t.Error("padded segment proof failed")
 	}
 }
+
+// TestCachedTree tests the cached tree functions of the package.
+func TestCachedTree(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Build a cached tree out of 4 subtrees, each subtree of height 2 (4
+	// elements).
+	tree1Bytes, err := RandBytes(SegmentSize * 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree2Bytes, err := RandBytes(SegmentSize * 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree3Bytes, err := RandBytes(SegmentSize * 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree4Bytes, err := RandBytes(SegmentSize * 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree1Root, err := ReaderMerkleRoot(bytes.NewReader(tree1Bytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree2Root, err := ReaderMerkleRoot(bytes.NewReader(tree2Bytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree3Root, err := ReaderMerkleRoot(bytes.NewReader(tree3Bytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree4Root, err := ReaderMerkleRoot(bytes.NewReader(tree4Bytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fullRoot, err := ReaderMerkleRoot(bytes.NewReader(append(tree1Bytes, append(tree2Bytes, append(tree3Bytes, tree4Bytes...)...)...)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get a cached proof for index 0.
+	base, cachedHashSet, err := BuildReaderProof(bytes.NewReader(tree1Bytes), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !VerifySegment(base, cachedHashSet, 4, 0, tree1Root) {
+		t.Fatal("the proof for the subtree was invalid")
+	}
+	ct := NewCachedTree(2)
+	ct.SetIndex(0)
+	ct.Push(tree1Root)
+	ct.Push(tree2Root)
+	ct.Push(tree3Root)
+	ct.Push(tree4Root)
+	hashSet := ct.Prove(base, cachedHashSet)
+	if !VerifySegment(base, hashSet, 4*4, 0, fullRoot) {
+		t.Fatal("cached proof construction appears unsuccessful")
+	}
+	if ct.Root() != fullRoot {
+		t.Fatal("cached Merkle root is not matching the full Merkle root")
+	}
+
+	// Get a cached proof for index 6.
+	base, cachedHashSet, err = BuildReaderProof(bytes.NewReader(tree2Bytes), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !VerifySegment(base, cachedHashSet, 4, 2, tree2Root) {
+		t.Fatal("the proof for the subtree was invalid")
+	}
+	ct = NewCachedTree(2)
+	ct.SetIndex(6)
+	ct.Push(tree1Root)
+	ct.Push(tree2Root)
+	ct.Push(tree3Root)
+	ct.Push(tree4Root)
+	hashSet = ct.Prove(base, cachedHashSet)
+	if !VerifySegment(base, hashSet, 4*4, 6, fullRoot) {
+		t.Fatal("cached proof construction appears unsuccessful")
+	}
+	if ct.Root() != fullRoot {
+		t.Fatal("cached Merkle root is not matching the full Merkle root")
+	}
+}

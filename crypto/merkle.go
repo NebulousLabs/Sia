@@ -48,7 +48,8 @@ type CachedMerkleTree struct {
 	merkletree.CachedTree
 }
 
-// NewCached returns a new cached tree object.
+// NewCached returns a new cached tree object. A tree of height 1 will have 2
+// elements in each subtree, at height 2 there are 4 elements, etc.
 func NewCachedTree(height uint64) *CachedMerkleTree {
 	return &CachedMerkleTree{*merkletree.NewCachedTree(NewHash(), height)}
 }
@@ -73,16 +74,15 @@ func (ct *CachedMerkleTree) Prove(base []byte, cachedHashSet []Hash) []Hash {
 	return hashSet
 }
 
+// Push pushes a subtree Merkle root into a cached Merkle tree.
+func (ct *CachedMerkleTree) Push(h Hash) {
+	ct.CachedTree.Push(h[:])
+}
+
 // Root returns the Merkle root of all the objects pushed to the tree.
 func (ct *CachedMerkleTree) Root() (h Hash) {
 	copy(h[:], ct.CachedTree.Root())
 	return
-}
-
-// SetIndex establishes the index that should be used when creating a proof for
-// the data being put into the tree.
-func (ct *CachedMerkleTree) SetIndex(i uint64) error {
-	return ct.CachedTree.SetIndex(i)
 }
 
 // Calculates the number of leaves in the file when building a Merkle tree.
