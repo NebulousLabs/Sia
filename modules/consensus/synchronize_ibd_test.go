@@ -236,7 +236,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 		errSendBlocksStalled,
 		// rpcErrs that should not cause a disconnect.
 		mockNetError{
-			error:   errors.New("mock timeout error"),
+			error:   errors.New("Read timeout"),
 			timeout: true,
 		},
 		// Need at least minNumOutbound peers that return nil for
@@ -347,7 +347,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	defer gatewayTimesout.Close()
 	mg.mu.Lock()
 	mg.rpcErrs[gatewayTimesout.Address()] = mockNetError{
-		error:   errors.New("mock timeout error"),
+		error:   errors.New("Read timeout"),
 		timeout: true,
 	}
 	mg.mu.Unlock()
@@ -390,7 +390,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		defer tmpG.Close()
 		mg.mu.Lock()
 		mg.rpcErrs[tmpG.Address()] = mockNetError{
-			error:   errors.New("mock timeout error"),
+			error:   errors.New("Write timeout"),
 			timeout: true,
 		}
 		mg.mu.Unlock()

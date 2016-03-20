@@ -156,11 +156,11 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 	// is to stop an attacker from preventing block broadcasts.
 	chainExtended := false
 	defer func() {
-		if chainExtended {
+		if chainExtended && cs.Synced() {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()
-			// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
+			// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
 			var relayBlockPeers, relayHeaderPeers []modules.Peer
 			for _, p := range cs.gateway.Peers() {
 				if build.VersionCmp(p.Version, "0.5.1") <= 0 {
@@ -313,6 +313,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 }
 
 // rpcRelayBlock is an RPC that accepts a block from a peer.
+// COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
@@ -448,7 +449,12 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 				numOutboundSynced++
 				continue
 			}
-			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+			// TODO: Timeout errors returned by muxado do not conform to the net.Error
+			// interface and therefore we cannot check if the error is a timeout using
+			// the Timeout() method. Once muxado issue #14 is resolved change the below
+			// condition to:
+			//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
+			if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
 				// TODO: log the error returned by RPC.
 
 				// Disconnect if there is an unexpected error (not a timeout). This
