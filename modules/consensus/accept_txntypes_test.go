@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -236,10 +235,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	if err != nil {
 		panic(err)
 	}
-	segment, hashSet, err := crypto.BuildReaderProof(bytes.NewReader(file), segmentIndex)
-	if err != nil {
-		panic(err)
-	}
+	segment, hashSet := crypto.MerkleProof(file, segmentIndex)
 	sp := types.StorageProof{
 		ParentID: fcid,
 		HashSet:  hashSet,
@@ -523,10 +519,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	if err != nil {
 		panic(err)
 	}
-	segment, hashSet, err := crypto.BuildReaderProof(bytes.NewReader(file), segmentIndex)
-	if err != nil {
-		panic(err)
-	}
+	segment, hashSet := crypto.MerkleProof(file, segmentIndex)
 	sp := types.StorageProof{
 		ParentID: fcid,
 		HashSet:  hashSet,

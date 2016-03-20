@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/rand"
 	"testing"
 )
@@ -49,21 +48,14 @@ func TestStorageProof(t *testing.T) {
 
 	// Create and verify proofs for all indices.
 	for i := uint64(0); i < numSegments; i++ {
-		baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), i)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
+		baseSegment, hashSet := MerkleProof(data, i)
 		if !VerifySegment(baseSegment, hashSet, numSegments, i, rootHash) {
 			t.Error("Proof", i, "did not pass verification")
 		}
 	}
 
 	// Try an incorrect proof.
-	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	baseSegment, hashSet := MerkleProof(data, 3)
 	if VerifySegment(baseSegment, hashSet, numSegments, 4, rootHash) {
 		t.Error("Verified a bad proof")
 	}
@@ -78,10 +70,7 @@ func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
 	rootHash := MerkleRoot(data)
 
 	// Create and verify a proof for the last index.
-	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 2)
-	if err != nil {
-		t.Error(err)
-	}
+	baseSegment, hashSet := MerkleProof(data, 2)
 	if !VerifySegment(baseSegment, hashSet, 3, 2, rootHash) {
 		t.Error("padded segment proof failed")
 	}
@@ -118,10 +107,7 @@ func TestCachedTree(t *testing.T) {
 	fullRoot := MerkleRoot(append(tree1Bytes, append(tree2Bytes, append(tree3Bytes, tree4Bytes...)...)...))
 
 	// Get a cached proof for index 0.
-	base, cachedHashSet, err := BuildReaderProof(bytes.NewReader(tree1Bytes), 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, cachedHashSet := MerkleProof(tree1Bytes, 0)
 	if !VerifySegment(base, cachedHashSet, 4, 0, tree1Root) {
 		t.Fatal("the proof for the subtree was invalid")
 	}
@@ -140,10 +126,7 @@ func TestCachedTree(t *testing.T) {
 	}
 
 	// Get a cached proof for index 6.
-	base, cachedHashSet, err = BuildReaderProof(bytes.NewReader(tree2Bytes), 2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, cachedHashSet = MerkleProof(tree2Bytes, 2)
 	if !VerifySegment(base, cachedHashSet, 4, 2, tree2Root) {
 		t.Fatal("the proof for the subtree was invalid")
 	}

@@ -31,7 +31,6 @@ package host
 // TODO: Make sure that not too many action items are being created.
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -654,10 +653,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 		// Build the storage proof for just the sector.
 		sectorSegment := segmentIndex % (modules.SectorSize / crypto.SegmentSize)
-		base, cachedHashSet, err := crypto.BuildReaderProof(bytes.NewReader(sectorBytes), sectorSegment)
-		if err != nil {
-			return
-		}
+		base, cachedHashSet := crypto.MerkleProof(sectorBytes, sectorSegment)
 
 		// Using the sector, build a cached root.
 		log2SectorSize := uint64(0)

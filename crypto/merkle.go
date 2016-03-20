@@ -7,8 +7,6 @@ package crypto
 // be able to interact with this file.
 
 import (
-	"io"
-
 	"github.com/NebulousLabs/Sia/encoding"
 
 	"github.com/NebulousLabs/merkletree"
@@ -107,19 +105,26 @@ func MerkleRoot(b []byte) Hash {
 	return t.Root()
 }
 
-// BuildReaderProof will build a storage proof when given a reader.
-func BuildReaderProof(r io.Reader, proofIndex uint64) (base []byte, hashSet []Hash, err error) {
-	_, proofSet, _, err := merkletree.BuildReaderProof(r, NewHash(), SegmentSize, proofIndex)
-	if err != nil {
-		return
+// MerkleProof will build a storage proof for an index.
+func MerkleProof(b []byte, proofIndex uint64) (base []byte, hashSet []Hash) {
+	t := NewTree()
+	t.SetIndex(proofIndex)
+	for len(b) >= SegmentSize {
+		t.Push(b[:SegmentSize])
+		b = b[SegmentSize:]
 	}
-	// convert proofSet to base and hashSet
+	if len(b) > 0 {
+		t.Push(b)
+	}
+	_, proofSet, _, _ := t.Prove()
+
+	// Convert proofSet to base and hashSet.
 	base = proofSet[0]
 	hashSet = make([]Hash, len(proofSet)-1)
 	for i, proof := range proofSet[1:] {
 		copy(hashSet[i][:], proof)
 	}
-	return
+	return base, hashSet
 }
 
 // VerifySegment will verify that a segment, given the proof, is a part of a
