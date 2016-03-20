@@ -31,6 +31,7 @@ package host
 // TODO: Make sure that not too many action items are being created.
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -42,7 +43,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
-	"github.com/NebulousLabs/merkletree"
 )
 
 const (
@@ -627,7 +627,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 	// Check whether a storage proof is ready to be provided, and whether it
 	// has been accepted. Check for death.
 	// TODO: I'm not 100% certain why this is supposed to be triggering.
-	if !so.ProofConfirmed && h.blockHeight < so.expiration()+resubmissionTimeout {
+	if !so.ProofConfirmed && h.blockHeight >= so.expiration()+resubmissionTimeout {
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
 		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
@@ -654,7 +654,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 		// Build the storage proof for just the sector.
 		sectorSegment := segmentIndex % (modules.SectorSize / crypto.SegmentSize)
-		proofSet, err := crypto.BuildMerkleProof(sectorBytes, sectorSegment)
+		base, cachedHashSet, err := crypto.BuildReaderProof(bytes.NewReader(sectorBytes), sectorSegment)
 		if err != nil {
 			return
 		}
@@ -664,19 +664,12 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		for 1<<log2SectorSize < modules.SectorSize {
 			log2SectorSize++
 		}
-		ct := merkletree.NewCachedTree(crypto.NewHash(), log2SectorSize)
+		ct := crypto.NewCachedTree(log2SectorSize)
 		ct.SetIndex(segmentIndex)
 		for _, root := range so.SectorRoots {
 			ct.Push(root[:])
 		}
-		_, proofSet, _, _ = ct.Prove(proofSet)
-
-		// convert proofSet to base and hashSet
-		base := proofSet[0]
-		hashSet := make([]crypto.Hash, len(proofSet)-1)
-		for i, proof := range proofSet[1:] {
-			copy(hashSet[i][:], proof)
-		}
+		hashSet := ct.Prove(base, cachedHashSet)
 		sp := types.StorageProof{
 			ParentID: so.id(),
 			HashSet:  hashSet,

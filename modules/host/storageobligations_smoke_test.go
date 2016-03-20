@@ -279,7 +279,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	}
 
 	// Mine until the host submits a storage proof.
-	for i := 0; i <= resubmissionTimeout*2+2; i++ {
+	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+2+resubmissionTimeout; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -294,6 +294,12 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !so.OriginConfirmed {
+		t.Fatal("origin transaction for storage obligation was not confirmed after a block was mined")
+	}
+	if !so.RevisionConfirmed {
+		t.Fatal("revision transaction for storage obligation was not confirmed after a block was mined")
 	}
 	if !so.ProofConfirmed {
 		t.Fatal("storage obligation is not saying that the storage proof was confirmed on the blockchain")
@@ -516,7 +522,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	}
 
 	// Mine until the host submits a storage proof.
-	for i := 0; i <= resubmissionTimeout*2+2; i++ {
+	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+1+resubmissionTimeout; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -644,7 +650,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	// do it automatically.
 
 	// Mine until the host submits a storage proof.
-	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+3; i++ {
+	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+2+resubmissionTimeout; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)

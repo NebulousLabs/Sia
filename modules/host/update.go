@@ -110,10 +110,10 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	err := h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
-			for i, txn := range block.Transactions {
+			for _, txn := range block.Transactions {
 				// Check for file contracts.
 				if len(txn.FileContracts) > 0 {
-					for j = range txn.FileContracts {
+					for j := range txn.FileContracts {
 						fcid := txn.FileContractID(uint64(j))
 						so, err := getStorageObligation(tx, fcid)
 						if err != nil {

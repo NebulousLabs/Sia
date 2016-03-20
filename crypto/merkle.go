@@ -1,5 +1,11 @@
 package crypto
 
+// TODO: It's likely that all of the readers in this file can be replaced with
+// simple byte slices, I believe that in the vast majority of cases things are
+// now handled one sector at a time, meaning that the callers are actually
+// creating new readers out of byte slices the majority of the time in order to
+// be able to interact with this file.
+
 import (
 	"io"
 
@@ -30,14 +36,6 @@ func (t *MerkleTree) PushObject(obj interface{}) {
 	t.Push(encoding.Marshal(obj))
 }
 
-// ReadSegments reads segments from r into the tree. If EOF is encountered
-// mid-segment, the leaf is resized to the number of bytes read and then added
-// to the tree.  No error is returned unless err != io.EOF && err !=
-// io.errUnexpectedEOF
-func (t *MerkleTree) ReadSegments(r io.Reader) error {
-	return t.ReadAll(r, SegmentSize)
-}
-
 // Root returns the Merkle root of all the objects pushed to the tree.
 func (t *MerkleTree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
@@ -55,10 +53,36 @@ func NewCachedTree(height uint64) *CachedMerkleTree {
 	return &CachedMerkleTree{*merkletree.NewCachedTree(NewHash(), height)}
 }
 
+// Prove returns a proof that the data at the previously established index is a
+// part of the tree. The input is a proof that the data is in the sub-tree.
+func (ct *CachedMerkleTree) Prove(base []byte, cachedHashSet []Hash) []Hash {
+	// Turn the input in to a proof set that will be recognized by the high
+	// level tree.
+	cachedProofSet := make([][]byte, len(cachedHashSet)+1)
+	cachedProofSet[0] = base
+	for i := range cachedHashSet {
+		cachedProofSet[i+1] = cachedHashSet[i][:]
+	}
+	_, proofSet, _, _ := ct.CachedTree.Prove(cachedProofSet)
+
+	// convert proofSet to base and hashSet
+	hashSet := make([]Hash, len(proofSet)-1)
+	for i, proof := range proofSet[1:] {
+		copy(hashSet[i][:], proof)
+	}
+	return hashSet
+}
+
 // Root returns the Merkle root of all the objects pushed to the tree.
-func (t *CachedMerkleTree) Root() (h Hash) {
-	copy(h[:], t.CachedTree.Root())
+func (ct *CachedMerkleTree) Root() (h Hash) {
+	copy(h[:], ct.CachedTree.Root())
 	return
+}
+
+// SetIndex establishes the index that should be used when creating a proof for
+// the data being put into the tree.
+func (ct *CachedMerkleTree) SetIndex(i uint64) error {
+	return ct.CachedTree.SetIndex(i)
 }
 
 // Calculates the number of leaves in the file when building a Merkle tree.
@@ -93,22 +117,6 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base []byte, hashSet []Ha
 		copy(hashSet[i][:], proof)
 	}
 	return
-}
-
-// BuildMerkleProof will build a proof that the segment at the provided proof
-// index is a part of the provided data.
-func BuildMerkleProof(sourceData []byte, proofIndex uint64) (proofSet [][]byte, err error) {
-	// Get the proof set for the sourceData and proofIndex.
-	tree := merkletree.New(NewHash())
-	err = tree.SetIndex(proofIndex)
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < len(sourceData); i += SegmentSize {
-		tree.Push(sourceData[i : i+SegmentSize])
-	}
-	_, proofSet, _, _ = tree.Prove()
-	return proofSet, nil
 }
 
 // VerifySegment will verify that a segment, given the proof, is a part of a
