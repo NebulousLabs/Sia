@@ -531,6 +531,12 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !so.OriginConfirmed {
+		t.Fatal("origin transaction for storage obligation was not confirmed after a block was mined")
+	}
+	if !so.RevisionConfirmed {
+		t.Fatal("revision transaction for storage obligation was not confirmed after a block was mined")
+	}
 	if !so.ProofConfirmed {
 		t.Fatal("storage obligation is not saying that the storage proof was confirmed on the blockchain")
 	}

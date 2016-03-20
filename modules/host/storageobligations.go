@@ -625,7 +625,6 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 	// Check whether a storage proof is ready to be provided, and whether it
 	// has been accepted. Check for death.
-	// TODO: I'm not 100% certain why this is supposed to be triggering.
 	if !so.ProofConfirmed && h.blockHeight >= so.expiration()+resubmissionTimeout {
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
@@ -657,7 +656,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 		// Using the sector, build a cached root.
 		log2SectorSize := uint64(0)
-		for 1<<log2SectorSize < modules.SectorSize {
+		for 1<<log2SectorSize < (modules.SectorSize / crypto.SegmentSize) {
 			log2SectorSize++
 		}
 		ct := crypto.NewCachedTree(log2SectorSize)
