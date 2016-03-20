@@ -54,10 +54,7 @@ func createSector() (sectorRoot crypto.Hash, sectorData []byte, err error) {
 	if err != nil {
 		return crypto.Hash{}, nil, err
 	}
-	sectorRoot, err = crypto.ReaderMerkleRoot(bytes.NewReader(sectorData))
-	if err != nil {
-		return crypto.Hash{}, nil, err
-	}
+	sectorRoot = crypto.MerkleRoot(sectorData)
 	return sectorRoot, sectorData, nil
 }
 

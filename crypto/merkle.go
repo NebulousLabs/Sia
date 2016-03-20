@@ -94,14 +94,17 @@ func CalculateLeaves(fileSize uint64) uint64 {
 	return numSegments
 }
 
-// ReaderMerkleRoot returns the Merkle root of a reader.
-func ReaderMerkleRoot(r io.Reader) (h Hash, err error) {
-	root, err := merkletree.ReaderRoot(r, NewHash(), SegmentSize)
-	if err != nil {
-		return
+// MerkleRoot returns the Merkle root of a reader.
+func MerkleRoot(b []byte) Hash {
+	t := NewTree()
+	for len(b) >= SegmentSize {
+		t.Push(b[:SegmentSize])
+		b = b[SegmentSize:]
 	}
-	copy(h[:], root)
-	return
+	if len(b) > 0 {
+		t.Push(b)
+	}
+	return t.Root()
 }
 
 // BuildReaderProof will build a storage proof when given a reader.

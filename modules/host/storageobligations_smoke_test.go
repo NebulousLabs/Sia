@@ -6,7 +6,6 @@ package host
 // correctly.
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -23,10 +22,7 @@ func randSector() (crypto.Hash, []byte, error) {
 	if err != nil {
 		return crypto.Hash{}, nil, err
 	}
-	sectorRoot, err := crypto.ReaderMerkleRoot(bytes.NewReader(sectorData))
-	if err != nil {
-		return crypto.Hash{}, nil, err
-	}
+	sectorRoot := crypto.MerkleRoot(sectorData)
 	return sectorRoot, sectorData, nil
 }
 
@@ -459,10 +455,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	missedPayouts[0].Value = missedPayouts[0].Value.Sub(sectorCost2)
 	missedPayouts[1].Value = missedPayouts[1].Value.Add(sectorCost2)
 	combinedSectors := append(sectorData, sectorData2...)
-	combinedRoot, err := crypto.ReaderMerkleRoot(bytes.NewBuffer(combinedSectors))
-	if err != nil {
-		t.Fatal(err)
-	}
+	combinedRoot := crypto.MerkleRoot(combinedSectors)
 	revisionSet2 := []types.Transaction{{
 		FileContractRevisions: []types.FileContractRevision{{
 			ParentID:          so.id(),

@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"fmt"
+	"bytes"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -171,12 +171,11 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file := randFile(filesize)
-	merkleRoot, err := crypto.ReaderMerkleRoot(file)
+	file, err := crypto.RandBytes(int(filesize))
 	if err != nil {
 		panic(err)
 	}
-	file.Seek(0, 0)
+	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a file contract that will be successful.
 	validProofDest := randAddress()
@@ -237,7 +236,7 @@ func (cst *consensusSetTester) testValidStorageProofBlocks() {
 	if err != nil {
 		panic(err)
 	}
-	segment, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
+	segment, hashSet, err := crypto.BuildReaderProof(bytes.NewReader(file), segmentIndex)
 	if err != nil {
 		panic(err)
 	}
@@ -421,12 +420,11 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	// Create a file (as a bytes.Buffer) that will be used for the file
 	// contract.
 	filesize := uint64(4e3)
-	file := randFile(filesize)
-	merkleRoot, err := crypto.ReaderMerkleRoot(file)
+	file, err := crypto.RandBytes(int(filesize))
 	if err != nil {
 		panic(err)
 	}
-	file.Seek(0, 0)
+	merkleRoot := crypto.MerkleRoot(file)
 
 	// Create a spendable unlock hash for the file contract.
 	sk, pk, err := crypto.GenerateKeyPair()
@@ -525,7 +523,7 @@ func (cst *consensusSetTester) testFileContractRevision() {
 	if err != nil {
 		panic(err)
 	}
-	segment, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
+	segment, hashSet, err := crypto.BuildReaderProof(bytes.NewReader(file), segmentIndex)
 	if err != nil {
 		panic(err)
 	}
@@ -641,9 +639,6 @@ func (cst *consensusSetTester) testSpendSiafunds() {
 	for i, id := range claimIDs {
 		dsco, err := cst.cs.dbGetDSCO(cst.cs.dbBlockHeight()+types.MaturityDelay, id)
 		if err != nil {
-			fmt.Println(id)
-			fmt.Println(cst.cs.dbBlockHeight())
-			fmt.Println(cst.cs.dbBlockHeight() + types.MaturityDelay - 1)
 			panic(err)
 		}
 		if dsco.Value.Cmp(claimValues[i]) != 0 {

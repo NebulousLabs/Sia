@@ -1,7 +1,6 @@
 package contractor
 
 import (
-	"bytes"
 	"errors"
 	"net"
 	"time"
@@ -90,14 +89,14 @@ func (he *hostEditor) Upload(data []byte) (uint64, error) {
 	piecePrice := types.NewCurrency64(uint64(len(data))).Mul(types.NewCurrency64(uint64(he.contract.FileContract.WindowStart - height))).Mul(he.price)
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
-	pieceRoot, _ := crypto.ReaderMerkleRoot(bytes.NewReader(data))
+	pieceRoot := crypto.MerkleRoot(data)
 
 	// calculate the new total Merkle root
 	tree := crypto.NewCachedTree(0) // height is not relevant here
 	for _, h := range he.contract.MerkleRoots {
-		tree.Push(h[:])
+		tree.Push(h)
 	}
-	tree.Push(pieceRoot[:])
+	tree.Push(pieceRoot)
 	merkleRoot := tree.Root()
 
 	// revise the file contract

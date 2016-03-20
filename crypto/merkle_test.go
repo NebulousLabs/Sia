@@ -45,10 +45,7 @@ func TestStorageProof(t *testing.T) {
 	numSegments := uint64(7)
 	data := make([]byte, numSegments*SegmentSize)
 	rand.Read(data)
-	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootHash := MerkleRoot(data)
 
 	// Create and verify proofs for all indices.
 	for i := uint64(0); i < numSegments; i++ {
@@ -78,10 +75,7 @@ func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
 	// Generate proof data.
 	data := make([]byte, (2*SegmentSize)+10)
 	rand.Read(data)
-	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootHash := MerkleRoot(data)
 
 	// Create and verify a proof for the last index.
 	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 2)
@@ -117,26 +111,11 @@ func TestCachedTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree1Root, err := ReaderMerkleRoot(bytes.NewReader(tree1Bytes))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree2Root, err := ReaderMerkleRoot(bytes.NewReader(tree2Bytes))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree3Root, err := ReaderMerkleRoot(bytes.NewReader(tree3Bytes))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree4Root, err := ReaderMerkleRoot(bytes.NewReader(tree4Bytes))
-	if err != nil {
-		t.Fatal(err)
-	}
-	fullRoot, err := ReaderMerkleRoot(bytes.NewReader(append(tree1Bytes, append(tree2Bytes, append(tree3Bytes, tree4Bytes...)...)...)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	tree1Root := MerkleRoot(tree1Bytes)
+	tree2Root := MerkleRoot(tree2Bytes)
+	tree3Root := MerkleRoot(tree3Bytes)
+	tree4Root := MerkleRoot(tree4Bytes)
+	fullRoot := MerkleRoot(append(tree1Bytes, append(tree2Bytes, append(tree3Bytes, tree4Bytes...)...)...))
 
 	// Get a cached proof for index 0.
 	base, cachedHashSet, err := BuildReaderProof(bytes.NewReader(tree1Bytes), 0)
