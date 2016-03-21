@@ -55,7 +55,7 @@ func TestLogger(t *testing.T) {
 // TestLoggerCritical prints a critical message from the logger.
 func TestLoggerCritical(t *testing.T) {
 	// Create a folder for the log file.
-	testdir := build.TempDir(persistDir, "TestLogger")
+	testdir := build.TempDir(persistDir, "TestLoggerCritical")
 	err := os.MkdirAll(testdir, 0700)
 	if err != nil {
 		t.Fatal(err)
