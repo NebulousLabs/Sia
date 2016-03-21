@@ -1,29 +1,30 @@
 package crypto
 
-// TODO: It's likely that all of the readers in this file can be replaced with
-// simple byte slices, I believe that in the vast majority of cases things are
-// now handled one sector at a time, meaning that the callers are actually
-// creating new readers out of byte slices the majority of the time in order to
-// be able to interact with this file.
-
 import (
+	"bytes"
+
 	"github.com/NebulousLabs/Sia/encoding"
 
 	"github.com/NebulousLabs/merkletree"
 )
 
 const (
-	SegmentSize = 64 // number of bytes that are hashed to form each base leaf of the Merkle tree
+	// SegmentSize is the chunk size that is used when taking the Merkle root
+	// of a file. 64 is chosen because bandwidth is scarce and it optimizes for
+	// the smallest possible storage proofs. Using a larger base, even 256
+	// bytes, would result in substantially faster hashing, but the bandwidth
+	// tradeoff was deemed to be more important, as blockchain space is scarce.
+	SegmentSize = 64
 )
 
-// MerkleTree wraps the merkletree.Tree type, providing convenient
-// Sia-specific functionality.
+// MerkleTree wraps merkletree.Tree, changing some of the function definitions
+// to assume sia-specific constants and return sia-specific types.
 type MerkleTree struct {
 	merkletree.Tree
 }
 
-// NewTree returns a tree object that can be used to get the Merkle root of a
-// dataset.
+// NewTree returns a MerkleTree, which can be used for getting Merkle roots and
+// Merkle proofs on data. See merkletree.Tree for more details.
 func NewTree() *MerkleTree {
 	return &MerkleTree{*merkletree.New(NewHash())}
 }
@@ -34,26 +35,29 @@ func (t *MerkleTree) PushObject(obj interface{}) {
 	t.Push(encoding.Marshal(obj))
 }
 
-// Root returns the Merkle root of all the objects pushed to the tree.
+// Root is a redefinition of merkletree.Tree.Root, returning a Hash instead of
+// a []byte.
 func (t *MerkleTree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
 	return
 }
 
-// CachedMerkleTree wraps the merkletree.CachedTree type, providing convenient
-// Sia-specific functionality.
+// CachedMerkleTree wraps merkletree.CachedTree, changing some of the function
+// definitions to assume sia-specific constants and return sia-specific types.
 type CachedMerkleTree struct {
 	merkletree.CachedTree
 }
 
-// NewCached returns a new cached tree object. A tree of height 1 will have 2
-// elements in each subtree, at height 2 there are 4 elements, etc.
+// NewCachedTree returns a CachedMerkleTree, which can be used for getting
+// Merkle roots and proofs from data that has cached subroots. See
+// merkletree.CachedTree for more details.
 func NewCachedTree(height uint64) *CachedMerkleTree {
 	return &CachedMerkleTree{*merkletree.NewCachedTree(NewHash(), height)}
 }
 
-// Prove returns a proof that the data at the previously established index is a
-// part of the tree. The input is a proof that the data is in the sub-tree.
+// Prove is a redefinition of merkletree.CachedTree.Prove, so that Sia-specific
+// types are used instead of the generic types used by the parent package. The
+// base is not a return value because the base is used as input.
 func (ct *CachedMerkleTree) Prove(base []byte, cachedHashSet []Hash) []Hash {
 	// Turn the input in to a proof set that will be recognized by the high
 	// level tree.
@@ -72,57 +76,58 @@ func (ct *CachedMerkleTree) Prove(base []byte, cachedHashSet []Hash) []Hash {
 	return hashSet
 }
 
-// Push pushes a subtree Merkle root into a cached Merkle tree.
+// Push is a redefinition of merkletree.CachedTree.Push, with the added type
+// safety of only accepting a hash.
 func (ct *CachedMerkleTree) Push(h Hash) {
 	ct.CachedTree.Push(h[:])
 }
 
-// Root returns the Merkle root of all the objects pushed to the tree.
+// Root is a redefinition of merkletree.CachedTree.Root, returning a Hash
+// instead of a []byte.
 func (ct *CachedMerkleTree) Root() (h Hash) {
 	copy(h[:], ct.CachedTree.Root())
 	return
 }
 
-// Calculates the number of leaves in the file when building a Merkle tree.
-func CalculateLeaves(fileSize uint64) uint64 {
-	numSegments := fileSize / SegmentSize
-	if fileSize == 0 || fileSize%SegmentSize != 0 {
+// CalculateLeaves calculates the number of leaves that would be pushed from
+// data of size 'dataSize'.
+func CalculateLeaves(dataSize uint64) uint64 {
+	numSegments := dataSize / SegmentSize
+	if dataSize == 0 || dataSize%SegmentSize != 0 {
 		numSegments++
 	}
 	return numSegments
 }
 
-// MerkleRoot returns the Merkle root of a reader.
+// MerkleRoot returns the Merkle root of the input data.
 func MerkleRoot(b []byte) Hash {
 	t := NewTree()
-	for len(b) >= SegmentSize {
-		t.Push(b[:SegmentSize])
-		b = b[SegmentSize:]
-	}
-	if len(b) > 0 {
-		t.Push(b)
+	buf := bytes.NewBuffer(b)
+	for buf.Len() > 0 {
+		t.Push(buf.Next(SegmentSize))
 	}
 	return t.Root()
 }
 
-// MerkleProof will build a storage proof for an index.
+// MerkleProof builds a Merkle proof that the data at segment 'proofIndex' is a
+// part of the Merkle root formed by 'b'.
 func MerkleProof(b []byte, proofIndex uint64) (base []byte, hashSet []Hash) {
+	// Create the tree.
 	t := NewTree()
 	t.SetIndex(proofIndex)
-	for len(b) >= SegmentSize {
-		t.Push(b[:SegmentSize])
-		b = b[SegmentSize:]
-	}
-	if len(b) > 0 {
-		t.Push(b)
-	}
-	_, proofSet, _, _ := t.Prove()
 
-	// Convert proofSet to base and hashSet.
-	base = proofSet[0]
-	hashSet = make([]Hash, len(proofSet)-1)
-	for i, proof := range proofSet[1:] {
-		copy(hashSet[i][:], proof)
+	// Fill the tree.
+	buf := bytes.NewBuffer(b)
+	for buf.Len() > 0 {
+		t.Push(buf.Next(SegmentSize))
+	}
+
+	// Get the proof and convert it to a base + hash set.
+	_, proof, _, _ := t.Prove()
+	base = proof[0]
+	hashSet = make([]Hash, len(proof)-1)
+	for i, p := range proof[1:] {
+		copy(hashSet[i][:], p)
 	}
 	return base, hashSet
 }

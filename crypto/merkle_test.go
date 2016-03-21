@@ -144,3 +144,38 @@ func TestCachedTree(t *testing.T) {
 		t.Fatal("cached Merkle root is not matching the full Merkle root")
 	}
 }
+
+// TestMerkleTreeOddDataSize checks that MerkleRoot and MerkleProof still
+// function correctly if you provide data which does not have a size evenly
+// divisible by SegmentSize.
+func TestOddDataSize(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create some random data that's not evenly padded.
+	for i := 0; i < 25; i++ {
+		randFullSegments, err := RandIntn(65)
+		if err != nil {
+			t.Fatal(err)
+		}
+		randOverflow, err := RandIntn(63)
+		if err != nil {
+			t.Fatal(err)
+		}
+		randOverflow++ // Range is [1, 63] instead of [0, 62]
+		randProofIndex, err := RandIntn(randFullSegments + 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := RandBytes(SegmentSize*randFullSegments + randOverflow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := MerkleRoot(data)
+		base, hashSet := MerkleProof(data, uint64(randProofIndex))
+		if !VerifySegment(base, hashSet, uint64(randFullSegments)+1, uint64(randProofIndex), root) {
+			t.Error("Padded data proof failed for", randFullSegments, randOverflow, randProofIndex)
+		}
+	}
+}
