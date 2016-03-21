@@ -210,7 +210,7 @@ func TestBroadcast(t *testing.T) {
 	select {
 	case <-bothDoneChan:
 		// Both g2 and g3 should receive the broadcast.
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("broadcasting to gateway.Peers() should broadcast to all peers")
 	}
 	if g2Payload != "bar" || g3Payload != "bar" {
@@ -231,7 +231,7 @@ func TestBroadcast(t *testing.T) {
 		// Only g2 should receive a broadcast.
 	case <-g3DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("called broadcast with g2 in peers list, but g2 didn't receive it.")
 	}
 	if g2Payload != "baz" {
@@ -252,7 +252,7 @@ func TestBroadcast(t *testing.T) {
 		t.Error("broadcast broadcasted to peers not in the peers arg")
 	case <-g3DoneChan:
 		// Only g3 should receive a broadcast.
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatal("called broadcast with g3 in peers list, but g3 didn't receive it.")
 	}
 	if g3Payload != "qux" {
@@ -268,7 +268,7 @@ func TestBroadcast(t *testing.T) {
 		t.Error("broadcast broadcasted to peers not in the peers arg")
 	case <-g3DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		// Neither peer should receive a broadcast.
 	}
 
@@ -279,7 +279,7 @@ func TestBroadcast(t *testing.T) {
 		t.Error("broadcast broadcasted to peers not in the peers arg")
 	case <-g3DoneChan:
 		t.Error("broadcast broadcasted to peers not in the peers arg")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		// Neither peer should receive a broadcast.
 	}
 }

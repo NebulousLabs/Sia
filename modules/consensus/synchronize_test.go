@@ -1228,7 +1228,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	cst1.gateway.Disconnect(cst3.gateway.Address())
 	cst3.gateway.Disconnect(cst1.gateway.Address())
 	// Give the gateway's time for all of the OnConnectRPCs to complete.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Mine a block on cst1.
 	b, err := cst1.miner.AddBlock()
@@ -1236,7 +1236,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Sleep to allow the block to propogate.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	// Check that cst1 relayed it to cst2.
 	if cst2.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("cst1 did not relay the block to cst2")
@@ -1252,7 +1252,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Sleep to allow the block to propogate.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	// Check that cst2 relayed it to cst1.
 	if cst1.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("cst2 did not relay the block to cst1")
@@ -1268,7 +1268,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Sleep to allow the block to propogate.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	// Check that cst3 relayed it to cst2.
 	if cst2.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("cst3 did not relay the block to cst2")
