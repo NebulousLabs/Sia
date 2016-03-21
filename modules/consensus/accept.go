@@ -239,7 +239,7 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
 					err := cs.AcceptBlock(b)
 					if err != nil {
-						cs.log.Println("WARN: failed to accept a future block:", err)
+						cs.log.Debugln("WARN: failed to accept a future block:", err)
 					}
 				}()
 			}

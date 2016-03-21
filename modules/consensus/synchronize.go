@@ -331,7 +331,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 		go func() {
 			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 			if err != nil {
-				cs.log.Println("WARN: failed to get parents of orphan block:", err)
+				cs.log.Debugln("WARN: failed to get parents of orphan block:", err)
 			}
 		}()
 	}
@@ -362,7 +362,7 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 		go func() {
 			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
 			if err != nil {
-				cs.log.Println("WARN: failed to get parents of orphan header:", err)
+				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
 		}()
 		return nil
@@ -374,7 +374,7 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	go func() {
 		err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
 		if err != nil {
-			cs.log.Println("WARN: failed to get header's corresponding block:", err)
+			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
 		}
 	}()
 	return nil
