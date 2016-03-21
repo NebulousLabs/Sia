@@ -303,13 +303,13 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	}
 	// Sanity check - There needs to be enough time left on the file contract
 	// for the host to safely submit the file contract revision.
-	if so.expiration()-resubmissionTimeout <= h.blockHeight {
+	if h.blockHeight+revisionSubmissionBuffer >= so.expiration() {
 		h.log.Critical("submission window was not verified before trying to submit a storage obligation")
 		return errNoBuffer
 	}
 	// Sanity check - the resubmission timeout needs to be smaller than storage
 	// proof window.
-	if so.proofDeadline()-so.expiration() <= resubmissionTimeout {
+	if so.expiration()+resubmissionTimeout >= so.proofDeadline() {
 		h.log.Critical("host is misconfigured - the storage proof window needs to be long enough to resubmit if needed")
 		return errors.New("fill me in")
 	}

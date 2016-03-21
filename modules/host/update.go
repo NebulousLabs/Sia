@@ -252,7 +252,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// Handle any action items relevant to the current height.
 			bai := tx.Bucket(bucketActionItems)
 			heightBytes := make([]byte, 8)
-			binary.BigEndian.PutUint64(heightBytes, uint64(h.blockHeight))
+			binary.BigEndian.PutUint64(heightBytes, uint64(h.blockHeight)) // BigEndian used so bolt will keep things sorted automatically.
 			existingItems := bai.Get(heightBytes)
 
 			// From the existing items, pull out a storage obligation.

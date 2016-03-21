@@ -236,7 +236,7 @@ func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error
 		}
 		var su sectorUsage
 		err = json.Unmarshal(sectorUsageBytes, &su)
-		if sectorUsageBytes == nil {
+		if err != nil {
 			return err
 		}
 
