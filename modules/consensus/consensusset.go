@@ -8,6 +8,7 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -65,6 +66,7 @@ type ConsensusSet struct {
 
 	// Utilities
 	db         *persist.BoltDatabase
+	log        *persist.Logger
 	persistDir string
 	mu         demotemutex.DemoteMutex
 }
@@ -176,7 +178,15 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 func (cs *ConsensusSet) Close() error {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	return cs.db.Close()
+
+	var errs []error
+	if err := cs.db.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("db.Close failed: %v", err))
+	}
+	if err := cs.log.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
+	}
+	return build.JoinErrors(errs, "; ")
 }
 
 // CurrentBlock returns the latest block in the heaviest known blockchain.
