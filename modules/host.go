@@ -82,15 +82,25 @@ type (
 		SectorIndex uint64
 	}
 
-	// HostBandwidthLimits set limits on the volume and speed of the uploading
-	// and downloading of the host. The limits have no bearings on the other
-	// modules. The data limits are in bytes per month, and the speed limits
-	// are in bytes per second.
+	// HostBandwidthLimits set limits on the volume, price, and speed of data
+	// that's available to the host. Because different ISPs and setups have
+	// different rules governing appropriate limits, and because there's a
+	// profit incentive to matching the limits as close as possible, and
+	// because there might be intelligent ways to allocate data that require
+	// outside information (for example, more data available at night), the
+	// limits have been created with the idea that some external process will
+	// be able to adjust them constantly to conform to transfer limits and take
+	// advantage of low-traffic or low-cost hours.
 	HostBandwidthLimits struct {
-		DownloadDataLimit  uint64 `json:"downloaddatalimit"`
-		DownloadSpeedLimit uint64 `json:"downloadspeedlimit"`
-		UploadDataLimit    uint64 `json:"uploaddatalimit"`
-		UploadSpeedLimit   uint64 `json:"uploadspeedlimit"`
+		DownloadLimitGrowth uint64         `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
+		DownloadLimitCap    uint64         `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.
+		DownloadMinPrice    types.Currency `json:"downloadminprice"`    // The minimum price in Hastings per byte of download bandwidth.
+		DownloadSpeedLimit  uint64         `json:"downloadspeedlimit"`  // The maximum download speed for all combined host connections.
+
+		UploadLimitGrwoth uint64         `json:"uploadlimitgrowth"` // Bytes per second that get added to the limit for how much upload bandwidth the host is allowed to use.
+		UploadLimitCap    uint64         `json:"uploadlimitcap"`    // The maximum size of the limit for how much upload bandwidth the host is allowed to use.
+		UploadMinPrice    types.Currency `json:"uploadminprice"`    // The minimum price in Hastings per byte of download bandwidth.
+		UploadSpeedLimit  uint64         `json:"uploadspeedlimit"`  // The maximum upload speed for all combined host connections.
 	}
 
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
@@ -146,12 +156,12 @@ type (
 		NetAddress         NetAddress        `json:"netaddress"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
-		Collateral                    types.Currency `json:"collateral"`
-		MinimumContractPrice          types.Currency `json:"contractprice"`
-		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
-		MinimumStoragePrice           types.Currency `json:"storageprice"`
-		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
-		// TODO: HostBandwidthLimits - can't be added until dynamic pricing is in place.
+		BandwidthLimits               HostBandwidthLimits `json:"bandwidthlimits"`
+		Collateral                    types.Currency      `json:"collateral"`
+		MinimumContractPrice          types.Currency      `json:"contractprice"`
+		MinimumDownloadBandwidthPrice types.Currency      `json:"minimumdownloadbandwidthprice"`
+		MinimumStoragePrice           types.Currency      `json:"storageprice"`
+		MinimumUploadBandwidthPrice   types.Currency      `json:"minimumuploadbandwidthprice"`
 	}
 
 	// HostRPCMetrics reports the quantity of each type of RPC call that has
@@ -275,7 +285,7 @@ type (
 		// will tolerate. Altruistic limits indicate how much data the host is
 		// willing to transfer for free, and priced limits indicate how much
 		// data the host is willing to transfer when the host is getting paid.
-		// TODO: SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
+		SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
 
 		// SetInternalSettings sets the hosting parameters of the host.
 		// TODO: SetInternalSettings(HostInternalSettings) error
