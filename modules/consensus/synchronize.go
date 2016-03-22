@@ -42,7 +42,8 @@ var (
 		case "dev":
 			return 40 * time.Second
 		case "standard":
-			return 5 * time.Minute
+			// TODO: 45 minutes for 0.5.2 RC2. Change back to 5 minutes for release.
+			return 45 * time.Minute
 		case "testing":
 			return 5 * time.Second
 		default:
