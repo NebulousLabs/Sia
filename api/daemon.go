@@ -113,5 +113,7 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ h
 	}
 	f.Flush()
 
-	srv.Close()
+	if err := srv.Close(); err != nil {
+		build.Critical(err)
+	}
 }
