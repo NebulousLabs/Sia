@@ -2,6 +2,7 @@ package api
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
@@ -33,6 +34,9 @@ func TestStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Sleep to give time for server to close, as /daemon/stop will return success
+	// before Server.Close() is called.
+	time.Sleep(200 * time.Millisecond)
 	err = st.getAPI("/daemon/stop", &success)
 	if err == nil {
 		t.Fatal("after /daemon/stop, subsequent calls should fail")
