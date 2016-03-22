@@ -319,7 +319,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	select {
 	case <-doneChan:
 		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
-	case <-time.After(minIBDWaitTime * 11 / 10):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 	}
 
 	// Test when there are only inbound peers.
@@ -336,7 +336,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	select {
 	case <-doneChan:
 		t.Error("threadedInitialBlockchainDownload finished with only inbound peers")
-	case <-time.After(minIBDWaitTime * 11 / 10):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 	}
 
 	// Test when there is 1 peer that isn't synced.
@@ -358,7 +358,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	select {
 	case <-doneChan:
 		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
-	case <-time.After(minIBDWaitTime * 11 / 10):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 	}
 
 	// Test when there is 1 peer that is synced and one that is not synced.
@@ -376,7 +376,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(minIBDWaitTime * 11 / 10):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 		t.Fatal("threadedInitialBlockchainDownload never finished with 1 synced peer")
 	}
 
@@ -411,7 +411,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(minIBDWaitTime):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 		t.Fatal("threadedInitialBlockchainDownload didn't finish after minIBDWaitTime")
 	}
 

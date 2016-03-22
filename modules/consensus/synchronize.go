@@ -67,6 +67,21 @@ var (
 			panic("unrecognized build.Release")
 		}
 	}()
+	// ibdLoopDelay is the time that threadedInitialBlockchainDownload waits
+	// between attempts to synchronize with the network if the last attempt
+	// failed.
+	ibdLoopDelay = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 1 * time.Second
+		case "standard":
+			return 10 * time.Second
+		case "testing":
+			return 100 * time.Millisecond
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
 
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
@@ -489,7 +504,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 			break
 		} else {
 			// Sleep so we don't hammer the network with SendBlock requests.
-			time.Sleep(minIBDWaitTime / 10)
+			time.Sleep(ibdLoopDelay)
 		}
 	}
 
