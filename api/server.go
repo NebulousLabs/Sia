@@ -78,7 +78,7 @@ func (srv *Server) Serve() error {
 		select {
 		case <-sigChan:
 			fmt.Println("\rCaught stop signal, quitting...")
-			srv.listener.Close()
+			srv.Close()
 		case <-stop:
 			// Don't leave a dangling goroutine.
 		}

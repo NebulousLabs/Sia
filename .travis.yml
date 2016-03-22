@@ -7,6 +7,13 @@ os:
 go:
   - 1.5.3
 
+before_install:
+  # Decrypts a script (encrypted with `travis encrypt-file`) that installs a
+  # git authentication cookie to bypass bandwidth limiting by googlesource.com.
+  # See github.com/golang/go/issues/12933
+  - openssl aes-256-cbc -K $encrypted_32cec12ce93e_key -iv $encrypted_32cec12ce93e_iv -in .gitcookies.sh.enc -out .gitcookies.sh -d
+  - bash .gitcookies.sh
+
 install:
   - make dependencies
   - test -z "$(go fmt ./...)"

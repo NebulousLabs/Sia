@@ -21,3 +21,20 @@ func TestVersion(t *testing.T) {
 		t.Fatalf("/daemon/version reporting bad version: expected %v, got %v", build.Version, dv.Version)
 	}
 }
+
+// TestStop tests the /daemon/stop handler.
+func TestStop(t *testing.T) {
+	st, err := createServerTester("TestStop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var success struct{ Success bool }
+	err = st.getAPI("/daemon/stop", &success)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.getAPI("/daemon/stop", &success)
+	if err == nil {
+		t.Fatal("after /daemon/stop, subsequent calls should fail")
+	}
+}

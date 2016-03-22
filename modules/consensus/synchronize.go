@@ -42,7 +42,8 @@ var (
 		case "dev":
 			return 40 * time.Second
 		case "standard":
-			return 5 * time.Minute
+			// TODO: 45 minutes for 0.5.2 RC2. Change back to 5 minutes for release.
+			return 45 * time.Minute
 		case "testing":
 			return 5 * time.Second
 		default:
@@ -50,13 +51,16 @@ var (
 		}
 	}()
 	// minIBDWaitTime is the time threadedInitialBlockchainDownload waits before
-	// exiting if there are >= 1 and <= minNumOutbound peers synced.
+	// exiting if there are >= 1 and <= minNumOutbound peers synced. This timeout
+	// will primarily affect miners who have multiple nodes daisy chained off each
+	// other. Those nodes will likely have to wait minIBDWaitTime on every startup
+	// before IBD is done.
 	minIBDWaitTime = func() time.Duration {
 		switch build.Release {
 		case "dev":
 			return 80 * time.Second
 		case "standard":
-			return 10 * time.Minute
+			return 90 * time.Minute
 		case "testing":
 			return 10 * time.Second
 		default:
@@ -156,11 +160,11 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 	// is to stop an attacker from preventing block broadcasts.
 	chainExtended := false
 	defer func() {
-		if chainExtended {
+		if chainExtended && cs.Synced() {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.CurrentBlock()
-			// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
+			// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
 			var relayBlockPeers, relayHeaderPeers []modules.Peer
 			for _, p := range cs.gateway.Peers() {
 				if build.VersionCmp(p.Version, "0.5.1") <= 0 {
@@ -313,6 +317,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 }
 
 // rpcRelayBlock is an RPC that accepts a block from a peer.
+// COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
@@ -327,9 +332,12 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
-		//
-		// TODO: log error returned if non-nill.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+		go func() {
+			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+			if err != nil {
+				cs.log.Debugln("WARN: failed to get parents of orphan block:", err)
+			}
+		}()
 	}
 	if err != nil {
 		return err
@@ -355,18 +363,24 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	cs.mu.RUnlock()
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
-		//
-		// TODO: log error returned if non-nill.
-		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+		go func() {
+			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+			if err != nil {
+				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
+			}
+		}()
 		return nil
 	} else if err != nil {
 		return err
 	}
 	// If the header is valid and extends the heaviest chain, fetch, accept it,
 	// and broadcast it.
-	//
-	// TODO: log error returned if non-nill.
-	go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+	go func() {
+		err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+		if err != nil {
+			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
+		}
+	}()
 	return nil
 }
 
@@ -433,8 +447,9 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 	// Set the deadline 10 minutes in the future. After this deadline, we will say
 	// IBD is done as long as there is at least one outbound peer synced.
 	deadline := time.Now().Add(minIBDWaitTime)
+	numOutboundSynced := 0
 	for {
-		numOutboundSynced := 0
+		numOutboundSynced = 0
 		for _, p := range cs.gateway.Peers() {
 			// We only sync on outbound peers at first to make IBD less susceptible to
 			// fast-mining and other attacks, as outbound peers are more difficult to
@@ -448,16 +463,22 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 				numOutboundSynced++
 				continue
 			}
-			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-				// TODO: log the error returned by RPC.
-
+			// TODO: Timeout errors returned by muxado do not conform to the net.Error
+			// interface and therefore we cannot check if the error is a timeout using
+			// the Timeout() method. Once muxado issue #14 is resolved change the below
+			// condition to:
+			//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
+			if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
+				cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
 				// Disconnect if there is an unexpected error (not a timeout). This
 				// includes errSendBlocksStalled.
 				//
 				// We disconnect so that these peers are removed from gateway.Peers() and
 				// do not prevent us from marking ourselves as fully synced.
-				cs.gateway.Disconnect(p.NetAddress)
-				// TODO: log error returned by Disconnect
+				err := cs.gateway.Disconnect(p.NetAddress)
+				if err != nil {
+					cs.log.Printf("WARN: disconnecting from peer %v failed: %v", p.NetAddress, err)
+				}
 			}
 		}
 
@@ -472,7 +493,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 		}
 	}
 
-	// TODO: log IBD done.
+	cs.log.Printf("INFO: IBD done, synced with %v peers", numOutboundSynced)
 }
 
 // Synced returns true if the consensus set is synced with the network.

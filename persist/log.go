@@ -77,3 +77,27 @@ func (l *Logger) Critical(v ...interface{}) {
 	l.Print("CRITICAL:", fmt.Sprintln(v...))
 	build.Critical(v...)
 }
+
+// Debug is equivalent to Logger.Print when build.DEBUG is true. Otherwise it
+// is a no-op.
+func (l *Logger) Debug(v ...interface{}) {
+	if build.DEBUG {
+		l.Print(v...)
+	}
+}
+
+// Debug is equivalent to Logger.Printf when build.DEBUG is true. Otherwise it
+// is a no-op.
+func (l *Logger) Debugf(format string, v ...interface{}) {
+	if build.DEBUG {
+		l.Printf(format, v...)
+	}
+}
+
+// Debug is equivalent to Logger.Println when build.DEBUG is true. Otherwise it
+// is a no-op.
+func (l *Logger) Debugln(v ...interface{}) {
+	if build.DEBUG {
+		l.Println(v...)
+	}
+}

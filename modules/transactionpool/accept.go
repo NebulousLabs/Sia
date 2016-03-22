@@ -293,6 +293,7 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	// NOTE: The transaction set is only broadcast to v0.4.7 peers and above.
 	// v0.4.7-v0.5.1 broadcasted both transaction sets and individual transactions
 	// and those versions act as a bridge between v0.5.2+ and older versions.
+	// COMPATv0.4.6
 	var v047AndAbove []modules.Peer
 	for _, p := range tp.gateway.Peers() {
 		if build.VersionCmp(p.Version, "0.4.7") >= 0 {

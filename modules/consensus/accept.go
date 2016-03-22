@@ -237,8 +237,10 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-					// TODO: log error returned by AcceptBlock if non-nill
-					cs.AcceptBlock(b) // NOTE: Error is not handled.
+					err := cs.AcceptBlock(b)
+					if err != nil {
+						cs.log.Debugln("WARN: failed to accept a future block:", err)
+					}
 				}()
 			}
 			return err
@@ -285,7 +287,7 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	if err != nil {
 		return err
 	}
-	// Broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
+	// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
 	var relayBlockPeers, relayHeaderPeers []modules.Peer
 	for _, p := range cs.gateway.Peers() {
 		if build.VersionCmp(p.Version, "0.5.1") <= 0 {
