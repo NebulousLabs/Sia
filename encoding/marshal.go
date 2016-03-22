@@ -79,8 +79,10 @@ func (e *Encoder) write(p []byte) error {
 // the package docstring.
 func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
-	if m, ok := val.Interface().(SiaMarshaler); ok {
-		return m.MarshalSia(e.w)
+	if val.CanInterface() {
+		if m, ok := val.Interface().(SiaMarshaler); ok {
+			return m.MarshalSia(e.w)
+		}
 	}
 
 	switch val.Kind() {
@@ -261,7 +263,7 @@ func (d *Decoder) readPrefix() []byte {
 // docstring.
 func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
-	if val.CanAddr() {
+	if val.CanAddr() && val.Addr().CanInterface() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
 			err := u.UnmarshalSia(d)
 			if err != nil {
