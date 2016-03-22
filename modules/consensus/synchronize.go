@@ -51,13 +51,16 @@ var (
 		}
 	}()
 	// minIBDWaitTime is the time threadedInitialBlockchainDownload waits before
-	// exiting if there are >= 1 and <= minNumOutbound peers synced.
+	// exiting if there are >= 1 and <= minNumOutbound peers synced. This timeout
+	// will primarily affect miners who have multiple nodes daisy chained off each
+	// other. Those nodes will likely have to wait minIBDWaitTime on every startup
+	// before IBD is done.
 	minIBDWaitTime = func() time.Duration {
 		switch build.Release {
 		case "dev":
 			return 80 * time.Second
 		case "standard":
-			return 10 * time.Minute
+			return 90 * time.Minute
 		case "testing":
 			return 10 * time.Second
 		default:
