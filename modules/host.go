@@ -36,8 +36,8 @@ var (
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
 
-	// RPCNegotiate is the specifier for negotiating a contract with a host.
-	RPCNegotiate = types.Specifier{'N', 'e', 'g', 'o', 't', 'i', 'a', 't', 'e', 2}
+	// RPCFormContract is the specifier for forming a contract with a host.
+	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
 
 	// RPCRenew is the specifier to renewing an existing contract.
 	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w', 2}
@@ -170,13 +170,13 @@ type (
 		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
 		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
 
-		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
-		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 		DownloadCalls     uint64 `json:"downloadcalls"`
+		ErrorCalls        uint64 `json:"errorcalls"`
+		FormContractCalls uint64 `json:"formcontractcalls"`
 		RenewCalls        uint64 `json:"renewcalls"`
 		ReviseCalls       uint64 `json:"revisecalls"`
 		SettingsCalls     uint64 `json:"settingscalls"`
-		UploadCalls       uint64 `json:"uploadcalls"`
+		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 	}
 
 	// StorageFolderMetadata contians metadata about a storage folder that is

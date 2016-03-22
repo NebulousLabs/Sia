@@ -57,13 +57,13 @@ var (
 type Host struct {
 	// RPC Metrics - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems.
-	atomicErroredCalls      uint64
-	atomicUnrecognizedCalls uint64
 	atomicDownloadCalls     uint64
+	atomicErroredCalls      uint64
+	atomicFormContractCalls uint64
 	atomicRenewCalls        uint64
 	atomicReviseCalls       uint64
 	atomicSettingsCalls     uint64
-	atomicUploadCalls       uint64
+	atomicUnrecognizedCalls uint64
 
 	// Dependencies.
 	cs     modules.ConsensusSet
