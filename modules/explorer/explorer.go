@@ -19,21 +19,6 @@ const (
 
 var (
 	errNilCS = errors.New("explorer cannot use a nil consensus set")
-
-	// database buckets
-	bucketBlockFacts            = []byte("BlockFacts")
-	bucketBlockHashes           = []byte("BlockHashes")
-	bucketBlocksDifficulty      = []byte("BlocksDifficulty")
-	bucketBlockTargets          = []byte("BlockTargets")
-	bucketFileContractHistories = []byte("FileContractHistories")
-	bucketFileContractIDs       = []byte("FileContractIDs")
-	bucketRecentChange          = []byte("RecentChange")
-	bucketSiacoinOutputIDs      = []byte("SiacoinOutputIDs")
-	bucketSiacoinOutputs        = []byte("SiacoinOutputs")
-	bucketSiafundOutputIDs      = []byte("SiafundOutputIDs")
-	bucketSiafundOutputs        = []byte("SiafundOutputs")
-	bucketTransactionHashes     = []byte("TransactionHashes")
-	bucketUnlockHashes          = []byte("UnlockHashes")
 )
 
 type (
