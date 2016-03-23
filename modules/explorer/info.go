@@ -5,11 +5,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Block takes a block id and finds the corresponding block, provided that the
+// Block takes a block ID and finds the corresponding block, provided that the
 // block is in the consensus set.
 func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool) {
-	height, exists := e.blockHashes[id]
-	if !exists {
+	var height types.BlockHeight
+	err := e.db.View(dbGetBlockHeight(id, &height))
+	if err != nil {
 		return types.Block{}, 0, false
 	}
 	block, exists := e.cs.BlockAtHeight(height)
@@ -23,23 +24,19 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 // at a given block height, and a bool indicating whether facts exist for the
 // given height.
 func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
-	// Check that a block exists at the given height.
-	if height >= types.BlockHeight(len(e.historicFacts)) {
+	var bf blockFacts
+	err := e.db.View(dbGetBlockFacts(height, &bf))
+	if err != nil {
 		return modules.BlockFacts{}, false
 	}
 
-	// Grab the stats and return the facts.
-	bf := e.historicFacts[height]
-	var maturityTimestamp types.Timestamp
-	if height > types.MaturityDelay {
-		maturityTimestamp = e.historicFacts[height-types.MaturityDelay].timestamp
-	}
+	// convert to modules.BlockFacts
 	return modules.BlockFacts{
 		BlockID:           bf.currentBlock,
 		Difficulty:        bf.target.Difficulty(),
 		EstimatedHashrate: bf.estimatedHashrate,
 		Height:            bf.blockchainHeight,
-		MaturityTimestamp: maturityTimestamp,
+		MaturityTimestamp: bf.maturityTimestamp,
 		Target:            bf.target,
 		TotalCoins:        bf.totalCoins,
 
@@ -67,12 +64,13 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 	}, true
 }
 
-// Transaction takes a transaction id and finds the block containing the
-// transaction. Because of the miner payouts, the transaction id might be a
-// block id. To find the transaction, iterate through the block.
+// Transaction takes a transaction ID and finds the block containing the
+// transaction. Because of the miner payouts, the transaction ID might be a
+// block ID. To find the transaction, iterate through the block.
 func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.BlockHeight, bool) {
-	height, exists := e.transactionHashes[id]
-	if !exists {
+	var height types.BlockHeight
+	err := e.db.View(dbGetTransactionHeight(id, &height))
+	if err != nil {
 		return types.Block{}, 0, false
 	}
 	block, exists := e.cs.BlockAtHeight(height)
@@ -82,92 +80,85 @@ func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.Block
 	return block, height, true
 }
 
-// UnlockHash returns the ids of all the transactions that contain the unlock
+// UnlockHash returns the IDs of all the transactions that contain the unlock
 // hash. An empty set indicates that the unlock hash does not appear in the
 // blockchain.
 func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
-	txnMap, exists := e.unlockHashes[uh]
-	if !exists || len(txnMap) == 0 {
-		return nil
-	}
-	ids := make([]types.TransactionID, 0, len(txnMap))
-	for txid := range txnMap {
-		ids = append(ids, txid)
+	var ids []types.TransactionID
+	err := e.db.View(dbGetUnlockHashTxnIDs(uh, &ids))
+	if err != nil {
+		ids = nil
 	}
 	return ids
 }
 
-// SiacoinOutput will return the siacoin output associated with the input id.
+// SiacoinOutput returns the siacoin output associated with the specified ID.
 func (e *Explorer) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool) {
-	sco, exists := e.siacoinOutputs[id]
-	return sco, exists
+	var sco types.SiacoinOutput
+	err := e.db.View(dbGetSiacoinOutput(id, &sco))
+	if err != nil {
+		return types.SiacoinOutput{}, false
+	}
+	return sco, true
 }
 
-// SiacoinOutputID returns all of the transactions that contain the input
-// siacoin output id. An empty set indicates that the siacoin output id does
+// SiacoinOutputID returns all of the transactions that contain the specified
+// siacoin output ID. An empty set indicates that the siacoin output ID does
 // not appear in the blockchain.
 func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.TransactionID {
-	txnMap, exists := e.siacoinOutputIDs[id]
-	if !exists || len(txnMap) == 0 {
-		return nil
-	}
-	ids := make([]types.TransactionID, 0, len(txnMap))
-	for txid := range txnMap {
-		ids = append(ids, txid)
+	var ids []types.TransactionID
+	err := e.db.View(dbGetSiacoinOutputTxnIDs(id, &ids))
+	if err != nil {
+		ids = nil
 	}
 	return ids
 }
 
-// FileContractHistory returns the history associated with a file contract,
-// which includes the file contract itself and all of the revisions that have
-// been submitted to the blockchain. The first bool indicates whether the file
-// contract exists, and the second bool indicates whether a storage proof was
-// successfully submitted for the file contract.
+// FileContractHistory returns the history associated with the specified file
+// contract ID, which includes the file contract itself and all of the
+// revisions that have been submitted to the blockchain. The first bool
+// indicates whether the file contract exists, and the second bool indicates
+// whether a storage proof was successfully submitted for the file contract.
 func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, fcE bool, spE bool) {
-	fch, fcE := e.fileContractHistories[id]
-	if !fcE {
-		return types.FileContract{}, nil, false, false
-	}
-	fc = fch.contract
-	fcrs = fch.revisions
-	if fch.storageProof.ParentID == id {
-		spE = true
-	}
-	return fc, fcrs, fcE, spE
+	var history fileContractHistory
+	err := e.db.View(dbGetFileContractHistory(id, &history))
+	fc = history.contract
+	fcrs = history.revisions
+	fcE = err == nil
+	spE = history.storageProof.ParentID == id
+	return
 }
 
-// FileContractIDs returns all of the transactions that contain the input file
-// contract id. An empty set indicates that the file contract id does not
+// FileContractIDs returns all of the transactions that contain the specified
+// file contract ID. An empty set indicates that the file contract ID does not
 // appear in the blockchain.
 func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID {
-	txnMap, exists := e.fileContractIDs[id]
-	if !exists || len(txnMap) == 0 {
-		return nil
-	}
-	ids := make([]types.TransactionID, 0, len(txnMap))
-	for txid := range txnMap {
-		ids = append(ids, txid)
+	var ids []types.TransactionID
+	err := e.db.View(dbGetFileContractTxnIDs(id, &ids))
+	if err != nil {
+		ids = nil
 	}
 	return ids
 }
 
-// SiafundOutput will return the siafund output associated with the input id.
+// SiafundOutput returns the siafund output associated with the specified ID.
 func (e *Explorer) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool) {
-	sco, exists := e.siafundOutputs[id]
-	return sco, exists
+	var sco types.SiafundOutput
+	err := e.db.View(dbGetSiafundOutput(id, &sco))
+	if err != nil {
+		return types.SiafundOutput{}, false
+	}
+	return sco, true
 }
 
-// SiafundOutputID returns all of the transactions that contain the input
-// siafund output id. An empty set indicates that the siafund output id does
+// SiafundOutputID returns all of the transactions that contain the specified
+// siafund output ID. An empty set indicates that the siafund output ID does
 // not appear in the blockchain.
 func (e *Explorer) SiafundOutputID(id types.SiafundOutputID) []types.TransactionID {
-	txnMap, exists := e.siafundOutputIDs[id]
-	if !exists || len(txnMap) == 0 {
-		return nil
-	}
-	ids := make([]types.TransactionID, 0, len(txnMap))
-	for txid := range txnMap {
-		ids = append(ids, txid)
+	var ids []types.TransactionID
+	err := e.db.View(dbGetSiafundOutputTxnIDs(id, &ids))
+	if err != nil {
+		ids = nil
 	}
 	return ids
 }
