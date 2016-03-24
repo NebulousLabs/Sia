@@ -28,7 +28,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		// get starting block height
 		var blockheight types.BlockHeight
-		err = encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalBlockHeight), &blockheight)
+		err = dbGetInternalBlockHeight(&blockheight)(tx)
 		if err != nil {
 			return err
 		}
@@ -223,9 +223,17 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 
 		// set final blockheight
-		dbSetBlockHeight(tx, blockheight)
+		err = dbSetInternalBlockHeight(blockheight)(tx)
+		if err != nil {
+			return err
+		}
 
-		// TODO: set cc.ID
+		// set change ID
+		err = dbSetInternalRecentChange(cc.ID)(tx)
+		if err != nil {
+			return err
+		}
+
 		// TODO: incorporate cc.FileContractDiffs
 		return nil
 	})
@@ -253,11 +261,6 @@ func mustDelete(bucket *bolt.Bucket, key interface{}) {
 // These functions panic on error. The panic will be caught by
 // ProcessConsensusChange.
 
-func dbSetBlockHeight(tx *bolt.Tx, height types.BlockHeight) {
-	err := tx.Bucket(bucketInternal).Put(internalBlockHeight, encoding.Marshal(height))
-	assertNil(err)
-}
-
 // Add/Remove block ID
 func dbAddBlockID(tx *bolt.Tx, id types.BlockID, height types.BlockHeight) {
 	mustPut(tx.Bucket(bucketBlockIDs), id, height)
@@ -278,20 +281,18 @@ func dbRemoveBlockFacts(tx *bolt.Tx, id types.BlockID) {
 func dbAddBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 	mustPut(tx.Bucket(bucketBlockTargets), id, target)
 	// update difficulty
-	b := tx.Bucket(bucketInternal)
 	var difficulty types.Target
-	assertNil(encoding.Unmarshal(b.Get(internalDifficulty), &difficulty))
+	assertNil(dbGetInternalDifficulty(&difficulty)(tx))
 	difficulty = difficulty.AddDifficulties(target)
-	assertNil(b.Put(internalDifficulty, encoding.Marshal(difficulty)))
+	assertNil(dbSetInternalDifficulty(difficulty)(tx))
 }
 func dbRemoveBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 	mustDelete(tx.Bucket(bucketBlockTargets), id)
 	// update difficulty
-	b := tx.Bucket(bucketInternal)
 	var difficulty types.Target
-	assertNil(encoding.Unmarshal(b.Get(internalDifficulty), &difficulty))
+	assertNil(dbGetInternalDifficulty(&difficulty)(tx))
 	difficulty = difficulty.SubtractDifficulties(target)
-	assertNil(b.Put(internalDifficulty, encoding.Marshal(difficulty)))
+	assertNil(dbSetInternalDifficulty(difficulty)(tx))
 }
 
 // Add/Remove file contract

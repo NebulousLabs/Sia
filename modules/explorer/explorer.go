@@ -70,8 +70,16 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		return nil, err
 	}
 
-	err = cs.ConsensusSetSubscribe(e, modules.ConsensusChangeBeginning)
+	// retrieve the current ConsensusChangeID
+	var recentChange modules.ConsensusChangeID
+	err = e.db.View(dbGetInternalRecentChange(&recentChange))
 	if err != nil {
+		return nil, err
+	}
+
+	err = cs.ConsensusSetSubscribe(e, recentChange)
+	if err != nil {
+		// TODO: restart from 0
 		return nil, errors.New("explorer subscription failed: " + err.Error())
 	}
 
