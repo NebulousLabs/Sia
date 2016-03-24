@@ -4,7 +4,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
 )
@@ -33,17 +36,17 @@ func (e *Explorer) initPersist() error {
 	err = e.db.Update(func(tx *bolt.Tx) error {
 		buckets := [][]byte{
 			bucketBlockFacts,
-			bucketBlockHashes,
+			bucketBlockIDs,
 			bucketBlocksDifficulty,
 			bucketBlockTargets,
 			bucketFileContractHistories,
 			bucketFileContractIDs,
-			bucketRecentChange,
+			bucketInternal,
 			bucketSiacoinOutputIDs,
 			bucketSiacoinOutputs,
 			bucketSiafundOutputIDs,
 			bucketSiafundOutputs,
-			bucketTransactionHashes,
+			bucketTransactionIDs,
 			bucketUnlockHashes,
 		}
 		for _, b := range buckets {
@@ -52,6 +55,26 @@ func (e *Explorer) initPersist() error {
 				return err
 			}
 		}
+
+		// set default values for the bucketInternal
+		internalDefaults := []struct {
+			key, val []byte
+		}{
+			{internalBlockHeight, encoding.Marshal(types.BlockHeight(0))},
+			{internalDifficulty, encoding.Marshal(types.RootDepth)},
+			{internalRecentChange, encoding.Marshal(modules.ConsensusChangeID{})},
+		}
+		b := tx.Bucket(bucketInternal)
+		for _, d := range internalDefaults {
+			if b.Get(d.key) != nil {
+				continue
+			}
+			err := b.Put(d.key, d.val)
+			if err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 

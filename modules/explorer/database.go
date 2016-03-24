@@ -14,18 +14,25 @@ var (
 
 	// database buckets
 	bucketBlockFacts            = []byte("BlockFacts")
-	bucketBlockHashes           = []byte("BlockHashes")
+	bucketBlockIDs              = []byte("BlockIDs")
 	bucketBlocksDifficulty      = []byte("BlocksDifficulty")
 	bucketBlockTargets          = []byte("BlockTargets")
 	bucketFileContractHistories = []byte("FileContractHistories")
 	bucketFileContractIDs       = []byte("FileContractIDs")
-	bucketRecentChange          = []byte("RecentChange")
 	bucketSiacoinOutputIDs      = []byte("SiacoinOutputIDs")
 	bucketSiacoinOutputs        = []byte("SiacoinOutputs")
 	bucketSiafundOutputIDs      = []byte("SiafundOutputIDs")
 	bucketSiafundOutputs        = []byte("SiafundOutputs")
-	bucketTransactionHashes     = []byte("TransactionHashes")
+	bucketTransactionIDs        = []byte("TransactionIDs")
 	bucketUnlockHashes          = []byte("UnlockHashes")
+
+	// bucketInternal is used to store values internal to the explorer
+	bucketInternal = []byte("Internal")
+
+	// keys for bucketInternal
+	internalBlockHeight  = []byte("BlockHeight")
+	internalDifficulty   = []byte("Difficulty")
+	internalRecentChange = []byte("RecentChange")
 )
 
 // getAndDecode is a helper function that retrieves and decodes a value from
@@ -84,29 +91,14 @@ func getTransactionIDSet(bucket *bolt.Bucket, ids *[]types.TransactionID) error 
 // dbGetBlockHeight retrieves the block height of the specified block ID.
 func dbGetBlockHeight(id types.BlockID, height *types.BlockHeight) func(*bolt.Tx) error {
 	return func(tx *bolt.Tx) error {
-		return getAndDecode(tx.Bucket(bucketBlockHashes), id, height)
+		return getAndDecode(tx.Bucket(bucketBlockIDs), id, height)
 	}
 }
 
-// dbGetBlockFacts retrieves the blockFacts at a specified height.
-func dbGetBlockFacts(height types.BlockHeight, facts *blockFacts) func(*bolt.Tx) error {
+// dbGetBlockFacts retrieves the blockFacts of the specified block ID.
+func dbGetBlockFacts(id types.BlockID, facts *blockFacts) func(*bolt.Tx) error {
 	return func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketBlockFacts)
-		err := getAndDecode(b, height, facts)
-		if err != nil {
-			return err
-		}
-		// also look up the maturity timestamp, if possible
-		// TODO: does this make sense? Why not set maturityTimestamp elsewhere, like in update.go?
-		if height > types.MaturityDelay {
-			var bf2 blockFacts
-			err = getAndDecode(b, height, &bf2)
-			if err != nil {
-				return err
-			}
-			facts.maturityTimestamp = bf2.timestamp
-		}
-		return nil
+		return getAndDecode(tx.Bucket(bucketBlockFacts), id, facts)
 	}
 }
 
@@ -114,7 +106,7 @@ func dbGetBlockFacts(height types.BlockHeight, facts *blockFacts) func(*bolt.Tx)
 // transaction appeared.
 func dbGetTransactionHeight(id types.TransactionID, height *types.BlockHeight) func(*bolt.Tx) error {
 	return func(tx *bolt.Tx) error {
-		return getAndDecode(tx.Bucket(bucketTransactionHashes), id, height)
+		return getAndDecode(tx.Bucket(bucketTransactionIDs), id, height)
 	}
 }
 

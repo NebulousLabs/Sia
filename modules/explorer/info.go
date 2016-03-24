@@ -24,8 +24,13 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 // at a given block height, and a bool indicating whether facts exist for the
 // given height.
 func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
+	block, exists := e.cs.BlockAtHeight(height)
+	if !exists {
+		return modules.BlockFacts{}, false
+	}
+
 	var bf blockFacts
-	err := e.db.View(dbGetBlockFacts(height, &bf))
+	err := e.db.View(dbGetBlockFacts(block.ID(), &bf))
 	if err != nil {
 		return modules.BlockFacts{}, false
 	}
