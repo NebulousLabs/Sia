@@ -268,7 +268,7 @@ func dbRemoveBlockID(tx *bolt.Tx, id types.BlockID) {
 
 // Add/Remove block facts
 func dbAddBlockFacts(tx *bolt.Tx, facts blockFacts) {
-	mustPut(tx.Bucket(bucketBlockFacts), facts.currentBlock, facts)
+	mustPut(tx.Bucket(bucketBlockFacts), facts.BlockID, facts)
 }
 func dbRemoveBlockFacts(tx *bolt.Tx, id types.BlockID) {
 	mustDelete(tx.Bucket(bucketBlockFacts), id)
@@ -296,7 +296,7 @@ func dbRemoveBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 
 // Add/Remove file contract
 func dbAddFileContract(tx *bolt.Tx, id types.FileContractID, fc types.FileContract) {
-	history := fileContractHistory{contract: fc}
+	history := fileContractHistory{Contract: fc}
 	mustPut(tx.Bucket(bucketFileContractHistories), id, history)
 }
 func dbRemoveFileContract(tx *bolt.Tx, id types.FileContractID) {
@@ -318,7 +318,7 @@ func dbAddFileContractRevision(tx *bolt.Tx, fcid types.FileContractID, fcr types
 	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
 	assertNil(getAndDecode(b, fcid, &history))
-	history.revisions = append(history.revisions, fcr)
+	history.Revisions = append(history.Revisions, fcr)
 	mustPut(b, fcid, history)
 }
 func dbRemoveFileContractRevision(tx *bolt.Tx, fcid types.FileContractID) {
@@ -326,7 +326,7 @@ func dbRemoveFileContractRevision(tx *bolt.Tx, fcid types.FileContractID) {
 	var history fileContractHistory
 	assertNil(getAndDecode(b, fcid, &history))
 	// TODO: could be more rigorous
-	history.revisions = history.revisions[:len(history.revisions)-1]
+	history.Revisions = history.Revisions[:len(history.Revisions)-1]
 	mustPut(b, fcid, history)
 }
 
@@ -373,7 +373,7 @@ func dbAddStorageProof(tx *bolt.Tx, fcid types.FileContractID, sp types.StorageP
 	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
 	assertNil(getAndDecode(b, fcid, &history))
-	history.storageProof = sp
+	history.StorageProof = sp
 	mustPut(b, fcid, history)
 }
 func dbRemoveStorageProof(tx *bolt.Tx, fcid types.FileContractID) {
@@ -412,22 +412,23 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 	}
 
 	// update fields
-	bf.currentBlock = block.ID()
-	bf.blockchainHeight++
-	bf.target = target
-	bf.timestamp = block.Timestamp
-	bf.totalCoins = types.CalculateNumSiacoins(bf.blockchainHeight)
+	bf.BlockID = block.ID()
+	bf.Height++
+	bf.Difficulty = target.Difficulty()
+	bf.Target = target
+	bf.Timestamp = block.Timestamp
+	bf.TotalCoins = types.CalculateNumSiacoins(bf.Height)
 
 	// calculate maturity timestamp
 	var maturityTimestamp types.Timestamp
-	if bf.blockchainHeight > types.MaturityDelay {
-		oldBlock, exists := cs.BlockAtHeight(bf.blockchainHeight - types.MaturityDelay)
+	if bf.Height > types.MaturityDelay {
+		oldBlock, exists := cs.BlockAtHeight(bf.Height - types.MaturityDelay)
 		if !exists {
-			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.blockchainHeight-types.MaturityDelay))
+			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-types.MaturityDelay))
 		}
 		maturityTimestamp = oldBlock.Timestamp
 	}
-	bf.maturityTimestamp = maturityTimestamp
+	bf.MaturityTimestamp = maturityTimestamp
 
 	// get difficulty
 	var difficulty types.Target
@@ -436,11 +437,10 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 
 	// calculate hashrate
 	var estimatedHashrate types.Currency
-	difficulty = difficulty.AddDifficulties(target)
-	if bf.blockchainHeight > hashrateEstimationBlocks {
-		oldBlock, exists := cs.BlockAtHeight(bf.blockchainHeight - hashrateEstimationBlocks)
+	if bf.Height > hashrateEstimationBlocks {
+		oldBlock, exists := cs.BlockAtHeight(bf.Height - hashrateEstimationBlocks)
 		if !exists {
-			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.blockchainHeight-hashrateEstimationBlocks))
+			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-hashrateEstimationBlocks))
 		}
 		oldTarget, exists := cs.ChildTarget(oldBlock.ID())
 		if !exists {
@@ -450,29 +450,29 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 		secondsPassed := block.Timestamp - oldBlock.Timestamp
 		estimatedHashrate = hashDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
 	}
-	bf.estimatedHashrate = estimatedHashrate
+	bf.EstimatedHashrate = estimatedHashrate
 
-	bf.minerPayoutCount += uint64(len(block.MinerPayouts))
-	bf.transactionCount += uint64(len(block.Transactions))
+	bf.MinerPayoutCount += uint64(len(block.MinerPayouts))
+	bf.TransactionCount += uint64(len(block.Transactions))
 	for _, txn := range block.Transactions {
-		bf.siacoinInputCount += uint64(len(txn.SiacoinInputs))
-		bf.siacoinOutputCount += uint64(len(txn.SiacoinOutputs))
-		bf.fileContractCount += uint64(len(txn.FileContracts))
-		bf.fileContractRevisionCount += uint64(len(txn.FileContractRevisions))
-		bf.storageProofCount += uint64(len(txn.StorageProofs))
-		bf.siafundInputCount += uint64(len(txn.SiafundInputs))
-		bf.siafundOutputCount += uint64(len(txn.SiafundOutputs))
-		bf.minerFeeCount += uint64(len(txn.MinerFees))
-		bf.arbitraryDataCount += uint64(len(txn.ArbitraryData))
-		bf.transactionSignatureCount += uint64(len(txn.TransactionSignatures))
+		bf.SiacoinInputCount += uint64(len(txn.SiacoinInputs))
+		bf.SiacoinOutputCount += uint64(len(txn.SiacoinOutputs))
+		bf.FileContractCount += uint64(len(txn.FileContracts))
+		bf.FileContractRevisionCount += uint64(len(txn.FileContractRevisions))
+		bf.StorageProofCount += uint64(len(txn.StorageProofs))
+		bf.SiafundInputCount += uint64(len(txn.SiafundInputs))
+		bf.SiafundOutputCount += uint64(len(txn.SiafundOutputs))
+		bf.MinerFeeCount += uint64(len(txn.MinerFees))
+		bf.ArbitraryDataCount += uint64(len(txn.ArbitraryData))
+		bf.TransactionSignatureCount += uint64(len(txn.TransactionSignatures))
 
 		for _, fc := range txn.FileContracts {
-			bf.totalContractCost = bf.totalContractCost.Add(fc.Payout)
-			bf.totalContractSize = bf.totalContractSize.Add(types.NewCurrency64(fc.FileSize))
+			bf.TotalContractCost = bf.TotalContractCost.Add(fc.Payout)
+			bf.TotalContractSize = bf.TotalContractSize.Add(types.NewCurrency64(fc.FileSize))
 		}
 		for _, fcr := range txn.FileContractRevisions {
-			bf.totalContractSize = bf.totalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
-			bf.totalRevisionVolume = bf.totalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
+			bf.TotalContractSize = bf.TotalContractSize.Add(types.NewCurrency64(fcr.NewFileSize))
+			bf.TotalRevisionVolume = bf.TotalRevisionVolume.Add(types.NewCurrency64(fcr.NewFileSize))
 		}
 	}
 
@@ -492,18 +492,15 @@ func dbAddGenesisBlock(tx *bolt.Tx) {
 		dbAddSiafundOutput(tx, sfoid, sfo)
 	}
 	dbAddBlockFacts(tx, blockFacts{
-		currentBlock:        id,
-		blockchainHeight:    0,
-		target:              types.RootTarget,
-		timestamp:           types.GenesisBlock.Timestamp,
-		estimatedHashrate:   types.ZeroCurrency,
-		totalCoins:          types.CalculateCoinbase(0),
-		siafundOutputCount:  uint64(len(types.GenesisSiafundAllocation)),
-		transactionCount:    1,
-		activeContractCost:  types.ZeroCurrency,
-		activeContractSize:  types.ZeroCurrency,
-		totalContractCost:   types.ZeroCurrency,
-		totalContractSize:   types.ZeroCurrency,
-		totalRevisionVolume: types.ZeroCurrency,
+		BlockFacts: modules.BlockFacts{
+			BlockID:            id,
+			Height:             0,
+			Difficulty:         types.RootTarget.Difficulty(),
+			Target:             types.RootTarget,
+			TotalCoins:         types.CalculateCoinbase(0),
+			TransactionCount:   1,
+			SiafundOutputCount: uint64(len(types.GenesisSiafundAllocation)),
+		},
+		Timestamp: types.GenesisBlock.Timestamp,
 	})
 }

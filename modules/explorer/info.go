@@ -35,38 +35,7 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 		return modules.BlockFacts{}, false
 	}
 
-	// convert to modules.BlockFacts
-	return modules.BlockFacts{
-		BlockID:           bf.currentBlock,
-		Difficulty:        bf.target.Difficulty(),
-		EstimatedHashrate: bf.estimatedHashrate,
-		Height:            bf.blockchainHeight,
-		MaturityTimestamp: bf.maturityTimestamp,
-		Target:            bf.target,
-		TotalCoins:        bf.totalCoins,
-
-		// Transaction type counts.
-		MinerPayoutCount:          bf.minerPayoutCount,
-		TransactionCount:          bf.transactionCount,
-		SiacoinInputCount:         bf.siacoinInputCount,
-		SiacoinOutputCount:        bf.siacoinOutputCount,
-		FileContractCount:         bf.fileContractCount,
-		FileContractRevisionCount: bf.fileContractRevisionCount,
-		StorageProofCount:         bf.storageProofCount,
-		SiafundInputCount:         bf.siafundInputCount,
-		SiafundOutputCount:        bf.siafundOutputCount,
-		MinerFeeCount:             bf.minerFeeCount,
-		ArbitraryDataCount:        bf.arbitraryDataCount,
-		TransactionSignatureCount: bf.transactionSignatureCount,
-
-		// Factoids about file contracts.
-		ActiveContractCost:  bf.activeContractCost,
-		ActiveContractCount: bf.activeContractCount,
-		ActiveContractSize:  bf.activeContractSize,
-		TotalContractCost:   bf.totalContractCost,
-		TotalContractSize:   bf.totalContractSize,
-		TotalRevisionVolume: bf.totalRevisionVolume,
-	}, true
+	return bf.BlockFacts, true
 }
 
 // Transaction takes a transaction ID and finds the block containing the
@@ -127,10 +96,10 @@ func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.Transaction
 func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, fcE bool, spE bool) {
 	var history fileContractHistory
 	err := e.db.View(dbGetFileContractHistory(id, &history))
-	fc = history.contract
-	fcrs = history.revisions
+	fc = history.Contract
+	fcrs = history.Revisions
 	fcE = err == nil
-	spE = history.storageProof.ParentID == id
+	spE = history.StorageProof.ParentID == id
 	return
 }
 

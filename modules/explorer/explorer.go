@@ -25,47 +25,20 @@ type (
 	// revisions that have affected a file contract through the life of the
 	// blockchain.
 	fileContractHistory struct {
-		contract     types.FileContract
-		revisions    []types.FileContractRevision
-		storageProof types.StorageProof
+		Contract     types.FileContract
+		Revisions    []types.FileContractRevision
+		StorageProof types.StorageProof
 	}
 
-	// blockFacts contians a set of facts about the consensus set related to a
+	// blockFacts contains a set of facts about the consensus set related to a
 	// certain block. The explorer needs some additional information in the
 	// history so that it can calculate certain values, which is one of the
 	// reasons that the explorer uses a separate struct instead of
 	// modules.BlockFacts.
 	blockFacts struct {
-		// Block information.
-		currentBlock      types.BlockID
-		blockchainHeight  types.BlockHeight
-		target            types.Target
-		timestamp         types.Timestamp
-		maturityTimestamp types.Timestamp
-		estimatedHashrate types.Currency
-		totalCoins        types.Currency
+		modules.BlockFacts
 
-		// Transaction type counts.
-		minerPayoutCount          uint64
-		transactionCount          uint64
-		siacoinInputCount         uint64
-		siacoinOutputCount        uint64
-		fileContractCount         uint64
-		fileContractRevisionCount uint64
-		storageProofCount         uint64
-		siafundInputCount         uint64
-		siafundOutputCount        uint64
-		minerFeeCount             uint64
-		arbitraryDataCount        uint64
-		transactionSignatureCount uint64
-
-		// Factoids about file contracts.
-		activeContractCost  types.Currency
-		activeContractCount uint64
-		activeContractSize  types.Currency
-		totalContractCost   types.Currency
-		totalContractSize   types.Currency
-		totalRevisionVolume types.Currency
+		Timestamp types.Timestamp
 	}
 
 	// An Explorer contains a more comprehensive view of the blockchain,
