@@ -4,7 +4,6 @@ package explorer
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -69,30 +68,12 @@ type (
 		totalRevisionVolume types.Currency
 	}
 
-	// Basic structure to store the blockchain. Metadata may also be
-	// stored here in the future
+	// An Explorer contains a more comprehensive view of the blockchain,
+	// including various statistics and metrics.
 	Explorer struct {
-		// Stat tracking information.
-		blocksDifficulty      types.Target // cumulative difficulty from the past hashrateEstimationDepth blocks.
-		blockHashes           map[types.BlockID]types.BlockHeight
-		blockTargets          map[types.BlockID]types.Target
-		transactionHashes     map[types.TransactionID]types.BlockHeight
-		unlockHashes          map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
-		siacoinOutputIDs      map[types.SiacoinOutputID]map[types.TransactionID]struct{}
-		siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
-		fileContractIDs       map[types.FileContractID]map[types.TransactionID]struct{}
-		fileContractHistories map[types.FileContractID]*fileContractHistory
-		siafundOutputIDs      map[types.SiafundOutputID]map[types.TransactionID]struct{}
-		siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
-
-		// Utilities.
 		cs         modules.ConsensusSet
+		db         *persist.BoltDatabase
 		persistDir string
-		mu         sync.RWMutex
-
-		// Factoids about the current block.
-		historicFacts []blockFacts
-		blockFacts
 	}
 )
 
@@ -106,22 +87,9 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
-		blocksDifficulty:      types.RootDepth,
-		blockHashes:           make(map[types.BlockID]types.BlockHeight),
-		blockTargets:          make(map[types.BlockID]types.Target),
-		transactionHashes:     make(map[types.TransactionID]types.BlockHeight),
-		unlockHashes:          make(map[types.UnlockHash]map[types.TransactionID]struct{}),
-		siacoinOutputIDs:      make(map[types.SiacoinOutputID]map[types.TransactionID]struct{}),
-		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		fileContractIDs:       make(map[types.FileContractID]map[types.TransactionID]struct{}),
-		fileContractHistories: make(map[types.FileContractID]*fileContractHistory),
-		siafundOutputIDs:      make(map[types.SiafundOutputID]map[types.TransactionID]struct{}),
-		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
-
 		cs:         cs,
 		persistDir: persistDir,
 	}
-	e.blockchainHeight-- // Set to -1 so the genesis block sets the height to 0.
 
 	// Intialize the persistent structures, including the database.
 	err := e.initPersist()
@@ -139,5 +107,5 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 // Close closes the explorer.
 func (e *Explorer) Close() error {
-	return nil
+	return e.db.Close()
 }
