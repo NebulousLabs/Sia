@@ -28,7 +28,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 		// get starting block height
 		var blockheight types.BlockHeight
-		err = dbGetInternalBlockHeight(&blockheight)(tx)
+		err = dbGetInternal(internalBlockHeight, &blockheight)(tx)
 		if err != nil {
 			return err
 		}
@@ -223,13 +223,13 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 
 		// set final blockheight
-		err = dbSetInternalBlockHeight(blockheight)(tx)
+		err = dbSetInternal(internalBlockHeight, blockheight)(tx)
 		if err != nil {
 			return err
 		}
 
 		// set change ID
-		err = dbSetInternalRecentChange(cc.ID)(tx)
+		err = dbSetInternal(internalRecentChange, cc.ID)(tx)
 		if err != nil {
 			return err
 		}
@@ -282,17 +282,17 @@ func dbAddBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 	mustPut(tx.Bucket(bucketBlockTargets), id, target)
 	// update difficulty
 	var difficulty types.Target
-	assertNil(dbGetInternalDifficulty(&difficulty)(tx))
+	assertNil(dbGetInternal(internalDifficulty, &difficulty)(tx))
 	difficulty = difficulty.AddDifficulties(target)
-	assertNil(dbSetInternalDifficulty(difficulty)(tx))
+	assertNil(dbSetInternal(internalDifficulty, difficulty)(tx))
 }
 func dbRemoveBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 	mustDelete(tx.Bucket(bucketBlockTargets), id)
 	// update difficulty
 	var difficulty types.Target
-	assertNil(dbGetInternalDifficulty(&difficulty)(tx))
+	assertNil(dbGetInternal(internalDifficulty, &difficulty)(tx))
 	difficulty = difficulty.SubtractDifficulties(target)
-	assertNil(dbSetInternalDifficulty(difficulty)(tx))
+	assertNil(dbSetInternal(internalDifficulty, difficulty)(tx))
 }
 
 // Add/Remove file contract

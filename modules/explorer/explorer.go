@@ -72,7 +72,7 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// retrieve the current ConsensusChangeID
 	var recentChange modules.ConsensusChangeID
-	err = e.db.View(dbGetInternalRecentChange(&recentChange))
+	err = e.db.View(dbGetInternal(internalRecentChange, &recentChange))
 	if err != nil {
 		return nil, err
 	}

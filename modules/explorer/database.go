@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -152,38 +151,13 @@ func dbGetSiafundOutputTxnIDs(id types.SiafundOutputID, ids *[]types.Transaction
 
 // Internal bucket getters/setters
 
-// Set/Get block height
-func dbSetInternalBlockHeight(height types.BlockHeight) func(*bolt.Tx) error {
+func dbSetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
 	return func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketInternal).Put(internalBlockHeight, encoding.Marshal(height))
+		return tx.Bucket(bucketInternal).Put(key, encoding.Marshal(val))
 	}
 }
-func dbGetInternalBlockHeight(height *types.BlockHeight) func(*bolt.Tx) error {
+func dbGetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
 	return func(tx *bolt.Tx) error {
-		return encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalBlockHeight), height)
-	}
-}
-
-// Set/Get recent change
-func dbSetInternalRecentChange(id modules.ConsensusChangeID) func(*bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketInternal).Put(internalRecentChange, encoding.Marshal(id))
-	}
-}
-func dbGetInternalRecentChange(id *modules.ConsensusChangeID) func(*bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
-		return encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalRecentChange), id)
-	}
-}
-
-// Set/Get difficulty
-func dbSetInternalDifficulty(difficulty types.Target) func(*bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketInternal).Put(internalDifficulty, encoding.Marshal(difficulty))
-	}
-}
-func dbGetInternalDifficulty(difficulty *types.Target) func(*bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
-		return encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalDifficulty), difficulty)
+		return encoding.Unmarshal(tx.Bucket(bucketInternal).Get(key), val)
 	}
 }
