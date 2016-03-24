@@ -318,14 +318,14 @@ func dbRemoveFileContractID(tx *bolt.Tx, id types.FileContractID, txid types.Tra
 func dbAddFileContractRevision(tx *bolt.Tx, fcid types.FileContractID, fcr types.FileContractRevision) {
 	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
-	assertNil(getAndDecode(b, fcid, &history))
+	assertNil(dbGetFileContractHistory(fcid, &history)(tx))
 	history.Revisions = append(history.Revisions, fcr)
 	mustPut(b, fcid, history)
 }
 func dbRemoveFileContractRevision(tx *bolt.Tx, fcid types.FileContractID) {
 	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
-	assertNil(getAndDecode(b, fcid, &history))
+	assertNil(dbGetFileContractHistory(fcid, &history)(tx))
 	// TODO: could be more rigorous
 	history.Revisions = history.Revisions[:len(history.Revisions)-1]
 	mustPut(b, fcid, history)
@@ -373,7 +373,7 @@ func dbRemoveSiafundOutputID(tx *bolt.Tx, id types.SiafundOutputID, txid types.T
 func dbAddStorageProof(tx *bolt.Tx, fcid types.FileContractID, sp types.StorageProof) {
 	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
-	assertNil(getAndDecode(b, fcid, &history))
+	assertNil(dbGetFileContractHistory(fcid, &history)(tx))
 	history.StorageProof = sp
 	mustPut(b, fcid, history)
 }
@@ -403,7 +403,7 @@ func dbRemoveUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.Transaction
 func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) blockFacts {
 	// get the parent block facts
 	var bf blockFacts
-	err := getAndDecode(tx.Bucket(bucketBlockFacts), block.ParentID, &bf)
+	err := dbGetBlockFacts(block.ParentID, &bf)(tx)
 	assertNil(err)
 
 	// get target
