@@ -316,19 +316,17 @@ func dbRemoveFileContractID(tx *bolt.Tx, id types.FileContractID, txid types.Tra
 }
 
 func dbAddFileContractRevision(tx *bolt.Tx, fcid types.FileContractID, fcr types.FileContractRevision) {
-	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
-	assertNil(dbGetFileContractHistory(fcid, &history)(tx))
+	assertNil(dbGetAndDecode(bucketFileContractHistories, fcid, &history)(tx))
 	history.Revisions = append(history.Revisions, fcr)
-	mustPut(b, fcid, history)
+	mustPut(tx.Bucket(bucketFileContractHistories), fcid, history)
 }
 func dbRemoveFileContractRevision(tx *bolt.Tx, fcid types.FileContractID) {
-	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
-	assertNil(dbGetFileContractHistory(fcid, &history)(tx))
+	assertNil(dbGetAndDecode(bucketFileContractHistories, fcid, &history)(tx))
 	// TODO: could be more rigorous
 	history.Revisions = history.Revisions[:len(history.Revisions)-1]
-	mustPut(b, fcid, history)
+	mustPut(tx.Bucket(bucketFileContractHistories), fcid, history)
 }
 
 // Add/Remove siacoin output
@@ -371,11 +369,10 @@ func dbRemoveSiafundOutputID(tx *bolt.Tx, id types.SiafundOutputID, txid types.T
 
 // Add/Remove storage proof
 func dbAddStorageProof(tx *bolt.Tx, fcid types.FileContractID, sp types.StorageProof) {
-	b := tx.Bucket(bucketFileContractHistories)
 	var history fileContractHistory
-	assertNil(dbGetFileContractHistory(fcid, &history)(tx))
+	assertNil(dbGetAndDecode(bucketFileContractHistories, fcid, &history)(tx))
 	history.StorageProof = sp
-	mustPut(b, fcid, history)
+	mustPut(tx.Bucket(bucketFileContractHistories), fcid, history)
 }
 func dbRemoveStorageProof(tx *bolt.Tx, fcid types.FileContractID) {
 	dbAddStorageProof(tx, fcid, types.StorageProof{})
@@ -403,7 +400,7 @@ func dbRemoveUnlockHash(tx *bolt.Tx, uh types.UnlockHash, txid types.Transaction
 func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Block) blockFacts {
 	// get the parent block facts
 	var bf blockFacts
-	err := dbGetBlockFacts(block.ParentID, &bf)(tx)
+	err := dbGetAndDecode(bucketBlockFacts, block.ParentID, &bf)(tx)
 	assertNil(err)
 
 	// get target

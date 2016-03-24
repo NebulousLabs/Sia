@@ -9,7 +9,7 @@ import (
 // block is in the consensus set.
 func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool) {
 	var height types.BlockHeight
-	err := e.db.View(dbGetBlockHeight(id, &height))
+	err := e.db.View(dbGetAndDecode(bucketBlockIDs, id, &height))
 	if err != nil {
 		return types.Block{}, 0, false
 	}
@@ -30,7 +30,7 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 	}
 
 	var bf blockFacts
-	err := e.db.View(dbGetBlockFacts(block.ID(), &bf))
+	err := e.db.View(dbGetAndDecode(bucketBlockFacts, block.ID(), &bf))
 	if err != nil {
 		return modules.BlockFacts{}, false
 	}
@@ -43,7 +43,7 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 // block ID. To find the transaction, iterate through the block.
 func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.BlockHeight, bool) {
 	var height types.BlockHeight
-	err := e.db.View(dbGetTransactionHeight(id, &height))
+	err := e.db.View(dbGetAndDecode(bucketTransactionIDs, id, &height))
 	if err != nil {
 		return types.Block{}, 0, false
 	}
@@ -59,7 +59,7 @@ func (e *Explorer) Transaction(id types.TransactionID) (types.Block, types.Block
 // blockchain.
 func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
 	var ids []types.TransactionID
-	err := e.db.View(dbGetUnlockHashTxnIDs(uh, &ids))
+	err := e.db.View(dbGetTransactionIDSet(bucketUnlockHashes, uh, &ids))
 	if err != nil {
 		ids = nil
 	}
@@ -69,7 +69,7 @@ func (e *Explorer) UnlockHash(uh types.UnlockHash) []types.TransactionID {
 // SiacoinOutput returns the siacoin output associated with the specified ID.
 func (e *Explorer) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput, bool) {
 	var sco types.SiacoinOutput
-	err := e.db.View(dbGetSiacoinOutput(id, &sco))
+	err := e.db.View(dbGetAndDecode(bucketSiacoinOutputs, id, &sco))
 	if err != nil {
 		return types.SiacoinOutput{}, false
 	}
@@ -81,7 +81,7 @@ func (e *Explorer) SiacoinOutput(id types.SiacoinOutputID) (types.SiacoinOutput,
 // not appear in the blockchain.
 func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.TransactionID {
 	var ids []types.TransactionID
-	err := e.db.View(dbGetSiacoinOutputTxnIDs(id, &ids))
+	err := e.db.View(dbGetTransactionIDSet(bucketSiacoinOutputIDs, id, &ids))
 	if err != nil {
 		ids = nil
 	}
@@ -95,7 +95,7 @@ func (e *Explorer) SiacoinOutputID(id types.SiacoinOutputID) []types.Transaction
 // whether a storage proof was successfully submitted for the file contract.
 func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileContract, fcrs []types.FileContractRevision, fcE bool, spE bool) {
 	var history fileContractHistory
-	err := e.db.View(dbGetFileContractHistory(id, &history))
+	err := e.db.View(dbGetAndDecode(bucketFileContractHistories, id, &history))
 	fc = history.Contract
 	fcrs = history.Revisions
 	fcE = err == nil
@@ -108,7 +108,7 @@ func (e *Explorer) FileContractHistory(id types.FileContractID) (fc types.FileCo
 // appear in the blockchain.
 func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID {
 	var ids []types.TransactionID
-	err := e.db.View(dbGetFileContractTxnIDs(id, &ids))
+	err := e.db.View(dbGetTransactionIDSet(bucketFileContractIDs, id, &ids))
 	if err != nil {
 		ids = nil
 	}
@@ -118,7 +118,7 @@ func (e *Explorer) FileContractID(id types.FileContractID) []types.TransactionID
 // SiafundOutput returns the siafund output associated with the specified ID.
 func (e *Explorer) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput, bool) {
 	var sco types.SiafundOutput
-	err := e.db.View(dbGetSiafundOutput(id, &sco))
+	err := e.db.View(dbGetAndDecode(bucketSiafundOutputs, id, &sco))
 	if err != nil {
 		return types.SiafundOutput{}, false
 	}
@@ -130,7 +130,7 @@ func (e *Explorer) SiafundOutput(id types.SiafundOutputID) (types.SiafundOutput,
 // not appear in the blockchain.
 func (e *Explorer) SiafundOutputID(id types.SiafundOutputID) []types.TransactionID {
 	var ids []types.TransactionID
-	err := e.db.View(dbGetSiafundOutputTxnIDs(id, &ids))
+	err := e.db.View(dbGetTransactionIDSet(bucketSiafundOutputIDs, id, &ids))
 	if err != nil {
 		ids = nil
 	}
