@@ -222,6 +222,36 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 
+		// Compute the changes in the active set. Note, because this is calculated
+		// at the end instead of in a loop, the historic facts may contain
+		// inaccuracies about the active set. This should not be a problem except
+		// for large reorgs.
+		// TODO: improve this
+		currentBlock, exists := e.cs.BlockAtHeight(blockheight)
+		if !exists {
+			build.Critical("consensus is missing block", blockheight)
+		}
+		currentID := currentBlock.ID()
+		var facts blockFacts
+		err = dbGetAndDecode(bucketBlockFacts, currentID, &facts)(tx)
+		if err == nil {
+			for _, diff := range cc.FileContractDiffs {
+				if diff.Direction == modules.DiffApply {
+					facts.ActiveContractCount++
+					facts.ActiveContractCost = facts.ActiveContractCost.Add(diff.FileContract.Payout)
+					facts.ActiveContractSize = facts.ActiveContractSize.Add(types.NewCurrency64(diff.FileContract.FileSize))
+				} else {
+					facts.ActiveContractCount--
+					facts.ActiveContractCost = facts.ActiveContractCost.Sub(diff.FileContract.Payout)
+					facts.ActiveContractSize = facts.ActiveContractSize.Sub(types.NewCurrency64(diff.FileContract.FileSize))
+				}
+			}
+			err = tx.Bucket(bucketBlockFacts).Put(encoding.Marshal(currentID), encoding.Marshal(facts))
+			if err != nil {
+				return err
+			}
+		}
+
 		// set final blockheight
 		err = dbSetInternal(internalBlockHeight, blockheight)(tx)
 		if err != nil {
@@ -234,7 +264,6 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			return err
 		}
 
-		// TODO: incorporate cc.FileContractDiffs
 		return nil
 	})
 	if err != nil {
