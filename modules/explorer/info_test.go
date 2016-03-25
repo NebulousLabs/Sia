@@ -8,7 +8,7 @@ import (
 
 // TestImmediateBlockFacts grabs the block facts object from the block explorer
 // at the current height and verifies that the data has been filled out.
-func TestImmedieateBlockFacts(t *testing.T) {
+func TestImmediateBlockFacts(t *testing.T) {
 	et, err := createExplorerTester("TestImmediateBlockFacts")
 	if err != nil {
 		t.Fatal(err)
@@ -18,11 +18,13 @@ func TestImmedieateBlockFacts(t *testing.T) {
 	if !exists {
 		t.Fatal("could not find block facts for current height")
 	}
-	if facts.Height != et.explorer.blockchainHeight || et.explorer.blockchainHeight == 0 {
-		t.Error("wrong height reported in facts object")
+	var explorerHeight types.BlockHeight
+	err = et.explorer.db.View(dbGetInternal(internalBlockHeight, &explorerHeight))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if facts.TransactionCount != et.explorer.transactionCount || et.explorer.transactionCount == 0 {
-		t.Error("wrong transaction count reported in facts object")
+	if facts.Height != explorerHeight || explorerHeight == 0 {
+		t.Error("wrong height reported in facts object")
 	}
 	if facts.TotalCoins.Cmp(types.CalculateNumSiacoins(et.cs.Height())) != 0 {
 		t.Error("wrong number of total coins:", facts.TotalCoins, et.cs.Height())

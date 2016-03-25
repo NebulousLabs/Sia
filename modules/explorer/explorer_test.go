@@ -136,7 +136,7 @@ func (et *explorerTester) reorgToBlank() error {
 
 	// Mine blocks until the height is higher than the existing consensus,
 	// submitting each block to the explorerTester.
-	currentHeight := et.explorer.blockchainHeight
+	currentHeight := cs.Height()
 	for i := types.BlockHeight(0); i <= currentHeight+1; i++ {
 		block, err := m.AddBlock()
 		if err != nil {
@@ -147,7 +147,7 @@ func (et *explorerTester) reorgToBlank() error {
 	return nil
 }
 
-// TestNilExplorerDependencies tries to initalize an explorer with nil
+// TestNilExplorerDependencies tries to initialize an explorer with nil
 // dependencies, checks that the correct error is returned.
 func TestNilExplorerDependencies(t *testing.T) {
 	_, err := New(nil, "expdir")
@@ -176,7 +176,14 @@ func TestExplorerGenesisHeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.blockchainHeight != 0 {
-		t.Error("genesis height was not set to zero after explorer initialization")
+	block, height, exists := e.Block(types.GenesisBlock.ID())
+	if !exists {
+		t.Error("explorer missing genesis block after initialization")
+	}
+	if block.ID() != types.GenesisBlock.ID() {
+		t.Error("explorer returned wrong genesis block")
+	}
+	if height != 0 {
+		t.Errorf("genesis block hash wrong height: expected 0, got %v", height)
 	}
 }
