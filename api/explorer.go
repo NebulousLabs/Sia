@@ -317,6 +317,13 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 		return
 	}
 
+	// TODO: lookups on the zero hash are too expensive to allow. Need a
+	// better way to handle this case.
+	if hash == (types.UnlockHash{}) {
+		writeError(w, "can't lookup the empty unlock hash", http.StatusBadRequest)
+		return
+	}
+
 	// Try the hash as an unlock hash. Unlock hash is checked last because
 	// unlock hashes do not have collision-free guarantees. Someone can create
 	// an unlock hash that collides with another object id. They will not be
