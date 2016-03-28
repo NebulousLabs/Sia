@@ -77,6 +77,9 @@ func (e *Explorer) initPersist() error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
