@@ -309,19 +309,9 @@ func dbRemoveBlockFacts(tx *bolt.Tx, id types.BlockID) {
 // Add/Remove block target
 func dbAddBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 	mustPut(tx.Bucket(bucketBlockTargets), id, target)
-	// update difficulty
-	var difficulty types.Target
-	assertNil(dbGetInternal(internalDifficulty, &difficulty)(tx))
-	difficulty = difficulty.AddDifficulties(target)
-	assertNil(dbSetInternal(internalDifficulty, difficulty)(tx))
 }
 func dbRemoveBlockTarget(tx *bolt.Tx, id types.BlockID, target types.Target) {
 	mustDelete(tx.Bucket(bucketBlockTargets), id)
-	// update difficulty
-	var difficulty types.Target
-	assertNil(dbGetInternal(internalDifficulty, &difficulty)(tx))
-	difficulty = difficulty.SubtractDifficulties(target)
-	assertNil(dbSetInternal(internalDifficulty, difficulty)(tx))
 }
 
 // Add/Remove file contract

@@ -31,7 +31,6 @@ var (
 
 	// keys for bucketInternal
 	internalBlockHeight  = []byte("BlockHeight")
-	internalDifficulty   = []byte("Difficulty")
 	internalRecentChange = []byte("RecentChange")
 )
 

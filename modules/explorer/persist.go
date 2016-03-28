@@ -61,7 +61,6 @@ func (e *Explorer) initPersist() error {
 			key, val []byte
 		}{
 			{internalBlockHeight, encoding.Marshal(types.BlockHeight(0))},
-			{internalDifficulty, encoding.Marshal(types.RootDepth)},
 			{internalRecentChange, encoding.Marshal(modules.ConsensusChangeID{})},
 		}
 		b := tx.Bucket(bucketInternal)
