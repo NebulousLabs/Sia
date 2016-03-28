@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -12,16 +11,24 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Adjust the height of the miner. The miner height is initialized to zero,
-	// but the genesis block is actually height zero. For the genesis block
-	// only, the height will be left at zero.
-	//
-	// Checking the height here eliminates the need to initialize the miner to
-	// an underflowed types.BlockHeight, which was deemed the worse of the two
-	// evils.
-	if m.persist.Height != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisBlock.ID() {
-		m.persist.Height -= types.BlockHeight(len(cc.RevertedBlocks))
-		m.persist.Height += types.BlockHeight(len(cc.AppliedBlocks))
+	for _, block := range cc.RevertedBlocks {
+		if block.ID() != types.GenesisBlock.ID() {
+			m.persist.Height--
+		}
+	}
+	for _, block := range cc.AppliedBlocks {
+		if block.ID() != types.GenesisBlock.ID() {
+			m.persist.Height++
+		}
+	}
+	// Sanity check - if the most recent block in the miner is the same as the
+	// most recent block in the consensus set, then the height of the consensus
+	// set and the height of the miner should be the same.
+	if cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() == m.cs.CurrentBlock().ID() {
+		if m.persist.Height != m.cs.Height() {
+			m.log.Critical("miner has a height mismatch: have ", m.persist.Height, " expected ", m.cs.Height())
+			m.persist.Height = m.cs.Height()
+		}
 	}
 
 	// Update the unsolved block.
@@ -30,10 +37,10 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.persist.Target, exists1 = m.cs.ChildTarget(m.persist.UnsolvedBlock.ParentID)
 	m.persist.UnsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.persist.UnsolvedBlock.ParentID)
 	if !exists1 {
-		build.Critical("miner was unable to find parent id of an unsolved block in the consensus set")
+		m.log.Critical("miner was unable to find parent id of an unsolved block in the consensus set")
 	}
 	if !exists2 {
-		build.Critical("miner was unable to find child timestamp of an unsovled block in the consensus set")
+		m.log.Critical("miner was unable to find child timestamp of an unsovled block in the consensus set")
 	}
 
 	// There is a new parent block, the source block should be updated to keep

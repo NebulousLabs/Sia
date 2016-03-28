@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -127,10 +126,16 @@ func (m *Miner) managedSubmitBlock(b types.Block) error {
 		m.mu.Lock()
 		m.persist.BlocksFound = append(m.persist.BlocksFound, b.ID())
 		m.mu.Unlock()
+		m.log.Println("Mined a stale block - block appears valid but does not extend the blockchain")
+		return err
+	}
+	if err == modules.ErrBlockUnsolved {
+		m.log.Println("Mined an unsolved block - header submission appears to be incorrect")
+		return err
 	}
 	if err != nil {
 		m.tpool.PurgeTransactionPool()
-		m.log.Println("ERROR: an invalid block was submitted:", err)
+		m.log.Critical("ERROR: an invalid block was submitted:", err)
 		return err
 	}
 	m.mu.Lock()
@@ -180,7 +185,7 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 		// Sanity check - block should have same id as header.
 		bh.Nonce = nonce
 		if types.BlockID(crypto.HashObject(bh)) != b.ID() {
-			build.Critical("block reconstruction failed")
+			m.log.Critical("block reconstruction failed")
 		}
 		return nil
 	}()
