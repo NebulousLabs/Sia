@@ -26,7 +26,8 @@ type minerTester struct {
 
 	miner *Miner
 
-	persistDir string
+	minedBlocks []types.Block
+	persistDir  string
 }
 
 // createMinerTester creates a minerTester that's ready for use.
@@ -83,10 +84,11 @@ func createMinerTester(name string) (*minerTester, error) {
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, err = m.AddBlock()
+		b, err := m.AddBlock()
 		if err != nil {
 			return nil, err
 		}
+		mt.minedBlocks = append(mt.minedBlocks, b)
 	}
 
 	return mt, nil
