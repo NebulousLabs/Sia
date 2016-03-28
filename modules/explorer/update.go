@@ -15,7 +15,7 @@ import (
 // including parsing new blocks and updating the utxo sets.
 func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if len(cc.AppliedBlocks) == 0 {
-		build.Critical("Explorer.ProcessConsensusChange called with a ConensusChange that has no AppliedBlocks")
+		build.Critical("Explorer.ProcessConsensusChange called with a ConsensusChange that has no AppliedBlocks")
 	}
 
 	err := e.db.Update(func(tx *bolt.Tx) (err error) {
@@ -457,25 +457,25 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 	}
 	bf.MaturityTimestamp = maturityTimestamp
 
-	// get difficulty
-	var difficulty types.Target
-	err = encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalDifficulty), &difficulty)
-	assertNil(err)
-
-	// calculate hashrate
+	// calculate hashrate by averaging last 'hashrateEstimationBlocks' blocks
 	var estimatedHashrate types.Currency
 	if bf.Height > hashrateEstimationBlocks {
-		oldBlock, exists := cs.BlockAtHeight(bf.Height - hashrateEstimationBlocks)
-		if !exists {
-			panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-hashrateEstimationBlocks))
+		var totalDifficulty = bf.Target
+		var oldestTimestamp types.Timestamp
+		for i := types.BlockHeight(0); i < hashrateEstimationBlocks; i++ {
+			b, exists := cs.BlockAtHeight(bf.Height - i)
+			if !exists {
+				panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-hashrateEstimationBlocks))
+			}
+			target, exists := cs.ChildTarget(b.ParentID)
+			if !exists {
+				panic(fmt.Sprint("ConsensusSet is missing target of known block", b.ParentID))
+			}
+			totalDifficulty = totalDifficulty.AddDifficulties(target)
+			oldestTimestamp = b.Timestamp
 		}
-		oldTarget, exists := cs.ChildTarget(oldBlock.ID())
-		if !exists {
-			panic(fmt.Sprint("ConsensusSet is missing target of known block", oldBlock.ID()))
-		}
-		hashDifficulty := difficulty.SubtractDifficulties(oldTarget)
-		secondsPassed := block.Timestamp - oldBlock.Timestamp
-		estimatedHashrate = hashDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
+		secondsPassed := bf.Timestamp - oldestTimestamp
+		estimatedHashrate = totalDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
 	}
 	bf.EstimatedHashrate = estimatedHashrate
 
