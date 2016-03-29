@@ -117,7 +117,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 // sendAddress is the calling end of the RelayNode RPC.
 func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 	// don't send if we aren't connectible
-	if g.Address().Host() == "::1" {
+	if g.Address().IsLoopback() {
 		return errors.New("can't send address without knowing external IP")
 	}
 	return encoding.WriteObject(conn, g.Address())

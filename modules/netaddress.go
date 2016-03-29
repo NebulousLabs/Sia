@@ -36,10 +36,10 @@ func (na NetAddress) IsLoopback() bool {
 	}
 
 	host := na.Host()
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsUnspecified()) {
 		return true
 	}
-	if host == "localhost" || host == "::" || host == "0.0.0.0" {
+	if host == "localhost" {
 		return true
 	}
 	return false
