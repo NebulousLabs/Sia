@@ -28,6 +28,9 @@ func verifySettings(conn net.Conn, knownSettings modules.HostExternalSettings, h
 	if err := crypto.ReadSignedObject(conn, &recvSettings, 2048, knownSettings.PublicKey); err != nil { // ??? how large?
 		return modules.HostExternalSettings{}, errors.New("couldn't read host's settings: " + err.Error())
 	}
+	if !recvSettings.AcceptingContracts {
+		return recvSettings, errors.New("host is not accepting contracts")
+	}
 	// TODO: check settings. If there is a discrepancy, write the error to
 	// conn and update the hostdb
 	return recvSettings, nil
