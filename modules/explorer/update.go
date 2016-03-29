@@ -452,7 +452,7 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 	if bf.Height > hashrateEstimationBlocks {
 		var totalDifficulty = bf.Target
 		var oldestTimestamp types.Timestamp
-		for i := types.BlockHeight(0); i < hashrateEstimationBlocks; i++ {
+		for i := types.BlockHeight(1); i < hashrateEstimationBlocks; i++ {
 			b, exists := cs.BlockAtHeight(bf.Height - i)
 			if !exists {
 				panic(fmt.Sprint("ConsensusSet is missing block at height", bf.Height-hashrateEstimationBlocks))
