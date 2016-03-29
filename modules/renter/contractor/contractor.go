@@ -60,7 +60,7 @@ func (c *Contractor) Allowance() modules.Allowance {
 }
 
 // Spending returns the number of coins spent on file contracts.
-func (c *Contractor) Spending() (types.Currency, types.Currency) {
+func (c *Contractor) Spending() (period, total types.Currency) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.spentPeriod, c.spentTotal
