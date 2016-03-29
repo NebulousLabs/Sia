@@ -68,18 +68,15 @@ func negotiateContract(conn net.Conn, host modules.HostExternalSettings, fc type
 		return Contract{}, err
 	}
 	txnBuilder.AddFileContract(fc)
-	txn, parents := txnBuilder.View()
-	txnSet := append(parents, txn)
-
-	// calculate contract ID
-	fcid := txn.FileContractID(0)
 
 	// sign the txn
-	// TODO: needs to be fancy
-	signedTxnSet, err := txnBuilder.Sign(true)
+	signedTxnSet, err := txnBuilder.Sign(false)
 	if err != nil {
 		return Contract{}, err
 	}
+
+	// calculate contract ID
+	fcid := signedTxnSet[len(signedTxnSet)-1].FileContractID(0)
 
 	// send acceptance and txn signed by us
 	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
