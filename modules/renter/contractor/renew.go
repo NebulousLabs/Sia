@@ -151,7 +151,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	var numHosts uint64
 	for _, contract := range contracts {
 		if h, ok := c.hdb.Host(contract.IP); ok {
-			sum = sum.Add(h.Price)
+			sum = sum.Add(h.ContractPrice)
 			numHosts++
 		}
 	}

@@ -163,7 +163,7 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 
 	// create file contract
 	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
-	payout := renterCost // no collateral
+	payout := renterCost.Add(host.Collateral)
 
 	fc := types.FileContract{
 		FileSize:       0,
