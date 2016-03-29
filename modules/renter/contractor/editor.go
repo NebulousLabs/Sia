@@ -11,9 +11,16 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// SectorSize is the number of bytes in a sector.
-	SectorSize = 1 << 22 // 4 MiB
+var (
+	// sectorHeight is the height of a Merkle tree that covers a single
+	// sector. It is log2(modules.SectorSize / crypto.SegmentSize)
+	sectorHeight = func() uint64 {
+		height := uint64(0)
+		for 1<<height < (modules.SectorSize / crypto.SegmentSize) {
+			height++
+		}
+		return height
+	}()
 )
 
 // An Editor modifies a Contract by communicating with a host. It uses the
@@ -86,14 +93,14 @@ func (he *hostEditor) Upload(data []byte) (uint64, error) {
 	if height >= he.contract.FileContract.WindowStart {
 		return 0, errors.New("contract has already ended")
 	}
-	sectorPrice := he.price.Mul(types.NewCurrency64(SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	sectorPrice := he.price.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
 	pieceRoot := crypto.MerkleRoot(data)
 
 	// calculate the new total Merkle root
 	newRoots := append(he.contract.MerkleRoots, pieceRoot)
-	tree := crypto.NewCachedTree(0) // height is not relevant here
+	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
 	for _, h := range newRoots {
 		tree.Push(h)
 	}
@@ -142,7 +149,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 		return errors.New("contract has already ended")
 	}
 	// TODO: is this math correct?
-	sectorPrice := he.price.Mul(types.NewCurrency64(SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	sectorPrice := he.price.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
 
 	// calculate the new total Merkle root
 	var newRoots []crypto.Hash
@@ -157,7 +164,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	if index == -1 {
 		return errors.New("no record of that sector root")
 	}
-	tree := crypto.NewCachedTree(0) // height is not relevant here
+	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
 	for _, h := range newRoots {
 		tree.Push(h)
 	}

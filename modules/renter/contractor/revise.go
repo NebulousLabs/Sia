@@ -74,7 +74,7 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		missed0 = rev.NewMissedProofOutputs[0].Value
 		missed1 = rev.NewMissedProofOutputs[1].Value
 	)
-	curSectors := rev.NewFileSize / SectorSize
+	curSectors := rev.NewFileSize / modules.SectorSize
 	if numSectors > curSectors {
 		diffPrice := sectorPrice.Mul(types.NewCurrency64(numSectors - curSectors))
 		// move valid payout from renter to host
@@ -93,7 +93,7 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		ParentID:          rev.ParentID,
 		UnlockConditions:  rev.UnlockConditions,
 		NewRevisionNumber: rev.NewRevisionNumber + 1,
-		NewFileSize:       numSectors * SectorSize,
+		NewFileSize:       numSectors * modules.SectorSize,
 		NewFileMerkleRoot: merkleRoot,
 		NewWindowStart:    rev.NewWindowStart,
 		NewWindowEnd:      rev.NewWindowEnd,

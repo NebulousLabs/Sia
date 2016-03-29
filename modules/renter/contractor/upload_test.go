@@ -83,7 +83,7 @@ func TestEditor(t *testing.T) {
 	}
 
 	// give contract more value; it should be valid now
-	contract.LastRevision.NewValidProofOutputs[0].Value = types.NewCurrency64(SectorSize * 500)
+	contract.LastRevision.NewValidProofOutputs[0].Value = types.NewCurrency64(modules.SectorSize * 500)
 
 	// contract with unresponsive host
 	c.dialer = editorDialer(func() (net.Conn, error) {

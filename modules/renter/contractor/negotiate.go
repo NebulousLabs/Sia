@@ -242,7 +242,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	// host for the specified duration.
 	costPerSector := avgPrice.
 		Mul(types.NewCurrency64(a.Hosts)).
-		Mul(types.NewCurrency64(SectorSize)).
+		Mul(types.NewCurrency64(modules.SectorSize)).
 		Mul(types.NewCurrency64(uint64(a.Period)))
 	if a.Funds.Cmp(costPerSector) < 0 {
 		return errors.New("insufficient funds")
@@ -255,7 +255,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 		// if there was an overflow, something is definitely wrong
 		return errors.New("allowance resulted in unexpectedly large contract size")
 	}
-	filesize := numSectors * SectorSize
+	filesize := numSectors * modules.SectorSize
 
 	// Form contracts with each host.
 	c.mu.RLock()

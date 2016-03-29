@@ -162,7 +162,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 
 	costPerSector := avgPrice.
 		Mul(types.NewCurrency64(allowance.Hosts)).
-		Mul(types.NewCurrency64(SectorSize)).
+		Mul(types.NewCurrency64(modules.SectorSize)).
 		Mul(types.NewCurrency64(uint64(allowance.Period)))
 	if allowance.Funds.Cmp(costPerSector) < 0 {
 		// errors.New("insufficient funds")
@@ -174,7 +174,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	if err != nil {
 		// errors.New("allowance resulted in unexpectedly large contract size")
 	}
-	filesize := numSectors * SectorSize
+	filesize := numSectors * modules.SectorSize
 
 	for _, contract := range contracts {
 		if contract.FileContract.WindowStart < newHeight {
