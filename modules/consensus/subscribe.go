@@ -9,8 +9,10 @@ import (
 
 // computeConsensusChange computes the consensus change from the change entry
 // at index 'i' in the change log. If i is out of bounds, an error is returned.
-func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (cc modules.ConsensusChange, err error) {
-	cc.ID = ce.ID()
+func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (modules.ConsensusChange, error) {
+	cc := modules.ConsensusChange{
+		ID: ce.ID(),
+	}
 	for _, revertedBlockID := range ce.RevertedBlocks {
 		revertedBlock, err := getBlockMap(tx, revertedBlockID)
 		if build.DEBUG && err != nil {
@@ -69,7 +71,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (cc 
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
-	return
+	return cc, nil
 }
 
 // readlockUpdateSubscribers will inform all subscribers of a new update to the
