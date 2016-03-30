@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
@@ -15,8 +14,9 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	}
 	for _, revertedBlockID := range ce.RevertedBlocks {
 		revertedBlock, err := getBlockMap(tx, revertedBlockID)
-		if build.DEBUG && err != nil {
-			panic(err)
+		if err != nil {
+			cs.log.Critical("getBlockMap failed in computeConsensusChange:", err)
+			return modules.ConsensusChange{}, err
 		}
 
 		// Because the direction is 'revert', the order of the diffs needs to
@@ -50,8 +50,9 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 	}
 	for _, appliedBlockID := range ce.AppliedBlocks {
 		appliedBlock, err := getBlockMap(tx, appliedBlockID)
-		if build.DEBUG && err != nil {
-			panic(err)
+		if err != nil {
+			cs.log.Critical("getBlockMap failed in computeConsensusChange:", err)
+			return modules.ConsensusChange{}, err
 		}
 
 		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedBlock.Block)
@@ -87,8 +88,9 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 		cc, err = cs.computeConsensusChange(tx, ce)
 		return err
 	})
-	if err != nil && build.DEBUG {
-		panic(err)
+	if err != nil {
+		cs.log.Critical("computeConsensusChange failed:", err)
+		return
 	}
 	for _, subscriber := range cs.subscribers {
 		subscriber.ProcessConsensusChange(cc)
