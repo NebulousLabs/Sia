@@ -118,6 +118,7 @@ func (m *Miner) startupRescan() error {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 
+		m.log.Println("Performing a miner rescan.")
 		m.persist.RecentChange = modules.ConsensusChangeID{}
 		m.persist.Height = 0
 		m.persist.Target = types.Target{}

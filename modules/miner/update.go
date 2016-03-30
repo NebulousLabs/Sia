@@ -14,11 +14,21 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.RevertedBlocks {
 		if block.ID() != types.GenesisBlock.ID() {
 			m.persist.Height--
+		} else if m.persist.Height != 0 {
+			// Sanity check - if the current block is the genesis block, the
+			// miner height should be set to zero.
+			m.log.Critical("Miner has detected a genesis block, but the height of the miner is set to ", m.persist.Height)
+			m.persist.Height = 0
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
 		if block.ID() != types.GenesisBlock.ID() {
 			m.persist.Height++
+		} else if m.persist.Height != 0 {
+			// Sanity check - if the current block is the genesis block, the
+			// miner height should be set to zero.
+			m.log.Critical("Miner has detected a genesis block, but the height of the miner is set to ", m.persist.Height)
+			m.persist.Height = 0
 		}
 	}
 	// Sanity check - if the most recent block in the miner is the same as the
@@ -26,7 +36,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// set and the height of the miner should be the same.
 	if cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() == m.cs.CurrentBlock().ID() {
 		if m.persist.Height != m.cs.Height() {
-			m.log.Critical("miner has a height mismatch: have ", m.persist.Height, " expected ", m.cs.Height())
+			m.log.Critical("Miner has a height mismatch: expecting ", m.cs.Height(), " but got ", m.persist.Height, ". Recent update had ", len(cc.RevertedBlocks), " reverted blocks, and ", len(cc.AppliedBlocks), " applied blocks.")
 			m.persist.Height = m.cs.Height()
 		}
 	}
