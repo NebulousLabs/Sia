@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -112,4 +113,16 @@ func NewConsensusConflict(s string) ConsensusConflict {
 // acceptable error type.
 func (cc ConsensusConflict) Error() string {
 	return string(cc)
+}
+
+// CalculateFee returns the fee-per-byte of a transaction set.
+func CalculateFee(ts []types.Transaction) types.Currency {
+	var sum types.Currency
+	for _, t := range ts {
+		for _, fee := range t.MinerFees {
+			sum = sum.Add(fee)
+		}
+	}
+	size := len(encoding.Marshal(ts))
+	return sum.Div(types.NewCurrency64(uint64(size)))
 }
