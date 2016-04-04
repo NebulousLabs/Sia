@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	//"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -12,8 +14,18 @@ const (
 	// reason for rejection.)
 	AcceptResponse = "accept"
 
+	// FileContractNegotiationTime defines the amount of time that the renter
+	// and host have to negotiate a file contract. The time is set high enough
+	// that a node behind Tor has a reasonable chance at making the multiple
+	// required round trips to complete the negotiation.
+	FileContractNegotiationTime = 5 * time.Minute
+
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
+
+	// MaxErrorSize indicates the maximum number of bytes that can be used to
+	// encode an error being sent during negotiation.
+	MaxErrorSize = 256
 
 	// MaxFileContractSetLen determines the maximum allowed size of a
 	// transaction set that can be sent when trying to negotiate a file
@@ -138,12 +150,40 @@ type (
 		UnlockHash         types.UnlockHash  `json:"unlockhash"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
-		Collateral             types.Currency `json:"collateral"`
+		// Collateral is the amount of collateral that the host will put up for
+		// storage in 'bytes per block', as an assurance to the renter that the
+		// host really is committed to keeping the file. But, because the file
+		// contract is created with no data available, this does leave the host
+		// exposed to an attack by a wealthy renter whereby the renter causes
+		// the host to lockup in-advance a bunch of funds that the renter then
+		// never uses, meaning the host will not have collateral for other
+		// clients.
+		//
+		// To mitigate the effects of this attack, the host has a collateral
+		// fraction and a max collateral. CollateralFraction is a number that
+		// gets divided by 1e6 and then represents the ratio of funds that the
+		// host is willing to put into the contract relative to the number of
+		// funds that the renter put into the contract. For example, if
+		// 'CollateralFraction' is set to 1e6 and the renter adds 1 siacoin of
+		// funding to the file contract, the host will also add 1 siacoin of
+		// funding to the contract. if 'CollateralFraction' is set to 2e6, the
+		// host would add 2 siacoins of funding to the contract.
+		//
+		// MaxCollateral indicates the maximum number of coins that a host is
+		// willing to put into a file contract.
+		Collateral         types.Currency `json:"collateral"`
+		CollateralFraction types.Currency `json:"collateralfraction"`
+		MaxCollateral      types.Currency `json:"maxcollateral"`
+
 		ContractPrice          types.Currency `json:"contractprice"`
 		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`
 		StoragePrice           types.Currency `json:"storageprice"`
 		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"`
 
+		// Because the host has a public key, and settings are signed, and
+		// because settings may be MITM'd, settings need a revision number so
+		// that a renter can compare multiple sets of settings and determine
+		// which is the most recent.
 		RevisionNumber uint64 `json:"revisionnumber"`
 		Version        string `json:"version"`
 	}
@@ -156,8 +196,11 @@ type (
 		NetAddress         NetAddress        `json:"netaddress"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
+		Collateral         types.Currency `json:"collateral"`
+		CollateralFraction types.Currency `json:"collateralfraction"`
+		MaxCollateral      types.Currency `json:"maxcollateral"`
+
 		BandwidthLimits               HostBandwidthLimits `json:"bandwidthlimits"`
-		Collateral                    types.Currency      `json:"collateral"`
 		MinimumContractPrice          types.Currency      `json:"contractprice"`
 		MinimumDownloadBandwidthPrice types.Currency      `json:"minimumdownloadbandwidthprice"`
 		MinimumStoragePrice           types.Currency      `json:"storageprice"`

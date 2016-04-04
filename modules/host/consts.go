@@ -4,6 +4,8 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"time"
 )
 
 const (
@@ -13,6 +15,11 @@ const (
 	// long-term entities, and because we want to have a set of hosts that
 	// support 6 month contracts when Sia leaves beta.
 	defaultMaxDuration = 144 * 30 * 6 // 6 months.
+
+	// fileContractNegotiationTimeout indicates the amount of time that a
+	// renter has to negotiate a file contract with the host. A timeout is
+	// necessary to limit the impact of DoS attacks.
+	fileContractNegotiationTimeout = 120 * time.Second
 
 	// maximumStorageFolders indicates the maximum number of storage folders
 	// that the host allows. Some operations, such as creating a new storage

@@ -133,11 +133,12 @@ type storageObligation struct {
 	// submit a transaction set it is important to try several subsets to rule
 	// out the possibility that the transaction set is partially confirmed.
 	AnticipatedRevenue          types.Currency
-	TransactionFeesAdded        types.Currency
-	TransactionFeesPaidByRenter types.Currency
-	RiskedCollateral            types.Currency
+	ConfirmedRevenue            types.Currency
+	LockedCollateral            types.Currency
 	OriginTransactionSet        []types.Transaction
 	RevisionTransactionSet      []types.Transaction
+	RiskedCollateral            types.Currency
+	TransactionFeesAdded        types.Currency
 
 	// Variables indicating whether the critical transactions in a storage
 	// obligation have been confirmed on the blockchain.
