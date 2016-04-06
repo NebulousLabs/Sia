@@ -49,7 +49,8 @@ func (srv *Server) initAPI() {
 	// Daemon API Calls
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
-	router.GET("/daemon/stop", srv.daemonStopHandler)
+	router.GET("/daemon/stop", srv.daemonStopHandler) // COMPATv0.5.2
+	router.POST("/daemon/stop", srv.daemonStopHandler)
 
 	// Consensus API Calls
 	if srv.cs != nil {
@@ -83,8 +84,10 @@ func (srv *Server) initAPI() {
 		router.GET("/miner", srv.minerHandler)
 		router.GET("/miner/header", srv.minerHeaderHandlerGET)
 		router.POST("/miner/header", srv.minerHeaderHandlerPOST)
-		router.GET("/miner/start", srv.minerStartHandler)
-		router.GET("/miner/stop", srv.minerStopHandler)
+		router.GET("/miner/start", srv.minerStartHandler) // COMPATv0.5.2
+		router.GET("/miner/stop", srv.minerStopHandler)   // COMPATv0.5.2
+		router.POST("/miner/start", srv.minerStartHandler)
+		router.POST("/miner/stop", srv.minerStopHandler)
 		router.GET("/miner/headerforwork", srv.minerHeaderHandlerGET)  // COMPATv0.4.8
 		router.POST("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
 	}
