@@ -62,31 +62,40 @@ File Contract Creation
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 360 seconds.
 
-2. The host sends the renter the most recent copy of its settings.
+2. The host sends the renter the most recent copy of its settings. If the host
+   is not accepting new file contracts, the connection is closed.
 
+# Witholding the signature is not strictly necessary, but if the signature is
+# not withheld, the host has not yet committed to accepting the file contract,
+# and so can appear to reject the file contract while still submitting it to the
+# blockchain. The renter will not know until the file contract appears on the
+# blockchain. If the renter signs at this point, the renter will also not be
+# able to sign the whole transaction because the host must add collateral. This
+# means that the renter will not even know the file contract id.
 3. The renter sends a notice of acceptance or rejection. If the renter accepts,
    the renter then sends a funded file contract without a signature.
-   Withholding the signature is not strictly necessary, but does allow the host
-   an opportunity to reject the file contract in the protocol but still submit
-   it to the blockchain, confusing the renter. Furthermore, because the host
-   has not added collateral yet, the renter would not know the final file
-   contract id.
 
+# The host must always sign last, lest the renter trick the host into storing
+# data for free. Only the new data is sent to the renter, both to make
+# programming against the TransactionBuilder easier but also so that there's no
+# risk to the renter that other fields (such as the file contract) have been
+# changed.
 4. The host sends an acceptance or rejection of the file contract. If the host
    accepts, the host will add collateral (and maybe miner fees) to the file
-   contract, returning a complete but unsigned file contract to the renter. The
-   host must not make itself vulnerable to a renter withholding a signature, as
-   this will result in the host storing data for free.
+   contract, and will send the renter the inputs + outputs for the collateral,
+   followed by any new parent transactions. The length of any of these may be
+   zero.
 
+# Only the transaction signatures are sent because the file contract is
+# supposed to be finalized at this point.
 5. The renter indicates acceptance or rejection of the file contract. If the
-   renter accepts, the renter will sign the file contract and send it to the
-   host.
+   renter accepts, the renter will sign the file contract and send the
+   transaction signatures to the host.
 
 6. The host may only reject the file contract in the event that the renter has
-   changed the file contract. The host writes acceptance, and then signs the
-   file contract and sends the complete, fully signed file contract to the
-   renter. Both the renter and the host may now submit the file contract and
-   all related transactions to the transaction pool.
+   sent invalid signatures. The host writes acceptance, and then signs the file
+   contract and sends the transaction signatures to the renter. The connection
+   is closed.
 
 File Contract Revision
 ----------------------
@@ -146,7 +155,8 @@ File Contract Renewal
    because a significant amount of metadata modifications may be necessary on
    the host's end, especially when renewing larger file contracts.
 
-2. The host sends the most recent copy of the settings to the renter.
+2. The host sends the most recent copy of the settings to the renter. If the
+   host is not accepting new file contracts, the connection is closed.
 
 3. The renter either accepts or rejects the settings. If accepted, the renter
    sends an unsigned file contract to the host, containing the same Merkle root
