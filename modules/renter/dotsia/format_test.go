@@ -2,7 +2,6 @@ package dotsia
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -57,7 +56,7 @@ func TestEncodeDecode(t *testing.T) {
 	b := []byte(savedBuf)
 	b[0] = 0xFF
 	_, err = Decode(bytes.NewReader(b))
-	if err != gzip.ErrHeader {
+	if err != ErrNotSiaFile {
 		t.Fatal("expected header error, got", err)
 	}
 	b = []byte(savedBuf)
