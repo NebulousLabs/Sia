@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 type mockWriter func([]byte) (int, error)
@@ -209,5 +210,114 @@ func TestMetadata(t *testing.T) {
 	_, err = DecodeString(str)
 	if err != ErrNotSiaFile {
 		t.Fatal("expected header error, got", err)
+	}
+}
+
+// TestEncodedSize checks that the size of a .sia file is within reasonable
+// bounds.
+func TestEncodedSize(t *testing.T) {
+	// generate 100 random files
+	fs := make([]*File, 100)
+	for i := range fs {
+		r, err := crypto.RandIntn(i + 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fs[i] = &File{
+			Size:       uint64(r),
+			Mode:       os.FileMode(r),
+			SectorSize: uint64(r),
+		}
+	}
+
+	buf := new(bytes.Buffer)
+	err := Encode(fs, buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// should be ~15 bytes of entropy per file
+	maxSize := len(fs) * 20
+	minSize := len(fs) * 10
+	if size := buf.Len(); size > maxSize {
+		t.Fatalf(".sia file is too large: max is %v, got %v", maxSize, size)
+	} else if size < minSize {
+		t.Fatalf(".sia file is too small: min is %v, got %v", minSize, size)
+	}
+}
+
+// BenchmarkEncode benchmarks the Encode function.
+func BenchmarkEncode(b *testing.B) {
+	// generate 100 random files
+	fs := make([]*File, 100)
+	for i := range fs {
+		r, err := crypto.RandIntn(i*1000 + 1)
+		if err != nil {
+			b.Fatal(err)
+		}
+		fs[i] = &File{
+			Size:       uint64(r),
+			Mode:       os.FileMode(r),
+			SectorSize: uint64(r),
+		}
+	}
+
+	// to get an accurate number of bytes processed, we need to know the
+	// length before tarring + gzipping
+	data, err := json.Marshal(fs)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.SetBytes(int64(len(data)))
+
+	buf := new(bytes.Buffer)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		err := Encode(fs, buf)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkDecode benchmarks the Decode function.
+func BenchmarkDecode(b *testing.B) {
+	// generate 100 random files
+	fs := make([]*File, 100)
+	for i := range fs {
+		r, err := crypto.RandIntn(i*1000 + 1)
+		if err != nil {
+			b.Fatal(err)
+		}
+		fs[i] = &File{
+			Size:       uint64(r),
+			Mode:       os.FileMode(r),
+			SectorSize: uint64(r),
+		}
+	}
+	// write to buffer
+	buf := new(bytes.Buffer)
+	err := Encode(fs, buf)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// to get an accurate number of bytes processed, we need to know the
+	// length before tarring + gzipping
+	data, err := json.Marshal(fs)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.SetBytes(int64(len(data)))
+
+	r := bytes.NewReader(buf.Bytes())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Seek(0, 0)
+		_, err = Decode(r)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
