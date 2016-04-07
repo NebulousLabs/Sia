@@ -45,7 +45,7 @@ const (
 
 var (
 	ErrNotSiaFile   = errors.New("not a .sia file")
-	ErrIncompatible = errors.New("file is not compatible with current version")
+	ErrIncompatible = errors.New("file is not compatible with version " + Version)
 
 	currentMetadata = Metadata{
 		Header:  Header,
