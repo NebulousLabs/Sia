@@ -1,7 +1,9 @@
 package dotsia
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -64,6 +66,22 @@ func TestEncodeDecode(t *testing.T) {
 	_, err = Decode(bytes.NewReader(b))
 	if _, ok := err.(*json.SyntaxError); !ok {
 		t.Fatal("expected syntax error, got", err)
+	}
+	// empty archive
+	buf.Reset()
+	z := gzip.NewWriter(buf)
+	tw := tar.NewWriter(z)
+	err = tw.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = z.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Decode(buf)
+	if err != ErrNotSiaFile {
+		t.Fatal(err)
 	}
 
 	// use a mockWriter to simulate write errors
@@ -160,5 +178,36 @@ func TestEncodeDecodeString(t *testing.T) {
 			files[i].SectorSize != fs[i].SectorSize {
 			t.Errorf("File %d differs after encoding: %v %v", i, files[i], fs[i])
 		}
+	}
+}
+
+// TestMetadata tests the metadata validation of the Decode function.
+func TestMetadata(t *testing.T) {
+	// save global metadata var
+	oldMeta := currentMetadata
+	defer func() {
+		currentMetadata = oldMeta
+	}()
+
+	// bad version
+	currentMetadata.Version = "foo"
+	str, err := EncodeString([]*File{new(File)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = DecodeString(str)
+	if err != ErrIncompatible {
+		t.Fatal("expected version error, got", err)
+	}
+
+	// bad header
+	currentMetadata.Header = "foo"
+	str, err = EncodeString([]*File{new(File)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = DecodeString(str)
+	if err != ErrNotSiaFile {
+		t.Fatal("expected header error, got", err)
 	}
 }
