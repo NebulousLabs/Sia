@@ -188,7 +188,7 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 	sendSiacoinsValues := url.Values{}
 	sendSiacoinsValues.Set("amount", "1234")
-	sendSiacoinsValues.Add("destination", wag.Address.String())
+	sendSiacoinsValues.Set("destination", wag.Address.String())
 	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
 	if err != nil {
 		t.Fatal(err)
