@@ -14,7 +14,7 @@ func HttpGET(url string) (resp *http.Response, err error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("User-Agent", "Sia-Agent")
+	req.Header.Set("User-Agent", "Sia-Agent")
 	return new(http.Client).Do(req)
 }
 
@@ -24,8 +24,8 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("User-Agent", "Sia-Agent")
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "Sia-Agent")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return new(http.Client).Do(req)
 }
 

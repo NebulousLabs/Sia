@@ -355,7 +355,7 @@ func (st *serverTester) stdGetAPIUA(call string, userAgent string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Add("User-Agent", userAgent)
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := new(http.Client).Do(req)
 	if err != nil {
 		return err
