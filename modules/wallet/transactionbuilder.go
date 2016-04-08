@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"errors"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -10,14 +11,25 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	// errBuilderAlreadySigned indicates that the transaction builder has
+	// already added at least one successful signature to the transaction,
+	// meaning that future calls to Sign will result in an invalid transaction.
+	errBuilderAlreadySigned = errors.New("sign has already been called on this transaction builder, multiple calls can cause issues")
+)
+
 // transactionBuilder allows transactions to be manually constructed, including
 // the ability to fund transactions with siacoins and siafunds from the wallet.
 type transactionBuilder struct {
+	// 'signed' indicates that at least one transaction signature has been
+	// added to the wallet, meaning that future calls to 'Sign' will fail.
+	parents     []types.Transaction
+	signed      bool
+	transaction types.Transaction
+
 	newParents            []int
-	parents               []types.Transaction
 	siacoinInputs         []int
 	siafundInputs         []int
-	transaction           types.Transaction
 	transactionSignatures []int
 
 	wallet *Wallet
@@ -405,11 +417,13 @@ func (tb *transactionBuilder) Drop() {
 		}
 	}
 
-	tb.newParents = nil
 	tb.parents = nil
+	tb.signed = false
+	tb.transaction = types.Transaction{}
+
+	tb.newParents = nil
 	tb.siacoinInputs = nil
 	tb.siafundInputs = nil
-	tb.transaction = types.Transaction{}
 	tb.transactionSignatures = nil
 }
 
@@ -424,6 +438,10 @@ func (tb *transactionBuilder) Drop() {
 // have already been added to the transaction, but will also leave room for
 // more fields to be added.
 func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, error) {
+	if tb.signed {
+		return nil, errBuilderAlreadySigned
+	}
+
 	// Create the coveredfields struct.
 	txn := tb.transaction
 	var coveredFields types.CoveredFields
@@ -476,6 +494,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		if err != nil {
 			return nil, err
 		}
+		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 	}
 	for _, inputIndex := range tb.siafundInputs {
 		input := txn.SiafundInputs[inputIndex]
@@ -485,6 +504,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		if err != nil {
 			return nil, err
 		}
+		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 	}
 
 	// Get the transaction set and delete the transaction from the registry.
