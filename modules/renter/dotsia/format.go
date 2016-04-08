@@ -214,9 +214,9 @@ type Sector struct {
 	Piece      uint64 `json:"piece"`
 }
 
-// validate checks that f conforms to the specification defined in the package
-// docstring.
-func (f *File) validate() bool {
+// Validate checks that f conforms to the specification defined in the package
+// docstring. Files returned by Decode are automatically validated.
+func (f *File) Validate() bool {
 	// check path
 	if !filepath.IsAbs(f.Path) || filepath.Clean(f.Path) != f.Path || f.Path == "/" {
 		return false
@@ -332,7 +332,7 @@ func Decode(r io.Reader) ([]*File, error) {
 		err = dec.Decode(f)
 		if err != nil {
 			return nil, err
-		} else if !f.validate() {
+		} else if !f.Validate() {
 			return nil, ErrInvalid
 		}
 		files = append(files, f)
