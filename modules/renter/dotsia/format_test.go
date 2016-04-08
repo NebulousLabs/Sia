@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -25,17 +26,74 @@ func (fn mockReader) Read(p []byte) (int, error) {
 	return fn(p)
 }
 
+func makeRandomFile() *File {
+	entropy, err := crypto.RandBytes(10)
+	if err != nil {
+		panic(err)
+	}
+	return &File{
+		Size:        uint64(entropy[0]),
+		Permissions: os.FileMode(entropy[1]),
+		SectorSize:  uint64(entropy[2]),
+	}
+}
+
+// TestHashMarshalling tests the MarshalJSON and UnmarshalJSON methods of the
+// Hash type.
+func TestHashMarshalling(t *testing.T) {
+	h := Hash{1, 2, 3}
+	jsonBytes, err := h.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(jsonBytes, []byte(`"`+hex.EncodeToString(h[:])+`"`)) {
+		t.Errorf("hash %s encoded incorrectly: got %s\n", h, jsonBytes)
+	}
+
+	var h2 Hash
+	err = h2.UnmarshalJSON(jsonBytes)
+	if err != nil {
+		t.Fatal(err)
+	} else if h != h2 {
+		t.Error("encoded and decoded hash do not match!")
+	}
+
+	quote := func(b []byte) []byte {
+		return append([]byte{'"'}, append(b, '"')...)
+	}
+
+	// Test unmarshalling invalid data.
+	invalidJSONBytes := [][]byte{
+		// Invalid JSON.
+		nil,
+		[]byte{},
+		[]byte(`"`),
+		// JSON of wrong length.
+		[]byte(""),
+		quote(bytes.Repeat([]byte{'a'}, len(h))),
+		quote(bytes.Repeat([]byte{'a'}, len(h)*2+1)),
+		// JSON of right length but invalid Hashes.
+		quote(bytes.Repeat([]byte{'z'}, len(h)*2)),
+		quote(bytes.Repeat([]byte{'.'}, len(h)*2)),
+		quote(bytes.Repeat([]byte{'\n'}, len(h)*2)),
+	}
+
+	for _, jsonBytes := range invalidJSONBytes {
+		var h Hash
+		err := h.UnmarshalJSON(jsonBytes)
+		if err == nil {
+			t.Errorf("expected unmarshal to fail on the invalid JSON: %q\n", jsonBytes)
+		}
+	}
+}
+
 // TestEncodeDecode tests the Encode and Decode functions, which are inverses
 // of each other.
 func TestEncodeDecode(t *testing.T) {
 	buf := new(bytes.Buffer)
 	fs := make([]*File, 100)
 	for i := range fs {
-		fs[i] = &File{
-			Size:       uint64(i),
-			Mode:       os.FileMode(i),
-			SectorSize: uint64(i),
-		}
+		fs[i] = makeRandomFile()
 	}
 	err := Encode(fs, buf)
 	if err != nil {
@@ -49,7 +107,7 @@ func TestEncodeDecode(t *testing.T) {
 	// verify that files were not changed after encode/decode
 	for i := range files {
 		if files[i].Size != fs[i].Size ||
-			files[i].Mode != fs[i].Mode ||
+			files[i].Permissions != fs[i].Permissions ||
 			files[i].SectorSize != fs[i].SectorSize {
 			t.Errorf("File %d differs after encoding: %v %v", i, files[i], fs[i])
 		}
@@ -61,12 +119,6 @@ func TestEncodeDecode(t *testing.T) {
 	_, err = Decode(bytes.NewReader(b))
 	if err != ErrNotSiaFile {
 		t.Fatal("expected header error, got", err)
-	}
-	b = []byte(savedBuf)
-	b[500] = 0xFF
-	_, err = Decode(bytes.NewReader(b))
-	if _, ok := err.(*json.SyntaxError); !ok {
-		t.Fatal("expected syntax error, got", err)
 	}
 	// empty archive
 	buf.Reset()
@@ -109,11 +161,7 @@ func TestEncodeDecode(t *testing.T) {
 func TestEncodeDecodeFile(t *testing.T) {
 	fs := make([]*File, 100)
 	for i := range fs {
-		fs[i] = &File{
-			Size:       uint64(i),
-			Mode:       os.FileMode(i),
-			SectorSize: uint64(i),
-		}
+		fs[i] = makeRandomFile()
 	}
 	dir := build.TempDir("dotsia")
 	err := os.MkdirAll(dir, 0777)
@@ -132,7 +180,7 @@ func TestEncodeDecodeFile(t *testing.T) {
 	// verify that files were not changed after encode/decode
 	for i := range files {
 		if files[i].Size != fs[i].Size ||
-			files[i].Mode != fs[i].Mode ||
+			files[i].Permissions != fs[i].Permissions ||
 			files[i].SectorSize != fs[i].SectorSize {
 			t.Errorf("File %d differs after encoding: %v %v", i, files[i], fs[i])
 		}
@@ -158,11 +206,7 @@ func TestEncodeDecodeFile(t *testing.T) {
 func TestEncodeDecodeString(t *testing.T) {
 	fs := make([]*File, 100)
 	for i := range fs {
-		fs[i] = &File{
-			Size:       uint64(i),
-			Mode:       os.FileMode(i),
-			SectorSize: uint64(i),
-		}
+		fs[i] = makeRandomFile()
 	}
 	str, err := EncodeString(fs)
 	if err != nil {
@@ -175,7 +219,7 @@ func TestEncodeDecodeString(t *testing.T) {
 	// verify that files were not changed after encode/decode
 	for i := range files {
 		if files[i].Size != fs[i].Size ||
-			files[i].Mode != fs[i].Mode ||
+			files[i].Permissions != fs[i].Permissions ||
 			files[i].SectorSize != fs[i].SectorSize {
 			t.Errorf("File %d differs after encoding: %v %v", i, files[i], fs[i])
 		}
@@ -219,15 +263,7 @@ func TestEncodedSize(t *testing.T) {
 	// generate 100 random files
 	fs := make([]*File, 100)
 	for i := range fs {
-		r, err := crypto.RandIntn(i + 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fs[i] = &File{
-			Size:       uint64(r),
-			Mode:       os.FileMode(r),
-			SectorSize: uint64(r),
-		}
+		fs[i] = makeRandomFile()
 	}
 
 	buf := new(bytes.Buffer)
@@ -251,15 +287,7 @@ func BenchmarkEncode(b *testing.B) {
 	// generate 100 random files
 	fs := make([]*File, 100)
 	for i := range fs {
-		r, err := crypto.RandIntn(i*1000 + 1)
-		if err != nil {
-			b.Fatal(err)
-		}
-		fs[i] = &File{
-			Size:       uint64(r),
-			Mode:       os.FileMode(r),
-			SectorSize: uint64(r),
-		}
+		fs[i] = makeRandomFile()
 	}
 
 	// to get an accurate number of bytes processed, we need to know the
@@ -286,15 +314,7 @@ func BenchmarkDecode(b *testing.B) {
 	// generate 100 random files
 	fs := make([]*File, 100)
 	for i := range fs {
-		r, err := crypto.RandIntn(i*1000 + 1)
-		if err != nil {
-			b.Fatal(err)
-		}
-		fs[i] = &File{
-			Size:       uint64(r),
-			Mode:       os.FileMode(r),
-			SectorSize: uint64(r),
-		}
+		fs[i] = makeRandomFile()
 	}
 	// write to buffer
 	buf := new(bytes.Buffer)
