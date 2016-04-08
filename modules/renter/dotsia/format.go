@@ -1,6 +1,5 @@
 /*
-Package dotsia defines the .sia format. It exposes functions that allow
-encoding and decoding the format.
+Package dotsia defines the .sia format.
 
 Specification
 
@@ -17,6 +16,110 @@ object contains a version string, which indicates the version of the .sia
 format used. At this time, the .sia format has no promise of backwards or
 forwards compatibility, except that the version field will never be removed
 from the metadata object.
+
+The JSON encoding tries to be flexible in allowing arbitrary encryption and
+encoding schemes. As such, the "masterKey" and "erasureCode" fields are
+encoded as generic JSON objects (in Go, a map[string]interface{}). However,
+these objects must always contain a "name" field that identifies the scheme
+used. They may not be null.
+
+Integer fields must not contain negative values.
+
+The "permissions" field is encoded as a decimal number (not octal, or a
+symbolic string) and must not exceed 511 (0777 in octal).
+
+The "path" string must be an absolute Unix-style path; that is, it must begin
+with a leading slash, use '/' as its separator. Paths must not end in a slash,
+and must not contain any occurences of the current directory (.) or parent
+directory (..) elements.
+
+The "contracts" array must not be null, but it may be empty.
+
+The "id" and "merkleRoot" fields are encoded as hex strings, which should
+always be 64 bytes long.
+
+Default values are not specified in the event that a field is undefined.
+Implementations should treat such objects as malformed.
+
+All fields use the camelCase naming convention.
+
+Sample Data
+
+A full example of a .sia file (omitting tar + gzip details) is show below:
+
+	[gzip header]
+	[tar header]
+	{
+		"header": "Sia Shared File",
+		"version": "0.6.0"
+	}
+	[tar header]
+	{
+		"path": "/foo/bar/baz",
+		"size": 1234567890,
+		"sectorSize": 4194304,
+		"masterKey": {
+			"name": "twofish",
+			"key": "9f775c79b9c05944b5212a855d132b7b6b9ca50ffff210d63510549e53724d6c"
+		},
+		"permissions": 438,
+		"erasureCode": {
+			"name": "reed-solomon",
+			"data": 4,
+			"parity": 24
+		},
+		"contracts": [
+			{
+				"id": "dbd0cc359d2f9e238cbcfcf972b18118dfb9075210c4b77d551e4285e16872a3",
+				"hostAddress": 127.0.0.1:2048,
+				"endHeight": 40000,
+				"sectors": [
+					{
+						"merkleRoot": "e8926a62bcc7bb054e9f0fcc53111e26ca93067347e9386db38000159d7b7e6d",
+						"chunk": 0,
+						"piece": 0
+					},
+					{
+						"merkleRoot": "1794ff6c29f7dfef3fa7a5743233b9906f34c833c053c885411cea4b18f57672",
+						"chunk": 1,
+						"piece": 0
+					},
+				]
+			},
+			{
+				"id": "0b700dbc48ba8d6a44faf171942e32bb8326f079a376bf0e4ab2c327e368f6cb",
+				"hostAddress": 192.168.1.10:1979,
+				"endHeight": 50000,
+				"sectors": [
+					{
+						"merkleRoot": "d44f12b57db08cdc1f102fdf30a80ccac11762b284e0daf12a711c6e9d001469",
+						"chunk": 0,
+						"piece": 1
+					},
+					{
+						"merkleRoot": "dcfe720afcb2b12b26e1d8f821c0137c6529736b7e4a337b867940b417d53359",
+						"chunk": 1,
+						"piece": 1
+					},
+				]
+			}
+		]
+	}
+	[tar header]
+	{
+		"path": "/minimal_valid_file",
+		"size": 0,
+		"sectorSize": 0,
+		"masterKey": {
+			"name": ""
+		},
+		"permissions": 0,
+		"erasureCode": {
+			"name": ""
+		},
+		"contracts": []
+	}
+	[gzip footer]
 */
 package dotsia
 
