@@ -145,16 +145,12 @@ const (
 	Version = "0.6.0"
 )
 
+// These errors may be returned when Decode is called on invalid data.
 var (
 	ErrNotSiaFile   = errors.New("not a .sia file")
 	ErrIncompatible = errors.New("file is not compatible with version " + Version)
 	ErrInvalid      = errors.New("file contains invalid values")
 	ErrWrongLen     = errors.New("Hex string is not 64 bytes long")
-
-	currentMetadata = Metadata{
-		Header:  Header,
-		Version: Version,
-	}
 )
 
 // Metadata is the metadata entry present at the beginning of the .sia
@@ -163,6 +159,8 @@ type Metadata struct {
 	Header  string `json:"header"`
 	Version string `json:"version"`
 }
+
+var currentMetadata = Metadata{Header, Version}
 
 // A Hash is a 32-byte checksum, encoded as a 64-byte hex string.
 type Hash [32]byte

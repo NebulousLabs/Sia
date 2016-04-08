@@ -91,7 +91,7 @@ func TestHashMarshalling(t *testing.T) {
 	invalidJSONBytes := [][]byte{
 		// Invalid JSON.
 		nil,
-		[]byte{},
+		{},
 		[]byte(`"`),
 		// JSON of wrong length.
 		[]byte(""),
