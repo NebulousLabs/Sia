@@ -25,14 +25,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
-
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -46,6 +43,7 @@ const (
 var (
 	ErrNotSiaFile   = errors.New("not a .sia file")
 	ErrIncompatible = errors.New("file is not compatible with version " + Version)
+	ErrWrongLen     = errors.New("Hex string is not 64 bytes long")
 
 	currentMetadata = Metadata{
 		Header:  Header,
@@ -56,39 +54,60 @@ var (
 // Metadata is the metadata entry present at the beginning of the .sia
 // format's tar archive.
 type Metadata struct {
-	Header  string
-	Version string
+	Header  string `json:"header"`
+	Version string `json:"version"`
+}
+
+// A Hash is a 32-byte checksum, encoded as a 64-byte hex string.
+type Hash [32]byte
+
+// MarshalJSON implements the json.Marshaler interface.
+func (h Hash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(h[:]))
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (h *Hash) UnmarshalJSON(b []byte) error {
+	var hexString string
+	if err := json.Unmarshal(b, &hexString); err != nil {
+		return err
+	}
+	if n, err := hex.Decode(h[:], []byte(hexString)); err != nil {
+		return err
+	} else if n != len(h) {
+		return ErrWrongLen
+	}
+	return nil
 }
 
 // A File contains the metadata necessary for retrieving, decoding, and
 // decrypting a file stored on the Sia network.
 type File struct {
-	Path        string
-	Size        uint64
-	SectorSize  uint64
-	MasterKey   crypto.TwofishKey
-	Mode        os.FileMode
-	ErasureCode modules.ErasureCoder
-	Contracts   []Contract
+	Path        string                 `json:"path"`
+	Size        uint64                 `json:"size"`
+	SectorSize  uint64                 `json:"sectorSize"`
+	Permissions os.FileMode            `json:"permissions"`
+	MasterKey   map[string]interface{} `json:"masterKey"`
+	ErasureCode map[string]interface{} `json:"erasureCode"`
+	Contracts   []Contract             `json:"contracts"`
 }
 
 // A Contract represents a file contract made with a host, as well as all of
 // the sectors stored on that host.
 type Contract struct {
-	ID         types.FileContractID
-	NetAddress modules.NetAddress
-	EndHeight  types.BlockHeight
-
-	Sectors []Sector
+	ID          Hash     `json:"id"`
+	HostAddress string   `json:"hostAddress"`
+	EndHeight   uint64   `json:"endHeight"`
+	Sectors     []Sector `json:"sectors"`
 }
 
 // A Sector refers to a sector of data stored on a host via its Merkle root.
 // It also specifies the chunk and piece index of the sector, used during
 // erasure coding.
 type Sector struct {
-	Hash  crypto.Hash
-	Chunk uint64
-	Piece uint64
+	MerkleRoot Hash   `json:"merkleRoot"`
+	Chunk      uint64 `json:"chunk"`
+	Piece      uint64 `json:"piece"`
 }
 
 // writeJSONentry is a helper function that encodes a JSON object and writes
