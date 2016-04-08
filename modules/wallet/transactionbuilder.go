@@ -1,9 +1,5 @@
 package wallet
 
-// TODO: Need to be certain that the wallet is not trying to do opeerations
-// while locked - signatures, etc. may start to fail silently in the current
-// implementation.
-
 import (
 	"bytes"
 	"sort"
@@ -17,10 +13,12 @@ import (
 // transactionBuilder allows transactions to be manually constructed, including
 // the ability to fund transactions with siacoins and siafunds from the wallet.
 type transactionBuilder struct {
-	parents       []types.Transaction
-	transaction   types.Transaction
-	siacoinInputs []int
-	siafundInputs []int
+	newParents            []int
+	parents               []types.Transaction
+	siacoinInputs         []int
+	siafundInputs         []int
+	transaction           types.Transaction
+	transactionSignatures []int
 
 	wallet *Wallet
 }
@@ -191,6 +189,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		ParentID:         parentTxn.SiacoinOutputID(0),
 		UnlockConditions: parentUnlockConditions,
 	}
+	tb.newParents = append(tb.newParents, len(tb.parents))
 	tb.parents = append(tb.parents, parentTxn)
 	tb.siacoinInputs = append(tb.siacoinInputs, len(tb.transaction.SiacoinInputs))
 	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, newInput)
@@ -303,6 +302,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		UnlockConditions: parentUnlockConditions,
 		ClaimUnlockHash:  claimUnlockConditions.UnlockHash(),
 	}
+	tb.newParents = append(tb.newParents, len(tb.parents))
 	tb.parents = append(tb.parents, parentTxn)
 	tb.siafundInputs = append(tb.siafundInputs, len(tb.transaction.SiafundInputs))
 	tb.transaction.SiafundInputs = append(tb.transaction.SiafundInputs, newInput)
@@ -405,10 +405,12 @@ func (tb *transactionBuilder) Drop() {
 		}
 	}
 
+	tb.newParents = nil
 	tb.parents = nil
-	tb.transaction = types.Transaction{}
 	tb.siacoinInputs = nil
 	tb.siafundInputs = nil
+	tb.transaction = types.Transaction{}
+	tb.transactionSignatures = nil
 }
 
 // Sign will sign any inputs added by 'FundSiacoins' or 'FundSiafunds' and
@@ -469,6 +471,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 	for _, inputIndex := range tb.siacoinInputs {
 		input := txn.SiacoinInputs[inputIndex]
 		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		tb.transactionSignatures = append(tb.transactionSignatures, len(tb.transaction.TransactionSignatures))
 		err := addSignatures(&txn, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		if err != nil {
 			return nil, err
@@ -477,6 +480,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 	for _, inputIndex := range tb.siafundInputs {
 		input := txn.SiafundInputs[inputIndex]
 		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		tb.transactionSignatures = append(tb.transactionSignatures, len(tb.transaction.TransactionSignatures))
 		err := addSignatures(&txn, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		if err != nil {
 			return nil, err
@@ -494,6 +498,12 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 // called because the transaction gets deleted.
 func (tb *transactionBuilder) View() (types.Transaction, []types.Transaction) {
 	return tb.transaction, tb.parents
+}
+
+// ViewAdded returns all of the siacoin inputs, siafund inputs, and parent
+// transactions that have been automatically added by the builder.
+func (tb *transactionBuilder) ViewAdded() (newParents, siacoinInputs, siafundInputs, transactionSignatures []int) {
+	return tb.newParents, tb.siacoinInputs, tb.siafundInputs, tb.transactionSignatures
 }
 
 // RegisterTransaction takes a transaction and its parents and returns a
