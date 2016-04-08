@@ -29,11 +29,12 @@ The "permissions" field is encoded as a decimal number (not octal, or a
 symbolic string) and must not exceed 511 (0777 in octal).
 
 The "path" string must be an absolute Unix-style path; that is, it must begin
-with a leading slash, use '/' as its separator. Paths must not end in a slash,
-and must not contain any occurences of the current directory (.) or parent
-directory (..) elements.
+with a leading slash and use '/' as its separator. Additionally, paths must
+not end in a slash, and must not contain any occurences of the current
+directory (.) or parent directory (..) elements.
 
-The "contracts" array must not be null, but it may be empty.
+The "contracts" array must not be null, but it may be empty. The same rule
+applies to the "sectors" array inside the contract object.
 
 The "id" and "merkleRoot" fields are encoded as hex strings, which should
 always be 64 bytes long.
@@ -71,7 +72,7 @@ A full example of a .sia file (omitting tar + gzip details) is show below:
 		"contracts": [
 			{
 				"id": "dbd0cc359d2f9e238cbcfcf972b18118dfb9075210c4b77d551e4285e16872a3",
-				"hostAddress": 127.0.0.1:2048,
+				"hostAddress": "127.0.0.1:2048",
 				"endHeight": 40000,
 				"sectors": [
 					{
@@ -88,7 +89,7 @@ A full example of a .sia file (omitting tar + gzip details) is show below:
 			},
 			{
 				"id": "0b700dbc48ba8d6a44faf171942e32bb8326f079a376bf0e4ab2c327e368f6cb",
-				"hostAddress": 192.168.1.10:1979,
+				"hostAddress": "192.168.1.10:1979",
 				"endHeight": 50000,
 				"sectors": [
 					{
@@ -133,6 +134,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -146,6 +148,7 @@ const (
 var (
 	ErrNotSiaFile   = errors.New("not a .sia file")
 	ErrIncompatible = errors.New("file is not compatible with version " + Version)
+	ErrInvalid      = errors.New("file contains invalid values")
 	ErrWrongLen     = errors.New("Hex string is not 64 bytes long")
 
 	currentMetadata = Metadata{
@@ -211,6 +214,37 @@ type Sector struct {
 	MerkleRoot Hash   `json:"merkleRoot"`
 	Chunk      uint64 `json:"chunk"`
 	Piece      uint64 `json:"piece"`
+}
+
+// validate checks that f conforms to the specification defined in the package
+// docstring.
+func (f *File) validate() bool {
+	// check path
+	if !filepath.IsAbs(f.Path) || filepath.Clean(f.Path) != f.Path || f.Path == "/" {
+		return false
+	}
+	// check permissions
+	if f.Permissions > 0777 {
+		return false
+	}
+	// check master key
+	if f.MasterKey == nil || f.MasterKey["name"] == nil {
+		return false
+	}
+	// check erasure code
+	if f.ErasureCode == nil || f.ErasureCode["name"] == nil {
+		return false
+	}
+	// check contracts
+	if f.Contracts == nil {
+		return false
+	}
+	for _, c := range f.Contracts {
+		if c.Sectors == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // writeJSONentry is a helper function that encodes a JSON object and writes
@@ -300,6 +334,8 @@ func Decode(r io.Reader) ([]*File, error) {
 		err = dec.Decode(f)
 		if err != nil {
 			return nil, err
+		} else if !f.validate() {
+			return nil, ErrInvalid
 		}
 		files = append(files, f)
 	}
