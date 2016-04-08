@@ -112,6 +112,87 @@ func TestHashMarshalling(t *testing.T) {
 	}
 }
 
+// TestValidate tests that the Validate method correctly checks each
+// validation requirement.
+func TestValidate(t *testing.T) {
+	// Minimum valid file
+	minimumValid := File{
+		Path:        "/test",
+		Permissions: 0,
+		MasterKey:   map[string]interface{}{"name": ""},
+		ErasureCode: map[string]interface{}{"name": ""},
+		Contracts:   []Contract{},
+	}
+	if !minimumValid.Validate() {
+		t.Error("minimum valid file should be valid")
+	}
+
+	// Path
+	pathTests := []struct {
+		path string
+		ok   bool
+	}{
+		{"relative/path", false},           // not absolute
+		{"///unclean///", false},           // not a clean path
+		{"/directory/../traversal", false}, // not a clean path
+		{"/folder/", false},                // not a clean path
+		{"/./foo", false},                  // not a clean path
+		{".", false},                       // not a clean path
+		{"/", false},                       // empty
+
+		{"/foo", true},         // normal file
+		{"/foo/bar/baz", true}, // normal file
+		{"/.foo", true},        // dotfile
+	}
+	for i, test := range pathTests {
+		f := minimumValid
+		f.Path = test.path
+		if f.Validate() != test.ok {
+			t.Errorf("test %v failed: Validate(Path: %v) should be %v", i, test.path, test.ok)
+		}
+	}
+
+	// Permissions
+	permTest := minimumValid
+	permTest.Permissions = 01000
+	if permTest.Validate() {
+		t.Error("file with perm > 0777 should be invalid")
+	}
+
+	// MasterKey
+	keyTest := minimumValid
+	keyTest.MasterKey = nil
+	if keyTest.Validate() {
+		t.Error("file with nil MasterKey should be invalid")
+	}
+	keyTest.MasterKey = map[string]interface{}{"foo": "bar"}
+	if keyTest.Validate() {
+		t.Error("file with MasterKey missing name field should be invalid")
+	}
+
+	// ErasureCode
+	codeTest := minimumValid
+	codeTest.ErasureCode = nil
+	if codeTest.Validate() {
+		t.Error("file with nil ErasureCode should be invalid")
+	}
+	codeTest.ErasureCode = map[string]interface{}{"foo": "bar"}
+	if codeTest.Validate() {
+		t.Error("file with ErasureCode missing name field should be invalid")
+	}
+
+	// Contracts
+	contractTest := minimumValid
+	contractTest.Contracts = nil
+	if contractTest.Validate() {
+		t.Error("file with nil Contracts should be invalid")
+	}
+	contractTest.Contracts = []Contract{{}}
+	if contractTest.Validate() {
+		t.Error("file with nil Sector should be invalid")
+	}
+}
+
 // TestEncodeDecode tests the Encode and Decode functions, which are inverses
 // of each other.
 func TestEncodeDecode(t *testing.T) {
