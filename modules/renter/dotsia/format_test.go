@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -26,15 +27,39 @@ func (fn mockReader) Read(p []byte) (int, error) {
 	return fn(p)
 }
 
+// makeRandomFile generates a random File, containing up to 3 contracts, each
+// with up to 7 sectors. On average, this seems to produce about 300 bytes of
+// entropy.
 func makeRandomFile() *File {
-	entropy, err := crypto.RandBytes(10)
+	entropy, err := crypto.RandBytes(6)
 	if err != nil {
 		panic(err)
 	}
+	contracts := make([]Contract, entropy[0]&0x03)
+	for i := range contracts {
+		sectors := make([]Sector, entropy[1]&0x07)
+		for j := range sectors {
+			sectors[j] = Sector{
+				Chunk: uint64(entropy[j%len(entropy)]),
+				Piece: uint64(entropy[i%len(entropy)]),
+			}
+			rand.Read(sectors[j].MerkleRoot[:])
+		}
+		contracts[i] = Contract{
+			EndHeight: uint64(entropy[2]),
+			Sectors:   sectors,
+		}
+		rand.Read(contracts[i].ID[:])
+	}
+
 	return &File{
-		Size:        uint64(entropy[0]),
-		Permissions: os.FileMode(entropy[1]),
-		SectorSize:  uint64(entropy[2]),
+		Path:        "/random/file",
+		Size:        uint64(entropy[3]),
+		Permissions: os.FileMode(entropy[4]),
+		SectorSize:  uint64(entropy[5]),
+		MasterKey:   map[string]interface{}{"name": "random-key"},
+		ErasureCode: map[string]interface{}{"name": "random-code"},
+		Contracts:   contracts,
 	}
 }
 
@@ -272,9 +297,9 @@ func TestEncodedSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// should be ~15 bytes of entropy per file
-	maxSize := len(fs) * 20
-	minSize := len(fs) * 10
+	// should be no more than ~500 bytes of entropy per file
+	maxSize := len(fs) * 500
+	minSize := len(fs) * 100
 	if size := buf.Len(); size > maxSize {
 		t.Fatalf(".sia file is too large: max is %v, got %v", maxSize, size)
 	} else if size < minSize {
