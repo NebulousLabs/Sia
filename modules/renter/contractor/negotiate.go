@@ -151,9 +151,9 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 
 // newContract negotiates an initial file contract with the specified host
 // and returns a Contract. The contract is also saved by the HostDB.
-func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
+func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
-	if host.Price.Cmp(maxPrice) > 0 {
+	if host.ContractPrice.Cmp(maxPrice) > 0 {
 		return Contract{}, errTooExpensive
 	}
 
@@ -176,7 +176,7 @@ func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, end
 	duration := endHeight - height
 
 	// create file contract
-	renterCost := host.Price.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
+	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
 
@@ -211,7 +211,7 @@ func (c *Contractor) newContract(host modules.HostSettings, filesize uint64, end
 		return Contract{}, err
 	}
 	defer conn.Close()
-	if err := encoding.WriteObject(conn, modules.RPCUpload); err != nil {
+	if err := encoding.WriteObject(conn, modules.RPCNegotiate); err != nil {
 		return Contract{}, err
 	}
 
@@ -242,7 +242,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	// Calculate average host price
 	var sum types.Currency
 	for _, h := range hosts {
-		sum = sum.Add(h.Price)
+		sum = sum.Add(h.ContractPrice)
 	}
 	avgPrice := sum.Div(types.NewCurrency64(uint64(len(hosts))))
 

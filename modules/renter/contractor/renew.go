@@ -25,7 +25,7 @@ func (c *Contractor) managedRenew(fcid types.FileContractID, newEndHeight types.
 		return types.FileContractID{}, errors.New("no record of that host")
 	} else if newEndHeight < height {
 		return types.FileContractID{}, errors.New("cannot renew below current height")
-	} else if host.Price.Cmp(maxPrice) > 0 {
+	} else if host.ContractPrice.Cmp(maxPrice) > 0 {
 		return types.FileContractID{}, errTooExpensive
 	}
 
@@ -48,7 +48,7 @@ func (c *Contractor) managedRenew(fcid types.FileContractID, newEndHeight types.
 		return types.FileContractID{}, err
 	}
 
-	renterCost := host.Price.Mul(types.NewCurrency64(contract.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	renterCost := host.ContractPrice.Mul(types.NewCurrency64(contract.LastRevision.NewFileSize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
 	payout := renterCost                   // no collateral
 

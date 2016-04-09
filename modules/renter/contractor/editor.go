@@ -169,7 +169,7 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
-	if settings.Price.Cmp(maxPrice) > 0 {
+	if settings.ContractPrice.Cmp(maxPrice) > 0 {
 		return nil, errTooExpensive
 	}
 
@@ -177,8 +177,8 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
-	if !settings.Price.IsZero() {
-		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(settings.Price).Uint64()
+	if !settings.ContractPrice.IsZero() {
+		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(settings.ContractPrice).Uint64()
 		if errOverflow == nil && bytes < SectorSize {
 			return nil, errors.New("contract has insufficient capacity")
 		}
@@ -200,7 +200,7 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 
 	he := &hostEditor{
 		contract: contract,
-		price:    settings.Price,
+		price:    settings.ContractPrice,
 
 		conn:       conn,
 		contractor: c,
