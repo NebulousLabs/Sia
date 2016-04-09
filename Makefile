@@ -80,7 +80,7 @@ clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
 test: REBUILD
-	go test -short -tags='debug testing' -timeout=3s $(pkgs) -run=$(run)
+	go test -short -tags='debug testing' -timeout=5s $(pkgs) -run=$(run)
 test-v: REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint REBUILD
