@@ -29,8 +29,8 @@ func (newStub) StartTransaction() modules.TransactionBuilder        { return nil
 func (newStub) AcceptTransactionSet([]types.Transaction) error { return nil }
 
 // hdb stubs
-func (newStub) Host(modules.NetAddress) (settings modules.HostSettings, ok bool) { return }
-func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostSettings     { return nil }
+func (newStub) Host(modules.NetAddress) (settings modules.HostExternalSettings, ok bool) { return }
+func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostExternalSettings     { return nil }
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
@@ -126,8 +126,8 @@ func TestAllowance(t *testing.T) {
 // its methods.
 type stubHostDB struct{}
 
-func (stubHostDB) Host(modules.NetAddress) (h modules.HostSettings, ok bool)         { return }
-func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostSettings) { return }
+func (stubHostDB) Host(modules.NetAddress) (h modules.HostExternalSettings, ok bool)         { return }
+func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostExternalSettings) { return }
 
 // TestSetAllowance tests the SetAllowance method.
 func TestSetAllowance(t *testing.T) {
@@ -150,16 +150,6 @@ func TestSetAllowance(t *testing.T) {
 	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
 	if err == nil {
 		t.Error("expected error, got nil")
-	}
-
-	// set renewHeight manually; this will cause SetAllowance to set
-	// nextAllowance instead
-	c.renewHeight = 50
-	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
-	if err != nil {
-		t.Error(err)
-	} else if c.allowance.Hosts != 3 {
-		t.Error("allowance was not set:", c.allowance)
 	}
 }
 

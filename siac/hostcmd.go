@@ -6,8 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
-	"github.com/NebulousLabs/Sia/api"
+	//"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -102,47 +101,48 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 // hostcmd is the handler for the command `siac host`.
 // Prints info about the host.
 func hostcmd() {
-	hg := new(api.HostGET)
-	err := getAPI("/host", &hg)
-	if err != nil {
-		die("Could not fetch host settings:", err)
-	}
-	// convert accepting bool
-	accept := yesNo(hg.AcceptingContracts)
-	// convert price to SC/GB/mo
-	price := new(big.Rat).SetInt(hg.Price.Big())
-	price.Mul(price, big.NewRat(4320, 1e24/1e9))
-	fmt.Printf(`Host info:
-	Storage:      %v (%v used)
-	Price:        %v SC per GB per month
-	Max Duration: %v Blocks
+	fmt.Println("TODO: fix/revamp this command")
+	// hg := new(api.HostGET)
+	// err := getAPI("/host", &hg)
+	// if err != nil {
+	// 	die("Could not fetch host settings:", err)
+	// }
+	// // convert accepting bool
+	// accept := yesNo(hg.AcceptingContracts)
+	// // convert price to SC/GB/mo
+	// price := new(big.Rat).SetInt(hg.ContractPrice.Big())
+	// price.Mul(price, big.NewRat(4320, 1e24/1e9))
+	// fmt.Printf(`Host info:
+	// 	Storage:      %v (%v used)
+	// 	Price:        %v SC per GB per month
+	// 	Max Duration: %v Blocks
 
-	Contracts:           %v
-	Accepting Contracts: %v
-	Anticipated Revenue: %v
-	Revenue:             %v
-	Lost Revenue:        %v
-`, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
-		price.FloatString(3), hg.MaxDuration, hg.NumContracts, accept,
-		hg.AnticipatedRevenue, hg.Revenue, hg.LostRevenue)
+	// 	Contracts:           %v
+	// 	Accepting Contracts: %v
+	// 	Anticipated Revenue: %v
+	// 	Revenue:             %v
+	// 	Lost Revenue:        %v
+	// `, filesizeUnits(hg.TotalStorage), filesizeUnits(hg.TotalStorage-hg.StorageRemaining),
+	// 	price.FloatString(3), hg.MaxDuration, hg.NumContracts, accept,
+	// 	hg.AnticipatedRevenue, hg.Revenue, hg.LostRevenue)
 
-	// display more info if verbose flag is set
-	if !hostVerbose {
-		return
-	}
-	fmt.Printf(`
-	Net Address: %v
-	Unlock Hash: %v
-	(NOT a wallet address!)
+	// // display more info if verbose flag is set
+	// if !hostVerbose {
+	// 	return
+	// }
+	// fmt.Printf(`
+	// 	Net Address: %v
+	// 	Unlock Hash: %v
+	// 	(NOT a wallet address!)
 
-RPC Stats:
-	Error Calls:        %v
-	Unrecognized Calls: %v
-	Download Calls:     %v
-	Renew Calls:        %v
-	Revise Calls:       %v
-	Settings Calls:     %v
-	Upload Calls:       %v
-`, hg.NetAddress, hg.UnlockHash, hg.RPCErrorCalls, hg.RPCUnrecognizedCalls, hg.RPCDownloadCalls,
-		hg.RPCRenewCalls, hg.RPCReviseCalls, hg.RPCSettingsCalls, hg.RPCUploadCalls)
+	// RPC Stats:
+	// 	Error Calls:        %v
+	// 	Unrecognized Calls: %v
+	// 	Download Calls:     %v
+	// 	Renew Calls:        %v
+	// 	Revise Calls:       %v
+	// 	Settings Calls:     %v
+	// 	Upload Calls:       %v
+	// `, hg.NetAddress, hg.UnlockHash, hg.RPCErrorCalls, hg.RPCUnrecognizedCalls, hg.RPCDownloadCalls,
+	// 	hg.RPCRenewCalls, hg.RPCReviseCalls, hg.RPCSettingsCalls, hg.RPCUploadCalls)
 }

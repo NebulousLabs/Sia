@@ -14,10 +14,10 @@ import (
 // editorHostDB is used to test the Editor method.
 type editorHostDB struct {
 	stubHostDB
-	hosts map[modules.NetAddress]modules.HostSettings
+	hosts map[modules.NetAddress]modules.HostExternalSettings
 }
 
-func (hdb editorHostDB) Host(addr modules.NetAddress) (modules.HostSettings, bool) {
+func (hdb editorHostDB) Host(addr modules.NetAddress) (modules.HostExternalSettings, bool) {
 	h, ok := hdb.hosts[addr]
 	return h, ok
 }
@@ -33,7 +33,7 @@ func (dial editorDialer) DialTimeout(addr modules.NetAddress, timeout time.Durat
 func TestEditor(t *testing.T) {
 	// use a mock hostdb to supply hosts
 	hdb := &editorHostDB{
-		hosts: make(map[modules.NetAddress]modules.HostSettings),
+		hosts: make(map[modules.NetAddress]modules.HostExternalSettings),
 	}
 	c := &Contractor{
 		hdb: hdb,
@@ -54,14 +54,14 @@ func TestEditor(t *testing.T) {
 	c.blockHeight = 0
 
 	// expensive host
-	hdb.hosts["foo"] = modules.HostSettings{Price: types.NewCurrency64(^uint64(0))}
+	hdb.hosts["foo"] = modules.HostExternalSettings{ContractPrice: types.NewCurrency64(^uint64(0))}
 	_, err = c.Editor(Contract{IP: "foo"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// invalid contract
-	hdb.hosts["bar"] = modules.HostSettings{Price: types.NewCurrency64(500)}
+	hdb.hosts["bar"] = modules.HostExternalSettings{ContractPrice: types.NewCurrency64(500)}
 	_, err = c.Editor(Contract{IP: "bar"})
 	if err == nil {
 		t.Error("expected error, got nil")

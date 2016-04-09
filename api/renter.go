@@ -33,7 +33,7 @@ type RenterShareASCII struct {
 
 // ActiveHosts lists active hosts on the network.
 type ActiveHosts struct {
-	Hosts []modules.HostSettings `json:"hosts"`
+	Hosts []modules.HostExternalSettings `json:"hosts"`
 }
 
 // renterAllowanceHandlerGET handles the API call to get the allowance.
