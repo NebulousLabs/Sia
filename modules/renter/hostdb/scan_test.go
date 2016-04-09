@@ -107,8 +107,6 @@ func TestThreadedProbeHosts(t *testing.T) {
 	if len(hdb.ActiveHosts()) != 1 {
 		t.Error("host was not added")
 	}
-
-	// TODO: respond with old host settings
 }
 
 // TestThreadedScan tests the threadedScan method.
