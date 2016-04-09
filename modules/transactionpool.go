@@ -21,7 +21,7 @@ const (
 var (
 	// ErrDuplicateTransactionSet is the error that gets returned if a
 	// duplicate transaction set is given to the transaction pool.
-	ErrDuplicateTransactionSet = errors.New("transaction is a duplicate")
+	ErrDuplicateTransactionSet = errors.New("transaction set contains only duplicate transaction")
 
 	// ErrLargeTransaction is the error that gets returned if a transaction
 	// provided to the transaction pool is larger than what is allowed by the
