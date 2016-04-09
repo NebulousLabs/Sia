@@ -103,10 +103,10 @@ func newRenterTester(name string) (*renterTester, error) {
 // of the hostDB's methods on every mock.
 type stubHostDB struct{}
 
-func (stubHostDB) ActiveHosts() []modules.HostSettings { return nil }
-func (stubHostDB) AllHosts() []modules.HostSettings    { return nil }
-func (stubHostDB) AveragePrice() types.Currency        { return types.Currency{} }
-func (stubHostDB) IsOffline(modules.NetAddress) bool   { return true }
+func (stubHostDB) ActiveHosts() []modules.HostExternalSettings { return nil }
+func (stubHostDB) AllHosts() []modules.HostExternalSettings    { return nil }
+func (stubHostDB) AveragePrice() types.Currency                { return types.Currency{} }
+func (stubHostDB) IsOffline(modules.NetAddress) bool           { return true }
 
 // stubContractor is the minimal implementation of the hostContractor
 // interface.

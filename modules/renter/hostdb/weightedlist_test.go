@@ -102,8 +102,8 @@ func TestWeightedList(t *testing.T) {
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:       types.NewCurrency64(10),
+			HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(uint8(i))},
+			weight:               types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -147,8 +147,8 @@ func TestWeightedList(t *testing.T) {
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:       types.NewCurrency64(10),
+			HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(uint8(i))},
+			weight:               types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -178,8 +178,8 @@ func TestVariedWeights(t *testing.T) {
 	selections := 0
 	for i := 0; i < hostCount; i++ {
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:       types.NewCurrency64(uint64(i)),
+			HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(uint8(i))},
+			weight:               types.NewCurrency64(uint64(i)),
 		}
 		hdb.insertNode(&entry)
 		selections += i * expectedPerWeight
@@ -230,8 +230,8 @@ func TestRepeatInsert(t *testing.T) {
 	}
 
 	entry1 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(0)},
-		weight:       types.NewCurrency64(1),
+		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(0)},
+		weight:               types.NewCurrency64(1),
 	}
 	entry2 := entry1
 	hdb.insertNode(&entry1)
@@ -277,16 +277,16 @@ func TestRandomHosts(t *testing.T) {
 
 	// Insert 3 hosts to be selected.
 	entry1 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(1)},
-		weight:       types.NewCurrency64(1),
+		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(1)},
+		weight:               types.NewCurrency64(1),
 	}
 	entry2 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(2)},
-		weight:       types.NewCurrency64(2),
+		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(2)},
+		weight:               types.NewCurrency64(2),
 	}
 	entry3 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(3)},
-		weight:       types.NewCurrency64(3),
+		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(3)},
+		weight:               types.NewCurrency64(3),
 	}
 	hdb.insertNode(&entry1)
 	hdb.insertNode(&entry2)

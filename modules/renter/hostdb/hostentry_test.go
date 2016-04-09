@@ -14,7 +14,7 @@ func TestInsertHost(t *testing.T) {
 	hdb := bareHostDB()
 
 	// invalid host should not be scanned
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo"})
+	hdb.insertHost(modules.HostExternalSettings{NetAddress: "foo"})
 	select {
 	case <-hdb.scanPool:
 		t.Error("invalid host was added to scan pool")
@@ -22,7 +22,7 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// valid host should be scanned
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
+	hdb.insertHost(modules.HostExternalSettings{NetAddress: "foo:1234"})
 	select {
 	case <-hdb.scanPool:
 	case <-time.After(time.Second):
@@ -30,7 +30,7 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// duplicate host should not be scanned
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
+	hdb.insertHost(modules.HostExternalSettings{NetAddress: "foo:1234"})
 	select {
 	case <-hdb.scanPool:
 		t.Error("duplicate host was added to scan pool")
@@ -88,17 +88,17 @@ func TestAveragePrice(t *testing.T) {
 	// with one host
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
-	h1.Price = types.NewCurrency64(100)
+	h1.ContractPrice = types.NewCurrency64(100)
 	h1.weight = baseWeight
 	hdb.insertNode(h1)
-	if avg := hdb.AveragePrice(); avg.Cmp(h1.Price) != 0 {
+	if avg := hdb.AveragePrice(); avg.Cmp(h1.ContractPrice) != 0 {
 		t.Error("average of one host should be that host's price:", avg)
 	}
 
 	// with two hosts
 	h2 := new(hostEntry)
 	h2.NetAddress = "bar"
-	h2.Price = types.NewCurrency64(300)
+	h2.ContractPrice = types.NewCurrency64(300)
 	h2.weight = baseWeight
 	hdb.insertNode(h2)
 	if len(hdb.activeHosts) != 2 {

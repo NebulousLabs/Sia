@@ -95,8 +95,8 @@ func TestThreadedProbeHosts(t *testing.T) {
 		go func() {
 			// read the RPC
 			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
-			// write old host settings
-			encoding.WriteObject(ourConn, oldHostSettings{
+			// write host settings
+			encoding.WriteObject(ourConn, modules.HostExternalSettings{
 				NetAddress: "probed",
 			})
 			ourConn.Close()
