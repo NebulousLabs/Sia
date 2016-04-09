@@ -18,7 +18,7 @@ const (
 	// and host have to negotiate a file contract. The time is set high enough
 	// that a node behind Tor has a reasonable chance at making the multiple
 	// required round trips to complete the negotiation.
-	FileContractNegotiationTime = 5 * time.Minute
+	FileContractNegotiationTime = 360 * time.Second
 
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
