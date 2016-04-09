@@ -40,7 +40,8 @@ fmt:
 	go fmt $(pkgs)
 
 # vet calls go vet on all packages.
-vet:
+# NOTE: go vet requires packages to be built in order to obtain type info.
+vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.

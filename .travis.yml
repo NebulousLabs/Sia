@@ -5,7 +5,7 @@ os:
   - osx
 
 go:
-  - 1.5.3
+  - 1.6
 
 before_install:
   # Decrypts a script (encrypted with `travis encrypt-file`) that installs a
