@@ -1,7 +1,7 @@
 package api
 
 import (
-	"fmt"
+	//"fmt"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -45,105 +45,109 @@ type (
 
 // hostHandlerGET handles GET requests to the /host API endpoint.
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	settings := srv.host.Settings()
-	anticipatedRevenue, revenue, lostRevenue := srv.host.Revenue()
-	rpcCalls := srv.host.RPCMetrics()
-	hg := HostGET{
-		AcceptingContracts: settings.AcceptingContracts,
-		MaxDuration:        settings.MaxDuration,
-		NetAddress:         settings.NetAddress,
-		RemainingStorage:   srv.host.Capacity(),
-		TotalStorage:       settings.TotalStorage,
-		UnlockHash:         settings.UnlockHash,
-		WindowSize:         settings.WindowSize,
+	writeJSON(w, "TODO: fix/revamp this call")
+	// settings := srv.host.Settings()
+	// anticipatedRevenue, revenue, lostRevenue := srv.host.Revenue()
+	// rpcCalls := srv.host.RPCMetrics()
+	// hg := HostGET{
+	// 	AcceptingContracts: settings.AcceptingContracts,
+	// 	MaxDuration:        settings.MaxDuration,
+	// 	NetAddress:         settings.NetAddress,
+	// 	RemainingStorage:   srv.host.Capacity(),
+	// 	TotalStorage:       settings.TotalStorage,
+	// 	UnlockHash:         settings.UnlockHash,
+	// 	WindowSize:         settings.WindowSize,
 
-		Collateral:             settings.Collateral,
-		ContractPrice:          settings.ContractPrice,
-		DownloadBandwidthPrice: settings.DownloadBandwidthPrice,
-		StoragePrice:           settings.StoragePrice,
-		UploadBandwidthPrice:   settings.UploadBandwidthPrice,
+	// 	Collateral:             settings.Collateral,
+	// 	ContractPrice:          settings.ContractPrice,
+	// 	DownloadBandwidthPrice: settings.DownloadBandwidthPrice,
+	// 	StoragePrice:           settings.StoragePrice,
+	// 	UploadBandwidthPrice:   settings.UploadBandwidthPrice,
 
-		AnticipatedRevenue: anticipatedRevenue,
-		LostRevenue:        lostRevenue,
-		NumContracts:       srv.host.Contracts(),
-		Revenue:            revenue,
+	// 	AnticipatedRevenue: anticipatedRevenue,
+	// 	LostRevenue:        lostRevenue,
+	// 	NumContracts:       srv.host.Contracts(),
+	// 	Revenue:            revenue,
 
-		RPCErrorCalls:        rpcCalls.ErrorCalls,
-		RPCUnrecognizedCalls: rpcCalls.UnrecognizedCalls,
-		RPCDownloadCalls:     rpcCalls.DownloadCalls,
-		RPCRenewCalls:        rpcCalls.RenewCalls,
-		RPCReviseCalls:       rpcCalls.ReviseCalls,
-		RPCSettingsCalls:     rpcCalls.SettingsCalls,
-		RPCUploadCalls:       rpcCalls.UploadCalls,
-	}
-	writeJSON(w, hg)
+	// 	RPCErrorCalls:        rpcCalls.ErrorCalls,
+	// 	RPCUnrecognizedCalls: rpcCalls.UnrecognizedCalls,
+	// 	RPCDownloadCalls:     rpcCalls.DownloadCalls,
+	// 	RPCRenewCalls:        rpcCalls.RenewCalls,
+	// 	RPCReviseCalls:       rpcCalls.ReviseCalls,
+	// 	RPCSettingsCalls:     rpcCalls.SettingsCalls,
+	// 	RPCUploadCalls:       rpcCalls.UploadCalls,
+	// }
+	// writeJSON(w, hg)
 }
 
 // hostHandlerPOST handles POST request to the /host API endpoint.
 func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// Map each query string to a field in the host settings.
-	settings := srv.host.Settings()
-	qsVars := map[string]interface{}{
-		// TODO: I'm not sure that allowing the user to set the netaddress via
-		// SetSettings is a good idea, if they change it to a bad address, or
-		// even a dns address... what happens?
-		"acceptingcontracts": &settings.AcceptingContracts,
-		"maxduration":        &settings.MaxDuration,
-		"netaddress":         &settings.NetAddress,
-		"windowsize":         &settings.WindowSize,
+	writeJSON(w, "TODO: fix/revamp this call")
+	// // Map each query string to a field in the host settings.
+	// settings := srv.host.Settings()
+	// qsVars := map[string]interface{}{
+	// 	// TODO: I'm not sure that allowing the user to set the netaddress via
+	// 	// SetSettings is a good idea, if they change it to a bad address, or
+	// 	// even a dns address... what happens?
+	// 	"acceptingcontracts": &settings.AcceptingContracts,
+	// 	"maxduration":        &settings.MaxDuration,
+	// 	"netaddress":         &settings.NetAddress,
+	// 	"windowsize":         &settings.WindowSize,
 
-		"collateral":             &settings.Collateral,
-		"contractprice":          &settings.ContractPrice,
-		"downloadbandwidthprice": &settings.DownloadBandwidthPrice,
-		"StoragePrice":           &settings.StoragePrice,
-		"uploadbandwidthprice":   &settings.UploadBandwidthPrice,
-	}
+	// 	"collateral":             &settings.Collateral,
+	// 	"contractprice":          &settings.ContractPrice,
+	// 	"downloadbandwidthprice": &settings.DownloadBandwidthPrice,
+	// 	"StoragePrice":           &settings.StoragePrice,
+	// 	"uploadbandwidthprice":   &settings.UploadBandwidthPrice,
+	// }
 
-	// Iterate through the query string and replace any fields that have been
-	// altered.
-	for qs := range qsVars {
-		if req.FormValue(qs) != "" { // skip empty values
-			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
-			if err != nil {
-				writeError(w, "Malformed "+qs, http.StatusBadRequest)
-				return
-			}
-		}
-	}
-	srv.host.SetSettings(settings)
-	writeSuccess(w)
+	// // Iterate through the query string and replace any fields that have been
+	// // altered.
+	// for qs := range qsVars {
+	// 	if req.FormValue(qs) != "" { // skip empty values
+	// 		_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
+	// 		if err != nil {
+	// 			writeError(w, "Malformed "+qs, http.StatusBadRequest)
+	// 			return
+	// 		}
+	// 	}
+	// }
+	// srv.host.SetSettings(settings)
+	// writeSuccess(w)
 }
 
 // hostAnnounceHandler handles the API call to get the host to announce itself
 // to the network.
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var err error
-	// TODO: should it just announce using the address found in host.Settings?
-	// What happens if the two are different?
-	if addr := req.FormValue("netaddress"); addr != "" {
-		err = srv.host.AnnounceAddress(modules.NetAddress(addr))
-	} else {
-		err = srv.host.Announce()
-	}
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeSuccess(w)
+	writeJSON(w, "TODO: fix/revamp this call")
+	// var err error
+	// // TODO: should it just announce using the address found in host.Settings?
+	// // What happens if the two are different?
+	// if addr := req.FormValue("netaddress"); addr != "" {
+	// 	err = srv.host.AnnounceAddress(modules.NetAddress(addr))
+	// } else {
+	// 	err = srv.host.Announce()
+	// }
+	// if err != nil {
+	// 	writeError(w, err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
+	// writeSuccess(w)
 }
 
 // hostDeleteHandler deletes a file contract from the host.
 func (srv *Server) hostDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	hash, err := scanAddress(ps.ByName("filecontractid"))
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	fcid := types.FileContractID(hash)
-	err = srv.host.DeleteContract(fcid)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeSuccess(w)
+	writeJSON(w, "TODO: fix/revamp this call")
+	// hash, err := scanAddress(ps.ByName("filecontractid"))
+	// if err != nil {
+	// 	writeError(w, err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
+	// fcid := types.FileContractID(hash)
+	// err = srv.host.DeleteContract(fcid)
+	// if err != nil {
+	// 	writeError(w, err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
+	// writeSuccess(w)
 }
