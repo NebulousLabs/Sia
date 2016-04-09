@@ -2,7 +2,7 @@ package modules
 
 import (
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
+	//"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -206,17 +206,17 @@ type (
 		// the host will forcibly remove the storage folder, discarding the
 		// data. This means that the host will be unable to provide storage
 		// proofs on the data, and is going to incur penalties.
-		ForceRemoveStorageFolder(index int) error
+		// TODO: ForceRemoveStorageFolder(index int) error
 
 		// RemoveStorageFolder will remove a storage folder from the host. All
 		// storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the host is unable to save
 		// data, an error will be returned and the operation will be stopped.
-		RemoveStorageFolder(index int) error
+		RemoveStorageFolder(index int, force bool) error
 
 		// ResetStorageFolderHealth will reset the health statistics on a
 		// storage folder.
-		ResetStorageFolderHealth(index int) error
+		// TODO: ResetStorageFolderHealth(index int) error
 
 		// ResizeStorageFolder will grow or shrink a storage folder in the
 		// host. The host may not check that there is enough space on-disk to
@@ -230,16 +230,19 @@ type (
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// host.
-		StorageFolders() []StorageFolderMetadata
+		// TODO: StorageFolders() []StorageFolderMetadata
 	}
 
 	// Host can take storage from disk and offer it to the network, managing things
 	// such as announcements, settings, and implementing all of the RPCs of the
 	// host protocol.
 	Host interface {
-		// Announce submits a host announcement to the blockchain.  After
+		// Announce submits a host announcement to the blockchain. After
 		// announcing, the host will begin accepting contracts.
-		Announce(NetAddress) error
+		Announce() error
+
+		// AnnounceAddress submits an announcement using the given address.
+		AnnounceAddress(NetAddress) error
 
 		// ConsistencyCheckAndRepair runs a consistency check on the host,
 		// looking for places where some combination of disk errors, usage
@@ -251,15 +254,15 @@ type (
 		// DeleteSector deletes a sector, meaning that the host will be unable
 		// to upload that sector and be unable to provide a storage proof if
 		// that sector is chosen by the blockchain.
-		DeleteSector(sectorRoot crypto.Hash) error
+		// TODO: DeleteSector(sectorRoot crypto.Hash) error
 
 		// FileContracts returns a list of file contracts that the host
 		// currently has open, along with the volume of data tracked by each
 		// file contract.
-		FileContracts() ([]types.FileContractID, []uint64)
+		// TODO: FileContracts() ([]types.FileContractID, []uint64)
 
 		// FinancialMetrics returns the financial statistics of the host.
-		FinancialMetrics() HostFinancialMetrics
+		// TODO: FinancialMetrics() HostFinancialMetrics
 
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
@@ -275,7 +278,7 @@ type (
 		// TODO: SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
 
 		// SetInternalSettings sets the hosting parameters of the host.
-		SetInternalSettings(HostInternalSettings) error
+		// TODO: SetInternalSettings(HostInternalSettings) error
 
 		// Settings returns the host's internal settings.
 		Settings() HostInternalSettings
