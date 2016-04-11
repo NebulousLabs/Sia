@@ -62,8 +62,8 @@ File Contract Creation
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 360 seconds.
 
-2. The host sends the renter the most recent copy of its settings. If the host
-   is not accepting new file contracts, the connection is closed.
+2. The host sends the renter the most recent copy of its settings, signed. If
+   the host is not accepting new file contracts, the connection is closed.
 
 # Witholding the signature is not strictly necessary, but if the signature is
 # not withheld, the host has not yet committed to accepting the file contract,
@@ -73,7 +73,9 @@ File Contract Creation
 # able to sign the whole transaction because the host must add collateral. This
 # means that the renter will not even know the file contract id.
 3. The renter sends a notice of acceptance or rejection. If the renter accepts,
-   the renter then sends a funded file contract without a signature.
+   the renter then sends a funded file contract without a signature, followed
+   by the public key that will be used to create the renter's portion of the
+   UnlockConditions for the file contract.
 
 # The host must always sign last, lest the renter trick the host into storing
 # data for free. Only the new data is sent to the renter, both to make
@@ -93,23 +95,25 @@ File Contract Creation
    transaction signatures to the host.
 
 6. The host may only reject the file contract in the event that the renter has
-   sent invalid signatures. The host writes acceptance, and then signs the file
-   contract and sends the transaction signatures to the renter. The connection
-   is closed.
+   sent invalid signatures, so the acceptance step is skipped. The host signs
+   the file contract and sends the transaction signatures to the renter. The
+   connection is closed.
 
 File Contract Revision
 ----------------------
 
 1. The renter makes an RPC to the host, opening a connection. The minimum
-   deadline for the connection is 600 seconds.
+   deadline for the connection is 600 seconds. The renter then sends a file
+   contract ID, indicting the file contract that is getting revised during the
+   RPC.
 
-2. A loop begins. The host sends the most recent revision of the host settings
-   to the renter, and a copy of the most recent known file contract revision
-   transaction. The transaction will be empty if there have been no completed
-   revisions yet. The host is expected to always have the most recent revision,
-   the renter may not have the most recent revision. The settings are sent
-   after each iteration of the loop to enable high resolution dynamic pricing
-   for the host, especially for bandwidth.
+2. The host will send an acceptance or rejection. A loop begins. The host sends
+   the most recent revision of the host settings to the renter, and a copy of
+   the most recent known revision transaction set. The transaction will be empty if
+   there have been no completed revisions yet. The host is expected to always
+   have the most recent revision, the renter may not have the most recent
+   revision. The settings are sent after each iteration of the loop to enable
+   high resolution dynamic pricing for the host, especially for bandwidth.
 
 3. The renter may reject or accept the settings + revision. The renter will
    send a batch of modification actions. Batching allows the renter to send a
@@ -144,8 +148,7 @@ File Contract Revision
    parties submit the new revision to the transaction pool. The host sends an
    acceptance or rejection indicating whether another iteration is okay. If
    another iteration is to be performed, the connection deadline will be reset
-   so that there are at least 600 seconds remaining. The host is expected to
-   accept at least 1200 seconds worth of iterations on the loop.
+   so that there are at least 600 seconds remaining.
 
 File Contract Renewal
 ---------------------

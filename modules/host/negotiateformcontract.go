@@ -1,5 +1,9 @@
 package host
 
+// TODO: Enforce some limit on the percent added that the transaction
+// signatures can be to manage fees. Maybe limit the total number of
+// signatures, or use some other method to guarantee safety.
+
 // TODO: Host needs some way to prevent renters from making multiple file
 // contracts, such that the collateral in the host cannot be drained by a
 // single malicious renter. A good defense may include having a limited amount
@@ -36,6 +40,11 @@ import (
 )
 
 var (
+	// errBadContractUnlockHash is returned when the host receives a file
+	// contract where it does not understand the unlock hash driving the
+	// contract.
+	errBadContractUnlockHash = errors.New("file contract has an unexpected unlock hash")
+
 	// errBadPayoutsLen is returned if a new file contract is presented that
 	// has the wrong number of valid or missed proof payouts.
 	errBadPayoutsLen = errors.New("file contract has the wrong number of payouts - there should be two valid and two missed payouts")
@@ -186,10 +195,9 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
 
-	// The first thing that the host should do is write the host settings to
-	// the connection. If the host is not accepting new contracts, the renter
-	// is expected to see this and gracefully handle the host closing the
-	// connection.
+	// Send the host settings to the renter. If the host is not accepting new
+	// contracts, the renter is expected to see this and gracefully handle the
+	// host closing the connection.
 	h.mu.RLock()
 	settings := h.settings
 	secretKey := h.secretKey
@@ -220,27 +228,30 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// is now going to send a signed file contract that funds the renter's
 	// portion of the file contract, including any parent transactions.
 	var txnSet []types.Transaction
+	var renterPK crypto.PublicKey
 	err = encoding.ReadObject(conn, &txnSet, modules.MaxFileContractSetLen)
+	if err != nil {
+		return err
+	}
+	err = encoding.ReadObject(conn, &renterPK, modules.MaxFileContractSetLen)
 	if err != nil {
 		return err
 	}
 
 	// The host verifies that the file contract coming over the wire is
 	// acceptable.
-	err = h.managedVerifyNewContract(txnSet)
+	err = h.managedVerifyNewContract(txnSet, renterPK)
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
-		writeErr := encoding.WriteObject(conn, err.Error())
-		return composeErrors(err, writeErr)
+		return rejectNegotiation(conn, err)
 	}
 	// The host adds collateral, then sends any new parent transactions,
 	// followed by any new inputs to the transaction, followed by any new
 	// outputs to the transaction.
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(txnSet)
 	if err != nil {
-		writeErr := encoding.WriteObject(conn, err.Error())
-		return composeErrors(err, writeErr)
+		return rejectNegotiation(conn, err)
 	}
 	err = encoding.WriteObject(conn, newParents)
 	if err != nil {
@@ -280,27 +291,17 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
-		writeErr := encoding.WriteObject(conn, err.Error())
-		return composeErrors(err, writeErr)
+		return rejectNegotiation(conn, err)
 	}
 
-	// The host writes acceptance, and then sends the updated transaction set
-	// back to the renter.
-	err = encoding.WriteObject(conn, modules.AcceptResponse)
-	if err != nil {
-		return err
-	}
-	err = encoding.WriteObject(conn, hostTxnSignatures)
-	if err != nil {
-		return err
-	}
-	// After the send has completed, negotiation is done.
-	return nil
+	// The host sends the transaction signatures to the renter. Negotiation is
+	// complete.
+	return encoding.WriteObject(conn, hostTxnSignatures)
 }
 
 // managedVerifyNewContract checks that an incoming file contract matches the host's
 // expectations for a valid contract.
-func (h *Host) managedVerifyNewContract(txnSet []types.Transaction) error {
+func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK crypto.PublicKey) error {
 	// Check that the transaction set is not nil - a nil transaction set could
 	// cause a panic and is therefore not allowed.
 	if txnSet == nil {
@@ -309,6 +310,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction) error {
 
 	h.mu.RLock()
 	blockHeight := h.blockHeight
+	publicKey := h.publicKey
 	settings := h.settings
 	unlockHash := h.unlockHash
 	h.mu.RUnlock()
@@ -342,6 +344,25 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction) error {
 	// must match the host's unlock hash.
 	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash {
 		return errBadPayoutsUnlockHashes
+	}
+
+	// The unlock hash for the file contract must match the unlock hash that
+	// the host knows how to spend.
+	expectedUH := types.UnlockConditions{
+		PublicKeys: []types.SiaPublicKey{
+			{
+				Algorithm: types.SignatureEd25519,
+				Key:       renterPK[:],
+			},
+			{
+				Algorithm: types.SignatureEd25519,
+				Key:       publicKey.Key,
+			},
+		},
+		SignaturesRequired: 2,
+	}.UnlockHash()
+	if fc.UnlockHash != expectedUH {
+		return errBadContractUnlockHash
 	}
 
 	// Check that the transaction set has enough fees on it to get into the

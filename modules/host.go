@@ -53,13 +53,17 @@ const (
 )
 
 var (
-	// ActionInsert is the specifier for a RevisionAction that modifies sector
-	// data.
-	ActionInsert = types.Specifier{'I', 'n', 's', 'e', 'r', 't'}
-
 	// ActionDelete is the specifier for a RevisionAction that deletes a
 	// sector.
 	ActionDelete = types.Specifier{'D', 'e', 'l', 'e', 't', 'e'}
+
+	// ActionInsert is the specifier for a RevisionAction that inserts a
+	// sector.
+	ActionInsert = types.Specifier{'I', 'n', 's', 'e', 'r', 't'}
+
+	// ActionModify is the specifier for a RevisionAction that modifies sector
+	// data.
+	ActionModify = types.Specifier{'M', 'o', 'd', 'i', 'f', 'y'}
 
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
@@ -157,6 +161,15 @@ type (
 	// are the values that the renter will request from the host in order to
 	// build its database.
 	HostExternalSettings struct {
+		// Recipient is a field that allows the host to specify that the
+		// settings apply only to a single recipient. Generally, the field will
+		// be blank, meaning the settings apply to everyone. When there is a
+		// value, it will usually be an encoded public key. Certain recipients
+		// with good reputation or a history of honesty may receive better
+		// deals or increased collateral as a result of the reduced risk of
+		// scams.
+		Recipient string
+
 		AcceptingContracts bool              `json:"acceptingcontracts"`
 		MaxBatchSize       uint64            `json:"maxbatchsize"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`

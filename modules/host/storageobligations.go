@@ -266,7 +266,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 	// Sanity check - action item should be at a higher height than the current
 	// block height.
 	if height <= h.blockHeight {
-		build.Critical("action item queued improperly")
+		h.log.Critical("action item queued improperly")
 	}
 	return h.db.Update(func(tx *bolt.Tx) error {
 		// Translate the height into a byte slice.
@@ -733,7 +733,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 func (h *Host) unlockStorageObligation(so *storageObligation) error {
 	_, exists := h.lockedStorageObligations[so.id()]
 	if !exists {
-		build.Critical(errObligationUnlocked)
+		h.log.Critical(errObligationUnlocked)
 		return errObligationUnlocked
 	}
 	delete(h.lockedStorageObligations, so.id())
