@@ -274,9 +274,17 @@ func Encode(files []*File, w io.Writer) error {
 
 	// Write each file entry.
 	for _, f := range files {
+		// Convert path separator to /, if necessary.
+		// NOTE: we don't need to do the inverse during Decode; Go treats / as
+		// the separator on all platforms.
+		f.Path = filepath.ToSlash(f.Path)
+
+		// Validate file contents.
 		if !f.Validate() {
 			return ErrInvalid
 		}
+
+		// Write entry.
 		err = writeJSONentry(t, f)
 		if err != nil {
 			return err
