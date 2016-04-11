@@ -29,8 +29,8 @@ func (newStub) StartTransaction() modules.TransactionBuilder        { return nil
 func (newStub) AcceptTransactionSet([]types.Transaction) error { return nil }
 
 // hdb stubs
-func (newStub) Host(modules.NetAddress) (settings modules.HostExternalSettings, ok bool) { return }
-func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostExternalSettings     { return nil }
+func (newStub) Host(modules.NetAddress) (settings modules.HostDBEntry, ok bool) { return }
+func (newStub) RandomHosts(int, []modules.NetAddress) []modules.HostDBEntry     { return nil }
 
 // TestNew tests the New function.
 func TestNew(t *testing.T) {
@@ -126,8 +126,8 @@ func TestAllowance(t *testing.T) {
 // its methods.
 type stubHostDB struct{}
 
-func (stubHostDB) Host(modules.NetAddress) (h modules.HostExternalSettings, ok bool)         { return }
-func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostExternalSettings) { return }
+func (stubHostDB) Host(modules.NetAddress) (h modules.HostDBEntry, ok bool)         { return }
+func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostDBEntry) { return }
 
 // TestSetAllowance tests the SetAllowance method.
 func TestSetAllowance(t *testing.T) {

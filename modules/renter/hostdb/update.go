@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -9,7 +10,7 @@ import (
 // findHostAnnouncements returns a list of the host announcements found within
 // a given block. No check is made to see that the ip address found in the
 // announcement is actually a valid ip address.
-func findHostAnnouncements(b types.Block) (announcements []modules.HostExternalSettings) {
+func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) {
 	for _, t := range b.Transactions {
 		// the HostAnnouncement must be prefaced by the standard host
 		// announcement string
@@ -25,12 +26,16 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostExternalS
 			err := encoding.Unmarshal(arb[types.SpecifierLen:], &ha)
 			if err != nil {
 				continue
+			} else if ha.PublicKey.Algorithm != types.SignatureEd25519 || len(ha.PublicKey.Key) != crypto.PublicKeySize {
+				// only Ed25519 supported for now
+				continue
 			}
 
 			// Add the announcement to the slice being returned.
-			announcements = append(announcements, modules.HostExternalSettings{
-				NetAddress: ha.IPAddress,
-			})
+			var host modules.HostDBEntry
+			host.NetAddress = ha.IPAddress
+			host.PublicKey = ha.PublicKey
+			announcements = append(announcements, host)
 		}
 	}
 

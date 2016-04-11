@@ -44,7 +44,10 @@ type Contractor struct {
 	blockHeight   types.BlockHeight
 	cachedAddress types.UnlockHash // to prevent excessive address creation
 	contracts     map[types.FileContractID]Contract
+	lastChange    modules.ConsensusChangeID
 	renewHeight   types.BlockHeight // height at which to renew contracts
+	spentPeriod   types.Currency    // number of coins spent on file contracts this period
+	spentTotal    types.Currency    // number of coins spent on file contracts ever
 
 	mu sync.RWMutex
 }
@@ -54,6 +57,13 @@ func (c *Contractor) Allowance() modules.Allowance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.allowance
+}
+
+// Spending returns the number of coins spent on file contracts.
+func (c *Contractor) Spending() (period, total types.Currency) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.spentPeriod, c.spentTotal
 }
 
 // SetAllowance sets the amount of money the Contractor is allowed to spend on
@@ -87,7 +97,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// Otherwise, if the new allowance is "significantly different" (to be
 	// defined more precisely later), form intermediary contracts.
 	if a.Funds.Cmp(old.Funds) > 0 {
-		// not yet implemented
+		// TODO: implement
 		// c.formContracts(diff(a, old))
 	}
 
@@ -152,7 +162,16 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d 
 		return nil, err
 	}
 
-	cs.ConsensusSetPersistentSubscribe(c, modules.ConsensusChangeID{})
+	err = cs.ConsensusSetPersistentSubscribe(c, c.lastChange)
+	if err == modules.ErrInvalidConsensusChangeID {
+		c.lastChange = modules.ConsensusChangeID{}
+		// ??? fix things ???
+		// subscribe again using the new ID
+		err = cs.ConsensusSetPersistentSubscribe(c, c.lastChange)
+	}
+	if err != nil {
+		return nil, errors.New("contractor subscription failed: " + err.Error())
+	}
 
 	return c, nil
 }

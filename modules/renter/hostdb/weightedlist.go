@@ -159,7 +159,7 @@ func (hdb *HostDB) isEmpty() bool {
 // may even be 0. The hosts that get returned first have the higher priority.
 // Hosts specified in 'ignore' will not be considered; pass 'nil' if no
 // blacklist is desired.
-func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostExternalSettings) {
+func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostDBEntry) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 	if hdb.isEmpty() {
@@ -191,7 +191,7 @@ func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modu
 		if err != nil {
 			break
 		}
-		hosts = append(hosts, node.hostEntry.HostExternalSettings)
+		hosts = append(hosts, node.hostEntry.HostDBEntry)
 
 		node.removeNode()
 		delete(hdb.activeHosts, node.hostEntry.NetAddress)

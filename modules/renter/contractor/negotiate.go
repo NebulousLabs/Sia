@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -13,41 +14,57 @@ import (
 
 var (
 	// the contractor will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Div(types.NewCurrency64(4320e9)).Mul(types.NewCurrency64(500)) // 500 SC / GB / Month
+	maxPrice = modules.StoragePriceToConsensus(500000) // 500k SC / TB / Month
 
 	errTooExpensive = errors.New("host price was too high")
 )
 
+// verifySettings reads a signed HostSettings object from conn, validates the
+// signature, and checks for discrepancies between the known settings and the
+// received settings. If there is a discrepancy, the hostDB is notified. The
+// received settings are returned.
+func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (modules.HostDBEntry, error) {
+	// convert host key (types.SiaPublicKey) to a crypto.PublicKey
+	if host.PublicKey.Algorithm != types.SignatureEd25519 || len(host.PublicKey.Key) != crypto.PublicKeySize {
+		build.Critical("hostdb did not filter out host with wrong signature algorithm:", host.PublicKey.Algorithm)
+		return modules.HostDBEntry{}, errors.New("host used unsupported signature algorithm")
+	}
+	var pk crypto.PublicKey
+	copy(pk[:], host.PublicKey.Key)
+
+	// read signed host settings
+	var recvSettings modules.HostExternalSettings
+	if err := crypto.ReadSignedObject(conn, &recvSettings, modules.MaxHostExternalSettingsLen, pk); err != nil {
+		return modules.HostDBEntry{}, errors.New("couldn't read host's settings: " + err.Error())
+	}
+	if !recvSettings.AcceptingContracts {
+		return modules.HostDBEntry{}, errors.New("host is not accepting contracts")
+	}
+	// TODO: check recvSettings against host.HostExternalSettings. If there is
+	// a discrepancy, write the error to conn and update the hostdb
+	host.HostExternalSettings = recvSettings
+	return host, nil
+}
+
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
+func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
-
-	// read host key
-	var hostPublicKey types.SiaPublicKey
-	if err := encoding.ReadObject(conn, &hostPublicKey, 256); err != nil {
-		return Contract{}, errors.New("couldn't read host's public key: " + err.Error())
-	}
 
 	// create our key
 	ourSK, ourPK, err := crypto.GenerateKeyPair()
 	if err != nil {
+		encoding.WriteObject(conn, "internal error")
 		return Contract{}, errors.New("failed to generate keypair: " + err.Error())
 	}
 	ourPublicKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       ourPK[:],
 	}
-
-	// send our public key
-	if err := encoding.WriteObject(conn, ourPublicKey); err != nil {
-		return Contract{}, errors.New("couldn't send our public key: " + err.Error())
-	}
-
 	// create unlock conditions
 	uc := types.UnlockConditions{
-		PublicKeys:         []types.SiaPublicKey{ourPublicKey, hostPublicKey},
+		PublicKeys:         []types.SiaPublicKey{ourPublicKey, host.PublicKey},
 		SignaturesRequired: 2,
 	}
 
@@ -57,21 +74,29 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 	// build transaction containing fc
 	err = txnBuilder.FundSiacoins(fc.Payout)
 	if err != nil {
+		encoding.WriteObject(conn, "internal error")
 		return Contract{}, err
 	}
 	txnBuilder.AddFileContract(fc)
-	txn, parents := txnBuilder.View()
-	txnSet := append(parents, txn)
 
-	// calculate contract ID
-	fcid := txn.FileContractID(0) // TODO: is it actually 0?
-
-	// send txn
-	if err := encoding.WriteObject(conn, txnSet); err != nil {
-		return Contract{}, errors.New("couldn't send our proposed contract: " + err.Error())
+	// sign the txn
+	signedTxnSet, err := txnBuilder.Sign(false)
+	if err != nil {
+		return Contract{}, err
 	}
 
-	// read back acceptance
+	// calculate contract ID
+	fcid := signedTxnSet[len(signedTxnSet)-1].FileContractID(0)
+
+	// send acceptance and txn signed by us
+	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
+		return Contract{}, errors.New("couldn't send acceptance: " + err.Error())
+	}
+	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
+		return Contract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
+	}
+
+	// read acceptance and txn signed by host
 	var response string
 	if err := encoding.ReadObject(conn, &response, 128); err != nil {
 		return Contract{}, errors.New("couldn't read the host's response to our proposed contract: " + err.Error())
@@ -79,46 +104,17 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 	if response != modules.AcceptResponse {
 		return Contract{}, errors.New("host rejected proposed contract: " + response)
 	}
-
-	// read back txn with host collateral.
 	var hostTxnSet []types.Transaction
 	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
 		return Contract{}, errors.New("couldn't read the host's updated contract: " + err.Error())
 	}
 
-	// check that txn is okay. For now, no collateral will be added, so the
-	// transaction sets should be identical.
-	if len(hostTxnSet) != len(txnSet) {
-		return Contract{}, errors.New("host sent bad collateral transaction")
-	}
-	for i := range hostTxnSet {
-		if hostTxnSet[i].ID() != txnSet[i].ID() {
-			return Contract{}, errors.New("host sent bad collateral transaction")
-		}
-	}
-
-	// sign the txn and resend
-	// NOTE: for now, we are assuming that the transaction has not changed
-	// since we sent it. Otherwise, the txnBuilder would have to be updated
-	// with whatever fields were added by the host.
-	signedTxnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		return Contract{}, err
-	}
-	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
-		return Contract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
-	}
-
-	// read signed txn from host
-	var signedHostTxnSet []types.Transaction
-	if err := encoding.ReadObject(conn, &signedHostTxnSet, types.BlockSizeLimit); err != nil {
-		return Contract{}, errors.New("couldn't read the contract signed by the host: " + err.Error())
-	}
+	// TODO: check txn?
 
 	// submit to blockchain
-	err = tpool.AcceptTransactionSet(signedHostTxnSet)
+	err = tpool.AcceptTransactionSet(hostTxnSet)
 	if err == modules.ErrDuplicateTransactionSet {
-		// this can happen if the renter is uploading to itself
+		// as long as it made it into the transaction pool, we're good
 		err = nil
 	}
 	if err != nil {
@@ -127,7 +123,7 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 
 	// create host contract
 	contract := Contract{
-		IP:           addr,
+		IP:           host.NetAddress,
 		ID:           fcid,
 		FileContract: fc,
 		LastRevision: types.FileContractRevision{
@@ -151,7 +147,7 @@ func negotiateContract(conn net.Conn, addr modules.NetAddress, fc types.FileCont
 
 // newContract negotiates an initial file contract with the specified host
 // and returns a Contract. The contract is also saved by the HostDB.
-func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
+func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
 	if host.ContractPrice.Cmp(maxPrice) > 0 {
 		return Contract{}, errTooExpensive
@@ -177,8 +173,7 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 
 	// create file contract
 	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
-	renterCost = renterCost.MulFloat(1.05) // extra buffer to guarantee we won't run out of money during revision
-	payout := renterCost                   // no collateral
+	payout := renterCost.Add(host.Collateral)
 
 	fc := types.FileContract{
 		FileSize:       0,
@@ -202,9 +197,6 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 		},
 	}
 
-	// create transaction builder
-	txnBuilder := c.wallet.StartTransaction()
-
 	// initiate connection
 	conn, err := c.dialer.DialTimeout(host.NetAddress, 15*time.Second)
 	if err != nil {
@@ -215,8 +207,17 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 		return Contract{}, err
 	}
 
+	// verify the host's settings and confirm its identity
+	host, err = verifySettings(conn, host, c.hdb)
+	if err != nil {
+		return Contract{}, err
+	}
+
+	// create transaction builder
+	txnBuilder := c.wallet.StartTransaction()
+
 	// execute negotiation protocol
-	contract, err := negotiateContract(conn, host.NetAddress, fc, txnBuilder, c.tpool)
+	contract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return Contract{}, err
@@ -224,8 +225,9 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
-	// clear the cached address
-	c.cachedAddress = types.UnlockHash{}
+	c.spentPeriod = c.spentPeriod.Add(fc.Payout)
+	c.spentTotal = c.spentTotal.Add(fc.Payout)
+	c.cachedAddress = types.UnlockHash{} // clear the cached address
 	c.save()
 	c.mu.Unlock()
 
@@ -250,7 +252,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	// host for the specified duration.
 	costPerSector := avgPrice.
 		Mul(types.NewCurrency64(a.Hosts)).
-		Mul(types.NewCurrency64(SectorSize)).
+		Mul(types.NewCurrency64(modules.SectorSize)).
 		Mul(types.NewCurrency64(uint64(a.Period)))
 	if a.Funds.Cmp(costPerSector) < 0 {
 		return errors.New("insufficient funds")
@@ -263,7 +265,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 		// if there was an overflow, something is definitely wrong
 		return errors.New("allowance resulted in unexpectedly large contract size")
 	}
-	filesize := numSectors * SectorSize
+	filesize := numSectors * modules.SectorSize
 
 	// Form contracts with each host.
 	c.mu.RLock()

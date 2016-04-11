@@ -90,6 +90,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 		persist: p,
 		log:     l,
 
+		// TODO: should index by pubkey, not ip
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),

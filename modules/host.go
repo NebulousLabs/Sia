@@ -34,6 +34,10 @@ const (
 	// The transaction pool's size limit for transaction sets has been chosen
 	// as a reasonable guideline for determining what is too large.
 	MaxFileContractSetLen = TransactionSetSizeLimit - 1e3
+
+	// MaxHostExternalSettingsLen is the maximum allowed size of an encoded
+	// HostExternalSettings.
+	MaxHostExternalSettingsLen = 16000
 )
 
 var (

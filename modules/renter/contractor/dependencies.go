@@ -40,8 +40,8 @@ type (
 	}
 
 	hostDB interface {
-		Host(modules.NetAddress) (modules.HostExternalSettings, bool)
-		RandomHosts(n int, exclude []modules.NetAddress) []modules.HostExternalSettings
+		Host(modules.NetAddress) (modules.HostDBEntry, bool)
+		RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry
 	}
 
 	dialer interface {

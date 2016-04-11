@@ -14,10 +14,10 @@ import (
 type hostDB interface {
 	// ActiveHosts returns the list of hosts that are actively being selected
 	// from.
-	ActiveHosts() []modules.HostExternalSettings
+	ActiveHosts() []modules.HostDBEntry
 
 	// AllHosts returns the full list of hosts known to the hostdb.
-	AllHosts() []modules.HostExternalSettings
+	AllHosts() []modules.HostDBEntry
 
 	// AveragePrice returns the average price of a host.
 	AveragePrice() types.Currency
@@ -116,8 +116,8 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 }
 
 // hostdb passthroughs
-func (r *Renter) ActiveHosts() []modules.HostExternalSettings { return r.hostDB.ActiveHosts() }
-func (r *Renter) AllHosts() []modules.HostExternalSettings    { return r.hostDB.AllHosts() }
+func (r *Renter) ActiveHosts() []modules.HostDBEntry { return r.hostDB.ActiveHosts() }
+func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts() }
 
 // contractor passthroughs
 func (r *Renter) Allowance() modules.Allowance           { return r.hostContractor.Allowance() }

@@ -26,5 +26,9 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	if c.blockHeight+c.allowance.RenewWindow >= c.renewHeight {
 		c.renewHeight += c.allowance.Period
 		go c.threadedRenewContracts(c.allowance, c.renewHeight)
+		// reset the spentPeriod metric
+		c.spentPeriod = types.ZeroCurrency
 	}
+
+	c.lastChange = cc.ID
 }

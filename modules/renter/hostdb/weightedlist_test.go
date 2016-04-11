@@ -99,11 +99,13 @@ func TestWeightedList(t *testing.T) {
 	}
 
 	// Create a bunch of host entries of equal weight.
+	var dbe modules.HostDBEntry
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
+		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
-			HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:               types.NewCurrency64(10),
+			HostDBEntry: dbe,
+			weight:      types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -146,9 +148,10 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
+		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
-			HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:               types.NewCurrency64(10),
+			HostDBEntry: dbe,
+			weight:      types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -173,13 +176,15 @@ func TestVariedWeights(t *testing.T) {
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
 	// per weight added to the tree, the total number of selections necessary
 	// will be tallied up as hosts are created.
+	var dbe modules.HostDBEntry
 	hostCount := 5
 	expectedPerWeight := int(10e3)
 	selections := 0
 	for i := 0; i < hostCount; i++ {
+		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
-			HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:               types.NewCurrency64(uint64(i)),
+			HostDBEntry: dbe,
+			weight:      types.NewCurrency64(uint64(i)),
 		}
 		hdb.insertNode(&entry)
 		selections += i * expectedPerWeight
@@ -229,9 +234,11 @@ func TestRepeatInsert(t *testing.T) {
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
 
+	var dbe modules.HostDBEntry
+	dbe.NetAddress = fakeAddr(0)
 	entry1 := hostEntry{
-		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(0)},
-		weight:               types.NewCurrency64(1),
+		HostDBEntry: dbe,
+		weight:      types.NewCurrency64(1),
 	}
 	entry2 := entry1
 	hdb.insertNode(&entry1)
@@ -276,17 +283,21 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Insert 3 hosts to be selected.
+	var dbe modules.HostDBEntry
+	dbe.NetAddress = fakeAddr(1)
 	entry1 := hostEntry{
-		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(1)},
-		weight:               types.NewCurrency64(1),
+		HostDBEntry: dbe,
+		weight:      types.NewCurrency64(1),
 	}
+	dbe.NetAddress = fakeAddr(2)
 	entry2 := hostEntry{
-		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(2)},
-		weight:               types.NewCurrency64(2),
+		HostDBEntry: dbe,
+		weight:      types.NewCurrency64(2),
 	}
+	dbe.NetAddress = fakeAddr(3)
 	entry3 := hostEntry{
-		HostExternalSettings: modules.HostExternalSettings{NetAddress: fakeAddr(3)},
-		weight:               types.NewCurrency64(3),
+		HostDBEntry: dbe,
+		weight:      types.NewCurrency64(3),
 	}
 	hdb.insertNode(&entry1)
 	hdb.insertNode(&entry2)
