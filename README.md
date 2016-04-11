@@ -1,4 +1,4 @@
-Sia 0.5.1
+Sia 0.5.2
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -110,6 +110,10 @@ Version History
 ---------------
 
 January 2016:
+
+v0.5.2 (patch)
+- Faster initial blockchain download
+- Introduced headers-only broadcasting
 
 v0.5.1 (patch)
 - Fixed bug severely impacting performance
