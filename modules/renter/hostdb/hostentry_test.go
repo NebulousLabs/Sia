@@ -14,7 +14,9 @@ func TestInsertHost(t *testing.T) {
 	hdb := bareHostDB()
 
 	// invalid host should not be scanned
-	hdb.insertHost(modules.HostExternalSettings{NetAddress: "foo"})
+	var dbe modules.HostDBEntry
+	dbe.NetAddress = "foo"
+	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
 		t.Error("invalid host was added to scan pool")
@@ -22,7 +24,8 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// valid host should be scanned
-	hdb.insertHost(modules.HostExternalSettings{NetAddress: "foo:1234"})
+	dbe.NetAddress = "foo:1234"
+	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
 	case <-time.After(time.Second):
@@ -30,7 +33,7 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// duplicate host should not be scanned
-	hdb.insertHost(modules.HostExternalSettings{NetAddress: "foo:1234"})
+	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
 		t.Error("duplicate host was added to scan pool")
@@ -136,15 +139,5 @@ func TestIsOffline(t *testing.T) {
 		if offline := hdb.IsOffline(test.addr); offline != test.offline {
 			t.Errorf("IsOffline(%v) = %v, expected %v", test.addr, offline, test.offline)
 		}
-	}
-
-	// quux should have sent host down scanPool
-	select {
-	case h := <-hdb.scanPool:
-		if h.NetAddress != "quux:1234" {
-			t.Error("wrong host in scan pool:", h.NetAddress)
-		}
-	case <-time.After(time.Second):
-		t.Error("unknown host was not added to scan pool")
 	}
 }

@@ -155,8 +155,9 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 			numHosts++
 		}
 	}
-	if numHosts < allowance.Hosts {
+	if numHosts == 0 || numHosts < allowance.Hosts {
 		// ??? get more
+		return
 	}
 	avgPrice := sum.Div(types.NewCurrency64(numHosts))
 

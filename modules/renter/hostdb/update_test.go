@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -11,8 +12,15 @@ import (
 
 // TestFindHostAnnouncements probes the findHostAnnouncements function
 func TestFindHostAnnouncements(t *testing.T) {
-	// Create a block with a host announcement.
-	announcement := append(modules.PrefixHostAnnouncement[:], encoding.Marshal(modules.HostAnnouncement{})...)
+	// Create a block with a valid host announcement.
+	var emptyKey crypto.PublicKey
+	announcement := encoding.MarshalAll(modules.PrefixHostAnnouncement, modules.HostAnnouncement{
+		IPAddress: "foo:1234",
+		PublicKey: types.SiaPublicKey{
+			Algorithm: types.SignatureEd25519,
+			Key:       emptyKey[:],
+		},
+	})
 	b := types.Block{
 		Transactions: []types.Transaction{
 			types.Transaction{
@@ -48,12 +56,14 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	hdb := bareHostDB()
 
 	// Put a host announcement into a block.
-	announceBytes := encoding.MarshalAll(
-		modules.PrefixHostAnnouncement,
-		modules.HostAnnouncement{
-			IPAddress: "foo:1234",
+	var emptyKey crypto.PublicKey
+	announceBytes := encoding.MarshalAll(modules.PrefixHostAnnouncement, modules.HostAnnouncement{
+		IPAddress: "foo:1234",
+		PublicKey: types.SiaPublicKey{
+			Algorithm: types.SignatureEd25519,
+			Key:       emptyKey[:],
 		},
-	)
+	})
 	cc := modules.ConsensusChange{
 		AppliedBlocks: []types.Block{{
 			Transactions: []types.Transaction{{
