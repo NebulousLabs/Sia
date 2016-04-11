@@ -14,11 +14,23 @@ const (
 	// reason for rejection.)
 	AcceptResponse = "accept"
 
-	// FileContractNegotiationTime defines the amount of time that the renter
-	// and host have to negotiate a file contract. The time is set high enough
-	// that a node behind Tor has a reasonable chance at making the multiple
+	// NegotiateFileContractTime defines the amount of time that the renter and
+	// host have to negotiate a file contract. The time is set high enough that
+	// a node behind Tor has a reasonable chance at making the multiple
 	// required round trips to complete the negotiation.
-	FileContractNegotiationTime = 360 * time.Second
+	NegotiateFileContractTime = 360 * time.Second
+
+	// NegotiateFileContractRevisionTime defines the minimum amount of time
+	// that the renter and host have to negotiate a file contract revision. The
+	// time is set high enough that a full 4MB can be piped through a
+	// connection that is running over Tor.
+	NegotiateFileContractRevisionTime = 600 * time.Second
+
+	// NegotiateSettingsTime establishes the minimum amount of time that the
+	// connection deadline is expected to be set to when settings are being
+	// requested from the host. The deadline is long enough that the connection
+	// should be successful even if both parties are on Tor.
+	NegotiateSettingsTime = 120 * time.Second
 
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
@@ -53,13 +65,14 @@ var (
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
 
 	// RPCFormContract is the specifier for forming a contract with a host.
-	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCRenew is the specifier to renewing an existing contract.
 	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w', 2}
 
-	// RPCRevise is the specifier for revising an existing file contract.
-	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 2}
+	// RPCReviseContract is the specifier for revising an existing file
+	// contract.
+	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCDownload is the specifier for downloading a file from a host.
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}

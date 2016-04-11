@@ -184,7 +184,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 // the blockchain.
 func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// Set the negotiation deadline.
-	conn.SetDeadline(time.Now().Add(modules.FileContractNegotiationTime))
+	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
 
 	// The first thing that the host should do is write the host settings to
 	// the connection. If the host is not accepting new contracts, the renter
