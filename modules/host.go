@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	//"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -12,8 +14,18 @@ const (
 	// reason for rejection.)
 	AcceptResponse = "accept"
 
+	// FileContractNegotiationTime defines the amount of time that the renter
+	// and host have to negotiate a file contract. The time is set high enough
+	// that a node behind Tor has a reasonable chance at making the multiple
+	// required round trips to complete the negotiation.
+	FileContractNegotiationTime = 360 * time.Second
+
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
+
+	// MaxErrorSize indicates the maximum number of bytes that can be used to
+	// encode an error being sent during negotiation.
+	MaxErrorSize = 256
 
 	// MaxFileContractSetLen determines the maximum allowed size of a
 	// transaction set that can be sent when trying to negotiate a file
@@ -36,8 +48,8 @@ var (
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
 
-	// RPCNegotiate is the specifier for negotiating a contract with a host.
-	RPCNegotiate = types.Specifier{'N', 'e', 'g', 'o', 't', 'i', 'a', 't', 'e', 2}
+	// RPCFormContract is the specifier for forming a contract with a host.
+	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
 
 	// RPCRenew is the specifier to renewing an existing contract.
 	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w', 2}
@@ -82,15 +94,25 @@ type (
 		SectorIndex uint64
 	}
 
-	// HostBandwidthLimits set limits on the volume and speed of the uploading
-	// and downloading of the host. The limits have no bearings on the other
-	// modules. The data limits are in bytes per month, and the speed limits
-	// are in bytes per second.
+	// HostBandwidthLimits set limits on the volume, price, and speed of data
+	// that's available to the host. Because different ISPs and setups have
+	// different rules governing appropriate limits, and because there's a
+	// profit incentive to matching the limits as close as possible, and
+	// because there might be intelligent ways to allocate data that require
+	// outside information (for example, more data available at night), the
+	// limits have been created with the idea that some external process will
+	// be able to adjust them constantly to conform to transfer limits and take
+	// advantage of low-traffic or low-cost hours.
 	HostBandwidthLimits struct {
-		DownloadDataLimit  uint64 `json:"downloaddatalimit"`
-		DownloadSpeedLimit uint64 `json:"downloadspeedlimit"`
-		UploadDataLimit    uint64 `json:"uploaddatalimit"`
-		UploadSpeedLimit   uint64 `json:"uploadspeedlimit"`
+		DownloadLimitGrowth uint64         `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
+		DownloadLimitCap    uint64         `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.
+		DownloadMinPrice    types.Currency `json:"downloadminprice"`    // The minimum price in Hastings per byte of download bandwidth.
+		DownloadSpeedLimit  uint64         `json:"downloadspeedlimit"`  // The maximum download speed for all combined host connections.
+
+		UploadLimitGrwoth uint64         `json:"uploadlimitgrowth"` // Bytes per second that get added to the limit for how much upload bandwidth the host is allowed to use.
+		UploadLimitCap    uint64         `json:"uploadlimitcap"`    // The maximum size of the limit for how much upload bandwidth the host is allowed to use.
+		UploadMinPrice    types.Currency `json:"uploadminprice"`    // The minimum price in Hastings per byte of download bandwidth.
+		UploadSpeedLimit  uint64         `json:"uploadspeedlimit"`  // The maximum upload speed for all combined host connections.
 	}
 
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
@@ -128,12 +150,40 @@ type (
 		UnlockHash         types.UnlockHash  `json:"unlockhash"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
-		Collateral             types.Currency `json:"collateral"`
+		// Collateral is the amount of collateral that the host will put up for
+		// storage in 'bytes per block', as an assurance to the renter that the
+		// host really is committed to keeping the file. But, because the file
+		// contract is created with no data available, this does leave the host
+		// exposed to an attack by a wealthy renter whereby the renter causes
+		// the host to lockup in-advance a bunch of funds that the renter then
+		// never uses, meaning the host will not have collateral for other
+		// clients.
+		//
+		// To mitigate the effects of this attack, the host has a collateral
+		// fraction and a max collateral. CollateralFraction is a number that
+		// gets divided by 1e6 and then represents the ratio of funds that the
+		// host is willing to put into the contract relative to the number of
+		// funds that the renter put into the contract. For example, if
+		// 'CollateralFraction' is set to 1e6 and the renter adds 1 siacoin of
+		// funding to the file contract, the host will also add 1 siacoin of
+		// funding to the contract. if 'CollateralFraction' is set to 2e6, the
+		// host would add 2 siacoins of funding to the contract.
+		//
+		// MaxCollateral indicates the maximum number of coins that a host is
+		// willing to put into a file contract.
+		Collateral         types.Currency `json:"collateral"`
+		CollateralFraction types.Currency `json:"collateralfraction"`
+		MaxCollateral      types.Currency `json:"maxcollateral"`
+
 		ContractPrice          types.Currency `json:"contractprice"`
 		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`
 		StoragePrice           types.Currency `json:"storageprice"`
 		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"`
 
+		// Because the host has a public key, and settings are signed, and
+		// because settings may be MITM'd, settings need a revision number so
+		// that a renter can compare multiple sets of settings and determine
+		// which is the most recent.
 		RevisionNumber uint64 `json:"revisionnumber"`
 		Version        string `json:"version"`
 	}
@@ -146,12 +196,15 @@ type (
 		NetAddress         NetAddress        `json:"netaddress"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
-		Collateral                    types.Currency `json:"collateral"`
-		MinimumContractPrice          types.Currency `json:"contractprice"`
-		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
-		MinimumStoragePrice           types.Currency `json:"storageprice"`
-		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
-		// TODO: HostBandwidthLimits - can't be added until dynamic pricing is in place.
+		Collateral         types.Currency `json:"collateral"`
+		CollateralFraction types.Currency `json:"collateralfraction"`
+		MaxCollateral      types.Currency `json:"maxcollateral"`
+
+		BandwidthLimits               HostBandwidthLimits `json:"bandwidthlimits"`
+		MinimumContractPrice          types.Currency      `json:"contractprice"`
+		MinimumDownloadBandwidthPrice types.Currency      `json:"minimumdownloadbandwidthprice"`
+		MinimumStoragePrice           types.Currency      `json:"storageprice"`
+		MinimumUploadBandwidthPrice   types.Currency      `json:"minimumuploadbandwidthprice"`
 	}
 
 	// HostRPCMetrics reports the quantity of each type of RPC call that has
@@ -160,13 +213,13 @@ type (
 		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
 		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
 
-		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
-		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 		DownloadCalls     uint64 `json:"downloadcalls"`
+		ErrorCalls        uint64 `json:"errorcalls"`
+		FormContractCalls uint64 `json:"formcontractcalls"`
 		RenewCalls        uint64 `json:"renewcalls"`
 		ReviseCalls       uint64 `json:"revisecalls"`
 		SettingsCalls     uint64 `json:"settingscalls"`
-		UploadCalls       uint64 `json:"uploadcalls"`
+		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 	}
 
 	// StorageFolderMetadata contians metadata about a storage folder that is
@@ -271,14 +324,8 @@ type (
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
 
-		// SetBandwidthLimits puts a limit on how much data transfer the host
-		// will tolerate. Altruistic limits indicate how much data the host is
-		// willing to transfer for free, and priced limits indicate how much
-		// data the host is willing to transfer when the host is getting paid.
-		// TODO: SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
-
 		// SetInternalSettings sets the hosting parameters of the host.
-		// TODO: SetInternalSettings(HostInternalSettings) error
+		SetInternalSettings(HostInternalSettings) error
 
 		// Settings returns the host's internal settings.
 		Settings() HostInternalSettings

@@ -14,13 +14,13 @@ import (
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
 	// RPC Metrics.
-	ErroredCalls      uint64
-	UnrecognizedCalls uint64
 	DownloadCalls     uint64
+	ErroredCalls      uint64
+	FormContractCalls uint64
 	RenewCalls        uint64
 	ReviseCalls       uint64
 	SettingsCalls     uint64
-	UploadCalls       uint64
+	UnrecognizedCalls uint64
 
 	// Consensus Tracking.
 	BlockHeight  types.BlockHeight
@@ -54,13 +54,13 @@ type persistence struct {
 func (h *Host) save() error {
 	p := persistence{
 		// RPC Metrics.
-		ErroredCalls:      atomic.LoadUint64(&h.atomicErroredCalls),
-		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
+		ErroredCalls:      atomic.LoadUint64(&h.atomicErroredCalls),
+		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),
 		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
 		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
 		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
-		UploadCalls:       atomic.LoadUint64(&h.atomicUploadCalls),
+		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 
 		// Consensus Tracking.
 		BlockHeight:  h.blockHeight,
@@ -110,7 +110,7 @@ func (h *Host) load() error {
 	atomic.StoreUint64(&h.atomicRenewCalls, p.RenewCalls)
 	atomic.StoreUint64(&h.atomicReviseCalls, p.ReviseCalls)
 	atomic.StoreUint64(&h.atomicSettingsCalls, p.SettingsCalls)
-	atomic.StoreUint64(&h.atomicUploadCalls, p.UploadCalls)
+	atomic.StoreUint64(&h.atomicFormContractCalls, p.FormContractCalls)
 
 	// Copy over consensus tracking.
 	h.blockHeight = p.BlockHeight

@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,7 +21,7 @@ const (
 var (
 	// ErrDuplicateTransactionSet is the error that gets returned if a
 	// duplicate transaction set is given to the transaction pool.
-	ErrDuplicateTransactionSet = errors.New("transaction is a duplicate")
+	ErrDuplicateTransactionSet = errors.New("transaction set contains only duplicate transaction")
 
 	// ErrLargeTransaction is the error that gets returned if a transaction
 	// provided to the transaction pool is larger than what is allowed by the
@@ -112,4 +113,16 @@ func NewConsensusConflict(s string) ConsensusConflict {
 // acceptable error type.
 func (cc ConsensusConflict) Error() string {
 	return string(cc)
+}
+
+// CalculateFee returns the fee-per-byte of a transaction set.
+func CalculateFee(ts []types.Transaction) types.Currency {
+	var sum types.Currency
+	for _, t := range ts {
+		for _, fee := range t.MinerFees {
+			sum = sum.Add(fee)
+		}
+	}
+	size := len(encoding.Marshal(ts))
+	return sum.Div(types.NewCurrency64(uint64(size)))
 }

@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -67,18 +66,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
 		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
-		atomic.AddUint64(&h.atomicErroredCalls, 1)
-
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
-		unrecognizedCalls := atomic.LoadUint64(&h.atomicUnrecognizedCalls)
-		if unrecognizedCalls < 1e3 || (unrecognizedCalls > 1e3 && randInt == 0) {
-			h.log.Printf("WARN: incoming conn %v was malformed: %v", conn.RemoteAddr(), err)
-		}
+		h.log.Debugf("WARN: incoming conn %v was malformed: %v", conn.RemoteAddr(), err)
 		return
 	}
 
@@ -93,40 +81,37 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		case modules.RPCRevise:
 			atomic.AddUint64(&h.atomicReviseCalls, 1)
 			// err = h.managedRPCRevise(conn)
-		case modules.RPCSettings:
-			atomic.AddUint64(&h.atomicSettingsCalls, 1)
-			err = h.managedRPCSettings(conn)
 		case modules.RPCUpload:
 			atomic.AddUint64(&h.atomicUploadCalls, 1)
 			// err = h.managedRPCUpload(conn)
-		default:
-			atomic.AddUint64(&h.atomicErroredCalls, 1)
-
-			// Don't clutter the logs with repeat messages - after 1000 messages
-			// have been printed, only print 1-in-200.
-			randInt, randErr := crypto.RandIntn(200)
-			if randErr != nil {
-				return
-			}
-			erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-			if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
-				h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
-			}
 	*/
+	case modules.RPCFormContract:
+		atomic.AddUint64(&h.atomicFormContractCalls, 1)
+		err = h.managedRPCFormContract(conn)
+	case modules.RPCSettings:
+		atomic.AddUint64(&h.atomicSettingsCalls, 1)
+		err = h.managedRPCSettings(conn)
+
 	default:
+		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
+		h.log.Debugf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
 
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
+		// If there have been less than 1000 errored rpcs, print the error
+		// message. This is to help developers debug live systems that are
+		// running into issues. Ultimately though, this error can be triggered
+		// by a malicious actor, and therefore should not be logged except for
+		// DEBUG builds.
+		//
+		// TODO: After the upgraded renter-host have more maturity, the
+		// non-debug log call can be removed.
 		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
+		if erroredCalls < 1e3 {
 			h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+		} else {
+			h.log.Debugf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 		}
 	}
 }
@@ -151,9 +136,4 @@ func (h *Host) threadedListen() {
 		// Grab the resource lock before creating a goroutine.
 		go h.threadedHandleConn(conn)
 	}
-}
-
-// managedRPCSettings is an rpc that returns the host's settings.
-func (h *Host) managedRPCSettings(conn net.Conn) error {
-	return encoding.WriteObject(conn, h.Settings())
 }

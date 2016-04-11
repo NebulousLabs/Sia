@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
-	"io"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -286,16 +285,16 @@ func TestReadWriteSignedObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// write signed object into buffer
+	// Write signed object into buffer.
 	b := new(bytes.Buffer)
 	err = WriteSignedObject(b, "foo", sk)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// keep a copy of b's bytes
+	// Keep a copy of b's bytes.
 	buf := b.Bytes()
 
-	// read and verify object
+	// Read and verify object.
 	var read string
 	err = ReadSignedObject(b, &read, 11, pk)
 	if err != nil {
@@ -305,54 +304,25 @@ func TestReadWriteSignedObject(t *testing.T) {
 		t.Fatal("encode/decode mismatch: expected 'foo', got", []byte(read))
 	}
 
-	// enforce maxLen
+	// Check that maxlen is being respected.
 	b = bytes.NewBuffer(buf) // reset b
 	err = ReadSignedObject(b, &read, 10, pk)
 	if err == nil || err.Error() != "length 11 exceeds maxLen of 10" {
 		t.Fatal("expected length error, got", err)
 	}
-}
 
-// TestSignVerifyObject tests the SignObject and VerifyObject functions, which
-// are inverses of each other.
-func TestSignVerifyObject(t *testing.T) {
-	sk, pk, err := GenerateKeyPair()
-	if err != nil {
+	// Disrupt the decoding to get coverage on the failure branch.
+	err = ReadSignedObject(b, &read, 11, pk)
+	if err == nil || err.Error() != "could not decode type crypto.Signature: unexpected EOF" {
 		t.Fatal(err)
 	}
 
-	// create signed object
-	signedObj := SignObject("foo", sk)
-
-	// verify signed object
-	var read string
-	err = VerifyObject(signedObj, &read, pk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if read != "foo" {
-		t.Fatal("encode/decode mismatch: expected 'foo', got", []byte(read))
-	}
-
-	// corrupt signature
-	_, err = rand.Read(signedObj[11:])
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = VerifyObject(signedObj, &read, pk)
+	// Try with an invalid signature.
+	buf[0]++                 // alter the first byte of the signature, invalidating it.
+	b = bytes.NewBuffer(buf) // reset b
+	err = ReadSignedObject(b, &read, 11, pk)
 	if err != errInvalidSignature {
-		t.Fatal("expected errInvalidSignature, got", err)
-	}
-
-	// not enough object data
-	err = VerifyObject(signedObj[:0], &read, pk)
-	if err != io.EOF {
-		t.Fatal("expected EOF, got", err)
-	}
-	// not enough signature data
-	err = VerifyObject(signedObj[:19], &read, pk)
-	if err == nil || err.Error() != "could not decode type crypto.Signature: EOF" {
-		t.Fatal("expected decode error, got", err)
+		t.Fatal(err)
 	}
 }
 

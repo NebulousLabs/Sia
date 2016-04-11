@@ -57,13 +57,13 @@ var (
 type Host struct {
 	// RPC Metrics - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems.
-	atomicErroredCalls      uint64
-	atomicUnrecognizedCalls uint64
 	atomicDownloadCalls     uint64
+	atomicErroredCalls      uint64
+	atomicFormContractCalls uint64
 	atomicRenewCalls        uint64
 	atomicReviseCalls       uint64
 	atomicSettingsCalls     uint64
-	atomicUploadCalls       uint64
+	atomicUnrecognizedCalls uint64
 
 	// Dependencies.
 	cs     modules.ConsensusSet
@@ -368,8 +368,8 @@ func (h *Host) Close() (composedError error) {
 	return composedError
 }
 
-// SetSettings updates the host's internal HostInternalSettings object.
-func (h *Host) SetSettings(settings modules.HostInternalSettings) error {
+// SetInternalSettings updates the host's internal HostInternalSettings object.
+func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.resourceLock.RLock()

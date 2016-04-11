@@ -90,13 +90,13 @@ func (h *Host) Revenue() (unresolved, resolved, lost types.Currency) {
 // made to the host.
 func (h *Host) RPCMetrics() modules.HostRPCMetrics {
 	return modules.HostRPCMetrics{
-		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
-		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
+		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
+		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),
 		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
 		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
 		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
-		UploadCalls:       atomic.LoadUint64(&h.atomicUploadCalls),
+		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
 	}
 }
 
