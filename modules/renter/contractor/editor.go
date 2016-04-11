@@ -222,7 +222,7 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	}
 	if !host.ContractPrice.IsZero() {
 		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(host.ContractPrice).Uint64()
-		if errOverflow == nil && bytes < SectorSize {
+		if errOverflow == nil && bytes < modules.SectorSize {
 			return nil, errors.New("contract has insufficient capacity")
 		}
 	}
