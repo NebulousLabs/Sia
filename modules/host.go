@@ -325,7 +325,7 @@ type (
 		RPCMetrics() HostRPCMetrics
 
 		// SetInternalSettings sets the hosting parameters of the host.
-		// TODO: SetInternalSettings(HostInternalSettings) error
+		SetInternalSettings(HostInternalSettings) error
 
 		// Settings returns the host's internal settings.
 		Settings() HostInternalSettings

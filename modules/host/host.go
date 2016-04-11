@@ -368,8 +368,8 @@ func (h *Host) Close() (composedError error) {
 	return composedError
 }
 
-// SetSettings updates the host's internal HostInternalSettings object.
-func (h *Host) SetSettings(settings modules.HostInternalSettings) error {
+// SetInternalSettings updates the host's internal HostInternalSettings object.
+func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.resourceLock.RLock()
