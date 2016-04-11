@@ -76,6 +76,13 @@ type Allowance struct {
 	RenewWindow types.BlockHeight `json:"renewwindow"`
 }
 
+// A HostDBEntry represents one host entry in the Renter's host DB. It
+// aggregates the host's external settings with its public key.
+type HostDBEntry struct {
+	HostExternalSettings
+	PublicKey types.SiaPublicKey
+}
+
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
@@ -84,10 +91,10 @@ type Renter interface {
 
 	// ActiveHosts returns the list of hosts that are actively being selected
 	// from.
-	ActiveHosts() []HostExternalSettings
+	ActiveHosts() []HostDBEntry
 
 	// AllHosts returns the full list of hosts known to the renter.
-	AllHosts() []HostExternalSettings
+	AllHosts() []HostDBEntry
 
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error

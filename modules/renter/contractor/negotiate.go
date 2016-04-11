@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -22,23 +23,32 @@ var (
 // signature, and checks for discrepancies between the known settings and the
 // received settings. If there is a discrepancy, the hostDB is notified. The
 // received settings are returned.
-func verifySettings(conn net.Conn, knownSettings modules.HostExternalSettings, hdb hostDB) (modules.HostExternalSettings, error) {
+func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (modules.HostDBEntry, error) {
+	// convert host key (types.SiaPublicKey) to a crypto.PublicKey
+	if host.PublicKey.Algorithm != types.SignatureEd25519 || len(host.PublicKey.Key) != crypto.PublicKeySize {
+		build.Critical("hostdb did not filter out host with wrong signature algorithm:", host.PublicKey.Algorithm)
+		return modules.HostDBEntry{}, errors.New("host used unsupported signature algorithm")
+	}
+	var pk crypto.PublicKey
+	copy(pk[:], host.PublicKey.Key)
+
 	// read signed host settings
 	var recvSettings modules.HostExternalSettings
-	if err := crypto.ReadSignedObject(conn, &recvSettings, 2048, knownSettings.PublicKey); err != nil { // ??? how large?
-		return modules.HostExternalSettings{}, errors.New("couldn't read host's settings: " + err.Error())
+	if err := crypto.ReadSignedObject(conn, &recvSettings, modules.MaxHostExternalSettingsLen, pk); err != nil {
+		return modules.HostDBEntry{}, errors.New("couldn't read host's settings: " + err.Error())
 	}
 	if !recvSettings.AcceptingContracts {
-		return recvSettings, errors.New("host is not accepting contracts")
+		return modules.HostDBEntry{}, errors.New("host is not accepting contracts")
 	}
-	// TODO: check settings. If there is a discrepancy, write the error to
-	// conn and update the hostdb
-	return recvSettings, nil
+	// TODO: check recvSettings against host.HostExternalSettings. If there is
+	// a discrepancy, write the error to conn and update the hostdb
+	host.HostExternalSettings = recvSettings
+	return host, nil
 }
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func negotiateContract(conn net.Conn, host modules.HostExternalSettings, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
+func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -137,7 +147,7 @@ func negotiateContract(conn net.Conn, host modules.HostExternalSettings, fc type
 
 // newContract negotiates an initial file contract with the specified host
 // and returns a Contract. The contract is also saved by the HostDB.
-func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
+func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
 	if host.ContractPrice.Cmp(maxPrice) > 0 {
 		return Contract{}, errTooExpensive
