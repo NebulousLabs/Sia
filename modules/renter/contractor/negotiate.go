@@ -211,7 +211,7 @@ func (c *Contractor) newContract(host modules.HostExternalSettings, filesize uin
 		return Contract{}, err
 	}
 	defer conn.Close()
-	if err := encoding.WriteObject(conn, modules.RPCNegotiate); err != nil {
+	if err := encoding.WriteObject(conn, modules.RPCFormContract); err != nil {
 		return Contract{}, err
 	}
 

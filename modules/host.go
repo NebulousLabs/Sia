@@ -324,12 +324,6 @@ type (
 		// been made to the host.
 		RPCMetrics() HostRPCMetrics
 
-		// SetBandwidthLimits puts a limit on how much data transfer the host
-		// will tolerate. Altruistic limits indicate how much data the host is
-		// willing to transfer for free, and priced limits indicate how much
-		// data the host is willing to transfer when the host is getting paid.
-		SetBandwidthLimits(altruisticLimits, pricedLimits HostBandwidthLimits)
-
 		// SetInternalSettings sets the hosting parameters of the host.
 		// TODO: SetInternalSettings(HostInternalSettings) error
 
