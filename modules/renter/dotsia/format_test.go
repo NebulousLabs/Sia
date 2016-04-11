@@ -55,7 +55,7 @@ func makeRandomFile() *File {
 	}
 
 	return &File{
-		Path:        "/random/file",
+		Path:        "random/file",
 		Size:        uint64(entropy[3]),
 		Permissions: os.FileMode(entropy[4]),
 		SectorSize:  uint64(entropy[5]),
@@ -165,7 +165,7 @@ func TestMarshalParity(t *testing.T) {
 func TestValidate(t *testing.T) {
 	// Minimum valid file
 	minimumValid := File{
-		Path:        "/test",
+		Path:        "test",
 		Permissions: 0,
 		MasterKey:   map[string]interface{}{"name": ""},
 		ErasureCode: map[string]interface{}{"name": ""},
@@ -180,17 +180,17 @@ func TestValidate(t *testing.T) {
 		path string
 		ok   bool
 	}{
-		{"relative/path", false},           // not absolute
-		{"///unclean///", false},           // not a clean path
-		{"/directory/../traversal", false}, // not a clean path
-		{"/folder/", false},                // not a clean path
-		{"/./foo", false},                  // not a clean path
-		{".", false},                       // not a clean path
-		{"/", false},                       // empty
+		{"/absolute/path", false},         // absolute path
+		{"unclean///path///", false},      // not a clean path
+		{"directory/../traversal", false}, // not a clean path
+		{"folder/", false},                // not a clean path
+		{"./foo", false},                  // not a clean path
+		{".", false},                      // empty
+		{"/", false},                      // absolute path
 
-		{"/foo", true},         // normal file
-		{"/foo/bar/baz", true}, // normal file
-		{"/.foo", true},        // dotfile
+		{"foo", true},         // normal file
+		{"foo/bar/baz", true}, // normal file
+		{".foo", true},        // dotfile
 	}
 	for i, test := range pathTests {
 		f := minimumValid
@@ -396,7 +396,7 @@ func TestMetadata(t *testing.T) {
 
 	// Minimum valid file
 	minimumValid := &File{
-		Path:        "/test",
+		Path:        "test",
 		Permissions: 0,
 		MasterKey:   map[string]interface{}{"name": ""},
 		ErasureCode: map[string]interface{}{"name": ""},
