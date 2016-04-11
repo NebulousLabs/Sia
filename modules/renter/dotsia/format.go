@@ -28,10 +28,10 @@ Integer fields must not contain negative values.
 The "permissions" field is encoded as a decimal number (not octal, or a
 symbolic string) and must not exceed 511 (0777 in octal).
 
-The "path" string must be an absolute Unix-style path; that is, it must begin
-with a leading slash and use '/' as its separator. Additionally, paths must
-not end in a slash, and must not contain any occurences of the current
-directory (.) or parent directory (..) elements.
+The "path" string must be a relative Unix-style path; that is, it must not
+begin with a leading slash, and it must use '/' as its separator.
+Additionally, paths must not end in a slash, and must not contain any
+occurences of the current directory (.) or parent directory (..) elements.
 
 The "contracts" array must not be null, but it may be empty. The same rule
 applies to the "sectors" array inside the contract object.
@@ -218,7 +218,7 @@ type Sector struct {
 // docstring. Files returned by Decode are automatically validated.
 func (f *File) Validate() bool {
 	// check path
-	if !filepath.IsAbs(f.Path) || filepath.Clean(f.Path) != f.Path || f.Path == "/" {
+	if filepath.IsAbs(f.Path) || filepath.Clean(f.Path) != f.Path || f.Path == "." {
 		return false
 	}
 	// check permissions
