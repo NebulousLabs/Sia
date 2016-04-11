@@ -13,6 +13,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 type mockWriter func([]byte) (int, error)
@@ -108,6 +110,52 @@ func TestHashMarshalling(t *testing.T) {
 		err := h.UnmarshalJSON(jsonBytes)
 		if err == nil {
 			t.Errorf("expected unmarshal to fail on the invalid JSON: %q\n", jsonBytes)
+		}
+	}
+}
+
+// TestMarshalParity tests that the Hash type encodes identically to the
+// types.FileContractID and crypto.Hash types, and that the modules.NetAddress
+// type encodes identically to a string.
+func TestMarshalParity(t *testing.T) {
+	var randBytes [32]byte
+	rand.Read(randBytes[:])
+
+	hashTests := [][32]byte{
+		{},
+		{1},
+		{1, 2, 3},
+		randBytes,
+	}
+	for _, h := range hashTests {
+		hashBytes, hashErr := json.Marshal(Hash(h))
+		cHashBytes, cHashErr := json.Marshal(crypto.Hash(h))
+		idBytes, idErr := json.Marshal(types.FileContractID(h))
+		if hashErr != nil || cHashErr != nil || idErr != nil {
+			t.Error("encoding error:", hashErr, cHashErr, idErr)
+		} else if !bytes.Equal(hashBytes, idBytes) {
+			t.Error("encoded Hash does not match types.FileContractID:", hashBytes, idBytes)
+		} else if !bytes.Equal(hashBytes, cHashBytes) {
+			t.Error("encoded Hash does not match crypto.Hash:", hashBytes, cHashBytes)
+		}
+	}
+
+	addrTests := []string{
+		"",
+		"foo",
+		"foo:1234",
+		"foo:",
+		"foo\n\t",
+		"::1",
+		"[::]:1234",
+	}
+	for _, str := range addrTests {
+		strBytes, strErr := json.Marshal(str)
+		netAddrBytes, naErr := json.Marshal(modules.NetAddress(str))
+		if strErr != nil || naErr != nil {
+			t.Error("encoding error:", strErr, naErr)
+		} else if !bytes.Equal(strBytes, netAddrBytes) {
+			t.Error("encoded string does not match modules.NetAddress:", strBytes, netAddrBytes)
 		}
 	}
 }
