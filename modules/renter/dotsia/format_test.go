@@ -378,6 +378,12 @@ func TestEncodeDecodeString(t *testing.T) {
 			t.Errorf("File %d differs after encoding: %v %v", i, files[i], fs[i])
 		}
 	}
+
+	// try encoding invalid File
+	_, err = EncodeString([]*File{new(File)})
+	if err != ErrInvalid {
+		t.Error("expected ErrInvalid, got", err)
+	}
 }
 
 // TestMetadata tests the metadata validation of the Decode function.
@@ -388,9 +394,18 @@ func TestMetadata(t *testing.T) {
 		currentMetadata = oldMeta
 	}()
 
+	// Minimum valid file
+	minimumValid := &File{
+		Path:        "/test",
+		Permissions: 0,
+		MasterKey:   map[string]interface{}{"name": ""},
+		ErasureCode: map[string]interface{}{"name": ""},
+		Contracts:   []Contract{},
+	}
+
 	// bad version
 	currentMetadata.Version = "foo"
-	str, err := EncodeString([]*File{new(File)})
+	str, err := EncodeString([]*File{minimumValid})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +416,7 @@ func TestMetadata(t *testing.T) {
 
 	// bad header
 	currentMetadata.Header = "foo"
-	str, err = EncodeString([]*File{new(File)})
+	str, err = EncodeString([]*File{minimumValid})
 	if err != nil {
 		t.Fatal(err)
 	}

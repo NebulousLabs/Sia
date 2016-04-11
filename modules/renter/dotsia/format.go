@@ -274,6 +274,9 @@ func Encode(files []*File, w io.Writer) error {
 
 	// Write each file entry.
 	for _, f := range files {
+		if !f.Validate() {
+			return ErrInvalid
+		}
 		err = writeJSONentry(t, f)
 		if err != nil {
 			return err
