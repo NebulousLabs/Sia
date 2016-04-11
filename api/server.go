@@ -63,6 +63,32 @@ func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet
 	return srv, nil
 }
 
+// requirePassword is middleware that requires all requests to authenticate
+// with a password using HTTP basic auth. Usernames are ignored.
+func requirePassword(h http.Handler, password string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, pass, ok := req.BasicAuth()
+		if !ok || pass != password {
+			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
+			writeError(w, "API authentication failed.", http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, req)
+	})
+}
+
+// RequireAuthentication makes a non-authenticated server require
+// authentication with the provided password. Authentication is done with HTTP
+// basic auth with the supplied password. Usernames are ignored during
+// authentication. This type of authentication sends passwords in plaintext and
+// should therefore only be used if the APIaddr is localhost. Calling
+// RequireAuthentication multiple times with different passwords will prevent
+// any API calls, authenticated or not, from succeeding as the server would
+// enforce multiple passwords.
+func (srv *Server) RequireAuthentication(password string) {
+	srv.apiServer.Handler = requirePassword(srv.apiServer.Handler, password)
+}
+
 // Serve listens for and handles API calls. It is a blocking function.
 func (srv *Server) Serve() error {
 	// Block the Close() method until Serve() has finished.

@@ -120,6 +120,86 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	return st, nil
 }
 
+// assembleAuthenticatedServerTester creates a bunch of modules and assembles
+// them into a server tester that requires authentication with the given
+// requiredPassword. No directories are created and no blocks are mined.
+func assembleAuthenticatedServerTester(requiredPassword string, key crypto.TwofishKey, testdir string) (*serverTester, error) {
+	// Create the modules.
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		return nil, err
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		return nil, err
+	}
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		return nil, err
+	}
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		return nil, err
+	}
+	if !w.Encrypted() {
+		_, err = w.Encrypt(key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return nil, err
+	}
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
+	if err != nil {
+		return nil, err
+	}
+	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	if err != nil {
+		return nil, err
+	}
+	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	if err != nil {
+		return nil, err
+	}
+	e, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
+	if err != nil {
+		return nil, err
+	}
+	srv, err := NewServer("localhost:0", "Sia-Agent", cs, e, g, h, m, r, tp, w)
+	if err != nil {
+		return nil, err
+	}
+	srv.RequireAuthentication(requiredPassword)
+
+	// Assemble the serverTester.
+	st := &serverTester{
+		cs:        cs,
+		gateway:   g,
+		host:      h,
+		miner:     m,
+		renter:    r,
+		tpool:     tp,
+		explorer:  e,
+		wallet:    w,
+		walletKey: key,
+
+		server: srv,
+
+		dir: testdir,
+	}
+
+	// TODO: A more reasonable way of listening for server errors.
+	go func() {
+		listenErr := srv.Serve()
+		if listenErr != nil {
+			panic(listenErr)
+		}
+	}()
+	return st, nil
+}
+
 // assembleExplorerServerTester creates all the explorer dependencies and
 // explorer module without creating any directories. The user agent requirement
 // is disabled.
@@ -174,6 +254,33 @@ func createServerTester(name string) (*serverTester, error) {
 		return nil, err
 	}
 	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mine blocks until the wallet has confirmed money.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, err := st.miner.AddBlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return st, nil
+}
+
+// createAuthenticatedServerTester creates an authenticated server tester
+// object that is ready for testing, including money in the wallet and all
+// modules initalized.
+func createAuthenticatedServerTester(name string, password string) (*serverTester, error) {
+	// Create the testing directory.
+	testdir := build.TempDir("authenticated-api", name)
+
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return nil, err
+	}
+	st, err := assembleAuthenticatedServerTester(password, key, testdir)
 	if err != nil {
 		return nil, err
 	}

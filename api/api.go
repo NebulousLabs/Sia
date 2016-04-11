@@ -8,7 +8,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// HttpGET is a utility function for making http get requests to sia with a whitelisted user-agent
+// HttpGET is a utility function for making http get requests to sia with a
+// whitelisted user-agent. A non-2xx response does not return an error.
 func HttpGET(url string) (resp *http.Response, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -18,7 +19,21 @@ func HttpGET(url string) (resp *http.Response, err error) {
 	return new(http.Client).Do(req)
 }
 
-// HttpPOST is a utility function for making post requests to sia with a whitelisted user-agent
+// HttpGETAuthenticated is a utility function for making authenticated http get
+// requests to sia with a whitelisted user-agent and the supplied password. A
+// non-2xx response does not return an error.
+func HttpGETAuthenticated(url string, password string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Sia-Agent")
+	req.SetBasicAuth("", password)
+	return new(http.Client).Do(req)
+}
+
+// HttpPOST is a utility function for making post requests to sia with a
+// whitelisted user-agent. A non-2xx response does not return an error.
 func HttpPOST(url string, data string) (resp *http.Response, err error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(data))
 	if err != nil {
@@ -26,6 +41,20 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 	}
 	req.Header.Set("User-Agent", "Sia-Agent")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return new(http.Client).Do(req)
+}
+
+// HttpPOSTAuthenticated is a utility function for making authenticated http
+// post requests to sia with a whitelisted user-agent and the supplied
+// password. A non-2xx response does not return an error.
+func HttpPOSTAuthenticated(url string, data string, password string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Sia-Agent")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth("", password)
 	return new(http.Client).Do(req)
 }
 
