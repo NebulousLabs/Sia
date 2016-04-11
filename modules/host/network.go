@@ -81,9 +81,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		case modules.RPCRevise:
 			atomic.AddUint64(&h.atomicReviseCalls, 1)
 			// err = h.managedRPCRevise(conn)
-		case modules.RPCSettings:
-			atomic.AddUint64(&h.atomicSettingsCalls, 1)
-			err = h.managedRPCSettings(conn)
 		case modules.RPCUpload:
 			atomic.AddUint64(&h.atomicUploadCalls, 1)
 			// err = h.managedRPCUpload(conn)
@@ -91,6 +88,9 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)
 		err = h.managedRPCFormContract(conn)
+	case modules.RPCSettings:
+		atomic.AddUint64(&h.atomicSettingsCalls, 1)
+		err = h.managedRPCSettings(conn)
 
 	default:
 		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
@@ -136,9 +136,4 @@ func (h *Host) threadedListen() {
 		// Grab the resource lock before creating a goroutine.
 		go h.threadedHandleConn(conn)
 	}
-}
-
-// managedRPCSettings is an rpc that returns the host's settings.
-func (h *Host) managedRPCSettings(conn net.Conn) error {
-	return encoding.WriteObject(conn, h.Settings())
 }

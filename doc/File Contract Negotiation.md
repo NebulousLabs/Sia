@@ -53,8 +53,8 @@ Settings Request
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 120 seconds.
 
-2. The host sends the renter the most recent copy of its internal settings. The
-   connection is then closed.
+2. The host sends the renter the most recent copy of its internal settings,
+   signed by the host public key. The connection is then closed.
 
 File Contract Creation
 ----------------------
