@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inconshreveable/muxado"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/muxado"
 )
 
 // dummyConn implements the net.Conn interface, but does not carry any actual
