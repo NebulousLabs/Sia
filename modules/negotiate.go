@@ -227,8 +227,8 @@ func CreateAnnouncement(addr NetAddress, pk types.SiaPublicKey, sk crypto.Secret
 func DecodeAnnouncement(fullAnnouncement []byte) (ha HostAnnouncement, err error) {
 	// Read the first part of the announcement to get the intended host
 	// announcement.
-	r := bytes.NewReader(fullAnnouncement)
-	err = encoding.NewDecoder(r).Decode(&ha)
+	dec := encoding.NewDecoder(bytes.NewReader(fullAnnouncement)
+	err = dec.Decode(&ha)
 	if err != nil {
 		return HostAnnouncement{}, err
 	}
@@ -244,7 +244,7 @@ func DecodeAnnouncement(fullAnnouncement []byte) (ha HostAnnouncement, err error
 
 	// Read the signature out of the reader.
 	var sig crypto.Signature
-	_, err = r.Read(sig[:])
+	_, err = dec.Decode(&sig)
 	if err != nil {
 		return HostAnnouncement{}, err
 	}
