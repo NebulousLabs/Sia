@@ -67,4 +67,26 @@ func TestAnnouncementHandling(t *testing.T) {
 		t.Error(err)
 	}
 	annBytes[lastIndex]--
+
+	// Pass in a bad specifier - change the host announcement type.
+	annBytes[0]++
+	_, err = DecodeAnnouncement(annBytes)
+	if err != ErrAnnNotAnnouncement {
+		t.Error(err)
+	}
+	annBytes[0]--
+
+	// Pass in a bad signature algorithm. 16 bytes to pass the specifier, 8+8 bytes to pass the net address.
+	annBytes[33]++
+	_, err = DecodeAnnouncement(annBytes)
+	if err != ErrAnnUnrecognizedSignature {
+		t.Error(err)
+	}
+	annBytes[33]--
+
+	// Cause the decoding to fail altogether.
+	_, err = DecodeAnnouncement(annBytes[:12])
+	if err == nil {
+		t.Error(err)
+	}
 }
