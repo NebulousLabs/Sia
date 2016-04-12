@@ -151,19 +151,17 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 			if err != nil {
 				return false, err
 			}
-			for i := modification.Offset; i < uint64(len(modification.Data)); i++ {
-				sector[i] = modification.Data[i-modification.Offset]
-			}
+			copy(sector[modification.Offset:], modification.Data)
 
 			// Update finances.
 			bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
 
 			// Update the sectors removed and gained to indicate that the old
 			// sector has been replaced with a new sector.
-			newRoot := crypto.MerkleRoot(sector[:])
+			newRoot := crypto.MerkleRoot(sector)
 			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
 			sectorsGained = append(sectorsGained, newRoot)
-			gainedSectorData = append(gainedSectorData, sector[:])
+			gainedSectorData = append(gainedSectorData, sector)
 			so.SectorRoots[modification.SectorIndex] = newRoot
 		} else {
 			return false, errUnknownModification
