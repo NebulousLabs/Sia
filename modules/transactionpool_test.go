@@ -10,6 +10,8 @@ import (
 // TestConsensusConflict checks that the consensus conflict type is correctly
 // assembling consensus conflict errors.
 func TestConsensusConflict(t *testing.T) {
+	t.Parallel()
+
 	ncc := NewConsensusConflict("problem")
 	if ncc.Error() != "consensus conflict: problem" {
 		t.Error("wrong error message being reported in a consensus conflict")
@@ -29,6 +31,8 @@ func TestConsensusConflict(t *testing.T) {
 // TestCalculateFee checks that the CalculateFee function is correctly tallying
 // the number of fees in a transaction set.
 func TestCalculateFee(t *testing.T) {
+	t.Parallel()
+
 	// Try calculating the fees on a nil transaction set.
 	if CalculateFee(nil).Cmp(types.ZeroCurrency) != 0 {
 		t.Error("CalculateFee is incorrectly handling nil input")

@@ -10,6 +10,8 @@ import (
 // TestUnitMaxFileContractSetLenSanity checks that a sensible value for
 // MaxFileContractSetLen has been chosen.
 func TestUnitMaxFileContractSetLenSanity(t *testing.T) {
+	t.Parallel()
+
 	// It does not make sense for the contract set limit to be higher than the
 	// IsStandard limit in the transaction pool. Such a transaction set would
 	// never be accepted by the transaction pool, and therefore is going to
@@ -26,6 +28,8 @@ func TestUnitMaxFileContractSetLenSanity(t *testing.T) {
 // StoragePriceToConsensus, verifying that they correctly convert between
 // human-readable prices and consensus-level prices.
 func TestUnitStoragePriceConversions(t *testing.T) {
+	t.Parallel()
+
 	// Establish a series of trials for conversion.
 	trials := []struct {
 		consensus types.Currency
@@ -104,6 +108,8 @@ func TestUnitStoragePriceConversions(t *testing.T) {
 // and BandwidthPriceToConsensus, verifying that they correctly convert between
 // human-readable prices and consensus-level prices.
 func TestUnitBandwidthPriceConversions(t *testing.T) {
+	t.Parallel()
+
 	// Establish a series of trials for conversion.
 	trials := []struct {
 		consensus types.Currency
