@@ -26,14 +26,18 @@ var (
 	// sector root that is not in the file contract.
 	errBadModificationIndex = errors.New("renter has made a modification that points to a nonexistant sector")
 
-	// errBatchCountExceeded is returned if the renter tries to send a batch of
-	// modifications that is larger than the maximum allowed batch.
-	errBatchCountExceeded = errors.New("renter is trying to modify things greater than the max batch count")
+	// badSectorSize is returned if the renter provides a sector to be inserted
+	// that is the wrong size.
+	errBadSectorSize = errors.New("renter has provided an incorrectly sized sector")
 
 	// errIllegalOffsetAndLength is returned if the renter tries perform a
 	// modify operation that uses a troublesome combination of offset and
 	// length.
 	errIllegalOffsetAndLength = errors.New("renter is trying to do a modify with an illegal offset and length")
+
+	// errLargeSector is returned if the renter sends a RevisionAction that has
+	// data which creates a sector that is larger than what the host uses.
+	errLargeSector = errors.New("renter has sent a sector that exceeds the host's sector size")
 
 	// errUnknownModification is returned if the host receives a modification
 	// action from the renter that it does not understand.
@@ -84,16 +88,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	// The renter is now going to send a batch of modifications followed by and
 	// update file contract revision. Read the number of modifications being
 	// sent by the renter.
-	var modificationCount uint64
-	err = encoding.ReadObject(conn, &modificationCount, 8)
+	var modifications []modules.RevisionAction
+	err = encoding.ReadObject(conn, &modifications, settings.MaxBatchSize)
 	if err != nil {
 		return false, err
-	}
-	if modificationCount > settings.MaxBatchSize {
-		// The connection is closing unexpectedly on the renter, but the renter
-		// has just received the settings and therefore the renter should know
-		// better.
-		return false, errBatchCountExceeded
 	}
 
 	// First read all of the modifications. Then make the modifications, but
@@ -105,36 +103,26 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	var sectorsRemoved []crypto.Hash
 	var sectorsGained []crypto.Hash
 	var gainedSectorData [][]byte
-	for i := uint64(0); i < modificationCount; i++ {
-		// Read the type of modification that has been sent.
-		var modificationType types.Specifier
-		err = encoding.ReadObject(conn, &modificationType, uint64(len(modificationType)))
-		if err != nil {
-			return false, err
-		}
-		// Read the index of the sector that is going to be deleted.
-		var index uint64
-		err = encoding.ReadObject(conn, &index, 8)
-		if err != nil {
-			return false, err
-		}
+	for _, modification := range modifications {
 		// Check that the index points to an existing sector root.
-		if uint64(len(so.SectorRoots)) <= index {
+		if uint64(len(so.SectorRoots)) <= modification.SectorIndex {
 			return false, errBadModificationIndex
+		}
+		// Check that the data sent for the sector is not too large.
+		if uint64(len(modification.Data)) > modules.SectorSize {
+			return false, errLargeSector
 		}
 
 		// Run a different codepath depending on the renter's selection.
-		if modificationType == modules.ActionDelete {
+		if modification.Type == modules.ActionDelete {
 			// There is no financial information to change, it is enough to
 			// remove the sector.
-			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[index])
-			so.SectorRoots = append(so.SectorRoots[0:index], so.SectorRoots[index+1:]...)
-		} else if modificationType == modules.ActionInsert {
-			// Download the sector.
-			var sector []byte
-			err = encoding.ReadObject(conn, &sector, modules.SectorSize+8)
-			if err != nil {
-				return false, err
+			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
+			so.SectorRoots = append(so.SectorRoots[0:modification.SectorIndex], so.SectorRoots[modification.SectorIndex+1:]...)
+		} else if modification.Type == modules.ActionInsert {
+			// Check that the sector size is correct.
+			if uint64(len(modification.Data)) != modules.SectorSize {
+				return false, errBadSectorSize
 			}
 
 			// Update finances.
@@ -145,40 +133,26 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 			collateralRisked = collateralRisked.Add(settings.Collateral.Mul(blockBytesCurrency))
 
 			// Insert the sector into the root list.
-			newRoot := crypto.MerkleRoot(sector[:])
+			newRoot := crypto.MerkleRoot(modification.Data)
 			sectorsGained = append(sectorsGained, newRoot)
-			gainedSectorData = append(gainedSectorData, sector[:])
-			so.SectorRoots = append(so.SectorRoots[:index], append([]crypto.Hash{newRoot}, so.SectorRoots[index:]...)...)
-		} else if modificationType == modules.ActionModify {
-			// Download the sector.
-			var offset uint64
-			var length uint64
-			err = encoding.ReadObject(conn, &offset, 8)
-			if err != nil {
-				return false, err
-			}
-			err = encoding.ReadObject(conn, &length, 8)
-			if err != nil {
-				return false, err
-			}
-			// Have to check all three cases, otherwise an attacker could abuse
-			// overflows.
-			if offset > modules.SectorSize || length > modules.SectorSize || offset+length > modules.SectorSize {
+			gainedSectorData = append(gainedSectorData, modification.Data)
+			so.SectorRoots = append(so.SectorRoots[:modification.SectorIndex], append([]crypto.Hash{newRoot}, so.SectorRoots[modification.SectorIndex:]...)...)
+		} else if modification.Type == modules.ActionModify {
+			// Check that the offset and length are okay. Length is already
+			// known to be appropriately small, but the offset needs to be
+			// checked for being appropriately small as well otherwise there is
+			// a risk of overflow.
+			if modification.Offset > modules.SectorSize || modification.Offset+uint64(len(modification.Data)) > modules.SectorSize {
 				return false, errIllegalOffsetAndLength
-			}
-			var sectorModifications []byte
-			err = encoding.ReadObject(conn, &sectorModifications, length+8)
-			if err != nil {
-				return false, err
 			}
 
 			// Get the data for the new sector.
-			sector, err := h.readSector(so.SectorRoots[index])
+			sector, err := h.readSector(so.SectorRoots[modification.SectorIndex])
 			if err != nil {
 				return false, err
 			}
-			for i := offset; i < uint64(len(sectorModifications)); i++ {
-				sector[i] = sectorModifications[i-offset]
+			for i := modification.Offset; i < uint64(len(modification.Data)); i++ {
+				sector[i] = modification.Data[i-modification.Offset]
 			}
 
 			// Update finances.
@@ -187,10 +161,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 			// Update the sectors removed and gained to indicate that the old
 			// sector has been replaced with a new sector.
 			newRoot := crypto.MerkleRoot(sector[:])
-			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[index])
+			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
 			sectorsGained = append(sectorsGained, newRoot)
 			gainedSectorData = append(gainedSectorData, sector[:])
-			so.SectorRoots[index] = newRoot
+			so.SectorRoots[modification.SectorIndex] = newRoot
 		} else {
 			return false, errUnknownModification
 		}

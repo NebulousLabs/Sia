@@ -113,6 +113,8 @@ type (
 	RevisionAction struct {
 		Type        types.Specifier
 		SectorIndex uint64
+		Offset      uint64
+		Data        []byte
 	}
 
 	// HostBandwidthLimits set limits on the volume, price, and speed of data
@@ -139,8 +141,8 @@ type (
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
 	// address that can be used to contact the host.
 	HostAnnouncement struct {
-		IPAddress NetAddress
-		PublicKey types.SiaPublicKey
+		NetAddress NetAddress
+		PublicKey  types.SiaPublicKey
 	}
 
 	// HostFinancialMetrics provides statistics on the spendings and earnings
@@ -170,6 +172,11 @@ type (
 		// scams.
 		Recipient string
 
+		// MaxBatchSize indicates the maximum size in bytes that a batch is
+		// allowed to be. A batch is an array of revision actions, each
+		// revision action can have a different number of bytes, depending on
+		// the action, so the number of revision actions allowed depends on the
+		// sizes of each.
 		AcceptingContracts bool              `json:"acceptingcontracts"`
 		MaxBatchSize       uint64            `json:"maxbatchsize"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`
