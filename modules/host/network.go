@@ -74,20 +74,20 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	/*
 		case modules.RPCDownload:
 			atomic.AddUint64(&h.atomicDownloadCalls, 1)
-			// err = h.managedRPCDownload(conn)
+			err = h.managedRPCDownload(conn)
 		case modules.RPCRenew:
 			atomic.AddUint64(&h.atomicRenewCalls, 1)
-			// err = h.managedRPCRenew(conn)
-		case modules.RPCRevise:
-			atomic.AddUint64(&h.atomicReviseCalls, 1)
-			// err = h.managedRPCRevise(conn)
+			err = h.managedRPCRenew(conn)
 		case modules.RPCUpload:
 			atomic.AddUint64(&h.atomicUploadCalls, 1)
-			// err = h.managedRPCUpload(conn)
+			err = h.managedRPCUpload(conn)
 	*/
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)
 		err = h.managedRPCFormContract(conn)
+	case modules.RPCReviseContract:
+		atomic.AddUint64(&h.atomicReviseCalls, 1)
+		err = h.managedRPCReviseContract(conn)
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)

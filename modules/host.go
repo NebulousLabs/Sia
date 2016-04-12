@@ -14,11 +14,23 @@ const (
 	// reason for rejection.)
 	AcceptResponse = "accept"
 
-	// FileContractNegotiationTime defines the amount of time that the renter
-	// and host have to negotiate a file contract. The time is set high enough
-	// that a node behind Tor has a reasonable chance at making the multiple
+	// NegotiateFileContractTime defines the amount of time that the renter and
+	// host have to negotiate a file contract. The time is set high enough that
+	// a node behind Tor has a reasonable chance at making the multiple
 	// required round trips to complete the negotiation.
-	FileContractNegotiationTime = 360 * time.Second
+	NegotiateFileContractTime = 360 * time.Second
+
+	// NegotiateFileContractRevisionTime defines the minimum amount of time
+	// that the renter and host have to negotiate a file contract revision. The
+	// time is set high enough that a full 4MB can be piped through a
+	// connection that is running over Tor.
+	NegotiateFileContractRevisionTime = 600 * time.Second
+
+	// NegotiateSettingsTime establishes the minimum amount of time that the
+	// connection deadline is expected to be set to when settings are being
+	// requested from the host. The deadline is long enough that the connection
+	// should be successful even if both parties are on Tor.
+	NegotiateSettingsTime = 120 * time.Second
 
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
@@ -41,25 +53,30 @@ const (
 )
 
 var (
-	// ActionInsert is the specifier for a RevisionAction that modifies sector
-	// data.
-	ActionInsert = types.Specifier{'I', 'n', 's', 'e', 'r', 't'}
-
 	// ActionDelete is the specifier for a RevisionAction that deletes a
 	// sector.
 	ActionDelete = types.Specifier{'D', 'e', 'l', 'e', 't', 'e'}
+
+	// ActionInsert is the specifier for a RevisionAction that inserts a
+	// sector.
+	ActionInsert = types.Specifier{'I', 'n', 's', 'e', 'r', 't'}
+
+	// ActionModify is the specifier for a RevisionAction that modifies sector
+	// data.
+	ActionModify = types.Specifier{'M', 'o', 'd', 'i', 'f', 'y'}
 
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
 
 	// RPCFormContract is the specifier for forming a contract with a host.
-	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCRenew is the specifier to renewing an existing contract.
 	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w', 2}
 
-	// RPCRevise is the specifier for revising an existing file contract.
-	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 2}
+	// RPCReviseContract is the specifier for revising an existing file
+	// contract.
+	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCDownload is the specifier for downloading a file from a host.
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
@@ -96,6 +113,8 @@ type (
 	RevisionAction struct {
 		Type        types.Specifier
 		SectorIndex uint64
+		Offset      uint64
+		Data        []byte
 	}
 
 	// HostBandwidthLimits set limits on the volume, price, and speed of data
@@ -122,8 +141,8 @@ type (
 	// HostAnnouncement declares a nodes intent to be a host, providing a net
 	// address that can be used to contact the host.
 	HostAnnouncement struct {
-		IPAddress NetAddress
-		PublicKey types.SiaPublicKey
+		NetAddress NetAddress
+		PublicKey  types.SiaPublicKey
 	}
 
 	// HostFinancialMetrics provides statistics on the spendings and earnings
@@ -144,6 +163,20 @@ type (
 	// are the values that the renter will request from the host in order to
 	// build its database.
 	HostExternalSettings struct {
+		// Recipient is a field that allows the host to specify that the
+		// settings apply only to a single recipient. Generally, the field will
+		// be blank, meaning the settings apply to everyone. When there is a
+		// value, it will usually be an encoded public key. Certain recipients
+		// with good reputation or a history of honesty may receive better
+		// deals or increased collateral as a result of the reduced risk of
+		// scams.
+		Recipient string
+
+		// MaxBatchSize indicates the maximum size in bytes that a batch is
+		// allowed to be. A batch is an array of revision actions, each
+		// revision action can have a different number of bytes, depending on
+		// the action, so the number of revision actions allowed depends on the
+		// sizes of each.
 		AcceptingContracts bool              `json:"acceptingcontracts"`
 		MaxBatchSize       uint64            `json:"maxbatchsize"`
 		MaxDuration        types.BlockHeight `json:"maxduration"`

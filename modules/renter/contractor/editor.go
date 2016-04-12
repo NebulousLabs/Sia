@@ -232,7 +232,7 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := encoding.WriteObject(conn, modules.RPCRevise); err != nil {
+	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 

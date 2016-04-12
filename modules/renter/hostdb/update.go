@@ -33,7 +33,7 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) 
 
 			// Add the announcement to the slice being returned.
 			var host modules.HostDBEntry
-			host.NetAddress = ha.IPAddress
+			host.NetAddress = ha.NetAddress
 			host.PublicKey = ha.PublicKey
 			announcements = append(announcements, host)
 		}

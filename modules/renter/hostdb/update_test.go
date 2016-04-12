@@ -15,7 +15,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	// Create a block with a valid host announcement.
 	var emptyKey crypto.PublicKey
 	announcement := encoding.MarshalAll(modules.PrefixHostAnnouncement, modules.HostAnnouncement{
-		IPAddress: "foo:1234",
+		NetAddress: "foo:1234",
 		PublicKey: types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
 			Key:       emptyKey[:],
@@ -58,7 +58,7 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	// Put a host announcement into a block.
 	var emptyKey crypto.PublicKey
 	announceBytes := encoding.MarshalAll(modules.PrefixHostAnnouncement, modules.HostAnnouncement{
-		IPAddress: "foo:1234",
+		NetAddress: "foo:1234",
 		PublicKey: types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
 			Key:       emptyKey[:],

@@ -27,8 +27,8 @@ func (h *Host) announce(addr modules.NetAddress) error {
 
 	// Create a host announcement and a signature for the announcement.
 	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: addr,
-		PublicKey: h.publicKey,
+		NetAddress: addr,
+		PublicKey:  h.publicKey,
 	})
 	annHash := crypto.HashBytes(announcement)
 	sig, err := crypto.SignHash(annHash, h.secretKey)
@@ -54,7 +54,7 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		return err
 	}
 
-	// Add the transaction to the transaction pool.
+	// Add the transactions to the transaction pool.
 	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		return err
@@ -102,6 +102,7 @@ func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	if h.closed {
 		return errHostClosed
 	}
+
 	h.revisionNumber++
 	return h.announce(addr)
 }
