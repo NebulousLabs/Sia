@@ -4,8 +4,6 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -17,6 +15,9 @@ var (
 
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
+	// The wallet needs to be unlocked to add fees to the transaction, and the
+	// host needs to have an active unlock hash that renters can make payment
+	// to.
 	if !h.wallet.Unlocked() {
 		return errAnnWalletLocked
 	}
@@ -25,20 +26,14 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		return err
 	}
 
-	// Create a host announcement and a signature for the announcement.
-	announcement := encoding.Marshal(modules.HostAnnouncement{
-		NetAddress: addr,
-		PublicKey:  h.publicKey,
-	})
-	annHash := crypto.HashBytes(announcement)
-	sig, err := crypto.SignHash(annHash, h.secretKey)
+	// Create the announcement that's going to be added to the arbitrary data
+	// field of the transaction.
+	signedAnnouncement, err := modules.CreateAnnouncement(addr, h.publicKey, h.secretKey)
 	if err != nil {
 		return err
 	}
-	annAndSig := append(sig[:], announcement...)
 
-	// Create a transaction, with a fee, that contains both the announcement
-	// and signature.
+	// Create a transaction, with a fee, that contains the full announcement.
 	txnBuilder := h.wallet.StartTransaction()
 	_, fee := h.tpool.FeeEstimation()
 	err = txnBuilder.FundSiacoins(fee)
@@ -47,7 +42,7 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		return err
 	}
 	_ = txnBuilder.AddMinerFee(fee)
-	_ = txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], annAndSig...))
+	_ = txnBuilder.AddArbitraryData(signedAnnouncement)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		txnBuilder.Drop()
@@ -57,11 +52,21 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	// Add the transactions to the transaction pool.
 	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
+		txnBuilder.Drop()
 		return err
 	}
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 
 	// Start accepting contracts.
+	//
+	// TODO: I'm not sure that we should keep this auto-accept feature. If the
+	// host is having significant disk trouble, it'll shut down. The user
+	// shouldn't be making announcements while the host is having disk trouble,
+	// but I still worry that the user will be turning on the host on accident
+	// sometimes. Furthermore, there's not a clear relationship between making
+	// an announcement and accepting file contracts, at least not one that's
+	// explicit. A host may want to announce before being ready to accept file
+	// contracts that way it's uptime clock and long-term clock can begin.
 	h.settings.AcceptingContracts = true
 	return nil
 }

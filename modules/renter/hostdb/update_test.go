@@ -5,26 +5,34 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// makeSignedAnnouncement creates a []byte that contains an encoded and signed
+// host announcement for the given net address.
+func makeSignedAnnouncement(na modules.NetAddress) ([]byte, error) {
+	sk, pk, err := crypto.GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+	spk := types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
+	return modules.CreateAnnouncement(na, spk, sk)
+}
+
 // TestFindHostAnnouncements probes the findHostAnnouncements function
 func TestFindHostAnnouncements(t *testing.T) {
-	// Create a block with a valid host announcement.
-	var emptyKey crypto.PublicKey
-	announcement := encoding.MarshalAll(modules.PrefixHostAnnouncement, modules.HostAnnouncement{
-		NetAddress: "foo:1234",
-		PublicKey: types.SiaPublicKey{
-			Algorithm: types.SignatureEd25519,
-			Key:       emptyKey[:],
-		},
-	})
+	annBytes, err := makeSignedAnnouncement("foo:1234")
+	if err != nil {
+		t.Fatal(err)
+	}
 	b := types.Block{
 		Transactions: []types.Transaction{
 			types.Transaction{
-				ArbitraryData: [][]byte{announcement},
+				ArbitraryData: [][]byte{annBytes},
 			},
 		},
 	}
@@ -56,18 +64,14 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	hdb := bareHostDB()
 
 	// Put a host announcement into a block.
-	var emptyKey crypto.PublicKey
-	announceBytes := encoding.MarshalAll(modules.PrefixHostAnnouncement, modules.HostAnnouncement{
-		NetAddress: "foo:1234",
-		PublicKey: types.SiaPublicKey{
-			Algorithm: types.SignatureEd25519,
-			Key:       emptyKey[:],
-		},
-	})
+	annBytes, err := makeSignedAnnouncement("foo:1234")
+	if err != nil {
+		t.Fatal(err)
+	}
 	cc := modules.ConsensusChange{
 		AppliedBlocks: []types.Block{{
 			Transactions: []types.Transaction{{
-				ArbitraryData: [][]byte{announceBytes},
+				ArbitraryData: [][]byte{annBytes},
 			}},
 		}},
 	}

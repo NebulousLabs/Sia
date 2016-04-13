@@ -24,9 +24,9 @@ const (
 )
 
 var (
-	// errInvalidSignature is returned if a signature is provided that does not
+	// ErrInvalidSignature is returned if a signature is provided that does not
 	// match the data and public key.
-	errInvalidSignature = errors.New("invalid signature")
+	ErrInvalidSignature = errors.New("invalid signature")
 )
 
 type (
@@ -96,7 +96,7 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	sigNorm := [SignatureSize]byte(sig)
 	verifies := ed25519.Verify(&pkNorm, data[:], &sigNorm)
 	if !verifies {
-		return errInvalidSignature
+		return ErrInvalidSignature
 	}
 	return nil
 }

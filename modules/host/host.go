@@ -4,6 +4,12 @@ package host
 
 // TODO: There may need to be limitations on the window start.
 
+// TODO: Host pricing tools.
+
+// TODO: The host should keep an awareness of its own IP and the addresses that
+// it has announced at, and should re-announce if the ip address changes or if
+// the host suddenly finds itself to be unreachable.
+
 import (
 	"crypto/rand"
 	"errors"
