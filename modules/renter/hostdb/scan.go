@@ -93,7 +93,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			if err != nil {
 				return err
 			}
-			return encoding.ReadObject(conn, &settings, maxSettingsLen)
+			var pubkey crypto.PublicKey
+			copy(pubkey[:], hostEntry.PublicKey.Key)
+			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 
 		// Now that network communication is done, lock the hostdb to modify the
