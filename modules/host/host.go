@@ -398,3 +398,10 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 	h.revisionNumber++
 	return h.save()
 }
+
+// InternalSettings returns the settings of a host.
+func (h *Host) InternalSettings() modules.HostInternalSettings {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.settings
+}

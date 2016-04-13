@@ -162,6 +162,9 @@ type (
 		// FinancialMetrics returns the financial statistics of the host.
 		// TODO: FinancialMetrics() HostFinancialMetrics
 
+		// InternalSettings returns the host's internal settings.
+		InternalSettings() HostInternalSettings
+
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
 
@@ -171,9 +174,6 @@ type (
 
 		// SetInternalSettings sets the hosting parameters of the host.
 		SetInternalSettings(HostInternalSettings) error
-
-		// Settings returns the host's internal settings.
-		Settings() HostInternalSettings
 
 		// Close saves the state of the host and stops its listener process.
 		Close() error

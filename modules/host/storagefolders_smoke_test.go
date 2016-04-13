@@ -124,10 +124,7 @@ func TestStorageFolderUsage(t *testing.T) {
 
 	// Start by checking that the initial state of the host has no storage
 	// added to it.
-	totalStorage, remainingStorage, err := ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage := ht.host.capacity()
 	if totalStorage != 0 || remainingStorage != 0 {
 		t.Error("initial capacity of host is not reported at 0 - but no drives have been added!")
 	}
@@ -194,10 +191,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the host has correctly updated the amount of total storage.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize {
 		t.Error("host capacity has not been correctly updated after adding a storage folder")
 		t.Error(totalStorage, minimumStorageFolderSize, remainingStorage)
@@ -220,10 +214,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the host has correctly updated the amount of total storage.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != minimumStorageFolderSize*3 || remainingStorage != minimumStorageFolderSize*3 {
 		t.Error("host capacity has not been correctly updated after adding a storage folder")
 	}
@@ -255,10 +246,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the host has correctly updated the amount of total storage.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize {
 		t.Error("host capacity has not been correctly updated after adding a storage folder")
 	}
@@ -284,10 +272,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the capacity has updated to reflected the new sector.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize-modules.SectorSize {
 		t.Error("host capacity has not been correctly updated after adding a sector", totalStorage, remainingStorage)
 	}
@@ -390,10 +375,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	sectorUsageMap := make(map[crypto.Hash][]types.BlockHeight)
 	sectorUsageMap[sectorRoot] = []types.BlockHeight{sectorExpiry}
 	// Sanity check - host should not have any sectors in it.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != remainingStorage+modules.SectorSize {
 		t.Fatal("host is not empty at the moment of creating the in-memory sector usage map")
 	}
@@ -500,20 +482,14 @@ func TestStorageFolderUsage(t *testing.T) {
 	// amount. Reduce the size of the first storage folder to minimum, which
 	// should be accepted but will result in sectors being transferred to the
 	// second storage folder.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	prevStorage := totalStorage
 	usedStorage := totalStorage - remainingStorage
 	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if usedStorage != totalStorage-remainingStorage {
 		t.Error("the used storage value adjusted after removing a storage folder", usedStorage, totalStorage-remainingStorage)
 	}
@@ -536,10 +512,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Remove the first storage folder, which should result in all of the
 	// sectors being moved to the second storage folder. Note that
 	// storageFolderTwo now has an index of '0'.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	prevStorage = totalStorage
 	usedStorage = totalStorage - remainingStorage
 	ht.host.mu.Lock()
@@ -549,10 +522,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if usedStorage != totalStorage-remainingStorage {
 		t.Error("the used storage value adjusted after removing a storage folder", usedStorage, totalStorage-remainingStorage)
 	}
@@ -653,10 +623,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 	// Check that the amount of storage in use represents 10 sectors, and not
 	// more - all the others are repeats and shouldn't be counted.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-modules.SectorSize*21 {
 		t.Fatal("Host not reporting expected storage capacity:", totalStorage, remainingStorage, minimumStorageFolderSize*4, minimumStorageFolderSize*4-modules.SectorSize*21)
 	}
@@ -718,10 +685,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Update the sector usage map to reflect the departure of a sector.
 	delete(sectorUsageMap, sectorRoot)
 	// Check that the new capacity is being reported correctly.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-modules.SectorSize*20 {
 		t.Fatal("Host not reporting expected storage capacity:")
 	}
@@ -768,19 +732,13 @@ func TestStorageFolderUsage(t *testing.T) {
 	for i, root := range targetedRoots {
 		// Grab the initial remaining storage, to make sure that it's not being
 		// changed when one instance of a repeated sector is removed.
-		_, initialRemainingStorage, err := ht.host.Capacity()
-		if err != nil {
-			t.Fatal(err)
-		}
+		_, initialRemainingStorage := ht.host.capacity()
 
 		// Remove the heights one at a time.
 		expiryHeights := sectorUsageMap[root]
 		for len(expiryHeights) > 0 {
 			// Check that the remaining storage is still the same.
-			_, remainingStorage, err := ht.host.Capacity()
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, remainingStorage := ht.host.capacity()
 			if remainingStorage != initialRemainingStorage {
 				t.Fatal("host is changing the amount of storage remaining when removing virtual sectors")
 			}
@@ -842,20 +800,14 @@ func TestStorageFolderUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Check that the remaining storage is still the same.
-		_, remainingStorage, err := ht.host.Capacity()
-		if err != nil {
-			t.Fatal(err)
-		}
+		_, remainingStorage := ht.host.capacity()
 		if remainingStorage != initialRemainingStorage+modules.SectorSize {
 			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
 		}
 	}
 
 	// Add a third storage folder.
-	prevTotalStorage, prevRemainingStorage, err := ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	prevTotalStorage, prevRemainingStorage := ht.host.capacity()
 	storageFolderThree := filepath.Join(ht.persistDir, "hd3")
 	err = os.Mkdir(storageFolderThree, 0700)
 	if err != nil {
@@ -866,19 +818,13 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the total storage and remaining storage updated correctly.
-	totalStorage, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalStorage, remainingStorage = ht.host.capacity()
 	if totalStorage != prevTotalStorage+minimumStorageFolderSize*2 || remainingStorage != prevRemainingStorage+minimumStorageFolderSize*2 {
 		t.Fatal("storage folder sizes are not being updated correctly when new storage folders are added")
 	}
 
 	// Add sectors until the storage folders have no more capacity.
-	_, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, remainingStorage = ht.host.capacity()
 	remainingSectors := remainingStorage / modules.SectorSize
 	for i := uint64(0); i < remainingSectors; i++ {
 		sectorRoot, sectorData, err := createSector()
@@ -910,10 +856,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, remainingStorage, err = ht.host.Capacity()
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, remainingStorage = ht.host.capacity()
 	if remainingStorage >= modules.SectorSize {
 		t.Error("remaining storage is reporting incorrect result - should report that there is not enough room for another sector")
 	}
@@ -979,18 +922,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	for sectorRoot, expiryHeights := range sectorUsageMap {
 		// Grab the initial remaining storage, to make sure that it's not being
 		// changed when one instance of a repeated sector is removed.
-		_, initialRemainingStorage, err := ht.host.Capacity()
-		if err != nil {
-			t.Fatal(err)
-		}
+		_, initialRemainingStorage := ht.host.capacity()
 
 		// Remove the heights one at a time.
 		for j := range expiryHeights {
 			// Check that the remaining storage is still the same.
-			_, remainingStorage, err := ht.host.Capacity()
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, remainingStorage := ht.host.capacity()
 			if remainingStorage != initialRemainingStorage {
 				t.Fatal("host is changing the amount of storage remaining when removing virtual sectors")
 			}
@@ -1036,10 +973,7 @@ func TestStorageFolderUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Check that the remaining storage is still the same.
-		_, remainingStorage, err := ht.host.Capacity()
-		if err != nil {
-			t.Fatal(err)
-		}
+		_, remainingStorage := ht.host.capacity()
 		if remainingStorage != initialRemainingStorage+modules.SectorSize {
 			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
 		}
