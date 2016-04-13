@@ -149,7 +149,7 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 // and returns a Contract. The contract is also saved by the HostDB.
 func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
-	if host.ContractPrice.Cmp(maxPrice) > 0 {
+	if host.StoragePrice.Cmp(maxPrice) > 0 {
 		return Contract{}, errTooExpensive
 	}
 
@@ -172,7 +172,7 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	duration := endHeight - height
 
 	// create file contract
-	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
+	renterCost := host.StoragePrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
 	payout := renterCost.Add(host.Collateral)
 
 	fc := types.FileContract{
@@ -244,7 +244,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	// Calculate average host price
 	var sum types.Currency
 	for _, h := range hosts {
-		sum = sum.Add(h.ContractPrice)
+		sum = sum.Add(h.StoragePrice)
 	}
 	avgPrice := sum.Div(types.NewCurrency64(uint64(len(hosts))))
 

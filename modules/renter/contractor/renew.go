@@ -24,7 +24,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	host, ok := c.hdb.Host(contract.IP)
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that host")
-	} else if host.ContractPrice.Cmp(maxPrice) > 0 {
+	} else if host.StoragePrice.Cmp(maxPrice) > 0 {
 		return types.FileContractID{}, errTooExpensive
 	}
 
@@ -48,7 +48,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	}
 
 	// TODO: what if this isn't enough money??
-	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	renterCost := host.StoragePrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
 	payout := renterCost // no collateral
 
 	// create file contract
@@ -151,7 +151,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	var numHosts uint64
 	for _, contract := range contracts {
 		if h, ok := c.hdb.Host(contract.IP); ok {
-			sum = sum.Add(h.ContractPrice)
+			sum = sum.Add(h.StoragePrice)
 			numHosts++
 		}
 	}

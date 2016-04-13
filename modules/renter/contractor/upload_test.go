@@ -62,7 +62,7 @@ func TestEditor(t *testing.T) {
 		},
 	}
 	dbe.AcceptingContracts = true
-	dbe.ContractPrice = types.NewCurrency64(^uint64(0))
+	dbe.StoragePrice = types.NewCurrency64(^uint64(0))
 	hdb.hosts["foo"] = dbe
 	_, err = c.Editor(Contract{IP: "foo"})
 	if err == nil {
@@ -70,7 +70,7 @@ func TestEditor(t *testing.T) {
 	}
 
 	// invalid contract
-	dbe.ContractPrice = types.NewCurrency64(500)
+	dbe.StoragePrice = types.NewCurrency64(500)
 	hdb.hosts["bar"] = dbe
 	_, err = c.Editor(Contract{IP: "bar"})
 	if err == nil {
