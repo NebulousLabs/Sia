@@ -130,15 +130,14 @@ type (
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// host.
-		StorageFolders() []StorageFolderMetadata
+		StorageFolders() ([]StorageFolderMetadata, error)
 	}
 
-	// Host can take storage from disk and offer it to the network, managing things
-	// such as announcements, settings, and implementing all of the RPCs of the
-	// host protocol.
+	// A Host can take storage from disk and offer it to the network, managing
+	// things such as announcements, settings, and implementing all of the RPCs
+	// of the host protocol.
 	Host interface {
-		// Announce submits a host announcement to the blockchain. After
-		// announcing, the host will begin accepting contracts.
+		// Announce submits a host announcement to the blockchain.
 		Announce() error
 
 		// AnnounceAddress submits an announcement using the given address.
