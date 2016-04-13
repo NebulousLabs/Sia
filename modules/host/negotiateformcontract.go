@@ -326,7 +326,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 		return errWindowStartTooSoon
 	}
 	// WindowEnd must be at least settings.WindowSize blocks after WindowStart.
-	if fc.WindowStart+settings.WindowSize >= fc.WindowEnd {
+	if fc.WindowEnd < fc.WindowStart+settings.WindowSize {
 		return errWindowSizeTooSmall
 	}
 	// ValidProofOutputs and MissedProofOutputs must both have len(2).
