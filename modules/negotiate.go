@@ -224,29 +224,30 @@ func CreateAnnouncement(addr NetAddress, pk types.SiaPublicKey, sk crypto.Secret
 
 // DecodeAnnouncement decodes announcement bytes into a host announcement,
 // verifying the prefix and the signature.
-func DecodeAnnouncement(fullAnnouncement []byte) (ha HostAnnouncement, err error) {
+func DecodeAnnouncement(fullAnnouncement []byte) (na NetAddress, spk types.SiaPublicKey, err error) {
 	// Read the first part of the announcement to get the intended host
 	// announcement.
-	dec := encoding.NewDecoder(bytes.NewReader(fullAnnouncement)
+	var ha HostAnnouncement
+	dec := encoding.NewDecoder(bytes.NewReader(fullAnnouncement))
 	err = dec.Decode(&ha)
 	if err != nil {
-		return HostAnnouncement{}, err
+		return "", types.SiaPublicKey{}, err
 	}
 
 	// Check that the announcement was registered as a host announcement.
 	if ha.Specifier != PrefixHostAnnouncement {
-		return HostAnnouncement{}, ErrAnnNotAnnouncement
+		return "", types.SiaPublicKey{}, ErrAnnNotAnnouncement
 	}
 	// Check that the public key is a recognized type of public key.
 	if ha.PublicKey.Algorithm != types.SignatureEd25519 {
-		return HostAnnouncement{}, ErrAnnUnrecognizedSignature
+		return "", types.SiaPublicKey{}, ErrAnnUnrecognizedSignature
 	}
 
 	// Read the signature out of the reader.
 	var sig crypto.Signature
-	_, err = dec.Decode(&sig)
+	err = dec.Decode(&sig)
 	if err != nil {
-		return HostAnnouncement{}, err
+		return "", types.SiaPublicKey{}, err
 	}
 	// Verify the signature.
 	var pk crypto.PublicKey
@@ -254,7 +255,7 @@ func DecodeAnnouncement(fullAnnouncement []byte) (ha HostAnnouncement, err error
 	annHash := crypto.HashObject(ha)
 	err = crypto.VerifyHash(annHash, pk, sig)
 	if err != nil {
-		return HostAnnouncement{}, err
+		return "", types.SiaPublicKey{}, err
 	}
-	return ha, nil
+	return ha.NetAddress, ha.PublicKey, nil
 }

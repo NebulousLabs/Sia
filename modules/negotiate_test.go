@@ -31,17 +31,17 @@ func TestAnnouncementHandling(t *testing.T) {
 	}
 
 	// Decode the announcement
-	ann, err := DecodeAnnouncement(annBytes)
+	decAddr, decPubKey, err := DecodeAnnouncement(annBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ann.PublicKey.Algorithm != spk.Algorithm {
+	if decPubKey.Algorithm != spk.Algorithm {
 		t.Error("decoded announcement has the wrong algorithm on the public key")
 	}
-	if ann.NetAddress != addr {
+	if decAddr != addr {
 		t.Error("decoded announcement has the wrong net address")
 	}
-	if !bytes.Equal(ann.PublicKey.Key, spk.Key) {
+	if !bytes.Equal(decPubKey.Key, spk.Key) {
 		t.Error("decoded announcement has the wrong public key")
 	}
 
@@ -52,7 +52,7 @@ func TestAnnouncementHandling(t *testing.T) {
 	// describing the length of the net address, followed by the net address.
 	// Corrupt the net address.
 	annBytes[25]++
-	_, err = DecodeAnnouncement(annBytes)
+	_, _, err = DecodeAnnouncement(annBytes)
 	if err != crypto.ErrInvalidSignature {
 		t.Error(err)
 	}
@@ -62,7 +62,7 @@ func TestAnnouncementHandling(t *testing.T) {
 	// byte and verify that there's an error.
 	lastIndex := len(annBytes) - 1
 	annBytes[lastIndex]++
-	_, err = DecodeAnnouncement(annBytes)
+	_, _, err = DecodeAnnouncement(annBytes)
 	if err != crypto.ErrInvalidSignature {
 		t.Error(err)
 	}
@@ -70,7 +70,7 @@ func TestAnnouncementHandling(t *testing.T) {
 
 	// Pass in a bad specifier - change the host announcement type.
 	annBytes[0]++
-	_, err = DecodeAnnouncement(annBytes)
+	_, _, err = DecodeAnnouncement(annBytes)
 	if err != ErrAnnNotAnnouncement {
 		t.Error(err)
 	}
@@ -78,14 +78,14 @@ func TestAnnouncementHandling(t *testing.T) {
 
 	// Pass in a bad signature algorithm. 16 bytes to pass the specifier, 8+8 bytes to pass the net address.
 	annBytes[33]++
-	_, err = DecodeAnnouncement(annBytes)
+	_, _, err = DecodeAnnouncement(annBytes)
 	if err != ErrAnnUnrecognizedSignature {
 		t.Error(err)
 	}
 	annBytes[33]--
 
 	// Cause the decoding to fail altogether.
-	_, err = DecodeAnnouncement(annBytes[:12])
+	_, _, err = DecodeAnnouncement(annBytes[:12])
 	if err == nil {
 		t.Error(err)
 	}

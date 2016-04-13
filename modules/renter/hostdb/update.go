@@ -13,15 +13,15 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostDBEntry) 
 		// the HostAnnouncement must be prefaced by the standard host
 		// announcement string
 		for _, arb := range t.ArbitraryData {
-			hostAnn, err := modules.DecodeAnnouncement(arb)
+			addr, pubKey, err := modules.DecodeAnnouncement(arb)
 			if err != nil {
 				continue
 			}
 
 			// Add the announcement to the slice being returned.
 			var host modules.HostDBEntry
-			host.NetAddress = hostAnn.NetAddress
-			host.PublicKey = hostAnn.PublicKey
+			host.NetAddress = addr
+			host.PublicKey = pubKey
 			announcements = append(announcements, host)
 		}
 	}

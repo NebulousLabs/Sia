@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // announcementFinder is a quick module that parses the blockchain for host
@@ -12,7 +13,9 @@ import (
 type announcementFinder struct {
 	cs modules.ConsensusSet
 
-	announcements []modules.HostAnnouncement
+	// Announcements that have been seen. The two slices are wedded.
+	netAddresses []modules.NetAddress
+	publicKeys   []types.SiaPublicKey
 }
 
 // ProcessConsensusChange receives consensus changes from the consensus set and
@@ -21,9 +24,10 @@ func (af *announcementFinder) ProcessConsensusChange(cc modules.ConsensusChange)
 	for _, block := range cc.AppliedBlocks {
 		for _, txn := range block.Transactions {
 			for _, arb := range txn.ArbitraryData {
-				ann, err := modules.DecodeAnnouncement(arb)
+				addr, pubKey, err := modules.DecodeAnnouncement(arb)
 				if err == nil {
-					af.announcements = append(af.announcements, ann)
+					af.netAddresses = append(af.netAddresses, addr)
+					af.publicKeys = append(af.publicKeys, pubKey)
 				}
 			}
 		}
@@ -78,13 +82,13 @@ func TestHostAnnounce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(af.announcements) != 1 {
+	if len(af.publicKeys) != 1 {
 		t.Fatal("could not find host announcement in blockchain")
 	}
-	if af.announcements[0].NetAddress != ht.host.netAddress {
+	if af.netAddresses[0] != ht.host.netAddress {
 		t.Error("announcement has wrong address")
 	}
-	if !bytes.Equal(af.announcements[0].PublicKey.Key, ht.host.publicKey.Key) {
+	if !bytes.Equal(af.publicKeys[0].Key, ht.host.publicKey.Key) {
 		t.Error("announcement has wrong host key")
 	}
 }
@@ -120,13 +124,13 @@ func TestHostAnnounceAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(af.announcements) != 1 {
+	if len(af.netAddresses) != 1 {
 		t.Fatal("could not find host announcement in blockchain")
 	}
-	if af.announcements[0].NetAddress != addr {
+	if af.netAddresses[0] != addr {
 		t.Error("announcement has wrong address")
 	}
-	if !bytes.Equal(af.announcements[0].PublicKey.Key, ht.host.publicKey.Key) {
+	if !bytes.Equal(af.publicKeys[0].Key, ht.host.publicKey.Key) {
 		t.Error("announcement has wrong host key")
 	}
 }
