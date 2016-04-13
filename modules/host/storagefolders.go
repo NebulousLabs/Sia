@@ -187,107 +187,6 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	return sfs[winningIndex], winningIndex
 }
 
-// uidString returns the string value of the storage folder's UID. This string
-// maps to the filename of the symlink that is used to point to the folder that
-// holds all of the sector data contained by the storage folder.
-func (sf *storageFolder) uidString() string {
-	if len(sf.UID) != storageFolderUIDSize {
-		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
-	}
-	return hex.EncodeToString(sf.UID)
-}
-
-// storageFolder returns the storage folder in the host with the input uid. If
-// the storage folder is not found, nil is returned.
-func (h *Host) storageFolder(uid []byte) *storageFolder {
-	for _, sf := range h.storageFolders {
-		if bytes.Equal(uid, sf.UID) {
-			return sf
-		}
-	}
-	return nil
-}
-
-// AddStorageFolder adds a storage folder to the host.
-func (h *Host) AddStorageFolder(path string, size uint64) error {
-	// Lock the host for the duration of the add operation - it is important
-	// that the host not be manipulated while sectors are being moved around.
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	// The resource lock is required as the sector movements require access to
-	// the logger.
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
-	}
-
-	// Check that the maximum number of allowed storage folders has not been
-	// exceeded.
-	if len(h.storageFolders) >= maximumStorageFolders {
-		return errMaxStorageFolders
-	}
-
-	// Check that the storage folder being added meets the minimum requirement
-	// for the size of a storage folder.
-	if size > maximumStorageFolderSize {
-		return errLargeStorageFolder
-	}
-	if size < minimumStorageFolderSize {
-		return errSmallStorageFolder
-	}
-
-	// Check that the folder being linked to both exists and is a folder.
-	pathInfo, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if !pathInfo.Mode().IsDir() {
-		return errStorageFolderNotFolder
-	}
-
-	// Create a storage folder object.
-	newSF := &storageFolder{
-		Size:          size,
-		SizeRemaining: size,
-	}
-	// Give the storage folder a new UID, while enforcing that the storage
-	// folder can't have a collision with any of the other storage folders.
-	newSF.UID = make([]byte, storageFolderUIDSize)
-	for {
-		// Generate an attempt UID for the storage folder.
-		_, err = h.dependencies.randRead(newSF.UID)
-		if err != nil {
-			return err
-		}
-
-		// Check for collsions. Check should be relatively inexpensive at all
-		// times, because the total number of storage folders is limited to
-		// 256.
-		safe := true
-		for _, sf := range h.storageFolders {
-			if bytes.Equal(newSF.UID, sf.UID) {
-				safe = false
-				break
-			}
-		}
-		if safe {
-			break
-		}
-	}
-
-	// Symlink the path for the data to the UID location of the host.
-	symPath := filepath.Join(h.persistDir, newSF.uidString())
-	err = h.dependencies.symlink(path, symPath)
-	if err != nil {
-		return err
-	}
-
-	// Add the storage folder to the list of folders for the host.
-	h.storageFolders = append(h.storageFolders, newSF)
-	return h.save()
-}
-
 // offloadStorageFolder takes sectors in a storage folder and moves them to
 // another storage folder.
 func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload uint64) error {
@@ -443,6 +342,107 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 		return errIncompleteOffload
 	}
 	return nil
+}
+
+// storageFolder returns the storage folder in the host with the input uid. If
+// the storage folder is not found, nil is returned.
+func (h *Host) storageFolder(uid []byte) *storageFolder {
+	for _, sf := range h.storageFolders {
+		if bytes.Equal(uid, sf.UID) {
+			return sf
+		}
+	}
+	return nil
+}
+
+// uidString returns the string value of the storage folder's UID. This string
+// maps to the filename of the symlink that is used to point to the folder that
+// holds all of the sector data contained by the storage folder.
+func (sf *storageFolder) uidString() string {
+	if len(sf.UID) != storageFolderUIDSize {
+		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
+	}
+	return hex.EncodeToString(sf.UID)
+}
+
+// AddStorageFolder adds a storage folder to the host.
+func (h *Host) AddStorageFolder(path string, size uint64) error {
+	// Lock the host for the duration of the add operation - it is important
+	// that the host not be manipulated while sectors are being moved around.
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	// The resource lock is required as the sector movements require access to
+	// the logger.
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
+
+	// Check that the maximum number of allowed storage folders has not been
+	// exceeded.
+	if len(h.storageFolders) >= maximumStorageFolders {
+		return errMaxStorageFolders
+	}
+
+	// Check that the storage folder being added meets the minimum requirement
+	// for the size of a storage folder.
+	if size > maximumStorageFolderSize {
+		return errLargeStorageFolder
+	}
+	if size < minimumStorageFolderSize {
+		return errSmallStorageFolder
+	}
+
+	// Check that the folder being linked to both exists and is a folder.
+	pathInfo, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !pathInfo.Mode().IsDir() {
+		return errStorageFolderNotFolder
+	}
+
+	// Create a storage folder object.
+	newSF := &storageFolder{
+		Size:          size,
+		SizeRemaining: size,
+	}
+	// Give the storage folder a new UID, while enforcing that the storage
+	// folder can't have a collision with any of the other storage folders.
+	newSF.UID = make([]byte, storageFolderUIDSize)
+	for {
+		// Generate an attempt UID for the storage folder.
+		_, err = h.dependencies.randRead(newSF.UID)
+		if err != nil {
+			return err
+		}
+
+		// Check for collsions. Check should be relatively inexpensive at all
+		// times, because the total number of storage folders is limited to
+		// 256.
+		safe := true
+		for _, sf := range h.storageFolders {
+			if bytes.Equal(newSF.UID, sf.UID) {
+				safe = false
+				break
+			}
+		}
+		if safe {
+			break
+		}
+	}
+
+	// Symlink the path for the data to the UID location of the host.
+	symPath := filepath.Join(h.persistDir, newSF.uidString())
+	err = h.dependencies.symlink(path, symPath)
+	if err != nil {
+		return err
+	}
+
+	// Add the storage folder to the list of folders for the host.
+	h.storageFolders = append(h.storageFolders, newSF)
+	return h.save()
 }
 
 // RemoveStorageFolder removes a storage folder from the host.

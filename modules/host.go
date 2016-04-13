@@ -140,7 +140,7 @@ type (
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// host.
-		// TODO: StorageFolders() []StorageFolderMetadata
+		StorageFolders() []StorageFolderMetadata
 	}
 
 	// Host can take storage from disk and offer it to the network, managing things
