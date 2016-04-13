@@ -141,6 +141,10 @@ var (
 // folders. The UID is used (via the uidString function) to determine the name
 // of the symlink which points to the folder holding the data for this storage
 // folder.
+//
+// Statistics are kept on the integrity of reads and writes. Ideally, the
+// filesystem is never returning errors, but if errors are being returned they
+// will be tracked and can be reported to the user.
 type storageFolder struct {
 	UID []byte
 
@@ -445,14 +449,34 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 	return h.save()
 }
 
-// RemoveStorageFolder removes a storage folder from the host.
-func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
-	// Lock the host for the duration of the remove operation - it is important
-	// that the host not be manipulated while sectors are being moved around.
+// ResetStorageFolderHealth will reset the read and write statistics for the
+// storage folder.
+func (h *Host) ResetStorageFolderHealth(index int) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	// The resource lock is required as the sector movements require access to
-	// the logger.
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
+
+	// Check that the input is valid.
+	if index >= len(h.storageFolders) {
+		return errBadStorageFolderIndex
+	}
+
+	// Reset the storage statistics and save the host.
+	h.storageFolders[index].FailedReads = 0
+	h.storageFolders[index].FailedWrites = 0
+	h.storageFolders[index].SuccessfulReads = 0
+	h.storageFolders[index].SuccessfulWrites = 0
+	return h.save()
+}
+
+// RemoveStorageFolder removes a storage folder from the host.
+func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
 	if h.closed {
@@ -543,4 +567,40 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 	resizeFolder.Size = newSize
 	resizeFolder.SizeRemaining = 0
 	return h.save()
+}
+
+// StorageFolders provides information about all of the storage folders in the
+// host.
+func (h *Host) StorageFolders() (sfms []modules.StorageFolderMetadata, err error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return nil, errHostClosed
+	}
+
+	for _, sf := range h.storageFolders {
+		// The actual path of the storage folder is managed by the host via a
+		// symlink to a folder in the host directory that has the UID name.
+		// Read the sym link and then parse the path that it points to for the
+		// path of the storage folder.
+		symPath := filepath.Join(h.persistDir, sf.uidString())
+		realPath, err := filepath.EvalSymlinks(symPath)
+		if err != nil {
+			return nil, err
+		}
+
+		sfms = append(sfms, modules.StorageFolderMetadata{
+			Capacity:          sf.Size,
+			CapacityRemaining: sf.SizeRemaining,
+			Path:              realPath,
+
+			FailedReads:      sf.FailedReads,
+			FailedWrites:     sf.FailedWrites,
+			SuccessfulReads:  sf.SuccessfulReads,
+			SuccessfulWrites: sf.SuccessfulWrites,
+		})
+	}
+	return sfms, nil
 }
