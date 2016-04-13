@@ -10,6 +10,21 @@ package host
 // it has announced at, and should re-announce if the ip address changes or if
 // the host suddenly finds itself to be unreachable.
 
+// TODO: The host should somehow keep track of renters that make use of it,
+// perhaps through public keys or something, that allows the host to know which
+// renters can be safely allocated a greater number of collateral coins.
+//
+// Renters, especially new renters, are going to need some mechanic to ramp
+// with hosts. The answer may be that new renters go through multiple
+// iterations of file contracts.
+//
+// Adding some sort of proof-of-burn to the renter may be sufficient. If the
+// renter is burning 1% coins compared to what the host is locking away (for
+// new relationships), then the host can know that the renter has made
+// sacrifices in excess of just locking away a proportional amount of coins.
+// The renter will outright lose the coins, while the host will get the coins
+// back after some time has passed.
+
 import (
 	"crypto/rand"
 	"errors"
