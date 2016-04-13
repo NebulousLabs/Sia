@@ -25,12 +25,19 @@ package host
 // The renter will outright lose the coins, while the host will get the coins
 // back after some time has passed.
 
+// TODO: host_test.go has commented out tests.
+
+// TODO: network_test.go has commented out tests.
+
+// TODO: persist_test.go has commented out tests.
+
+// TODO: update_test.go has commented out tests.
+
 import (
 	"crypto/rand"
 	"errors"
 	"net"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -311,27 +318,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 // New returns an initialized Host.
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
 	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
-}
-
-// composeErrors will take two errors and compose them into a single errors
-// with a longer message. Any nil errors used as inputs will be stripped out,
-// and if there are zero non-nil inputs then 'nil' will be returned.
-func composeErrors(errs ...error) error {
-	// Strip out any nil errors.
-	var errStrings []string
-	for _, err := range errs {
-		if err != nil {
-			errStrings = append(errStrings, err.Error())
-		}
-	}
-
-	// Return nil if there are no non-nil errors in the input.
-	if len(errStrings) <= 0 {
-		return nil
-	}
-
-	// Combine all of the non-nil errors into one larger return value.
-	return errors.New(strings.Join(errStrings, "; "))
 }
 
 // Close shuts down the host, preparing it for garbage collection.

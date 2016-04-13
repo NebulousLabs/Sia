@@ -3,7 +3,13 @@ package modules
 // TODO: Host is probably not correctly tracking the financial metrics, nor is
 // it properly tracking the RPC metrics for upload and download bandwidth.
 
+// TODO: Consolidate some of the information-retrieving methods in the host
+// interface.
+
+// TODO: Finalize the documentation for this package.
+
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -152,13 +158,6 @@ type (
 
 		// AnnounceAddress submits an announcement using the given address.
 		AnnounceAddress(NetAddress) error
-
-		// ConsistencyCheckAndRepair runs a consistency check on the host,
-		// looking for places where some combination of disk errors, usage
-		// errors, and development errors have led to inconsistencies in the
-		// host. In cases where these inconsistencies can be repaired, the
-		// repairs are made.
-		// TODO: ConsistencyCheckAndRepair() error
 
 		// FinancialMetrics returns the financial statistics of the host.
 		// TODO: FinancialMetrics() HostFinancialMetrics

@@ -344,13 +344,13 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 // will be unable to perform a storage proof on that sector. This function is
 // not intended to be used, however is available so that hosts can easily
 // comply if compelled by their government to delete certain data.
-func (h *Host) DeleteSector(sectorHash crypto.Hash) error {
+func (h *Host) DeleteSector(sectorRoot crypto.Hash) error {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
 	if h.closed {
-		return nil, errHostClosed
+		return errHostClosed
 	}
 
 	return h.db.Update(func(tx *bolt.Tx) error {
@@ -360,6 +360,11 @@ func (h *Host) DeleteSector(sectorHash crypto.Hash) error {
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
 			return errSectorNotFound
+		}
+		var usage sectorUsage
+		err := json.Unmarshal(sectorUsageBytes, &usage)
+		if err != nil {
+			return err
 		}
 
 		// Get the storage folder that contains the phsyical sector.
