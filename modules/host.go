@@ -1,5 +1,8 @@
 package modules
 
+// TODO: Host is probably not correctly tracking the financial metrics, nor is
+// it properly tracking the RPC metrics for upload and download bandwidth.
+
 import (
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -108,6 +111,13 @@ type (
 		// running out of storage unexpectedly.
 		AddStorageFolder(path string, size uint64) error
 
+		// DeleteSector deletes a sector, meaning that the host will be unable
+		// to upload that sector and be unable to provide a storage proof on
+		// that sector. This function is not intended to be used, but is
+		// available in case a host is compelled by their government to delete
+		// a piece of illegal data.
+		DeleteSector(sectorRoot crypto.Hash) error
+
 		// RemoveStorageFolder will remove a storage folder from the host. All
 		// storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the host is unable to save
@@ -149,11 +159,6 @@ type (
 		// host. In cases where these inconsistencies can be repaired, the
 		// repairs are made.
 		// TODO: ConsistencyCheckAndRepair() error
-
-		// DeleteSector deletes a sector, meaning that the host will be unable
-		// to upload that sector and be unable to provide a storage proof if
-		// that sector is chosen by the blockchain.
-		// TODO: DeleteSector(sectorRoot crypto.Hash) error
 
 		// FinancialMetrics returns the financial statistics of the host.
 		// TODO: FinancialMetrics() HostFinancialMetrics
