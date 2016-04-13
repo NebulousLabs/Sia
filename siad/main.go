@@ -79,6 +79,17 @@ func main() {
 	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules")
 
+	// Deprecate shorthand flags that aren't commonly used.
+	// COMPATv0.5.2
+	// TODO: remove shorthands for these flags by supplying a blank shorthand in flag construction above.
+	root.Flags().MarkShorthandDeprecated("agent", "please use --agent instead")
+	root.Flags().MarkShorthandDeprecated("host-addr", "please use --host-addr instead")
+	root.Flags().MarkShorthandDeprecated("profile-directory", "please use --profile-directory instead")
+	root.Flags().MarkShorthandDeprecated("api-addr", "please use --api-addr instead")
+	root.Flags().MarkShorthandDeprecated("no-bootstrap", "please use --no-bootstrap instead")
+	root.Flags().MarkShorthandDeprecated("profile", "please use --profile instead")
+	root.Flags().MarkShorthandDeprecated("rpc-addr", "please use --rpc-addr instead")
+
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.
 	if err := root.Execute(); err != nil {
