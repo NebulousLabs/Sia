@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/persist"
 )
@@ -70,6 +71,27 @@ type (
 	// dependencies using full featured libraries.
 	productionDependencies struct{}
 )
+
+// composeErrors will take two errors and compose them into a single errors
+// with a longer message. Any nil errors used as inputs will be stripped out,
+// and if there are zero non-nil inputs then 'nil' will be returned.
+func composeErrors(errs ...error) error {
+	// Strip out any nil errors.
+	var errStrings []string
+	for _, err := range errs {
+		if err != nil {
+			errStrings = append(errStrings, err.Error())
+		}
+	}
+
+	// Return nil if there are no non-nil errors in the input.
+	if len(errStrings) <= 0 {
+		return nil
+	}
+
+	// Combine all of the non-nil errors into one larger return value.
+	return errors.New(strings.Join(errStrings, "; "))
+}
 
 // listen gives the host the ability to receive incoming connections.
 func (productionDependencies) listen(s1, s2 string) (net.Listener, error) {

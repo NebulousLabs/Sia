@@ -56,18 +56,6 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		return err
 	}
 	h.log.Printf("INFO: Successfully announced as %v", addr)
-
-	// Start accepting contracts.
-	//
-	// TODO: I'm not sure that we should keep this auto-accept feature. If the
-	// host is having significant disk trouble, it'll shut down. The user
-	// shouldn't be making announcements while the host is having disk trouble,
-	// but I still worry that the user will be turning on the host on accident
-	// sometimes. Furthermore, there's not a clear relationship between making
-	// an announcement and accepting file contracts, at least not one that's
-	// explicit. A host may want to announce before being ready to accept file
-	// contracts that way it's uptime clock and long-term clock can begin.
-	h.settings.AcceptingContracts = true
 	return nil
 }
 

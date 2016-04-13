@@ -78,9 +78,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		case modules.RPCRenew:
 			atomic.AddUint64(&h.atomicRenewCalls, 1)
 			err = h.managedRPCRenew(conn)
-		case modules.RPCUpload:
-			atomic.AddUint64(&h.atomicUploadCalls, 1)
-			err = h.managedRPCUpload(conn)
 	*/
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)

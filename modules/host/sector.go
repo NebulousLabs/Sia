@@ -52,6 +52,9 @@ import (
 
 // TODO: Write an RPC that lets the host share which sectors it has lost.
 
+// TODO: Make sure the host will not stutter if it needs to perform operations
+// on sectors that have been manually deleted.
+
 var (
 	// errDiskTrouble is returned when the host is supposed to have enough
 	// storage to hold a new sector but failures that are likely related to the
@@ -257,7 +260,6 @@ func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error
 // If the provided sector does not have an expiration at the given height, an
 // error will be thrown.
 func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error {
-	// Open the database so that the sector usage information can be updated.
 	return h.db.Update(func(tx *bolt.Tx) error {
 		// Grab the existing sector usage information from the database.
 		bsu := tx.Bucket(bucketSectorUsage)
@@ -315,7 +317,8 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 			}
 		}
 
-		// Remove the sector from the physical disk.
+		// Remove the sector from the physical disk and update the storage
+		// folder metadata.
 		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
 		err = h.dependencies.removeFile(sectorPath)
 		if err != nil {
@@ -323,8 +326,6 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 			folder.FailedWrites++
 			return err
 		}
-
-		// Find the storage folder that contains the sector.
 		folder.SizeRemaining += modules.SectorSize
 		folder.SuccessfulWrites++
 		err = h.save()
@@ -335,5 +336,64 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		// Delete the sector from the bucket - there are no more instances of
 		// this sector in the host.
 		return bsu.Delete(h.sectorID(sectorRoot[:]))
+	})
+}
+
+// DeleteSector deletes a sector from the host explicitly, meaning that the
+// host will be unable to transfer that sector to a renter, and that the host
+// will be unable to perform a storage proof on that sector. This function is
+// not intended to be used, however is available so that hosts can easily
+// comply if compelled by their government to delete certain data.
+func (h *Host) DeleteSector(sectorRoot crypto.Hash) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		return errHostClosed
+	}
+
+	return h.db.Update(func(tx *bolt.Tx) error {
+		// Check that the sector exists in the database.
+		bsu := tx.Bucket(bucketSectorUsage)
+		sectorKey := h.sectorID(sectorRoot[:])
+		sectorUsageBytes := bsu.Get(sectorKey)
+		if sectorUsageBytes == nil {
+			return errSectorNotFound
+		}
+		var usage sectorUsage
+		err := json.Unmarshal(sectorUsageBytes, &usage)
+		if err != nil {
+			return err
+		}
+
+		// Get the storage folder that contains the phsyical sector.
+		var folder *storageFolder
+		for _, sf := range h.storageFolders {
+			if bytes.Equal(sf.UID, usage.StorageFolder) {
+				folder = sf
+			}
+		}
+
+		// Remove the sector from the physical disk and update the storage
+		// folder metadata. The file is removed from disk as early as possible
+		// to prevent potential errors from stopping the delete.
+		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
+		err = h.dependencies.removeFile(sectorPath)
+		if err != nil {
+			// Indicate that the storage folder is having write troubles.
+			folder.FailedWrites++
+			return err
+		}
+		folder.SizeRemaining += modules.SectorSize
+		folder.SuccessfulWrites++
+		err = h.save()
+		if err != nil {
+			return err
+		}
+
+		// After removing the file from disk, remove the file from the
+		// database.
+		return bsu.Delete(sectorKey)
 	})
 }

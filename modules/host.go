@@ -1,6 +1,15 @@
 package modules
 
+// TODO: Host is probably not correctly tracking the financial metrics, nor is
+// it properly tracking the RPC metrics for upload and download bandwidth.
+
+// TODO: Consolidate some of the information-retrieving methods in the host
+// interface.
+
+// TODO: Finalize the documentation for this package.
+
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -82,22 +91,20 @@ type (
 	// StorageFolderMetadata contians metadata about a storage folder that is
 	// tracked by the storage folder manager.
 	StorageFolderMetadata struct {
-		CapacityRemaining uint64
-		Path              string
-		TotalCapacity     uint64
+		Capacity          uint64 `json:"capacity"`
+		CapacityRemaining uint64 `json:"capacityremaining"`
+		Path              string `json:"path"`
 
-		// Successful and unsuccessful operations report the number of
-		// successful and unsuccessful disk operations that the storage manager
-		// has completed on the storage folder. A large number of unsuccessful
-		// operations can indicate that the space allocated for the storage
-		// folder is larger than the amount of actual free space on the disk.
-		// Things like filesystem overhead can reduce the amount of actual
-		// storage available on disk, but should ultimately be less than 1% of
-		// the total advertised capacity of a disk. A large number of
-		// unsuccessful operations can also indicate that the disk is failing
-		// and that it needs to be replaced.
-		SuccessfulOperations   uint64
-		UnsuccessfulOperations uint64
+		// Below are statistics about the filesystem. FailedReads and
+		// FailedWrites are only incremented if the filesystem is returning
+		// errors when operations are being performed. A large number of
+		// FailedWrites can indicate that more space has been allocated on a
+		// drive than is physically available. A high number of failures can
+		// also indicaate disk trouble.
+		FailedReads      uint64 `json:"failedreads"`
+		FailedWrites     uint64 `json:"failedwrites"`
+		SuccessfulReads  uint64 `json:"successfulreads"`
+		SuccessfulWrites uint64 `json:"successfulwrites"`
 	}
 
 	// StorageFolderManager tracks and manipulates storage folders. Storage
@@ -110,13 +117,12 @@ type (
 		// running out of storage unexpectedly.
 		AddStorageFolder(path string, size uint64) error
 
-		// ForceRemoveStorageFolder removes a storage folder. The host will try
-		// to save the data on the storage folder by moving it to another
-		// storage folder, but if there are errors (such as not enough space)
-		// the host will forcibly remove the storage folder, discarding the
-		// data. This means that the host will be unable to provide storage
-		// proofs on the data, and is going to incur penalties.
-		// TODO: ForceRemoveStorageFolder(index int) error
+		// DeleteSector deletes a sector, meaning that the host will be unable
+		// to upload that sector and be unable to provide a storage proof on
+		// that sector. This function is not intended to be used, but is
+		// available in case a host is compelled by their government to delete
+		// a piece of illegal data.
+		DeleteSector(sectorRoot crypto.Hash) error
 
 		// RemoveStorageFolder will remove a storage folder from the host. All
 		// storage on the folder will be moved to other storage folders,
@@ -126,7 +132,7 @@ type (
 
 		// ResetStorageFolderHealth will reset the health statistics on a
 		// storage folder.
-		// TODO: ResetStorageFolderHealth(index int) error
+		ResetStorageFolderHealth(index int) error
 
 		// ResizeStorageFolder will grow or shrink a storage folder in the
 		// host. The host may not check that there is enough space on-disk to
@@ -140,39 +146,24 @@ type (
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// host.
-		// TODO: StorageFolders() []StorageFolderMetadata
+		StorageFolders() ([]StorageFolderMetadata, error)
 	}
 
-	// Host can take storage from disk and offer it to the network, managing things
-	// such as announcements, settings, and implementing all of the RPCs of the
-	// host protocol.
+	// A Host can take storage from disk and offer it to the network, managing
+	// things such as announcements, settings, and implementing all of the RPCs
+	// of the host protocol.
 	Host interface {
-		// Announce submits a host announcement to the blockchain. After
-		// announcing, the host will begin accepting contracts.
+		// Announce submits a host announcement to the blockchain.
 		Announce() error
 
 		// AnnounceAddress submits an announcement using the given address.
 		AnnounceAddress(NetAddress) error
 
-		// ConsistencyCheckAndRepair runs a consistency check on the host,
-		// looking for places where some combination of disk errors, usage
-		// errors, and development errors have led to inconsistencies in the
-		// host. In cases where these inconsistencies can be repaired, the
-		// repairs are made.
-		// TODO: ConsistencyCheckAndRepair() error
-
-		// DeleteSector deletes a sector, meaning that the host will be unable
-		// to upload that sector and be unable to provide a storage proof if
-		// that sector is chosen by the blockchain.
-		// TODO: DeleteSector(sectorRoot crypto.Hash) error
-
-		// FileContracts returns a list of file contracts that the host
-		// currently has open, along with the volume of data tracked by each
-		// file contract.
-		// TODO: FileContracts() ([]types.FileContractID, []uint64)
-
 		// FinancialMetrics returns the financial statistics of the host.
 		// TODO: FinancialMetrics() HostFinancialMetrics
+
+		// InternalSettings returns the host's internal settings.
+		InternalSettings() HostInternalSettings
 
 		// NetAddress returns the host's network address
 		NetAddress() NetAddress
@@ -183,9 +174,6 @@ type (
 
 		// SetInternalSettings sets the hosting parameters of the host.
 		SetInternalSettings(HostInternalSettings) error
-
-		// Settings returns the host's internal settings.
-		Settings() HostInternalSettings
 
 		// Close saves the state of the host and stops its listener process.
 		Close() error
