@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
@@ -9,12 +8,15 @@ import (
 
 // computeConsensusChange computes the consensus change from the change entry
 // at index 'i' in the change log. If i is out of bounds, an error is returned.
-func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (cc modules.ConsensusChange, err error) {
-	cc.ID = ce.ID()
+func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (modules.ConsensusChange, error) {
+	cc := modules.ConsensusChange{
+		ID: ce.ID(),
+	}
 	for _, revertedBlockID := range ce.RevertedBlocks {
 		revertedBlock, err := getBlockMap(tx, revertedBlockID)
-		if build.DEBUG && err != nil {
-			panic(err)
+		if err != nil {
+			cs.log.Critical("getBlockMap failed in computeConsensusChange:", err)
+			return modules.ConsensusChange{}, err
 		}
 
 		// Because the direction is 'revert', the order of the diffs needs to
@@ -48,8 +50,9 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (cc 
 	}
 	for _, appliedBlockID := range ce.AppliedBlocks {
 		appliedBlock, err := getBlockMap(tx, appliedBlockID)
-		if build.DEBUG && err != nil {
-			panic(err)
+		if err != nil {
+			cs.log.Critical("getBlockMap failed in computeConsensusChange:", err)
+			return modules.ConsensusChange{}, err
 		}
 
 		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedBlock.Block)
@@ -69,7 +72,7 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (cc 
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
-	return
+	return cc, nil
 }
 
 // readlockUpdateSubscribers will inform all subscribers of a new update to the
@@ -85,8 +88,9 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 		cc, err = cs.computeConsensusChange(tx, ce)
 		return err
 	})
-	if err != nil && build.DEBUG {
-		panic(err)
+	if err != nil {
+		cs.log.Critical("computeConsensusChange failed:", err)
+		return
 	}
 	for _, subscriber := range cs.subscribers {
 		subscriber.ProcessConsensusChange(cc)
