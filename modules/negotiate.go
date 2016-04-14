@@ -3,7 +3,7 @@ package modules
 import (
 	"bytes"
 	"errors"
-	"net"
+	"io"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -202,25 +202,33 @@ type (
 	}
 )
 
-// WriteNegotiationAcceptance writes the 'accept' response to conn.
-func WriteNegotiationAcceptance(conn net.Conn) error {
-	return encoding.WriteObject(conn, AcceptResponse)
+// WriteNegotiationAcceptance writes the 'accept' response to w (usually a
+// net.Conn).
+func WriteNegotiationAcceptance(w io.Writer) error {
+	return encoding.WriteObject(w, AcceptResponse)
 }
 
-// WriteNegotiationRejection will write a rejection response to the connection
-// and return the input error composed with the error received from writing to
-// the connection.
-func WriteNegotiationRejection(conn net.Conn, err error) error {
-	writeErr := encoding.WriteObject(conn, err.Error())
-	return build.JoinErrors([]error{err, writeErr}, "; ")
+// WriteNegotiationRejection will write a rejection response to w (usually a
+// net.Conn) and return the input error. If the write fails, the write error
+// is joined with the input error.
+func WriteNegotiationRejection(w io.Writer, err error) error {
+	writeErr := encoding.WriteObject(w, err.Error())
+	if writeErr != nil {
+		return build.JoinErrors([]error{err, writeErr}, "; ")
+	}
+	return err
 }
 
-// ReadNegotiationAcceptance reads an accept/reject response from conn. If the
-// response is not acceptance, ReadNegotiationAcceptance returns the response
-// as an error.
-func ReadNegotiationAcceptance(conn net.Conn) error {
+// ReadNegotiationAcceptance reads an accept/reject response from r (usually a
+// net.Conn). If the response is not acceptance, ReadNegotiationAcceptance
+// returns the response as an error.
+//
+// Note that since errors returned by ReadNegotiationAcceptance are newly
+// allocated, they cannot be compared to other errors in the traditional
+// fashion.
+func ReadNegotiationAcceptance(r io.Reader) error {
 	var resp string
-	err := encoding.ReadObject(conn, &resp, MaxErrorSize)
+	err := encoding.ReadObject(r, &resp, MaxErrorSize)
 	if err != nil {
 		return err
 	} else if resp != AcceptResponse {
