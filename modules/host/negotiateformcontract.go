@@ -182,26 +182,26 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 // file contract, creating a storage obligation and submitting the contract to
 // the blockchain.
 func (h *Host) managedRPCFormContract(conn net.Conn) error {
-	// Set the negotiation deadline.
-	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
-
 	// Send the host settings to the renter. If the host is not accepting new
 	// contracts, the renter is expected to see this and gracefully handle the
 	// host closing the connection.
-	h.mu.RLock()
-	settings := h.settings
-	secretKey := h.secretKey
-	h.mu.RUnlock()
-	err := crypto.WriteSignedObject(conn, settings, secretKey)
+	err := h.managedRPCSettings(conn)
 	if err != nil {
 		return err
 	}
+
+	// If the host is not accepting contracts, the connection can be closed.
+	// The renter has been given enough information to understand that the
+	// connection is going to be closed.
+	h.mu.RLock()
+	settings := h.settings
+	h.mu.RUnlock()
 	if !settings.AcceptingContracts {
-		// The host is not accepting contracts, the connection can be closed.
-		// The renter has been given enough information to understand that the
-		// connection is going to be closed.
 		return nil
 	}
+
+	// Set the negotiation deadline.
+	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
 
 	// The renter is going to send a string, which will either be an error or
 	// will indicate that there was no error.
