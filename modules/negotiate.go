@@ -130,15 +130,6 @@ type (
 	// are the values that the renter will request from the host in order to
 	// build its database.
 	HostExternalSettings struct {
-		// Recipient is a field that allows the host to specify that the
-		// settings apply only to a single recipient. Generally, the field will
-		// be blank, meaning the settings apply to everyone. When there is a
-		// value, it will usually be an encoded public key. Certain recipients
-		// with good reputation or a history of honesty may receive better
-		// deals or increased collateral as a result of the reduced risk of
-		// scams.
-		Recipient string
-
 		// MaxBatchSize indicates the maximum size in bytes that a batch is
 		// allowed to be. A batch is an array of revision actions, each
 		// revision action can have a different number of bytes, depending on

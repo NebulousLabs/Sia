@@ -31,9 +31,6 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	secretKey := h.secretKey
 	totalStorage, remainingStorage := h.capacity()
 	hes := modules.HostExternalSettings{
-		// 'Recipient' will be left blank, as the settings RPC is to return the
-		// generic settings for the host.
-
 		AcceptingContracts: h.settings.AcceptingContracts,
 		MaxBatchSize:       h.settings.MaxBatchSize,
 		MaxDuration:        h.settings.MaxDuration,
