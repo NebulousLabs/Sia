@@ -72,7 +72,7 @@ func TestAuthentication(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	testGETURL := "http://" + st.server.listener.Addr().String() + "/daemon/version"
+	testGETURL := "http://" + st.server.listener.Addr().String() + "/wallet/seeds"
 	testPOSTURL := "http://" + st.server.listener.Addr().String() + "/host/announce"
 
 	// Test that unauthenticated API calls fail.

@@ -168,6 +168,7 @@ func startDaemon(config Config) (err error) {
 	srv, err := api.NewServer(
 		config.Siad.APIaddr,
 		config.Siad.RequiredUserAgent,
+		password,
 		cs,
 		e,
 		g,
@@ -179,9 +180,6 @@ func startDaemon(config Config) (err error) {
 	)
 	if err != nil {
 		return err
-	}
-	if !config.Siad.NoPassword {
-		srv.RequireAuthentication(password)
 	}
 
 	// Bootstrap to the network.
