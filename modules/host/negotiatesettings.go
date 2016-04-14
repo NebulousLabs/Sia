@@ -44,9 +44,9 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 		UnlockHash:         h.unlockHash,
 		WindowSize:         h.settings.WindowSize,
 
-		Collateral: h.settings.Collateral,
-		// CollateralFraction:
-		// MaxCollateral:
+		Collateral:            h.settings.Collateral,
+		MaxCollateralFraction: h.settings.MaxCollateralFraction,
+		MaxCollateral:         h.settings.MaxCollateral,
 
 		ContractPrice:          h.settings.MinimumContractPrice,
 		DownloadBandwidthPrice: h.settings.MinimumDownloadBandwidthPrice,

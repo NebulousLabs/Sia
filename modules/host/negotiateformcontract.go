@@ -47,7 +47,7 @@ var (
 
 	// errBadPayoutsLen is returned if a new file contract is presented that
 	// has the wrong number of valid or missed proof payouts.
-	errBadPayoutsLen = errors.New("file contract has the wrong number of payouts - there should be two valid and two missed payouts")
+	errBadPayoutsLen = errors.New("file contract has the wrong number of payouts - there should be two valid and three missed payouts")
 
 	// errBadPayoutsAmounts is returned if a new file contract is presented that
 	// does not pay the correct amount to the host - by default, the payouts
@@ -88,18 +88,8 @@ var (
 // expected to add to the file contract based on the payout of the file
 // contract and based on the host settings.
 func contractCollateral(settings modules.HostInternalSettings, txnSet []types.Transaction) types.Currency {
-	// The host adds collateral based on the host settings and based on how
-	// much funding the renter has put into the contract. The determination is
-	// made by looking at the payout of the file contract, and assuming that
-	// based on the settings the renter has correctly predicted the amount of
-	// coins that the host would try to add as collateral.
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
-	singlePortion := fc.Payout.Div(settings.CollateralFraction.Add(types.NewCurrency64(1e6)))
-	hostPortion := singlePortion.Mul(settings.CollateralFraction)
-	if hostPortion.Cmp(settings.MaxCollateral) > 0 {
-		hostPortion = settings.MaxCollateral
-	}
-	return hostPortion
+	return fc.ValidProofOutputs[1].Value.Sub(settings.MinimumContractPrice)
 }
 
 // managedAddCollateral adds the host's collateral to the file contract
@@ -325,25 +315,40 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	if fc.WindowStart <= blockHeight+revisionSubmissionBuffer {
 		return errWindowStartTooSoon
 	}
-	// WindowEnd must be at least settings.WindowSize blocks after WindowStart.
+	// WindowEnd must be at least settings.WindowSize blocks after
+	// WindowStart.
 	if fc.WindowEnd < fc.WindowStart+settings.WindowSize {
 		return errWindowSizeTooSmall
 	}
-	// ValidProofOutputs and MissedProofOutputs must both have len(2).
-	if len(fc.ValidProofOutputs) != 2 || len(fc.MissedProofOutputs) != 2 {
+
+	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
+	// outputs should have 3 (renter + host + void)
+	if len(fc.ValidProofOutputs) != 2 || len(fc.MissedProofOutputs) != 3 {
 		return errBadPayoutsLen
 	}
-	// The valid proof outputs and missed proof outputs for the host (index 1)
-	// must both have payouts that cover the 'ContractPrice' plus the expected
-	// host collateral.
-	hostPortion := contractCollateral(settings, txnSet)
-	if fc.ValidProofOutputs[1].Value.Cmp(settings.MinimumContractPrice.Add(hostPortion)) != 0 || fc.MissedProofOutputs[1].Value.Cmp(settings.MinimumContractPrice.Add(hostPortion)) != 0 {
+	// The unlock hashes of the valid and missed proof outputs for the host
+	// must match the host's unlock hash. The third missed output should point
+	// to the void.
+	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[2].UnlockHash != (types.UnlockHash{}) {
+		return errBadPayoutsUnlockHashes
+	}
+	// Check that the payouts for the valid proof outputs and the missed proof
+	// outputs are the same - this is important because no data has been added
+	// to the file contract yet.
+	if fc.ValidProofOutputs[1].Value.Cmp(fc.MissedProofOutputs[1].Value) != 0 {
 		return errBadPayoutsAmounts
 	}
-	// The unlock hashes of the valid and missed proof outputs for the host
-	// must match the host's unlock hash.
-	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash {
-		return errBadPayoutsUnlockHashes
+	// Check that there's enough payout for the host to cover at least the
+	// contract price. This will prevent negative currency panics when working
+	// with the collateral.
+	if fc.ValidProofOutputs[1].Value.Cmp(settings.MinimumContractPrice) < 0 {
+		return errBadPayoutsAmounts
+	}
+	// Check that the collateral for the host is not too high.
+	collateral := contractCollateral(settings, txnSet)
+	maxCollateral := fc.Payout.Mul(settings.MaxCollateralFraction).Div(types.NewCurrency64(1e6))
+	if collateral.Cmp(maxCollateral) > 0 {
+		return errBadPayoutsAmounts // TODO: Maybe errBadCollateralExpectation or something
 	}
 
 	// The unlock hash for the file contract must match the unlock hash that
