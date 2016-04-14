@@ -148,14 +148,14 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		LockedCollateral:     hostPortion,
 		OriginTransactionSet: fullTxnSet,
 	}
-	err = h.lockStorageObligation(so)
-	if err != nil {
-		return nil, err
+	lockErr := h.lockStorageObligation(so)
+	if lockErr != nil {
+		return nil, lockErr
 	}
 	err = h.addStorageObligation(so)
-	err2 := h.unlockStorageObligation(so)
-	if err2 != nil {
-		return nil, err2
+	lockErr = h.unlockStorageObligation(so)
+	if lockErr != nil {
+		return nil, lockErr
 	}
 	if err != nil {
 		// An error here is pretty bad, because the signed file contract has
