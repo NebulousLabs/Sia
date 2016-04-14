@@ -22,6 +22,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/profile"
 
+	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 )
 
@@ -67,6 +68,25 @@ func processConfig(config Config) (Config, error) {
 
 // startDaemonCmd uses the config parameters to start siad.
 func startDaemon(config Config) (err error) {
+	// Prompt user for API password.
+	var password string
+	if !config.Siad.NoPassword {
+		password, err = speakeasy.Ask("Enter API password: ")
+		if err != nil {
+			return err
+		}
+		if password == "" {
+			return errors.New("password cannot be blank, use the --no-password flag instead")
+		}
+		passwordConfirm, err := speakeasy.Ask("Confirm API password: ")
+		if err != nil {
+			return err
+		}
+		if password != passwordConfirm {
+			return errors.New("passwords don't match")
+		}
+	}
+
 	// Print a startup message.
 	fmt.Println("Loading...")
 	loadStart := time.Now()
@@ -159,6 +179,9 @@ func startDaemon(config Config) (err error) {
 	)
 	if err != nil {
 		return err
+	}
+	if !config.Siad.NoPassword {
+		srv.RequireAuthentication(password)
 	}
 
 	// Bootstrap to the network.
