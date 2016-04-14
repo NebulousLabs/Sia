@@ -88,7 +88,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", cs, e, g, h, m, r, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, e, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
@@ -167,11 +167,10 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", cs, e, g, h, m, r, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", requiredPassword, cs, e, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
-	srv.RequireAuthentication(requiredPassword)
 
 	// Assemble the serverTester.
 	st := &serverTester{
@@ -217,7 +216,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv, err := NewServer("localhost:0", "", cs, e, g, nil, nil, nil, nil, nil)
+	srv, err := NewServer("localhost:0", "", "", cs, e, g, nil, nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
