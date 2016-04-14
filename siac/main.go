@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -45,6 +46,18 @@ func apiGet(call string) (*http.Response, error) {
 		return nil, errors.New("no response from daemon")
 	}
 	// check error code
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		// Prompt for password and retry request with authentication.
+		password, err := speakeasy.Ask("API password: ")
+		if err != nil {
+			return nil, err
+		}
+		resp, err = api.HttpGETAuthenticated("http://"+addr+call, password)
+		if err != nil {
+			return nil, errors.New("no response from daemon - authentication failed")
+		}
+	}
 	if resp.StatusCode == http.StatusNotFound {
 		resp.Body.Close()
 		err = errors.New("API call not recognized: " + call)
@@ -93,6 +106,18 @@ func apiPost(call, vals string) (*http.Response, error) {
 		return nil, errors.New("no response from daemon")
 	}
 	// check error code
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		// Prompt for password and retry request with authentication.
+		password, err := speakeasy.Ask("API password: ")
+		if err != nil {
+			return nil, err
+		}
+		resp, err = api.HttpPOSTAuthenticated("http://"+addr+call, vals, password)
+		if err != nil {
+			return nil, errors.New("no response from daemon - authentication failed")
+		}
+	}
 	if resp.StatusCode == http.StatusNotFound {
 		resp.Body.Close()
 		err = errors.New("API call not recognized: " + call)
