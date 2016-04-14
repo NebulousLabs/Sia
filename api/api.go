@@ -70,15 +70,35 @@ func requireUserAgent(h http.Handler, ua string) http.Handler {
 	})
 }
 
-// initAPI determines which functions handle each API call.
-func (srv *Server) initAPI() {
+// requirePassword is middleware that requires a request to authenticate with a
+// password using HTTP basic auth. Usernames are ignored. Empty passwords
+// indicate no authentication is required.
+func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
+	// An empty password is equivalent to no password.
+	if password == "" {
+		return h
+	}
+	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		_, pass, ok := req.BasicAuth()
+		if !ok || pass != password {
+			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
+			writeError(w, "API authentication failed.", http.StatusUnauthorized)
+			return
+		}
+		h(w, req, ps)
+	}
+}
+
+// initAPI determines which functions handle each API call. An empty string as
+// the password indicates no password.
+func (srv *Server) initAPI(password string) {
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(srv.unrecognizedCallHandler) // custom 404
 
 	// Daemon API Calls
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
-	router.GET("/daemon/stop", srv.daemonStopHandler)
+	router.GET("/daemon/stop", requirePassword(srv.daemonStopHandler, password))
 
 	// Consensus API Calls
 	if srv.cs != nil {
@@ -95,34 +115,35 @@ func (srv *Server) initAPI() {
 	// Gateway API Calls
 	if srv.gateway != nil {
 		router.GET("/gateway", srv.gatewayHandler)
-		router.POST("/gateway/add/:netaddress", srv.gatewayAddHandler)
-		router.POST("/gateway/remove/:netaddress", srv.gatewayRemoveHandler)
+		router.POST("/gateway/add/:netaddress", requirePassword(srv.gatewayAddHandler, password))
+		router.POST("/gateway/remove/:netaddress", requirePassword(srv.gatewayRemoveHandler, password))
 	}
 
 	// Host API Calls
 	if srv.host != nil {
 		// Calls directly pertaining to the host.
-		router.GET("/host", srv.hostHandlerGET)                // Get a bunch of information about the host.
-		router.POST("/host", srv.hostHandlerPOST)              // Set HostInternalSettings.
-		router.POST("/host/announce", srv.hostAnnounceHandler) // Announce the host, optionally on a specific address.
+		router.GET("/host", srv.hostHandlerGET)                                           // Get a bunch of information about the host.
+		router.POST("/host", requirePassword(srv.hostHandlerPOST, password))              // Set HostInternalSettings.
+		router.POST("/host/announce", requirePassword(srv.hostAnnounceHandler, password)) // Announce the host, optionally on a specific address.
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/storage", srv.storageHandler)
-		router.POST("/storage/folders/add/*folder", srv.storageFoldersAddHandler)
-		router.POST("/storage/folders/remove/*folder", srv.storageFoldersRemoveHandler)
-		router.POST("/storage/folders/resize/*folder", srv.storageFoldersResizeHandler)
-		router.POST("/storage/sectors/delete/:merkleroot", srv.storageSectorsDeleteHandler)
+		router.POST("/storage/folders/add/*folder", requirePassword(srv.storageFoldersAddHandler, password))
+		router.POST("/storage/folders/remove/*folder", requirePassword(srv.storageFoldersRemoveHandler, password))
+		router.POST("/storage/folders/resize/*folder", requirePassword(srv.storageFoldersResizeHandler, password))
+		router.POST("/storage/sectors/delete/:merkleroot", requirePassword(srv.storageSectorsDeleteHandler, password))
 	}
 
 	// Miner API Calls
 	if srv.miner != nil {
 		router.GET("/miner", srv.minerHandler)
-		router.GET("/miner/header", srv.minerHeaderHandlerGET)
-		router.POST("/miner/header", srv.minerHeaderHandlerPOST)
-		router.GET("/miner/start", srv.minerStartHandler)
-		router.GET("/miner/stop", srv.minerStopHandler)
-		router.GET("/miner/headerforwork", srv.minerHeaderHandlerGET)  // COMPATv0.4.8
-		router.POST("/miner/submitheader", srv.minerHeaderHandlerPOST) // COMPATv0.4.8
+		router.GET("/miner/header", requirePassword(srv.minerHeaderHandlerGET, password))
+		router.POST("/miner/header", requirePassword(srv.minerHeaderHandlerPOST, password))
+		router.GET("/miner/start", requirePassword(srv.minerStartHandler, password))
+		router.GET("/miner/stop", requirePassword(srv.minerStopHandler, password))
+		// TODO: doesn't adding authentication break compatibility?
+		router.GET("/miner/headerforwork", requirePassword(srv.minerHeaderHandlerGET, password))  // COMPATv0.4.8
+		router.POST("/miner/submitheader", requirePassword(srv.minerHeaderHandlerPOST, password)) // COMPATv0.4.8
 	}
 
 	// Renter API Calls
@@ -132,15 +153,15 @@ func (srv *Server) initAPI() {
 		router.GET("/renter/allowance", srv.renterAllowanceHandlerGET)
 		router.POST("/renter/allowance", srv.renterAllowanceHandlerPOST)
 
-		router.POST("/renter/load", srv.renterLoadHandler)
-		router.POST("/renter/loadascii", srv.renterLoadAsciiHandler)
-		router.GET("/renter/share", srv.renterShareHandler)
-		router.GET("/renter/shareascii", srv.renterShareAsciiHandler)
+		router.POST("/renter/load", requirePassword(srv.renterLoadHandler, password))
+		router.POST("/renter/loadascii", requirePassword(srv.renterLoadAsciiHandler, password))
+		router.GET("/renter/share", requirePassword(srv.renterShareHandler, password))
+		router.GET("/renter/shareascii", requirePassword(srv.renterShareAsciiHandler, password))
 
-		router.POST("/renter/delete/*siapath", srv.renterDeleteHandler)
-		router.GET("/renter/download/*siapath", srv.renterDownloadHandler)
-		router.POST("/renter/rename/*siapath", srv.renterRenameHandler)
-		router.POST("/renter/upload/*siapath", srv.renterUploadHandler)
+		router.POST("/renter/delete/*siapath", requirePassword(srv.renterDeleteHandler, password))
+		router.GET("/renter/download/*siapath", requirePassword(srv.renterDownloadHandler, password))
+		router.POST("/renter/rename/*siapath", requirePassword(srv.renterRenameHandler, password))
+		router.POST("/renter/upload/*siapath", requirePassword(srv.renterUploadHandler, password))
 
 		router.GET("/renter/hosts/active", srv.renterHostsActiveHandler)
 		router.GET("/renter/hosts/all", srv.renterHostsAllHandler)
@@ -154,22 +175,23 @@ func (srv *Server) initAPI() {
 	// Wallet API Calls
 	if srv.wallet != nil {
 		router.GET("/wallet", srv.walletHandler)
-		router.POST("/wallet/033x", srv.wallet033xHandler)
-		router.GET("/wallet/address", srv.walletAddressHandler)
+		router.POST("/wallet/033x", requirePassword(srv.wallet033xHandler, password))
+		router.GET("/wallet/address", requirePassword(srv.walletAddressHandler, password))
 		router.GET("/wallet/addresses", srv.walletAddressesHandler)
-		router.GET("/wallet/backup", srv.walletBackupHandler)
-		router.POST("/wallet/init", srv.walletInitHandler)
-		router.POST("/wallet/lock", srv.walletLockHandler)
-		router.POST("/wallet/seed", srv.walletSeedHandler)
-		router.GET("/wallet/seeds", srv.walletSeedsHandler)
-		router.POST("/wallet/siacoins", srv.walletSiacoinsHandler)
-		router.POST("/wallet/siafunds", srv.walletSiafundsHandler)
-		router.POST("/wallet/siagkey", srv.walletSiagkeyHandler)
+		router.GET("/wallet/backup", requirePassword(srv.walletBackupHandler, password))
+		router.POST("/wallet/init", requirePassword(srv.walletInitHandler, password))
+		router.POST("/wallet/lock", requirePassword(srv.walletLockHandler, password))
+		router.POST("/wallet/seed", requirePassword(srv.walletSeedHandler, password))
+		router.GET("/wallet/seeds", requirePassword(srv.walletSeedsHandler, password))
+		router.POST("/wallet/siacoins", requirePassword(srv.walletSiacoinsHandler, password))
+		router.POST("/wallet/siafunds", requirePassword(srv.walletSiafundsHandler, password))
+		router.POST("/wallet/siagkey", requirePassword(srv.walletSiagkeyHandler, password))
 		router.GET("/wallet/transaction/:id", srv.walletTransactionHandler)
 		router.GET("/wallet/transactions", srv.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", srv.walletTransactionsAddrHandler)
-		router.POST("/wallet/unlock", srv.walletUnlockHandler)
-		router.POST("/wallet/encrypt", srv.walletInitHandler) // COMPATv0.4.0
+		router.POST("/wallet/unlock", requirePassword(srv.walletUnlockHandler, password))
+		// TODO: doesn't authentication break compatibility?
+		router.POST("/wallet/encrypt", requirePassword(srv.walletInitHandler, password)) // COMPATv0.4.0
 	}
 
 	// Apply UserAgent middleware and create HTTP server
