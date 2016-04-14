@@ -17,8 +17,8 @@ in production.
 
 Notes:
 - Requests must set their User-Agent string to contain the substring "Sia-Agent".
-- By default, siad listens on "localhost:9980". This can be changed using the '-a'
-  flag when running siad.
+- By default, siad listens on "localhost:9980". This can be changed using the
+  '--api-addr' flag when running siad.
 - The types.Currency object is an arbitrary-precision unsigned integer. In JSON,
   it is represented as a base-10 string. You must use a "bignum" library to handle
   these values, or you risk losing precision.
