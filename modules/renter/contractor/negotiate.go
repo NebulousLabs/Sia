@@ -101,7 +101,7 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 	fcid := txnSet[len(txnSet)-1].FileContractID(0)
 
 	// send acceptance, txn signed by us, and pubkey
-	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
+	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
 		return Contract{}, errors.New("couldn't send initial acceptance: " + err.Error())
 	}
 	if err := encoding.WriteObject(conn, txnSet); err != nil {
@@ -112,12 +112,8 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 	}
 
 	// read acceptance and txn signed by host
-	var response string
-	if err := encoding.ReadObject(conn, &response, modules.MaxErrorSize); err != nil {
-		return Contract{}, errors.New("couldn't read the host's response to our proposed contract: " + err.Error())
-	}
-	if response != modules.AcceptResponse {
-		return Contract{}, errors.New("host rejected proposed contract: " + response)
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return Contract{}, errors.New("host did not accept our proposed contract: " + err.Error())
 	}
 	// host now sends any new parent transactions, inputs and outputs that
 	// were added to the transaction
@@ -158,21 +154,17 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 
 	// Send acceptance and signatures
 	// TODO: validate new txn
-	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
+	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
 		return Contract{}, errors.New("couldn't send transaction acceptance: " + err.Error())
 	}
 	if err := encoding.WriteObject(conn, addedSignatures); err != nil {
 		return Contract{}, errors.New("couldn't send added signatures: " + err.Error())
 	}
 
-	// Read the host signatures.
-	var acceptStr string
-	err = encoding.ReadObject(conn, &acceptStr, modules.MaxErrorSize)
+	// Read the host acceptance and signatures.
+	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return Contract{}, err
-	}
-	if acceptStr != modules.AcceptResponse {
-		return Contract{}, errors.New(acceptStr)
+		return Contract{}, errors.New("host did not accept our signatures: " + err.Error())
 	}
 	var hostSigs []types.TransactionSignature
 	if err := encoding.ReadObject(conn, &hostSigs, 2e3); err != nil {

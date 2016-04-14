@@ -203,15 +203,10 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
 
-	// The renter is going to send a string, which will either be an error or
-	// will indicate that there was no error.
-	var acceptStr string
-	err = encoding.ReadObject(conn, &acceptStr, modules.MaxErrorSize)
+	// The renter sends a negotiation response.
+	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
 		return err
-	}
-	if acceptStr != modules.AcceptResponse {
-		return errors.New(acceptStr)
 	}
 
 	// The renter has sent an indication that the settings are acceptable, and
@@ -234,19 +229,19 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
-		return rejectNegotiation(conn, err)
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// The host adds collateral to the transaction.
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(txnSet)
 	if err != nil {
 		// TODO: should we return a different error here?
-		return rejectNegotiation(conn, err)
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// The host indicates acceptance, and then sends any new parent
 	// transactions, inputs and outputs that were added to the transaction.
-	err = acceptNegotiation(conn)
+	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
 		return err
 	}
@@ -263,14 +258,11 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		return err
 	}
 
-	// The renter will now send either an acceptance or rejection, followed by
-	// a transaction signature in the case of acceptance.
-	err = encoding.ReadObject(conn, &acceptStr, modules.MaxErrorSize)
+	// The renter will now send a negotiation response, followed by a
+	// transaction signature in the case of acceptance.
+	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
 		return err
-	}
-	if acceptStr != modules.AcceptResponse {
-		return errors.New(acceptStr)
 	}
 	var renterTxnSignatures []types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterTxnSignatures, 5e3)
@@ -288,9 +280,9 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
-		return rejectNegotiation(conn, err)
+		return modules.WriteNegotiationRejection(conn, err)
 	}
-	err = acceptNegotiation(conn)
+	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
 		return err
 	}

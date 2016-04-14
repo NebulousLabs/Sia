@@ -3,6 +3,7 @@ package modules
 import (
 	"bytes"
 	"errors"
+	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -200,6 +201,33 @@ type (
 		Data        []byte
 	}
 )
+
+// WriteNegotiationAcceptance writes the 'accept' response to conn.
+func WriteNegotiationAcceptance(conn net.Conn) error {
+	return encoding.WriteObject(conn, AcceptResponse)
+}
+
+// WriteNegotiationRejection will write a rejection response to the connection
+// and return the input error composed with the error received from writing to
+// the connection.
+func WriteNegotiationRejection(conn net.Conn, err error) error {
+	writeErr := encoding.WriteObject(conn, err.Error())
+	return build.JoinErrors([]error{err, writeErr}, "; ")
+}
+
+// ReadNegotiationAcceptance reads an accept/reject response from conn. If the
+// response is not acceptance, ReadNegotiationAcceptance returns the response
+// as an error.
+func ReadNegotiationAcceptance(conn net.Conn) error {
+	var resp string
+	err := encoding.ReadObject(conn, &resp, MaxErrorSize)
+	if err != nil {
+		return err
+	} else if resp != AcceptResponse {
+		return errors.New(resp)
+	}
+	return nil
+}
 
 // CreateAnnouncement will take a host announcement and encode it, returning
 // the exact []byte that should be added to the arbitrary data of a

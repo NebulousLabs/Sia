@@ -1,25 +1,10 @@
 package host
 
 import (
-	"net"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
-
-// acceptNegotiation writes the 'accept' response to conn.
-func acceptNegotiation(conn net.Conn) error {
-	return encoding.WriteObject(conn, modules.AcceptResponse)
-}
-
-// rejectNegotiation will write a rejection response to the connection and
-// return the input error composed with the error received from writing to the
-// connection.
-func rejectNegotiation(conn net.Conn, err error) error {
-	writeErr := encoding.WriteObject(conn, err.Error())
-	return composeErrors(err, writeErr)
-}
 
 // NetAddress returns the address at which the host can be reached.
 func (h *Host) NetAddress() modules.NetAddress {
