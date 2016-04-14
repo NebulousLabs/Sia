@@ -76,6 +76,10 @@ var (
 	// opportunity cost in being a host.
 	defaultCollateral = types.NewCurrency64(50) // 50 SC / GB / Month
 
+	defaultCollateralFraction = types.NewCurrency64(650e3)
+
+	defaultMaxCollateral = types.NewCurrency64(10000).Mul(types.SiacoinPrecision)
+
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
 	// has closed and buried under several confirmations. For release builds,

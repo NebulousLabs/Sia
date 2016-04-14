@@ -30,13 +30,20 @@ type (
 	transactionBuilder interface {
 		AddArbitraryData([]byte) uint64
 		AddFileContract(types.FileContract) uint64
+		AddMinerFee(types.Currency) uint64
+		AddParents([]types.Transaction)
+		AddSiacoinInput(types.SiacoinInput) uint64
+		AddSiacoinOutput(types.SiacoinOutput) uint64
+		AddTransactionSignature(types.TransactionSignature) uint64
 		Drop()
 		FundSiacoins(types.Currency) error
 		Sign(bool) ([]types.Transaction, error)
 		View() (types.Transaction, []types.Transaction)
+		ViewAdded() (parents, coins, funds, signatures []int)
 	}
 	transactionPool interface {
 		AcceptTransactionSet([]types.Transaction) error
+		FeeEstimation() (min types.Currency, max types.Currency)
 	}
 
 	hostDB interface {

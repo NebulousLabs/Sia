@@ -12,11 +12,18 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// estTxnSize is the estimated size of an encoded file contract
+	// transaction set.
+	estTxnSize = 1024
+)
+
 var (
 	// the contractor will not form contracts above this price
 	maxPrice = modules.StoragePriceToConsensus(500000) // 500k SC / TB / Month
 
-	errTooExpensive = errors.New("host price was too high")
+	errTooExpensive    = errors.New("host price was too high")
+	errSmallCollateral = errors.New("host collateral was too small")
 )
 
 // verifySettings reads a signed HostSettings object from conn, validates the
@@ -48,7 +55,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 
 // negotiateContract establishes a connection to a host and negotiates an
 // initial file contract according to the terms of the host.
-func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
+func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool, renterCost types.Currency) (Contract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -71,48 +78,108 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 	// add UnlockHash to file contract
 	fc.UnlockHash = uc.UnlockHash()
 
+	// calculate transaction fee
+	_, maxFee := tpool.FeeEstimation()
+	fee := maxFee.Mul(types.NewCurrency64(estTxnSize))
+
 	// build transaction containing fc
-	err = txnBuilder.FundSiacoins(fc.Payout)
+	err = txnBuilder.FundSiacoins(renterCost.Add(fee))
 	if err != nil {
 		encoding.WriteObject(conn, "internal error")
 		return Contract{}, err
 	}
 	txnBuilder.AddFileContract(fc)
 
+	// add miner fee
+	txnBuilder.AddMinerFee(fee)
+
+	// create the txn
+	txn, parentTxns := txnBuilder.View()
+	txnSet := append(parentTxns, txn)
+
+	// calculate contract ID
+	fcid := txnSet[len(txnSet)-1].FileContractID(0)
+
+	// send acceptance, txn signed by us, and pubkey
+	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
+		return Contract{}, errors.New("couldn't send initial acceptance: " + err.Error())
+	}
+	if err := encoding.WriteObject(conn, txnSet); err != nil {
+		return Contract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
+	}
+	if err := encoding.WriteObject(conn, ourPK); err != nil {
+		return Contract{}, errors.New("couldn't send our public key: " + err.Error())
+	}
+
+	// read acceptance and txn signed by host
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return Contract{}, errors.New("host did not accept our proposed contract: " + err.Error())
+	}
+	// host now sends any new parent transactions, inputs and outputs that
+	// were added to the transaction
+	var newParents []types.Transaction
+	var newInputs []types.SiacoinInput
+	var newOutputs []types.SiacoinOutput
+	if err := encoding.ReadObject(conn, &newParents, types.BlockSizeLimit); err != nil {
+		return Contract{}, errors.New("couldn't read the host's added parents: " + err.Error())
+	}
+	if err := encoding.ReadObject(conn, &newInputs, types.BlockSizeLimit); err != nil {
+		return Contract{}, errors.New("couldn't read the host's added inputs: " + err.Error())
+	}
+	if err := encoding.ReadObject(conn, &newOutputs, types.BlockSizeLimit); err != nil {
+		return Contract{}, errors.New("couldn't read the host's added outputs: " + err.Error())
+	}
+
+	// merge txnAdditions with txnSet
+	txnBuilder.AddParents(newParents)
+	for _, input := range newInputs {
+		txnBuilder.AddSiacoinInput(input)
+	}
+	for _, output := range newOutputs {
+		txnBuilder.AddSiacoinOutput(output)
+	}
+
 	// sign the txn
-	signedTxnSet, err := txnBuilder.Sign(false)
+	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return Contract{}, err
 	}
 
-	// calculate contract ID
-	fcid := signedTxnSet[len(signedTxnSet)-1].FileContractID(0)
-
-	// send acceptance and txn signed by us
-	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
-		return Contract{}, errors.New("couldn't send acceptance: " + err.Error())
-	}
-	if err := encoding.WriteObject(conn, signedTxnSet); err != nil {
-		return Contract{}, errors.New("couldn't send the contract signed by us: " + err.Error())
+	// calculate signatures added by the transaction builder
+	var addedSignatures []types.TransactionSignature
+	_, _, _, addedSignatureIndices := txnBuilder.ViewAdded()
+	for _, i := range addedSignatureIndices {
+		addedSignatures = append(addedSignatures, signedTxnSet[len(signedTxnSet)-1].TransactionSignatures[i])
 	}
 
-	// read acceptance and txn signed by host
-	var response string
-	if err := encoding.ReadObject(conn, &response, 128); err != nil {
-		return Contract{}, errors.New("couldn't read the host's response to our proposed contract: " + err.Error())
+	// Send acceptance and signatures
+	// TODO: validate new txn
+	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
+		return Contract{}, errors.New("couldn't send transaction acceptance: " + err.Error())
 	}
-	if response != modules.AcceptResponse {
-		return Contract{}, errors.New("host rejected proposed contract: " + response)
-	}
-	var hostTxnSet []types.Transaction
-	if err := encoding.ReadObject(conn, &hostTxnSet, types.BlockSizeLimit); err != nil {
-		return Contract{}, errors.New("couldn't read the host's updated contract: " + err.Error())
+	if err := encoding.WriteObject(conn, addedSignatures); err != nil {
+		return Contract{}, errors.New("couldn't send added signatures: " + err.Error())
 	}
 
-	// TODO: check txn?
+	// Read the host acceptance and signatures.
+	err = modules.ReadNegotiationAcceptance(conn)
+	if err != nil {
+		return Contract{}, errors.New("host did not accept our signatures: " + err.Error())
+	}
+	var hostSigs []types.TransactionSignature
+	if err := encoding.ReadObject(conn, &hostSigs, 2e3); err != nil {
+		return Contract{}, errors.New("couldn't read the host's signatures: " + err.Error())
+	}
+	for _, sig := range hostSigs {
+		txnBuilder.AddTransactionSignature(sig)
+	}
+
+	// Construct the final transaction.
+	txn, parentTxns = txnBuilder.View()
+	txnSet = append(parentTxns, txn)
 
 	// submit to blockchain
-	err = tpool.AcceptTransactionSet(hostTxnSet)
+	err = tpool.AcceptTransactionSet(txnSet)
 	if err == modules.ErrDuplicateTransactionSet {
 		// as long as it made it into the transaction pool, we're good
 		err = nil
@@ -135,7 +202,7 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 			NewWindowStart:        fc.WindowStart,
 			NewWindowEnd:          fc.WindowEnd,
 			NewValidProofOutputs:  []types.SiacoinOutput{fc.ValidProofOutputs[0], fc.ValidProofOutputs[1]},
-			NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1]},
+			NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1], fc.MissedProofOutputs[2]},
 			NewUnlockHash:         fc.UnlockHash,
 		},
 		LastRevisionTxn: types.Transaction{},
@@ -149,7 +216,7 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 // and returns a Contract. The contract is also saved by the HostDB.
 func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
-	if host.ContractPrice.Cmp(maxPrice) > 0 {
+	if host.StoragePrice.Cmp(maxPrice) > 0 {
 		return Contract{}, errTooExpensive
 	}
 
@@ -171,10 +238,23 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	}
 	duration := endHeight - height
 
-	// create file contract
-	renterCost := host.ContractPrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
-	payout := renterCost.Add(host.Collateral)
+	// calculate cost to renter and cost to host
+	// TODO: clarify/abstract this math
+	storageAllocation := host.StoragePrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
+	hostCollateral := storageAllocation.Mul(host.MaxCollateralFraction).Div(types.NewCurrency64(1e6).Sub(host.MaxCollateralFraction))
+	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
+		// TODO: check that this isn't too small
+		hostCollateral = host.MaxCollateral
+	}
+	saneCollateral := host.Collateral.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration))).Mul(types.NewCurrency64(2)).Div(types.NewCurrency64(3))
+	if hostCollateral.Cmp(saneCollateral) < 0 {
+		return Contract{}, errSmallCollateral
+	}
+	hostPayout := hostCollateral.Add(host.ContractPrice)
+	payout := storageAllocation.Add(hostPayout).Mul(types.NewCurrency64(uint64(10406))).Div(types.NewCurrency64(uint64(10000)))
+	renterCost := payout.Sub(hostCollateral)
 
+	// create file contract
 	fc := types.FileContract{
 		FileSize:       0,
 		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
@@ -185,14 +265,16 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// outputs need to account for tax
-			{Value: types.PostTax(height, renterCost), UnlockHash: ourAddress},
-			// no collateral
-			{Value: types.ZeroCurrency, UnlockHash: host.UnlockHash},
+			{Value: types.PostTax(height, payout).Sub(hostPayout), UnlockHash: ourAddress},
+			// collateral is returned to host
+			{Value: hostPayout, UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			// same as above
-			{Value: types.PostTax(height, renterCost), UnlockHash: ourAddress},
-			// goes to the void, not the renter
+			{Value: types.PostTax(height, payout).Sub(hostPayout), UnlockHash: ourAddress},
+			// same as above
+			{Value: hostPayout, UnlockHash: host.UnlockHash},
+			// once we start doing revisions, we'll move some coins to the host and some to the void
 			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
 		},
 	}
@@ -217,7 +299,7 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	txnBuilder := c.wallet.StartTransaction()
 
 	// execute negotiation protocol
-	contract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool)
+	contract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool, renterCost)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return Contract{}, err
@@ -244,7 +326,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	// Calculate average host price
 	var sum types.Currency
 	for _, h := range hosts {
-		sum = sum.Add(h.ContractPrice)
+		sum = sum.Add(h.StoragePrice)
 	}
 	avgPrice := sum.Div(types.NewCurrency64(uint64(len(hosts))))
 

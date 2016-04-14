@@ -62,9 +62,9 @@ type (
 		NetAddress         NetAddress        `json:"netaddress"`
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
-		Collateral         types.Currency `json:"collateral"`
-		CollateralFraction types.Currency `json:"collateralfraction"`
-		MaxCollateral      types.Currency `json:"maxcollateral"`
+		Collateral            types.Currency `json:"collateral"`
+		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
+		MaxCollateral         types.Currency `json:"maxcollateral"`
 
 		BandwidthLimits               HostBandwidthLimits `json:"bandwidthlimits"`
 		MinimumContractPrice          types.Currency      `json:"contractprice"`

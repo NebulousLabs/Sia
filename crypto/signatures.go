@@ -59,7 +59,7 @@ func GenerateKeyPairDeterministic(entropy [EntropySize]byte) (SecretKey, PublicK
 	return stdKeyGen.generateDeterministic(entropy)
 }
 
-// ReadSignedObject reads a length-prefixed object followed by its signature,
+// ReadSignedObject reads a length-prefixed object prefixed by its signature,
 // and verifies the signature.
 func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) error {
 	// read the signature
@@ -101,7 +101,7 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	return nil
 }
 
-// WriteSignedObject writes a length-prefixed object followed by its signature.
+// WriteSignedObject writes a length-prefixed object prefixed by its signature.
 func WriteSignedObject(w io.Writer, obj interface{}, sk SecretKey) error {
 	objBytes := encoding.Marshal(obj)
 	sig, err := SignHash(HashBytes(objBytes), sk)

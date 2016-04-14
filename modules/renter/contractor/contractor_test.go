@@ -26,7 +26,8 @@ func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }
 func (newStub) StartTransaction() modules.TransactionBuilder        { return nil }
 
 // transaction pool stubs
-func (newStub) AcceptTransactionSet([]types.Transaction) error { return nil }
+func (newStub) AcceptTransactionSet([]types.Transaction) error      { return nil }
+func (newStub) FeeEstimation() (a types.Currency, b types.Currency) { return }
 
 // hdb stubs
 func (newStub) Host(modules.NetAddress) (settings modules.HostDBEntry, ok bool) { return }

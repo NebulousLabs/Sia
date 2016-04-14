@@ -3,6 +3,7 @@ package modules
 import (
 	"bytes"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -174,9 +175,9 @@ type (
 		//
 		// MaxCollateral indicates the maximum number of coins that a host is
 		// willing to put into a file contract.
-		Collateral         types.Currency `json:"collateral"`
-		CollateralFraction types.Currency `json:"collateralfraction"`
-		MaxCollateral      types.Currency `json:"maxcollateral"`
+		Collateral            types.Currency `json:"collateral"`
+		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
+		MaxCollateral         types.Currency `json:"maxcollateral"`
 
 		ContractPrice          types.Currency `json:"contractprice"`
 		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`
@@ -200,6 +201,41 @@ type (
 		Data        []byte
 	}
 )
+
+// WriteNegotiationAcceptance writes the 'accept' response to w (usually a
+// net.Conn).
+func WriteNegotiationAcceptance(w io.Writer) error {
+	return encoding.WriteObject(w, AcceptResponse)
+}
+
+// WriteNegotiationRejection will write a rejection response to w (usually a
+// net.Conn) and return the input error. If the write fails, the write error
+// is joined with the input error.
+func WriteNegotiationRejection(w io.Writer, err error) error {
+	writeErr := encoding.WriteObject(w, err.Error())
+	if writeErr != nil {
+		return build.JoinErrors([]error{err, writeErr}, "; ")
+	}
+	return err
+}
+
+// ReadNegotiationAcceptance reads an accept/reject response from r (usually a
+// net.Conn). If the response is not acceptance, ReadNegotiationAcceptance
+// returns the response as an error.
+//
+// Note that since errors returned by ReadNegotiationAcceptance are newly
+// allocated, they cannot be compared to other errors in the traditional
+// fashion.
+func ReadNegotiationAcceptance(r io.Reader) error {
+	var resp string
+	err := encoding.ReadObject(r, &resp, MaxErrorSize)
+	if err != nil {
+		return err
+	} else if resp != AcceptResponse {
+		return errors.New(resp)
+	}
+	return nil
+}
 
 // CreateAnnouncement will take a host announcement and encode it, returning
 // the exact []byte that should be added to the arbitrary data of a

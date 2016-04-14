@@ -76,13 +76,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 
 	// The renter will either accept or reject the settings + revision
 	// transaction.
-	var acceptStr string
-	err = encoding.ReadObject(conn, &acceptStr, modules.MaxErrorSize)
+	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
 		return false, err
-	}
-	if acceptStr != modules.AcceptResponse {
-		return false, errors.New(acceptStr)
 	}
 
 	// The renter is now going to send a batch of modifications followed by and
@@ -176,11 +172,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	}
 	err = verifyRevision(so, revision, storageRevenue, bandwidthRevenue, collateralRisked)
 	if err != nil {
-		return false, rejectNegotiation(conn, err)
+		return false, modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// Revision is acceptable, write an acceptance string.
-	err = encoding.WriteObject(conn, modules.AcceptResponse)
+	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
 		return false, err
 	}
@@ -271,7 +267,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	defer h.unlockStorageObligation(so)
 
 	// Indicate that the host is accepting the revision request.
-	err = encoding.WriteObject(conn, modules.AcceptResponse)
+	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
 		return err
 	}
