@@ -52,6 +52,67 @@ func versionCmd(*cobra.Command, []string) {
 	fmt.Println("Sia Daemon v" + build.Version)
 }
 
+// modulesCmd is a cobra command that prints help info about modules.
+func modulesCmd(*cobra.Command, []string) {
+	fmt.Println(`Use the -M or --modules flag to only run specific modules. Modules are
+independent components of Sia. This flag should only be used by developers or
+people who want to reduce overhead from unused modules. Modules are specified by
+their first letter. If the -M or --modules flag is not specified the default
+modules are run. The default modules are:
+	gateway, consensus set, host, miner, renter, transaction pool, wallet
+This is equivalent to:
+	siad -M cghmrtw
+Below is a list of all the modules available.
+
+Gateway (g):
+	The gateway maintains a peer to peer connection to the network and
+	enables other modules to perform RPC calls on peers.
+	The gateway is required by all other modules.
+	Example:
+		siad -M g
+Consensus Set (c):
+	The consensus set manages everything related to consensus and keeps the
+	blockchain in sync with the rest of the network.
+	The consensus set requires the gateway.
+	Example:
+		siad -M gc
+Transaction Pool (t):
+	The transaction pool manages unconfirmed transactions.
+	The transaction pool requires the consensus set.
+	Example:
+		siad -M gct
+Wallet (w):
+	The wallet stores and manages siacoins and siafunds.
+	The wallet requires the consensus set and transaction pool.
+	Example:
+		siad -M gctw
+Renter (r):
+	The renter manages the user's files on the network.
+	The renter requires the consensus set, transaction pool, and wallet.
+	Example:
+		siad -M gctwr
+Host (h):
+	The host provides storage from local disks to the network. The host
+	negotiates file contracts with remote renters to earn money for storing
+	other users' files.
+	The host requires the consensus set, transaction pool, and wallet.
+	Example:
+		siad -M gctwh
+Miner (m):
+	The miner provides a basic CPU mining implementation as well as an API
+	for external miners to use.
+	The miner requires the consensus set, transaction pool, and wallet.
+	Example:
+		siad -M gctwm
+Explorer (e):
+	The explorer provides statistics about the blockchain and can be
+	queried for information about specific transactions or other objects on
+	the blockchain.
+	The explorer requires the consenus set.
+	Example:
+		siad -M gce`)
+}
+
 // main establishes a set of commands and flags using the cobra package.
 func main() {
 	root := &cobra.Command{
@@ -68,16 +129,34 @@ func main() {
 		Run:   versionCmd,
 	})
 
+	root.AddCommand(&cobra.Command{
+		Use:   "modules",
+		Short: "List available modules for use with -M, --modules flag",
+		Long:  "List available modules for use with -M, --modules flag and their uses",
+		Run:   modulesCmd,
+	})
+
 	// Set default values, which have the lowest priority.
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.RequiredUserAgent, "agent", "A", "Sia-Agent", "required substring for the user agent")
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
-	root.PersistentFlags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
-	root.PersistentFlags().BoolVarP(&globalConfig.Siad.Profile, "profile", "p", false, "enable profiling")
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
-	root.PersistentFlags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules")
+	root.Flags().StringVarP(&globalConfig.Siad.RequiredUserAgent, "agent", "A", "Sia-Agent", "required substring for the user agent")
+	root.Flags().StringVarP(&globalConfig.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
+	root.Flags().StringVarP(&globalConfig.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
+	root.Flags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
+	root.Flags().StringVarP(&globalConfig.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
+	root.Flags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
+	root.Flags().BoolVarP(&globalConfig.Siad.Profile, "profile", "p", false, "enable profiling")
+	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
+	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules, see 'siad modules' for more info")
+
+	// Deprecate shorthand flags that aren't commonly used.
+	// COMPATv0.5.2
+	// TODO: remove shorthands for these flags by supplying a blank shorthand in flag construction above.
+	root.Flags().MarkShorthandDeprecated("agent", "please use --agent instead")
+	root.Flags().MarkShorthandDeprecated("host-addr", "please use --host-addr instead")
+	root.Flags().MarkShorthandDeprecated("profile-directory", "please use --profile-directory instead")
+	root.Flags().MarkShorthandDeprecated("api-addr", "please use --api-addr instead")
+	root.Flags().MarkShorthandDeprecated("no-bootstrap", "please use --no-bootstrap instead")
+	root.Flags().MarkShorthandDeprecated("profile", "please use --profile instead")
+	root.Flags().MarkShorthandDeprecated("rpc-addr", "please use --rpc-addr instead")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

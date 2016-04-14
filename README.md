@@ -56,8 +56,8 @@ Troubleshooting
   are connected to the Internet. If you are confident that your connection is
   okay, contact us! Our server may be experiencing problems.
 
-  You can also opt not to connect to join the network by passing the "-n" flag
-  to siad.
+  You can also opt not to connect to join the network by passing the
+  "--no-bootstrap" flag to siad.
 
 - I can't connect to more than 8 peers.
 
