@@ -106,7 +106,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	txnBuilder := c.wallet.StartTransaction()
 
 	// execute negotiation protocol
-	newContract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool)
+	newContract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool, renterCost)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return types.FileContractID{}, err
