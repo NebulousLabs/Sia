@@ -8,6 +8,11 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// acceptNegotiation writes the 'accept' response to conn.
+func acceptNegotiation(conn net.Conn) error {
+	return encoding.WriteObject(conn, modules.AcceptResponse)
+}
+
 // rejectNegotiation will write a rejection response to the connection and
 // return the input error composed with the error received from writing to the
 // connection.

@@ -174,9 +174,9 @@ type (
 		//
 		// MaxCollateral indicates the maximum number of coins that a host is
 		// willing to put into a file contract.
-		Collateral         types.Currency `json:"collateral"`
-		CollateralFraction types.Currency `json:"collateralfraction"`
-		MaxCollateral      types.Currency `json:"maxcollateral"`
+		Collateral            types.Currency `json:"collateral"`
+		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
+		MaxCollateral         types.Currency `json:"maxcollateral"`
 
 		ContractPrice          types.Currency `json:"contractprice"`
 		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`

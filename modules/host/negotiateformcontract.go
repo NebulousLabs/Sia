@@ -236,13 +236,21 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		// why to the renter.
 		return rejectNegotiation(conn, err)
 	}
+
 	// The host adds collateral, then sends any new parent transactions,
 	// followed by any new inputs to the transaction, followed by any new
 	// outputs to the transaction.
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(txnSet)
 	if err != nil {
-		return rejectNegotiation(conn, err)
+		// an error here indicates the host does not have enough money to fund
+		// the collateral payment
+		return rejectNegotiation(conn, errBadPayoutsAmounts)
 	}
+	err = acceptNegotiation(conn)
+	if err != nil {
+		return err
+	}
+
 	err = encoding.WriteObject(conn, newParents)
 	if err != nil {
 		return err
@@ -282,6 +290,10 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
 		return rejectNegotiation(conn, err)
+	}
+	err = acceptNegotiation(conn)
+	if err != nil {
+		return err
 	}
 
 	// The host sends the transaction signatures to the renter. Negotiation is

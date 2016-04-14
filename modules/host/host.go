@@ -185,7 +185,11 @@ func (h *Host) establishDefaults() error {
 		MaxDuration: defaultMaxDuration,
 		WindowSize:  defaultWindowSize,
 
-		Collateral:                    defaultCollateral,
+		Collateral:            defaultCollateral,
+		MaxCollateralFraction: defaultCollateralFraction,
+		MaxCollateral:         defaultMaxCollateral,
+
+		MinimumStoragePrice:           defaultStoragePrice,
 		MinimumContractPrice:          defaultContractPrice,
 		MinimumDownloadBandwidthPrice: defaultDownloadBandwidthPrice,
 		MinimumUploadBandwidthPrice:   defaultUploadBandwidthPrice,
