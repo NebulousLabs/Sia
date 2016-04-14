@@ -138,14 +138,6 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		return nil, err
 	}
 
-	// Submit the transaction to the transaction pool, and then return the full
-	// transaction set.
-	err = h.tpool.AcceptTransactionSet(fullTxnSet)
-	if err != nil {
-		builder.Drop()
-		return nil, err
-	}
-
 	// Create and add the storage obligation for this file contract.
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -156,7 +148,15 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		LockedCollateral:     hostPortion,
 		OriginTransactionSet: fullTxnSet,
 	}
+	err = h.lockStorageObligation(so)
+	if err != nil {
+		return nil, err
+	}
 	err = h.addStorageObligation(so)
+	err2 := h.unlockStorageObligation(so)
+	if err2 != nil {
+		return nil, err2
+	}
 	if err != nil {
 		// An error here is pretty bad, because the signed file contract has
 		// already been broadcast to the world, meaning the host is going to be
@@ -237,20 +237,19 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		return rejectNegotiation(conn, err)
 	}
 
-	// The host adds collateral, then sends any new parent transactions,
-	// followed by any new inputs to the transaction, followed by any new
-	// outputs to the transaction.
+	// The host adds collateral to the transaction.
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(txnSet)
 	if err != nil {
-		// an error here indicates the host does not have enough money to fund
-		// the collateral payment
-		return rejectNegotiation(conn, errBadPayoutsAmounts)
+		// TODO: should we return a different error here?
+		return rejectNegotiation(conn, err)
 	}
+
+	// The host indicates acceptance, and then sends any new parent
+	// transactions, inputs and outputs that were added to the transaction.
 	err = acceptNegotiation(conn)
 	if err != nil {
 		return err
 	}
-
 	err = encoding.WriteObject(conn, newParents)
 	if err != nil {
 		return err
@@ -357,9 +356,9 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 		return errBadPayoutsAmounts
 	}
 	// Check that the collateral for the host is not too high.
-	collateral := contractCollateral(settings, txnSet)
-	maxCollateral := fc.Payout.Mul(settings.MaxCollateralFraction).Div(types.NewCurrency64(1e6))
-	if collateral.Cmp(maxCollateral) > 0 {
+	expectedCollateral := contractCollateral(settings, txnSet)
+	expectedCollateralFraction := expectedCollateral.Mul(types.NewCurrency64(1e6)).Div(fc.Payout)
+	if expectedCollateralFraction.Cmp(settings.MaxCollateralFraction) > 0 {
 		return errBadPayoutsAmounts // TODO: Maybe errBadCollateralExpectation or something
 	}
 
