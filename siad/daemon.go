@@ -70,13 +70,13 @@ func processConfig(config Config) (Config, error) {
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
 	var password string
-	if !config.Siad.NoPassword {
+	if config.Siad.AuthenticateAPI {
 		password, err = speakeasy.Ask("Enter API password: ")
 		if err != nil {
 			return err
 		}
 		if password == "" {
-			return errors.New("password cannot be blank, use the --no-password flag instead")
+			return errors.New("password cannot be blank")
 		}
 		passwordConfirm, err := speakeasy.Ask("Confirm API password: ")
 		if err != nil {
