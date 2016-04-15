@@ -130,15 +130,6 @@ type (
 	// are the values that the renter will request from the host in order to
 	// build its database.
 	HostExternalSettings struct {
-		// Recipient is a field that allows the host to specify that the
-		// settings apply only to a single recipient. Generally, the field will
-		// be blank, meaning the settings apply to everyone. When there is a
-		// value, it will usually be an encoded public key. Certain recipients
-		// with good reputation or a history of honesty may receive better
-		// deals or increased collateral as a result of the reduced risk of
-		// scams.
-		Recipient string
-
 		// MaxBatchSize indicates the maximum size in bytes that a batch is
 		// allowed to be. A batch is an array of revision actions, each
 		// revision action can have a different number of bytes, depending on
@@ -179,6 +170,20 @@ type (
 		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
 		MaxCollateral         types.Currency `json:"maxcollateral"`
 
+		// ContractPrice is the number of coins that the renter needs to pay to
+		// the host just to open a file contract with them. Generally, the
+		// price is only to cover the siacoin fees that the host will suffer
+		// when submitting the file contract revision and storage proof to the
+		// blockchain.
+		//
+		// The storage price is the cost per-byte-per-block in hastings of
+		// storing data on the host.
+		//
+		// 'Download' bandwidth price is the cost per byte of downloading data
+		// from the host.
+		//
+		// 'Upload' bandwidth price is the cost per byte of uploading data to
+		// the host.
 		ContractPrice          types.Currency `json:"contractprice"`
 		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`
 		StoragePrice           types.Currency `json:"storageprice"`
@@ -192,8 +197,18 @@ type (
 		Version        string `json:"version"`
 	}
 
-	// A RevisionAction is a description of an edit to be performed on a
-	// contract.
+	// A RevisionAction is a description of an edit to be performed on a file
+	// contract. Three types are allowed, 'ActionDelecte', 'ActionInsert', and
+	// 'ActionModify'. ActionDelete just takes a sector index, indicating which
+	// sector is going to be deleted. ActionInsert takes a sector index, and a
+	// full sector of data, indicating that a sector at the index should be
+	// inserted with the provided data. 'Modify' revises the sector at the
+	// given index, rewriting it with the provided data starting from the
+	// 'offset' within the sector.
+	//
+	// Modify could be simulated with an insert and a delete, however an insert
+	// requires a full sector to be uploaded, and a modify can be just a few
+	// kb, which can be significantly faster.
 	RevisionAction struct {
 		Type        types.Specifier
 		SectorIndex uint64
