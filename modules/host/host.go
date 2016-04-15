@@ -27,6 +27,9 @@ package host
 // TODO: check that the host is doing proper clean shudown, especially
 // network.go, a couple of problems with clean shutdown in network.go.
 
+// TODO: 'announced' doesn't tell you if the announcement made it to the
+// blockchain.
+
 // TODO: clean up all of the magic numbers in the host.
 
 // TODO: host_test.go has commented out tests.
