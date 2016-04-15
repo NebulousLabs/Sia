@@ -3,7 +3,6 @@ package host
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -80,7 +79,7 @@ func (h *Host) Announce() error {
 	if h.settings.NetAddress != "" {
 		return h.announce(h.settings.NetAddress)
 	}
-	if (h.autoAddress == "" || h.autoAddress.IsLoopback()) && build.Release != "testing" {
+	if h.autoAddress == "" {
 		return errUnknownAddress
 	}
 	return h.announce(h.autoAddress)

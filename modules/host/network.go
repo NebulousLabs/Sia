@@ -48,12 +48,7 @@ func (h *Host) initNetworking(address string) (err error) {
 	h.mu.Lock()
 	h.port = modules.NetAddress(h.listener.Addr().String()).Port()
 	if build.Release == "testing" {
-		// TODO: I'm not really sure if this is causing errors because the
-		// tests are bad, or because the design is bad. But what seems to be
-		// happening is that the host is realizing it has an empty autoAddress,
-		// and this is somehow confusing the contractor. Bears further
-		// investigation.
-		h.autoAddress = modules.NetAddress(":" + h.port)
+		h.autoAddress = modules.NetAddress(net.JoinHostPort("localhost", h.port))
 	}
 	h.mu.Unlock()
 
