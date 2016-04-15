@@ -507,19 +507,24 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 		h.log.Critical("storage obligation confused!")
 	}
 	if sos == obligationRejected {
-		h.potentialStorageRevenue = h.potentialStorageRevenue.Sub(so.AnticipatedRevenue)
-		h.lockedStorageCollateral = h.lockedStorageCollateral.Sub(so.RiskedCollateral)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.AnticipatedRevenue)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.RiskedCollateral)
+		// h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCompensation)
 	}
 	if sos == obligationSucceeded {
-		h.potentialStorageRevenue = h.potentialStorageRevenue.Sub(so.AnticipatedRevenue)
-		h.lockedStorageCollateral = h.lockedStorageCollateral.Sub(so.RiskedCollateral)
-		h.storageRevenue = h.storageRevenue.Add(so.AnticipatedRevenue)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.AnticipatedRevenue)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.RiskedCollateral)
+		h.financialMetrics.StorageRevenue = h.financialMetrics.StorageRevenue.Add(so.AnticipatedRevenue)
+		// TODO: h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCompensation)
+		// TODO: h.financialMetrics.ContractCompensation = h.financialMetrics.ContractCompensation.Add(so.ContractCompensation)
 	}
 	if sos == obligationFailed {
-		h.potentialStorageRevenue = h.potentialStorageRevenue.Sub(so.AnticipatedRevenue)
-		h.lockedStorageCollateral = h.lockedStorageCollateral.Sub(so.RiskedCollateral)
-		h.lostStorageCollateral = h.lostStorageCollateral.Add(so.RiskedCollateral)
-		h.lostStorageRevenue = h.lostStorageRevenue.Add(so.AnticipatedRevenue)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.AnticipatedRevenue)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.RiskedCollateral)
+		h.financialMetrics.LostStorageCollateral = h.financialMetrics.LostStorageCollateral.Add(so.RiskedCollateral)
+		h.financialMetrics.LostStorageRevenue = h.financialMetrics.LostStorageRevenue.Add(so.AnticipatedRevenue)
+		// TODO: h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCompensation)
+		// TODO: h.financialMetrics.ContractCompensation = h.financialMetrics.ContractCompensation.Add(so.ContractCompensation)
 	}
 
 	// Delete the storage obligation from the database.

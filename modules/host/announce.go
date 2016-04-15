@@ -11,6 +11,10 @@ var (
 	// errAnnWalletLocked is returned during a host announcement if the wallet
 	// is locked.
 	errAnnWalletLocked = errors.New("cannot announce the host while the wallet is locked")
+
+	// errUnknownAddress is returned if the host is unable to determine a
+	// public address for itself to use in the announcement.
+	errUnknownAddress = errors.New("host cannot announce, does not seem to have a valid address.")
 )
 
 // announce creates an announcement transaction and submits it to the network.
@@ -55,6 +59,7 @@ func (h *Host) announce(addr modules.NetAddress) error {
 		txnBuilder.Drop()
 		return err
 	}
+	h.announced = true
 	h.log.Printf("INFO: Successfully announced as %v", addr)
 	return nil
 }
@@ -63,26 +68,22 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
 	if h.closed {
 		return errHostClosed
 	}
 
-	// Get the external IP again; it may have changed.
-	h.learnHostname()
-	h.mu.RLock()
-	addr := h.netAddress
-	h.mu.RUnlock()
-
-	// Check that the host's ip address is known.
-	if addr.IsLoopback() && build.Release != "testing" {
-		return errors.New("can't announce without knowing external IP")
+	// Determine whether to use the settings.NetAddress or autoAddress.
+	if h.settings.NetAddress != "" {
+		return h.announce(h.settings.NetAddress)
 	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.announce(addr)
+	if (h.autoAddress == "" || h.autoAddress.IsLoopback()) && build.Release != "testing" {
+		return errUnknownAddress
+	}
+	return h.announce(h.autoAddress)
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
@@ -96,6 +97,5 @@ func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 		return errHostClosed
 	}
 
-	h.revisionNumber++
 	return h.announce(addr)
 }

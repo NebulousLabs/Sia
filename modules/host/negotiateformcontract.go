@@ -120,7 +120,7 @@ func (h *Host) managedAddCollateral(txnSet []types.Transaction, settings modules
 	for _, inputIndex := range newInputIndices {
 		newInputs = append(newInputs, updatedTxn.SiacoinInputs[inputIndex])
 	}
-	for _, outputIndex :=  range newOutputIndices {
+	for _, outputIndex := range newOutputIndices {
 		newOutputs = append(newOutputs, updatedTxn.SiacoinOutputs[outputIndex])
 	}
 	return builder, newParents, newInputs, newOutputs, nil
@@ -310,7 +310,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	publicKey := h.publicKey
 	settings := h.settings
 	unlockHash := h.unlockHash
-	lockedStorageCollateral := h.lockedStorageCollateral
+	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	h.mu.RUnlock()
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 

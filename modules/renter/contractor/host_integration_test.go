@@ -157,7 +157,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	m.AddBlock()
 
 	// wait for hostdb to scan host
-	for len(c.hdb.RandomHosts(1, nil)) == 0 {
+	for i := 0; i < 300 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
 		time.Sleep(time.Millisecond)
 	}
 

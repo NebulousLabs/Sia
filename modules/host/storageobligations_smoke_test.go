@@ -210,7 +210,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
-	ht.host.potentialStorageRevenue = ht.host.potentialStorageRevenue.Add(sectorCost)
+	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)
 	validPayouts[1].Value = validPayouts[1].Value.Add(sectorCost)
@@ -319,7 +319,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	if err != errNoStorageObligation {
 		t.Fatal(err)
 	}
-	if ht.host.storageRevenue.Cmp(sectorCost) != 0 {
+	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost) != 0 {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }
@@ -395,7 +395,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
-	ht.host.potentialStorageRevenue = ht.host.potentialStorageRevenue.Add(sectorCost)
+	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)
 	validPayouts[1].Value = validPayouts[1].Value.Add(sectorCost)
@@ -448,7 +448,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	so.SectorRoots = []crypto.Hash{sectorRoot, sectorRoot2}
 	sectorCost2 := types.NewCurrency64(650).Mul(types.SiacoinPrecision)
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost2)
-	ht.host.potentialStorageRevenue = ht.host.potentialStorageRevenue.Add(sectorCost2)
+	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost2)
 	validPayouts, missedPayouts = so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost2)
 	validPayouts[1].Value = validPayouts[1].Value.Add(sectorCost2)
@@ -559,7 +559,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	if err != errNoStorageObligation {
 		t.Fatal(err)
 	}
-	if ht.host.storageRevenue.Cmp(sectorCost.Add(sectorCost2)) != 0 {
+	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost.Add(sectorCost2)) != 0 {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }
@@ -610,7 +610,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
-	ht.host.potentialStorageRevenue = ht.host.potentialStorageRevenue.Add(sectorCost)
+	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)
 	validPayouts[1].Value = validPayouts[1].Value.Add(sectorCost)
@@ -696,7 +696,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		t.Error(so.ProofConfirmed)
 		t.Fatal(err)
 	}
-	if ht.host.storageRevenue.Cmp(sectorCost) != 0 {
+	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost) != 0 {
 		t.Fatal("the host should be reporting revenue after a successful storage proof")
 	}
 }

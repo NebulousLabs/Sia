@@ -27,14 +27,21 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateSettingsTime))
 
-	h.mu.RLock()
+	h.mu.Lock()
+	h.revisionNumber++
 	secretKey := h.secretKey
 	totalStorage, remainingStorage := h.capacity()
+	var netAddr modules.NetAddress
+	if h.settings.NetAddress != "" {
+		netAddr = h.settings.NetAddress
+	} else {
+		netAddr = h.autoAddress
+	}
 	hes := modules.HostExternalSettings{
 		AcceptingContracts: h.settings.AcceptingContracts,
 		MaxBatchSize:       h.settings.MaxBatchSize,
 		MaxDuration:        h.settings.MaxDuration,
-		NetAddress:         h.netAddress,
+		NetAddress:         netAddr,
 		RemainingStorage:   remainingStorage,
 		SectorSize:         modules.SectorSize,
 		TotalStorage:       totalStorage,
@@ -53,6 +60,6 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 		RevisionNumber: h.revisionNumber,
 		Version:        build.Version,
 	}
-	h.mu.RUnlock()
+	h.mu.Unlock()
 	return crypto.WriteSignedObject(conn, hes, secretKey)
 }
