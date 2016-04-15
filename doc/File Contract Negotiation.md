@@ -20,16 +20,14 @@ untrusted environment. Managing data on Sia happens through several protocols:
 
 + Data Request - data is requested from the host for retrieval.
 
-### Extra protocols will eventually be implemented, but not until after the
-### v1.0 release.
++ (planned for later) Storage Proof Request - the renter requests that the host
+  perform an out-of-band storage proof.
 
-# Storage Proof Request - the renter requests that the host perform an
-# out-of-band storage proof.
-
-# Metadata Request - the renter requests some metadata about the file contract
-# from the host, namely the list of hashes that compose the file. This list of
-# hashes is provided along with a cryptographic proof that the hashes are
-# valid. The proof is only needed if only a subset of hashes are being sent.
++ (planned for later) Metadata Request - the renter requests some metadata
+  about the file contract from the host, namely the list of hashes that compose
+  the file. This list of hashes is provided along with a cryptographic proof
+  that the hashes are valid. The proof is only needed if only a subset of
+  hashes are being sent.
 
 A frequently seen construction is 'acceptance'. The renter or host may have the
 opportunity to accept or reject a communication, which takes the form of a
@@ -59,24 +57,24 @@ Settings Request
 File Contract Creation
 ----------------------
 
-# A few decisions were made regarding the file contract protocol. The first is
-# that the renter should not sign the file contract until the host has formally
-# accepted the file contract. The second is that the host should be the last
-# one to sign the file contract, as the renter is the party with the strong
-# reputation system.
-#
-# Instead of sending a whole transaction each time, the transaction is sent
-# piecemeal, and only the new parts at each step are sent to the other party.
-# This minimizes the surface area of data for a malicious party to manipulate,
-# which means less verification code, which means less chances of having a bug in
-# the verification code.
-#
-# The renter pays for the siafund fee on the host's collateral and contract
-# fee. If a renter opens a file contract and then never uses it, the host does
-# not lose money. This does put the renter at risk, as they may open up a file
-# contract and then watch the host leave, but the renter is spreading the risk
-# over communications with many hosts, and has a reputation system that will help
-# ensure that the renter is only dealing with upstanding hosts.
+A few decisions were made regarding the file contract protocol. The first is
+that the renter should not sign the file contract until the host has formally
+accepted the file contract. The second is that the host should be the last one
+to sign the file contract, as the renter is the party with the strong
+reputation system.
+
+Instead of sending a whole transaction each time, the transaction is sent
+piecemeal, and only the new parts at each step are sent to the other party.
+This minimizes the surface area of data for a malicious party to manipulate,
+which means less verification code, which means less chances of having a bug in
+the verification code.
+
+The renter pays for the siafund fee on the host's collateral and contract fee.
+If a renter opens a file contract and then never uses it, the host does not
+lose money. This does put the renter at risk, as they may open up a file
+contract and then watch the host leave, but the renter is spreading the risk
+over communications with many hosts, and has a reputation system that will help
+ensure that the renter is only dealing with upstanding hosts.
 
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 360 seconds.
