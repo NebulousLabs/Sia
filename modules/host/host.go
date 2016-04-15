@@ -1,29 +1,22 @@
 // Package host is an implementation of the host module, and is responsible for
-// storing data and advertising available storage to the network.
+// participating in the storage ecosystem, turning available disk space an
+// internet bandwidth into profit for the user.
 package host
 
-// TODO: There may need to be limitations on the window start.
+// TODO: automated_settings.go, a file which can be responsible for
+// automatically regulating things like bandwidth price, storage price,
+// contract price, etc. One of the features in consideration is that the host
+// would start to steeply increase the contract price as it begins to run low
+// on collateral. The host would also inform the user that there doesn't seem
+// to be enough money to handle all of the file contracts, so that the user
+// could make a judgement call on whether to get more.
 
-// TODO: Host pricing tools.
+// TODO: The host needs to somehow keep an awareness of its bandwidth limits,
+// and needs to reject calls if there is not enough bandwidth available.
 
 // TODO: The host should keep an awareness of its own IP and the addresses that
 // it has announced at, and should re-announce if the ip address changes or if
 // the host suddenly finds itself to be unreachable.
-
-// TODO: The host should somehow keep track of renters that make use of it,
-// perhaps through public keys or something, that allows the host to know which
-// renters can be safely allocated a greater number of collateral coins.
-//
-// Renters, especially new renters, are going to need some mechanic to ramp
-// with hosts. The answer may be that new renters go through multiple
-// iterations of file contracts.
-//
-// Adding some sort of proof-of-burn to the renter may be sufficient. If the
-// renter is burning 1% coins compared to what the host is locking away (for
-// new relationships), then the host can know that the renter has made
-// sacrifices in excess of just locking away a proportional amount of coins.
-// The renter will outright lose the coins, while the host will get the coins
-// back after some time has passed.
 
 // TODO: host_test.go has commented out tests.
 
@@ -104,12 +97,11 @@ type Host struct {
 	recentChange modules.ConsensusChangeID
 
 	// Host Identity
-	netAddress     modules.NetAddress
 	publicKey      types.SiaPublicKey
 	revisionNumber uint64
 	secretKey      crypto.SecretKey
-	sectorSalt     crypto.Hash
-	unlockHash     types.UnlockHash
+	settings       modules.HostInternalSettings
+	unlockHash     types.UnlockHash // A wallet address that can receive coins.
 
 	// Storage Obligation Management - different from file management in that
 	// the storage obligation management is the new way of handling storage
@@ -123,6 +115,7 @@ type Host struct {
 	// layout (knowledge which should be unavailable), but a limited amount of
 	// damage can be done even with this attack.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
+	sectorSalt               crypto.Hash
 	storageFolders           []*storageFolder
 
 	// Financial Metrics
@@ -142,7 +135,6 @@ type Host struct {
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
-	settings   modules.HostInternalSettings
 
 	// The resource lock is held by threaded functions for the duration of
 	// their operation. Functions should grab the resource lock as a read lock

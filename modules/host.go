@@ -63,6 +63,7 @@ type (
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
 		Collateral            types.Currency `json:"collateral"`
+		CollateralBudget      types.Currency `json:"collateralbudget"`
 		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
 		MaxCollateral         types.Currency `json:"maxcollateral"`
 
