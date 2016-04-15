@@ -15,15 +15,14 @@ object corresponding to the Metadata type exported by this package. This
 object contains a version string, which indicates the version of the .sia
 format used. At this time, the .sia format has no promise of backwards or
 forwards compatibility, except that the version field will never be removed
-from the metadata object.
+from the metadata object. Backwards compatibility will be guaranteed as of the
+1.0 release of Sia.
 
 The JSON encoding tries to be flexible in allowing arbitrary encryption and
 encoding schemes. As such, the "masterKey" and "erasureCode" fields are
 encoded as generic JSON objects (in Go, a map[string]interface{}). However,
 these objects must always contain a "name" field that identifies the scheme
-used. They may not be null.
-
-Integer fields must not contain negative values.
+used. They must not be null.
 
 The "permissions" field is encoded as a decimal number (not octal, or a
 symbolic string) and must not exceed 511 (0777 in octal).
