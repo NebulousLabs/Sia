@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -52,8 +53,16 @@ func TestThreadedProbeHosts(t *testing.T) {
 	hdb := bareHostDB()
 
 	// create a host to send to threadedProbeHosts
+	sk, pk, err := crypto.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
 	h := new(hostEntry)
 	h.NetAddress = "foo"
+	h.PublicKey = types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
 	h.reliability = baseWeight // enough to withstand a few failures
 
 	// define a helper function for running threadedProbeHosts. We send the
@@ -95,10 +104,10 @@ func TestThreadedProbeHosts(t *testing.T) {
 		go func() {
 			// read the RPC
 			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
-			// write old host settings
-			encoding.WriteObject(ourConn, oldHostSettings{
+			// write host settings
+			crypto.WriteSignedObject(ourConn, modules.HostExternalSettings{
 				NetAddress: "probed",
-			})
+			}, sk)
 			ourConn.Close()
 		}()
 		return theirConn, nil
@@ -107,8 +116,6 @@ func TestThreadedProbeHosts(t *testing.T) {
 	if len(hdb.ActiveHosts()) != 1 {
 		t.Error("host was not added")
 	}
-
-	// TODO: respond with old host settings
 }
 
 // TestThreadedScan tests the threadedScan method.

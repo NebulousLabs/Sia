@@ -1,10 +1,10 @@
 package host
 
 import (
-	"errors"
+	// "errors"
+	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -12,7 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/renter"
+	// "github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -21,10 +21,10 @@ import (
 // A hostTester is the helper object for host testing, including helper modules
 // and methods for controlling synchronization.
 type hostTester struct {
-	cs        modules.ConsensusSet
-	gateway   modules.Gateway
-	miner     modules.TestMiner
-	renter    modules.Renter
+	cs      modules.ConsensusSet
+	gateway modules.Gateway
+	miner   modules.TestMiner
+	// renter    modules.Renter
 	renting   bool
 	tpool     modules.TransactionPool
 	wallet    modules.Wallet
@@ -35,6 +35,7 @@ type hostTester struct {
 	persistDir string
 }
 
+/*
 // initRenting prepares the host tester for uploads and downloads by announcing
 // the host to the network and performing other preparational tasks.
 // initRenting takes a while because the renter needs to process the host
@@ -76,6 +77,7 @@ func (ht *hostTester) initRenting() error {
 	ht.renting = true
 	return nil
 }
+*/
 
 // initWallet creates a wallet key, initializes the host wallet, unlocks it,
 // and then stores the key in the host tester.
@@ -128,19 +130,21 @@ func blankHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
-	if err != nil {
-		return nil, err
-	}
+	/*
+		r, err := renter.New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+		if err != nil {
+			return nil, err
+		}
+	*/
 
 	// Assemble all objects into a hostTester
 	ht := &hostTester{
 		cs:      cs,
 		gateway: g,
 		miner:   m,
-		renter:  r,
-		tpool:   tp,
-		wallet:  w,
+		// renter:  r,
+		tpool:  tp,
+		wallet: w,
 
 		host: h,
 
@@ -170,6 +174,27 @@ func newHostTester(name string) (*hostTester, error) {
 			return nil, err
 		}
 	}
+
+	// Create two storage folder for the host, one the minimum size and one
+	// twice the minimum size.
+	storageFolderOne := filepath.Join(ht.persistDir, "hostTesterStorageFolderOne")
+	err = os.Mkdir(storageFolderOne, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	if err != nil {
+		return nil, err
+	}
+	storageFolderTwo := filepath.Join(ht.persistDir, "hostTesterStorageFolderTwo")
+	err = os.Mkdir(storageFolderTwo, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	if err != nil {
+		return nil, err
+	}
 	return ht, nil
 }
 
@@ -179,6 +204,7 @@ func TestHostInitialization(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Create a blank host tester and check that the height is zero.
 	bht, err := blankHostTester("TestHostInitialization")
 	if err != nil {
@@ -208,6 +234,7 @@ func TestNilValues(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := blankHostTester("TestStartupRescan")
 	if err != nil {
 		t.Fatal(err)
@@ -228,6 +255,7 @@ func TestNilValues(t *testing.T) {
 	}
 }
 
+/*
 // TestSetAndGetSettings checks that the functions for interacting with the
 // hosts settings object are working as expected.
 func TestSetAndGetSettings(t *testing.T) {
@@ -241,9 +269,6 @@ func TestSetAndGetSettings(t *testing.T) {
 
 	// Check the default settings get returned at first call.
 	settings := ht.host.Settings()
-	if settings.TotalStorage != defaultTotalStorage {
-		t.Error("settings retrieval did not return default value:", settings.TotalStorage, defaultTotalStorage)
-	}
 	if settings.MaxDuration != defaultMaxDuration {
 		t.Error("settings retrieval did not return default value")
 	}
@@ -268,9 +293,6 @@ func TestSetAndGetSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	newSettings := ht.host.Settings()
-	if settings.TotalStorage != newSettings.TotalStorage {
-		t.Error("settings retrieval did not return updated value")
-	}
 	if settings.MaxDuration != newSettings.MaxDuration {
 		t.Error("settings retrieval did not return updated value")
 	}
@@ -308,26 +330,6 @@ func TestSetAndGetSettings(t *testing.T) {
 	}
 	if settings.Collateral.Cmp(rebootSettings.Collateral) != 0 {
 		t.Error("settings retrieval did not return updated value")
-	}
-}
-
-// TestSetUnlockHash tries setting the unlock hash using SetSettings, an error
-// should be returned.
-func TestSetUnlockHash(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	ht, err := newHostTester("TestSetUnlockHash")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Get the settings and try changing the unlock hash.
-	settings := ht.host.Settings()
-	settings.UnlockHash[0]++
-	err = ht.host.SetSettings(settings)
-	if err != errChangedUnlockHash {
-		t.Error("unlock hash was changed by SetSettings")
 	}
 }
 
@@ -380,3 +382,4 @@ func TestPersistentSettings(t *testing.T) {
 		t.Error("settings retrieval did not return updated value")
 	}
 }
+*/

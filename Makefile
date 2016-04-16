@@ -32,15 +32,16 @@ dependencies:
 run = Test
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus \
        ./modules/explorer ./modules/gateway ./modules/host ./modules/renter/hostdb \
-       ./modules/miner ./modules/renter ./modules/transactionpool ./modules/wallet \
-       ./persist ./siac ./siad ./sync ./types
+       ./modules/renter/contractor ./modules/miner ./modules/renter ./modules/wallet \
+       ./modules/transactionpool ./persist ./siac ./siad ./sync ./types
 
 # fmt calls go fmt on all packages.
 fmt:
 	go fmt $(pkgs)
 
 # vet calls go vet on all packages.
-vet:
+# NOTE: go vet requires packages to be built in order to obtain type info.
+vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
@@ -59,13 +60,13 @@ REBUILD:
 
 # install builds and installs developer binaries.
 install: REBUILD
-	go install -race -tags='dev debug profile' ./...
+	go install -race -tags='dev debug profile' $(pkgs)
 
 # release builds and installs release binaries.
 release: REBUILD
-	go install -a -race -tags='debug profile' ./...
+	go install -a -race -tags='debug profile' $(pkgs)
 release-std: REBUILD
-	go install -a ./...
+	go install -a $(pkgs)
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
@@ -80,7 +81,7 @@ clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
 test: REBUILD
-	go test -short -tags='debug testing' -timeout=3s $(pkgs) -run=$(run)
+	go test -short -tags='debug testing' -timeout=5s $(pkgs) -run=$(run)
 test-v: REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint REBUILD

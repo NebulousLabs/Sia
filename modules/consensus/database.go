@@ -23,8 +23,8 @@ var (
 	errNonEmptyBucket = errors.New("cannot remove a map with objects still in it")
 
 	dbMetadata = persist.Metadata{
-		Version: "0.5.0",
 		Header:  "Consensus Set Database",
+		Version: "0.5.0",
 	}
 )
 
@@ -91,8 +91,8 @@ func dbInitialized(tx *bolt.Tx) bool {
 	return tx.Bucket(SiafundPool) != nil
 }
 
-// initDatabase is run when the database. This has become the true
-// init function for consensus set
+// initDB is run if there is no existing consensus database, creating a
+// database with all the required buckets and sane inital values.
 func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	// Create the compononents of the database.
 	err := cs.createConsensusDB(tx)

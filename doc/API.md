@@ -569,6 +569,8 @@ Renter
 
 Queries:
 
+* /renter/allowance          [GET]
+* /renter/allowance          [POST]
 * /renter/downloads          [GET]
 * /renter/files              [GET]
 * /renter/load               [POST]
@@ -581,6 +583,46 @@ Queries:
 * /renter/upload/{siapath}   [POST]
 * /renter/hosts/active       [GET]
 * /renter/hosts/all          [GET]
+
+#### /renter/allowance [GET]
+
+Function: Returns the current contract allowance.
+
+Parameters: none
+
+Response:
+```
+struct {
+	funds  types.Currency    (string)
+	hosts  uint64
+	period types.BlockHeight (uint64)
+}
+```
+'funds' is the number of hastings allocated for file contracts in the given
+period.
+
+'hosts' is the number of hosts that contracts will be formed with.
+
+'period' is the duration of contracts formed.
+
+#### /renter/allowance [POST]
+
+Function: Sets the contract allowance.
+
+Parameters: none
+```
+funds  types.Currency    (string)
+hosts  uint64
+period types.BlockHeight (uint64)
+```
+'funds' is the number of hastings allocated for file contracts in the given
+period.
+
+'hosts' is the number of hosts that contracts will be formed with.
+
+'period' is the duration of contracts formed.
+
+Response: standard
 
 #### /renter/downloads [GET]
 

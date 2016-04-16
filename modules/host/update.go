@@ -1,12 +1,17 @@
 package host
 
-import (
-	"os"
+// TODO: Need to check that 'RevisionConfirmed' is sensitive to whether or not
+// it was the *most recent* revision that got confirmed.
 
-	"github.com/NebulousLabs/Sia/build"
+import (
+	"encoding/binary"
+	"encoding/json"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // initRescan is a helper funtion of initConsensusSubscribe, and is called when
@@ -15,15 +20,41 @@ import (
 // in the consensus set or the host.
 func (h *Host) initRescan() error {
 	// Reset all of the variables that have relevance to the consensus set.
+	var allObligations []*storageObligation
 	err := func() error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 
 		// Reset all of the consensus-relevant variables in the host.
 		h.blockHeight = 0
-		h.actionItems = make(map[types.BlockHeight]map[types.FileContractID]*contractObligation)
-		for _, ob := range h.obligationsByID {
-			ob.reset()
+
+		// Reset all of the storage obligations.
+		err := h.db.Update(func(tx *bolt.Tx) error {
+			bsu := tx.Bucket(bucketStorageObligations)
+			c := bsu.Cursor()
+			for k, soBytes := c.First(); soBytes != nil; k, soBytes = c.Next() {
+				var so storageObligation
+				err := json.Unmarshal(soBytes, &so)
+				if err != nil {
+					return err
+				}
+				so.OriginConfirmed = false
+				so.RevisionConfirmed = false
+				so.ProofConfirmed = false
+				allObligations = append(allObligations, &so)
+				soBytes, err = json.Marshal(so)
+				if err != nil {
+					return err
+				}
+				err = bsu.Put(k, soBytes)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		return h.save()
@@ -39,11 +70,17 @@ func (h *Host) initRescan() error {
 		return err
 	}
 
-	// After the host has caught up to the current consensus, perform any
-	// necessary actions on each obligation, including adding necessary future
-	// actions (such as creating storage proofs) to the queue.
-	for _, ob := range h.obligationsByID {
-		h.handleActionItem(ob)
+	// Re-queue all of the action items for the storage obligations.
+	for _, so := range allObligations {
+		soid := so.id()
+		err0 := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
+		err1 := h.queueActionItem(h.blockHeight+resubmissionTimeout, soid)
+		err2 := h.queueActionItem(so.expiration()-revisionSubmissionBuffer, soid)
+		err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
+		err = composeErrors(err0, err1, err2, err3)
+		if err != nil {
+			return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
+		}
 	}
 	return nil
 }
@@ -54,60 +91,11 @@ func (h *Host) initConsensusSubscription() error {
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id that the host
 		// has is unrecognized by the consensus set. This will typically only
-		// happen if the user has been replacing files inside the folder
+		// happen if the user has been replacing files inside the Sia folder
 		// structure.
 		return h.initRescan()
 	}
 	return err
-}
-
-// threadedCreateStorageProof creates a storage proof for a file contract
-// obligation and submits it to the blockchain. Though a lock is never held, a
-// significant amount of disk I/O happens, meaning this function should be
-// called in a separate goroutine.
-func (h *Host) threadedCreateStorageProof(obligation *contractObligation) {
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if build.DEBUG && h.closed {
-		panic("the close order should guarantee that threadedCreateStorageProof has access to host resources - yet host is closed!")
-	}
-
-	file, err := os.Open(obligation.Path)
-	if err != nil {
-		h.log.Printf("ERROR: could not open obligation %v (%v) for storage proof: %v", obligation.ID, obligation.Path, err)
-		return
-	}
-	defer file.Close()
-
-	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
-	if err != nil {
-		h.log.Printf("ERROR: could not determine storage proof index for %v (%v): %v", obligation.ID, obligation.Path, err)
-		return
-	}
-	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
-	if err != nil {
-		h.log.Printf("ERROR: could not construct storage proof for %v (%v): %v", obligation.ID, obligation.Path, err)
-		return
-	}
-	sp := types.StorageProof{
-		ParentID: obligation.ID,
-		HashSet:  hashSet,
-	}
-	copy(sp.Segment[:], base)
-
-	// Create and send the transaction.
-	txnBuilder := h.wallet.StartTransaction()
-	txnBuilder.AddStorageProof(sp)
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		h.log.Println("couldn't sign storage proof transaction:", err)
-		return
-	}
-	err = h.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		h.log.Printf("ERROR: could not submit storage proof txn for %v (%v): %v", obligation.ID, obligation.Path, err)
-		return
-	}
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
@@ -116,101 +104,187 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Go through the diffs and track any obligation-relevant transactions that
-	// have been confirmed or reorged.
-	for _, block := range cc.RevertedBlocks {
-		for _, txn := range block.Transactions {
-			// Look for file contracts, revisions, and storage proofs that are
-			// no longer confirmed on-chain.
-			for k := range txn.FileContracts {
-				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
-				if exists {
-					ob.OriginConfirmed = false
+	// Wrap the whole parsing into a single large database tx to keep things
+	// efficient.
+	var actionItems []*storageObligation
+	err := h.db.Update(func(tx *bolt.Tx) error {
+		for _, block := range cc.RevertedBlocks {
+			// Look for transactions relevant to open storage obligations.
+			for _, txn := range block.Transactions {
+				// Check for file contracts.
+				if len(txn.FileContracts) > 0 {
+					for j := range txn.FileContracts {
+						fcid := txn.FileContractID(uint64(j))
+						so, err := getStorageObligation(tx, fcid)
+						if err != nil {
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
+							continue
+						}
+						so.OriginConfirmed = false
+						err = putStorageObligation(tx, so)
+						if err != nil {
+							continue
+						}
+					}
 				}
-			}
-			for _, fcr := range txn.FileContractRevisions {
-				ob, exists := h.obligationsByID[fcr.ParentID]
-				if exists {
-					// There is a guarantee in the blockchain that if a
-					// revision for this file contract id is being removed, the
-					// most recent revision on the file contract is not in the
-					// blockchain. This guarantee only holds so long as the
-					// host has the revision with the highest revision number,
-					// and as long as there is only one revision signed with
-					// each revision number.
-					ob.RevisionConfirmed = false
-				}
-			}
-			for _, sp := range txn.StorageProofs {
-				ob, exists := h.obligationsByID[sp.ParentID]
-				if exists {
-					ob.ProofConfirmed = false
-				}
-			}
-		}
 
-		if block.ID() != types.GenesisBlock.ID() {
-			h.blockHeight--
+				// Check for file contract revisions.
+				if len(txn.FileContractRevisions) > 0 {
+					for _, fcr := range txn.FileContractRevisions {
+						so, err := getStorageObligation(tx, fcr.ParentID)
+						if err != nil {
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
+							continue
+						}
+						so.RevisionConfirmed = false
+						err = putStorageObligation(tx, so)
+						if err != nil {
+							continue
+						}
+					}
+				}
+
+				// Check for storage proofs.
+				if len(txn.StorageProofs) > 0 {
+					for _, sp := range txn.StorageProofs {
+						// Check database for relevant storage proofs.
+						so, err := getStorageObligation(tx, sp.ParentID)
+						if err != nil {
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
+							continue
+						}
+						so.ProofConfirmed = false
+						err = putStorageObligation(tx, so)
+						if err != nil {
+							continue
+						}
+					}
+				}
+			}
+
+			// Height is not adjusted when dealing with the genesis block because
+			// the default height is 0 and the genesis block height is 0. If
+			// removing the genesis block, height will already be at height 0 and
+			// should not update, lest an underflow occur.
+			if block.ID() != types.GenesisBlock.ID() {
+				h.blockHeight--
+			}
 		}
+		for _, block := range cc.AppliedBlocks {
+			// Look for transactions relevant to open storage obligations.
+			for _, txn := range block.Transactions {
+				// Check for file contracts.
+				if len(txn.FileContracts) > 0 {
+					for i := range txn.FileContracts {
+						fcid := txn.FileContractID(uint64(i))
+						so, err := getStorageObligation(tx, fcid)
+						if err != nil {
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
+							continue
+						}
+						so.OriginConfirmed = true
+						err = putStorageObligation(tx, so)
+						if err != nil {
+							continue
+						}
+					}
+				}
+
+				// Check for file contract revisions.
+				if len(txn.FileContractRevisions) > 0 {
+					for _, fcr := range txn.FileContractRevisions {
+						so, err := getStorageObligation(tx, fcr.ParentID)
+						if err != nil {
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
+							continue
+						}
+						so.RevisionConfirmed = true
+						err = putStorageObligation(tx, so)
+						if err != nil {
+							continue
+						}
+					}
+				}
+
+				// Check for storage proofs.
+				if len(txn.StorageProofs) > 0 {
+					for _, sp := range txn.StorageProofs {
+						so, err := getStorageObligation(tx, sp.ParentID)
+						if err != nil {
+							// The storage folder may not exist, or the disk
+							// may be having trouble. Either way, we ignore the
+							// problem. If the disk is having trouble, the user
+							// will have to perform a rescan.
+							continue
+						}
+						so.ProofConfirmed = true
+						err = putStorageObligation(tx, so)
+						if err != nil {
+							continue
+						}
+					}
+				}
+			}
+
+			// Height is not adjusted when dealing with the genesis block because
+			// the default height is 0 and the genesis block height is 0. If adding
+			// the genesis block, height will already be at height 0 and should not
+			// update.
+			if block.ID() != types.GenesisBlock.ID() {
+				h.blockHeight++
+			}
+
+			// Handle any action items relevant to the current height.
+			bai := tx.Bucket(bucketActionItems)
+			heightBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(heightBytes, uint64(h.blockHeight)) // BigEndian used so bolt will keep things sorted automatically.
+			existingItems := bai.Get(heightBytes)
+
+			// From the existing items, pull out a storage obligation.
+			knownActionItems := make(map[types.FileContractID]struct{})
+			obligationIDs := make([]types.FileContractID, len(existingItems)/crypto.HashSize)
+			for i := 0; i < len(existingItems); i += crypto.HashSize {
+				copy(obligationIDs[i/crypto.HashSize][:], existingItems[i:i+crypto.HashSize])
+			}
+			bso := tx.Bucket(bucketStorageObligations)
+			for _, soid := range obligationIDs {
+				soBytes := bso.Get(soid[:])
+				var so storageObligation
+				err := json.Unmarshal(soBytes, &so)
+				if err != nil {
+					return err
+				}
+				_, exists := knownActionItems[soid]
+				if !exists {
+					actionItems = append(actionItems, &so)
+					knownActionItems[soid] = struct{}{}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		h.log.Println(err)
 	}
-	for _, block := range cc.AppliedBlocks {
-		for _, txn := range block.Transactions {
-			// Look for file contracts, revisions, and storage proofs that have
-			// been confirmed on-chain.
-			for k := range txn.FileContracts {
-				ob, exists := h.obligationsByID[txn.FileContractID(uint64(k))]
-				if exists {
-					ob.OriginConfirmed = true
 
-					// COMPATv0.4.8 - found the original transaction on the
-					// chain, can copy it over for compatibility. An equivalent
-					// check is not needed when rewinding, as a rescan is
-					// performed that puts the host knowledge at the tip of
-					// consensus.
-					ob.OriginTransaction = txn
-				}
-			}
-			for _, fcr := range txn.FileContractRevisions {
-				ob, exists := h.obligationsByID[fcr.ParentID]
-				if exists && ob.revisionNumber() <= fcr.NewRevisionNumber {
-					// COMPATv0.4.8 - found a revision, can move it over to get
-					// compatibility. No harm is done by adding the revision as
-					// long as it is set to 'confirmed' after the fact.
-					h.reviseObligation(txn)
-
-					// Need to check that the revision is the most recent
-					// revision. By assuming that the host only signs one
-					// revision for each number, and that the host has the most
-					// recent revision in the obligation, just checking the
-					// revision number is sufficient.
-					ob.RevisionConfirmed = true
-				}
-			}
-			for _, sp := range txn.StorageProofs {
-				ob, exists := h.obligationsByID[sp.ParentID]
-				if exists {
-					ob.ProofConfirmed = true
-				}
-			}
-		}
-
-		// Adjust the height of the host. The host height is initialized to
-		// zero, but the genesis block is actually height zero. For the genesis
-		// block only, the height will be left at zero.
-		//
-		// Checking the height here eliminates the need to initialize the host
-		// to and underflowed types.BlockHeight.
-		if block.ID() != types.GenesisBlock.ID() {
-			h.blockHeight++
-		}
-
-		// Handle any action items that have been scheduled for the current
-		// height.
-		obMap := h.actionItems[h.blockHeight]
-		for _, ob := range obMap {
-			h.handleActionItem(ob)
-		}
-		delete(h.actionItems, h.blockHeight)
+	// Handle the list of action items.
+	for _, ai := range actionItems {
+		h.handleActionItem(ai)
 	}
 
 	// Update the host's recent change pointer to point to the most recent
@@ -218,7 +292,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.recentChange = cc.ID
 
 	// Save the host.
-	err := h.save()
+	err = h.save()
 	if err != nil {
 		h.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
 	}

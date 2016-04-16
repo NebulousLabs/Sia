@@ -366,7 +366,7 @@ meantime, it is an easy way for third party applications to make use of the
 siacoin blockchain.
 
 Transaction Signatures
-----------
+----------------------
 
 Each signature points to a single public key index in a single unlock
 conditions object. No two signatures can point to the same public key index for

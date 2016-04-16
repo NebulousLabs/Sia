@@ -67,15 +67,34 @@ type DownloadInfo struct {
 	StartTime   time.Time `json:"starttime"`
 }
 
+// An Allowance dictates how much the Renter is allowed to spend in a given
+// period.
+type Allowance struct {
+	Funds       types.Currency    `json:"funds"`
+	Hosts       uint64            `json:"hosts"`
+	Period      types.BlockHeight `json:"period"`
+	RenewWindow types.BlockHeight `json:"renewwindow"`
+}
+
+// A HostDBEntry represents one host entry in the Renter's host DB. It
+// aggregates the host's external settings with its public key.
+type HostDBEntry struct {
+	HostExternalSettings
+	PublicKey types.SiaPublicKey
+}
+
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
+	// Allowance returns the current allowance.
+	Allowance() Allowance
+
 	// ActiveHosts returns the list of hosts that are actively being selected
 	// from.
-	ActiveHosts() []HostSettings
+	ActiveHosts() []HostDBEntry
 
 	// AllHosts returns the full list of hosts known to the renter.
-	AllHosts() []HostSettings
+	AllHosts() []HostDBEntry
 
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
@@ -99,6 +118,12 @@ type Renter interface {
 
 	// Rename changes the path of a file.
 	RenameFile(path, newPath string) error
+
+	// SetAllowance sets the amount of money the Renter is allowed to spend on
+	// contracts over a given time period, divided among the number of hosts
+	// specified. Note that Renter can start forming contracts as soon as
+	// SetAllowance is called; that is, it may block.
+	SetAllowance(Allowance) error
 
 	// ShareFiles creates a '.sia' file that can be shared with others.
 	ShareFiles(paths []string, shareDest string) error

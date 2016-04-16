@@ -131,6 +131,9 @@ type (
 		// failed.
 		FundSiafunds(amount types.Currency) error
 
+		// AddParents adds a set of parents to the transaction.
+		AddParents([]types.Transaction)
+
 		// AddMinerFee adds a miner fee to the transaction, returning the index
 		// of the miner fee within the transaction.
 		AddMinerFee(fee types.Currency) uint64
@@ -188,11 +191,21 @@ type (
 		// whole transaction flag is set to false, then the covered fields
 		// object will cover all fields that have already been added to the
 		// transaction, but will also leave room for more fields to be added.
+		//
+		// An error will be returned if there are multiple calls to 'Sign',
+		// sometimes even if the first call to Sign has failed. Sign should
+		// only ever be called once, and if the first signing fails, the
+		// transaction should be dropped.
 		Sign(wholeTransaction bool) ([]types.Transaction, error)
 
 		// View returns the incomplete transaction along with all of its
 		// parents.
 		View() (txn types.Transaction, parents []types.Transaction)
+
+		// ViewAdded returns all of the siacoin inputs, siafund inputs, and
+		// parent transactions that have been automatically added by the
+		// builder. Items are returned by index.
+		ViewAdded() (newParents, siacoinInputs, siafundInputs, transactionSignatures []int)
 
 		// Drop indicates that a transaction is no longer useful, will not be
 		// broadcast, and that all of the outputs can be reclaimed. 'Drop'
@@ -329,8 +342,6 @@ type (
 
 		// RegisterTransaction takes a transaction and its parents and returns
 		// a TransactionBuilder which can be used to expand the transaction.
-		// The most typical call is 'RegisterTransaction(types.Transaction{},
-		// nil)', which registers a new transaction without parents.
 		RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
 		// StartTransaction is a convenience method that calls

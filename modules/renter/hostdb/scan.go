@@ -16,22 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// oldHostSettings is the HostSettings type used prior to v0.5.0. It is
-// preserved for compatibility with those hosts.
-// COMPATv0.4.8
-type oldHostSettings struct {
-	NetAddress   modules.NetAddress
-	TotalStorage int64
-	MinFilesize  uint64
-	MaxFilesize  uint64
-	MinDuration  types.BlockHeight
-	MaxDuration  types.BlockHeight
-	WindowSize   types.BlockHeight
-	Price        types.Currency
-	Collateral   types.Currency
-	UnlockHash   types.UnlockHash
-}
-
 const (
 	DefaultScanSleep = 1*time.Hour + 37*time.Minute
 	MaxScanSleep     = 4 * time.Hour
@@ -98,7 +82,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHosts() {
 	for hostEntry := range hdb.scanPool {
 		// Request settings from the queued host entry.
-		var settings modules.HostSettings
+		var settings modules.HostExternalSettings
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
 			if err != nil {
@@ -109,33 +93,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			if err != nil {
 				return err
 			}
-			// COMPATv0.4.8 - If first decoding attempt fails, try decoding
-			// into the old HostSettings type. Because we decode twice, we
-			// must read the data into memory first.
-			settingsBytes, err := encoding.ReadPrefix(conn, maxSettingsLen)
-			if err != nil {
-				return err
-			}
-			err = encoding.Unmarshal(settingsBytes, &settings)
-			if err != nil {
-				var oldSettings oldHostSettings
-				err = encoding.Unmarshal(settingsBytes, &oldSettings)
-				if err != nil {
-					return err
-				}
-				// Convert the old type.
-				settings = modules.HostSettings{
-					NetAddress:   oldSettings.NetAddress,
-					TotalStorage: oldSettings.TotalStorage,
-					MinDuration:  oldSettings.MinDuration,
-					MaxDuration:  oldSettings.MaxDuration,
-					WindowSize:   oldSettings.WindowSize,
-					Price:        oldSettings.Price,
-					Collateral:   oldSettings.Collateral,
-					UnlockHash:   oldSettings.UnlockHash,
-				}
-			}
-			return nil
+			var pubkey crypto.PublicKey
+			copy(pubkey[:], hostEntry.PublicKey.Key)
+			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 
 		// Now that network communication is done, lock the hostdb to modify the
@@ -157,8 +117,8 @@ func (hdb *HostDB) threadedProbeHosts() {
 
 			// Update the host settings, reliability, and weight. The old NetAddress
 			// must be preserved.
-			settings.NetAddress = hostEntry.HostSettings.NetAddress
-			hostEntry.HostSettings = settings
+			settings.NetAddress = hostEntry.HostExternalSettings.NetAddress
+			hostEntry.HostExternalSettings = settings
 			hostEntry.reliability = MaxReliability
 			hostEntry.weight = calculateHostWeight(*hostEntry)
 			hostEntry.online = true

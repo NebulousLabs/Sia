@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -33,7 +33,7 @@ var renewThreshold = func() types.BlockHeight {
 
 // repair attempts to repair a file chunk by uploading its pieces to more
 // hosts.
-func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []hostdb.Uploader) error {
+func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, hosts []contractor.Editor) error {
 	// read chunk data and encode
 	chunk := make([]byte, f.chunkSize())
 	_, err := r.ReadAt(chunk, int64(chunkIndex*f.chunkSize()))
@@ -61,21 +61,16 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	var wg sync.WaitGroup
 	wg.Add(numPieces)
 	for i := 0; i < numPieces; i++ {
-		// each goroutine gets a different host, index, and piece, so there
-		// are no data race concerns
-		pIndex := missingPieces[i]
-		go func(host hostdb.Uploader, pieceIndex uint64, piece []byte) {
+		go func(pieceIndex uint64, host contractor.Editor) {
 			defer wg.Done()
-
 			// upload data to host
-			offset, err := host.Upload(piece)
+			offset, err := host.Upload(pieces[pieceIndex])
 			if err != nil {
 				return
 			}
 
 			// create contract entry, if necessary
 			f.mu.Lock()
-			defer f.mu.Unlock()
 			contract, ok := f.contracts[host.ContractID()]
 			if !ok {
 				contract = fileContract{
@@ -92,7 +87,8 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 				Offset: offset,
 			})
 			f.contracts[host.ContractID()] = contract
-		}(hosts[i], pIndex, pieces[pIndex])
+			f.mu.Unlock()
+		}(missingPieces[i], hosts[i])
 	}
 	wg.Wait()
 
@@ -188,19 +184,15 @@ func (f *file) offlineChunks(hdb hostDB) map[uint64][]uint64 {
 // reuploading their missing pieces. Multiple repair attempts may be necessary
 // before the file reaches full redundancy.
 func (r *Renter) threadedRepairLoop() {
-	// Files are repaired concurrently. A repair worker must acquire a 'token'
-	// in order to run, and returns the token to the pool when it has
-	// finished.
-	tokenPool := make(chan struct{}, repairThreads)
-	// fill the tokenPool with tokens
-	for i := 0; i < repairThreads; i++ {
-		tokenPool <- struct{}{}
-	}
-
 	for {
 		time.Sleep(5 * time.Second)
 
 		if !r.wallet.Unlocked() {
+			continue
+		}
+
+		if len(r.hostContractor.Contracts()) == 0 {
+			// nothing to revise
 			continue
 		}
 
@@ -212,24 +204,17 @@ func (r *Renter) threadedRepairLoop() {
 		}
 		r.mu.RUnlock(id)
 
-		var wg sync.WaitGroup
-		wg.Add(len(repairing))
+		// create host pool
+		pool := r.newHostPool()
 		for name, meta := range repairing {
-			go func(name string, meta trackedFile) {
-				defer wg.Done()
-				t := <-tokenPool                 // acquire token
-				r.threadedRepairFile(name, meta) // repair
-				tokenPool <- t                   // return token
-			}(name, meta)
+			r.threadedRepairFile(name, meta, pool)
 		}
-		// wait for all repairs to complete before looping; otherwise we risk
-		// spawning multiple repair threads for the same file.
-		wg.Wait()
+		pool.Close() // heh
 	}
 }
 
 // threadedRepairFile repairs and saves an individual file.
-func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
+func (r *Renter) threadedRepairFile(name string, meta trackedFile, pool *hostPool) {
 	// helper function
 	logAndRemove := func(fmt string, args ...interface{}) {
 		r.log.Printf(fmt, args...)
@@ -249,15 +234,20 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// check for expiration
 	height := r.cs.Height()
 	if !meta.Renew && meta.EndHeight < height {
-		logAndRemove("removing %v from repair set: storage period has ended", name)
+		err := r.deleteContractData(f, pool)
+		if err != nil {
+			// don't remove from tracking set until contract data has been deleted
+			// TODO: this may be problematic if hosts go permanently offline
+			r.log.Println("failed to delete contract data of", f.name)
+		} else {
+			logAndRemove("removing %v from repair set: storage period has ended", name)
+		}
 		return
 	}
 
 	// determine if there is any work to do
 	incChunks := f.incompleteChunks()
-	offlineChunks := f.offlineChunks(r.hostDB)
-	expContracts := f.expiringContracts(height)
-	if len(incChunks) == 0 && len(offlineChunks) == 0 && (!meta.Renew || len(expContracts) == 0) {
+	if len(incChunks) == 0 {
 		return
 	}
 
@@ -272,56 +262,22 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile) {
 	// repair incomplete chunks
 	if len(incChunks) != 0 {
 		r.log.Printf("repairing %v chunks of %v", len(incChunks), f.name)
-		var duration types.BlockHeight
-		if meta.Renew {
-			duration = defaultDuration
-		} else {
-			duration = meta.EndHeight - height
-		}
-		r.repairChunks(f, handle, incChunks, duration)
-	}
-
-	// repair offline chunks
-	if len(offlineChunks) != 0 {
-		r.log.Printf("reuploading %v offline chunks of %v", len(offlineChunks), f.name)
-		var duration types.BlockHeight
-		if meta.Renew {
-			duration = defaultDuration
-		} else {
-			duration = meta.EndHeight - height
-		}
-		r.repairChunks(f, handle, offlineChunks, duration)
-	}
-
-	// renew expiring contracts
-	if meta.Renew && len(expContracts) != 0 {
-		r.log.Printf("renewing %v contracts of %v", len(expContracts), f.name)
-		newHeight := height + defaultDuration
-		r.renewContracts(f, expContracts, newHeight)
+		r.repairChunks(f, handle, incChunks, pool)
 	}
 }
 
 // repairChunks uploads missing chunks of f to new hosts.
-func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, duration types.BlockHeight) {
-	// create host pool
-	contractSize := (f.pieceSize + crypto.TwofishOverhead) * uint64(len(chunks)) // each host gets one piece of each chunk
-	pool, err := r.hostDB.NewPool(contractSize, duration)
-	if err != nil {
-		r.log.Printf("failed to repair %v: %v", f.name, err)
-		return
-	}
-	defer pool.Close() // heh
-
+func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]uint64, pool *hostPool) {
 	for chunk, pieces := range chunks {
 		// Determine host set. We want one host for each missing piece, and no
 		// repeats of other hosts of this chunk.
-		hosts := pool.UniqueHosts(len(pieces), f.chunkHosts(chunk))
+		hosts := pool.uniqueHosts(len(pieces), f.chunkHosts(chunk))
 		if len(hosts) == 0 {
 			r.log.Printf("aborting repair of %v: not enough hosts", f.name)
 			return
 		}
 		// upload to new hosts
-		err = f.repair(chunk, pieces, handle, hosts)
+		err := f.repair(chunk, pieces, handle, hosts)
 		if err != nil {
 			r.log.Printf("aborting repair of %v: %v", f.name, err)
 			return
@@ -340,32 +296,35 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 	}
 }
 
-// renewContracts renews each of the supplied contracts, replacing their entry
-// in f with the new contract.
-func (r *Renter) renewContracts(f *file, contracts []fileContract, newHeight types.BlockHeight) {
+// deleteContractData deletes the data associated with f on all of f's hosts.
+func (r *Renter) deleteContractData(f *file, pool *hostPool) error {
+	// convert contract map to slice so that we can modify the map during
+	// iteration
+	f.mu.RLock()
+	var contracts []fileContract
+	for _, c := range f.contracts {
+		contracts = append(contracts, c)
+	}
+	f.mu.RUnlock()
+	var err error
 	for _, c := range contracts {
-		newID, err := r.hostDB.Renew(c.ID, newHeight)
-		if err != nil {
-			r.log.Printf("failed to renew contract %v: %v", c.ID, err)
+		editor, editorErr := pool.add(contractor.Contract{}) // TODO: pass the actual contract
+		if editorErr != nil {
+			// TODO: check for "already deleted err"
+			err = editorErr
 			continue
 		}
+		for range c.Pieces {
+			deleteErr := editor.Delete(crypto.Hash{}) // TODO: pass the actual hash
+			if deleteErr != nil {
+				err = deleteErr
+				continue
+			}
+		}
 		f.mu.Lock()
-		f.contracts[newID] = fileContract{
-			ID:          newID,
-			IP:          c.IP,
-			Pieces:      c.Pieces,
-			WindowStart: newHeight,
-		}
-		// need to delete the old contract; otherwise f.expiringContracts
-		// will continue to return it
 		delete(f.contracts, c.ID)
-
-		// save the updated contract
-		err = r.saveFile(f)
+		r.saveFile(f)
 		f.mu.Unlock()
-		if err != nil {
-			r.log.Printf("failed to save renewed file %v: %v", f.name, err)
-			return
-		}
 	}
+	return err
 }

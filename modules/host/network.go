@@ -6,22 +6,51 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// threadedUpdateHostname periodically runs 'managedLearnHostname', which
+// checks if the host's hostname has changed, and makes an updated host
+// announcement if so.
+//
+// TODO: This thread doesn't actually have clean shutdown, because the sleep is
+// outside of of the resource lock.
+func (h *Host) threadedUpdateHostname() {
+	for {
+		h.resourceLock.RLock()
+		if h.closed {
+			// The host is closed, the goroutine can exit.
+			h.resourceLock.RUnlock()
+			break
+		}
+		h.managedLearnHostname()
+		h.resourceLock.RUnlock()
+
+		// Wait 30 minutes to check again. If the hostname is changing
+		// regularly (more than once a week), we want the host to be able to be
+		// seen as having 95% uptime. Every minute that the announcement is
+		// pointing to the wrong address is a minute of perceived downtime to
+		// the renters.
+		time.Sleep(time.Minute * 30)
+	}
+}
+
 // initNetworking performs actions like port forwarding, and gets the host
 // established on the network.
-func (h *Host) initNetworking(address string) error {
+func (h *Host) initNetworking(address string) (err error) {
 	// Create listener and set address.
-	var err error
-	h.listener, err = net.Listen("tcp", address)
+	h.listener, err = h.dependencies.listen("tcp", address)
 	if err != nil {
 		return err
 	}
-	h.netAddress = modules.NetAddress(h.listener.Addr().String())
+	h.mu.Lock()
+	h.port = modules.NetAddress(h.listener.Addr().String()).Port()
+	if build.Release == "testing" {
+		h.autoAddress = modules.NetAddress(net.JoinHostPort("localhost", h.port))
+	}
+	h.mu.Unlock()
 
 	// Non-blocking, perform port forwarding and hostname discovery.
 	go func() {
@@ -31,14 +60,15 @@ func (h *Host) initNetworking(address string) error {
 			return
 		}
 
-		h.mu.RLock()
-		port := h.netAddress.Port()
-		h.mu.RUnlock()
-		err := h.forwardPort(port)
+		err := h.managedForwardPort()
 		if err != nil {
 			h.log.Println("ERROR: failed to forward port:", err)
 		}
-		h.learnHostname()
+
+		// Spin up the hostname checker. The hostname checker should not be
+		// spun up until after the port has been forwarded, because it can
+		// result in announcements being submitted to the blockchain.
+		go h.threadedUpdateHostname()
 	}()
 
 	// Launch the listener.
@@ -68,74 +98,65 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
 		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
-		atomic.AddUint64(&h.atomicErroredCalls, 1)
-
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
-		unrecognizedCalls := atomic.LoadUint64(&h.atomicUnrecognizedCalls)
-		if unrecognizedCalls < 1e3 || (unrecognizedCalls > 1e3 && randInt == 0) {
-			h.log.Printf("WARN: incoming conn %v was malformed: %v", conn.RemoteAddr(), err)
-		}
+		h.log.Debugf("WARN: incoming conn %v was malformed: %v", conn.RemoteAddr(), err)
 		return
 	}
 
 	switch id {
-	case modules.RPCDownload:
-		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		err = h.managedRPCDownload(conn)
-	case modules.RPCRenew:
-		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		err = h.managedRPCRenew(conn)
-	case modules.RPCRevise:
+	/*
+		case modules.RPCDownload:
+			atomic.AddUint64(&h.atomicDownloadCalls, 1)
+			err = h.managedRPCDownload(conn)
+		case modules.RPCRenew:
+			atomic.AddUint64(&h.atomicRenewCalls, 1)
+			err = h.managedRPCRenew(conn)
+	*/
+	case modules.RPCFormContract:
+		atomic.AddUint64(&h.atomicFormContractCalls, 1)
+		err = h.managedRPCFormContract(conn)
+	case modules.RPCReviseContract:
 		atomic.AddUint64(&h.atomicReviseCalls, 1)
-		err = h.managedRPCRevise(conn)
+		err = h.managedRPCReviseContract(conn)
+	case modules.RPCRevisionRequest:
+		atomic.AddUint64(&h.atomicRevisionRequestCalls, 1)
+		_, err = h.managedRPCRevisionRequest(conn)
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)
-	case modules.RPCUpload:
-		atomic.AddUint64(&h.atomicUploadCalls, 1)
-		err = h.managedRPCUpload(conn)
-	default:
-		atomic.AddUint64(&h.atomicErroredCalls, 1)
 
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
-		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
-			h.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
-		}
-		return
+	default:
+		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
+		h.log.Debugf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
 
-		// Don't clutter the logs with repeat messages - after 1000 messages
-		// have been printed, only print 1-in-200.
-		randInt, randErr := crypto.RandIntn(200)
-		if randErr != nil {
-			return
-		}
+		// If there have been less than 1000 errored rpcs, print the error
+		// message. This is to help developers debug live systems that are
+		// running into issues. Ultimately though, this error can be triggered
+		// by a malicious actor, and therefore should not be logged except for
+		// DEBUG builds.
+		//
+		// TODO: After the upgraded renter-host have more maturity, the
+		// non-debug log call can be removed.
 		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-		if erroredCalls < 1e3 || (erroredCalls > 1e3 && randInt == 0) {
+		if erroredCalls < 1e3 {
 			h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
+		} else {
+			h.log.Debugf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 		}
 	}
 }
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
+//
+// TODO: Does not seem like this function ever actually lets go of the resource
+// lock.
 func (h *Host) threadedListen() {
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
-	if build.DEBUG && h.closed {
-		panic("threaded listen does not have access to host resources - is only called at startup")
+	if h.closed {
+		return
 	}
 
 	// Receive connections until an error is returned by the listener. When an
@@ -152,7 +173,27 @@ func (h *Host) threadedListen() {
 	}
 }
 
-// managedRPCSettings is an rpc that returns the host's settings.
-func (h *Host) managedRPCSettings(conn net.Conn) error {
-	return encoding.WriteObject(conn, h.Settings())
+// NetAddress returns the address at which the host can be reached.
+func (h *Host) NetAddress() modules.NetAddress {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.settings.NetAddress != "" {
+		return h.settings.NetAddress
+	}
+	return h.autoAddress
+}
+
+// RPCMetrics returns information about the types of rpc calls that have been
+// made to the host.
+func (h *Host) RPCMetrics() modules.HostRPCMetrics {
+	return modules.HostRPCMetrics{
+		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
+		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
+		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),
+		RenewCalls:        atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:       atomic.LoadUint64(&h.atomicReviseCalls),
+		SettingsCalls:     atomic.LoadUint64(&h.atomicSettingsCalls),
+		UnrecognizedCalls: atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+	}
 }

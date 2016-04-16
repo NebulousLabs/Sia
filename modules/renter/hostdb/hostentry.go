@@ -8,7 +8,8 @@ import (
 
 // A hostEntry represents a host on the network.
 type hostEntry struct {
-	modules.HostSettings
+	modules.HostDBEntry
+
 	weight      types.Currency
 	reliability types.Currency
 	online      bool
@@ -19,7 +20,7 @@ type hostEntry struct {
 // put into the list of active hosts.
 //
 // TODO: Function should return an error.
-func (hdb *HostDB) insertHost(host modules.HostSettings) {
+func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 	// Remove garbage hosts and local hosts.
 	if !host.NetAddress.IsValid() {
 		return
@@ -34,8 +35,8 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 
 	// Create hostEntry and add to allHosts.
 	h := &hostEntry{
-		HostSettings: host,
-		reliability:  DefaultReliability,
+		HostDBEntry: host,
+		reliability: DefaultReliability,
 	}
 	hdb.allHosts[host.NetAddress] = h
 
@@ -58,44 +59,53 @@ func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 	return nil
 }
 
+// Host returns the HostSettings associated with the specified NetAddress. If
+// no matching host is found, Host returns false.
+func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
+	entry, ok := hdb.allHosts[addr]
+	if !ok || entry == nil {
+		return modules.HostDBEntry{}, false
+	}
+	return entry.HostDBEntry, true
+}
+
 // ActiveHosts returns the hosts that can be randomly selected out of the
 // hostdb.
-func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostSettings) {
+func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
 
 	for _, node := range hdb.activeHosts {
-		activeHosts = append(activeHosts, node.hostEntry.HostSettings)
+		activeHosts = append(activeHosts, node.hostEntry.HostDBEntry)
 	}
 	return
 }
 
 // AllHosts returns all of the hosts known to the hostdb, including the
 // inactive ones.
-func (hdb *HostDB) AllHosts() (allHosts []modules.HostSettings) {
+func (hdb *HostDB) AllHosts() (allHosts []modules.HostDBEntry) {
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
 
 	for _, entry := range hdb.allHosts {
-		allHosts = append(allHosts, entry.HostSettings)
+		allHosts = append(allHosts, entry.HostDBEntry)
 	}
 	return
 }
 
 // AveragePrice returns the average price of a host.
 func (hdb *HostDB) AveragePrice() types.Currency {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
-
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18
-	hosts := hdb.randomHosts(sampleSize, nil)
+	hosts := hdb.RandomHosts(sampleSize, nil)
 	if len(hosts) == 0 {
 		return totalPrice
 	}
 	for _, host := range hosts {
-		totalPrice = totalPrice.Add(host.Price)
+		totalPrice = totalPrice.Add(host.ContractPrice)
 	}
 	return totalPrice.Div(types.NewCurrency64(uint64(len(hosts))))
 }
@@ -113,7 +123,5 @@ func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
 	if h, ok := hdb.allHosts[addr]; ok {
 		return !h.online
 	}
-	// no record of the host; add it to the HostDB
-	hdb.insertHost(modules.HostSettings{NetAddress: addr})
 	return false
 }

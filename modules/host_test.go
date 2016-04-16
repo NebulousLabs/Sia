@@ -10,6 +10,8 @@ import (
 // TestUnitMaxFileContractSetLenSanity checks that a sensible value for
 // MaxFileContractSetLen has been chosen.
 func TestUnitMaxFileContractSetLenSanity(t *testing.T) {
+	t.Parallel()
+
 	// It does not make sense for the contract set limit to be higher than the
 	// IsStandard limit in the transaction pool. Such a transaction set would
 	// never be accepted by the transaction pool, and therefore is going to
@@ -26,6 +28,8 @@ func TestUnitMaxFileContractSetLenSanity(t *testing.T) {
 // StoragePriceToConsensus, verifying that they correctly convert between
 // human-readable prices and consensus-level prices.
 func TestUnitStoragePriceConversions(t *testing.T) {
+	t.Parallel()
+
 	// Establish a series of trials for conversion.
 	trials := []struct {
 		consensus types.Currency
@@ -95,6 +99,81 @@ func TestUnitStoragePriceConversions(t *testing.T) {
 		t.Error(err)
 	}
 	toHuman, err = StoragePriceToHuman(causeOverflow)
+	if err != types.ErrUint64Overflow {
+		t.Error(err)
+	}
+}
+
+// TestUnitBandwidthPriceConversions checks the functions BandwidthPriceToHuman
+// and BandwidthPriceToConsensus, verifying that they correctly convert between
+// human-readable prices and consensus-level prices.
+func TestUnitBandwidthPriceConversions(t *testing.T) {
+	t.Parallel()
+
+	// Establish a series of trials for conversion.
+	trials := []struct {
+		consensus types.Currency
+		human     uint64
+	}{
+		{
+			// Convert 0.
+			types.ZeroCurrency,
+			0,
+		},
+		{
+			// Convert from 1e12 - simple result.
+			types.NewCurrency64(1e12),
+			1,
+		},
+		{
+			// Convert from types.SiacoinPrecision - simple result.
+			types.SiacoinPrecision,
+			1e12,
+		},
+	}
+
+	// Run the trials.
+	for i, trial := range trials {
+		// Convert from the consensus result to the human result, and
+		// vice-versa. The transformations should be commutative, so both
+		// passing should indicate that the trial has succeeded.
+		toHuman, err := BandwidthPriceToHuman(trial.consensus)
+		if err != nil {
+			t.Error(i, err)
+		}
+		if toHuman != trial.human {
+			t.Error("BandwidthPriceToHuman conversion failed:", i, trial.consensus, trial.human, toHuman)
+		}
+		if BandwidthPriceToConsensus(trial.human).Cmp(trial.consensus) != 0 {
+			t.Error("BandwidthPriceToConsensus conversion failed:", i, trial.human, trial.consensus, BandwidthPriceToConsensus(trial.human))
+		}
+	}
+
+	// Check the corner cases for StoragePriceToHuman - rounding to 1, rounding
+	// to 0, and overflowing.
+	causeRoundToZero := types.NewCurrency64(500e9 - 1)
+	causeRoundToOne := types.NewCurrency64(500e9)
+	notOverflow := types.NewCurrency64(math.MaxUint64).Mul(types.NewCurrency64(1e12))
+	causeOverflow := types.NewCurrency64(math.MaxUint64).Mul(types.NewCurrency64(1e12 + 1))
+	toHuman, err := BandwidthPriceToHuman(causeRoundToZero)
+	if err != nil {
+		t.Error(err)
+	}
+	if toHuman != 0 {
+		t.Error("rounding is not happening correctly in StoragePriceToHuman")
+	}
+	toHuman, err = BandwidthPriceToHuman(causeRoundToOne)
+	if err != nil {
+		t.Error(err)
+	}
+	if toHuman != 1 {
+		t.Error("rounding is not happening correctly in StoragePriceToHuman")
+	}
+	toHuman, err = BandwidthPriceToHuman(notOverflow)
+	if err != nil {
+		t.Error(err)
+	}
+	toHuman, err = BandwidthPriceToHuman(causeOverflow)
 	if err != types.ErrUint64Overflow {
 		t.Error(err)
 	}

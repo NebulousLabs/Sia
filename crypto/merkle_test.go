@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/rand"
 	"testing"
 )
@@ -12,9 +11,6 @@ func TestTreeBuilder(t *testing.T) {
 	tree.PushObject("a")
 	tree.PushObject("b")
 	_ = tree.Root()
-
-	bytes := [][]byte{{1}, {2}}
-	_ = MerkleRoot(bytes)
 
 	// Correctness is assumed, as it's tested by the merkletree package. This
 	// function is really for code coverage.
@@ -48,28 +44,18 @@ func TestStorageProof(t *testing.T) {
 	numSegments := uint64(7)
 	data := make([]byte, numSegments*SegmentSize)
 	rand.Read(data)
-	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootHash := MerkleRoot(data)
 
 	// Create and verify proofs for all indices.
 	for i := uint64(0); i < numSegments; i++ {
-		baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), i)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
+		baseSegment, hashSet := MerkleProof(data, i)
 		if !VerifySegment(baseSegment, hashSet, numSegments, i, rootHash) {
 			t.Error("Proof", i, "did not pass verification")
 		}
 	}
 
 	// Try an incorrect proof.
-	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	baseSegment, hashSet := MerkleProof(data, 3)
 	if VerifySegment(baseSegment, hashSet, numSegments, 4, rootHash) {
 		t.Error("Verified a bad proof")
 	}
@@ -81,77 +67,115 @@ func TestNonMultipleLeafSizeStorageProof(t *testing.T) {
 	// Generate proof data.
 	data := make([]byte, (2*SegmentSize)+10)
 	rand.Read(data)
-	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootHash := MerkleRoot(data)
 
 	// Create and verify a proof for the last index.
-	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 2)
-	if err != nil {
-		t.Error(err)
-	}
+	baseSegment, hashSet := MerkleProof(data, 2)
 	if !VerifySegment(baseSegment, hashSet, 3, 2, rootHash) {
 		t.Error("padded segment proof failed")
 	}
 }
 
-// TestReadSegments tests MerkleTree.ReadSegments by building a MerkleTree and
-// comparing its root with the root returned from ReaderMerkleRoot.
-func TestReadSegments(t *testing.T) {
-	// Generate leaf data.
-	numSegments := 7
-	data := make([]byte, numSegments*SegmentSize)
-	rand.Read(data)
+// TestCachedTree tests the cached tree functions of the package.
+func TestCachedTree(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 
-	// Generate merkle tree root using MerkleTree.ReadSegments and
-	// MerkleTree.Root.
-	m := NewTree()
-	err := m.ReadSegments(bytes.NewReader(data))
+	// Build a cached tree out of 4 subtrees, each subtree of height 2 (4
+	// elements).
+	tree1Bytes, err := RandBytes(SegmentSize * 4)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rootHash := m.Root()
-
-	// Generate merkle tree root using ReaderMerkleRoot.
-	expectedHash, err := ReaderMerkleRoot(bytes.NewReader(data))
+	tree2Bytes, err := RandBytes(SegmentSize * 4)
 	if err != nil {
 		t.Fatal(err)
 	}
+	tree3Bytes, err := RandBytes(SegmentSize * 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree4Bytes, err := RandBytes(SegmentSize * 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree1Root := MerkleRoot(tree1Bytes)
+	tree2Root := MerkleRoot(tree2Bytes)
+	tree3Root := MerkleRoot(tree3Bytes)
+	tree4Root := MerkleRoot(tree4Bytes)
+	fullRoot := MerkleRoot(append(tree1Bytes, append(tree2Bytes, append(tree3Bytes, tree4Bytes...)...)...))
 
-	// Compare roots.
-	if rootHash != expectedHash {
-		t.Errorf("root hashes not consistent: expected %s, got %s\n", expectedHash, rootHash)
+	// Get a cached proof for index 0.
+	base, cachedHashSet := MerkleProof(tree1Bytes, 0)
+	if !VerifySegment(base, cachedHashSet, 4, 0, tree1Root) {
+		t.Fatal("the proof for the subtree was invalid")
+	}
+	ct := NewCachedTree(2)
+	ct.SetIndex(0)
+	ct.Push(tree1Root)
+	ct.Push(tree2Root)
+	ct.Push(tree3Root)
+	ct.Push(tree4Root)
+	hashSet := ct.Prove(base, cachedHashSet)
+	if !VerifySegment(base, hashSet, 4*4, 0, fullRoot) {
+		t.Fatal("cached proof construction appears unsuccessful")
+	}
+	if ct.Root() != fullRoot {
+		t.Fatal("cached Merkle root is not matching the full Merkle root")
+	}
+
+	// Get a cached proof for index 6.
+	base, cachedHashSet = MerkleProof(tree2Bytes, 2)
+	if !VerifySegment(base, cachedHashSet, 4, 2, tree2Root) {
+		t.Fatal("the proof for the subtree was invalid")
+	}
+	ct = NewCachedTree(2)
+	ct.SetIndex(6)
+	ct.Push(tree1Root)
+	ct.Push(tree2Root)
+	ct.Push(tree3Root)
+	ct.Push(tree4Root)
+	hashSet = ct.Prove(base, cachedHashSet)
+	if !VerifySegment(base, hashSet, 4*4, 6, fullRoot) {
+		t.Fatal("cached proof construction appears unsuccessful")
+	}
+	if ct.Root() != fullRoot {
+		t.Fatal("cached Merkle root is not matching the full Merkle root")
 	}
 }
 
-// TestNonMultipleNumberOfSegmentsReadSegments tests MerkleTree.ReadSements for
-// data that doesn't fit evently into a whole number of leaves. It does so by
-// building a MerkleTree with MerkleTree.ReadSegments and comparing its root
-// with the root returned from ReaderMerkleRoot.
-func TestNonMultipleNumberOfSegmentsReadSegments(t *testing.T) {
-	// Generate leaf data that doesn't fit evenly into leaves.
-	numSegments := 2.5
-	data := make([]byte, int(numSegments*SegmentSize))
-	rand.Read(data)
-
-	// Generate merkle tree root using MerkleTree.ReadSegments and
-	// MerkleTree.Root.
-	m := NewTree()
-	err := m.ReadSegments(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootHash := m.Root()
-
-	// Generate merkle tree root using ReaderMerkleRoot.
-	expectedHash, err := ReaderMerkleRoot(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
+// TestMerkleTreeOddDataSize checks that MerkleRoot and MerkleProof still
+// function correctly if you provide data which does not have a size evenly
+// divisible by SegmentSize.
+func TestOddDataSize(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
 	}
 
-	// Compare roots.
-	if rootHash != expectedHash {
-		t.Errorf("root hashes not consistent: expected %s, got %s\n", expectedHash, rootHash)
+	// Create some random data that's not evenly padded.
+	for i := 0; i < 25; i++ {
+		randFullSegments, err := RandIntn(65)
+		if err != nil {
+			t.Fatal(err)
+		}
+		randOverflow, err := RandIntn(63)
+		if err != nil {
+			t.Fatal(err)
+		}
+		randOverflow++ // Range is [1, 63] instead of [0, 62]
+		randProofIndex, err := RandIntn(randFullSegments + 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := RandBytes(SegmentSize*randFullSegments + randOverflow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := MerkleRoot(data)
+		base, hashSet := MerkleProof(data, uint64(randProofIndex))
+		if !VerifySegment(base, hashSet, uint64(randFullSegments)+1, uint64(randProofIndex), root) {
+			t.Error("Padded data proof failed for", randFullSegments, randOverflow, randProofIndex)
+		}
 	}
 }
