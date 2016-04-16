@@ -82,6 +82,7 @@ func TestRepair(t *testing.T) {
 	hosts := make([]contractor.Editor, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
+			sectors:  make(map[crypto.Hash][]byte),
 			ip:       modules.NetAddress(strconv.Itoa(i)),
 			delay:    time.Duration(i) * time.Millisecond,
 			failRate: 5, // 20% failure rate

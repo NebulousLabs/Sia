@@ -61,6 +61,7 @@ func TestErasureDownload(t *testing.T) {
 	hosts := make([]fetcher, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testFetcher{
+			sectors:   make(map[crypto.Hash][]byte),
 			pieceMap:  make(map[uint64][]pieceData),
 			pieceSize: pieceSize,
 
