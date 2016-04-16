@@ -6,6 +6,10 @@ untrusted environment. Managing data on Sia happens through several protocols:
 
 + Settings Request - the host sends the renter its settings.
 
++ Revision Request - the renter will send the host a file contract id, and the
+  host will send the most recent file contract revision that it knows of for
+  that file contract, with the signatures.
+
 + File Contract Creation - no data is uploaded during the inital creation of a
   file contract, but funds are allocated so that the file contract can be
   iteratively revised in the future.
@@ -51,8 +55,19 @@ Settings Request
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 120 seconds.
 
-2. The host sends the renter the most recent copy of its internal settings,
-   signed by the host public key. The connection is then closed.
+2. The host sends the renter the most recent copy of its settings, signed by
+   the host public key. The connection is then closed.
+
+Revision Request
+----------------
+
+1. The renter makes an RPC to the host, opening a connection. The connection
+   deadline sould be at least 120 seconds. The renter sends the file contract
+   id for the revision being requested.
+
+2. The host sends the renter the most recent file contract revision, along with
+   the transaction signatures from both the renter and the host. The connection
+   is then closed.
 
 File Contract Creation
 ----------------------
@@ -160,8 +175,9 @@ File Contract Renewal
    because a significant amount of metadata modifications may be necessary on
    the host's end, especially when renewing larger file contracts.
 
-2. The host sends the most recent copy of the settings to the renter. If the
-   host is not accepting new file contracts, the connection is closed.
+2. The host sends the most recent copy of the settings to the renter, along
+   with the most recent file contract revision. If the host is not accepting
+   new file contracts, the connection is closed.
 
 3. The renter either accepts or rejects the settings. If accepted, the renter
    sends an unsigned file contract to the host, containing the same Merkle root
@@ -187,7 +203,10 @@ Data Request
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline is at least 600 seconds.
 
-2. A loop begins, which will allow the renter to download multiple batches of
+2. The host will send the renter the most recent file contract revision
+   transaction set.
+
+   A loop begins, which will allow the renter to download multiple batches of
    data from the same connection. The host will send the host settings, and the
    most recent file contract revision transaction. If there is no revision yet,
    the host will send a blank transaction. The host is expected to always have
