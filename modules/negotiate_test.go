@@ -116,4 +116,15 @@ func TestNegotiationResponses(t *testing.T) {
 	if err == nil || err.Error() != ErrLowBalance.Error() {
 		t.Fatal(err)
 	}
+
+	// Write/Read StopResponse
+	buf.Reset()
+	err = WriteNegotiationStop(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ReadNegotiationAcceptance(buf)
+	if err != ErrStopResponse {
+		t.Fatal(err)
+	}
 }
