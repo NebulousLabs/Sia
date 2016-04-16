@@ -97,9 +97,6 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	txn, parentTxns := txnBuilder.View()
 	txnSet := append(parentTxns, txn)
 
-	// calculate contract ID
-	fcid := txnSet[len(txnSet)-1].FileContractID(0)
-
 	// send acceptance, txn signed by us, and pubkey
 	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
 		return Contract{}, errors.New("couldn't send initial acceptance: " + err.Error())
@@ -187,6 +184,9 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	if err != nil {
 		return Contract{}, err
 	}
+
+	// calculate contract ID
+	fcid := txnSet[len(txnSet)-1].FileContractID(0)
 
 	// create host contract
 	contract := Contract{
