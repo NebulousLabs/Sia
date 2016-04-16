@@ -47,38 +47,30 @@ var (
 // managedRevisionIteration handles one iteration of the revision loop. As a
 // performance optimization, multiple iterations of revisions are allowed to be
 // made over the same connection.
-func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (bool, error) {
-	// Set the negotiation deadline.
-	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
-
+func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) error {
 	// Send the settings to the renter. The host will keep going even if it is
 	// not accepting contracts, because in this case the contract already
 	// exists.
+	err := h.managedRPCSettings(conn)
+	if err != nil {
+		return err
+	}
+
 	h.mu.RLock()
 	settings := h.settings
 	secretKey := h.secretKey
 	blockHeight := h.blockHeight
 	h.mu.RUnlock()
-	err := crypto.WriteSignedObject(conn, settings, secretKey)
-	if err != nil {
-		return false, err
-	}
 
-	// Write the most recent file contract revision transaction.
-	var revisionTxn types.Transaction
-	if len(so.RevisionTransactionSet) > 0 {
-		revisionTxn = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1]
-	}
-	err = encoding.WriteObject(conn, revisionTxn)
-	if err != nil {
-		return false, err
-	}
+	// Set the negotiation deadline.
+	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
 
 	// The renter will either accept or reject the settings + revision
-	// transaction.
+	// transaction. It may also return a stop response to indicate that it
+	// wishes to terminate the revision loop.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// The renter is now going to send a batch of modifications followed by and
@@ -87,7 +79,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	var modifications []modules.RevisionAction
 	err = encoding.ReadObject(conn, &modifications, settings.MaxBatchSize)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// First read all of the modifications. Then make the modifications, but
@@ -100,13 +92,18 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	var sectorsGained []crypto.Hash
 	var gainedSectorData [][]byte
 	for _, modification := range modifications {
-		// Check that the index points to an existing sector root.
-		if uint64(len(so.SectorRoots)) <= modification.SectorIndex {
-			return false, errBadModificationIndex
+		// Check that the index points to an existing sector root. If the type
+		// is ActionInsert, we permit inserting at the end.
+		if modification.Type == modules.ActionInsert {
+			if modification.SectorIndex > uint64(len(so.SectorRoots)) {
+				return errBadModificationIndex
+			}
+		} else if modification.SectorIndex >= uint64(len(so.SectorRoots)) {
+			return errBadModificationIndex
 		}
 		// Check that the data sent for the sector is not too large.
 		if uint64(len(modification.Data)) > modules.SectorSize {
-			return false, errLargeSector
+			return errLargeSector
 		}
 
 		// Run a different codepath depending on the renter's selection.
@@ -118,7 +115,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 		} else if modification.Type == modules.ActionInsert {
 			// Check that the sector size is correct.
 			if uint64(len(modification.Data)) != modules.SectorSize {
-				return false, errBadSectorSize
+				return errBadSectorSize
 			}
 
 			// Update finances.
@@ -139,13 +136,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 			// checked for being appropriately small as well otherwise there is
 			// a risk of overflow.
 			if modification.Offset > modules.SectorSize || modification.Offset+uint64(len(modification.Data)) > modules.SectorSize {
-				return false, errIllegalOffsetAndLength
+				return errIllegalOffsetAndLength
 			}
 
 			// Get the data for the new sector.
 			sector, err := h.readSector(so.SectorRoots[modification.SectorIndex])
 			if err != nil {
-				return false, err
+				return err
 			}
 			copy(sector[modification.Offset:], modification.Data)
 
@@ -160,7 +157,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 			gainedSectorData = append(gainedSectorData, sector)
 			so.SectorRoots[modification.SectorIndex] = newRoot
 		} else {
-			return false, errUnknownModification
+			return errUnknownModification
 		}
 	}
 
@@ -168,30 +165,24 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	var revision types.FileContractRevision
 	err = encoding.ReadObject(conn, &revision, 16e3)
 	if err != nil {
-		return false, err
+		return err
 	}
 	err = verifyRevision(so, revision, storageRevenue, bandwidthRevenue, collateralRisked)
 	if err != nil {
-		return false, modules.WriteNegotiationRejection(conn, err)
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// Revision is acceptable, write an acceptance string.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	// Renter will now send the transaction signatures for the file contract,
-	// followed by an indication of whether another iteration is preferred.
+	// Renter will now send the transaction signatures for the file contract.
 	var renterSig types.TransactionSignature
-	var another bool
 	err = encoding.ReadObject(conn, &renterSig, 16e3)
 	if err != nil {
-		return false, err
-	}
-	err = encoding.ReadObject(conn, &another, 16)
-	if err != nil {
-		return false, err
+		return err
 	}
 
 	// Create the signatures for a transaction that contains only the file
@@ -199,7 +190,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	// Create the CoveredFields for the signature.
 	cf := types.CoveredFields{
 		FileContractRevisions: []uint64{0},
-		TransactionSignatures: []uint64{0},
 	}
 	hostTxnSig := types.TransactionSignature{
 		ParentID:       crypto.Hash(revision.ParentID),
@@ -213,7 +203,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	sigHash := txn.SigHash(1)
 	encodedSig, err := crypto.SignHash(sigHash, secretKey)
 	if err != nil {
-		return false, err
+		return err
 	}
 	txn.TransactionSignatures[1].Signature = encodedSig[:]
 
@@ -221,19 +211,23 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) (b
 	// the host will update and submit the storage obligation.
 	err = txn.StandaloneValid(blockHeight)
 	if err != nil {
-		return false, err
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(storageRevenue)
 	so.ConfirmedRevenue = so.ConfirmedRevenue.Add(bandwidthRevenue)
 	so.RiskedCollateral = so.RiskedCollateral.Add(collateralRisked)
 	err = h.modifyStorageObligation(so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
-		return false, err
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 
-	// Host will now send the signatures to the renter. This iteration is
-	// complete.
-	return another, encoding.WriteObject(conn, txn.TransactionSignatures[1])
+	// Host will now send acceptance and its signature to the renter. This
+	// iteration is complete.
+	err = modules.WriteNegotiationAcceptance(conn)
+	if err != nil {
+		return err
+	}
+	return encoding.WriteObject(conn, txn.TransactionSignatures[1])
 }
 
 // managedRPCReviseContract accepts a request to revise an existing contract.
@@ -258,11 +252,11 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 		return innerErr
 	})
 	if err != nil {
-		return err
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 	err = h.lockStorageObligation(so)
 	if err != nil {
-		return err
+		return modules.WriteNegotiationRejection(conn, errHostClosed)
 	}
 	defer h.unlockStorageObligation(so)
 
@@ -272,16 +266,24 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 		return err
 	}
 
-	// Upon connection, begin the revision loop.
+	// Write the most recent file contract revision transaction.
+	var revisionTxn types.Transaction
+	if len(so.RevisionTransactionSet) > 0 {
+		revisionTxn = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1]
+	}
+	err = encoding.WriteObject(conn, revisionTxn)
+	if err != nil {
+		return err
+	}
+
+	// Begin the revision loop. The host will process revisions until a
+	// timeout is reached, or until the renter sends a StopResponse.
 	for time.Now().Before(startTime.Add(1200 * time.Second)) {
-		another, err := h.managedRevisionIteration(conn, so)
-		if err != nil {
-			return err
-		}
-		// If the renter is not asking for another iteration, terminate the
-		// connection.
-		if !another {
+		err := h.managedRevisionIteration(conn, so)
+		if err == modules.ErrStopResponse {
 			return nil
+		} else if err != nil {
+			return err
 		}
 	}
 	return nil

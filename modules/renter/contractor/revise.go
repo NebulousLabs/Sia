@@ -12,7 +12,7 @@ import (
 )
 
 // negotiateRevision sends the revision and new piece data to the host.
-func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
+func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
 	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
 	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
 
@@ -22,38 +22,42 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 		TransactionSignatures: []types.TransactionSignature{{
 			ParentID:       crypto.Hash(rev.ParentID),
 			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
-			PublicKeyIndex: 0, // renter key is always first -- see negotiateContract
+			PublicKeyIndex: 0, // renter key is always first -- see formContract
 		}},
 	}
 	// sign the transaction
 	encodedSig, _ := crypto.SignHash(signedTxn.SigHash(0), secretKey) // no error possible
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
-	// send the transaction
-	if err := encoding.WriteObject(conn, signedTxn); err != nil {
-		return types.Transaction{}, errors.New("couldn't send revision transaction: " + err.Error())
+	// send the revision
+	if err := encoding.WriteObject(conn, rev); err != nil {
+		return types.Transaction{}, errors.New("couldn't send revision: " + err.Error())
 	}
 
-	// host sends acceptance
-	var response string
-	if err := encoding.ReadObject(conn, &response, 128); err != nil {
-		return types.Transaction{}, errors.New("couldn't read host acceptance: " + err.Error())
-	}
-	if response != modules.AcceptResponse {
-		return types.Transaction{}, errors.New("host rejected revision: " + response)
+	// read acceptance
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
 	}
 
-	// read txn signed by host
-	var signedHostTxn types.Transaction
-	if err := encoding.ReadObject(conn, &signedHostTxn, types.BlockSizeLimit); err != nil {
-		return types.Transaction{}, errors.New("couldn't read signed revision transaction: " + err.Error())
+	// send the new transaction signature
+	if err := encoding.WriteObject(conn, signedTxn.TransactionSignatures[0]); err != nil {
+		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
 	}
 
-	if signedHostTxn.ID() != signedTxn.ID() {
-		return types.Transaction{}, errors.New("host sent bad signed transaction")
+	// read the host's acceptance and transaction signature
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
 	}
-
-	return signedHostTxn, nil
+	var hostSig types.TransactionSignature
+	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
+		return types.Transaction{}, errors.New("couldn't read host's signature: " + err.Error())
+	}
+	// add the signature to the transaction and verify it
+	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
+	if err := signedTxn.StandaloneValid(blockheight); err != nil {
+		return types.Transaction{}, err
+	}
+	return signedTxn, nil
 }
 
 // newRevision revises the current revision to cover a different number of

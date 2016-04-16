@@ -81,22 +81,13 @@ func (he *hostEditor) Close() error {
 }
 
 // startRevision is run at the beginning of each revision iteration. It reads
-// the host's settings and the last revision transaction, confirms that the
-// values are acceptable, and writes an acceptance.
+// the host's settings confirms that the values are acceptable, and writes an acceptance.
 func (he *hostEditor) startRevision() error {
 	// verify the host's settings and confirm its identity
 	// TODO: return new host, so we can calculate price accurately
 	_, err := verifySettings(he.conn, he.host, he.contractor.hdb)
 	if err != nil {
 		return modules.WriteNegotiationRejection(he.conn, err)
-	}
-
-	// read last txn
-	var lastRevisionTxn types.Transaction
-	if err := encoding.ReadObject(he.conn, &lastRevisionTxn, 2048); err != nil {
-		return modules.WriteNegotiationRejection(he.conn, errors.New("couldn't read last revision transaction: "+err.Error()))
-	} else if lastRevisionTxn.ID() != he.contract.LastRevisionTxn.ID() {
-		return modules.WriteNegotiationRejection(he.conn, errors.New("desynchronized with host (revision transactions do not match)"))
 	}
 	return modules.WriteNegotiationAcceptance(he.conn)
 }
@@ -133,7 +124,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	// send 'insert' action
 	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
-		SectorIndex: uint64(len(newRoots)), // current length + 1
+		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
 	}})
 	if err != nil {
@@ -143,7 +134,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	// revise the file contract to cover the cost of the new sector
 	// TODO: should probably create revision beforehand so we know we have enough money
 	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
@@ -209,7 +200,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 
 	// revise the file contract to cover one fewer sector
 	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {
 		return err
 	}
@@ -270,6 +261,13 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	// read acceptance
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return nil, errors.New("host did not accept revision request: " + err.Error())
+	}
+	// read last txn
+	var lastRevisionTxn types.Transaction
+	if err := encoding.ReadObject(conn, &lastRevisionTxn, 2048); err != nil {
+		return nil, errors.New("couldn't read last revision transaction: " + err.Error())
+	} else if lastRevisionTxn.ID() != contract.LastRevisionTxn.ID() {
+		return nil, errors.New("desynchronized with host (revision transactions do not match)")
 	}
 
 	// the host is now ready to accept revisions
