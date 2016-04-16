@@ -85,7 +85,7 @@ func TestHostAnnounce(t *testing.T) {
 	if len(af.publicKeys) != 1 {
 		t.Fatal("could not find host announcement in blockchain")
 	}
-	if af.netAddresses[0] != ht.host.netAddress {
+	if af.netAddresses[0] != ht.host.autoAddress {
 		t.Error("announcement has wrong address")
 	}
 	if !bytes.Equal(af.publicKeys[0].Key, ht.host.publicKey.Key) {

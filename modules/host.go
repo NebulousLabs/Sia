@@ -1,13 +1,5 @@
 package modules
 
-// TODO: Host is probably not correctly tracking the financial metrics, nor is
-// it properly tracking the RPC metrics for upload and download bandwidth.
-
-// TODO: Consolidate some of the information-retrieving methods in the host
-// interface.
-
-// TODO: Finalize the documentation for this package.
-
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -40,18 +32,32 @@ type (
 		UploadSpeedLimit  uint64         `json:"uploadspeedlimit"`  // The maximum upload speed for all combined host connections.
 	}
 
-	// HostFinancialMetrics provides statistics on the spendings and earnings
-	// of the host.
+	// HostFinancialMetrics provides financial statistics for the host,
+	// including money that is locked in contracts. Though verbose, these
+	// statistics should provide a clear picture of where the host's money is
+	// currently being used. The front end can consolidate stats where desired.
+	// Potential revenue refers to revenue that is available in a file
+	// contract, but the file contract window has not yet closed.
 	HostFinancialMetrics struct {
-		DownloadBandwidthRevenue           types.Currency
-		LockedStorageCollateral            types.Currency
-		LostStorageCollateral              types.Currency
-		LostStorageRevenue                 types.Currency
-		PotentialStorageRevenue            types.Currency
-		StorageRevenue                     types.Currency
-		TransactionFeeExpenses             types.Currency // Amount spent on transaction fees total
-		UnsubsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renter did help pay for.
-		UploadBandwidthRevenue             types.Currency
+		// Every time a renter forms a contract with a host, a contract fee is
+		// paid by the renter. These stats track the total contract fees.
+		ContractCompensation          types.Currency `json:"contractcompensation"`
+		PotentialContractCompensation types.Currency `json:"potentialcontractcompensation"`
+
+		// Metrics related to storage proofs, collateral, and submitting
+		// transactions to the blockchain.
+		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
+		LostStorageCollateral   types.Currency `json:"loststoragecollateral"`
+		LostStorageRevenue      types.Currency `json:"loststoragerevenue"`
+		PotentialStorageRevenue types.Currency `json:"potentialstoragerevenue"`
+		StorageRevenue          types.Currency `json:"storagerevenue"`
+		TransactionFeeExpenses  types.Currency `json:"transactionfeeexpenses"`
+
+		// Bandwidth financial metrics.
+		DownloadBandwidthRevenue          types.Currency `json:"downloadbandwidthrevenue"`
+		PotentialDownloadBandwidthRevenue types.Currency `json:"potentialdownloadbandwidthrevenue"`
+		PotentialUploadBandwidthRevenue   types.Currency `json:"potentialuploadbandwidthrevenue"`
+		UploadBandwidthRevenue            types.Currency `json:"uploadbandwidthrevenue"`
 	}
 
 	// HostInternalSettings contains a list of settings that can be changed.
@@ -63,6 +69,7 @@ type (
 		WindowSize         types.BlockHeight `json:"windowsize"`
 
 		Collateral            types.Currency `json:"collateral"`
+		CollateralBudget      types.Currency `json:"collateralbudget"`
 		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
 		MaxCollateral         types.Currency `json:"maxcollateral"`
 
@@ -160,7 +167,7 @@ type (
 		AnnounceAddress(NetAddress) error
 
 		// FinancialMetrics returns the financial statistics of the host.
-		// TODO: FinancialMetrics() HostFinancialMetrics
+		FinancialMetrics() HostFinancialMetrics
 
 		// InternalSettings returns the host's internal settings.
 		InternalSettings() HostInternalSettings

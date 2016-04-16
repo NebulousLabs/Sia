@@ -1,29 +1,36 @@
 // Package host is an implementation of the host module, and is responsible for
-// storing data and advertising available storage to the network.
+// participating in the storage ecosystem, turning available disk space an
+// internet bandwidth into profit for the user.
 package host
 
-// TODO: There may need to be limitations on the window start.
+// TODO: automated_settings.go, a file which can be responsible for
+// automatically regulating things like bandwidth price, storage price,
+// contract price, etc. One of the features in consideration is that the host
+// would start to steeply increase the contract price as it begins to run low
+// on collateral. The host would also inform the user that there doesn't seem
+// to be enough money to handle all of the file contracts, so that the user
+// could make a judgement call on whether to get more.
 
-// TODO: Host pricing tools.
+// TODO: The host needs to somehow keep an awareness of its bandwidth limits,
+// and needs to reject calls if there is not enough bandwidth available.
 
-// TODO: The host should keep an awareness of its own IP and the addresses that
-// it has announced at, and should re-announce if the ip address changes or if
-// the host suddenly finds itself to be unreachable.
+// TODO: The synchronization on the port forwarding is not perfect. Sometimes a
+// port will be cleared before it was set (if things happen fast enough),
+// because the port forwarding call is asynchronous.
 
-// TODO: The host should somehow keep track of renters that make use of it,
-// perhaps through public keys or something, that allows the host to know which
-// renters can be safely allocated a greater number of collateral coins.
-//
-// Renters, especially new renters, are going to need some mechanic to ramp
-// with hosts. The answer may be that new renters go through multiple
-// iterations of file contracts.
-//
-// Adding some sort of proof-of-burn to the renter may be sufficient. If the
-// renter is burning 1% coins compared to what the host is locking away (for
-// new relationships), then the host can know that the renter has made
-// sacrifices in excess of just locking away a proportional amount of coins.
-// The renter will outright lose the coins, while the host will get the coins
-// back after some time has passed.
+// TODO: Add contract compensation from form contract to the storage obligation
+// financial metrics, and to the host's tracking.
+
+// TODO: merge the network interfaces stuff, don't forget to include the
+// 'announced' variable as one of the outputs.
+
+// TODO: check that the host is doing proper clean shudown, especially
+// network.go, a couple of problems with clean shutdown in network.go.
+
+// TODO: 'announced' doesn't tell you if the announcement made it to the
+// blockchain.
+
+// TODO: clean up all of the magic numbers in the host.
 
 // TODO: host_test.go has commented out tests.
 
@@ -34,7 +41,6 @@ package host
 // TODO: update_test.go has commented out tests.
 
 import (
-	"crypto/rand"
 	"errors"
 	"net"
 	"path/filepath"
@@ -44,8 +50,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -104,12 +108,26 @@ type Host struct {
 	recentChange modules.ConsensusChangeID
 
 	// Host Identity
-	netAddress     modules.NetAddress
-	publicKey      types.SiaPublicKey
-	revisionNumber uint64
-	secretKey      crypto.SecretKey
-	sectorSalt     crypto.Hash
-	unlockHash     types.UnlockHash
+	//
+	// The revision number keeps track of the current revision number on the
+	// host external settingse
+	//
+	// The auto address is the address that is fetched automatically by the
+	// host. The host will ignore the automatic address if settings.NetAddress
+	// has been set by the user. If settings.NetAddress is blank, then the host
+	// will track its own ip address and make an announcement on the blockchain
+	// every time that the address changes.
+	//
+	// The announced bool indicates whether the host remembers having a
+	// successful announcement with the current address.
+	announced        bool
+	autoAddress      modules.NetAddress
+	financialMetrics modules.HostFinancialMetrics
+	publicKey        types.SiaPublicKey
+	revisionNumber   uint64
+	secretKey        crypto.SecretKey
+	settings         modules.HostInternalSettings
+	unlockHash       types.UnlockHash // A wallet address that can receive coins.
 
 	// Storage Obligation Management - different from file management in that
 	// the storage obligation management is the new way of handling storage
@@ -123,18 +141,8 @@ type Host struct {
 	// layout (knowledge which should be unavailable), but a limited amount of
 	// damage can be done even with this attack.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
+	sectorSalt               crypto.Hash
 	storageFolders           []*storageFolder
-
-	// Financial Metrics
-	downloadBandwidthRevenue         types.Currency
-	lockedStorageCollateral          types.Currency
-	lostStorageCollateral            types.Currency
-	lostStorageRevenue               types.Currency
-	potentialStorageRevenue          types.Currency
-	storageRevenue                   types.Currency
-	transactionFeeExpenses           types.Currency // Amount spent on transaction fees total.
-	subsidizedTransactionFeeExpenses types.Currency // Amount spent on transaction fees that the renters paid for.
-	uploadBandwidthRevenue           types.Currency
 
 	// Utilities.
 	db         *persist.BoltDatabase
@@ -142,7 +150,7 @@ type Host struct {
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
-	settings   modules.HostInternalSettings
+	port       string
 
 	// The resource lock is held by threaded functions for the duration of
 	// their operation. Functions should grab the resource lock as a read lock
@@ -177,74 +185,12 @@ func (h *Host) checkUnlockHash() error {
 	return nil
 }
 
-// establishDefaults configures the default settings for the host, overwriting
-// any existing settings.
-func (h *Host) establishDefaults() error {
-	// Configure the settings object.
-	h.settings = modules.HostInternalSettings{
-		MaxDuration: defaultMaxDuration,
-		WindowSize:  defaultWindowSize,
-
-		Collateral:            defaultCollateral,
-		MaxCollateralFraction: defaultCollateralFraction,
-		MaxCollateral:         defaultMaxCollateral,
-
-		MinimumStoragePrice:           defaultStoragePrice,
-		MinimumContractPrice:          defaultContractPrice,
-		MinimumDownloadBandwidthPrice: defaultDownloadBandwidthPrice,
-		MinimumUploadBandwidthPrice:   defaultUploadBandwidthPrice,
-	}
-
-	// Generate signing key, for revising contracts.
-	sk, pk, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return err
-	}
-	h.secretKey = sk
-	h.publicKey = types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       pk[:],
-	}
-	_, err = rand.Read(h.sectorSalt[:])
-	if err != nil {
-		return err
-	}
-
-	// Subscribe to the consensus set.
-	err = h.initConsensusSubscription()
-	if err != nil {
-		return err
-	}
-	return h.save()
-}
-
-// initDB will check that the database has been initialized and if not, will
-// initialize the database.
-func (h *Host) initDB() error {
-	return h.db.Update(func(tx *bolt.Tx) error {
-		// The storage obligation bucket does not exist, which means the
-		// database needs to be initialized. Create the database buckets.
-		buckets := [][]byte{
-			bucketActionItems,
-			bucketSectorUsage,
-			bucketStorageObligations,
-		}
-		for _, bucket := range buckets {
-			_, err := tx.CreateBucketIfNotExists(bucket)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
 // newHost returns an initialized Host, taking a set of dependencies as input.
 // By making the dependencies an argument of the 'new' call, the host can be
 // mocked such that the dependencies can return unexpected errors or unique
 // behaviors during testing, enabling easier testing of the failure modes of
 // the Host.
-func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
@@ -254,6 +200,12 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	}
 	if wallet == nil {
 		return nil, errNilWallet
+	}
+
+	// Parse the port from the address.
+	_, port, err := net.SplitHostPort(listenerAddress)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create the host object.
@@ -266,10 +218,11 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 
 		persistDir: persistDir,
+		port:       port,
 	}
 
 	// Create the perist directory if it does not yet exist.
-	err := dependencies.mkdirAll(h.persistDir, 0700)
+	err = dependencies.mkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +262,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	// Get the host established on the network.
-	err = h.initNetworking(address)
+	err = h.initNetworking(listenerAddress)
 	if err != nil {
 		_ = h.log.Close()
 		_ = h.db.Close()
@@ -357,7 +310,7 @@ func (h *Host) Close() (composedError error) {
 
 	// Clear the port that was forwarded at startup. The port handling must
 	// happen before the logger is closed, as it leaves a logging message.
-	err = h.clearPort(h.netAddress.Port())
+	err = h.managedClearPort()
 	if err != nil {
 		composedError = composeErrors(composedError, err)
 	}
@@ -379,6 +332,14 @@ func (h *Host) Close() (composedError error) {
 	return composedError
 }
 
+// FinancialMetrics returns information about the financial commitments,
+// rewards, and activities of the host.
+func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.financialMetrics
+}
+
 // SetInternalSettings updates the host's internal HostInternalSettings object.
 func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error {
 	h.mu.Lock()
@@ -396,6 +357,13 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 		if err != nil {
 			return err
 		}
+	}
+
+	// Check if the net address for the host has changed. If it has, and it's
+	// not equal to the auto address, then the host is going to need to make
+	// another blockchain announcement.
+	if h.settings.NetAddress != settings.NetAddress && settings.NetAddress != h.autoAddress {
+		h.announced = false
 	}
 
 	h.settings = settings

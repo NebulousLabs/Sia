@@ -36,33 +36,6 @@ const (
 )
 
 var (
-	// defaultContractPrice defines the default price of creating a contract
-	// with the host. The default is set to 50 siacoins, which means that the
-	// opening file contract can have 5 siacoins put towards it, the file
-	// contract revision can have 15 siacoins put towards it, and the storage
-	// proof can have 15 siacoins put towards it, with 5 left over for the
-	// host, a sort of compensation for keeping and backing up the storage
-	// obligation data.
-	defaultContractPrice = types.NewCurrency64(40).Mul(types.SiacoinPrecision) // 40 siacoins
-
-	// defaultUploadBandwidthPrice defines the default price of upload
-	// bandwidth. The default is set to 1 siacoin per GB, because the host is
-	// presumed to have a large amount of downstream bandwidth. Furthermore,
-	// the host is typically only downloading data if it is planning to store
-	// the data, meaning that the host serves to profit from accepting the
-	// data.
-	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
-
-	// defaultDownloadBandwidthPrice defines the default price of upload
-	// bandwidth. The default is set to 10 siacoins per gigabyte, because
-	// download bandwidth is expected to be plentiful but also in-demand.
-	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(10e3) // 10 SC / GB
-
-	// defaultStoragePrice defines the starting price for hosts selling
-	// storage. We try to match a number that is both reasonably profitable and
-	// reasonably competitive.
-	defaultStoragePrice = modules.StoragePriceToConsensus(20e3) // 20 SC / GB / Month
-
 	// defaultCollateral defines the amount of money that the host puts up as
 	// collateral per-byte by default. The collateral should be considered as
 	// an absolute instead of as a percentage, because low prices result in
@@ -76,9 +49,64 @@ var (
 	// opportunity cost in being a host.
 	defaultCollateral = types.NewCurrency64(50) // 50 SC / GB / Month
 
+	// defaultCollateralBudget defines the maximum number of siacoins that the
+	// host is going to allocate towards collateral. 10 million has been chosen
+	// as a number that is large, but not so large that someone would be
+	// furious for losing access to it for a few weeks.
+	defaultCollateralBudget = types.NewCurrency64(10e6).Mul(types.SiacoinPrecision)
+
+	// defaultCollateralFraction defines the percentage of the payout that the
+	// host is comfortable having as the collateral. A default of 650e3
+	// indicates that the host is comfortable with 65% of the payout being host
+	// collateral.
 	defaultCollateralFraction = types.NewCurrency64(650e3)
 
-	defaultMaxCollateral = types.NewCurrency64(10000).Mul(types.SiacoinPrecision)
+	// defaultContractPrice defines the default price of creating a contract
+	// with the host. The default is set to 50 siacoins, which means that the
+	// opening file contract can have 5 siacoins put towards it, the file
+	// contract revision can have 15 siacoins put towards it, and the storage
+	// proof can have 15 siacoins put towards it, with 5 left over for the
+	// host, a sort of compensation for keeping and backing up the storage
+	// obligation data.
+	defaultContractPrice = types.NewCurrency64(40).Mul(types.SiacoinPrecision) // 40 siacoins
+
+	// defaultDownloadBandwidthPrice defines the default price of upload
+	// bandwidth. The default is set to 10 siacoins per gigabyte, because
+	// download bandwidth is expected to be plentiful but also in-demand.
+	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(10e3) // 10 SC / GB
+
+	// defaultMaxBatchSize defines the maximum number of bytes that the host
+	// will allow to be sent during a single batch update in a revision RPC.
+	// 17MiB has been chosen because it's four full sectors, plus some wiggle
+	// room for the extra data or a few delete operations. The whole batch will
+	// be held in memory, so the batch size should only be increased
+	// substantially if the host has a lot of memory. Additionally, the whole
+	// batch is sent in one network connection. Additionally, the renter can
+	// steal funds for upload bandwidth all the way out to the size of a batch.
+	// 17MiB is a conservative default, most hosts are likely to be just fine
+	// with a number like 65MiB.
+	defaultMaxBatchSize = 17 * 1 << 20
+
+	// defaultMaxCollateral defines the maximum amount of collateral that the
+	// host is comfortable putting into a single file contract. 10e3 is a
+	// relatively small file contract, but millions of siacoins could be locked
+	// away by only a few hundred file contracts. As the ecosystem matures, it
+	// is expected that the safe default for this value will increase quite a
+	// bit.
+	defaultMaxCollateral = types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
+
+	// defaultStoragePrice defines the starting price for hosts selling
+	// storage. We try to match a number that is both reasonably profitable and
+	// reasonably competitive.
+	defaultStoragePrice = modules.StoragePriceToConsensus(20e3) // 20 SC / GB / Month
+
+	// defaultUploadBandwidthPrice defines the default price of upload
+	// bandwidth. The default is set to 1 siacoin per GB, because the host is
+	// presumed to have a large amount of downstream bandwidth. Furthermore,
+	// the host is typically only downloading data if it is planning to store
+	// the data, meaning that the host serves to profit from accepting the
+	// data.
+	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window

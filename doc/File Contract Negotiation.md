@@ -20,16 +20,14 @@ untrusted environment. Managing data on Sia happens through several protocols:
 
 + Data Request - data is requested from the host for retrieval.
 
-### Extra protocols will eventually be implemented, but not until after the
-### v1.0 release.
++ (planned for later) Storage Proof Request - the renter requests that the host
+  perform an out-of-band storage proof.
 
-# Storage Proof Request - the renter requests that the host perform an
-# out-of-band storage proof.
-
-# Metadata Request - the renter requests some metadata about the file contract
-# from the host, namely the list of hashes that compose the file. This list of
-# hashes is provided along with a cryptographic proof that the hashes are
-# valid. The proof is only needed if only a subset of hashes are being sent.
++ (planned for later) Metadata Request - the renter requests some metadata
+  about the file contract from the host, namely the list of hashes that compose
+  the file. This list of hashes is provided along with a cryptographic proof
+  that the hashes are valid. The proof is only needed if only a subset of
+  hashes are being sent.
 
 A frequently seen construction is 'acceptance'. The renter or host may have the
 opportunity to accept or reject a communication, which takes the form of a
@@ -59,37 +57,41 @@ Settings Request
 File Contract Creation
 ----------------------
 
+A few decisions were made regarding the file contract protocol. The first is
+that the renter should not sign the file contract until the host has formally
+accepted the file contract. The second is that the host should be the last one
+to sign the file contract, as the renter is the party with the strong
+reputation system.
+
+Instead of sending a whole transaction each time, the transaction is sent
+piecemeal, and only the new parts at each step are sent to the other party.
+This minimizes the surface area of data for a malicious party to manipulate,
+which means less verification code, which means less chances of having a bug in
+the verification code.
+
+The renter pays for the siafund fee on the host's collateral and contract fee.
+If a renter opens a file contract and then never uses it, the host does not
+lose money. This does put the renter at risk, as they may open up a file
+contract and then watch the host leave, but the renter is spreading the risk
+over communications with many hosts, and has a reputation system that will help
+ensure that the renter is only dealing with upstanding hosts.
+
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 360 seconds.
 
 2. The host sends the renter the most recent copy of its settings, signed. If
    the host is not accepting new file contracts, the connection is closed.
 
-# Witholding the signature is not strictly necessary, but if the signature is
-# not withheld, the host has not yet committed to accepting the file contract,
-# and so can appear to reject the file contract while still submitting it to the
-# blockchain. The renter will not know until the file contract appears on the
-# blockchain. If the renter signs at this point, the renter will also not be
-# able to sign the whole transaction because the host must add collateral. This
-# means that the renter will not even know the file contract id.
 3. The renter sends a notice of acceptance or rejection. If the renter accepts,
    the renter then sends a funded file contract without a signature, followed
    by the public key that will be used to create the renter's portion of the
    UnlockConditions for the file contract.
 
-# The host must always sign last, lest the renter trick the host into storing
-# data for free. Only the new data is sent to the renter, both to make
-# programming against the TransactionBuilder easier but also so that there's no
-# risk to the renter that other fields (such as the file contract) have been
-# changed.
 4. The host sends an acceptance or rejection of the file contract. If the host
-   accepts, the host will add collateral (and maybe miner fees) to the file
-   contract, and will send the renter the inputs + outputs for the collateral,
-   followed by any new parent transactions. The length of any of these may be
-   zero.
+   accepts, the host will add collateral to the file contract, and will send
+   the renter the inputs + outputs for the collateral, followed by any new
+   parent transactions. The length of any of these may be zero.
 
-# Only the transaction signatures are sent because the file contract is
-# supposed to be finalized at this point.
 5. The renter indicates acceptance or rejection of the file contract. If the
    renter accepts, the renter will sign the file contract and send the
    transaction signatures to the host.
