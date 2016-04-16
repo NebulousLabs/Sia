@@ -64,7 +64,7 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 		go func(pieceIndex uint64, host contractor.Editor) {
 			defer wg.Done()
 			// upload data to host
-			offset, err := host.Upload(pieces[pieceIndex])
+			root, err := host.Upload(pieces[pieceIndex])
 			if err != nil {
 				return
 			}
@@ -82,9 +82,9 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 
 			// update contract
 			contract.Pieces = append(contract.Pieces, pieceData{
-				Chunk:  chunkIndex,
-				Piece:  pieceIndex,
-				Offset: offset,
+				Chunk:      chunkIndex,
+				Piece:      pieceIndex,
+				MerkleRoot: root,
 			})
 			f.contracts[host.ContractID()] = contract
 			f.mu.Unlock()

@@ -54,7 +54,7 @@ func TestEditor(t *testing.T) {
 	c.blockHeight = 0
 
 	// expensive host
-	hostSecretKey, hostPublicKey := crypto.GenerateKeyPairDeterministic([32]byte{})
+	_, hostPublicKey := crypto.GenerateKeyPairDeterministic([32]byte{})
 	dbe := modules.HostDBEntry{
 		PublicKey: types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
@@ -138,14 +138,10 @@ func TestEditor(t *testing.T) {
 		go func() {
 			// read specifier
 			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
-			// send settings
-			crypto.WriteSignedObject(ourConn, dbe.HostExternalSettings, hostSecretKey)
-			// read acceptance
-			encoding.ReadObject(ourConn, new(string), modules.MaxErrorSize)
 			// read contract ID
 			encoding.ReadObject(ourConn, new(types.FileContractID), 32)
-			// send transaction
-			encoding.WriteObject(ourConn, contract.LastRevisionTxn)
+			// send acceptance
+			modules.WriteNegotiationAcceptance(ourConn)
 			ourConn.Close()
 		}()
 		return theirConn, nil

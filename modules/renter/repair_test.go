@@ -18,8 +18,8 @@ import (
 
 // a testHost simulates a host. It implements the contractor.Editor interface.
 type testHost struct {
-	ip   modules.NetAddress
-	data []byte
+	ip      modules.NetAddress
+	sectors map[crypto.Hash][]byte
 
 	// used to simulate real-world conditions
 	delay    time.Duration // transfers will take this long
@@ -43,7 +43,7 @@ func (h *testHost) ContractID() types.FileContractID {
 
 // Upload adds a piece to the testHost. It randomly fails according to the
 // testHost's parameters.
-func (h *testHost) Upload(data []byte) (offset uint64, err error) {
+func (h *testHost) Upload(data []byte) (crypto.Hash, error) {
 	// simulate I/O delay
 	time.Sleep(h.delay)
 
@@ -52,11 +52,12 @@ func (h *testHost) Upload(data []byte) (offset uint64, err error) {
 
 	// randomly fail
 	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
-		return 0, errors.New("no data")
+		return crypto.Hash{}, errors.New("no data")
 	}
 
-	h.data = append(h.data, data...)
-	return uint64(len(h.data) - len(data)), nil
+	root := crypto.MerkleRoot(data)
+	h.sectors[root] = data
+	return root, nil
 }
 
 // TestRepair tests the repair method of the file type.
@@ -112,7 +113,7 @@ func TestRepair(t *testing.T) {
 			continue
 		}
 		for _, p := range contract.Pieces {
-			encPiece := h.(*testHost).data[p.Offset : p.Offset+pieceSize+crypto.TwofishOverhead]
+			encPiece := h.(*testHost).sectors[p.MerkleRoot]
 			piece, err := deriveKey(f.masterKey, p.Chunk, p.Piece).DecryptBytes(encPiece)
 			if err != nil {
 				t.Fatal(err)
@@ -175,9 +176,9 @@ func TestOfflineChunks(t *testing.T) {
 	f := &file{
 		erasureCode: rsc,
 		contracts: map[types.FileContractID]fileContract{
-			{0}: {IP: "foo", Pieces: []pieceData{{0, 0, 0}, {1, 0, 0}}},
-			{1}: {IP: "bar", Pieces: []pieceData{{0, 1, 0}}},
-			{2}: {IP: "baz", Pieces: []pieceData{{1, 1, 0}}},
+			{0}: {IP: "foo", Pieces: []pieceData{{0, 0, crypto.Hash{}}, {1, 0, crypto.Hash{}}}},
+			{1}: {IP: "bar", Pieces: []pieceData{{0, 1, crypto.Hash{}}}},
+			{2}: {IP: "baz", Pieces: []pieceData{{1, 1, crypto.Hash{}}}},
 		},
 	}
 

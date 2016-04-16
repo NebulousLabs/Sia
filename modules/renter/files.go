@@ -47,9 +47,9 @@ type fileContract struct {
 // pieceData contains the metadata necessary to request a piece from a
 // fetcher.
 type pieceData struct {
-	Chunk  uint64 // which chunk the piece belongs to
-	Piece  uint64 // the index of the piece in the chunk
-	Offset uint64 // the offset of the piece in the file contract
+	Chunk      uint64      // which chunk the piece belongs to
+	Piece      uint64      // the index of the piece in the chunk
+	MerkleRoot crypto.Hash // the Merkle root of the piece
 }
 
 // deriveKey derives the key used to encrypt and decrypt a specific file piece.

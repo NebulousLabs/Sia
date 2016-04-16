@@ -28,8 +28,8 @@ var (
 // Editors are the means by which the renter uploads data to hosts.
 type Editor interface {
 	// Upload revises the underlying contract to store the new data. It
-	// returns the offset of the data in the stored file.
-	Upload(data []byte) (offset uint64, err error)
+	// returns the Merkle root of the data.
+	Upload(data []byte) (root crypto.Hash, err error)
 
 	// Delete removes a sector from the underlying contract.
 	Delete(crypto.Hash) error
@@ -52,7 +52,7 @@ type Editor interface {
 // Upload must happen in serial.
 type hostEditor struct {
 	// constants
-	price types.Currency
+	host modules.HostDBEntry
 
 	// updated after each revision
 	contract Contract
@@ -80,20 +80,38 @@ func (he *hostEditor) Close() error {
 	return he.conn.Close()
 }
 
+// startRevision is run at the beginning of each revision iteration. It reads
+// the host's settings and the last revision transaction, confirms that the
+// values are acceptable, and writes an acceptance.
+func (he *hostEditor) startRevision() error {
+	// verify the host's settings and confirm its identity
+	// TODO: return new host, so we can calculate price accurately
+	_, err := verifySettings(he.conn, he.host, he.contractor.hdb)
+	if err != nil {
+		return modules.WriteNegotiationRejection(he.conn, err)
+	}
+
+	// read last txn
+	var lastRevisionTxn types.Transaction
+	if err := encoding.ReadObject(he.conn, &lastRevisionTxn, 2048); err != nil {
+		return modules.WriteNegotiationRejection(he.conn, errors.New("couldn't read last revision transaction: "+err.Error()))
+	} else if lastRevisionTxn.ID() != he.contract.LastRevisionTxn.ID() {
+		return modules.WriteNegotiationRejection(he.conn, errors.New("desynchronized with host (revision transactions do not match)"))
+	}
+	return modules.WriteNegotiationAcceptance(he.conn)
+}
+
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
-func (he *hostEditor) Upload(data []byte) (uint64, error) {
-	// offset is old filesize
-	offset := he.contract.LastRevision.NewFileSize
-
+func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	// calculate price
 	he.contractor.mu.RLock()
 	height := he.contractor.blockHeight
 	he.contractor.mu.RUnlock()
 	if height >= he.contract.FileContract.WindowStart {
-		return 0, errors.New("contract has already ended")
+		return crypto.Hash{}, errors.New("contract has already ended")
 	}
-	sectorPrice := he.price.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
 	pieceRoot := crypto.MerkleRoot(data)
@@ -106,24 +124,28 @@ func (he *hostEditor) Upload(data []byte) (uint64, error) {
 	}
 	merkleRoot := tree.Root()
 
+	// initiate revision
+	err := he.startRevision()
+	if err != nil {
+		return crypto.Hash{}, err
+	}
+
 	// send 'insert' action
-	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(newRoots)), // current length + 1
+		Data:        data,
 	}})
 	if err != nil {
-		return 0, err
-	}
-	// send sector data
-	if err := encoding.WritePrefix(he.conn, data); err != nil {
-		return 0, err
+		return crypto.Hash{}, err
 	}
 
 	// revise the file contract to cover the cost of the new sector
+	// TODO: should probably create revision beforehand so we know we have enough money
 	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
 	if err != nil {
-		return 0, err
+		return crypto.Hash{}, err
 	}
 
 	// update host contract
@@ -136,7 +158,7 @@ func (he *hostEditor) Upload(data []byte) (uint64, error) {
 	he.contractor.save()
 	he.contractor.mu.Unlock()
 
-	return offset, nil
+	return pieceRoot, nil
 }
 
 // Delete deletes a sector in a contract.
@@ -149,7 +171,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 		return errors.New("contract has already ended")
 	}
 	// TODO: is this math correct?
-	sectorPrice := he.price.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
 
 	// calculate the new total Merkle root
 	var newRoots []crypto.Hash
@@ -170,8 +192,14 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	}
 	merkleRoot := tree.Root()
 
+	// initiate revision
+	err := he.startRevision()
+	if err != nil {
+		return err
+	}
+
 	// send 'delete' action
-	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
 	}})
@@ -235,34 +263,19 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-
-	// verify the host's settings and confirm its identity
-	host, err = verifySettings(conn, host, c.hdb)
-	if err != nil {
-		return nil, err
-	}
-
-	// send acceptance and contract ID
-	if err := encoding.WriteObject(conn, modules.AcceptResponse); err != nil {
-		return nil, errors.New("couldn't send acceptance: " + err.Error())
-	}
+	// send contract ID
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
 		return nil, errors.New("couldn't send contract ID: " + err.Error())
 	}
-
-	// read last txn
-	var lastRevisionTxn types.Transaction
-	if err := encoding.ReadObject(conn, &lastRevisionTxn, 2048); err != nil {
-		return nil, errors.New("couldn't read last revision transaction: " + err.Error())
-	} else if lastRevisionTxn.ID() != contract.LastRevisionTxn.ID() {
-		return nil, errors.New("desynchronized with host (revision transactions do not match)")
+	// read acceptance
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return nil, errors.New("host did not accept revision request: " + err.Error())
 	}
 
 	// the host is now ready to accept revisions
-
 	he := &hostEditor{
 		contract: contract,
-		price:    host.StoragePrice,
+		host:     host,
 
 		conn:       conn,
 		contractor: c,
