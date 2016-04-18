@@ -43,7 +43,7 @@ type Editor interface {
 	// EndHeight returns the height at which the contract ends.
 	EndHeight() types.BlockHeight
 
-	// Close terminates the connection to the uploader.
+	// Close terminates the connection to the host.
 	Close() error
 }
 
@@ -72,11 +72,12 @@ func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID 
 // store the file.
 func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.FileContract.WindowStart }
 
-// Close cleanly ends the revision process with the host, closes the
-// connection, and submits the last revision to the transaction pool.
+// Close cleanly ends the revision process with the host and closes the
+// connection.
 func (he *hostEditor) Close() error {
-	// send an empty revision to indicate that we are finished
-	encoding.WriteObject(he.conn, types.Transaction{})
+	// don't care about these errors
+	_, _ = verifySettings(he.conn, he.host, he.contractor.hdb)
+	_ = modules.WriteNegotiationStop(he.conn)
 	return he.conn.Close()
 }
 
