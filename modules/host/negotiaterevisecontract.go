@@ -56,12 +56,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 		return err
 	}
 
-	h.mu.RLock()
-	settings := h.settings
-	secretKey := h.secretKey
-	blockHeight := h.blockHeight
-	h.mu.RUnlock()
-
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
 
@@ -72,6 +66,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	if err != nil {
 		return err
 	}
+
+	// Read some variables from the host for use later in the function.
+	h.mu.RLock()
+	settings := h.settings
+	secretKey := h.secretKey
+	blockHeight := h.blockHeight
+	h.mu.RUnlock()
 
 	// The renter is now going to send a batch of modifications followed by and
 	// update file contract revision. Read the number of modifications being

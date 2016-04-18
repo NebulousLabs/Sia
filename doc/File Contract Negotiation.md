@@ -201,10 +201,12 @@ Data Request
 ------------
 
 1. The renter makes an RPC to the host, opening a connection. The connection
-   deadline is at least 600 seconds.
+   deadline is at least 600 seconds. The renter will send a file contract id
+   corresponding to the file contract that will be used to pay for the
+   download.
 
-2. The host will send the renter the most recent file contract revision
-   transaction set.
+2. The host will send the renter the most recent file contract revision, along
+   with the signatures that validate the revision.
 
    A loop begins, which will allow the renter to download multiple batches of
    data from the same connection. The host will send the host settings, and the

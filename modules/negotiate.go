@@ -164,15 +164,16 @@ type (
 		// revision action can have a different number of bytes, depending on
 		// the action, so the number of revision actions allowed depends on the
 		// sizes of each.
-		AcceptingContracts bool              `json:"acceptingcontracts"`
-		MaxBatchSize       uint64            `json:"maxbatchsize"`
-		MaxDuration        types.BlockHeight `json:"maxduration"`
-		NetAddress         NetAddress        `json:"netaddress"`
-		RemainingStorage   uint64            `json:"remainingstorage"`
-		SectorSize         uint64            `json:"sectorsize"`
-		TotalStorage       uint64            `json:"totalstorage"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
-		WindowSize         types.BlockHeight `json:"windowsize"`
+		AcceptingContracts   bool              `json:"acceptingcontracts"`
+		MaxDownloadBatchSize uint64            `json:"maxdownloadbatchsize"`
+		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
+		MaxDuration          types.BlockHeight `json:"maxduration"`
+		NetAddress           NetAddress        `json:"netaddress"`
+		RemainingStorage     uint64            `json:"remainingstorage"`
+		SectorSize           uint64            `json:"sectorsize"`
+		TotalStorage         uint64            `json:"totalstorage"`
+		UnlockHash           types.UnlockHash  `json:"unlockhash"`
+		WindowSize           types.BlockHeight `json:"windowsize"`
 
 		// Collateral is the amount of collateral that the host will put up for
 		// storage in 'bytes per block', as an assurance to the renter that the

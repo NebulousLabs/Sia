@@ -15,7 +15,7 @@ import (
 // managedRPCRecentRevision sends the most recent known file contract
 // revision, including signatures, to the renter, for the file contract with
 // the input id.
-func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, error) {
+func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *storageObligation, error) {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateRecentRevisionTime))
 
@@ -23,7 +23,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, er
 	var fcid types.FileContractID
 	err := encoding.ReadObject(conn, &fcid, uint64(len(fcid)))
 	if err != nil {
-		return types.FileContractID{}, err
+		return types.FileContractID{}, nil, err
 	}
 
 	// Fetch the storage obligation with the file contract revision
@@ -35,13 +35,13 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, er
 		return err
 	})
 	if err != nil {
-		return types.FileContractID{}, modules.WriteNegotiationRejection(conn, err)
+		return types.FileContractID{}, nil, modules.WriteNegotiationRejection(conn, err)
 	}
 
-	// Send the most recent file contract revision.
+	// Pull out the file contract revision and the revision's signatures from
+	// the transaction.
 	revisionTxn := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1]
 	recentRevision := revisionTxn.FileContractRevisions[0]
-	// Find all of the signatures on the file contract revision. There should be two.
 	var revisionSigs []types.TransactionSignature
 	for _, sig := range revisionTxn.TransactionSignatures {
 		if sig.ParentID == crypto.Hash(fcid) {
@@ -57,18 +57,18 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, er
 	err = modules.VerifyFileContractRevisionTransactionSignatures(recentRevision, revisionSigs, blockHeight)
 	if err != nil {
 		h.log.Critical("host is inconsistent, bad file contract revision transaction", err)
-		return types.FileContractID{}, err
+		return types.FileContractID{}, nil, err
 	}
 
 	// Send the file contract revision and the corresponding signatures to the
 	// renter.
-	err = encoding.WriteObject(conn, revisionTxn)
+	err = encoding.WriteObject(conn, recentRevision)
 	if err != nil {
-		return types.FileContractID{}, err
+		return types.FileContractID{}, nil, err
 	}
 	err = encoding.WriteObject(conn, revisionSigs)
 	if err != nil {
-		return types.FileContractID{}, err
+		return types.FileContractID{}, nil, err
 	}
-	return fcid, nil
+	return fcid, so, nil
 }

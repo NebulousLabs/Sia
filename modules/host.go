@@ -62,11 +62,12 @@ type (
 
 	// HostInternalSettings contains a list of settings that can be changed.
 	HostInternalSettings struct {
-		AcceptingContracts bool              `json:"acceptingcontracts"`
-		MaxBatchSize       uint64            `json:"maxbatchsize"`
-		MaxDuration        types.BlockHeight `json:"maxduration"`
-		NetAddress         NetAddress        `json:"netaddress"`
-		WindowSize         types.BlockHeight `json:"windowsize"`
+		AcceptingContracts   bool              `json:"acceptingcontracts"`
+		MaxDuration          types.BlockHeight `json:"maxduration"`
+		MaxDownloadBatchSize uint64            `json:"maxdownloadbatchsize"`
+		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
+		NetAddress           NetAddress        `json:"netaddress"`
+		WindowSize           types.BlockHeight `json:"windowsize"`
 
 		Collateral            types.Currency `json:"collateral"`
 		CollateralBudget      types.Currency `json:"collateralbudget"`
