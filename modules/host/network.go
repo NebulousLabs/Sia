@@ -117,6 +117,9 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCReviseContract:
 		atomic.AddUint64(&h.atomicReviseCalls, 1)
 		err = h.managedRPCReviseContract(conn)
+	case modules.RPCRevisionRequest:
+		atomic.AddUint64(&h.atomicRevisionRequestCalls, 1)
+		_, err = h.managedRPCRevisionRequest(conn)
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)

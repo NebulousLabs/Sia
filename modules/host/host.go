@@ -30,6 +30,21 @@ package host
 // TODO: 'announced' doesn't tell you if the announcement made it to the
 // blockchain.
 
+// TODO: Need to make sure that the revision exchange for the renter and the
+// host is being handled correctly. For the host, it's not so difficult. The
+// host need only send the most recent revision every time. But, the host
+// should not sign a revision unless the renter has explicitly signed such that
+// the 'WholeTransaction' fields cover only the revision and that the
+// signatures for the revision don't depend on anything else. The renter needs
+// to verify the same when checking on a file contract revision from the host.
+// If the host has submitted a file contract revision where the signatures have
+// signed the whole file contract, there is an issue.
+
+// TODO: there is a mistake in the file contract revision rpc, the host, if it
+// does not have the right file contract id, should be returning an error there
+// to the renter (and not just to it's calling function without informing the
+// renter what's up).
+
 // TODO: clean up all of the magic numbers in the host.
 
 // TODO: host_test.go has commented out tests.
@@ -89,13 +104,14 @@ var (
 type Host struct {
 	// RPC Metrics - atomic variables need to be placed at the top to preserve
 	// compatibility with 32bit systems.
-	atomicDownloadCalls     uint64
-	atomicErroredCalls      uint64
-	atomicFormContractCalls uint64
-	atomicRenewCalls        uint64
-	atomicReviseCalls       uint64
-	atomicSettingsCalls     uint64
-	atomicUnrecognizedCalls uint64
+	atomicDownloadCalls        uint64
+	atomicErroredCalls         uint64
+	atomicFormContractCalls    uint64
+	atomicRenewCalls           uint64
+	atomicReviseCalls          uint64
+	atomicRevisionRequestCalls uint64
+	atomicSettingsCalls        uint64
+	atomicUnrecognizedCalls    uint64
 
 	// Dependencies.
 	cs     modules.ConsensusSet

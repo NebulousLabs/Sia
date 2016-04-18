@@ -30,6 +30,13 @@ const (
 	// connection that is running over Tor.
 	NegotiateFileContractRevisionTime = 600 * time.Second
 
+	// NegotiateRevisionRequestTime establishes the minimum amount of time that
+	// the connection deadline is expected to be set to when a recent file
+	// contract revision is being requested from the host. The deadline is long
+	// enough that the connection should be successful even if both parties are
+	// running Tor.
+	NegotiateRevisionRequestTime = 120 * time.Second
+
 	// NegotiateSettingsTime establishes the minimum amount of time that the
 	// connection deadline is expected to be set to when settings are being
 	// requested from the host. The deadline is long enough that the connection
@@ -75,13 +82,23 @@ var (
 	// announcement is not a type of signature that is recognized.
 	ErrAnnUnrecognizedSignature = errors.New("the signature provided in the host announcement is not recognized")
 
+	// ErrRevisionCoveredFields is returned if there is a covered fields object
+	// in a transaction signature which has the 'WholeTransaction' field set to
+	// true, meaning that miner fees cannot be added to the transaction without
+	// invalidating the signature.
+	ErrRevisionCoveredFields = errors.New("file contract revision transaction signature does not allow miner fees to be added")
+
+	// ErrRevisionSigCount is returned when a file contract revision has the
+	// wrong number of transaction signatures.
+	ErrRevisionSigCount = errors.New("file contract revision the wrong number of transaction signatures")
+
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
 	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', '2'}
 
-	// RPCSettings is the specifier for requesting settings from the host.
-	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
+	// RPCDownload is the specifier for downloading a file from a host.
+	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
 
 	// RPCFormContract is the specifier for forming a contract with a host.
 	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
@@ -93,8 +110,12 @@ var (
 	// contract.
 	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
-	// RPCDownload is the specifier for downloading a file from a host.
-	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
+	// RPCRevisionRequest is the specifier for getting the most recent file
+	// contract revision for a given file contract.
+	RPCRevisionRequest = types.Specifier{'R', 'e', 'v', 'i', 's', 'i', 'o', 'n', 'R', 'e', 'q', 'u', 'e', 's', 't', 2}
+
+	// RPCSettings is the specifier for requesting settings from the host.
+	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
 
 	// SectorSize defines how large a sector should be in bytes. The sector
 	// size needs to be a power of two to be compatible with package
@@ -217,23 +238,6 @@ type (
 	}
 )
 
-// WriteNegotiationAcceptance writes the 'accept' response to w (usually a
-// net.Conn).
-func WriteNegotiationAcceptance(w io.Writer) error {
-	return encoding.WriteObject(w, AcceptResponse)
-}
-
-// WriteNegotiationRejection will write a rejection response to w (usually a
-// net.Conn) and return the input error. If the write fails, the write error
-// is joined with the input error.
-func WriteNegotiationRejection(w io.Writer, err error) error {
-	writeErr := encoding.WriteObject(w, err.Error())
-	if writeErr != nil {
-		return build.JoinErrors([]error{err, writeErr}, "; ")
-	}
-	return err
-}
-
 // ReadNegotiationAcceptance reads an accept/reject response from r (usually a
 // net.Conn). If the response is not acceptance, ReadNegotiationAcceptance
 // returns the response as an error.
@@ -250,6 +254,23 @@ func ReadNegotiationAcceptance(r io.Reader) error {
 		return errors.New(resp)
 	}
 	return nil
+}
+
+// WriteNegotiationAcceptance writes the 'accept' response to w (usually a
+// net.Conn).
+func WriteNegotiationAcceptance(w io.Writer) error {
+	return encoding.WriteObject(w, AcceptResponse)
+}
+
+// WriteNegotiationRejection will write a rejection response to w (usually a
+// net.Conn) and return the input error. If the write fails, the write error
+// is joined with the input error.
+func WriteNegotiationRejection(w io.Writer, err error) error {
+	writeErr := encoding.WriteObject(w, err.Error())
+	if writeErr != nil {
+		return build.JoinErrors([]error{err, writeErr}, "; ")
+	}
+	return err
 }
 
 // CreateAnnouncement will take a host announcement and encode it, returning
@@ -309,4 +330,29 @@ func DecodeAnnouncement(fullAnnouncement []byte) (na NetAddress, spk types.SiaPu
 		return "", types.SiaPublicKey{}, err
 	}
 	return ha.NetAddress, ha.PublicKey, nil
+}
+
+// VerifyFileContractRevisionTransactionSignatures checks that the signatures
+// on a file contract revision are valid and cover the right fields.
+func VerifyFileContractRevisionTransactionSignatures(fcr types.FileContractRevision, tsigs []types.TransactionSignature, height types.BlockHeight) error {
+	if len(tsigs) != 2 {
+		return ErrRevisionSigCount
+	}
+	for _, tsig := range tsigs {
+		// The transaction needs to be malleable so that miner fees can be
+		// added. If the whole transaction is covered, it is doomed to have no
+		// fees.
+		if tsig.CoveredFields.WholeTransaction {
+			return ErrRevisionCoveredFields
+		}
+	}
+	txn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{fcr},
+		TransactionSignatures: tsigs,
+	}
+	// Check that the signatures verify. This will also check that the covered
+	// fields object is not over-aggressive, because if the object is pointing
+	// to elements that haven't been added to the transaction, verification
+	// will fail.
+	return txn.StandaloneValid(height)
 }
