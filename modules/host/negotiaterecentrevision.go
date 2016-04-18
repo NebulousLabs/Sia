@@ -12,30 +12,17 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// managedRPCRecentRevision sends the most recent known file contract
-// revision, including signatures, to the renter, for the file contract with
-// the input id.
-func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *storageObligation, error) {
-	// Set the negotiation deadline.
-	conn.SetDeadline(time.Now().Add(modules.NegotiateRecentRevisionTime))
-
-	// Receive the file contract id from the renter.
-	var fcid types.FileContractID
-	err := encoding.ReadObject(conn, &fcid, uint64(len(fcid)))
-	if err != nil {
-		return types.FileContractID{}, nil, err
-	}
-
-	// Fetch the storage obligation with the file contract revision
-	// transaction.
+// fetchRevision verifies that a request for a revision can be managed by the
+// host, and then returns that revision to the host.
+func (h *Host) fetchRevision(fcid types.FileContractID) (*storageObligation, types.FileContractRevision, []types.TransactionSignature, error) {
 	var so *storageObligation
-	err = h.db.Update(func(tx *bolt.Tx) error {
+	err := h.db.Update(func(tx *bolt.Tx) error {
 		fso, err := getStorageObligation(tx, fcid)
 		so = &fso
 		return err
 	})
 	if err != nil {
-		return types.FileContractID{}, nil, modules.WriteNegotiationRejection(conn, err)
+		return nil, types.FileContractRevision{}, nil, err
 	}
 
 	// Pull out the file contract revision and the revision's signatures from
@@ -57,11 +44,37 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *s
 	err = modules.VerifyFileContractRevisionTransactionSignatures(recentRevision, revisionSigs, blockHeight)
 	if err != nil {
 		h.log.Critical("host is inconsistent, bad file contract revision transaction", err)
+		return nil, types.FileContractRevision{}, nil, err
+	}
+	return so, recentRevision, revisionSigs, nil
+}
+
+// managedRPCRecentRevision sends the most recent known file contract
+// revision, including signatures, to the renter, for the file contract with
+// the input id.
+func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *storageObligation, error) {
+	// Set the negotiation deadline.
+	conn.SetDeadline(time.Now().Add(modules.NegotiateRecentRevisionTime))
+
+	// Receive the file contract id from the renter.
+	var fcid types.FileContractID
+	err := encoding.ReadObject(conn, &fcid, uint64(len(fcid)))
+	if err != nil {
 		return types.FileContractID{}, nil, err
+	}
+
+	// Fetch the file contract revision.
+	so, recentRevision, revisionSigs, err := h.fetchRevision(fcid)
+	if err != nil {
+		return types.FileContractID{}, nil, modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// Send the file contract revision and the corresponding signatures to the
 	// renter.
+	err = modules.WriteNegotiationAcceptance(conn)
+	if err != nil {
+		return types.FileContractID{}, nil, err
+	}
 	err = encoding.WriteObject(conn, recentRevision)
 	if err != nil {
 		return types.FileContractID{}, nil, err

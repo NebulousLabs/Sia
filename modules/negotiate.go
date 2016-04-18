@@ -22,6 +22,12 @@ const (
 	// not due to an error.
 	StopResponse = "stop"
 
+	// NegotiateDownloadTime defines the amount of time that the renter and
+	// host have to negotitate a download request batch. The time is set high
+	// enough that two nodes behind Tor have a reasonable chance of completing
+	// the negotiation.
+	NegotiateDownloadTime = 600 * time.Second
+
 	// NegotiateFileContractTime defines the amount of time that the renter and
 	// host have to negotiate a file contract. The time is set high enough that
 	// a node behind Tor has a reasonable chance at making the multiple
@@ -145,6 +151,17 @@ var (
 )
 
 type (
+	// A DownloadAction is a description of a download that the renter would
+	// like to make. The MerkleRoot indicates the root of the sector, the
+	// offset indicates what portion of the sector is being downloaded, and the
+	// length indicates how many bytes should be grabbed starting from the
+	// offset.
+	DownloadAction struct {
+		MerkleRoot crypto.Hash
+		Offset     uint64
+		Length     uint64
+	}
+
 	// HostAnnouncement is an announcement by the host that appears in the
 	// blockchain. 'Specifier' is always 'PrefixHostAnnouncement'. The
 	// announcement is always followed by a signature from the public key of

@@ -8,6 +8,11 @@ package host
 // TODO: Since we're gathering untrusted input, need to check for both
 // overflows and nil values.
 
+// TODO: Does the host properly account for the cost of uploading or
+// downloading data? Sectors gained is not going to be good enough, because
+// it's going to contain a whole sector even though the amount of storage is
+// not changing and the amount of bandwidth is mostly minimal.
+
 import (
 	"errors"
 	"net"
@@ -17,8 +22,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -74,11 +77,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	blockHeight := h.blockHeight
 	h.mu.RUnlock()
 
-	// The renter is now going to send a batch of modifications followed by and
-	// update file contract revision. Read the number of modifications being
+	// The renter is now going to send a batch of modifications followed by an
+	// updated file contract revision. Read the number of modifications being
 	// sent by the renter.
 	var modifications []modules.RevisionAction
-	err = encoding.ReadObject(conn, &modifications, settings.MaxBatchSize)
+	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
 	if err != nil {
 		return err
 	}
@@ -92,74 +95,79 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	var sectorsRemoved []crypto.Hash
 	var sectorsGained []crypto.Hash
 	var gainedSectorData [][]byte
-	for _, modification := range modifications {
-		// Check that the index points to an existing sector root. If the type
-		// is ActionInsert, we permit inserting at the end.
-		if modification.Type == modules.ActionInsert {
-			if modification.SectorIndex > uint64(len(so.SectorRoots)) {
+	err = func() error {
+		for _, modification := range modifications {
+			// Check that the index points to an existing sector root. If the type
+			// is ActionInsert, we permit inserting at the end.
+			if modification.Type == modules.ActionInsert {
+				if modification.SectorIndex > uint64(len(so.SectorRoots)) {
+					return errBadModificationIndex
+				}
+			} else if modification.SectorIndex >= uint64(len(so.SectorRoots)) {
 				return errBadModificationIndex
 			}
-		} else if modification.SectorIndex >= uint64(len(so.SectorRoots)) {
-			return errBadModificationIndex
-		}
-		// Check that the data sent for the sector is not too large.
-		if uint64(len(modification.Data)) > modules.SectorSize {
-			return errLargeSector
-		}
-
-		// Run a different codepath depending on the renter's selection.
-		if modification.Type == modules.ActionDelete {
-			// There is no financial information to change, it is enough to
-			// remove the sector.
-			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
-			so.SectorRoots = append(so.SectorRoots[0:modification.SectorIndex], so.SectorRoots[modification.SectorIndex+1:]...)
-		} else if modification.Type == modules.ActionInsert {
-			// Check that the sector size is correct.
-			if uint64(len(modification.Data)) != modules.SectorSize {
-				return errBadSectorSize
+			// Check that the data sent for the sector is not too large.
+			if uint64(len(modification.Data)) > modules.SectorSize {
+				return errLargeSector
 			}
 
-			// Update finances.
-			blocksRemaining := so.proofDeadline() - blockHeight
-			blockBytesCurrency := types.NewCurrency64(uint64(blocksRemaining)).Mul(types.NewCurrency64(modules.SectorSize))
-			bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
-			storageRevenue = storageRevenue.Add(settings.MinimumStoragePrice.Mul(blockBytesCurrency))
-			collateralRisked = collateralRisked.Add(settings.Collateral.Mul(blockBytesCurrency))
+			// Run a different codepath depending on the renter's selection.
+			if modification.Type == modules.ActionDelete {
+				// There is no financial information to change, it is enough to
+				// remove the sector.
+				sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
+				so.SectorRoots = append(so.SectorRoots[0:modification.SectorIndex], so.SectorRoots[modification.SectorIndex+1:]...)
+			} else if modification.Type == modules.ActionInsert {
+				// Check that the sector size is correct.
+				if uint64(len(modification.Data)) != modules.SectorSize {
+					return errBadSectorSize
+				}
 
-			// Insert the sector into the root list.
-			newRoot := crypto.MerkleRoot(modification.Data)
-			sectorsGained = append(sectorsGained, newRoot)
-			gainedSectorData = append(gainedSectorData, modification.Data)
-			so.SectorRoots = append(so.SectorRoots[:modification.SectorIndex], append([]crypto.Hash{newRoot}, so.SectorRoots[modification.SectorIndex:]...)...)
-		} else if modification.Type == modules.ActionModify {
-			// Check that the offset and length are okay. Length is already
-			// known to be appropriately small, but the offset needs to be
-			// checked for being appropriately small as well otherwise there is
-			// a risk of overflow.
-			if modification.Offset > modules.SectorSize || modification.Offset+uint64(len(modification.Data)) > modules.SectorSize {
-				return errIllegalOffsetAndLength
+				// Update finances.
+				blocksRemaining := so.proofDeadline() - blockHeight
+				blockBytesCurrency := types.NewCurrency64(uint64(blocksRemaining)).Mul(types.NewCurrency64(modules.SectorSize))
+				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
+				storageRevenue = storageRevenue.Add(settings.MinimumStoragePrice.Mul(blockBytesCurrency))
+				collateralRisked = collateralRisked.Add(settings.Collateral.Mul(blockBytesCurrency))
+
+				// Insert the sector into the root list.
+				newRoot := crypto.MerkleRoot(modification.Data)
+				sectorsGained = append(sectorsGained, newRoot)
+				gainedSectorData = append(gainedSectorData, modification.Data)
+				so.SectorRoots = append(so.SectorRoots[:modification.SectorIndex], append([]crypto.Hash{newRoot}, so.SectorRoots[modification.SectorIndex:]...)...)
+			} else if modification.Type == modules.ActionModify {
+				// Check that the offset and length are okay. Length is already
+				// known to be appropriately small, but the offset needs to be
+				// checked for being appropriately small as well otherwise there is
+				// a risk of overflow.
+				if modification.Offset > modules.SectorSize || modification.Offset+uint64(len(modification.Data)) > modules.SectorSize {
+					return errIllegalOffsetAndLength
+				}
+
+				// Get the data for the new sector.
+				sector, err := h.readSector(so.SectorRoots[modification.SectorIndex])
+				if err != nil {
+					return err
+				}
+				copy(sector[modification.Offset:], modification.Data)
+
+				// Update finances.
+				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
+
+				// Update the sectors removed and gained to indicate that the old
+				// sector has been replaced with a new sector.
+				newRoot := crypto.MerkleRoot(sector)
+				sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
+				sectorsGained = append(sectorsGained, newRoot)
+				gainedSectorData = append(gainedSectorData, sector)
+				so.SectorRoots[modification.SectorIndex] = newRoot
+			} else {
+				return errUnknownModification
 			}
-
-			// Get the data for the new sector.
-			sector, err := h.readSector(so.SectorRoots[modification.SectorIndex])
-			if err != nil {
-				return err
-			}
-			copy(sector[modification.Offset:], modification.Data)
-
-			// Update finances.
-			bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
-
-			// Update the sectors removed and gained to indicate that the old
-			// sector has been replaced with a new sector.
-			newRoot := crypto.MerkleRoot(sector)
-			sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
-			sectorsGained = append(sectorsGained, newRoot)
-			gainedSectorData = append(gainedSectorData, sector)
-			so.SectorRoots[modification.SectorIndex] = newRoot
-		} else {
-			return errUnknownModification
 		}
+	}()
+	if err != nil {
+		return modules.WriteNegotitationRejection(conn, err)
 	}
 
 	// Read the file contract revision and check whether it's acceptable.
@@ -236,43 +244,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	// Set a preliminary deadline for receiving the storage obligation.
 	startTime := time.Now()
-	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractRevisionTime))
-
-	// Read the file contract id from the renter.
-	var fcid types.FileContractID
-	err := encoding.ReadObject(conn, &fcid, uint64(len(fcid)))
-	if err != nil {
-		return err
-	}
-
-	// Get and then lock the storage obligation.
-	var so *storageObligation
-	err = h.db.Update(func(tx *bolt.Tx) error {
-		fso, innerErr := getStorageObligation(tx, fcid)
-		so = &fso
-		return innerErr
-	})
-	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
-	}
-	err = h.lockStorageObligation(so)
-	if err != nil {
-		return modules.WriteNegotiationRejection(conn, errHostClosed)
-	}
-	defer h.unlockStorageObligation(so)
-
-	// Indicate that the host is accepting the revision request.
-	err = modules.WriteNegotiationAcceptance(conn)
-	if err != nil {
-		return err
-	}
-
-	// Write the most recent file contract revision transaction.
-	var revisionTxn types.Transaction
-	if len(so.RevisionTransactionSet) > 0 {
-		revisionTxn = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1]
-	}
-	err = encoding.WriteObject(conn, revisionTxn)
+	// Perform the file contract revision exchange, giving the renter the most
+	// recent file contract revision and getting the storage obligation that
+	// will be used to pay for the data.
+	_, so, err := h.managedRPCRevisionRequest(conn)
 	if err != nil {
 		return err
 	}
