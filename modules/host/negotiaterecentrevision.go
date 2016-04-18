@@ -35,7 +35,7 @@ func (h *Host) managedRPCRevisionRequest(conn net.Conn) (types.FileContractID, e
 		return err
 	})
 	if err != nil {
-		return types.FileContractID{}, composeErrors(err, modules.WriteNegotiationRejection(conn, err))
+		return types.FileContractID{}, modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// Send the most recent file contract revision.
@@ -56,7 +56,7 @@ func (h *Host) managedRPCRevisionRequest(conn net.Conn) (types.FileContractID, e
 	h.mu.RUnlock()
 	err = modules.VerifyFileContractRevisionTransactionSignatures(recentRevision, revisionSigs, blockHeight)
 	if err != nil {
-		h.log.Critical("host is inconsistend, bad file contract revision transaction", err)
+		h.log.Critical("host is inconsistent, bad file contract revision transaction", err)
 		return types.FileContractID{}, err
 	}
 
