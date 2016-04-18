@@ -34,12 +34,12 @@ const (
 	// connection that is running over Tor.
 	NegotiateFileContractRevisionTime = 600 * time.Second
 
-	// NegotiateRevisionRequestTime establishes the minimum amount of time that
+	// NegotiateRecentRevisionTime establishes the minimum amount of time that
 	// the connection deadline is expected to be set to when a recent file
 	// contract revision is being requested from the host. The deadline is long
 	// enough that the connection should be successful even if both parties are
 	// running Tor.
-	NegotiateRevisionRequestTime = 120 * time.Second
+	NegotiateRecentRevisionTime = 120 * time.Second
 
 	// NegotiateSettingsTime establishes the minimum amount of time that the
 	// connection deadline is expected to be set to when settings are being
@@ -118,9 +118,9 @@ var (
 	// contract.
 	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
-	// RPCRevisionRequest is the specifier for getting the most recent file
+	// RPCRecentRevision is the specifier for getting the most recent file
 	// contract revision for a given file contract.
-	RPCRevisionRequest = types.Specifier{'R', 'e', 'v', 'i', 's', 'i', 'o', 'n', 'R', 'e', 'q', 'u', 'e', 's', 't', 2}
+	RPCRecentRevision = types.Specifier{'R', 'e', 'c', 'e', 'n', 't', 'R', 'e', 'v', 'i', 's', 'i', 'o', 'n', 2}
 
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
