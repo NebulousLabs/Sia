@@ -58,7 +58,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 		WindowStart:    newEndHeight,
 		WindowEnd:      newEndHeight + host.WindowSize,
 		Payout:         payout,
-		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
+		UnlockHash:     types.UnlockHash{}, // to be filled in by formContract
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// nothing returned to us; everything goes to the host
@@ -106,7 +106,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	txnBuilder := c.wallet.StartTransaction()
 
 	// execute negotiation protocol
-	newContract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool, renterCost)
+	newContract, err := formContract(conn, host, fc, txnBuilder, c.tpool, renterCost)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return types.FileContractID{}, err

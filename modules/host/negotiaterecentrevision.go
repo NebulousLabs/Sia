@@ -12,12 +12,12 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// managedSendRecentRevision sends the most recent known file contract
+// managedRPCRecentRevision sends the most recent known file contract
 // revision, including signatures, to the renter, for the file contract with
 // the input id.
-func (h *Host) managedRPCRevisionRequest(conn net.Conn) (types.FileContractID, error) {
+func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, error) {
 	// Set the negotiation deadline.
-	conn.SetDeadline(time.Now().Add(modules.NegotiateRevisionRequestTime))
+	conn.SetDeadline(time.Now().Add(modules.NegotiateRecentRevisionTime))
 
 	// Receive the file contract id from the renter.
 	var fcid types.FileContractID

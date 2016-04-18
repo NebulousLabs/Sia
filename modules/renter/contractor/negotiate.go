@@ -53,9 +53,9 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 	return host, nil
 }
 
-// negotiateContract establishes a connection to a host and negotiates an
-// initial file contract according to the terms of the host.
-func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool, renterCost types.Currency) (Contract, error) {
+// formContract establishes a connection to a host and negotiates an initial
+// file contract according to the terms of the host.
+func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool, renterCost types.Currency) (Contract, error) {
 	// allow 30 seconds for negotiation
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -96,9 +96,6 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 	// create the txn
 	txn, parentTxns := txnBuilder.View()
 	txnSet := append(parentTxns, txn)
-
-	// calculate contract ID
-	fcid := txnSet[len(txnSet)-1].FileContractID(0)
 
 	// send acceptance, txn signed by us, and pubkey
 	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
@@ -188,6 +185,9 @@ func negotiateContract(conn net.Conn, host modules.HostDBEntry, fc types.FileCon
 		return Contract{}, err
 	}
 
+	// calculate contract ID
+	fcid := txnSet[len(txnSet)-1].FileContractID(0)
+
 	// create host contract
 	contract := Contract{
 		IP:           host.NetAddress,
@@ -261,7 +261,7 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 		WindowStart:    endHeight,
 		WindowEnd:      endHeight + host.WindowSize,
 		Payout:         payout,
-		UnlockHash:     types.UnlockHash{}, // to be filled in by negotiateContract
+		UnlockHash:     types.UnlockHash{}, // to be filled in by formContract
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
 			// outputs need to account for tax
@@ -299,7 +299,7 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	txnBuilder := c.wallet.StartTransaction()
 
 	// execute negotiation protocol
-	contract, err := negotiateContract(conn, host, fc, txnBuilder, c.tpool, renterCost)
+	contract, err := formContract(conn, host, fc, txnBuilder, c.tpool, renterCost)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
 		return Contract{}, err

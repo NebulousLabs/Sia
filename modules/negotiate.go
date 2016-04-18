@@ -14,9 +14,13 @@ import (
 
 const (
 	// AcceptResponse is the response given to an RPC call to indicate
-	// acceptance. (Any other string indicates rejection, and describes the
-	// reason for rejection.)
+	// acceptance, i.e. that the sender wishes to continue communication.
 	AcceptResponse = "accept"
+
+	// StopResponse is the response given to an RPC call to indicate graceful
+	// termination, i.e. that the sender wishes to cease communication, but
+	// not due to an error.
+	StopResponse = "stop"
 
 	// NegotiateFileContractTime defines the amount of time that the renter and
 	// host have to negotiate a file contract. The time is set high enough that
@@ -30,12 +34,12 @@ const (
 	// connection that is running over Tor.
 	NegotiateFileContractRevisionTime = 600 * time.Second
 
-	// NegotiateRevisionRequestTime establishes the minimum amount of time that
+	// NegotiateRecentRevisionTime establishes the minimum amount of time that
 	// the connection deadline is expected to be set to when a recent file
 	// contract revision is being requested from the host. The deadline is long
 	// enough that the connection should be successful even if both parties are
 	// running Tor.
-	NegotiateRevisionRequestTime = 120 * time.Second
+	NegotiateRecentRevisionTime = 120 * time.Second
 
 	// NegotiateSettingsTime establishes the minimum amount of time that the
 	// connection deadline is expected to be set to when settings are being
@@ -92,6 +96,10 @@ var (
 	// wrong number of transaction signatures.
 	ErrRevisionSigCount = errors.New("file contract revision the wrong number of transaction signatures")
 
+	// ErrStopResponse is the error returned by ReadNegotiationAcceptance when
+	// it reads the StopResponse string.
+	ErrStopResponse = errors.New("sender wishes to stop communicating")
+
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
@@ -110,9 +118,9 @@ var (
 	// contract.
 	RPCReviseContract = types.Specifier{'R', 'e', 'v', 'i', 's', 'e', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
-	// RPCRevisionRequest is the specifier for getting the most recent file
+	// RPCRecentRevision is the specifier for getting the most recent file
 	// contract revision for a given file contract.
-	RPCRevisionRequest = types.Specifier{'R', 'e', 'v', 'i', 's', 'i', 'o', 'n', 'R', 'e', 'q', 'u', 'e', 's', 't', 2}
+	RPCRecentRevision = types.Specifier{'R', 'e', 'c', 'e', 'n', 't', 'R', 'e', 'v', 'i', 's', 'i', 'o', 'n', 2}
 
 	// RPCSettings is the specifier for requesting settings from the host.
 	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's', 2}
@@ -239,8 +247,9 @@ type (
 )
 
 // ReadNegotiationAcceptance reads an accept/reject response from r (usually a
-// net.Conn). If the response is not acceptance, ReadNegotiationAcceptance
-// returns the response as an error.
+// net.Conn). If the response is not AcceptResponse, ReadNegotiationAcceptance
+// returns the response as an error. If the response is StopResponse,
+// ErrStopResponse is returned, allowing for direct error comparison.
 //
 // Note that since errors returned by ReadNegotiationAcceptance are newly
 // allocated, they cannot be compared to other errors in the traditional
@@ -250,10 +259,15 @@ func ReadNegotiationAcceptance(r io.Reader) error {
 	err := encoding.ReadObject(r, &resp, MaxErrorSize)
 	if err != nil {
 		return err
-	} else if resp != AcceptResponse {
+	}
+	switch resp {
+	case AcceptResponse:
+		return nil
+	case StopResponse:
+		return ErrStopResponse
+	default:
 		return errors.New(resp)
 	}
-	return nil
 }
 
 // WriteNegotiationAcceptance writes the 'accept' response to w (usually a
@@ -271,6 +285,12 @@ func WriteNegotiationRejection(w io.Writer, err error) error {
 		return build.JoinErrors([]error{err, writeErr}, "; ")
 	}
 	return err
+}
+
+// WriteNegotiationStop writes the 'stop' response to w (usually a
+// net.Conn).
+func WriteNegotiationStop(w io.Writer) error {
+	return encoding.WriteObject(w, StopResponse)
 }
 
 // CreateAnnouncement will take a host announcement and encode it, returning

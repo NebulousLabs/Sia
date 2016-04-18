@@ -30,7 +30,7 @@ func (uc *uploadContractor) Editor(contractor.Contract) (contractor.Editor, erro
 }
 
 // Upload simulates a successful data upload.
-func (uploadContractor) Upload(data []byte) (uint64, error) { return uint64(len(data)), nil }
+func (uploadContractor) Upload(data []byte) (crypto.Hash, error) { return crypto.MerkleRoot(data), nil }
 
 // stub implementations of the contractor.Editor methods
 func (uploadContractor) Address() modules.NetAddress      { return "" }

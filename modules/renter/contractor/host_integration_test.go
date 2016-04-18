@@ -1,6 +1,7 @@
 package contractor
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -127,30 +128,29 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 		return nil, nil, nil, err
 	}
 
-	return h, c, m, nil
-}
-
-// TestIntegrationFormContract tests that the contractor can form contracts
-// with the host module.
-func TestIntegrationFormContract(t *testing.T) {
-	// create host+contractor+miner
-	h, c, m, err := newTestingTrio("TestIngrationFormContract")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Configure host to accept contracts
 	settings := h.InternalSettings()
 	settings.AcceptingContracts = true
 	err = h.SetInternalSettings(settings)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, nil, err
+	}
+
+	// add storage to host
+	storageFolder := filepath.Join(build.SiaTestingDir, "contractor", "TestIntegrationReviseContract", "storage")
+	err = os.MkdirAll(storageFolder, 0700)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	err = h.AddStorageFolder(storageFolder, 1e6)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	// announce the host
 	err = h.Announce()
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, nil, err
 	}
 
 	// mine a block, processing the announcement
@@ -159,6 +159,17 @@ func TestIntegrationFormContract(t *testing.T) {
 	// wait for hostdb to scan host
 	for i := 0; i < 500 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
 		time.Sleep(time.Millisecond)
+	}
+
+	return h, c, m, nil
+}
+
+// TestIntegrationFormContract tests that the contractor can form contracts
+// with the host module.
+func TestIntegrationFormContract(t *testing.T) {
+	h, c, _, err := newTestingTrio("TestIntegrationFormContract")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// get the host's entry from the db
@@ -175,5 +186,46 @@ func TestIntegrationFormContract(t *testing.T) {
 
 	if contract.IP != h.NetAddress() {
 		t.Fatal("bad contract")
+	}
+}
+
+// TestIntegrationReviseContract tests that the contractor can revise a
+// contract previously formed with a host.
+func TestIntegrationReviseContract(t *testing.T) {
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationReviseContract")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.newContract(hostEntry, 64000, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// revise the contract
+	editor, err := c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
