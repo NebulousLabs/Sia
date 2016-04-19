@@ -253,6 +253,18 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 		return err
 	}
 
+	// Lock the storage obligation during the revision.
+	err = h.lockStorageObligation(so)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = h.unlockStorageObligation(so)
+		if err != nil {
+			h.log.Critical(err)
+		}
+	}()
+
 	// Begin the revision loop. The host will process revisions until a
 	// timeout is reached, or until the renter sends a StopResponse.
 	for time.Now().Before(startTime.Add(1200 * time.Second)) {

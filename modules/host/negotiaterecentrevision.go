@@ -36,7 +36,7 @@ func (h *Host) fetchRevision(fcid types.FileContractID) (*storageObligation, typ
 	recentRevision := revisionTxn.FileContractRevisions[0]
 	var revisionSigs []types.TransactionSignature
 	for _, sig := range revisionTxn.TransactionSignatures {
-		if sig.ParentID == crypto.Hash(fcid) {
+		if sig.ParentID == crypto.Hash(fcid) && !sig.CoveredFields.WholeTransaction {
 			revisionSigs = append(revisionSigs, sig)
 		}
 	}

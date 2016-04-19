@@ -38,16 +38,16 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 		netAddr = h.autoAddress
 	}
 	hes := modules.HostExternalSettings{
-		AcceptingContracts: h.settings.AcceptingContracts,
-		MaxDownloadBatchSize:       h.settings.MaxDownloadBatchSize,
-		MaxDuration:        h.settings.MaxDuration,
-		MaxReviseBatchSize : h.settings.MaxReviseBatchSize,
-		NetAddress:         netAddr,
-		RemainingStorage:   remainingStorage,
-		SectorSize:         modules.SectorSize,
-		TotalStorage:       totalStorage,
-		UnlockHash:         h.unlockHash,
-		WindowSize:         h.settings.WindowSize,
+		AcceptingContracts:   h.settings.AcceptingContracts,
+		MaxDownloadBatchSize: h.settings.MaxDownloadBatchSize,
+		MaxDuration:          h.settings.MaxDuration,
+		MaxReviseBatchSize:   h.settings.MaxReviseBatchSize,
+		NetAddress:           netAddr,
+		RemainingStorage:     remainingStorage,
+		SectorSize:           modules.SectorSize,
+		TotalStorage:         totalStorage,
+		UnlockHash:           h.unlockHash,
+		WindowSize:           h.settings.WindowSize,
 
 		Collateral:            h.settings.Collateral,
 		MaxCollateralFraction: h.settings.MaxCollateralFraction,

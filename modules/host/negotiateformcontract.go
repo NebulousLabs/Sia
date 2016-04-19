@@ -1,14 +1,5 @@
 package host
 
-// TODO: Test the safety of the builder, it should be okay to have multiple
-// builders open for up to 600 seconds, which means multiple blocks could be
-// received in that time period. Should also check what happens if a prent gets
-// confirmed on the blockchain before the builder is finished.
-
-// TODO: Would be nice to have some sort of error transport to the user, so
-// that the user is notified in ways other than logs via the host that there
-// are issues such as disk, etc.
-
 import (
 	"errors"
 	"net"

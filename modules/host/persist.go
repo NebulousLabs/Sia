@@ -51,9 +51,9 @@ func (h *Host) establishDefaults() error {
 	// Configure the settings object.
 	h.settings = modules.HostInternalSettings{
 		MaxDownloadBatchSize: uint64(defaultMaxDownloadBatchSize),
-		MaxDuration:  defaultMaxDuration,
-		MaxReviseBatchSize: uint64(defaultMaxReviseBatchSize),
-		WindowSize:   defaultWindowSize,
+		MaxDuration:          defaultMaxDuration,
+		MaxReviseBatchSize:   uint64(defaultMaxReviseBatchSize),
+		WindowSize:           defaultWindowSize,
 
 		Collateral:            defaultCollateral,
 		CollateralBudget:      defaultCollateralBudget,
