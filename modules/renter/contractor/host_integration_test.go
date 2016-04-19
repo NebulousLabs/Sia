@@ -1,6 +1,7 @@
 package contractor
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -167,6 +168,9 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 // TestIntegrationFormContract tests that the contractor can form contracts
 // with the host module.
 func TestIntegrationFormContract(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	h, c, _, err := newTestingTrio("TestIntegrationFormContract")
 	if err != nil {
 		t.Fatal(err)
@@ -192,6 +196,9 @@ func TestIntegrationFormContract(t *testing.T) {
 // TestIntegrationReviseContract tests that the contractor can revise a
 // contract previously formed with a host.
 func TestIntegrationReviseContract(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationReviseContract")
 	if err != nil {
@@ -225,6 +232,63 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 
 	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestIntegrationUploadDownload tests that the contractor can upload data to
+// a host and download it intact.
+func TestIntegrationUploadDownload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationUploadDownload")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.newContract(hostEntry, 64000, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// revise the contract
+	editor, err := c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// download the data
+	downloader, err := c.Downloader(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrieved, err := downloader.Sector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, retrieved) {
+		t.Fatal("downloaded data does not match original")
+	}
+
+	err = downloader.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

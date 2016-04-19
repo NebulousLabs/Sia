@@ -72,7 +72,7 @@ func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID 
 // store the file.
 func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.FileContract.WindowStart }
 
-// Close cleanly ends the revision process with the host and closes the
+// Close cleanly terminates the revision loop with the host and closes the
 // connection.
 func (he *hostEditor) Close() error {
 	// don't care about these errors
@@ -104,6 +104,9 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 		return crypto.Hash{}, errors.New("contract has already ended")
 	}
 	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
+		return crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
+	}
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
 	pieceRoot := crypto.MerkleRoot(data)

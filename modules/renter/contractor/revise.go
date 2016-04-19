@@ -108,6 +108,45 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		NewMissedProofOutputs: []types.SiacoinOutput{
 			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
 			{Value: missed1, UnlockHash: rev.NewMissedProofOutputs[1].UnlockHash},
+			// TODO: void???
+		},
+		NewUnlockHash: rev.NewUnlockHash,
+	}
+}
+
+// newDownloadRevision revises the current revision to cover the cost of
+// downloading data.
+func newDownloadRevision(rev types.FileContractRevision, downloadCost types.Currency) types.FileContractRevision {
+	// move safely moves n coins from src to dest, avoiding negative currency
+	// panics. The new values of src and dest are returned.
+	move := func(n, src, dest types.Currency) (types.Currency, types.Currency) {
+		if n.Cmp(src) > 0 {
+			n = src
+		}
+		return src.Sub(n), dest.Add(n)
+	}
+
+	// move valid payout from renter to host
+	valid0, valid1 := move(downloadCost, rev.NewValidProofOutputs[0].Value, rev.NewValidProofOutputs[1].Value)
+	// move missed payout from renter to void
+	missed0, missed1 := move(downloadCost, rev.NewMissedProofOutputs[0].Value, rev.NewMissedProofOutputs[1].Value)
+
+	return types.FileContractRevision{
+		ParentID:          rev.ParentID,
+		UnlockConditions:  rev.UnlockConditions,
+		NewRevisionNumber: rev.NewRevisionNumber + 1,
+		NewFileSize:       rev.NewFileSize,
+		NewFileMerkleRoot: rev.NewFileMerkleRoot,
+		NewWindowStart:    rev.NewWindowStart,
+		NewWindowEnd:      rev.NewWindowEnd,
+		NewValidProofOutputs: []types.SiacoinOutput{
+			{Value: valid0, UnlockHash: rev.NewValidProofOutputs[0].UnlockHash},
+			{Value: valid1, UnlockHash: rev.NewValidProofOutputs[1].UnlockHash},
+		},
+		NewMissedProofOutputs: []types.SiacoinOutput{
+			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
+			{Value: missed1, UnlockHash: rev.NewMissedProofOutputs[1].UnlockHash},
+			// TODO: void???
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}
