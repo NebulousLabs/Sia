@@ -1,12 +1,25 @@
 package host
 
 import (
+	"errors"
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// errLargeDownloadBatch is returned if the renter requests a download
+	// batch that exceeds the maximum batch size that the host will
+	// accomondate.
+	errLargeDownloadBatch = errors.New("a batch of download requests has exceeded the maximum allowed download size")
+
+	// errRequestOutOfBounds is returned when a download request is made which
+	// asks for elements of a sector which do not exist.
+	errRequestOutOfBounds = errors.New("a download request has been made that exceeds the sector boundaries")
 )
 
 // managedDownloadIteration is responsible for managing a single iteration of
@@ -29,41 +42,150 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 	// Read a batch of download requests.
 	h.mu.RLock()
+	blockHeight := h.blockHeight
+	secretKey := h.secretKey
 	settings := h.settings
 	h.mu.RUnlock()
 	var requests []modules.DownloadAction
-	err = encoding.ReadObject(conn, &requests, settings.MaxDownloadBatchSize)
+	err = encoding.ReadObject(conn, &requests, 50e3)
 	if err != nil {
 		return err
 	}
-	// Read the file contract revision + signature that pay for the download
-	// requests.
+	// Read the file contract revision that pays for the download requests.
 	var paymentRevision types.FileContractRevision
-	var paymentSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &paymentRevision, 16e3)
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &paymentSignature, 16e3)
+
+	// Verify that the request is acceptable, and then fetch all of the data
+	// for the renter.
+	var payload [][]byte
+	var hostSignature types.TransactionSignature
+	err = func() error {
+		// Check that the length of each file is in-bounds, and that the total
+		// size being requested is acceptable.
+		var totalSize uint64
+		for _, request := range requests {
+			if request.Length > modules.SectorSize || request.Offset+request.Length > modules.SectorSize {
+				return errRequestOutOfBounds
+			}
+			totalSize += request.Length
+		}
+		if totalSize > settings.MaxDownloadBatchSize {
+			return errLargeDownloadBatch
+		}
+
+		// Verify that the correct amount of money has been moved from the
+		// renter's contract funds to the host's contract funds.
+		expectedTransfer := settings.MinimumDownloadBandwidthPrice.Mul(types.NewCurrency64(totalSize))
+		existingRevision := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]
+		// Check that NewValidProofOutputs[0] is deducted by expectedTransfer.
+		if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) != 0 {
+			return errors.New("bad payments")
+		}
+		// Check that NewValidProofOutputs[1] is incremented by expectedTransfer.
+		if existingRevision.NewValidProofOutputs[1].Value.Add(expectedTransfer).Cmp(paymentRevision.NewValidProofOutputs[1].Value) != 0 {
+			return errors.New("bad payouts")
+		}
+		// Check that MissedProofOutputs[0] is decremented by expectedTransfer.
+		if paymentRevision.NewMissedProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewMissedProofOutputs[0].Value) != 0 {
+			return errors.New("bad payments")
+		}
+		// Check that NewMissedProofOutputs[2] is incremented by expectedTransfer.
+		if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) != 0 {
+			return errors.New("bad payouts")
+		}
+		// Check that the revision count has increased.
+		if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {
+			return errors.New("bad revision number")
+		}
+
+		// Check that no other fields have changed.
+		if paymentRevision.ParentID != existingRevision.ParentID {
+			return errors.New("unstable revision")
+		}
+		if paymentRevision.NewFileSize != existingRevision.NewFileSize {
+			return errors.New("unstable revision")
+		}
+		if paymentRevision.NewFileMerkleRoot != existingRevision.NewFileMerkleRoot {
+			return errors.New("unstable revision")
+		}
+		if paymentRevision.NewWindowStart != existingRevision.NewWindowStart {
+			return errors.New("unstable revision")
+		}
+		if paymentRevision.NewWindowEnd != existingRevision.NewWindowEnd {
+			return errors.New("unstable revision")
+		}
+		if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
+			return errors.New("unstable revision")
+		}
+		if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
+			return errors.New("unstable revision")
+		}
+
+		// Load the sectors and build the data payload.
+		for _, request := range requests {
+			sectorData, err := h.readSector(request.MerkleRoot)
+			if err != nil {
+				return err
+			}
+			payload = append(payload, sectorData[request.Offset:request.Offset+request.Length])
+		}
+
+		// Read the transaction signature from the renter.
+		var paymentSignature types.TransactionSignature
+		err = encoding.ReadObject(conn, &paymentSignature, 16e3)
+		if err != nil {
+			return err
+		}
+		// Create the host signature for the revision.
+		cf := types.CoveredFields{
+			FileContractRevisions: []uint64{0},
+		}
+		hostSignature = types.TransactionSignature{
+			ParentID:       crypto.Hash(paymentRevision.ParentID),
+			PublicKeyIndex: 1,
+			CoveredFields:  cf,
+		}
+		txn := types.Transaction{
+			FileContractRevisions: []types.FileContractRevision{paymentRevision},
+			TransactionSignatures: []types.TransactionSignature{paymentSignature, hostSignature},
+		}
+		sigHash := txn.SigHash(1)
+		encodedSig, err := crypto.SignHash(sigHash, secretKey)
+		if err != nil {
+			return err
+		}
+		txn.TransactionSignatures[1].Signature = encodedSig[:]
+
+		// Verify that the renter signature is valid.
+		err = txn.StandaloneValid(blockHeight)
+		if err != nil {
+			return modules.WriteNegotiationRejection(conn, err)
+		}
+		// Verify that the renter signature is covering the right fields.
+		if paymentSignature.CoveredFields.WholeTransaction {
+			return errors.New("renter cannot cover the whole transaction")
+		}
+		return nil
+	}()
+	if err != nil {
+		return modules.WriteNegotiationRejection(conn, err)
+	}
+
+	// Write acceptance to the renter - the data request can be fulfilled by
+	// the host, the payment is satisfactory, signature is correct. Then send
+	// the host signature and all of the data.
+	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
 		return err
 	}
-
-	// TODO: Verify that all of the sectors are known to the host, and pull out
-	// the bytes that the renter has requested.
-
-	// TODO: Verify that the payment is sufficient, and that the signauture is
-	// valid.
-
-	// TODO: sign the thing yourself.
-
-	// Send the host signature back to the renter, followed by all of the data
-	// that was requested.
 	err = encoding.WriteObject(conn, hostSignature)
 	if err != nil {
 		return err
 	}
-	return encoding.WriteObject(conn, downloadPayload)
+	return encoding.WriteObject(conn, payload)
 }
 
 // managedRPCDownload is responsible for handling an RPC request from the

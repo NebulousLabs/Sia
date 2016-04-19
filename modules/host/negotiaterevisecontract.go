@@ -1,10 +1,5 @@
 package host
 
-// TODO: The revision transaction does need to be sent, because it needs to
-// contain the transaction signatures. Furthermore, the 'WholeTransaction' flag
-// on the transaction signatures needs to be set to false, something that the
-// negotiation protocol needs to check.
-
 // TODO: Since we're gathering untrusted input, need to check for both
 // overflows and nil values.
 
@@ -165,9 +160,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				return errUnknownModification
 			}
 		}
+		return nil
 	}()
 	if err != nil {
-		return modules.WriteNegotitationRejection(conn, err)
+		return modules.WriteNegotiationRejection(conn, err)
 	}
 
 	// Read the file contract revision and check whether it's acceptable.
@@ -187,7 +183,8 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 		return err
 	}
 
-	// Renter will now send the transaction signatures for the file contract.
+	// Renter will now send the transaction signatures for the file contract
+	// revision.
 	var renterSig types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSig, 16e3)
 	if err != nil {
@@ -222,6 +219,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
+	// Verify that the renter signature is covering the right fields.
+	if renterSig.CoveredFields.WholeTransaction {
+		return errors.New("renter cannot cover the whole transaction")
+	}
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(storageRevenue)
 	so.ConfirmedRevenue = so.ConfirmedRevenue.Add(bandwidthRevenue)
 	so.RiskedCollateral = so.RiskedCollateral.Add(collateralRisked)
@@ -247,7 +248,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	// Perform the file contract revision exchange, giving the renter the most
 	// recent file contract revision and getting the storage obligation that
 	// will be used to pay for the data.
-	_, so, err := h.managedRPCRevisionRequest(conn)
+	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
 		return err
 	}

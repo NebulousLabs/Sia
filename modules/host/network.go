@@ -119,7 +119,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		err = h.managedRPCReviseContract(conn)
 	case modules.RPCRecentRevision:
 		atomic.AddUint64(&h.atomicRecentRevisionCalls, 1)
-		_, err = h.managedRPCRecentRevision(conn)
+		_, _, err = h.managedRPCRecentRevision(conn)
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)

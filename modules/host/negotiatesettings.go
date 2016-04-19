@@ -39,8 +39,9 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	}
 	hes := modules.HostExternalSettings{
 		AcceptingContracts: h.settings.AcceptingContracts,
-		MaxBatchSize:       h.settings.MaxBatchSize,
+		MaxDownloadBatchSize:       h.settings.MaxDownloadBatchSize,
 		MaxDuration:        h.settings.MaxDuration,
+		MaxReviseBatchSize : h.settings.MaxReviseBatchSize,
 		NetAddress:         netAddr,
 		RemainingStorage:   remainingStorage,
 		SectorSize:         modules.SectorSize,

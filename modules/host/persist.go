@@ -50,8 +50,9 @@ type persistence struct {
 func (h *Host) establishDefaults() error {
 	// Configure the settings object.
 	h.settings = modules.HostInternalSettings{
-		MaxBatchSize: uint64(defaultMaxBatchSize),
+		MaxDownloadBatchSize: uint64(defaultMaxDownloadBatchSize),
 		MaxDuration:  defaultMaxDuration,
+		MaxReviseBatchSize: uint64(defaultMaxReviseBatchSize),
 		WindowSize:   defaultWindowSize,
 
 		Collateral:            defaultCollateral,

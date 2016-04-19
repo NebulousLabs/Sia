@@ -25,6 +25,11 @@ func (h *Host) fetchRevision(fcid types.FileContractID) (*storageObligation, typ
 		return nil, types.FileContractRevision{}, nil, err
 	}
 
+	// If there is no revision, return blank values.
+	if len(so.RevisionTransactionSet) == 0 {
+		return nil, types.FileContractRevision{}, nil, nil
+	}
+
 	// Pull out the file contract revision and the revision's signatures from
 	// the transaction.
 	revisionTxn := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1]
