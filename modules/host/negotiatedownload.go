@@ -134,8 +134,8 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		}
 
 		// Read the transaction signature from the renter.
-		var paymentSignature types.TransactionSignature
-		err = encoding.ReadObject(conn, &paymentSignature, 16e3)
+		var renterSignature types.TransactionSignature
+		err = encoding.ReadObject(conn, &renterSignature, 16e3)
 		if err != nil {
 			return err
 		}
@@ -150,7 +150,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		}
 		txn := types.Transaction{
 			FileContractRevisions: []types.FileContractRevision{paymentRevision},
-			TransactionSignatures: []types.TransactionSignature{paymentSignature, hostSignature},
+			TransactionSignatures: []types.TransactionSignature{renterSignature, hostSignature},
 		}
 		sigHash := txn.SigHash(1)
 		encodedSig, err := crypto.SignHash(sigHash, secretKey)
@@ -165,9 +165,10 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 			return modules.WriteNegotiationRejection(conn, err)
 		}
 		// Verify that the renter signature is covering the right fields.
-		if paymentSignature.CoveredFields.WholeTransaction {
+		if renterSignature.CoveredFields.WholeTransaction {
 			return errors.New("renter cannot cover the whole transaction")
 		}
+		// TODO: shouldn't we be calling that verify function in modules?
 		return nil
 	}()
 	if err != nil {
