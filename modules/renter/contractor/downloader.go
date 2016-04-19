@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"errors"
-	"io"
 	"net"
 	"time"
 
@@ -57,12 +56,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	// initiate download request by confirming host settings
-	if _, err := verifySettings(hd.conn, hd.host, hd.contractor.hdb); err != nil {
-		// TODO: doesn't make sense to reject here if the err is an I/O error.
-		// This goes for Editor as well.
-		return nil, modules.WriteNegotiationRejection(hd.conn, err)
-	}
-	if err := modules.WriteNegotiationAcceptance(hd.conn); err != nil {
+	if err := startRevision(hd.conn, hd.host, hd.contractor.hdb); err != nil {
 		return nil, err
 	}
 	// send download request
@@ -76,7 +70,6 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	// revise the file contract to cover the cost of the new sector
-
 	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
 	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey, height)
 	if err != nil {
@@ -84,10 +77,18 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	// read sector data
-	// TODO: could optimize this if slice were passed as an arg
-	sector := make([]byte, modules.SectorSize)
-	if _, err := io.ReadFull(hd.conn, sector); err != nil {
+	// TODO: optimize this
+	var sectors [][]byte
+	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+8); err != nil {
 		return nil, err
+	} else if len(sectors) != 1 {
+		return nil, errors.New("host did not send enough sectors")
+	}
+	sector := sectors[0]
+	if uint64(len(sector)) != modules.SectorSize {
+		return nil, errors.New("host did not send enough sector data")
+	} else if crypto.MerkleRoot(sector) != root {
+		return nil, errors.New("host sent bad sector data")
 	}
 
 	// update host contract
@@ -147,20 +148,8 @@ func (c *Contractor) Downloader(contract Contract) (Downloader, error) {
 	if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-	// send contract ID
-	if err := encoding.WriteObject(conn, contract.ID); err != nil {
-		return nil, errors.New("couldn't send contract ID: " + err.Error())
-	}
-	// read acceptance
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return nil, errors.New("host did not accept revision request: " + err.Error())
-	}
-	// read last txn
-	var lastRevisionTxn types.Transaction
-	if err := encoding.ReadObject(conn, &lastRevisionTxn, 2048); err != nil {
-		return nil, errors.New("couldn't read last revision transaction: " + err.Error())
-	} else if lastRevisionTxn.ID() != contract.LastRevisionTxn.ID() {
-		return nil, errors.New("desynchronized with host (revision transactions do not match)")
+	if err := verifyRecentRevision(conn, contract); err != nil {
+		return nil, errors.New("revision exchange failed: " + err.Error())
 	}
 
 	// the host is now ready to accept revisions

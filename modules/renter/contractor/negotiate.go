@@ -44,6 +44,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 	if err := crypto.ReadSignedObject(conn, &recvSettings, modules.NegotiateMaxHostExternalSettingsLen, pk); err != nil {
 		return modules.HostDBEntry{}, errors.New("couldn't read host's settings: " + err.Error())
 	}
+	// TODO: move this elsewhere. Shouldn't be checked when downloading.
 	if !recvSettings.AcceptingContracts {
 		return modules.HostDBEntry{}, errors.New("host is not accepting contracts")
 	}

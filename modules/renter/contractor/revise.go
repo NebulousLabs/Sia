@@ -11,6 +11,46 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// startRevision is run at the beginning of each revision iteration. It reads
+// the host's settings confirms that the values are acceptable, and writes an acceptance.
+func startRevision(conn net.Conn, host modules.HostDBEntry, hdb hostDB) error {
+	// verify the host's settings and confirm its identity
+	// TODO: return new host, so we can calculate price accurately
+	_, err := verifySettings(conn, host, hdb)
+	if err != nil {
+		// TODO: doesn't make sense to reject here if the err is an I/O error.
+		return modules.WriteNegotiationRejection(conn, err)
+	}
+	return modules.WriteNegotiationAcceptance(conn)
+}
+
+// verifyRecentRevision confirms that the host and contractor agree upon the current
+// state of the contract being revisde.
+func verifyRecentRevision(conn net.Conn, contract Contract) error {
+	// send contract ID
+	if err := encoding.WriteObject(conn, contract.ID); err != nil {
+		return errors.New("couldn't send contract ID: " + err.Error())
+	}
+	// read acceptance
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return errors.New("host did not accept revision request: " + err.Error())
+	}
+	// read last revision and signatures
+	var lastRevision types.FileContractRevision
+	var hostSignatures []types.TransactionSignature
+	if err := encoding.ReadObject(conn, &lastRevision, 2048); err != nil {
+		return errors.New("couldn't read last revision: " + err.Error())
+	}
+	if err := encoding.ReadObject(conn, &hostSignatures, 2048); err != nil {
+		return errors.New("couldn't read host signatures: " + err.Error())
+	}
+	// verify the revision and signatures
+	// NOTE: we can fake the blockheight here because it doesn't affect
+	// verification; it just needs to be above the fork height and below the
+	// contract expiration (which was checked earlier).
+	return modules.VerifyFileContractRevisionTransactionSignatures(lastRevision, hostSignatures, contract.FileContract.WindowStart-1)
+}
+
 // negotiateRevision sends the revision and new piece data to the host.
 func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
 	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps

@@ -81,18 +81,6 @@ func (he *hostEditor) Close() error {
 	return he.conn.Close()
 }
 
-// startRevision is run at the beginning of each revision iteration. It reads
-// the host's settings confirms that the values are acceptable, and writes an acceptance.
-func (he *hostEditor) startRevision() error {
-	// verify the host's settings and confirm its identity
-	// TODO: return new host, so we can calculate price accurately
-	_, err := verifySettings(he.conn, he.host, he.contractor.hdb)
-	if err != nil {
-		return modules.WriteNegotiationRejection(he.conn, err)
-	}
-	return modules.WriteNegotiationAcceptance(he.conn)
-}
-
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
@@ -120,7 +108,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	merkleRoot := tree.Root()
 
 	// initiate revision
-	err := he.startRevision()
+	err := startRevision(he.conn, he.host, he.contractor.hdb)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
@@ -188,7 +176,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	merkleRoot := tree.Root()
 
 	// initiate revision
-	err := he.startRevision()
+	err := startRevision(he.conn, he.host, he.contractor.hdb)
 	if err != nil {
 		return err
 	}
@@ -258,20 +246,8 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-	// send contract ID
-	if err := encoding.WriteObject(conn, contract.ID); err != nil {
-		return nil, errors.New("couldn't send contract ID: " + err.Error())
-	}
-	// read acceptance
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return nil, errors.New("host did not accept revision request: " + err.Error())
-	}
-	// read last txn
-	var lastRevisionTxn types.Transaction
-	if err := encoding.ReadObject(conn, &lastRevisionTxn, 2048); err != nil {
-		return nil, errors.New("couldn't read last revision transaction: " + err.Error())
-	} else if lastRevisionTxn.ID() != contract.LastRevisionTxn.ID() {
-		return nil, errors.New("desynchronized with host (revision transactions do not match)")
+	if err := verifyRecentRevision(conn, contract); err != nil {
+		return nil, errors.New("revision exchange failed: " + err.Error())
 	}
 
 	// the host is now ready to accept revisions

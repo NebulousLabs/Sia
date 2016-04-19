@@ -142,8 +142,9 @@ func TestEditor(t *testing.T) {
 			encoding.ReadObject(ourConn, new(types.FileContractID), 32)
 			// send acceptance
 			modules.WriteNegotiationAcceptance(ourConn)
-			// send last txn
-			encoding.WriteObject(ourConn, contract.LastRevisionTxn)
+			// send last revision + signatures
+			encoding.WriteObject(ourConn, contract.LastRevision)
+			encoding.WriteObject(ourConn, contract.LastRevisionTxn.TransactionSignatures)
 			ourConn.Close()
 		}()
 		return theirConn, nil
