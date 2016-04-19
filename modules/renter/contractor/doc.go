@@ -1,5 +1,5 @@
 /*
-package contractor is responsible for forming and renewing file contracts with
+Package contractor is responsible for forming and renewing file contracts with
 hosts. Its goal is to manage the low-level details of the negotiation,
 revision, and renewal protocols, such that the renter can operate at a higher
 level of abstraction. Ideally, the renter should be mostly ignorant of the Sia
