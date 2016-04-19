@@ -2,7 +2,6 @@ package renter
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io"
 	"testing"
 	"time"
@@ -39,7 +38,9 @@ func (f *testFetcher) fetch(p pieceData) ([]byte, error) {
 	return f.sectors[p.MerkleRoot], nil
 }
 
-// TestErasureDownload tests parallel downloading of erasure-coded data.
+// TestErasureDownload tests parallel downloading of erasure-coded data. It
+// mocks the fetcher interface in order to directly test the downloading
+// algorithm.
 func TestErasureDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -47,8 +48,10 @@ func TestErasureDownload(t *testing.T) {
 
 	// generate data
 	const dataSize = 777
-	data := make([]byte, dataSize)
-	rand.Read(data)
+	data, err := crypto.RandBytes(dataSize)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create Reed-Solomon encoder
 	rsc, err := NewRSCode(2, 10)

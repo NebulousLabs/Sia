@@ -179,10 +179,6 @@ func (f *file) newDownload(hosts []fetcher, destination string) *download {
 // Download downloads a file, identified by its path, to the destination
 // specified.
 func (r *Renter) Download(path, destination string) error {
-	if true { // evade go vet
-		return errors.New("TODO: fix download code")
-	}
-
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.Lock()
 	file, exists := r.files[path]
