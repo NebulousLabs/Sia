@@ -112,7 +112,8 @@ func (stubHostDB) IsOffline(modules.NetAddress) bool  { return true }
 // interface.
 type stubContractor struct{}
 
-func (stubContractor) SetAllowance(modules.Allowance) error                  { return nil }
-func (stubContractor) Allowance() modules.Allowance                          { return modules.Allowance{} }
-func (stubContractor) Contracts() []contractor.Contract                      { return nil }
-func (stubContractor) Editor(contractor.Contract) (contractor.Editor, error) { return nil, nil }
+func (stubContractor) SetAllowance(modules.Allowance) error                          { return nil }
+func (stubContractor) Allowance() modules.Allowance                                  { return modules.Allowance{} }
+func (stubContractor) Contracts() []contractor.Contract                              { return nil }
+func (stubContractor) Editor(contractor.Contract) (contractor.Editor, error)         { return nil, nil }
+func (stubContractor) Downloader(contractor.Contract) (contractor.Downloader, error) { return nil, nil }

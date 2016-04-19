@@ -44,6 +44,10 @@ type hostContractor interface {
 	// Editor creates an Editor from the specified contract, allowing it to be
 	// modified.
 	Editor(contractor.Contract) (contractor.Editor, error)
+
+	// Downloader creates a Downloader from the specified contract, allowing
+	// the retrieval of sectors.
+	Downloader(contractor.Contract) (contractor.Downloader, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.

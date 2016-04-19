@@ -3,14 +3,13 @@ package renter
 import (
 	"errors"
 	"io"
-	"net"
 	"os"
 	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 )
 
 var (
@@ -31,10 +30,9 @@ type fetcher interface {
 // A hostFetcher fetches pieces from a host. It implements the fetcher
 // interface.
 type hostFetcher struct {
-	conn      net.Conn
-	pieceMap  map[uint64][]pieceData
-	pieceSize uint64
-	masterKey crypto.TwofishKey
+	downloader contractor.Downloader
+	pieceMap   map[uint64][]pieceData
+	masterKey  crypto.TwofishKey
 }
 
 // pieces returns the pieces stored on this host that are part of a given
@@ -45,17 +43,8 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	hf.conn.SetDeadline(time.Now().Add(2 * time.Minute)) // sufficient to transfer 4 MB over 250 kbps
-	defer hf.conn.SetDeadline(time.Time{})
 	// request piece
-	err := encoding.WriteObject(hf.conn, errors.New("TODO: switch to new download protocol"))
-	if err != nil {
-		return nil, err
-	}
-
-	// download piece
-	data := make([]byte, hf.pieceSize)
-	_, err = io.ReadFull(hf.conn, data)
+	data, err := hf.downloader.Sector(p.MerkleRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -67,48 +56,18 @@ func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
 	return key.DecryptBytes(data)
 }
 
-func (hf *hostFetcher) Close() error {
-	// ignore error; we'll need to close conn anyway
-	encoding.WriteObject(hf.conn, errors.New("TODO: switch to new download protocol"))
-	return hf.conn.Close()
-}
-
-// newHostFetcher creates a new hostFetcher by connecting to a host.
-// TODO: We may not wind up requesting data from this, which means we will
-// connect and then disconnect without making any actual requests (but holding
-// the connection open the entire time). This is wasteful of host resources.
-// Consider only opening the connection after the first request has been made.
-func newHostFetcher(fc fileContract, pieceSize uint64, masterKey crypto.TwofishKey) (*hostFetcher, error) {
-	conn, err := net.DialTimeout("tcp", string(fc.IP), 15*time.Second)
-	if err != nil {
-		return nil, err
-	}
-	conn.SetDeadline(time.Now().Add(15 * time.Second))
-	defer conn.SetDeadline(time.Time{})
-
-	// send RPC
-	err = encoding.WriteObject(conn, modules.RPCDownload)
-	if err != nil {
-		return nil, err
-	}
-
-	// send contract ID
-	err = encoding.WriteObject(conn, fc.ID)
-	if err != nil {
-		return nil, err
-	}
-
+// newHostFetcher creates a new hostFetcher.
+func newHostFetcher(d contractor.Downloader, fc fileContract, masterKey crypto.TwofishKey) *hostFetcher {
 	// make piece map
 	pieceMap := make(map[uint64][]pieceData)
 	for _, p := range fc.Pieces {
 		pieceMap[p.Chunk] = append(pieceMap[p.Chunk], p)
 	}
 	return &hostFetcher{
-		conn:      conn,
-		pieceMap:  pieceMap,
-		pieceSize: pieceSize + crypto.TwofishOverhead,
-		masterKey: masterKey,
-	}, nil
+		downloader: d,
+		pieceMap:   pieceMap,
+		masterKey:  masterKey,
+	}
 }
 
 // checkHosts checks that a set of hosts is sufficient to download a file.
@@ -233,23 +192,28 @@ func (r *Renter) Download(path, destination string) error {
 	}
 
 	// Copy the file's metadata
-	var contracts []fileContract
+	// TODO: this is ugly because we only have the Contracts method for
+	// looking up contracts.
+	contracts := make(map[*fileContract]contractor.Contract)
 	file.mu.RLock()
-	for _, fc := range file.contracts {
-		contracts = append(contracts, fc)
+	for _, c := range r.hostContractor.Contracts() {
+		fc, ok := file.contracts[c.ID]
+		if ok {
+			contracts[&fc] = c
+		}
 	}
 	file.mu.RUnlock()
 
 	// Initiate connections to each host.
 	var hosts []fetcher
-	for _, fc := range contracts {
+	for fc, c := range contracts {
 		// TODO: connect in parallel
-		hf, err := newHostFetcher(fc, file.pieceSize, file.masterKey)
+		d, err := r.hostContractor.Downloader(c)
 		if err != nil {
 			continue
 		}
-		defer hf.Close()
-		hosts = append(hosts, hf)
+		defer d.Close()
+		hosts = append(hosts, newHostFetcher(d, *fc, file.masterKey))
 	}
 
 	// Check that this host set is sufficient to download the file.
