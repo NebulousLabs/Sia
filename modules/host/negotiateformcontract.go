@@ -1,5 +1,9 @@
 package host
 
+// TODO: Not all of the max sizes in this file are acceptable.
+
+// TODO: Not confident that all the 'nil' cases are handled properly here.
+
 import (
 	"errors"
 	"net"
@@ -121,14 +125,54 @@ func (h *Host) managedAddCollateral(txnSet []types.Transaction, settings modules
 // collateral, and then try submitting the file contract to the transaction
 // pool. If there is no error, the completed transaction set will be returned
 // to the caller.
-func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, renterSignatures []types.TransactionSignature) ([]types.TransactionSignature, error) {
+func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, renterPK crypto.PublicKey, renterSignatures []types.TransactionSignature, renterRevisionSignature types.TransactionSignature) ([]types.TransactionSignature, types.TransactionSignature, error) {
 	for _, sig := range renterSignatures {
 		builder.AddTransactionSignature(sig)
 	}
 	fullTxnSet, err := builder.Sign(true)
 	if err != nil {
 		builder.Drop()
-		return nil, err
+		return nil, types.TransactionSignature{}, err
+	}
+
+	// Verify that the signature for the revision from the renter is correct.
+	h.mu.RLock()
+	blockHeight := h.blockHeight
+	hostPK := h.publicKey.Key
+	hostSK := h.secretKey
+	h.mu.RUnlock()
+	contractTxn := fullTxnSet[len(fullTxnSet)-1]
+	fc := contractTxn.FileContracts[0]
+	noOpRevision := types.FileContractRevision{
+		ParentID: contractTxn.FileContractID(0),
+		UnlockConditions: types.UnlockConditions{
+			PublicKeys: []types.SiaPublicKey{
+				{
+					Algorithm: types.SignatureEd25519,
+					Key:       renterPK[:],
+				},
+				{
+					Algorithm: types.SignatureEd25519,
+					Key:       hostPK[:],
+				},
+			},
+			SignaturesRequired: 2,
+		},
+		NewRevisionNumber: fc.RevisionNumber + 1,
+
+		NewFileSize:           fc.FileSize,
+		NewFileMerkleRoot:     fc.FileMerkleRoot,
+		NewWindowStart:        fc.WindowStart,
+		NewWindowEnd:          fc.WindowEnd,
+		NewValidProofOutputs:  fc.ValidProofOutputs,
+		NewMissedProofOutputs: fc.MissedProofOutputs,
+		NewUnlockHash:         fc.UnlockHash,
+	}
+	// createRevisionSignature will also perform validation on the result,
+	// returning an error if the renter.
+	revisionTransaction, err := createRevisionSignature(noOpRevision, renterRevisionSignature, hostSK, blockHeight)
+	if err != nil {
+		return nil, types.TransactionSignature{}, err
 	}
 
 	// Create and add the storage obligation for this file contract.
@@ -137,13 +181,14 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	fullTxn, parentTxns := builder.View()
 	hostPortion := contractCollateral(h.settings, append(parentTxns, fullTxn))
 	so := &storageObligation{
-		ConfirmedRevenue:     h.settings.MinimumContractPrice,
-		LockedCollateral:     hostPortion,
-		OriginTransactionSet: fullTxnSet,
+		ConfirmedRevenue:       h.settings.MinimumContractPrice,
+		LockedCollateral:       hostPortion,
+		OriginTransactionSet:   fullTxnSet,
+		RevisionTransactionSet: []types.Transaction{revisionTransaction},
 	}
 	lockErr := h.lockStorageObligation(so)
 	if lockErr != nil {
-		return nil, lockErr
+		return nil, types.TransactionSignature{}, lockErr
 	}
 	// addStorageObligation will submit the transaction to the transaction
 	// pool, and will only do so if there was not some error in creating the
@@ -151,7 +196,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	err = h.addStorageObligation(so)
 	lockErr = h.unlockStorageObligation(so)
 	if lockErr != nil {
-		return nil, lockErr
+		return nil, types.TransactionSignature{}, lockErr
 	}
 	if err != nil {
 		// AcceptingContracts is set to false in the event of an error, because
@@ -161,7 +206,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		h.log.Println(err)
 		h.settings.AcceptingContracts = false
 		builder.Drop()
-		return nil, err
+		return nil, types.TransactionSignature{}, err
 	}
 
 	// Get the host's transaction signatures from the builder.
@@ -170,7 +215,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	for _, sigIndex := range txnSigIndices {
 		hostTxnSignatures = append(hostTxnSignatures, fullTxn.TransactionSignatures[sigIndex])
 	}
-	return hostTxnSignatures, nil
+	return hostTxnSignatures, revisionTransaction.TransactionSignatures[1], nil
 }
 
 // managedRPCFormContract accepts a file contract from a renter, checks the
@@ -178,8 +223,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 // file contract, creating a storage obligation and submitting the contract to
 // the blockchain.
 func (h *Host) managedRPCFormContract(conn net.Conn) error {
-	// Send the host settings to the renter. managedRPCSettings will set a
-	// deadline.
+	// Send the host settings to the renter.
 	err := h.managedRPCSettings(conn)
 	if err != nil {
 		return err
@@ -214,7 +258,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &renterPK, modules.MaxFileContractSetLen)
+	err = encoding.ReadObject(conn, &renterPK, 1e3)
 	if err != nil {
 		return err
 	}
@@ -227,13 +271,11 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		// why to the renter.
 		return modules.WriteNegotiationRejection(conn, err)
 	}
-
 	// The host adds collateral to the transaction.
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(txnSet, settings)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
-
 	// The host indicates acceptance, and then sends any new parent
 	// transactions, inputs and outputs that were added to the transaction.
 	err = modules.WriteNegotiationAcceptance(conn)
@@ -253,14 +295,21 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		return err
 	}
 
-	// The renter will now send a negotiation response, followed by a
-	// transaction signature in the case of acceptance.
+	// The renter will now send a negotiation response, followed by transaction
+	// signatures for the file contract transaction in the case of acceptance.
+	// The transaction signatures will be followed by another transaction
+	// siganture, to sign a no-op file contract revision.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
 		return err
 	}
 	var renterTxnSignatures []types.TransactionSignature
+	var renterRevisionSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterTxnSignatures, 5e3)
+	if err != nil {
+		return err
+	}
+	err = encoding.ReadObject(conn, &renterRevisionSignature, 5e3)
 	if err != nil {
 		return err
 	}
@@ -271,7 +320,10 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// written to the renter, but to give the renter confidence, the host will
 	// send the signatures so that the renter can immediately have the
 	// completed file contract.
-	hostTxnSignatures, err := h.managedFinalizeContract(txnBuilder, renterTxnSignatures)
+	//
+	// During finalization, the siganture for the revision is also checked, and
+	// signatures for the revision transaction are created.
+	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature)
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
@@ -281,10 +333,13 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-
-	// The host sends the transaction signatures to the renter. Negotiation is
-	// complete.
-	return encoding.WriteObject(conn, hostTxnSignatures)
+	// The host sends the transaction signatures to the renter, followed by the
+	// revision signature. Negotiation is complete.
+	err = encoding.WriteObject(conn, hostTxnSignatures)
+	if err != nil {
+		return err
+	}
+	return encoding.WriteObject(conn, hostRevisionSignature)
 }
 
 // managedVerifyNewContract checks that an incoming file contract matches the host's
