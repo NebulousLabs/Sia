@@ -68,6 +68,20 @@ const (
 	// MaxHostExternalSettingsLen is the maximum allowed size of an encoded
 	// HostExternalSettings.
 	MaxHostExternalSettingsLen = 16000
+
+	// MaxSiaPubkeySize defines the maximum size that a SiaPubkey is allowed to
+	// be when being sent over the wire during negotiation.
+	MaxSiaPubkeySize = 1e3
+
+	// MaxTransactionSignatureSize defines the maximum size that a transaction
+	// signature is allowed to be when being sent over the wire during
+	// negoitation.
+	MaxTransactionSignatureSize = 2e3
+
+	// MaxTransactionSignaturesSize defines the maximum size that a transaction
+	// signature slice is allowed to be when being sent over the wire during
+	// negoitation.
+	MaxTransactionSignaturesSize = 5e3
 )
 
 var (

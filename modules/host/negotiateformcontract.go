@@ -1,9 +1,5 @@
 package host
 
-// TODO: Not all of the max sizes in this file are acceptable.
-
-// TODO: Not confident that all the 'nil' cases are handled properly here.
-
 import (
 	"errors"
 	"net"
@@ -258,7 +254,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &renterPK, 1e3)
+	err = encoding.ReadObject(conn, &renterPK, modules.MaxSiaPubkeySize)
 	if err != nil {
 		return err
 	}
@@ -305,11 +301,11 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	}
 	var renterTxnSignatures []types.TransactionSignature
 	var renterRevisionSignature types.TransactionSignature
-	err = encoding.ReadObject(conn, &renterTxnSignatures, 5e3)
+	err = encoding.ReadObject(conn, &renterTxnSignatures, modules.MaxTransactionSignaturesSize)
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &renterRevisionSignature, 5e3)
+	err = encoding.ReadObject(conn, &renterRevisionSignature, modules.MaxTransactionSignatureSize)
 	if err != nil {
 		return err
 	}
