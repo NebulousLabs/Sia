@@ -31,6 +31,18 @@ func verifyRecentRevision(conn net.Conn, contract Contract) error {
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
 		return errors.New("couldn't send contract ID: " + err.Error())
 	}
+	// read challenge
+	var challenge crypto.Hash
+	if err := encoding.ReadObject(conn, &challenge, 32); err != nil {
+		return errors.New("couldn't read challenge: " + err.Error())
+	}
+	// sign and return
+	sig, err := crypto.SignHash(challenge, contract.SecretKey)
+	if err != nil {
+		return err
+	} else if err := encoding.WriteObject(conn, sig); err != nil {
+		return errors.New("couldn't send challenge response: " + err.Error())
+	}
 	// read acceptance
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return errors.New("host did not accept revision request: " + err.Error())
