@@ -63,6 +63,11 @@ var (
 	// which is supposed to be getting revised.
 	errReviseBadParent = errors.New("proposed file contract revision has the wrong parent id")
 
+	// errReviseBadRenterValidOutput is returned if a propsed file contract
+	// revision does not corectly deduct value from the renter's valid proof
+	// output.
+	errReviseBadRenterValidOutput = errors.New("proposed file contract revision does not correctly deduct from the renter's valid proof output")
+
 	// errReviseBadRenterMissedOutput is returned if a proposed file contract
 	// revision does not correctly deduct value from the renter's missed proof
 	// output.
@@ -221,7 +226,6 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
-
 	// Revision is acceptable, write an acceptance string.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
