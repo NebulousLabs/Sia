@@ -57,6 +57,11 @@ const (
 	// encode an error being sent during negotiation.
 	MaxErrorSize = 256
 
+	// MaxFileContractRevisionSize specifies the maximum size that a file
+	// contract revision is allowed to have when being sent over the wire
+	// during negotiation.
+	MaxFileContractRevisionSize = 3e3
+
 	// MaxFileContractSetLen determines the maximum allowed size of a
 	// transaction set that can be sent when trying to negotiate a file
 	// contract. The transaction set will contain all of the unconfirmed

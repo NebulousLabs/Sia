@@ -1,13 +1,5 @@
 package host
 
-// TODO: Since we're gathering untrusted input, need to check for both
-// overflows and nil values.
-
-// TODO: Does the host properly account for the cost of uploading or
-// downloading data? Sectors gained is not going to be good enough, because
-// it's going to contain a whole sector even though the amount of storage is
-// not changing and the amount of bandwidth is mostly minimal.
-
 import (
 	"errors"
 	"net"
@@ -72,10 +64,15 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	blockHeight := h.blockHeight
 	h.mu.RUnlock()
 
-	// The renter is now going to send a batch of modifications followed by an
-	// updated file contract revision. Read the number of modifications being
-	// sent by the renter.
+	// The renter is going to send a file contract revision that pays for a
+	// bunch of modifications, and then is going to send the modifications that
+	// are paid for by the revision.
+	var revision types.FileContractRevision
 	var modifications []modules.RevisionAction
+	err = encoding.ReadObject(conn, &revision, modules.MaxFileContractRevisionSize)
+	if err != nil {
+		return err
+	}
 	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
 	if err != nil {
 		return err
@@ -86,7 +83,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	// revision that comes down the line.
 	var bandwidthRevenue types.Currency
 	var storageRevenue types.Currency
-	var collateralRisked types.Currency
+	var newCollateral types.Currency
 	var sectorsRemoved []crypto.Hash
 	var sectorsGained []crypto.Hash
 	var gainedSectorData [][]byte
@@ -106,13 +103,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				return errLargeSector
 			}
 
-			// Run a different codepath depending on the renter's selection.
-			if modification.Type == modules.ActionDelete {
+			switch modification.Type{
+			case modules.ActionDelete:
 				// There is no financial information to change, it is enough to
 				// remove the sector.
 				sectorsRemoved = append(sectorsRemoved, so.SectorRoots[modification.SectorIndex])
 				so.SectorRoots = append(so.SectorRoots[0:modification.SectorIndex], so.SectorRoots[modification.SectorIndex+1:]...)
-			} else if modification.Type == modules.ActionInsert {
+			case modules.ActionInsert:
 				// Check that the sector size is correct.
 				if uint64(len(modification.Data)) != modules.SectorSize {
 					return errBadSectorSize
@@ -123,14 +120,14 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				blockBytesCurrency := types.NewCurrency64(uint64(blocksRemaining)).Mul(types.NewCurrency64(modules.SectorSize))
 				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
 				storageRevenue = storageRevenue.Add(settings.MinimumStoragePrice.Mul(blockBytesCurrency))
-				collateralRisked = collateralRisked.Add(settings.Collateral.Mul(blockBytesCurrency))
+				newCollateral = newCollateral.Add(settings.Collateral.Mul(blockBytesCurrency))
 
 				// Insert the sector into the root list.
 				newRoot := crypto.MerkleRoot(modification.Data)
 				sectorsGained = append(sectorsGained, newRoot)
 				gainedSectorData = append(gainedSectorData, modification.Data)
 				so.SectorRoots = append(so.SectorRoots[:modification.SectorIndex], append([]crypto.Hash{newRoot}, so.SectorRoots[modification.SectorIndex:]...)...)
-			} else if modification.Type == modules.ActionModify {
+			case modules.ActionModify:
 				// Check that the offset and length are okay. Length is already
 				// known to be appropriately small, but the offset needs to be
 				// checked for being appropriately small as well otherwise there is
@@ -156,23 +153,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				sectorsGained = append(sectorsGained, newRoot)
 				gainedSectorData = append(gainedSectorData, sector)
 				so.SectorRoots[modification.SectorIndex] = newRoot
-			} else {
+			default:
 				return errUnknownModification
 			}
 		}
-		return nil
+		newRevenue := storageRevenue.Add(bandwidthRevenue)
+		return verifyRevision(so, revision, newRevenue , newCollateral)
 	}()
-	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
-	}
-
-	// Read the file contract revision and check whether it's acceptable.
-	var revision types.FileContractRevision
-	err = encoding.ReadObject(conn, &revision, 16e3)
-	if err != nil {
-		return err
-	}
-	err = verifyRevision(so, revision, storageRevenue, bandwidthRevenue, collateralRisked)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
@@ -186,46 +173,19 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	// Renter will now send the transaction signatures for the file contract
 	// revision.
 	var renterSig types.TransactionSignature
-	err = encoding.ReadObject(conn, &renterSig, 16e3)
+	err = encoding.ReadObject(conn, &renterSig, modules.MaxTransactionSignatureSize)
 	if err != nil {
 		return err
 	}
-
-	// Create the signatures for a transaction that contains only the file
-	// contract revision and the renter signatures.
-	// Create the CoveredFields for the signature.
-	cf := types.CoveredFields{
-		FileContractRevisions: []uint64{0},
-	}
-	hostTxnSig := types.TransactionSignature{
-		ParentID:       crypto.Hash(revision.ParentID),
-		PublicKeyIndex: 1,
-		CoveredFields:  cf,
-	}
-	txn := types.Transaction{
-		FileContractRevisions: []types.FileContractRevision{revision},
-		TransactionSignatures: []types.TransactionSignature{renterSig, hostTxnSig},
-	}
-	sigHash := txn.SigHash(1)
-	encodedSig, err := crypto.SignHash(sigHash, secretKey)
-	if err != nil {
-		return err
-	}
-	txn.TransactionSignatures[1].Signature = encodedSig[:]
-
-	// Host will verify the transaction StandaloneValid is enough. If valid,
-	// the host will update and submit the storage obligation.
-	err = txn.StandaloneValid(blockHeight)
+	// Verify that the signature is valid and get the host's signature.
+	txn, err := createRevisionSignature(revision, renterSig, secretKey, blockHeight)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
-	// Verify that the renter signature is covering the right fields.
-	if renterSig.CoveredFields.WholeTransaction {
-		return errors.New("renter cannot cover the whole transaction")
-	}
+
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(storageRevenue)
 	so.ConfirmedRevenue = so.ConfirmedRevenue.Add(bandwidthRevenue)
-	so.RiskedCollateral = so.RiskedCollateral.Add(collateralRisked)
+	so.RiskedCollateral = so.RiskedCollateral.Add(newCollateral)
 	err = h.modifyStorageObligation(so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
@@ -267,7 +227,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 
 	// Begin the revision loop. The host will process revisions until a
 	// timeout is reached, or until the renter sends a StopResponse.
-	for time.Now().Before(startTime.Add(1200 * time.Second)) {
+	for time.Now().Before(startTime.Add(iteratedConnectionTime)) {
 		err := h.managedRevisionIteration(conn, so)
 		if err == modules.ErrStopResponse {
 			return nil
@@ -278,19 +238,72 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	return nil
 }
 
-// verifyRevision checks that the revision
-//
-// TODO: Finish implementation
-func verifyRevision(so *storageObligation, revision types.FileContractRevision, storageRevenue, bandwidthRevenue, collateralRisked types.Currency) error {
+// verifyRevision checks that the revision pays the host correctly, and that
+// the revision does not attempt any malicious or unexpected changes.
+func verifyRevision(so *storageObligation, revision types.FileContractRevision, newRevenue, newCollateral types.Currency) error {
+	oldFCR := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]
+
 	// Check that all non-volatile fields are the same.
+	if oldFCR.ParentID != revision.ParentID {
+		return errors.New("bad revision")
+	}
+	if oldFCR.UnlockConditions.UnlockHash() != revision.UnlockConditions.UnlockHash() {
+		return errors.New("bad revision")
+	}
+	if oldFCR.NewRevisionNumber >= revision.NewRevisionNumber {
+		return errors.New("bad revision")
+	}
+	if revision.NewFileSize != uint64(len(so.SectorRoots))*modules.SectorSize {
+		return errors.New("bad revision")
+	}
+	if oldFCR.NewWindowStart != revision.NewWindowStart {
+		return errors.New("bad revision")
+	}
+	if oldFCR.NewWindowEnd != revision.NewWindowEnd {
+		return errors.New("bad revision")
+	}
+	if oldFCR.NewUnlockHash != revision.NewUnlockHash {
+		return errors.New("bad revision")
+	}
 
-	// Check that the root hash and the file size match the updated sector
-	// roots.
+	// The new revenue comes out of the renter's valid outputs.
+	if revision.NewValidProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
+		return errors.New("bad revision")
+	}
+	// The new revenue goes into the host's valid outputs.
+	if oldFCR.NewValidProofOutputs[1].Value.Add(newRevenue).Cmp(revision.NewValidProofOutputs[1].Value) < 0 {
+		return errors.New("bad revision")
+	}
+	// The new revenue comes out of the renter's missed outputs.
+	if revision.NewMissedProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewMissedProofOutputs[0].Value) > 0 {
+		return errors.New("bad revision")
+	}
+	// The new revenue goes into the host's void outputs.
+	if oldFCR.NewMissedProofOutputs[2].Value.Add(newRevenue).Cmp(revision.NewMissedProofOutputs[2].Value) < 0 {
+		return errors.New("bad revision")
+	}
+	// The collateral comes out of the host's missed outputs.
+	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) > 0 {
+		return errors.New("bad revision")
+	}
+	// The collateral goes into the host's void outputs.
+	if oldFCR.NewMissedProofOutputs[2].Value.Add(newCollateral).Cmp(revision.NewMissedProofOutputs[2].Value) < 0 {
+		return errors.New("bad revision")
+	}
 
-	// Check that the payments have updated to reflect the new revenues.
+	// The Merkle root is checked last because it is the most expensive check.
+	log2SectorSize := uint64(0)
+	for 1<<log2SectorSize < (modules.SectorSize / crypto.SegmentSize) {
+		log2SectorSize++
+	}
+	ct := crypto.NewCachedTree(log2SectorSize)
+	for _, root := range so.SectorRoots {
+		ct.Push(root)
+	}
+	expectedMerkleRoot := ct.Root()
+	if revision.NewFileMerkleRoot != expectedMerkleRoot {
+		return errors.New("bad revision")
+	}
 
-	// Check that the revision number has increased.
-
-	// Check any other thing that needs to be checked.
 	return nil
 }

@@ -134,7 +134,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// Verify that the signature for the revision from the renter is correct.
 	h.mu.RLock()
 	blockHeight := h.blockHeight
-	hostPK := h.publicKey.Key
+	hostSPK := h.publicKey
 	hostSK := h.secretKey
 	h.mu.RUnlock()
 	contractTxn := fullTxnSet[len(fullTxnSet)-1]
@@ -147,10 +147,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 					Algorithm: types.SignatureEd25519,
 					Key:       renterPK[:],
 				},
-				{
-					Algorithm: types.SignatureEd25519,
-					Key:       hostPK[:],
-				},
+				hostSPK,
 			},
 			SignaturesRequired: 2,
 		},

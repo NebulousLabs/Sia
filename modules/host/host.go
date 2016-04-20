@@ -56,6 +56,8 @@ package host
 
 // TODO: clean up all of the magic numbers in the host.
 
+// TODO: revamp the finances for the storage obligations.
+
 // TODO: host_test.go has commented out tests.
 
 // TODO: network_test.go has commented out tests.

@@ -21,6 +21,11 @@ const (
 	// necessary to limit the impact of DoS attacks.
 	fileContractNegotiationTimeout = 120 * time.Second
 
+	// iteratedConnectionTime is the amount of time that is allowed to pass
+	// before the host will stop accepting new iterations on an iterated
+	// connection.
+	iteratedConnectionTime = 1200 * time.Second
+
 	// maximumStorageFolders indicates the maximum number of storage folders
 	// that the host allows. Some operations, such as creating a new storage
 	// folder, take longer if there are more storage folders. Static RAM usage

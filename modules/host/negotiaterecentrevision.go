@@ -104,7 +104,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *s
 
 	// Read the signed response from the renter.
 	var challengeResponse crypto.Signature
-	err = encoding.ReadObject(conn, &challengeResponse, len(challengeResponse))
+	err = encoding.ReadObject(conn, &challengeResponse, uint64(len(challengeResponse)))
 	if err != nil {
 		return types.FileContractID{}, nil, err
 	}
