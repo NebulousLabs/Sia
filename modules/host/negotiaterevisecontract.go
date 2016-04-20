@@ -29,6 +29,64 @@ var (
 	// data which creates a sector that is larger than what the host uses.
 	errLargeSector = errors.New("renter has sent a sector that exceeds the host's sector size")
 
+	// errReviseBadCollateralDeduction is returned if a proposed file contrct
+	// revision does not correctly deduct value from the host's missed proof
+	// output - which is the host's collateral pool.
+	errReviseBadCollateralDeduction = errors.New("proposed file contract revision does not correctly deduct from the host's collateral pool")
+
+	// errReviseBadFileMerkleRoot is returned if the renter sends a file
+	// contract revision with a Merkle root that does not match the changes
+	// presented by the revision request.
+	errReviseBadFileMerkleRoot = errors.New("proposed file contract revision has an incorrect Merkle merkle root")
+
+	// errReviseBadHostValidOutput is returned if a proposed file contract
+	// revision does not correctly add value to the host's valid proof outputs.
+	errReviseBadHostValidOutput = errors.New("proposed file contract revision does not correctly add to the host's valid proof output")
+
+	// errReviseBadNewFileSize is returned if a proposed file contract revision
+	// does not have a file size which matches the revisions that have been
+	// made.
+	errReviseBadNewFileSize = errors.New("propsed file contract revision has a bad filesize")
+
+	// errReviseBadNewWindowEnd is returned if a proposed file contract
+	// revision does not have a window end which matches the original file
+	// contract revision.
+	errReviseBadNewWindowEnd = errors.New("proposed file contract revision has a bad window end")
+
+	// errReviseBadNewWindowStart is returned if a proposed file contract
+	// revision does not have a window start which matches the window start of
+	// the original file contract.
+	errReviseBadNewWindowStart = errors.New("propsed file contract revision has a bad window start")
+
+	// errReviseBadParent is returned when a file contract revision is
+	// presented which has a parent id that doesn't match the file contract
+	// which is supposed to be getting revised.
+	errReviseBadParent = errors.New("proposed file contract revision has the wrong parent id")
+
+	// errReviseBadRenterMissedOutput is returned if a proposed file contract
+	// revision does not correctly deduct value from the renter's missed proof
+	// output.
+	errReviseBadRenterMissedOutput = errors.New("proposed file contract revision does not correctly deduct from the renter's missed proof output")
+
+	// errReviseBadRevisionNumber is returned if a proposed file contract
+	// revision does not have a revision number which is strictly greater than
+	// the most recent revision number for the file contract being modified.
+	errReviseBadRevisionNumber = errors.New("proposed file contract revision did not correctly increase the revision number")
+
+	// errReviseBadUnlockConditions is returned when a file contract revision
+	// has unlock conditions that do not match the file contract being revised.
+	errReviseBadUnlockConditions = errors.New("propsed file contract revision appears to have the wrong unlock conditions")
+
+	// errRevisionBadUnlockHash is returned if a proposed file contract
+	// revision does not have an unlock hash which matches the unlock hash of
+	// the previous file contract revision.
+	errReviseBadUnlockHash = errors.New("proposed file contract revision has a bad new unlock hash")
+
+	// errReviseBadVoidOutput is returned if a proposed file contract revision
+	// does not correct add value to the void output to compensate for revenue
+	// from the renter.
+	errReviseBadVoidOutput = errors.New("proposed file contract revision does not correctly add to the host's void outputs")
+
 	// errUnknownModification is returned if the host receives a modification
 	// action from the renter that it does not understand.
 	errUnknownModification = errors.New("renter is attempting an action that the host is not aware of")
@@ -245,50 +303,46 @@ func verifyRevision(so *storageObligation, revision types.FileContractRevision, 
 
 	// Check that all non-volatile fields are the same.
 	if oldFCR.ParentID != revision.ParentID {
-		return errors.New("bad revision")
+		return errReviseBadParent
 	}
 	if oldFCR.UnlockConditions.UnlockHash() != revision.UnlockConditions.UnlockHash() {
-		return errors.New("bad revision")
+		return errReviseBadUnlockConditions
 	}
 	if oldFCR.NewRevisionNumber >= revision.NewRevisionNumber {
-		return errors.New("bad revision")
+		return errReviseBadRevisionNumber
 	}
 	if revision.NewFileSize != uint64(len(so.SectorRoots))*modules.SectorSize {
-		return errors.New("bad revision")
+		return errReviseBadNewFileSize
 	}
 	if oldFCR.NewWindowStart != revision.NewWindowStart {
-		return errors.New("bad revision")
+		return errReviseBadNewWindowStart
 	}
 	if oldFCR.NewWindowEnd != revision.NewWindowEnd {
-		return errors.New("bad revision")
+		return errReviseBadNewWindowEnd
 	}
 	if oldFCR.NewUnlockHash != revision.NewUnlockHash {
-		return errors.New("bad revision")
+		return errReviseBadUnlockHash
 	}
 
 	// The new revenue comes out of the renter's valid outputs.
 	if revision.NewValidProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
-		return errors.New("bad revision")
+		return errReviseBadRenterValidOutput
 	}
 	// The new revenue goes into the host's valid outputs.
 	if oldFCR.NewValidProofOutputs[1].Value.Add(newRevenue).Cmp(revision.NewValidProofOutputs[1].Value) < 0 {
-		return errors.New("bad revision")
+		return errReviseBadHostValidOutput
 	}
 	// The new revenue comes out of the renter's missed outputs.
 	if revision.NewMissedProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewMissedProofOutputs[0].Value) > 0 {
-		return errors.New("bad revision")
+		return errReviseBadRenterMissedOutput
 	}
-	// The new revenue goes into the host's void outputs.
-	if oldFCR.NewMissedProofOutputs[2].Value.Add(newRevenue).Cmp(revision.NewMissedProofOutputs[2].Value) < 0 {
-		return errors.New("bad revision")
-	}
-	// The collateral comes out of the host's missed outputs.
+	// The new collateral comes out of the host's missed outputs.
 	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) > 0 {
-		return errors.New("bad revision")
+		return errReviseBadCollateralDeduction
 	}
-	// The collateral goes into the host's void outputs.
-	if oldFCR.NewMissedProofOutputs[2].Value.Add(newCollateral).Cmp(revision.NewMissedProofOutputs[2].Value) < 0 {
-		return errors.New("bad revision")
+	// The new collateral and new revenue goes into the host's void outputs.
+	if oldFCR.NewMissedProofOutputs[2].Value.Add(newRevenue).Add(newCollateral).Cmp(revision.NewMissedProofOutputs[2].Value) < 0 {
+		return errReviseBadVoidOutput
 	}
 
 	// The Merkle root is checked last because it is the most expensive check.
@@ -302,7 +356,7 @@ func verifyRevision(so *storageObligation, revision types.FileContractRevision, 
 	}
 	expectedMerkleRoot := ct.Root()
 	if revision.NewFileMerkleRoot != expectedMerkleRoot {
-		return errors.New("bad revision")
+		return errReviseBadFileMerkleRoot
 	}
 
 	return nil
