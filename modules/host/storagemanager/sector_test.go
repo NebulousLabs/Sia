@@ -17,6 +17,7 @@ func TestMaxVirtualSectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer smt.Close()
 
 	// Add a storage folder to receive a sector.
 	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
@@ -60,6 +61,7 @@ func TestBadSectorAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer smt.Close()
 
 	defer func() {
 		r := recover()

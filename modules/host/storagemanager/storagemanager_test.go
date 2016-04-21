@@ -41,3 +41,8 @@ func newStorageManagerTester(name string) (*storageManagerTester, error) {
 	}
 	return smt, nil
 }
+
+// Close shuts down all of the components of the storage manager tester.
+func (smt *storageManagerTester) Close() error {
+	return smt.sm.Close()
+}

@@ -126,8 +126,12 @@ func (sm *StorageManager) Close() (composedError error) {
 	// threaded function will be running by the time the resource lock is
 	// acquired.
 	sm.resourceLock.Lock()
+	closed := sm.closed
 	sm.closed = true
 	sm.resourceLock.Unlock()
+	if closed {
+		return nil
+	}
 
 	// Close the bolt database.
 	err := sm.db.Close()
