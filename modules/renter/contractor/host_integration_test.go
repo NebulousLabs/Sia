@@ -274,6 +274,10 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// download the data
 	downloader, err := c.Downloader(contract)
