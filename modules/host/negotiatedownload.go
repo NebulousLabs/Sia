@@ -11,6 +11,63 @@ import (
 )
 
 var (
+	// errDownloadBadHostValidOutputs is returned if the renter requests a
+	// download and pays an insufficent amount to the host valid addresses.
+	errDownloadBadHostValidOutputs = errors.New("download request rejected for bad host valid outputs")
+
+	// errDownloadBadNewFileMerkleRoot is returned if the renter requests a
+	// download and changes the file merkle root in the payment revision.
+	errDownloadBadNewFileMerkleRoot = errors.New("download request rejected for bad file merkle root")
+
+	// errDownloadBadNewFileSize is returned if the renter requests a download
+	// and changes the file size in the payment revision.
+	errDownloadBadNewFileSize = errors.New("download request rejected for bad file size")
+
+	// errDownloadBadHostMissedOutputs is returned if the renter requests a
+	// download and changes the host missed outputs in the payment revision.
+	errDownloadBadHostMissedOutputs = errors.New("download request rejected for bad host missed outputs")
+
+	// errDownloadBadNewWindowEnd is returned if the renter requests a download
+	// and changes the window end in the payment revision.
+	errDownloadBadNewWindowEnd = errors.New("download request rejected for bad new window end")
+
+	// errDownloadBadNewWindowStart is returned if the renter requests a
+	// download and changes the window start in the payment revision.
+	errDownloadBadNewWindowStart = errors.New("download request rejected for bad new window start")
+
+	// errDownloadBadNewUnlockHash is returned if the renter requests a
+	// download and changes the unlock hash in the payment revision.
+	errDownloadBadNewUnlockHash = errors.New("download request rejected for bad new unlock hash")
+
+	// errDownloadBadParentID is returned if the renter requests a download and
+	// provides the wrong parent id in the payment revision.
+	errDownloadBadParentID = errors.New("download request rejected for bad parent id")
+
+	// errDownloadBadRenterMissedOutputs is returned if the renter requests a
+	// download and deducts an insufficient amount from the renter missed
+	// outputs in the payment revision.
+	errDownloadBadRenterMissedOutputs = errors.New("download request rejected for bad renter missed outputs")
+
+	// errDownloadBadRenterValidOutputs is returned if the renter requests a
+	// download and deducts an insufficient amount from the renter valid
+	// outputs in the payment revision.
+	errDownloadBadRenterValidOutputs = errors.New("download request rejected for bad renter valid outputs")
+
+	// errDownloadBadRevision number is returned if the renter requests a
+	// download and does not increase the revision number in the payment
+	// revision.
+	errDownloadBadRevisionNumber = errors.New("download request rejected for bad revision number")
+
+	// errDownloadBadUnlockConditions is returned if the renter requests a
+	// download and does not provide the right unlock conditions in the payment
+	// revision.
+	errDownloadBadUnlockConditions = errors.New("download request rejected for bad unlock conditions")
+
+	// errDownloadBadVoidOutputs is returned if the renter requests a download
+	// and does not add sufficient payment to the void outputs in the payment
+	// revision.
+	errDownloadBadVoidOutputs = errors.New("download request rejected for bad void outputs")
+
 	// errLargeDownloadBatch is returned if the renter requests a download
 	// batch that exceeds the maximum batch size that the host will
 	// accomondate.
@@ -80,48 +137,9 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		// Verify that the correct amount of money has been moved from the
 		// renter's contract funds to the host's contract funds.
 		expectedTransfer := settings.MinimumDownloadBandwidthPrice.Mul(types.NewCurrency64(totalSize))
-		// Check that NewValidProofOutputs[0] is deducted by expectedTransfer.
-		if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) != 0 {
-			return errors.New("bad payments")
-		}
-		// Check that NewValidProofOutputs[1] is incremented by expectedTransfer.
-		if existingRevision.NewValidProofOutputs[1].Value.Add(expectedTransfer).Cmp(paymentRevision.NewValidProofOutputs[1].Value) != 0 {
-			return errors.New("bad payouts")
-		}
-		// Check that MissedProofOutputs[0] is decremented by expectedTransfer.
-		if paymentRevision.NewMissedProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewMissedProofOutputs[0].Value) != 0 {
-			return errors.New("bad payments")
-		}
-		// Check that NewMissedProofOutputs[2] is incremented by expectedTransfer.
-		if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) != 0 {
-			return errors.New("bad payouts")
-		}
-		// Check that the revision count has increased.
-		if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {
-			return errors.New("bad revision number")
-		}
-
-		// Check that no other fields have changed.
-		if paymentRevision.ParentID != existingRevision.ParentID {
-			return errors.New("unstable revision")
-		}
-		if paymentRevision.NewFileSize != existingRevision.NewFileSize {
-			return errors.New("unstable revision")
-		}
-		if paymentRevision.NewFileMerkleRoot != existingRevision.NewFileMerkleRoot {
-			return errors.New("unstable revision")
-		}
-		if paymentRevision.NewWindowStart != existingRevision.NewWindowStart {
-			return errors.New("unstable revision")
-		}
-		if paymentRevision.NewWindowEnd != existingRevision.NewWindowEnd {
-			return errors.New("unstable revision")
-		}
-		if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
-			return errors.New("unstable revision")
-		}
-		if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
-			return errors.New("unstable revision")
+		err = verifyPaymentRevision(existingRevision, paymentRevision, expectedTransfer)
+		if err != nil {
+			return err
 		}
 
 		// Load the sectors and build the data payload.
@@ -175,6 +193,59 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		return err
 	}
 	return encoding.WriteObject(conn, payload)
+}
+
+// verifyPaymentRevision verifies that the revision being provided to pay for
+// the data has transferred the expected amount of money from the renter to the
+// host.
+func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, expectedTransfer types.Currency) error {
+	// The new revenue comes out of the renter's valid outputs.
+	if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
+		return errDownloadBadRenterValidOutputs
+	}
+	// The new revenue goes into the host's valid outputs.
+	if existingRevision.NewValidProofOutputs[1].Value.Add(expectedTransfer).Cmp(paymentRevision.NewValidProofOutputs[1].Value) < 0 {
+		return errDownloadBadHostValidOutputs
+	}
+	// The new revenue comes out of the renter's missed outputs.
+	if paymentRevision.NewMissedProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewMissedProofOutputs[0].Value) > 0 {
+		return errDownloadBadRenterMissedOutputs
+	}
+	// The new revenue goes into the void outputs.
+	if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) < 0 {
+		return errDownloadBadVoidOutputs
+	}
+	// Check that the revision count has increased.
+	if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {
+		return errDownloadBadRevisionNumber
+	}
+
+	// Check that all of the non-volatile fields are the same.
+	if paymentRevision.ParentID != existingRevision.ParentID {
+		return errDownloadBadParentID
+	}
+	if paymentRevision.UnlockConditions.UnlockHash() != existingRevision.UnlockConditions.UnlockHash() {
+		return errDownloadBadUnlockConditions
+	}
+	if paymentRevision.NewFileSize != existingRevision.NewFileSize {
+		return errDownloadBadNewFileSize
+	}
+	if paymentRevision.NewFileMerkleRoot != existingRevision.NewFileMerkleRoot {
+		return errDownloadBadNewFileMerkleRoot
+	}
+	if paymentRevision.NewWindowStart != existingRevision.NewWindowStart {
+		return errDownloadBadNewWindowStart
+	}
+	if paymentRevision.NewWindowEnd != existingRevision.NewWindowEnd {
+		return errDownloadBadNewWindowEnd
+	}
+	if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
+		return errDownloadBadNewUnlockHash
+	}
+	if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
+		return errDownloadBadHostMissedOutputs
+	}
+	return nil
 }
 
 // managedRPCDownload is responsible for handling an RPC request from the
