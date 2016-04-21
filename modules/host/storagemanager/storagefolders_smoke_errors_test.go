@@ -1,6 +1,5 @@
 package storagemanager
 
-/*
 import (
 	"bytes"
 	"io/ioutil"
@@ -92,29 +91,32 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := blankHostTester("TestStorageFolderTolerance")
+	smt, err := newStorageManagerTester("TestStorageFolderTolerance")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Replace the host so that it's using faultyOS for its dependencies.
-	err = ht.host.Close()
+	defer smt.Close()
+
+	// Replace the storage manager so that it's using faultyOS for its
+	// dependencies.
+	err = smt.sm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	ffs := new(faultyFS)
-	ht.host, err = newHost(ffs, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	smt.sm, err = newStorageManager(ffs, filepath.Join(smt.persistDir, modules.StorageManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Add a storage folder when the symlinking is failing.
-	storageFolderOne := filepath.Join(ht.persistDir, "driveOne")
+	storageFolderOne := filepath.Join(smt.persistDir, "driveOne")
 	ffs.brokenSubstrings = []string{storageFolderOne}
 	err = os.Mkdir(storageFolderOne, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err != mockErrSymlink {
 		t.Fatal(err)
 	}
@@ -122,7 +124,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// Add storage folder one without errors, and then add a sector to the
 	// storage folder.
 	ffs.brokenSubstrings = nil
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,15 +132,13 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, 10, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, 10, sectorData)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,16 +151,16 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.Fatal("expecting at least one sector in storage folder one")
 	}
 
-	// Replace the host dependencies with the faulty remove, and then try to
-	// remove the sector.
-	ht.host.dependencies = faultyRemove{}
-	err = ht.host.removeSector(sectorRoot, 10)
+	// Replace the storage manager dependencies with the faulty remove, and
+	// then try to remove the sector.
+	smt.sm.dependencies = faultyRemove{}
+	err = smt.sm.RemoveSector(sectorRoot, 10)
 	if err != mockErrRemoveFile {
 		t.Fatal(err)
 	}
 	// Check that the failed write count was incremented for the storage
 	// folder.
-	if ht.host.storageFolders[0].FailedWrites != 1 {
+	if smt.sm.storageFolders[0].FailedWrites != 1 {
 		t.Fatal("failed writes counter is not incrementing properly")
 	}
 	// Check the filesystem - sector should still be in the storage folder.
@@ -172,40 +172,40 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.Fatal("expecting at least one sector in storage folder one")
 	}
 	// Put 'ffs' back as the set of dependencies.
-	ht.host.dependencies = ffs
+	smt.sm.dependencies = ffs
 
 	// Add a second storage folder, which can receive the sector when the first
 	// storage folder is deleted.
-	storageFolderTwo := filepath.Join(ht.persistDir, "driveTwo")
+	storageFolderTwo := filepath.Join(smt.persistDir, "driveTwo")
 	err = os.Mkdir(storageFolderTwo, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*3)
+	err = smt.sm.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Trigger read errors in storage folder one, which means the storage
 	// folder is not going to be able to be deleted successfully.
-	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[0].uidString())}
-	err = ht.host.RemoveStorageFolder(0, false)
+	ffs.brokenSubstrings = []string{filepath.Join(smt.persistDir, modules.StorageManagerDir, smt.sm.storageFolders[0].uidString())}
+	err = smt.sm.RemoveStorageFolder(0, false)
 	if err != errIncompleteOffload {
 		t.Fatal(err)
 	}
 	// Check that the storage folder was not removed.
-	if len(ht.host.storageFolders) != 2 {
+	if len(smt.sm.storageFolders) != 2 {
 		t.Fatal("expecting two storage folders after failed remove")
 	}
 	// Check that the read failure was documented.
-	if ht.host.storageFolders[0].FailedReads != 1 {
-		t.Error("expecting a read failure to be reported:", ht.host.storageFolders[0].FailedReads)
+	if smt.sm.storageFolders[0].FailedReads != 1 {
+		t.Error("expecting a read failure to be reported:", smt.sm.storageFolders[0].FailedReads)
 	}
 	// Check the filesystem - there should be one sector in the storage folder,
 	// and none in storage folder two.
@@ -226,24 +226,24 @@ func TestStorageFolderTolerance(t *testing.T) {
 
 	// Switch the failure from a read error in the source folder to a write
 	// error in the destination folder.
-	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[1].uidString())}
-	err = ht.host.RemoveStorageFolder(0, false)
+	ffs.brokenSubstrings = []string{filepath.Join(smt.persistDir, modules.StorageManagerDir, smt.sm.storageFolders[1].uidString())}
+	err = smt.sm.RemoveStorageFolder(0, false)
 	if err != errIncompleteOffload {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the storage folder was not removed.
-	if len(ht.host.storageFolders) != 2 {
+	if len(smt.sm.storageFolders) != 2 {
 		t.Fatal("expecting two storage folders after failed remove")
 	}
 	// Check that the read failure was documented.
-	if ht.host.storageFolders[1].FailedWrites != 1 {
-		t.Error("expecting a read failure to be reported:", ht.host.storageFolders[1].FailedWrites)
+	if smt.sm.storageFolders[1].FailedWrites != 1 {
+		t.Error("expecting a read failure to be reported:", smt.sm.storageFolders[1].FailedWrites)
 	}
 	// Check the filesystem - there should be one sector in the storage folder,
 	// and none in storage folder two.
@@ -264,23 +264,23 @@ func TestStorageFolderTolerance(t *testing.T) {
 
 	// Try to forcibly remove the first storage folder, while in the presence
 	// of read errors.
-	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[0].uidString())}
-	uid2 := ht.host.storageFolders[1].UID
-	err = ht.host.RemoveStorageFolder(0, true)
+	ffs.brokenSubstrings = []string{filepath.Join(smt.persistDir, modules.StorageManagerDir, smt.sm.storageFolders[0].uidString())}
+	uid2 := smt.sm.storageFolders[1].UID
+	err = smt.sm.RemoveStorageFolder(0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the storage folder was removed.
-	if len(ht.host.storageFolders) != 1 {
+	if len(smt.sm.storageFolders) != 1 {
 		t.Fatal("expecting two storage folders after failed remove")
 	}
-	if !bytes.Equal(uid2, ht.host.storageFolders[0].UID) {
+	if !bytes.Equal(uid2, smt.sm.storageFolders[0].UID) {
 		t.Fatal("storage folder was not removed correctly")
 	}
 	// Check the filesystem - there should be no sectors in storage folder two.
@@ -296,18 +296,18 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// leftover sectors that the program was unable to clean up (due to disk
 	// failure), a third storage folder will be created.
 	ffs.brokenSubstrings = nil
-	storageFolderThree := filepath.Join(ht.persistDir, "driveThree")
+	storageFolderThree := filepath.Join(smt.persistDir, "driveThree")
 	err = os.Mkdir(storageFolderThree, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderThree, minimumStorageFolderSize+modules.SectorSize)
+	err = smt.sm.AddStorageFolder(storageFolderThree, minimumStorageFolderSize+modules.SectorSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,22 +315,20 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// Fill up the second storage folder, so that resizes can be attempted with
 	// failing disks. storageFolderOne has enough space to store the sectors,
 	// but is having disk troubles.
-	ffs.brokenSubstrings = []string{filepath.Join(ht.persistDir, modules.HostDir, ht.host.storageFolders[1].uidString())}
+	ffs.brokenSubstrings = []string{filepath.Join(smt.persistDir, modules.StorageManagerDir, smt.sm.storageFolders[1].uidString())}
 	numSectors := (minimumStorageFolderSize * 3) / modules.SectorSize
 	for i := uint64(0); i < numSectors; i++ {
 		sectorRoot, sectorData, err := createSector()
 		if err != nil {
 			t.Fatal(err)
 		}
-		ht.host.mu.Lock()
-		err = ht.host.addSector(sectorRoot, 11, sectorData)
-		ht.host.mu.Unlock()
+		err = smt.sm.AddSector(sectorRoot, 11, sectorData)
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Do a probabilistic reset of the host, to verify that the persistence
-		// structures can reboot without causing issues.
-		err = ht.probabilisticReset()
+		// Do a probabilistic reset of the storage manager, to verify that the
+		// persistence structures can reboot without causing issues.
+		err = smt.probabilisticReset()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -357,15 +355,13 @@ func TestStorageFolderTolerance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, 11, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, 11, sectorData)
 	if err != errDiskTrouble {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,28 +385,28 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// Add a third storage folder. Then try to resize the second storage folder
 	// such that both storageFolderThree and storageFolderFour have room for
 	// the data, but only storageFolderFour is not haivng disk troubles.
-	storageFolderFour := filepath.Join(ht.persistDir, "driveFour")
+	storageFolderFour := filepath.Join(smt.persistDir, "driveFour")
 	err = os.Mkdir(storageFolderFour, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderFour, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderFour, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*2)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,25 +439,25 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// to storageFolderFour, but then trying to remove a bunch of sectors from
 	// storageFolderTwo. There is enough room on storage folder 3 to make the
 	// operation successful, but it is having disk troubles.
-	err = ht.host.ResizeStorageFolder(2, minimumStorageFolderSize+modules.SectorSize)
+	err = smt.sm.ResizeStorageFolder(2, minimumStorageFolderSize+modules.SectorSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != errIncompleteOffload {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
-	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	// Do a probabilistic reset of the storage manager, to verify that the
+	// persistence structures can reboot without causing issues.
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the sizes of the storage folders have been updated correctly.
-	if ht.host.storageFolders[0].Size != minimumStorageFolderSize*2-modules.SectorSize {
+	if smt.sm.storageFolders[0].Size != minimumStorageFolderSize*2-modules.SectorSize {
 		t.Error("storage folder size was not decreased correctly during the shrink operation")
 	}
-	if ht.host.storageFolders[0].SizeRemaining != 0 {
+	if smt.sm.storageFolders[0].SizeRemaining != 0 {
 		t.Error("storage folder size remaining was not updated correctly after failed shrink operation")
 	}
 	// Check the filesystem - there should be one less sector in
@@ -489,4 +485,3 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.Fatal("filesystem consistency error")
 	}
 }
-*/

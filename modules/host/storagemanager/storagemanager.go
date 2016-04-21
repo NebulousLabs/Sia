@@ -3,6 +3,8 @@
 // distributed between a number of storage folders.
 package storagemanager
 
+// TODO: The documentation still talks like this code is a part of the host.
+
 import (
 	"errors"
 	"path/filepath"

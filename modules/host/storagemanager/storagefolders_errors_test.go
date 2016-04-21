@@ -8,14 +8,14 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// TestClosedHostOperations tries a bunch of operations on the storage manager
+// TestClosedStorageManagerOperations tries a bunch of operations on the storage manager
 // after it has been closed.
-func TestClosedHostOperations(t *testing.T) {
+func TestClosedStorageManagerOperations(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	smt, err := newStorageManagerTester("TestClosedHostOperations")
+	smt, err := newStorageManagerTester("TestClosedStorageManagerOperations")
 	if err != nil {
 		t.Fatal(err)
 	}
