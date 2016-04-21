@@ -116,16 +116,19 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 		return crypto.Hash{}, err
 	}
 
-	// create revision and 'insert' action
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
-	actions := []modules.RevisionAction{{
+	// send 'insert' action
+	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
-	}}
+	}})
+	if err != nil {
+		return crypto.Hash{}, err
+	}
 
-	// send revision and actions to host for approval
-	signedTxn, err := negotiateRevision(he.conn, rev, actions, he.contract.SecretKey, height)
+	// create and send revision to host for approval
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
@@ -181,15 +184,18 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 		return err
 	}
 
-	// create revision and 'delete' action
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
-	actions := []modules.RevisionAction{{
+	// send 'delete' action
+	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
-	}}
+	}})
+	if err != nil {
+		return err
+	}
 
-	// send revision and actions to host for approval
-	signedTxn, err := negotiateRevision(he.conn, rev, actions, he.contract.SecretKey, height)
+	// create and send revision to host for approval
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {
 		return err
 	}

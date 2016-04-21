@@ -60,16 +60,19 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 		return nil, err
 	}
 
-	// create revision and download action
-	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
-	actions := []modules.DownloadAction{{
+	// send download action
+	err := encoding.WriteObject(hd.conn, []modules.DownloadAction{{
 		MerkleRoot: root,
 		Offset:     0,
 		Length:     modules.SectorSize,
-	}}
+	}})
+	if err != nil {
+		return nil, err
+	}
 
-	// send revision and actions to host for approval
-	signedTxn, err := negotiateDownloadRevision(hd.conn, rev, actions, hd.contract.SecretKey, height)
+	// create and send revision to host for approval
+	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
+	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey, height)
 	if err != nil {
 		return nil, err
 	}

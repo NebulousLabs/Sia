@@ -103,15 +103,15 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	settings := h.settings
 	h.mu.RUnlock()
 
-	// Read the file contract revision that pays for the download requests,
-	// followed by the download requests themselves.
+	// Read the download requests, followed by the file contract revision that
+	// pays for them.
+	var requests []modules.DownloadAction
 	var paymentRevision types.FileContractRevision
-	err = encoding.ReadObject(conn, &paymentRevision, modules.NegotiateMaxFileContractRevisionSize)
+	err = encoding.ReadObject(conn, &requests, modules.NegotiateMaxDownloadActionRequestSize)
 	if err != nil {
 		return err
 	}
-	var requests []modules.DownloadAction
-	err = encoding.ReadObject(conn, &requests, modules.NegotiateMaxDownloadActionRequestSize)
+	err = encoding.ReadObject(conn, &paymentRevision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
 		return err
 	}

@@ -13,7 +13,7 @@ import (
 
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
-func negotiateRevision(conn net.Conn, rev types.FileContractRevision, actions []modules.RevisionAction, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
+func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
 	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
 	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
 
@@ -30,14 +30,10 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, actions []
 	encodedSig, _ := crypto.SignHash(signedTxn.SigHash(0), secretKey) // no error possible
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
-	// send the revision and actions
+	// send the revision
 	if err := encoding.WriteObject(conn, rev); err != nil {
 		return types.Transaction{}, errors.New("couldn't send revision: " + err.Error())
 	}
-	if err := encoding.WriteObject(conn, actions); err != nil {
-		return types.Transaction{}, errors.New("couldn't send revision actions: " + err.Error())
-	}
-
 	// read acceptance
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
@@ -47,7 +43,6 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, actions []
 	if err := encoding.WriteObject(conn, signedTxn.TransactionSignatures[0]); err != nil {
 		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
 	}
-
 	// read the host's acceptance and transaction signature
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
@@ -56,6 +51,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, actions []
 	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
 		return types.Transaction{}, errors.New("couldn't read host's signature: " + err.Error())
 	}
+
 	// add the signature to the transaction and verify it
 	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
 	if err := signedTxn.StandaloneValid(blockheight); err != nil {
@@ -123,62 +119,6 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}
-}
-
-// negotiateDownloadRevision sends a revision and actions to the host for
-// approval.
-func negotiateDownloadRevision(conn net.Conn, rev types.FileContractRevision, actions []modules.DownloadAction, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
-	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
-	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
-
-	// create transaction containing the revision
-	signedTxn := types.Transaction{
-		FileContractRevisions: []types.FileContractRevision{rev},
-		TransactionSignatures: []types.TransactionSignature{{
-			ParentID:       crypto.Hash(rev.ParentID),
-			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
-			PublicKeyIndex: 0, // renter key is always first -- see formContract
-		}},
-	}
-	// sign the transaction
-	encodedSig, _ := crypto.SignHash(signedTxn.SigHash(0), secretKey) // no error possible
-	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
-
-	// send the revision and actions
-	if err := encoding.WriteObject(conn, rev); err != nil {
-		return types.Transaction{}, errors.New("couldn't send revision: " + err.Error())
-	}
-	if err := encoding.WriteObject(conn, actions); err != nil {
-		return types.Transaction{}, errors.New("couldn't send download actions: " + err.Error())
-	}
-
-	// read acceptance
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
-	}
-
-	// send the new transaction signature
-	if err := encoding.WriteObject(conn, signedTxn.TransactionSignatures[0]); err != nil {
-		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
-	}
-
-	// read the host's acceptance and transaction signature
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
-	}
-	var hostSig types.TransactionSignature
-	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
-		return types.Transaction{}, errors.New("couldn't read host's signature: " + err.Error())
-	}
-	// add the signature to the transaction and verify it
-	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
-	if err := signedTxn.StandaloneValid(blockheight); err != nil {
-		// TODO: what should be done here? The host will still try to send
-		// data, but we probably want to close the connection immediately and
-		// punish the host somehow.
-		return types.Transaction{}, err
-	}
-	return signedTxn, nil
 }
 
 // newDownloadRevision revises the current revision to cover the cost of

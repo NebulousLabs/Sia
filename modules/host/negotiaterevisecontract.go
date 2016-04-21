@@ -127,16 +127,15 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	blockHeight := h.blockHeight
 	h.mu.RUnlock()
 
-	// The renter is going to send a file contract revision that pays for a
-	// bunch of modifications, and then is going to send the modifications that
-	// are paid for by the revision.
-	var revision types.FileContractRevision
+	// The renter is going to send its intended modifications, followed by the
+	// file contract revision that pays for them.
 	var modifications []modules.RevisionAction
-	err = encoding.ReadObject(conn, &revision, modules.NegotiateMaxFileContractRevisionSize)
+	var revision types.FileContractRevision
+	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
+	err = encoding.ReadObject(conn, &revision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
 		return err
 	}
