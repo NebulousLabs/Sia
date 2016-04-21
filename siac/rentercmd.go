@@ -234,7 +234,7 @@ func renterallowancecmd() {
 	sc, _ := r.Float64()
 
 	fmt.Printf(`Allowance:
-	Amount: %v
+	Amount: %+.2f SC
 	Period: %v
 `, sc, allowance.Period)
 }
