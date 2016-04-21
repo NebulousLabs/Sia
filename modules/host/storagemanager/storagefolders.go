@@ -1,4 +1,4 @@
-package host
+package storagemanager
 
 // storgaefolder.go is responsible for managing the storage folders within the
 // host. Storage folders can be added, resized, or removed. There are several
@@ -193,7 +193,7 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 
 // offloadStorageFolder takes sectors in a storage folder and moves them to
 // another storage folder.
-func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload uint64) error {
+func (sm *StorageManager) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload uint64) error {
 	// The host is going to check every sector, using a different database tx
 	// for each sector. To be able to track progress, a starting point needs to
 	// be grabbed. This read grabs the starting point.
@@ -202,7 +202,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 	// this function should be the only function with access to the database.
 	var currentSectorID []byte
 	var currentSectorBytes []byte
-	err := h.db.View(func(tx *bolt.Tx) error {
+	err := sm.db.View(func(tx *bolt.Tx) error {
 		currentSectorID, currentSectorBytes = tx.Bucket(bucketSectorUsage).Cursor().First()
 		return nil
 	})
@@ -214,7 +214,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 	// will be pruned. Once all folders are full, the offload loop will quit
 	// and return with errIncompleteOffload.
 	availableFolders := make([]*storageFolder, 0)
-	for _, sf := range h.storageFolders {
+	for _, sf := range sm.storageFolders {
 		if sf == offloadFolder {
 			// The offload folder is not an available folder.
 			continue
@@ -233,7 +233,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 	// after 'dataToOffload' data has been moved from the storage folder.
 	dataOffloaded := uint64(0)
 	for currentSectorID != nil && dataOffloaded < dataToOffload && len(availableFolders) > 0 {
-		err = h.db.Update(func(tx *bolt.Tx) error {
+		err = sm.db.Update(func(tx *bolt.Tx) error {
 			// Defer seeking to the next sector.
 			defer func() {
 				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
@@ -259,9 +259,9 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 			success := false
 			emptiestFolder, emptiestIndex := emptiestStorageFolder(availableFolders)
 			for emptiestFolder != nil {
-				oldSectorPath := filepath.Join(h.persistDir, offloadFolder.uidString(), string(currentSectorID))
+				oldSectorPath := filepath.Join(sm.persistDir, offloadFolder.uidString(), string(currentSectorID))
 				// Try reading the sector from disk.
-				sectorData, err := h.dependencies.readFile(oldSectorPath)
+				sectorData, err := sm.dependencies.readFile(oldSectorPath)
 				if err != nil {
 					// Inidicate that the storage folder is having read
 					// troubles.
@@ -276,8 +276,8 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				offloadFolder.SuccessfulReads++
 
 				// Try writing the sector to the emptiest storage folder.
-				newSectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(currentSectorID))
-				err = h.dependencies.writeFile(newSectorPath, sectorData, 0700)
+				newSectorPath := filepath.Join(sm.persistDir, emptiestFolder.uidString(), string(currentSectorID))
+				err = sm.dependencies.writeFile(newSectorPath, sectorData, 0700)
 				if err != nil {
 					// Indicate that the storage folder is having write
 					// troubles.
@@ -286,7 +286,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 					// After the failed write, try removing any garbage that
 					// may have gotten left behind. The error is not checked,
 					// as it is known that the disk is having write troubles.
-					_ = h.dependencies.removeFile(newSectorPath)
+					_ = sm.dependencies.removeFile(newSectorPath)
 
 					// Because the write failed, we should move on to the next
 					// storage folder, and remove the current storage folder
@@ -299,7 +299,7 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 				}
 				// Indicate that the storage folder is doing successful writes.
 				emptiestFolder.SuccessfulWrites++
-				err = h.dependencies.removeFile(oldSectorPath)
+				err = sm.dependencies.removeFile(oldSectorPath)
 				if err != nil {
 					// Indicate that the storage folder is having write
 					// troubles.
@@ -350,8 +350,8 @@ func (h *Host) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload 
 
 // storageFolder returns the storage folder in the host with the input uid. If
 // the storage folder is not found, nil is returned.
-func (h *Host) storageFolder(uid []byte) *storageFolder {
-	for _, sf := range h.storageFolders {
+func (sm *StorageManager) storageFolder(uid []byte) *storageFolder {
+	for _, sf := range sm.storageFolders {
 		if bytes.Equal(uid, sf.UID) {
 			return sf
 		}
@@ -370,22 +370,22 @@ func (sf *storageFolder) uidString() string {
 }
 
 // AddStorageFolder adds a storage folder to the host.
-func (h *Host) AddStorageFolder(path string, size uint64) error {
+func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
 	// Lock the host for the duration of the add operation - it is important
 	// that the host not be manipulated while sectors are being moved around.
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 	// The resource lock is required as the sector movements require access to
 	// the logger.
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+	sm.resourceLock.RLock()
+	defer sm.resourceLock.RUnlock()
+	if sm.closed {
+		return errStorageManagerClosed
 	}
 
 	// Check that the maximum number of allowed storage folders has not been
 	// exceeded.
-	if len(h.storageFolders) >= maximumStorageFolders {
+	if len(sm.storageFolders) >= maximumStorageFolders {
 		return errMaxStorageFolders
 	}
 
@@ -417,7 +417,7 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 	newSF.UID = make([]byte, storageFolderUIDSize)
 	for {
 		// Generate an attempt UID for the storage folder.
-		_, err = h.dependencies.randRead(newSF.UID)
+		_, err = sm.dependencies.randRead(newSF.UID)
 		if err != nil {
 			return err
 		}
@@ -426,7 +426,7 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 		// times, because the total number of storage folders is limited to
 		// 256.
 		safe := true
-		for _, sf := range h.storageFolders {
+		for _, sf := range sm.storageFolders {
 			if bytes.Equal(newSF.UID, sf.UID) {
 				safe = false
 				break
@@ -438,60 +438,60 @@ func (h *Host) AddStorageFolder(path string, size uint64) error {
 	}
 
 	// Symlink the path for the data to the UID location of the host.
-	symPath := filepath.Join(h.persistDir, newSF.uidString())
-	err = h.dependencies.symlink(path, symPath)
+	symPath := filepath.Join(sm.persistDir, newSF.uidString())
+	err = sm.dependencies.symlink(path, symPath)
 	if err != nil {
 		return err
 	}
 
 	// Add the storage folder to the list of folders for the host.
-	h.storageFolders = append(h.storageFolders, newSF)
-	return h.save()
+	sm.storageFolders = append(sm.storageFolders, newSF)
+	return sm.save()
 }
 
 // ResetStorageFolderHealth will reset the read and write statistics for the
 // storage folder.
-func (h *Host) ResetStorageFolderHealth(index int) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+func (sm *StorageManager) ResetStorageFolderHealth(index int) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.resourceLock.RLock()
+	defer sm.resourceLock.RUnlock()
+	if sm.closed {
+		return errStorageManagerClosed
 	}
 
 	// Check that the input is valid.
-	if index >= len(h.storageFolders) {
+	if index >= len(sm.storageFolders) {
 		return errBadStorageFolderIndex
 	}
 
 	// Reset the storage statistics and save the host.
-	h.storageFolders[index].FailedReads = 0
-	h.storageFolders[index].FailedWrites = 0
-	h.storageFolders[index].SuccessfulReads = 0
-	h.storageFolders[index].SuccessfulWrites = 0
-	return h.save()
+	sm.storageFolders[index].FailedReads = 0
+	sm.storageFolders[index].FailedWrites = 0
+	sm.storageFolders[index].SuccessfulReads = 0
+	sm.storageFolders[index].SuccessfulWrites = 0
+	return sm.save()
 }
 
 // RemoveStorageFolder removes a storage folder from the host.
-func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+func (sm *StorageManager) RemoveStorageFolder(removalIndex int, force bool) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.resourceLock.RLock()
+	defer sm.resourceLock.RUnlock()
+	if sm.closed {
+		return errStorageManagerClosed
 	}
 
 	// Check that the removal folder exists, and create a shortcut to it.
-	if removalIndex >= len(h.storageFolders) || removalIndex < 0 {
+	if removalIndex >= len(sm.storageFolders) || removalIndex < 0 {
 		return errBadStorageFolderIndex
 	}
-	removalFolder := h.storageFolders[removalIndex]
+	removalFolder := sm.storageFolders[removalIndex]
 
 	// Move all of the sectors in the storage folder to other storage folders.
 	usedSize := removalFolder.Size - removalFolder.SizeRemaining
-	offloadErr := h.offloadStorageFolder(removalFolder, usedSize)
+	offloadErr := sm.offloadStorageFolder(removalFolder, usedSize)
 	// If 'force' is set, we want to ignore 'errIncopmleteOffload' and try to
 	// remove the storage folder anyway. For any other error, we want to halt
 	// and return the error.
@@ -503,32 +503,32 @@ func (h *Host) RemoveStorageFolder(removalIndex int, force bool) error {
 	}
 
 	// Remove the storage folder from the host and then save the host.
-	h.storageFolders = append(h.storageFolders[0:removalIndex], h.storageFolders[removalIndex+1:]...)
-	removeErr := h.dependencies.removeFile(filepath.Join(h.persistDir, removalFolder.uidString()))
-	saveErr := h.save()
+	sm.storageFolders = append(sm.storageFolders[0:removalIndex], sm.storageFolders[removalIndex+1:]...)
+	removeErr := sm.dependencies.removeFile(filepath.Join(sm.persistDir, removalFolder.uidString()))
+	saveErr := sm.save()
 	return composeErrors(saveErr, removeErr)
 }
 
 // ResizeStorageFolder changes the amount of disk space that is going to be
 // allocated to a storage folder.
-func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error {
+func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error {
 	// Lock the host for the duration of the resize operation - it is important
 	// that the host not be manipulated while sectors are being moved around.
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
 	// The resource lock is required as the sector movements require access to
 	// the logger.
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+	sm.resourceLock.RLock()
+	defer sm.resourceLock.RUnlock()
+	if sm.closed {
+		return errStorageManagerClosed
 	}
 
 	// Check that the inputs are valid.
-	if storageFolderIndex >= len(h.storageFolders) || storageFolderIndex < 0 {
+	if storageFolderIndex >= len(sm.storageFolders) || storageFolderIndex < 0 {
 		return errBadStorageFolderIndex
 	}
-	resizeFolder := h.storageFolders[storageFolderIndex]
+	resizeFolder := sm.storageFolders[storageFolderIndex]
 	if newSize > maximumStorageFolderSize {
 		return errLargeStorageFolder
 	}
@@ -546,13 +546,13 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 	if resizeFolderSizeConsumed <= newSize {
 		resizeFolder.SizeRemaining = newSize - resizeFolderSizeConsumed
 		resizeFolder.Size = newSize
-		return h.save()
+		return sm.save()
 	}
 
 	// Calculate the number of sectors that need to be offloaded from the
 	// storage folder.
 	offloadSize := resizeFolderSizeConsumed - newSize
-	offloadErr := h.offloadStorageFolder(resizeFolder, offloadSize)
+	offloadErr := sm.offloadStorageFolder(resizeFolder, offloadSize)
 	if offloadErr == errIncompleteOffload {
 		// Offloading has not fully succeeded, but may have partially
 		// succeeded. To prevent new sectors from being added to the storage
@@ -566,26 +566,26 @@ func (h *Host) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error
 	}
 	resizeFolder.Size = newSize
 	resizeFolder.SizeRemaining = 0
-	return h.save()
+	return sm.save()
 }
 
 // StorageFolders provides information about all of the storage folders in the
 // host.
-func (h *Host) StorageFolders() (sfms []modules.StorageFolderMetadata, err error) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return nil, errHostClosed
+func (sm *StorageManager) StorageFolders() (sfms []modules.StorageFolderMetadata, err error) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	sm.resourceLock.RLock()
+	defer sm.resourceLock.RUnlock()
+	if sm.closed {
+		return nil, errStorageManagerClosed
 	}
 
-	for _, sf := range h.storageFolders {
+	for _, sf := range sm.storageFolders {
 		// The actual path of the storage folder is managed by the host via a
 		// symlink to a folder in the host directory that has the UID name.
 		// Read the sym link and then parse the path that it points to for the
 		// path of the storage folder.
-		symPath := filepath.Join(h.persistDir, sf.uidString())
+		symPath := filepath.Join(sm.persistDir, sf.uidString())
 		realPath, err := filepath.EvalSymlinks(symPath)
 		if err != nil {
 			return nil, err

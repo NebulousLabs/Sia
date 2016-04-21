@@ -54,6 +54,10 @@ package host
 // to the renter (and not just to it's calling function without informing the
 // renter what's up).
 
+// TODO: Need to make sure that the correct height is being used when adding
+// sectors to the storage manager - in some places right now WindowStart is
+// being used but really it's WindowEnd that should be in use.
+
 // TODO: clean up all of the magic numbers in the host.
 
 // TODO: revamp the finances for the storage obligations.
@@ -129,6 +133,7 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 	dependencies
+	StorageManager
 
 	// Consensus Tracking.
 	blockHeight  types.BlockHeight
@@ -168,8 +173,6 @@ type Host struct {
 	// layout (knowledge which should be unavailable), but a limited amount of
 	// damage can be done even with this attack.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
-	sectorSalt               crypto.Hash
-	storageFolders           []*storageFolder
 
 	// Utilities.
 	db         *persist.BoltDatabase
