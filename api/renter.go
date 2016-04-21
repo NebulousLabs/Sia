@@ -49,30 +49,32 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 		writeError(w, "Couldn't parse funds", http.StatusBadRequest)
 		return
 	}
-	var hosts uint64
-	_, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
-	if err != nil {
-		writeError(w, "Couldn't parse hosts: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+	// var hosts uint64
+	// _, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
+	// if err != nil {
+	// 	writeError(w, "Couldn't parse hosts: "+err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
 	var period types.BlockHeight
-	_, err = fmt.Sscan(req.FormValue("period"), &period)
+	_, err := fmt.Sscan(req.FormValue("period"), &period)
 	if err != nil {
 		writeError(w, "Couldn't parse period: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	var renewWindow types.BlockHeight
-	_, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
-	if err != nil {
-		writeError(w, "Couldn't parse renewwindow: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+	// var renewWindow types.BlockHeight
+	// _, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
+	// if err != nil {
+	// 	writeError(w, "Couldn't parse renewwindow: "+err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
 
 	err = srv.renter.SetAllowance(modules.Allowance{
-		Funds:       funds,
-		Hosts:       hosts,
-		Period:      period,
-		RenewWindow: renewWindow,
+		Funds:  funds,
+		Period: period,
+
+		// TODO: let user specify these
+		Hosts:       6,
+		RenewWindow: period / 4,
 	})
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
