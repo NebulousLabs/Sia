@@ -130,27 +130,4 @@ func TestEditor(t *testing.T) {
 	if err == nil {
 		t.Error("expected err, got nil")
 	}
-
-	// contract with a valid host
-	c.dialer = editorDialer(func() (net.Conn, error) {
-		// create an in-memory conn and spawn a goroutine to handle our half
-		ourConn, theirConn := net.Pipe()
-		go func() {
-			// read specifier
-			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
-			// read contract ID
-			encoding.ReadObject(ourConn, new(types.FileContractID), 32)
-			// send acceptance
-			modules.WriteNegotiationAcceptance(ourConn)
-			// send last revision + signatures
-			encoding.WriteObject(ourConn, contract.LastRevision)
-			encoding.WriteObject(ourConn, contract.LastRevisionTxn.TransactionSignatures)
-			ourConn.Close()
-		}()
-		return theirConn, nil
-	})
-	_, err = c.Editor(contract)
-	if err != nil {
-		t.Error(err)
-	}
 }
