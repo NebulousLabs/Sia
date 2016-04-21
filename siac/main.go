@@ -210,9 +210,11 @@ func main() {
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 
 	root.AddCommand(renterCmd)
-	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd, renterDownloadsCmd,
-		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd, renterFilesRenameCmd,
-		renterFilesShareCmd, renterFilesShareASCIICmd, renterFilesUploadCmd, renterUploadsCmd)
+	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,
+		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
+		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd,
+		renterFilesRenameCmd, renterFilesShareCmd, renterFilesShareASCIICmd,
+		renterFilesUploadCmd, renterUploadsCmd)
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 
@@ -226,7 +228,6 @@ func main() {
 	gatewayCmd.AddCommand(gatewayDeprecatedStatusCmd)
 	minerCmd.AddCommand(minerDeprecatedStatusCmd)
 	walletCmd.AddCommand(walletDeprecatedStatusCmd)
-	renterCmd.AddCommand(renterDeprecatedDownloadQueueCmd)
 	// DEPRECATED v0.5.2
 	hostCmd.AddCommand(hostdbDeprecatedCmd)
 

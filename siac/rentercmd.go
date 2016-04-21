@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // filesize returns a string that displays a filesize in human-readable units.
@@ -46,12 +48,23 @@ var (
 		Run:   wrap(renterdownloadscmd),
 	}
 
-	// DEPRECATED v0.5.0
-	renterDeprecatedDownloadQueueCmd = &cobra.Command{
-		Use:        "queue",
-		Deprecated: `use "downloads [-H | --history]" instead.`,
-		PreRun:     func(*cobra.Command, []string) { renterShowHistory = true }, // Show completed downloads too.
-		Run:        wrap(renterdownloadscmd),
+	renterAllowanceCmd = &cobra.Command{
+		Use:   "allowance",
+		Short: "View the current allowance",
+		Long:  "View the current allowance, which controls how much money is spent on file contracts.",
+		Run:   wrap(renterallowancecmd),
+	}
+	renterSetAllowanceCmd = &cobra.Command{
+		Use:   "setallowance [amount] [period]",
+		Short: "Set the allowance",
+		Long: `Set the amount of money that can be spent over a given period.
+amount is given in currency units (SC, KS, etc.)
+period is given in blocks; 1000 blocks roughly equals 1 week
+
+Note that setting the allowance will cause siad to immediately begin forming
+contracts! You should only set the allowance once you are fully synced and you
+have a reasonable number (>30) of hosts in your hostdb.`,
+		Run: wrap(rentersetallowancecmd),
 	}
 
 	renterFilesDeleteCmd = &cobra.Command{
@@ -206,6 +219,37 @@ func renterdownloadscmd() {
 			fmt.Printf("%s: %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), file.SiaPath, file.Destination)
 		}
 	}
+}
+
+// renterallowancecmd displays the current allowance.
+func renterallowancecmd() {
+	var allowance modules.Allowance
+	err := getAPI("/renter/allowance", &allowance)
+	if err != nil {
+		die("Could not get allowance:", err)
+	}
+
+	// convert to SC
+	r := new(big.Rat).SetFrac(allowance.Funds.Big(), types.SiacoinPrecision.Big())
+	sc, _ := r.Float64()
+
+	fmt.Printf(`Allowance:
+	Amount: %v
+	Period: %v
+`, sc, allowance.Period)
+}
+
+// rentersetallowancecmd allows the user to set the allowance.
+func rentersetallowancecmd(amount, period string) {
+	adjAmount, err := coinUnits(amount)
+	if err != nil {
+		die("Could not parse amount:", err)
+	}
+	err = post("/renter/allowance", fmt.Sprintf("amount=%s&period=%s", adjAmount, period))
+	if err != nil {
+		die("Could not set allowance:", err)
+	}
+	fmt.Println("Allowance updated.")
 }
 
 // renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
