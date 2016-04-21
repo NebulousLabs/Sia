@@ -59,24 +59,22 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	if err := startDownload(hd.conn, hd.host, hd.contractor.hdb); err != nil {
 		return nil, err
 	}
-	// send download request
-	err := encoding.WriteObject(hd.conn, []modules.DownloadRequest{{
+
+	// create revision and download request
+	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
+	requests := []modules.DownloadRequest{{
 		MerkleRoot: root,
 		Offset:     0,
 		Length:     modules.SectorSize,
-	}})
+	}}
+
+	// send revision and requests to host for approval
+	signedTxn, err := negotiateDownloadRevision(hd.conn, rev, requests, hd.contract.SecretKey, height)
 	if err != nil {
 		return nil, err
 	}
 
-	// revise the file contract to cover the cost of the new sector
-	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
-	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey, height)
-	if err != nil {
-		return nil, err
-	}
-
-	// read sector data
+	// read sector data, completing one iteration of the download loop
 	// TODO: optimize this
 	var sectors [][]byte
 	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+8); err != nil {

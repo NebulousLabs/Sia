@@ -108,25 +108,20 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	merkleRoot := tree.Root()
 
 	// initiate revision
-	err := startRevision(he.conn, he.host, he.contractor.hdb)
-	if err != nil {
+	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
 		return crypto.Hash{}, err
 	}
 
-	// send 'insert' action
-	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	// create revision and 'insert' action
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
+	actions := []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
-	}})
-	if err != nil {
-		return crypto.Hash{}, err
-	}
+	}}
 
-	// revise the file contract to cover the cost of the new sector
-	// TODO: should probably create revision beforehand so we know we have enough money
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
+	// send revision and actions to host for approval
+	signedTxn, err := negotiateRevision(he.conn, rev, actions, he.contract.SecretKey, height)
 	if err != nil {
 		return crypto.Hash{}, err
 	}
@@ -176,23 +171,19 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	merkleRoot := tree.Root()
 
 	// initiate revision
-	err := startRevision(he.conn, he.host, he.contractor.hdb)
-	if err != nil {
+	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
 		return err
 	}
 
-	// send 'delete' action
-	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	// create revision and 'delete' action
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
+	actions := []modules.RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
-	}})
-	if err != nil {
-		return err
-	}
+	}}
 
-	// revise the file contract to cover one fewer sector
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
+	// send revision and actions to host for approval
+	signedTxn, err := negotiateRevision(he.conn, rev, actions, he.contract.SecretKey, height)
 	if err != nil {
 		return err
 	}
