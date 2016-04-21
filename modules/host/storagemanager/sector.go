@@ -124,6 +124,9 @@ func (sm *StorageManager) sectorID(sectorRootBytes []byte) []byte {
 // AddSector will add a data sector to the host, correctly selecting the
 // storage folder in which the sector belongs.
 func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	// Sanity check - sector should have modules.SectorSize bytes.
 	if uint64(len(sectorData)) != modules.SectorSize {
 		sm.log.Critical("incorrectly sized sector passed to AddSector in the storage manager")
@@ -228,8 +231,11 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 	return sm.save()
 }
 
-// readSector will pull a sector from disk into memory.
-func (sm *StorageManager) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error) {
+// ReadSector will pull a sector from disk into memory.
+func (sm *StorageManager) ReadSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	err = sm.db.View(func(tx *bolt.Tx) error {
 		bsu := tx.Bucket(bucketSectorUsage)
 		sectorKey := sm.sectorID(sectorRoot[:])
@@ -260,6 +266,9 @@ func (sm *StorageManager) readSector(sectorRoot crypto.Hash) (sectorBytes []byte
 // If the provided sector does not have an expiration at the given height, an
 // error will be thrown.
 func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	return sm.db.Update(func(tx *bolt.Tx) error {
 		// Grab the existing sector usage information from the database.
 		bsu := tx.Bucket(bucketSectorUsage)

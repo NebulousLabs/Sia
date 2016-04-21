@@ -1,5 +1,9 @@
 package storagemanager
 
+import (
+	"github.com/NebulousLabs/Sia/build"
+)
+
 const (
 	// maximumStorageFolders indicates the maximum number of storage folders
 	// that the host allows. Some operations, such as creating a new storage

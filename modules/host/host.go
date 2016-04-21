@@ -78,6 +78,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -251,6 +252,16 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		port:       port,
 	}
 
+	// Add the storage manager to the host.
+	//
+	// TODO: instead of hardcoding a storage manager, the storage manager
+	// should probably be chosen by the person that calls 'New', same way that
+	// the wallet, transaction pool, and consensus set are.
+	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
+	if err != nil {
+		return nil, err
+	}
+
 	// Create the perist directory if it does not yet exist.
 	err = dependencies.mkdirAll(h.persistDir, 0700)
 	if err != nil {
@@ -331,6 +342,11 @@ func (h *Host) Close() (composedError error) {
 	h.resourceLock.Lock()
 	h.closed = true
 	h.resourceLock.Unlock()
+
+	err = h.StorageManager.Close()
+	if err != nil {
+		composedError = composeErrors(composedError, err)
+	}
 
 	// Close the bolt database.
 	err = h.db.Close()

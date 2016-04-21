@@ -1,5 +1,6 @@
 package storagemanager
 
+/*
 import (
 	"bytes"
 	"io/ioutil"
@@ -488,3 +489,4 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.Fatal("filesystem consistency error")
 	}
 }
+*/

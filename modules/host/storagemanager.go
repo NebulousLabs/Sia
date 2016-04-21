@@ -16,6 +16,9 @@ type StorageManager interface {
 	// 'sectorData' will be ignored and no new disk space will be consumed.
 	AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error
 
+	// The storage manager needs to be able to shut down.
+	Close() error
+
 	// ReadSector will read a sector from the storage manager, returning the
 	// bytes that match the input sector root.
 	ReadSector(sectorRoot crypto.Hash) ([]byte, error)

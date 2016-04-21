@@ -1,5 +1,6 @@
 package storagemanager
 
+/*
 import (
 	"bytes"
 	"encoding/json"
@@ -45,17 +46,6 @@ func (ht *hostTester) probabilisticReset() error {
 		ht.host = h
 	}
 	return nil
-}
-
-// createSector makes a random, unique sector that can be inserted into the
-// host.
-func createSector() (sectorRoot crypto.Hash, sectorData []byte, err error) {
-	sectorData, err = crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		return crypto.Hash{}, nil, err
-	}
-	sectorRoot = crypto.MerkleRoot(sectorData)
-	return sectorRoot, sectorData, nil
 }
 
 // sectorUsageCheck compares a manually maintained sector usage map to the
@@ -1004,3 +994,4 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Error("unexpected number of files in the host directory")
 	}
 }
+*/

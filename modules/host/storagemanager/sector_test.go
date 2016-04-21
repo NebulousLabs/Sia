@@ -13,13 +13,13 @@ func TestMaxVirtualSectors(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newHostTester("TestMaxVirtualSectors")
+	smt, err := newStorageManagerTester("TestMaxVirtualSectors")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Add a storage folder to receive a sector.
-	err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,9 +29,7 @@ func TestMaxVirtualSectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, 1, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, 1, sectorData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,18 +37,14 @@ func TestMaxVirtualSectors(t *testing.T) {
 	// Add virtual instances of the sector until there are no more available
 	// virual slots.
 	for i := 1; i < maximumVirtualSectors; i++ {
-		ht.host.mu.Lock()
-		err = ht.host.addSector(sectorRoot, types.BlockHeight(i%3+2), sectorData)
-		ht.host.mu.Unlock()
+		err = smt.sm.AddSector(sectorRoot, types.BlockHeight(i%3+2), sectorData)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// Add another virtual sector, an error should be returned.
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, 1, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, 1, sectorData)
 	if err != errMaxVirtualSectors {
 		t.Fatal(err)
 	}
@@ -62,7 +56,7 @@ func TestBadSectorAdd(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newHostTester("TestBadSectorAdd")
+	smt, err := newStorageManagerTester("TestBadSectorAdd")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,8 +71,7 @@ func TestBadSectorAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
 	// Error doesn't need to be checked, a panic will be thrown.
-	_ = ht.host.addSector(sectorRoot, 1, sectorData[:1])
+	_ = smt.sm.AddSector(sectorRoot, 1, sectorData[:1])
 	t.Fatal("panic not thrown")
 }

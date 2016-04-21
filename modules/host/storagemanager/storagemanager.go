@@ -67,6 +67,8 @@ type StorageManager struct {
 // newStorageManager creates a new storage manager.
 func newStorageManager(dependencies dependencies, persistDir string) (*StorageManager, error) {
 	sm := &StorageManager{
+		dependencies: dependencies,
+
 		persistDir: persistDir,
 	}
 

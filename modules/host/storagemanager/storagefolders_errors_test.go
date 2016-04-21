@@ -1,5 +1,6 @@
 package storagemanager
 
+/*
 import (
 	"errors"
 	"path/filepath"
@@ -88,3 +89,4 @@ func TestAddFolderNoRand(t *testing.T) {
 		t.Error("storage folder was added to the host despite a dependency failure")
 	}
 }
+*/
