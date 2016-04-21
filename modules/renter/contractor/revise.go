@@ -66,7 +66,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, actions []
 
 // newRevision revises the current revision to cover a different number of
 // sectors.
-func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSectors uint64, sectorPrice types.Currency) types.FileContractRevision {
+func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSectors uint64, sectorPrice, sectorCollateral types.Currency) types.FileContractRevision {
 	// move safely moves n coins from src to dest, avoiding negative currency
 	// panics. The new values of src and dest are returned.
 	move := func(n, src, dest types.Currency) (types.Currency, types.Currency) {
@@ -81,20 +81,27 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		valid1  = rev.NewValidProofOutputs[1].Value
 		missed0 = rev.NewMissedProofOutputs[0].Value
 		missed1 = rev.NewMissedProofOutputs[1].Value
+		missed2 = rev.NewMissedProofOutputs[2].Value
 	)
 	curSectors := rev.NewFileSize / modules.SectorSize
 	if numSectors > curSectors {
 		diffPrice := sectorPrice.Mul(types.NewCurrency64(numSectors - curSectors))
+		diffCollateral := sectorCollateral.Mul(types.NewCurrency64(numSectors - curSectors))
 		// move valid payout from renter to host
 		valid0, valid1 = move(diffPrice, valid0, valid1)
 		// move missed payout from renter to void
-		missed0, missed1 = move(diffPrice, missed0, missed1)
+		missed0, missed2 = move(diffPrice, missed0, missed2)
+		// move missed collateral from host to void
+		missed1, missed2 = move(diffCollateral, missed1, missed2)
 	} else if numSectors < curSectors {
 		diffPrice := sectorPrice.Mul(types.NewCurrency64(curSectors - numSectors))
+		diffCollateral := sectorCollateral.Mul(types.NewCurrency64(curSectors - numSectors))
 		// move valid payout from host to renter
 		valid1, valid0 = move(diffPrice, valid1, valid0)
 		// move missed payout from void to renter
 		missed1, missed0 = move(diffPrice, missed1, missed0)
+		// move missed collateral from void to host
+		missed2, missed1 = move(diffCollateral, missed2, missed1)
 	}
 
 	return types.FileContractRevision{
@@ -112,7 +119,7 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		NewMissedProofOutputs: []types.SiacoinOutput{
 			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
 			{Value: missed1, UnlockHash: rev.NewMissedProofOutputs[1].UnlockHash},
-			// TODO: void???
+			{Value: missed2, UnlockHash: rev.NewMissedProofOutputs[2].UnlockHash},
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}

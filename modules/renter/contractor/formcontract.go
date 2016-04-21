@@ -157,6 +157,9 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	if err := encoding.WriteObject(conn, addedSignatures); err != nil {
 		return Contract{}, errors.New("couldn't send added signatures: " + err.Error())
 	}
+	if err := encoding.WriteObject(conn, revisionTxn.TransactionSignatures[0]); err != nil {
+		return Contract{}, errors.New("couldn't send revision signature: " + err.Error())
+	}
 
 	// Read the host acceptance and signatures.
 	err = modules.ReadNegotiationAcceptance(conn)

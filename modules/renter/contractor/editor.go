@@ -91,10 +91,14 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	if height >= he.contract.FileContract.WindowStart {
 		return crypto.Hash{}, errors.New("contract has already ended")
 	}
-	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
+	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
+	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize))
+	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
 		return crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
 	}
+	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
 	pieceRoot := crypto.MerkleRoot(data)
@@ -113,7 +117,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	}
 
 	// create revision and 'insert' action
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
 	actions := []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
@@ -148,8 +152,10 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	if height >= he.contract.FileContract.WindowStart {
 		return errors.New("contract has already ended")
 	}
-	// TODO: is this math correct?
-	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	// TODO: is this math correct? (specifically the height)
+	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
+	sectorPrice := he.host.StoragePrice.Mul(blockBytes)
+	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 
 	// calculate the new total Merkle root
 	var newRoots []crypto.Hash
@@ -176,7 +182,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	}
 
 	// create revision and 'delete' action
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
 	actions := []modules.RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
