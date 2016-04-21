@@ -274,12 +274,16 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	}
 
 	// Lock the storage obligation during the revision.
+	h.mu.Lock()
 	err = h.lockStorageObligation(so)
+	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	defer func() {
+		h.mu.Lock()
 		err = h.unlockStorageObligation(so)
+		h.mu.Unlock()
 		if err != nil {
 			h.log.Critical(err)
 		}
