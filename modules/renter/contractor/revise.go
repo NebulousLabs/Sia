@@ -3,7 +3,6 @@ package contractor
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -14,9 +13,6 @@ import (
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
 func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
-	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
-	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
-
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},

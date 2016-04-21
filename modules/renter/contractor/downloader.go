@@ -43,6 +43,10 @@ type hostDownloader struct {
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
 func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
+	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
+	hd.conn.SetDeadline(time.Now().Add(600 * time.Second))
+	defer hd.conn.SetDeadline(time.Now().Add(time.Hour))
+
 	// calculate price
 	hd.contractor.mu.RLock()
 	height := hd.contractor.blockHeight
@@ -146,6 +150,9 @@ func (c *Contractor) Downloader(contract Contract) (Downloader, error) {
 	if err != nil {
 		return nil, err
 	}
+	// allot 2 minutes for RPC request + revision exchange
+	conn.SetDeadline(time.Now().Add(120 * time.Second))
+	defer conn.SetDeadline(time.Now().Add(time.Hour))
 	if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}

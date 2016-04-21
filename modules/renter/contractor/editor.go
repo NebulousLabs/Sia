@@ -84,6 +84,10 @@ func (he *hostEditor) Close() error {
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
+	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
+	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
+	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
+
 	// calculate price
 	he.contractor.mu.RLock()
 	height := he.contractor.blockHeight
@@ -148,6 +152,10 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 
 // Delete deletes a sector in a contract.
 func (he *hostEditor) Delete(root crypto.Hash) error {
+	// allot 2 minutes for this exchange
+	he.conn.SetDeadline(time.Now().Add(120 * time.Second))
+	defer he.conn.SetDeadline(time.Now().Add(time.Hour))
+
 	// calculate price
 	he.contractor.mu.RLock()
 	height := he.contractor.blockHeight
@@ -246,6 +254,9 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if err != nil {
 		return nil, err
 	}
+	// allot 2 minutes for RPC request + revision exchange
+	conn.SetDeadline(time.Now().Add(120 * time.Second))
+	defer conn.SetDeadline(time.Now().Add(time.Hour))
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
