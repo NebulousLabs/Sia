@@ -55,21 +55,21 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 		return nil, errors.New("contract has insufficient funds to support download")
 	}
 
-	// initiate download request by confirming host settings
+	// initiate download by confirming host settings
 	if err := startDownload(hd.conn, hd.host, hd.contractor.hdb); err != nil {
 		return nil, err
 	}
 
-	// create revision and download request
+	// create revision and download action
 	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
-	requests := []modules.DownloadRequest{{
+	actions := []modules.DownloadAction{{
 		MerkleRoot: root,
 		Offset:     0,
 		Length:     modules.SectorSize,
 	}}
 
-	// send revision and requests to host for approval
-	signedTxn, err := negotiateDownloadRevision(hd.conn, rev, requests, hd.contract.SecretKey, height)
+	// send revision and actions to host for approval
+	signedTxn, err := negotiateDownloadRevision(hd.conn, rev, actions, hd.contract.SecretKey, height)
 	if err != nil {
 		return nil, err
 	}

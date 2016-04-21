@@ -118,9 +118,9 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 	}
 }
 
-// negotiateDownloadRevision sends a revision and requests to the host for
+// negotiateDownloadRevision sends a revision and actions to the host for
 // approval.
-func negotiateDownloadRevision(conn net.Conn, rev types.FileContractRevision, requests []modules.DownloadRequest, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
+func negotiateDownloadRevision(conn net.Conn, rev types.FileContractRevision, actions []modules.DownloadAction, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
 	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
 	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
 
@@ -137,12 +137,12 @@ func negotiateDownloadRevision(conn net.Conn, rev types.FileContractRevision, re
 	encodedSig, _ := crypto.SignHash(signedTxn.SigHash(0), secretKey) // no error possible
 	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
 
-	// send the revision and requests
+	// send the revision and actions
 	if err := encoding.WriteObject(conn, rev); err != nil {
 		return types.Transaction{}, errors.New("couldn't send revision: " + err.Error())
 	}
-	if err := encoding.WriteObject(conn, requests); err != nil {
-		return types.Transaction{}, errors.New("couldn't send download requests: " + err.Error())
+	if err := encoding.WriteObject(conn, actions); err != nil {
+		return types.Transaction{}, errors.New("couldn't send download actions: " + err.Error())
 	}
 
 	// read acceptance
