@@ -3,6 +3,15 @@
 // internet bandwidth into profit for the user.
 package host
 
+// TODO: Test the safety of the builder, it should be okay to have multiple
+// builders open for up to 600 seconds, which means multiple blocks could be
+// received in that time period. Should also check what happens if a prent gets
+// confirmed on the blockchain before the builder is finished.
+
+// TODO: Would be nice to have some sort of error transport to the user, so
+// that the user is notified in ways other than logs via the host that there
+// are issues such as disk, etc.
+
 // TODO: automated_settings.go, a file which can be responsible for
 // automatically regulating things like bandwidth price, storage price,
 // contract price, etc. One of the features in consideration is that the host
@@ -46,6 +55,8 @@ package host
 // renter what's up).
 
 // TODO: clean up all of the magic numbers in the host.
+
+// TODO: revamp the finances for the storage obligations.
 
 // TODO: host_test.go has commented out tests.
 

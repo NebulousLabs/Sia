@@ -16,17 +16,14 @@ package host
 // the file contract revision. Also need to make sure that multiple actions are
 // being taken if needed.
 
-// TODO: Document mistakes that got made when constructing the Sia consensus
-// code. The first is not putting timeouts on keys including signatures? The
-// second was using floating point values in consensus code. The third is that
-// you can't build a concise storage proof (e.g. 0 bytes) for a file contract
-// with a size of 0.
-
 // TODO: Make sure that the origin tranasction set is not submitted to the
 // transaction pool before addSO is called - if it is, there will be a
 // duplicate transaction error, and then the storage obligation will return an
 // error, which is bad. Well, or perhas we just need to have better logic
 // handling.
+
+// TODO: Need to make sure that 'revision confirmed' is actually looking only
+// at the most recent revision (I think it is...)
 
 // TODO: Make sure that not too many action items are being created.
 

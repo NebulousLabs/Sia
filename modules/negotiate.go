@@ -22,6 +22,12 @@ const (
 	// not due to an error.
 	StopResponse = "stop"
 
+	// NegotiateDownloadTime defines the amount of time that the renter and
+	// host have to negotitate a download request batch. The time is set high
+	// enough that two nodes behind Tor have a reasonable chance of completing
+	// the negotiation.
+	NegotiateDownloadTime = 600 * time.Second
+
 	// NegotiateFileContractTime defines the amount of time that the renter and
 	// host have to negotiate a file contract. The time is set high enough that
 	// a node behind Tor has a reasonable chance at making the multiple
@@ -47,21 +53,46 @@ const (
 	// should be successful even if both parties are on Tor.
 	NegotiateSettingsTime = 120 * time.Second
 
-	// MaxErrorSize indicates the maximum number of bytes that can be used to
-	// encode an error being sent during negotiation.
-	MaxErrorSize = 256
+	// NegotiateMaxDownloadActionRequestSize defines the maximum size that a
+	// download request can be. Note, this is not a max size for the data that
+	// can be requested, but instead is a max size for the definition of the
+	// data being requested.
+	NegotiateMaxDownloadActionRequestSize = 50e3
 
-	// MaxFileContractSetLen determines the maximum allowed size of a
+	// NegotiateMaxErrorSize indicates the maximum number of bytes that can be
+	// used to encode an error being sent during negotiation.
+	NegotiateMaxErrorSize = 256
+
+	// NegotiateMaxFileContractRevisionSize specifies the maximum size that a
+	// file contract revision is allowed to have when being sent over the wire
+	// during negotiation.
+	NegotiateMaxFileContractRevisionSize = 3e3
+
+	// NegotiateMaxFileContractSetLen determines the maximum allowed size of a
 	// transaction set that can be sent when trying to negotiate a file
 	// contract. The transaction set will contain all of the unconfirmed
 	// dependencies of the file contract, meaning that it can be quite large.
 	// The transaction pool's size limit for transaction sets has been chosen
 	// as a reasonable guideline for determining what is too large.
-	MaxFileContractSetLen = TransactionSetSizeLimit - 1e3
+	NegotiateMaxFileContractSetLen = TransactionSetSizeLimit - 1e3
 
-	// MaxHostExternalSettingsLen is the maximum allowed size of an encoded
-	// HostExternalSettings.
-	MaxHostExternalSettingsLen = 16000
+	// NegotiateMaxHostExternalSettingsLen is the maximum allowed size of an
+	// encoded HostExternalSettings.
+	NegotiateMaxHostExternalSettingsLen = 16000
+
+	// NegotiateMaxSiaPubkeySize defines the maximum size that a SiaPubkey is
+	// allowed to be when being sent over the wire during negotiation.
+	NegotiateMaxSiaPubkeySize = 1e3
+
+	// NegotiateMaxTransactionSignatureSize defines the maximum size that a
+	// transaction signature is allowed to be when being sent over the wire
+	// during negoitation.
+	NegotiateMaxTransactionSignatureSize = 2e3
+
+	// NegotiateMaxTransactionSignaturesSize defines the maximum size that a
+	// transaction signature slice is allowed to be when being sent over the
+	// wire during negoitation.
+	NegotiateMaxTransactionSignaturesSize = 5e3
 )
 
 var (
@@ -145,6 +176,17 @@ var (
 )
 
 type (
+	// A DownloadAction is a description of a download that the renter would
+	// like to make. The MerkleRoot indicates the root of the sector, the
+	// offset indicates what portion of the sector is being downloaded, and the
+	// length indicates how many bytes should be grabbed starting from the
+	// offset.
+	DownloadAction struct {
+		MerkleRoot crypto.Hash
+		Offset     uint64
+		Length     uint64
+	}
+
 	// HostAnnouncement is an announcement by the host that appears in the
 	// blockchain. 'Specifier' is always 'PrefixHostAnnouncement'. The
 	// announcement is always followed by a signature from the public key of
@@ -164,15 +206,16 @@ type (
 		// revision action can have a different number of bytes, depending on
 		// the action, so the number of revision actions allowed depends on the
 		// sizes of each.
-		AcceptingContracts bool              `json:"acceptingcontracts"`
-		MaxBatchSize       uint64            `json:"maxbatchsize"`
-		MaxDuration        types.BlockHeight `json:"maxduration"`
-		NetAddress         NetAddress        `json:"netaddress"`
-		RemainingStorage   uint64            `json:"remainingstorage"`
-		SectorSize         uint64            `json:"sectorsize"`
-		TotalStorage       uint64            `json:"totalstorage"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
-		WindowSize         types.BlockHeight `json:"windowsize"`
+		AcceptingContracts   bool              `json:"acceptingcontracts"`
+		MaxDownloadBatchSize uint64            `json:"maxdownloadbatchsize"`
+		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
+		MaxDuration          types.BlockHeight `json:"maxduration"`
+		NetAddress           NetAddress        `json:"netaddress"`
+		RemainingStorage     uint64            `json:"remainingstorage"`
+		SectorSize           uint64            `json:"sectorsize"`
+		TotalStorage         uint64            `json:"totalstorage"`
+		UnlockHash           types.UnlockHash  `json:"unlockhash"`
+		WindowSize           types.BlockHeight `json:"windowsize"`
 
 		// Collateral is the amount of collateral that the host will put up for
 		// storage in 'bytes per block', as an assurance to the renter that the
@@ -256,7 +299,7 @@ type (
 // fashion.
 func ReadNegotiationAcceptance(r io.Reader) error {
 	var resp string
-	err := encoding.ReadObject(r, &resp, MaxErrorSize)
+	err := encoding.ReadObject(r, &resp, NegotiateMaxErrorSize)
 	if err != nil {
 		return err
 	}

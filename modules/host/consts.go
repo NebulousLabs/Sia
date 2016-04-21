@@ -21,6 +21,11 @@ const (
 	// necessary to limit the impact of DoS attacks.
 	fileContractNegotiationTimeout = 120 * time.Second
 
+	// iteratedConnectionTime is the amount of time that is allowed to pass
+	// before the host will stop accepting new iterations on an iterated
+	// connection.
+	iteratedConnectionTime = 1200 * time.Second
+
 	// maximumStorageFolders indicates the maximum number of storage folders
 	// that the host allows. Some operations, such as creating a new storage
 	// folder, take longer if there are more storage folders. Static RAM usage
@@ -75,17 +80,24 @@ var (
 	// download bandwidth is expected to be plentiful but also in-demand.
 	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(10e3) // 10 SC / GB
 
-	// defaultMaxBatchSize defines the maximum number of bytes that the host
-	// will allow to be sent during a single batch update in a revision RPC.
-	// 17MiB has been chosen because it's four full sectors, plus some wiggle
-	// room for the extra data or a few delete operations. The whole batch will
-	// be held in memory, so the batch size should only be increased
+	// defaultMaxDownloadBatchSize defines the maximum number of bytes that the
+	// host will allow to be requested by a single download request. 17 MiB has
+	// been chosen because it's 4 full sectors plus some wiggle room. 17 MiB is
+	// a conservative default, most hosts will be fine with a number like 65
+	// MiB.
+	defaultMaxDownloadBatchSize = 17 * (1 << 20)
+
+	// defaultMaxReviseBatchSize defines the maximum number of bytes that the
+	// host will allow to be sent during a single batch update in a revision
+	// RPC. 17 MiB has been chosen because it's four full sectors, plus some
+	// wiggle room for the extra data or a few delete operations. The whole
+	// batch will be held in memory, so the batch size should only be increased
 	// substantially if the host has a lot of memory. Additionally, the whole
 	// batch is sent in one network connection. Additionally, the renter can
 	// steal funds for upload bandwidth all the way out to the size of a batch.
-	// 17MiB is a conservative default, most hosts are likely to be just fine
-	// with a number like 65MiB.
-	defaultMaxBatchSize = 17 * 1 << 20
+	// 17 MiB is a conservative default, most hosts are likely to be just fine
+	// with a number like 65 MiB.
+	defaultMaxReviseBatchSize = 17 * (1 << 20)
 
 	// defaultMaxCollateral defines the maximum amount of collateral that the
 	// host is comfortable putting into a single file contract. 10e3 is a

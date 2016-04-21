@@ -8,7 +8,9 @@ untrusted environment. Managing data on Sia happens through several protocols:
 
 + Revision Request - the renter will send the host a file contract id, and the
   host will send the most recent file contract revision that it knows of for
-  that file contract, with the signatures.
+  that file contract, with the signatures. A challenge and response is also
+  performed to verify that the renter is able to create the signatures to
+  modify the file contract revision.
 
 + File Contract Creation - no data is uploaded during the inital creation of a
   file contract, but funds are allocated so that the file contract can be
@@ -22,7 +24,7 @@ untrusted environment. Managing data on Sia happens through several protocols:
   New funds are added to this file contract, and it can now be modified
   separately from the previous contract.
 
-+ Data Request - data is requested from the host for retrieval.
++ Data Request - data is requested from the host by hash.
 
 + (planned for later) Storage Proof Request - the renter requests that the host
   perform an out-of-band storage proof.
@@ -52,22 +54,39 @@ minutes may struggle to complete the protocols.
 Settings Request
 ----------------
 
+The host signs the settings request to prove that the connection has opened to
+the right party. Hosts announce on the blockchain and perform burn, therefore
+identity is important.
+
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline should be at least 120 seconds.
 
-2. The host sends the renter the most recent copy of its settings, signed by
-   the host public key. The connection is then closed.
+2. The host sends the renter the most recent copy of its external settings,
+   signed by the host public key. The connection is then closed.
 
 Revision Request
 ----------------
+
+The renter requests a recent revision from the host. Often, this request
+preceeds modifications. A file contract can only be open for revision with one
+party at a time. To prevent DoS attacks, the party must authenticate here by
+performing a challenge-response protocol during the revision request. Putting
+this challenge-response requirement in the revision-request can help improve
+privacy, though the host is under no cryptographic or incentive-based
+obligation to preserve the privacy of the revision.
 
 1. The renter makes an RPC to the host, opening a connection. The connection
    deadline sould be at least 120 seconds. The renter sends the file contract
    id for the revision being requested.
 
-2. The host sends the renter the most recent file contract revision, along with
-   the transaction signatures from both the renter and the host. The connection
-   is then closed.
+2. The host writes 32 bytes of random data that the renter must sign for the
+   renter key in the corresponding file contract.
+
+3. The renter returns the signed challenge.
+
+4. The host verifies the signature from the renter and then sends the renter
+   the most recent file contract revision, along with the transaction
+   signatures from both the renter and the host. The connection is then closed.
 
 File Contract Creation
 ----------------------
@@ -98,9 +117,9 @@ ensure that the renter is only dealing with upstanding hosts.
    the host is not accepting new file contracts, the connection is closed.
 
 3. The renter sends a notice of acceptance or rejection. If the renter accepts,
-   the renter then sends a funded file contract without a signature, followed
-   by the public key that will be used to create the renter's portion of the
-   UnlockConditions for the file contract.
+   the renter then sends a funded file contract transaction without a
+   signature, followed by the public key that will be used to create the
+   renter's portion of the UnlockConditions for the file contract.
 
 4. The host sends an acceptance or rejection of the file contract. If the host
    accepts, the host will add collateral to the file contract, and will send
@@ -109,12 +128,14 @@ ensure that the renter is only dealing with upstanding hosts.
 
 5. The renter indicates acceptance or rejection of the file contract. If the
    renter accepts, the renter will sign the file contract and send the
-   transaction signatures to the host.
+   transaction signatures to the host. The renter will also send a signature
+   for a no-op file contract revision that follows the file contract.
 
 6. The host may only reject the file contract in the event that the renter has
    sent invalid signatures, so the acceptance step is skipped. The host signs
-   the file contract and sends the transaction signatures to the renter. The
-   connection is closed.
+   the file contract and sends the transaction signatures to the renter, and
+   the host creates and sends a signature for the no-op revision that follows
+   the file contract. The connection is closed.
 
 File Contract Revision
 ----------------------
@@ -124,16 +145,29 @@ File Contract Revision
    contract ID, indicting the file contract that is getting revised during the
    RPC.
 
-2. The host will send an acceptance or rejection. A loop begins. The host sends
-   the most recent revision of the host settings to the renter, and a copy of
-   the most recent known revision transaction set. The transaction will be empty if
-   there have been no completed revisions yet. The host is expected to always
-   have the most recent revision, the renter may not have the most recent
-   revision. The settings are sent after each iteration of the loop to enable
-   high resolution dynamic pricing for the host, especially for bandwidth.
+2. The host will respond with a 32 byte challenge - a random 32 bytes that the
+   renter will need to sign.
 
-3. The renter may reject or accept the settings + revision. The renter will
-   send a batch of modification actions. Batching allows the renter to send a
+3. The renter will sign the challenge with the renter key that protects the
+   file contract. This is to prove that the renter has access to the file
+   contract.
+
+4. The host will verify the challenge signature, then send an acceptance or
+   rejection. If accetped, the host will send the most recent file contract
+   revision for the file contract along with the transaction signagtures that
+   validate the revision. The host will lock the file contract, meaning no
+   other changes can be made to the revision file contract until this
+   connection has closed.
+
+   A loop begins. The host sends the most recent revision of the host settings
+   to the renter, signed. The settings are sent after each iteration of the
+   loop to enable high resolution dynamic pricing for the host, especially for
+   bandwidth.
+
+6. The renter may reject or accept the settings + revision. A specific
+   rejection message will gracefully terminate the loop here. The renter will
+   send an unsigned file contract revision followed by a batch of modification
+   actions which the revision pays for. Batching allows the renter to send a
    lot of data in a single, one-way connection, improving throughput. The
    renter will send a number indicating how many modifications will be made in
    a batch, and then sends each modification in order.
@@ -152,20 +186,14 @@ File Contract Revision
    meaning if you are inserting 3 sectors at the front of the file contract,
    the indexes of each should be '0', '1', '2'.
 
-   The renter sends a file contract revision which pays the host for all of the
-   modifications and bandwidth consumed. The revision is not signed.
+7. The host indicates either acceptance or rejection of the new revision.
 
-4. The host indicates either acceptance or rejection of the new revision.
+8. The renter signs the revision and sends the signature to the host.
 
-5. The renter signs the revision and sends the signature to the host. The
-   renter will then send an indication of whether another iteration of the loop
-   is desired.
-
-6. The host signs the revision and sends the siganture to the renter. Both
-   parties submit the new revision to the transaction pool. The host sends an
-   acceptance or rejection indicating whether another iteration is okay. If
-   another iteration is to be performed, the connection deadline will be reset
-   so that there are at least 600 seconds remaining.
+9. The host signs the revision and sends the siganture to the renter. Both
+   parties submit the new revision to the transaction pool. The connection
+   deadline is reset to 600 seconds (unless the maximum deadline has been
+   reached), and the loop restarts.
 
 File Contract Renewal
 ---------------------
@@ -175,9 +203,9 @@ File Contract Renewal
    because a significant amount of metadata modifications may be necessary on
    the host's end, especially when renewing larger file contracts.
 
-2. The host sends the most recent copy of the settings to the renter, along
-   with the most recent file contract revision. If the host is not accepting
-   new file contracts, the connection is closed.
+2. The host sends the most recent copy of the settings to the renter, signed.
+   along with the most recent file contract revision. If the host is not
+   accepting new file contracts, the connection is closed.
 
 3. The renter either accepts or rejects the settings. If accepted, the renter
    sends an unsigned file contract to the host, containing the same Merkle root
@@ -201,10 +229,29 @@ Data Request
 ------------
 
 1. The renter makes an RPC to the host, opening a connection. The connection
-   deadline is at least 600 seconds.
+   deadline is at least 600 seconds. The renter will send a file contract id
+   corresponding to the file contract that will be used to pay for the
+   download.
 
-2. The host will send the renter the most recent file contract revision
-   transaction set.
+2. The host will respond with a 32 byte challenge - a random 32 bytes that the
+   renter will need to sign.
+
+3. The renter will sign the challenge with the public key that protects the
+   file contract being used to pay for the download. This proves that the
+   renter has access to the payment.
+
+4. The host will verify the challenge signature, and then send an acceptance or
+   rejection. If accepted, the host will send the most recent file contract
+   revision followed by the signautres that validate the revision. The host
+   will lock the file contract, preventing other connections from making
+   changes to the underlying storage obligation.
+
+   A loop begins. The host sends the most recent external settings to the
+   renter, signed. The settings are sent each iteration to provide high
+   resolution dynamic bandwidth pricing.
+
+5. The host will send the renter the most recent file contract revision, along
+   with the signatures that validate the revision.
 
    A loop begins, which will allow the renter to download multiple batches of
    data from the same connection. The host will send the host settings, and the
@@ -213,22 +260,14 @@ Data Request
    the most recent revision (the host signs last), the renter may not have the
    most recent revision.
 
-3. The renter will accept or reject the host's settings. If accepting, the
-   renter will send a batch of download requests, which takes the form of a
-   batch size followed by each of the requests in order. This request is
-   followed by a file contract revision, which pays the host for the download
-   bandwidth that is about to be consumed. The revision will be signed. The
-   renter will also send a variable indicating whether another iteration is
-   desired.
+6. The renter will accept or reject the host's settings. If accepting, the
+   renter will send a file contract revision, unsigned, to pay for the download
+   request. The renter will then send the download request itself.
 
-   A download request can either be a full sector or a partial sector. A full
-   sector request will be followed by the hash of the sector. A partial sector
-   request will be followed by the hash of the sector that is being partially
-   downloaded, along with an offset and a length indicating which portion of
-   the sector is being downloaded.
+7. The host will either accept or reject the revision.
 
-4. The host will either accept or reject the revision. If accepted, the host
-   will upload all of the data. The host will indicate whether another
-   iteration is okay. If another iteration is acceptable, the deadline will be
-   reset to a minimum of 600 seconds. The host is expected to accept at least
-   1200 seconds of iterations.
+8. The renter will send a signature for the file contract revision.
+
+9. The host sends a signature for the file contract revision, followed by the
+   data that was requested by the download request. The loop starts over, and
+   the connection deadline is reset to a minimum of 600 seconds.
