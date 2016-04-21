@@ -302,6 +302,11 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 // verifyRevision checks that the revision pays the host correctly, and that
 // the revision does not attempt any malicious or unexpected changes.
 func verifyRevision(so *storageObligation, revision types.FileContractRevision, newRevenue, newCollateral types.Currency) error {
+	// Check that the revision is well-formed.
+	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
+		return errInsaneFileContractRevisionOutputCounts
+	}
+
 	oldFCR := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]
 
 	// Check that all non-volatile fields are the same.
