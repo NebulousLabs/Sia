@@ -3,7 +3,6 @@ package contractor
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -11,11 +10,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// negotiateRevision sends the revision and new piece data to the host.
+// negotiateRevision sends a revision and actions to the host for approval,
+// completing one iteration of the revision loop.
 func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
-	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // sufficient to transfer 4 MB over 100 kbps
-	defer conn.SetDeadline(time.Now().Add(time.Hour)) // reset timeout after each revision
-
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
@@ -33,7 +30,6 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	if err := encoding.WriteObject(conn, rev); err != nil {
 		return types.Transaction{}, errors.New("couldn't send revision: " + err.Error())
 	}
-
 	// read acceptance
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
@@ -43,7 +39,6 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	if err := encoding.WriteObject(conn, signedTxn.TransactionSignatures[0]); err != nil {
 		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
 	}
-
 	// read the host's acceptance and transaction signature
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
@@ -52,6 +47,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
 		return types.Transaction{}, errors.New("couldn't read host's signature: " + err.Error())
 	}
+
 	// add the signature to the transaction and verify it
 	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
 	if err := signedTxn.StandaloneValid(blockheight); err != nil {
@@ -62,7 +58,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 
 // newRevision revises the current revision to cover a different number of
 // sectors.
-func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSectors uint64, sectorPrice types.Currency) types.FileContractRevision {
+func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSectors uint64, sectorPrice, sectorCollateral types.Currency) types.FileContractRevision {
 	// move safely moves n coins from src to dest, avoiding negative currency
 	// panics. The new values of src and dest are returned.
 	move := func(n, src, dest types.Currency) (types.Currency, types.Currency) {
@@ -77,20 +73,27 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		valid1  = rev.NewValidProofOutputs[1].Value
 		missed0 = rev.NewMissedProofOutputs[0].Value
 		missed1 = rev.NewMissedProofOutputs[1].Value
+		missed2 = rev.NewMissedProofOutputs[2].Value
 	)
 	curSectors := rev.NewFileSize / modules.SectorSize
 	if numSectors > curSectors {
 		diffPrice := sectorPrice.Mul(types.NewCurrency64(numSectors - curSectors))
+		diffCollateral := sectorCollateral.Mul(types.NewCurrency64(numSectors - curSectors))
 		// move valid payout from renter to host
 		valid0, valid1 = move(diffPrice, valid0, valid1)
 		// move missed payout from renter to void
-		missed0, missed1 = move(diffPrice, missed0, missed1)
+		missed0, missed2 = move(diffPrice, missed0, missed2)
+		// move missed collateral from host to void
+		missed1, missed2 = move(diffCollateral, missed1, missed2)
 	} else if numSectors < curSectors {
 		diffPrice := sectorPrice.Mul(types.NewCurrency64(curSectors - numSectors))
+		diffCollateral := sectorCollateral.Mul(types.NewCurrency64(curSectors - numSectors))
 		// move valid payout from host to renter
 		valid1, valid0 = move(diffPrice, valid1, valid0)
 		// move missed payout from void to renter
 		missed1, missed0 = move(diffPrice, missed1, missed0)
+		// move missed collateral from void to host
+		missed2, missed1 = move(diffCollateral, missed2, missed1)
 	}
 
 	return types.FileContractRevision{
@@ -108,6 +111,45 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		NewMissedProofOutputs: []types.SiacoinOutput{
 			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
 			{Value: missed1, UnlockHash: rev.NewMissedProofOutputs[1].UnlockHash},
+			{Value: missed2, UnlockHash: rev.NewMissedProofOutputs[2].UnlockHash},
+		},
+		NewUnlockHash: rev.NewUnlockHash,
+	}
+}
+
+// newDownloadRevision revises the current revision to cover the cost of
+// downloading data.
+func newDownloadRevision(rev types.FileContractRevision, downloadCost types.Currency) types.FileContractRevision {
+	// move safely moves n coins from src to dest, avoiding negative currency
+	// panics. The new values of src and dest are returned.
+	move := func(n, src, dest types.Currency) (types.Currency, types.Currency) {
+		if n.Cmp(src) > 0 {
+			n = src
+		}
+		return src.Sub(n), dest.Add(n)
+	}
+
+	// move valid payout from renter to host
+	valid0, valid1 := move(downloadCost, rev.NewValidProofOutputs[0].Value, rev.NewValidProofOutputs[1].Value)
+	// move missed payout from renter to void
+	missed0, missed2 := move(downloadCost, rev.NewMissedProofOutputs[0].Value, rev.NewMissedProofOutputs[2].Value)
+
+	return types.FileContractRevision{
+		ParentID:          rev.ParentID,
+		UnlockConditions:  rev.UnlockConditions,
+		NewRevisionNumber: rev.NewRevisionNumber + 1,
+		NewFileSize:       rev.NewFileSize,
+		NewFileMerkleRoot: rev.NewFileMerkleRoot,
+		NewWindowStart:    rev.NewWindowStart,
+		NewWindowEnd:      rev.NewWindowEnd,
+		NewValidProofOutputs: []types.SiacoinOutput{
+			{Value: valid0, UnlockHash: rev.NewValidProofOutputs[0].UnlockHash},
+			{Value: valid1, UnlockHash: rev.NewValidProofOutputs[1].UnlockHash},
+		},
+		NewMissedProofOutputs: []types.SiacoinOutput{
+			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
+			rev.NewMissedProofOutputs[1], // host output is unchanged
+			{Value: missed2, UnlockHash: rev.NewMissedProofOutputs[2].UnlockHash},
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}

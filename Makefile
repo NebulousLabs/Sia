@@ -45,7 +45,7 @@ vet: release-std
 	go vet $(pkgs)
 
 # will always run on some packages for a while.
-lintpkgs = ./modules/host ./modules
+lintpkgs = ./modules/host ./modules ./modules/renter/hostdb ./modules/renter/contractor
 lint:
 	@for package in $(lintpkgs); do                           \
 		golint -min_confidence=1.0 $$package                  \

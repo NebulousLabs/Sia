@@ -72,7 +72,7 @@ func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID 
 // store the file.
 func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.FileContract.WindowStart }
 
-// Close cleanly ends the revision process with the host and closes the
+// Close cleanly terminates the revision loop with the host and closes the
 // connection.
 func (he *hostEditor) Close() error {
 	// don't care about these errors
@@ -81,21 +81,13 @@ func (he *hostEditor) Close() error {
 	return he.conn.Close()
 }
 
-// startRevision is run at the beginning of each revision iteration. It reads
-// the host's settings confirms that the values are acceptable, and writes an acceptance.
-func (he *hostEditor) startRevision() error {
-	// verify the host's settings and confirm its identity
-	// TODO: return new host, so we can calculate price accurately
-	_, err := verifySettings(he.conn, he.host, he.contractor.hdb)
-	if err != nil {
-		return modules.WriteNegotiationRejection(he.conn, err)
-	}
-	return modules.WriteNegotiationAcceptance(he.conn)
-}
-
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
+	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
+	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
+	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
+
 	// calculate price
 	he.contractor.mu.RLock()
 	height := he.contractor.blockHeight
@@ -103,7 +95,14 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	if height >= he.contract.FileContract.WindowStart {
 		return crypto.Hash{}, errors.New("contract has already ended")
 	}
-	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
+	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
+	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize))
+	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
+	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
+		return crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
+	}
+	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 
 	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
 	pieceRoot := crypto.MerkleRoot(data)
@@ -117,13 +116,12 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	merkleRoot := tree.Root()
 
 	// initiate revision
-	err := he.startRevision()
-	if err != nil {
+	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
 		return crypto.Hash{}, err
 	}
 
 	// send 'insert' action
-	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
@@ -132,9 +130,8 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 		return crypto.Hash{}, err
 	}
 
-	// revise the file contract to cover the cost of the new sector
-	// TODO: should probably create revision beforehand so we know we have enough money
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
+	// create and send revision to host for approval
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {
 		return crypto.Hash{}, err
@@ -155,6 +152,10 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 
 // Delete deletes a sector in a contract.
 func (he *hostEditor) Delete(root crypto.Hash) error {
+	// allot 2 minutes for this exchange
+	he.conn.SetDeadline(time.Now().Add(120 * time.Second))
+	defer he.conn.SetDeadline(time.Now().Add(time.Hour))
+
 	// calculate price
 	he.contractor.mu.RLock()
 	height := he.contractor.blockHeight
@@ -162,8 +163,10 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	if height >= he.contract.FileContract.WindowStart {
 		return errors.New("contract has already ended")
 	}
-	// TODO: is this math correct?
-	sectorPrice := he.host.StoragePrice.Mul(types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowStart-height)))
+	// TODO: is this math correct? (specifically the height)
+	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
+	sectorPrice := he.host.StoragePrice.Mul(blockBytes)
+	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 
 	// calculate the new total Merkle root
 	var newRoots []crypto.Hash
@@ -185,13 +188,12 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	merkleRoot := tree.Root()
 
 	// initiate revision
-	err := he.startRevision()
-	if err != nil {
+	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
 		return err
 	}
 
 	// send 'delete' action
-	err = encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
 	}})
@@ -199,8 +201,8 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 		return err
 	}
 
-	// revise the file contract to cover one fewer sector
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice)
+	// create and send revision to host for approval
+	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {
 		return err
@@ -252,23 +254,14 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if err != nil {
 		return nil, err
 	}
+	// allot 2 minutes for RPC request + revision exchange
+	conn.SetDeadline(time.Now().Add(120 * time.Second))
+	defer conn.SetDeadline(time.Now().Add(time.Hour))
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-	// send contract ID
-	if err := encoding.WriteObject(conn, contract.ID); err != nil {
-		return nil, errors.New("couldn't send contract ID: " + err.Error())
-	}
-	// read acceptance
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return nil, errors.New("host did not accept revision request: " + err.Error())
-	}
-	// read last txn
-	var lastRevisionTxn types.Transaction
-	if err := encoding.ReadObject(conn, &lastRevisionTxn, 2048); err != nil {
-		return nil, errors.New("couldn't read last revision transaction: " + err.Error())
-	} else if lastRevisionTxn.ID() != contract.LastRevisionTxn.ID() {
-		return nil, errors.New("desynchronized with host (revision transactions do not match)")
+	if err := verifyRecentRevision(conn, contract); err != nil {
+		return nil, errors.New("revision exchange failed: " + err.Error())
 	}
 
 	// the host is now ready to accept revisions

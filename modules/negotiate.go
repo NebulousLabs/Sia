@@ -125,7 +125,7 @@ var (
 
 	// ErrRevisionSigCount is returned when a file contract revision has the
 	// wrong number of transaction signatures.
-	ErrRevisionSigCount = errors.New("file contract revision the wrong number of transaction signatures")
+	ErrRevisionSigCount = errors.New("file contract revision has the wrong number of transaction signatures")
 
 	// ErrStopResponse is the error returned by ReadNegotiationAcceptance when
 	// it reads the StopResponse string.

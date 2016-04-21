@@ -103,10 +103,10 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	}
 
 	switch id {
+	case modules.RPCDownload:
+		atomic.AddUint64(&h.atomicDownloadCalls, 1)
+		err = h.managedRPCDownload(conn)
 	/*
-		case modules.RPCDownload:
-			atomic.AddUint64(&h.atomicDownloadCalls, 1)
-			err = h.managedRPCDownload(conn)
 		case modules.RPCRenew:
 			atomic.AddUint64(&h.atomicRenewCalls, 1)
 			err = h.managedRPCRenew(conn)

@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrOverweight = errors.New("requested a too-heavy weight")
+	errOverweight = errors.New("requested a too-heavy weight")
 )
 
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
@@ -57,7 +57,7 @@ func createNode(parent *hostNode, entry *hostEntry) *hostNode {
 func (hn *hostNode) nodeAtWeight(weight types.Currency) (*hostNode, error) {
 	// Sanity check - weight must be less than the total weight of the tree.
 	if weight.Cmp(hn.weight) > 0 {
-		return nil, ErrOverweight
+		return nil, errOverweight
 	}
 
 	// Check if the left or right child should be returned.

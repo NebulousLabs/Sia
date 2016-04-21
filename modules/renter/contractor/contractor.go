@@ -17,7 +17,7 @@ var (
 	errUnknownContract = errors.New("no record of that contract")
 )
 
-// a Contract includes the original contract made with a host, along with
+// A Contract includes the original contract made with a host, along with
 // the most recent revision.
 type Contract struct {
 	IP              modules.NetAddress

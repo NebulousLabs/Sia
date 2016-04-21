@@ -43,9 +43,9 @@ func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 		for i := 0; i < expected*numEntries; i++ {
 			entries := hdb.RandomHosts(1, nil)
 			if len(entries) == 0 {
-				return errors.New("no hosts!")
+				return errors.New("no hosts")
 			}
-			selectionMap[entries[0].NetAddress] = selectionMap[entries[0].NetAddress] + 1
+			selectionMap[entries[0].NetAddress]++
 		}
 
 		// See if each host was selected enough times.
@@ -202,7 +202,7 @@ func TestVariedWeights(t *testing.T) {
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
-		selectionMap[node.hostEntry.weight.String()] += 1
+		selectionMap[node.hostEntry.weight.String()]++
 	}
 
 	// Check that each host was selected an expected number of times. An error
@@ -260,8 +260,8 @@ func TestNodeAtWeight(t *testing.T) {
 
 	// overweight
 	_, err := ht.nodeAtWeight(baseWeight.Mul(types.NewCurrency64(2)))
-	if err != ErrOverweight {
-		t.Errorf("expected %v, got %v", ErrOverweight, err)
+	if err != errOverweight {
+		t.Errorf("expected %v, got %v", errOverweight, err)
 	}
 
 	h, err := ht.nodeAtWeight(baseWeight)

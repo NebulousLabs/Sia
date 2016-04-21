@@ -103,15 +103,15 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	settings := h.settings
 	h.mu.RUnlock()
 
-	// Read the file contract revision that pays for the download requests,
-	// followed by the download requests themselves.
+	// Read the download requests, followed by the file contract revision that
+	// pays for them.
+	var requests []modules.DownloadAction
 	var paymentRevision types.FileContractRevision
-	err = encoding.ReadObject(conn, &paymentRevision, modules.NegotiateMaxFileContractRevisionSize)
+	err = encoding.ReadObject(conn, &requests, modules.NegotiateMaxDownloadActionRequestSize)
 	if err != nil {
 		return err
 	}
-	var requests []modules.DownloadAction
-	err = encoding.ReadObject(conn, &requests, modules.NegotiateMaxDownloadActionRequestSize)
+	err = encoding.ReadObject(conn, &paymentRevision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
 		return err
 	}
@@ -199,6 +199,11 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 // the data has transferred the expected amount of money from the renter to the
 // host.
 func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, expectedTransfer types.Currency) error {
+	// Check that the revision is well-formed.
+	if len(paymentRevision.NewValidProofOutputs) != 2 || len(paymentRevision.NewMissedProofOutputs) != 3 {
+		return errInsaneFileContractRevisionOutputCounts
+	}
+
 	// The new revenue comes out of the renter's valid outputs.
 	if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
 		return errDownloadBadRenterValidOutputs
@@ -262,12 +267,16 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 	}
 
 	// Lock the storage obligation during the revision.
+	h.mu.Lock()
 	err = h.lockStorageObligation(so)
+	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	defer func() {
+		h.mu.Lock()
 		err = h.unlockStorageObligation(so)
+		h.mu.Unlock()
 		if err != nil {
 			h.log.Critical(err)
 		}

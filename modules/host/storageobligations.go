@@ -288,11 +288,6 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 // when creating a new, empty file contract or when renewing an existing file
 // contract.
 func (h *Host) addStorageObligation(so *storageObligation) error {
-	// Sanity check - 'addObligation' should not be adding an obligation that
-	// has a revision.
-	if len(so.RevisionTransactionSet) != 0 {
-		h.log.Critical("addStroageObligation called with an obligation that has a revision")
-	}
 	// Sanity check - obligation should be under lock while being added.
 	soid := so.id()
 	_, exists := h.lockedStorageObligations[soid]
