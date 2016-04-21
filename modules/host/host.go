@@ -134,7 +134,7 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 	dependencies
-	StorageManager
+	modules.StorageManager
 
 	// Consensus Tracking.
 	blockHeight  types.BlockHeight
