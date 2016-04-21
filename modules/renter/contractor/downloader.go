@@ -56,7 +56,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	// initiate download request by confirming host settings
-	if err := startRevision(hd.conn, hd.host, hd.contractor.hdb); err != nil {
+	if err := startDownload(hd.conn, hd.host, hd.contractor.hdb); err != nil {
 		return nil, err
 	}
 	// send download request
