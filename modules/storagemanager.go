@@ -1,10 +1,5 @@
 package modules
 
-// TODO: Need to explain the whole 'expiryHeight' thing.
-
-// TODO: Need to update the documentation to reflect the structural change
-// between the host and the storage manager.
-
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -36,40 +31,49 @@ type (
 		SuccessfulWrites uint64 `json:"successfulwrites"`
 	}
 
-	// A StorageManager is responsible for managing storage folders and sectors for
-	// the host.
+	// A StorageManager is responsible for managing storage folders and
+	// sectors. Sectors are the base unit of storage that gets moved between
+	// renters and hosts, and primarily is stored on the hosts.
 	StorageManager interface {
 		// AddSector will add a sector to the storage manager. If the sector
 		// already exists, a virtual sector will be added, meaning that the
 		// 'sectorData' will be ignored and no new disk space will be consumed.
+		// The expiry height is used to track what height the sector can be
+		// safely deleted at, though typically the host will manually delete
+		// the sector before the expiry height. The same sector can be added
+		// multiple times at different expiry heights, and the storage manager
+		// is expected to only store the data once.
 		AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error
 
-		// AddStorageFolder adds a storage folder to the host. The host may not
-		// check that there is enough space available on-disk to support as
-		// much storage as requested, though the host should gracefully handle
-		// running out of storage unexpectedly.
+		// AddStorageFolder adds a storage folder to the manager. The manager
+		// may not check that there is enough space available on-disk to
+		// support as much storage as requested, though the manager should
+		// gracefully handle running out of storage unexpectedly.
 		AddStorageFolder(path string, size uint64) error
 
 		// The storage manager needs to be able to shut down.
 		Close() error
 
-		// DeleteSector deletes a sector, meaning that the host will be unable
-		// to upload that sector and be unable to provide a storage proof on
-		// that sector. This function is not intended to be used, but is
-		// available in case a host is compelled by their government to delete
-		// a piece of illegal data.
+		// DeleteSector deletes a sector, meaning that the manager will be
+		// unable to upload that sector and be unable to provide a storage
+		// proof on that sector. DeleteSector is for removing the data
+		// entirely, and will remove instances of the sector appearing at all
+		// heights. The primary purpose of DeleteSector is to comply with legal
+		// requests to remove data.
 		DeleteSector(sectorRoot crypto.Hash) error
 
 		// ReadSector will read a sector from the storage manager, returning the
 		// bytes that match the input sector root.
 		ReadSector(sectorRoot crypto.Hash) ([]byte, error)
 
-		// RemoveSector will remove a sector from the storage manager.
+		// RemoveSector will remove a sector from the storage manager. The
+		// height at which the sector expires should be provided, so that the
+		// auto-expiry information for that sector can be properly updated.
 		RemoveSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error
 
-		// RemoveStorageFolder will remove a storage folder from the host. All
-		// storage on the folder will be moved to other storage folders,
-		// meaning that no data will be lost. If the host is unable to save
+		// RemoveStorageFolder will remove a storage folder from the manager.
+		// All storage on the folder will be moved to other storage folders,
+		// meaning that no data will be lost. If the manager is unable to save
 		// data, an error will be returned and the operation will be stopped.
 		RemoveStorageFolder(index int, force bool) error
 
@@ -78,17 +82,17 @@ type (
 		ResetStorageFolderHealth(index int) error
 
 		// ResizeStorageFolder will grow or shrink a storage folder in the
-		// host. The host may not check that there is enough space on-disk to
-		// support growing the storage folder, but should gracefully handle
-		// running out of space unexpectedly. When shrinking a storage folder,
-		// any data in the folder that needs to be moved will be placed into
-		// other storage folders, meaning that no data will be lost. If the
-		// host is unable to migrate the data, an error will be returned and
-		// the operation will be stopped.
+		// manager. The manager may not check that there is enough space
+		// on-disk to support growing the storage folder, but should gracefully
+		// handle running out of space unexpectedly. When shrinking a storage
+		// folder, any data in the folder that needs to be moved will be placed
+		// into other storage folders, meaning that no data will be lost. If
+		// the manager is unable to migrate the data, an error will be returned
+		// and the operation will be stopped.
 		ResizeStorageFolder(index int, newSize uint64) error
 
 		// StorageFolders will return a list of storage folders tracked by the
-		// host.
+		// manager.
 		StorageFolders() ([]StorageFolderMetadata, error)
 	}
 )
