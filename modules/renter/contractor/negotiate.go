@@ -63,8 +63,7 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	// create our key
 	ourSK, ourPK, err := crypto.GenerateKeyPair()
 	if err != nil {
-		encoding.WriteObject(conn, "internal error")
-		return Contract{}, errors.New("failed to generate keypair: " + err.Error())
+		return Contract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to generate keypair: "+err.Error()))
 	}
 	ourPublicKey := types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
@@ -86,8 +85,7 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	// build transaction containing fc
 	err = txnBuilder.FundSiacoins(renterCost.Add(fee))
 	if err != nil {
-		encoding.WriteObject(conn, "internal error")
-		return Contract{}, err
+		return Contract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to fund transaction: "+err.Error()))
 	}
 	txnBuilder.AddFileContract(fc)
 
@@ -140,7 +138,7 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	// sign the txn
 	signedTxnSet, err := txnBuilder.Sign(true)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign transaction: "+err.Error()))
 	}
 
 	// calculate signatures added by the transaction builder
@@ -150,8 +148,38 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 		addedSignatures = append(addedSignatures, signedTxnSet[len(signedTxnSet)-1].TransactionSignatures[i])
 	}
 
+	// create initial (no-op) revision, transaction, and signature
+	initRevision := types.FileContractRevision{
+		ParentID:          signedTxnSet[len(signedTxnSet)-1].FileContractID(0), // TODO: is this correct?
+		UnlockConditions:  uc,
+		NewRevisionNumber: fc.RevisionNumber + 1,
+
+		NewFileSize:           fc.FileSize,
+		NewFileMerkleRoot:     fc.FileMerkleRoot,
+		NewWindowStart:        fc.WindowStart,
+		NewWindowEnd:          fc.WindowEnd,
+		NewValidProofOutputs:  fc.ValidProofOutputs,
+		NewMissedProofOutputs: fc.MissedProofOutputs,
+		NewUnlockHash:         fc.UnlockHash,
+	}
+	renterRevisionSig := types.TransactionSignature{
+		ParentID:       crypto.Hash(initRevision.ParentID),
+		PublicKeyIndex: 0,
+		CoveredFields: types.CoveredFields{
+			FileContractRevisions: []uint64{0},
+		},
+	}
+	revisionTxn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{initRevision},
+		TransactionSignatures: []types.TransactionSignature{renterRevisionSig},
+	}
+	encodedSig, err := crypto.SignHash(revisionTxn.SigHash(0), ourSK)
+	if err != nil {
+		return Contract{}, modules.WriteNegotiationRejection(conn, errors.New("failed to sign revision transaction: "+err.Error()))
+	}
+	revisionTxn.TransactionSignatures[0].Signature = encodedSig[:]
+
 	// Send acceptance and signatures
-	// TODO: validate new txn
 	if err := modules.WriteNegotiationAcceptance(conn); err != nil {
 		return Contract{}, errors.New("couldn't send transaction acceptance: " + err.Error())
 	}
@@ -171,6 +199,11 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 	for _, sig := range hostSigs {
 		txnBuilder.AddTransactionSignature(sig)
 	}
+	var hostRevisionSig types.TransactionSignature
+	if err := encoding.ReadObject(conn, &hostRevisionSig, 2e3); err != nil {
+		return Contract{}, errors.New("couldn't read the host's revision signature: " + err.Error())
+	}
+	revisionTxn.TransactionSignatures = append(revisionTxn.TransactionSignatures, hostRevisionSig)
 
 	// Construct the final transaction.
 	txn, parentTxns = txnBuilder.View()
@@ -191,22 +224,11 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 
 	// create host contract
 	contract := Contract{
-		IP:           host.NetAddress,
-		ID:           fcid,
-		FileContract: fc,
-		LastRevision: types.FileContractRevision{
-			ParentID:              fcid,
-			UnlockConditions:      uc,
-			NewRevisionNumber:     fc.RevisionNumber,
-			NewFileSize:           fc.FileSize,
-			NewFileMerkleRoot:     fc.FileMerkleRoot,
-			NewWindowStart:        fc.WindowStart,
-			NewWindowEnd:          fc.WindowEnd,
-			NewValidProofOutputs:  []types.SiacoinOutput{fc.ValidProofOutputs[0], fc.ValidProofOutputs[1]},
-			NewMissedProofOutputs: []types.SiacoinOutput{fc.MissedProofOutputs[0], fc.MissedProofOutputs[1], fc.MissedProofOutputs[2]},
-			NewUnlockHash:         fc.UnlockHash,
-		},
-		LastRevisionTxn: types.Transaction{},
+		IP:              host.NetAddress,
+		ID:              fcid,
+		FileContract:    fc,
+		LastRevision:    initRevision,
+		LastRevisionTxn: revisionTxn,
 		SecretKey:       ourSK,
 	}
 
