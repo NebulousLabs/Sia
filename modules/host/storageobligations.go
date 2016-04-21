@@ -22,6 +22,9 @@ package host
 // error, which is bad. Well, or perhas we just need to have better logic
 // handling.
 
+// TODO: Need to make sure that 'revision confirmed' is actually looking only
+// at the most recent revision (I think it is...)
+
 // TODO: Make sure that not too many action items are being created.
 
 import (

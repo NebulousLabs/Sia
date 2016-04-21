@@ -18,7 +18,7 @@ func TestUnitMaxFileContractSetLenSanity(t *testing.T) {
 	// cause a failure later on in the host process. An extra 1kb is left
 	// because the file contract transaction is going to grow as the terms are
 	// negotiated and as signatures are added.
-	if MaxFileContractSetLen > TransactionSetSizeLimit-1e3 {
+	if NegotiateMaxFileContractSetLen > TransactionSetSizeLimit-1e3 {
 		t.Fatal("MaxfileContractSetLen does not have a sensible value - should be smaller than the TransactionSetSizeLimit")
 	}
 

@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -40,28 +39,30 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		return err
 	}
 
-	// Read a batch of download requests.
+	// Grab a set of variables that will be useful later in the function.
 	h.mu.RLock()
 	blockHeight := h.blockHeight
 	secretKey := h.secretKey
 	settings := h.settings
 	h.mu.RUnlock()
-	var requests []modules.DownloadAction
-	err = encoding.ReadObject(conn, &requests, 50e3)
+
+	// Read the file contract revision that pays for the download requests,
+	// followed by the download requests themselves.
+	var paymentRevision types.FileContractRevision
+	err = encoding.ReadObject(conn, &paymentRevision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
 		return err
 	}
-	// Read the file contract revision that pays for the download requests.
-	var paymentRevision types.FileContractRevision
-	err = encoding.ReadObject(conn, &paymentRevision, 16e3)
+	var requests []modules.DownloadAction
+	err = encoding.ReadObject(conn, &requests, modules.NegotiateMaxDownloadActionRequestSize)
 	if err != nil {
 		return err
 	}
 
 	// Verify that the request is acceptable, and then fetch all of the data
 	// for the renter.
+	existingRevision := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]
 	var payload [][]byte
-	var hostSignature types.TransactionSignature
 	err = func() error {
 		// Check that the length of each file is in-bounds, and that the total
 		// size being requested is acceptable.
@@ -79,7 +80,6 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		// Verify that the correct amount of money has been moved from the
 		// renter's contract funds to the host's contract funds.
 		expectedTransfer := settings.MinimumDownloadBandwidthPrice.Mul(types.NewCurrency64(totalSize))
-		existingRevision := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]
 		// Check that NewValidProofOutputs[0] is deducted by expectedTransfer.
 		if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) != 0 {
 			return errors.New("bad payments")
@@ -132,45 +132,33 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 			}
 			payload = append(payload, sectorData[request.Offset:request.Offset+request.Length])
 		}
-
-		// Read the transaction signature from the renter.
-		var renterSignature types.TransactionSignature
-		err = encoding.ReadObject(conn, &renterSignature, 16e3)
-		if err != nil {
-			return err
-		}
-		// Create the host signature for the revision.
-		cf := types.CoveredFields{
-			FileContractRevisions: []uint64{0},
-		}
-		hostSignature = types.TransactionSignature{
-			ParentID:       crypto.Hash(paymentRevision.ParentID),
-			PublicKeyIndex: 1,
-			CoveredFields:  cf,
-		}
-		txn := types.Transaction{
-			FileContractRevisions: []types.FileContractRevision{paymentRevision},
-			TransactionSignatures: []types.TransactionSignature{renterSignature, hostSignature},
-		}
-		sigHash := txn.SigHash(1)
-		encodedSig, err := crypto.SignHash(sigHash, secretKey)
-		if err != nil {
-			return err
-		}
-		txn.TransactionSignatures[1].Signature = encodedSig[:]
-
-		// Verify that the renter signature is valid.
-		err = txn.StandaloneValid(blockHeight)
-		if err != nil {
-			return modules.WriteNegotiationRejection(conn, err)
-		}
-		// Verify that the renter signature is covering the right fields.
-		if renterSignature.CoveredFields.WholeTransaction {
-			return errors.New("renter cannot cover the whole transaction")
-		}
-		// TODO: shouldn't we be calling that verify function in modules?
 		return nil
 	}()
+	if err != nil {
+		return modules.WriteNegotiationRejection(conn, err)
+	}
+	// Revision is acceptable, write acceptance.
+	err = modules.WriteNegotiationAcceptance(conn)
+	if err != nil {
+		return err
+	}
+
+	// Renter will send a transaction siganture for the file contract revision.
+	var renterSignature types.TransactionSignature
+	err = encoding.ReadObject(conn, &renterSignature, modules.NegotiateMaxTransactionSignatureSize)
+	if err != nil {
+		return err
+	}
+	txn, err := createRevisionSignature(paymentRevision, renterSignature, secretKey, blockHeight)
+
+	// Update the storage obligation.
+	paymentTransfer := existingRevision.NewValidProofOutputs[0].Value.Sub(paymentRevision.NewValidProofOutputs[0].Value)
+	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(paymentTransfer)
+	so.RevisionTransactionSet = []types.Transaction{{
+		FileContractRevisions: []types.FileContractRevision{paymentRevision},
+		TransactionSignatures: []types.TransactionSignature{renterSignature, txn.TransactionSignatures[1]},
+	}}
+	err = h.modifyStorageObligation(so, nil, nil, nil)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
@@ -182,7 +170,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	if err != nil {
 		return err
 	}
-	err = encoding.WriteObject(conn, hostSignature)
+	err = encoding.WriteObject(conn, txn.TransactionSignatures[1])
 	if err != nil {
 		return err
 	}
@@ -216,7 +204,7 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 
 	// Perform a loop that will allow downloads to happen until the maximum
 	// time for a single connection has been reached.
-	for time.Now().Before(startTime.Add(1200 * time.Second)) {
+	for time.Now().Before(startTime.Add(iteratedConnectionTime)) {
 		err := h.managedDownloadIteration(conn, so)
 		if err == modules.ErrStopResponse {
 			// The renter has indicated that it has finished downloading the

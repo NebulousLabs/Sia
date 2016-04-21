@@ -247,11 +247,11 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// contract from revision.
 	var txnSet []types.Transaction
 	var renterPK crypto.PublicKey
-	err = encoding.ReadObject(conn, &txnSet, modules.MaxFileContractSetLen)
+	err = encoding.ReadObject(conn, &txnSet, modules.NegotiateMaxFileContractSetLen)
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &renterPK, modules.MaxSiaPubkeySize)
+	err = encoding.ReadObject(conn, &renterPK, modules.NegotiateMaxSiaPubkeySize)
 	if err != nil {
 		return err
 	}
@@ -298,11 +298,11 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	}
 	var renterTxnSignatures []types.TransactionSignature
 	var renterRevisionSignature types.TransactionSignature
-	err = encoding.ReadObject(conn, &renterTxnSignatures, modules.MaxTransactionSignaturesSize)
+	err = encoding.ReadObject(conn, &renterTxnSignatures, modules.NegotiateMaxTransactionSignaturesSize)
 	if err != nil {
 		return err
 	}
-	err = encoding.ReadObject(conn, &renterRevisionSignature, modules.MaxTransactionSignatureSize)
+	err = encoding.ReadObject(conn, &renterRevisionSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
 		return err
 	}

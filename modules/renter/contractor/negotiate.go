@@ -41,7 +41,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 
 	// read signed host settings
 	var recvSettings modules.HostExternalSettings
-	if err := crypto.ReadSignedObject(conn, &recvSettings, modules.MaxHostExternalSettingsLen, pk); err != nil {
+	if err := crypto.ReadSignedObject(conn, &recvSettings, modules.NegotiateMaxHostExternalSettingsLen, pk); err != nil {
 		return modules.HostDBEntry{}, errors.New("couldn't read host's settings: " + err.Error())
 	}
 	if !recvSettings.AcceptingContracts {

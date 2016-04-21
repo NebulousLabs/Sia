@@ -132,7 +132,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	// are paid for by the revision.
 	var revision types.FileContractRevision
 	var modifications []modules.RevisionAction
-	err = encoding.ReadObject(conn, &revision, modules.MaxFileContractRevisionSize)
+	err = encoding.ReadObject(conn, &revision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
 		return err
 	}
@@ -142,8 +142,8 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	}
 
 	// First read all of the modifications. Then make the modifications, but
-	// with the ability to reverse them. Then verify the the file contract
-	// revision that comes down the line.
+	// with the ability to reverse them. Then verify the file contract revision
+	// correctly accounts for the changes.
 	var bandwidthRevenue types.Currency
 	var storageRevenue types.Currency
 	var newCollateral types.Currency
@@ -166,7 +166,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				return errLargeSector
 			}
 
-			switch modification.Type{
+			switch modification.Type {
 			case modules.ActionDelete:
 				// There is no financial information to change, it is enough to
 				// remove the sector.
@@ -221,7 +221,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 			}
 		}
 		newRevenue := storageRevenue.Add(bandwidthRevenue)
-		return verifyRevision(so, revision, newRevenue , newCollateral)
+		return verifyRevision(so, revision, newRevenue, newCollateral)
 	}()
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
@@ -232,10 +232,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 		return err
 	}
 
-	// Renter will now send the transaction signatures for the file contract
-	// revision.
+	// Renter will send a transaction signature for the file contract revision.
 	var renterSig types.TransactionSignature
-	err = encoding.ReadObject(conn, &renterSig, modules.MaxTransactionSignatureSize)
+	err = encoding.ReadObject(conn, &renterSig, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
 		return err
 	}

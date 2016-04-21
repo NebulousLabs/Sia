@@ -53,40 +53,46 @@ const (
 	// should be successful even if both parties are on Tor.
 	NegotiateSettingsTime = 120 * time.Second
 
-	// MaxErrorSize indicates the maximum number of bytes that can be used to
-	// encode an error being sent during negotiation.
-	MaxErrorSize = 256
+	// NegotiateMaxDownloadActionRequestSize defines the maximum size that a
+	// download request can be. Note, this is not a max size for the data that
+	// can be requested, but instead is a max size for the definition of the
+	// data being requested.
+	NegotiateMaxDownloadActionRequestSize = 50e3
 
-	// MaxFileContractRevisionSize specifies the maximum size that a file
-	// contract revision is allowed to have when being sent over the wire
+	// NegotiateMaxErrorSize indicates the maximum number of bytes that can be
+	// used to encode an error being sent during negotiation.
+	NegotiateMaxErrorSize = 256
+
+	// NegotiateMaxFileContractRevisionSize specifies the maximum size that a
+	// file contract revision is allowed to have when being sent over the wire
 	// during negotiation.
-	MaxFileContractRevisionSize = 3e3
+	NegotiateMaxFileContractRevisionSize = 3e3
 
-	// MaxFileContractSetLen determines the maximum allowed size of a
+	// NegotiateMaxFileContractSetLen determines the maximum allowed size of a
 	// transaction set that can be sent when trying to negotiate a file
 	// contract. The transaction set will contain all of the unconfirmed
 	// dependencies of the file contract, meaning that it can be quite large.
 	// The transaction pool's size limit for transaction sets has been chosen
 	// as a reasonable guideline for determining what is too large.
-	MaxFileContractSetLen = TransactionSetSizeLimit - 1e3
+	NegotiateMaxFileContractSetLen = TransactionSetSizeLimit - 1e3
 
-	// MaxHostExternalSettingsLen is the maximum allowed size of an encoded
-	// HostExternalSettings.
-	MaxHostExternalSettingsLen = 16000
+	// NegotiateMaxHostExternalSettingsLen is the maximum allowed size of an
+	// encoded HostExternalSettings.
+	NegotiateMaxHostExternalSettingsLen = 16000
 
-	// MaxSiaPubkeySize defines the maximum size that a SiaPubkey is allowed to
-	// be when being sent over the wire during negotiation.
-	MaxSiaPubkeySize = 1e3
+	// NegotiateMaxSiaPubkeySize defines the maximum size that a SiaPubkey is
+	// allowed to be when being sent over the wire during negotiation.
+	NegotiateMaxSiaPubkeySize = 1e3
 
-	// MaxTransactionSignatureSize defines the maximum size that a transaction
-	// signature is allowed to be when being sent over the wire during
-	// negoitation.
-	MaxTransactionSignatureSize = 2e3
+	// NegotiateMaxTransactionSignatureSize defines the maximum size that a
+	// transaction signature is allowed to be when being sent over the wire
+	// during negoitation.
+	NegotiateMaxTransactionSignatureSize = 2e3
 
-	// MaxTransactionSignaturesSize defines the maximum size that a transaction
-	// signature slice is allowed to be when being sent over the wire during
-	// negoitation.
-	MaxTransactionSignaturesSize = 5e3
+	// NegotiateMaxTransactionSignaturesSize defines the maximum size that a
+	// transaction signature slice is allowed to be when being sent over the
+	// wire during negoitation.
+	NegotiateMaxTransactionSignaturesSize = 5e3
 )
 
 var (
@@ -293,7 +299,7 @@ type (
 // fashion.
 func ReadNegotiationAcceptance(r io.Reader) error {
 	var resp string
-	err := encoding.ReadObject(r, &resp, MaxErrorSize)
+	err := encoding.ReadObject(r, &resp, NegotiateMaxErrorSize)
 	if err != nil {
 		return err
 	}
