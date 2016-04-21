@@ -186,11 +186,11 @@ File Contract Revision
    meaning if you are inserting 3 sectors at the front of the file contract,
    the indexes of each should be '0', '1', '2'.
 
-4. The host indicates either acceptance or rejection of the new revision.
+7. The host indicates either acceptance or rejection of the new revision.
 
-5. The renter signs the revision and sends the signature to the host.
+8. The renter signs the revision and sends the signature to the host.
 
-6. The host signs the revision and sends the siganture to the renter. Both
+9. The host signs the revision and sends the siganture to the renter. Both
    parties submit the new revision to the transaction pool. The connection
    deadline is reset to 600 seconds (unless the maximum deadline has been
    reached), and the loop restarts.
@@ -233,7 +233,24 @@ Data Request
    corresponding to the file contract that will be used to pay for the
    download.
 
-2. The host will send the renter the most recent file contract revision, along
+2. The host will respond with a 32 byte challenge - a random 32 bytes that the
+   renter will need to sign.
+
+3. The renter will sign the challenge with the public key that protects the
+   file contract being used to pay for the download. This proves that the
+   renter has access to the payment.
+
+4. The host will verify the challenge signature, and then send an acceptance or
+   rejection. If accepted, the host will send the most recent file contract
+   revision followed by the signautres that validate the revision. The host
+   will lock the file contract, preventing other connections from making
+   changes to the underlying storage obligation.
+
+   A loop begins. The host sends the most recent external settings to the
+   renter, signed. The settings are sent each iteration to provide high
+   resolution dynamic bandwidth pricing.
+
+5. The host will send the renter the most recent file contract revision, along
    with the signatures that validate the revision.
 
    A loop begins, which will allow the renter to download multiple batches of
@@ -243,22 +260,14 @@ Data Request
    the most recent revision (the host signs last), the renter may not have the
    most recent revision.
 
-3. The renter will accept or reject the host's settings. If accepting, the
-   renter will send a batch of download requests, which takes the form of a
-   batch size followed by each of the requests in order. This request is
-   followed by a file contract revision, which pays the host for the download
-   bandwidth that is about to be consumed. The revision will be signed. The
-   renter will also send a variable indicating whether another iteration is
-   desired.
+6. The renter will accept or reject the host's settings. If accepting, the
+   renter will send a file contract revision, unsigned, to pay for the download
+   request. The renter will then send the download request itself.
 
-   A download request can either be a full sector or a partial sector. A full
-   sector request will be followed by the hash of the sector. A partial sector
-   request will be followed by the hash of the sector that is being partially
-   downloaded, along with an offset and a length indicating which portion of
-   the sector is being downloaded.
+7. The host will either accept or reject the revision.
 
-4. The host will either accept or reject the revision. If accepted, the host
-   will upload all of the data. The host will indicate whether another
-   iteration is okay. If another iteration is acceptable, the deadline will be
-   reset to a minimum of 600 seconds. The host is expected to accept at least
-   1200 seconds of iterations.
+8. The renter will send a signature for the file contract revision.
+
+9. The host sends a signature for the file contract revision, followed by the
+   data that was requested by the download request. The loop starts over, and
+   the connection deadline is reset to a minimum of 600 seconds.
