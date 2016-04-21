@@ -82,26 +82,34 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errors.New("renew window must be less than period")
 	}
 
+	err := c.formContracts(a)
+	if err != nil {
+		return err
+	}
+
 	// Set the allowance.
 	c.mu.Lock()
-	old := c.allowance
 	c.allowance = a
 	c.mu.Unlock()
 
-	// If this is the first time the allowance has been set, form contracts
-	// immediately.
-	if old.Hosts == 0 {
-		return c.formContracts(a)
-	}
-
-	// Otherwise, if the new allowance is "significantly different" (to be
-	// defined more precisely later), form intermediary contracts.
-	if a.Funds.Cmp(old.Funds) > 0 {
-		// TODO: implement
-		// c.formContracts(diff(a, old))
-	}
-
 	return nil
+
+	/*
+		// If this is the first time the allowance has been set, form contracts
+		// immediately.
+		if old.Hosts == 0 {
+			return c.formContracts(a)
+		}
+
+		// Otherwise, if the new allowance is "significantly different" (to be
+		// defined more precisely later), form intermediary contracts.
+		if a.Funds.Cmp(old.Funds) > 0 {
+			// TODO: implement
+			// c.formContracts(diff(a, old))
+		}
+
+		return nil
+	*/
 }
 
 // Contracts returns the contracts formed by the contractor.
