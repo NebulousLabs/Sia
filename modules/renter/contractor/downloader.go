@@ -77,7 +77,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	// read sector data, completing one iteration of the download loop
 	// TODO: optimize this
 	var sectors [][]byte
-	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+8); err != nil {
+	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+16); err != nil {
 		return nil, err
 	} else if len(sectors) != 1 {
 		return nil, errors.New("host did not send enough sectors")

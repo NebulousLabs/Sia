@@ -196,7 +196,7 @@ func newDownloadRevision(rev types.FileContractRevision, downloadCost types.Curr
 	// move valid payout from renter to host
 	valid0, valid1 := move(downloadCost, rev.NewValidProofOutputs[0].Value, rev.NewValidProofOutputs[1].Value)
 	// move missed payout from renter to void
-	missed0, missed1 := move(downloadCost, rev.NewMissedProofOutputs[0].Value, rev.NewMissedProofOutputs[1].Value)
+	missed0, missed2 := move(downloadCost, rev.NewMissedProofOutputs[0].Value, rev.NewMissedProofOutputs[2].Value)
 
 	return types.FileContractRevision{
 		ParentID:          rev.ParentID,
@@ -212,8 +212,8 @@ func newDownloadRevision(rev types.FileContractRevision, downloadCost types.Curr
 		},
 		NewMissedProofOutputs: []types.SiacoinOutput{
 			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
-			{Value: missed1, UnlockHash: rev.NewMissedProofOutputs[1].UnlockHash},
-			// TODO: void???
+			rev.NewMissedProofOutputs[1], // host output is unchanged
+			{Value: missed2, UnlockHash: rev.NewMissedProofOutputs[2].UnlockHash},
 		},
 		NewUnlockHash: rev.NewUnlockHash,
 	}
