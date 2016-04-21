@@ -50,7 +50,7 @@ func (h *Host) verifyChallengeResponse(fcid types.FileContractID, challenge cryp
 		}
 	}
 
-	// Verify that the challegne response matches public key.
+	// Verify that the challegne response matches the public key.
 	var renterPK crypto.PublicKey
 	// Sanity check - there should be two public keys.
 	if len(recentRevision.UnlockConditions.PublicKeys) != 2 {
@@ -95,7 +95,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *s
 	var challenge crypto.Hash
 	_, err = rand.Read(challenge[:])
 	if err != nil {
-		return types.FileContractID{}, nil, modules.WriteNegotiationRejection(conn, err)
+		return types.FileContractID{}, nil, err
 	}
 	err = encoding.WriteObject(conn, challenge)
 	if err != nil {

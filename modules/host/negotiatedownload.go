@@ -71,11 +71,11 @@ var (
 	// errLargeDownloadBatch is returned if the renter requests a download
 	// batch that exceeds the maximum batch size that the host will
 	// accomondate.
-	errLargeDownloadBatch = errors.New("a batch of download requests has exceeded the maximum allowed download size")
+	errLargeDownloadBatch = errors.New("download request exceeded maximum batch size")
 
 	// errRequestOutOfBounds is returned when a download request is made which
 	// asks for elements of a sector which do not exist.
-	errRequestOutOfBounds = errors.New("a download request has been made that exceeds the sector boundaries")
+	errRequestOutOfBounds = errors.New("download request has invalid sector bounds")
 )
 
 // managedDownloadIteration is responsible for managing a single iteration of
