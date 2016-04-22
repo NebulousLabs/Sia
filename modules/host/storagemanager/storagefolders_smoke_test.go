@@ -1,5 +1,6 @@
-package host
+package storagemanager
 
+/*
 import (
 	"bytes"
 	"encoding/json"
@@ -15,48 +16,6 @@ import (
 
 	"github.com/NebulousLabs/bolt"
 )
-
-// probabilisticReset will probabilistically reboot the host before continuing.
-// This helps to verify that the persistence is working correctly. The reset is
-// probabilistic to make sure that the test is not passing because of the
-// reset.
-func (ht *hostTester) probabilisticReset() error {
-	rand, err := crypto.RandIntn(3)
-	if err != nil {
-		return err
-	}
-	if rand == 1 {
-		// Grab the potentially faulty dependencies and replace them with good
-		// dependencies so that closing happens without issues.
-		deps := ht.host.dependencies
-		ht.host.dependencies = productionDependencies{}
-		// Close the host, then create a new host to replace it.
-		err = ht.host.Close()
-		if err != nil {
-			return err
-		}
-		// Open the host with production dependencies so that there are no
-		// errors.
-		h, err := New(ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
-		if err != nil {
-			return err
-		}
-		h.dependencies = deps
-		ht.host = h
-	}
-	return nil
-}
-
-// createSector makes a random, unique sector that can be inserted into the
-// host.
-func createSector() (sectorRoot crypto.Hash, sectorData []byte, err error) {
-	sectorData, err = crypto.RandBytes(int(modules.SectorSize))
-	if err != nil {
-		return crypto.Hash{}, nil, err
-	}
-	sectorRoot = crypto.MerkleRoot(sectorData)
-	return sectorRoot, sectorData, nil
-}
 
 // sectorUsageCheck compares a manually maintained sector usage map to the
 // host's internal sector usage map, and returns an error if there are any
@@ -1004,3 +963,4 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Error("unexpected number of files in the host directory")
 	}
 }
+*/

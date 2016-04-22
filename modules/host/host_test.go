@@ -182,7 +182,7 @@ func newHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*8)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func newHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*8*2)
 	if err != nil {
 		return nil, err
 	}

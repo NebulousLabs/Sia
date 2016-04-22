@@ -1,7 +1,6 @@
 package host
 
 import (
-	"crypto/rand"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -39,10 +38,6 @@ type persistence struct {
 	SecretKey        crypto.SecretKey
 	Settings         modules.HostInternalSettings
 	UnlockHash       types.UnlockHash
-
-	// Storage Folders.
-	SectorSalt     crypto.Hash
-	StorageFolders []*storageFolder
 }
 
 // establishDefaults configures the default settings for the host, overwriting
@@ -76,10 +71,6 @@ func (h *Host) establishDefaults() error {
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],
 	}
-	_, err = rand.Read(h.sectorSalt[:])
-	if err != nil {
-		return err
-	}
 
 	// Subscribe to the consensus set.
 	err = h.initConsensusSubscription()
@@ -97,7 +88,6 @@ func (h *Host) initDB() error {
 		// database needs to be initialized. Create the database buckets.
 		buckets := [][]byte{
 			bucketActionItems,
-			bucketSectorUsage,
 			bucketStorageObligations,
 		}
 		for _, bucket := range buckets {
@@ -145,10 +135,6 @@ func (h *Host) load() error {
 	h.settings = p.Settings
 	h.unlockHash = p.UnlockHash
 
-	// Copy over storage folders.
-	h.storageFolders = p.StorageFolders
-	h.sectorSalt = p.SectorSalt
-
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
@@ -182,10 +168,6 @@ func (h *Host) save() error {
 		SecretKey:        h.secretKey,
 		Settings:         h.settings,
 		UnlockHash:       h.unlockHash,
-
-		// Storage Folders.
-		StorageFolders: h.storageFolders,
-		SectorSalt:     h.sectorSalt,
 	}
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 }

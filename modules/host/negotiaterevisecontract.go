@@ -199,7 +199,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				}
 
 				// Get the data for the new sector.
-				sector, err := h.readSector(so.SectorRoots[modification.SectorIndex])
+				sector, err := h.ReadSector(so.SectorRoots[modification.SectorIndex])
 				if err != nil {
 					return err
 				}

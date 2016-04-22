@@ -307,10 +307,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		return errors.New("fill me in")
 	}
 
-	// Add the storage obligation information to the database. Different code
-	// is used from 'addSector' because every single sector that's being added
-	// is supposed to be a virtual sector, there should be an error if it is
-	// not a virtual sector.
+	// Add the storage obligation information to the database.
 	err := h.db.Update(func(tx *bolt.Tx) error {
 		// Sanity check - a storage obligation using the same file contract id
 		// should not already exist. This situation can happen if the
@@ -326,31 +323,20 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 			return errDuplicateStorageObligation
 		}
 
-		// Update all of the sectors in the database so that the new virtual
-		// sector is added for this obligation.
-		bsu := tx.Bucket(bucketSectorUsage)
-		for _, root := range so.SectorRoots {
-			var usage sectorUsage
-			sectorUsageBytes := bsu.Get(h.sectorID(root[:]))
-			if sectorUsageBytes == nil {
-				h.log.Critical("host tried to add an obligation with a missing sector")
-				return errSectorNotFound
-			}
-			err := json.Unmarshal(sectorUsageBytes, &usage)
+		// If the storage obligation already has sectors, it means that the
+		// file contract is being renewed, and that the sector should be
+		// re-added with a new expriation height. If there is an error at any
+		// point, all of the sectors should be removed.
+		for i, root := range so.SectorRoots {
+			err := h.AddSector(root, so.expiration(), make([]byte, modules.SectorSize))
 			if err != nil {
-				return err
-			}
-			if usage.Corrupted {
-				h.log.Critical("host tried to add an obligation when one of the sectors is corrupted")
-				return errSectorNotFound
-			}
-			usage.Expiry = append(usage.Expiry, so.expiration())
-			usageBytes, err := json.Marshal(usage)
-			if err != nil {
-				return err
-			}
-			err = bsu.Put(h.sectorID(root[:]), usageBytes)
-			if err != nil {
+				// Remove all of the sectors that got added and return an error.
+				for j := 0; j < i; j++ {
+					removeErr := h.RemoveSector(so.SectorRoots[j], so.expiration())
+					if removeErr != nil {
+						h.log.Println(removeErr)
+					}
+				}
 				return err
 			}
 		}
@@ -441,7 +427,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 	var i int
 	var err error
 	for i = range sectorsGained {
-		err = h.addSector(sectorsGained[i], so.expiration(), gainedSectorData[i])
+		err = h.AddSector(sectorsGained[i], so.expiration(), gainedSectorData[i])
 		if err != nil {
 			break
 		}
@@ -452,7 +438,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		for j := 0; j < i; j++ {
 			// Error is not checkeed because there's nothing useful that can be
 			// done about an error.
-			_ = h.removeSector(sectorsGained[j], so.expiration())
+			_ = h.RemoveSector(sectorsGained[j], so.expiration())
 		}
 		return err
 	}
@@ -470,7 +456,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		for i := range sectorsGained {
 			// Error is not checkeed because there's nothing useful that can be
 			// done about an error.
-			_ = h.removeSector(sectorsGained[i], so.expiration())
+			_ = h.RemoveSector(sectorsGained[i], so.expiration())
 		}
 		return err
 	}
@@ -479,7 +465,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		// Error is not checkeed because there's nothing useful that can be
 		// done about an error. Failing to remove a sector is not a terrible
 		// place to be, especially if the host can run consistency checks.
-		_ = h.removeSector(sectorsRemoved[k], so.expiration())
+		_ = h.RemoveSector(sectorsRemoved[k], so.expiration())
 	}
 	return nil
 }
@@ -491,7 +477,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	for _, root := range so.SectorRoots {
 		// Error is not checked, we want to call remove on every sector even if
 		// there are problems - disk health information will be updated.
-		_ = h.removeSector(root, so.expiration())
+		_ = h.RemoveSector(root, so.expiration())
 	}
 
 	// Update the host revenue metrics based on the status of the obligation.
@@ -643,7 +629,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		sectorIndex := segmentIndex / (modules.SectorSize / crypto.SegmentSize)
 		// Pull the corresponding sector into memory.
 		sectorRoot := so.SectorRoots[sectorIndex]
-		sectorBytes, err := h.readSector(sectorRoot)
+		sectorBytes, err := h.ReadSector(sectorRoot)
 		if err != nil {
 			return
 		}

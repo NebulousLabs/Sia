@@ -1,4 +1,4 @@
-package host
+package storagemanager
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ import (
 // read from the filesystem, which means the problem manifests at the lowest
 // level, the sector level. Because data is missing, there is no 'repair'
 // operation that can be supported. The sector usage database should match the
-// storage obligation database, and should be patched if there's a mismatch.
+// storage obligation database, and should be patched if there's a mismatcsm.
 // The storage obligation database gets preference. Any missing sectors will be
 // treated as if they were filesystem problems.
 //
@@ -114,26 +114,29 @@ type sectorUsage struct {
 // keeps the filesize small and therefore limits the amount of load placed on
 // the filesystem when trying to manage hundreds of thousands or even tens of
 // millions of sectors in a single folder.
-func (h *Host) sectorID(sectorRootBytes []byte) []byte {
-	saltedRoot := crypto.HashAll(sectorRootBytes, h.sectorSalt)
+func (sm *StorageManager) sectorID(sectorRootBytes []byte) []byte {
+	saltedRoot := crypto.HashAll(sectorRootBytes, sm.sectorSalt)
 	id := make([]byte, base64.RawURLEncoding.EncodedLen(12))
 	base64.RawURLEncoding.Encode(id, saltedRoot[:12])
 	return id
 }
 
-// addSector will add a data sector to the host, correctly selecting the
+// AddSector will add a data sector to the host, correctly selecting the
 // storage folder in which the sector belongs.
-func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error {
+func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
 	// Sanity check - sector should have modules.SectorSize bytes.
 	if uint64(len(sectorData)) != modules.SectorSize {
-		h.log.Critical("incorrectly sized sector passed to addSector in the host")
-		return errors.New("incorrectly sized sector passed to addSector in the host")
+		sm.log.Critical("incorrectly sized sector passed to AddSector in the storage manager")
+		return errors.New("incorrectly sized sector passed to AddSector in the storage manager")
 	}
 
 	// Check that there is enough room for the sector in at least one storage
 	// folder - check will also guarantee that there is at least one storage folder.
 	enoughRoom := false
-	for _, sf := range h.storageFolders {
+	for _, sf := range sm.storageFolders {
 		if sf.SizeRemaining >= modules.SectorSize {
 			enoughRoom = true
 		}
@@ -143,9 +146,9 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 	}
 
 	// Determine which storage folder is going to receive the new sector.
-	err := h.db.Update(func(tx *bolt.Tx) error {
+	err := sm.db.Update(func(tx *bolt.Tx) error {
 		// Check whether the sector is a virtual sector.
-		sectorKey := h.sectorID(sectorRoot[:])
+		sectorKey := sm.sectorID(sectorRoot[:])
 		bsu := tx.Bucket(bucketSectorUsage)
 		usageBytes := bsu.Get(sectorKey)
 		var usage sectorUsage
@@ -173,17 +176,17 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 			if err != nil {
 				return err
 			}
-			return bsu.Put(h.sectorID(sectorRoot[:]), usageBytes)
+			return bsu.Put(sm.sectorID(sectorRoot[:]), usageBytes)
 		}
 
 		// Try adding the sector to disk. In the event of a failure, the host
 		// will try the next storage folder until there is either a success or
 		// until all options have been exhausted.
-		potentialFolders := h.storageFolders
+		potentialFolders := sm.storageFolders
 		emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
 		for emptiestFolder != nil {
-			sectorPath := filepath.Join(h.persistDir, emptiestFolder.uidString(), string(sectorKey))
-			err := h.dependencies.writeFile(sectorPath, sectorData, 0700)
+			sectorPath := filepath.Join(sm.persistDir, emptiestFolder.uidString(), string(sectorKey))
+			err := sm.dependencies.writeFile(sectorPath, sectorData, 0700)
 			if err != nil {
 				// Indicate to the user that the storage folder is having write
 				// trouble.
@@ -192,7 +195,7 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 				// Remove the attempted write - an an incomplete write can
 				// leave a partial file on disk. Error is not checked, we
 				// already know the disk is having trouble.
-				_ = h.dependencies.removeFile(sectorPath)
+				_ = sm.dependencies.removeFile(sectorPath)
 
 				// Remove the failed folder from the list of folders that can
 				// be tried.
@@ -225,14 +228,17 @@ func (h *Host) addSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight,
 	if err != nil {
 		return err
 	}
-	return h.save()
+	return sm.save()
 }
 
-// readSector will pull a sector from disk into memory.
-func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error) {
-	err = h.db.View(func(tx *bolt.Tx) error {
+// ReadSector will pull a sector from disk into memory.
+func (sm *StorageManager) ReadSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	err = sm.db.View(func(tx *bolt.Tx) error {
 		bsu := tx.Bucket(bucketSectorUsage)
-		sectorKey := h.sectorID(sectorRoot[:])
+		sectorKey := sm.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
 			return errSectorNotFound
@@ -243,11 +249,11 @@ func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error
 			return err
 		}
 
-		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(su.StorageFolder), string(sectorKey))
+		sectorPath := filepath.Join(sm.persistDir, hex.EncodeToString(su.StorageFolder), string(sectorKey))
 		sectorBytes, err = ioutil.ReadFile(sectorPath)
 		if err != nil {
 			// Mark the read failure in the sector.
-			sf := h.storageFolder(su.StorageFolder)
+			sf := sm.storageFolder(su.StorageFolder)
 			sf.FailedReads++
 			return err
 		}
@@ -256,14 +262,17 @@ func (h *Host) readSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error
 	return
 }
 
-// removeSector will remove a sector from the host at the given expiry height.
+// RemoveSector will remove a sector from the host at the given expiry height.
 // If the provided sector does not have an expiration at the given height, an
 // error will be thrown.
-func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error {
-	return h.db.Update(func(tx *bolt.Tx) error {
+func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	return sm.db.Update(func(tx *bolt.Tx) error {
 		// Grab the existing sector usage information from the database.
 		bsu := tx.Bucket(bucketSectorUsage)
-		sectorKey := h.sectorID(sectorRoot[:])
+		sectorKey := sm.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
 			return errSectorNotFound
@@ -274,7 +283,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 			return err
 		}
 		if len(usage.Expiry) == 0 {
-			h.log.Critical("sector recorded in database, but has no expirations")
+			sm.log.Critical("sector recorded in database, but has no expirations")
 			return errSectorNotFound
 		}
 		if len(usage.Expiry) == 1 && usage.Expiry[0] != expiryHeight {
@@ -311,7 +320,7 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 
 		// Get the storage folder that contains the phsyical sector.
 		var folder *storageFolder
-		for _, sf := range h.storageFolders {
+		for _, sf := range sm.storageFolders {
 			if bytes.Equal(sf.UID, usage.StorageFolder) {
 				folder = sf
 			}
@@ -319,8 +328,8 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 
 		// Remove the sector from the physical disk and update the storage
 		// folder metadata.
-		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
-		err = h.dependencies.removeFile(sectorPath)
+		sectorPath := filepath.Join(sm.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
+		err = sm.dependencies.removeFile(sectorPath)
 		if err != nil {
 			// Indicate that the storage folder is having write troubles.
 			folder.FailedWrites++
@@ -328,14 +337,14 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 		}
 		folder.SizeRemaining += modules.SectorSize
 		folder.SuccessfulWrites++
-		err = h.save()
+		err = sm.save()
 		if err != nil {
 			return err
 		}
 
 		// Delete the sector from the bucket - there are no more instances of
 		// this sector in the host.
-		return bsu.Delete(h.sectorID(sectorRoot[:]))
+		return bsu.Delete(sm.sectorID(sectorRoot[:]))
 	})
 }
 
@@ -344,19 +353,19 @@ func (h *Host) removeSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeig
 // will be unable to perform a storage proof on that sector. This function is
 // not intended to be used, however is available so that hosts can easily
 // comply if compelled by their government to delete certain data.
-func (h *Host) DeleteSector(sectorRoot crypto.Hash) error {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+func (sm *StorageManager) DeleteSector(sectorRoot crypto.Hash) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.resourceLock.RLock()
+	defer sm.resourceLock.RUnlock()
+	if sm.closed {
+		return errStorageManagerClosed
 	}
 
-	return h.db.Update(func(tx *bolt.Tx) error {
+	return sm.db.Update(func(tx *bolt.Tx) error {
 		// Check that the sector exists in the database.
 		bsu := tx.Bucket(bucketSectorUsage)
-		sectorKey := h.sectorID(sectorRoot[:])
+		sectorKey := sm.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
 			return errSectorNotFound
@@ -369,7 +378,7 @@ func (h *Host) DeleteSector(sectorRoot crypto.Hash) error {
 
 		// Get the storage folder that contains the phsyical sector.
 		var folder *storageFolder
-		for _, sf := range h.storageFolders {
+		for _, sf := range sm.storageFolders {
 			if bytes.Equal(sf.UID, usage.StorageFolder) {
 				folder = sf
 			}
@@ -378,8 +387,8 @@ func (h *Host) DeleteSector(sectorRoot crypto.Hash) error {
 		// Remove the sector from the physical disk and update the storage
 		// folder metadata. The file is removed from disk as early as possible
 		// to prevent potential errors from stopping the delete.
-		sectorPath := filepath.Join(h.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
-		err = h.dependencies.removeFile(sectorPath)
+		sectorPath := filepath.Join(sm.persistDir, hex.EncodeToString(usage.StorageFolder), string(sectorKey))
+		err = sm.dependencies.removeFile(sectorPath)
 		if err != nil {
 			// Indicate that the storage folder is having write troubles.
 			folder.FailedWrites++
@@ -387,7 +396,7 @@ func (h *Host) DeleteSector(sectorRoot crypto.Hash) error {
 		}
 		folder.SizeRemaining += modules.SectorSize
 		folder.SuccessfulWrites++
-		err = h.save()
+		err = sm.save()
 		if err != nil {
 			return err
 		}

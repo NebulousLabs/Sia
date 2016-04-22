@@ -54,6 +54,10 @@ package host
 // to the renter (and not just to it's calling function without informing the
 // renter what's up).
 
+// TODO: Need to make sure that the correct height is being used when adding
+// sectors to the storage manager - in some places right now WindowStart is
+// being used but really it's WindowEnd that should be in use.
+
 // TODO: clean up all of the magic numbers in the host.
 
 // TODO: revamp the finances for the storage obligations.
@@ -74,6 +78,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -129,6 +134,7 @@ type Host struct {
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
 	dependencies
+	modules.StorageManager
 
 	// Consensus Tracking.
 	blockHeight  types.BlockHeight
@@ -168,8 +174,6 @@ type Host struct {
 	// layout (knowledge which should be unavailable), but a limited amount of
 	// damage can be done even with this attack.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
-	sectorSalt               crypto.Hash
-	storageFolders           []*storageFolder
 
 	// Utilities.
 	db         *persist.BoltDatabase
@@ -246,6 +250,16 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 
 		persistDir: persistDir,
 		port:       port,
+	}
+
+	// Add the storage manager to the host.
+	//
+	// TODO: instead of hardcoding a storage manager, the storage manager
+	// should probably be chosen by the person that calls 'New', same way that
+	// the wallet, transaction pool, and consensus set are.
+	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
+	if err != nil {
+		return nil, err
 	}
 
 	// Create the perist directory if it does not yet exist.
@@ -328,6 +342,11 @@ func (h *Host) Close() (composedError error) {
 	h.resourceLock.Lock()
 	h.closed = true
 	h.resourceLock.Unlock()
+
+	err = h.StorageManager.Close()
+	if err != nil {
+		composedError = composeErrors(composedError, err)
+	}
 
 	// Close the bolt database.
 	err = h.db.Close()

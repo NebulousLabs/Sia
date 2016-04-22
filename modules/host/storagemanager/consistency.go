@@ -1,4 +1,4 @@
-package host
+package storagemanager
 
 import (
 	"errors"
@@ -45,30 +45,30 @@ var (
 
 // storageFolderSizeConsistency checks that all of the storage folders have
 // sane sizes.
-func (h *Host) storageFolderSizeConsistency() error {
+func (sm *StorageManager) storageFolderSizeConsistency() error {
 	knownUIDs := make(map[string]int)
-	for i, sf := range h.storageFolders {
+	for i, sf := range sm.storageFolders {
 		// The size of a storage folder should be between the minimum and the
 		// maximum allowed size.
 		if sf.Size > maximumStorageFolderSize {
-			h.log.Critical("storage folder", i, "exceeds the maximum allowed storage folder size")
+			sm.log.Critical("storage folder", i, "exceeds the maximum allowed storage folder size")
 			return errStorageFolderMaxSizeExceeded
 		}
 		if sf.Size < minimumStorageFolderSize {
-			h.log.Critical("storage folder", i, "has less than the minimum allowed storage folder size")
+			sm.log.Critical("storage folder", i, "has less than the minimum allowed storage folder size")
 			return errStorageFolderMinSizeViolated
 		}
 
 		// The amount of storage remaining should not be greater than the
 		// folder size.
 		if sf.SizeRemaining > sf.Size {
-			h.log.Critical("storage folder", i, "has more storage remaining than it has storage total")
+			sm.log.Critical("storage folder", i, "has more storage remaining than it has storage total")
 			return errStorageFolderSizeRemainingDivergence
 		}
 
 		// The UID has a fixed size.
 		if len(sf.UID) != storageFolderUIDSize {
-			h.log.Critical("storage folder", i, "has an ID which is not valid")
+			sm.log.Critical("storage folder", i, "has an ID which is not valid")
 			return errStorageFolderInvalidUIDLen
 		}
 
@@ -76,7 +76,7 @@ func (h *Host) storageFolderSizeConsistency() error {
 		// known storage folder UID.
 		conflict, exists := knownUIDs[sf.uidString()]
 		if exists {
-			h.log.Critical("storage folder", i, "has a duplicate UID, conflicting with storage folder", conflict)
+			sm.log.Critical("storage folder", i, "has a duplicate UID, conflicting with storage folder", conflict)
 			return errStorageFolderDuplicateUID
 		}
 		// Add this storage folder's UID to the set of known UIDs.

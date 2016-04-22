@@ -1,4 +1,4 @@
-package host
+package storagemanager
 
 import (
 	"testing"
@@ -84,17 +84,18 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := blankHostTester("TestAddStorageFolderUIDCollisions")
+	smt, err := newStorageManagerTester("TestAddStorageFolderUIDCollisions")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer smt.Close()
 
 	// Check that the environment requirements for the test have been met.
 	if storageFolderUIDSize != 1 {
-		t.Fatal("For this test, the host must be using storage folder UIDs that are 1 byte")
+		t.Fatal("For this test, the storage manager must be using storage folder UIDs that are 1 byte")
 	}
 	if maximumStorageFolders < 100 {
-		t.Fatal("For this test, the host must be allowed to have at least 100 storage folders")
+		t.Fatal("For this test, the storage manager must be allowed to have at least 100 storage folders")
 	}
 
 	// Create 100 storage folders, and check that there are no collisions
@@ -104,14 +105,14 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	// guaranteed, and running into repeated collisions (where two UIDs
 	// consecutively collide with existing UIDs) are highly likely.
 	for i := 0; i < maximumStorageFolders; i++ {
-		err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Check that there are no collisions.
 	uidMap := make(map[uint8]struct{})
-	for _, sf := range ht.host.storageFolders {
+	for _, sf := range smt.sm.storageFolders {
 		_, exists := uidMap[uint8(sf.UID[0])]
 		if exists {
 			t.Error("Collision")
@@ -120,21 +121,21 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	}
 	// For coverage purposes, try adding a storage folder after the maximum
 	// number of storage folders has been reached.
-	err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
 	if err != errMaxStorageFolders {
 		t.Fatal("expecting errMaxStorageFolders:", err)
 	}
 
 	// Try again, this time removing a random storage folder and then adding
 	// another one repeatedly - enough times to exceed the 256 possible folder
-	// UIDs that be chosen in the testing environment.
+	// UIDs that can be chosen in the testing environment.
 	for i := 0; i < 300; i++ {
 		// Repalce the very first storage folder.
-		err = ht.host.RemoveStorageFolder(0, false)
+		err = smt.sm.RemoveStorageFolder(0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,17 +145,17 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ht.host.RemoveStorageFolder(n, false)
+		err = smt.sm.RemoveStorageFolder(n, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ht.host.AddStorageFolder(ht.host.persistDir, minimumStorageFolderSize)
+		err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	uidMap = make(map[uint8]struct{})
-	for _, sf := range ht.host.storageFolders {
+	for _, sf := range smt.sm.storageFolders {
 		_, exists := uidMap[uint8(sf.UID[0])]
 		if exists {
 			t.Error("Collision")

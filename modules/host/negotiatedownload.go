@@ -144,7 +144,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 		// Load the sectors and build the data payload.
 		for _, request := range requests {
-			sectorData, err := h.readSector(request.MerkleRoot)
+			sectorData, err := h.ReadSector(request.MerkleRoot)
 			if err != nil {
 				return err
 			}
