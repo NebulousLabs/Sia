@@ -230,7 +230,6 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	err = editor.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -291,7 +290,6 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if !bytes.Equal(data, retrieved) {
 		t.Fatal("downloaded data does not match original")
 	}
-
 	err = downloader.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -350,7 +348,6 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	err = editor.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -409,5 +406,68 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	contract = c.contracts[contract.ID]
 	if len(contract.MerkleRoots) != 0 {
 		t.Fatal("contract should have no sectors:", contract.MerkleRoots)
+	}
+}
+
+// TestIntegrationModify tests that the contractor can modify a previously-
+// uploaded sector.
+func TestIntegrationModify(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationModify")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.newContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// revise the contract
+	editor, err := c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// insert the sector
+	_, err = editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// modify the sector
+	oldRoot := crypto.MerkleRoot(data)
+	offset, newData := uint64(10), []byte{1, 2, 3, 4, 5}
+	copy(data[offset:], newData)
+	newRoot := crypto.MerkleRoot(data)
+	contract = c.contracts[contract.ID]
+	editor, err = c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Modify(oldRoot, newRoot, offset, newData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

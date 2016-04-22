@@ -154,3 +154,41 @@ func newDownloadRevision(rev types.FileContractRevision, downloadCost types.Curr
 		NewUnlockHash: rev.NewUnlockHash,
 	}
 }
+
+// newModifyRevision revises the current revision to cover the cost of
+// modifying sector data.
+func newModifyRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, uploadCost types.Currency) types.FileContractRevision {
+	// move safely moves n coins from src to dest, avoiding negative currency
+	// panics. The new values of src and dest are returned.
+	move := func(n, src, dest types.Currency) (types.Currency, types.Currency) {
+		if n.Cmp(src) > 0 {
+			n = src
+		}
+		return src.Sub(n), dest.Add(n)
+	}
+
+	// move valid payout from renter to host
+	valid0, valid1 := move(uploadCost, rev.NewValidProofOutputs[0].Value, rev.NewValidProofOutputs[1].Value)
+	// move missed payout from renter to void
+	missed0, missed2 := move(uploadCost, rev.NewMissedProofOutputs[0].Value, rev.NewMissedProofOutputs[2].Value)
+
+	return types.FileContractRevision{
+		ParentID:          rev.ParentID,
+		UnlockConditions:  rev.UnlockConditions,
+		NewRevisionNumber: rev.NewRevisionNumber + 1,
+		NewFileSize:       rev.NewFileSize,
+		NewFileMerkleRoot: merkleRoot,
+		NewWindowStart:    rev.NewWindowStart,
+		NewWindowEnd:      rev.NewWindowEnd,
+		NewValidProofOutputs: []types.SiacoinOutput{
+			{Value: valid0, UnlockHash: rev.NewValidProofOutputs[0].UnlockHash},
+			{Value: valid1, UnlockHash: rev.NewValidProofOutputs[1].UnlockHash},
+		},
+		NewMissedProofOutputs: []types.SiacoinOutput{
+			{Value: missed0, UnlockHash: rev.NewMissedProofOutputs[0].UnlockHash},
+			rev.NewMissedProofOutputs[1], // host output is unchanged
+			{Value: missed2, UnlockHash: rev.NewMissedProofOutputs[2].UnlockHash},
+		},
+		NewUnlockHash: rev.NewUnlockHash,
+	}
+}

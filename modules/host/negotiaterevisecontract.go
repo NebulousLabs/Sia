@@ -206,7 +206,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				copy(sector[modification.Offset:], modification.Data)
 
 				// Update finances.
-				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
+				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(uint64(len(modification.Data)))))
 
 				// Update the sectors removed and gained to indicate that the old
 				// sector has been replaced with a new sector.

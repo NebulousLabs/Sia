@@ -56,11 +56,12 @@ func (uc *uploadDownloadContractor) Sector(root crypto.Hash) ([]byte, error) {
 }
 
 // stub implementations of the contractor.Editor methods
-func (*uploadDownloadContractor) Address() modules.NetAddress      { return "" }
-func (*uploadDownloadContractor) Delete(crypto.Hash) error         { return nil }
-func (*uploadDownloadContractor) ContractID() types.FileContractID { return types.FileContractID{} }
-func (*uploadDownloadContractor) EndHeight() types.BlockHeight     { return 10000 }
-func (*uploadDownloadContractor) Close() error                     { return nil }
+func (*uploadDownloadContractor) Address() modules.NetAddress                           { return "" }
+func (*uploadDownloadContractor) Delete(crypto.Hash) error                              { return nil }
+func (*uploadDownloadContractor) Modify(crypto.Hash, crypto.Hash, uint64, []byte) error { return nil }
+func (*uploadDownloadContractor) ContractID() types.FileContractID                      { return types.FileContractID{} }
+func (*uploadDownloadContractor) EndHeight() types.BlockHeight                          { return 10000 }
+func (*uploadDownloadContractor) Close() error                                          { return nil }
 
 // TestUploadDownload tests the Upload and Download methods using a mock
 // contractor.
