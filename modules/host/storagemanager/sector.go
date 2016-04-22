@@ -40,7 +40,7 @@ import (
 // read from the filesystem, which means the problem manifests at the lowest
 // level, the sector level. Because data is missing, there is no 'repair'
 // operation that can be supported. The sector usage database should match the
-// storage obligation database, and should be patched if there's a mismatcsm.
+// storage obligation database, and should be patched if there's a mismatch.
 // The storage obligation database gets preference. Any missing sectors will be
 // treated as if they were filesystem problems.
 //

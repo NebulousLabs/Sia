@@ -1,5 +1,6 @@
 package api
 
+/*
 import (
 	"net/url"
 	"path/filepath"
@@ -131,3 +132,4 @@ func TestIntegrationRenewing(t *testing.T) {
 		st.getAPI("/renter/files", &rf)
 	}
 }
+*/

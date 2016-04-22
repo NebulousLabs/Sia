@@ -184,10 +184,22 @@ func (h *Host) NetAddress() modules.NetAddress {
 	return h.autoAddress
 }
 
-// RPCMetrics returns information about the types of rpc calls that have been
-// made to the host.
-func (h *Host) RPCMetrics() modules.HostRPCMetrics {
-	return modules.HostRPCMetrics{
+// NetworkMetrics returns information about the types of rpc calls that have
+// been made to the host.
+func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	var na modules.NetAddress
+	if h.settings.NetAddress != "" {
+		na = h.settings.NetAddress
+	}
+	na = h.autoAddress
+	return modules.HostNetworkMetrics{
+		NetAddress: na,
+
+		// TODO: Up/Down bandwidth
+
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
 		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),

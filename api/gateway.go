@@ -8,6 +8,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+// TODO: GatewayInfo is not the right name for this struct.
 type GatewayInfo struct {
 	NetAddress modules.NetAddress `json:"netaddress"`
 	Peers      []modules.Peer     `json:"peers"`

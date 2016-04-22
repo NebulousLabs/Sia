@@ -1,153 +1,222 @@
 package api
 
 import (
-	//"fmt"
+	"errors"
+	"fmt"
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
 )
 
+var (
+	// errStorageFolderNotFound is returned if a call is made looking for a
+	// storage folder which does not appear to exist within the storage
+	// manager.
+	errStorageFolderNotFound = errors.New("storage folder with the provided path could not be found")
+)
+
 type (
 	// HostGET contains the information that is returned after a GET request to
-	// /host.
+	// /host - a bunch of information about the status of the host.
 	HostGET struct {
-		AcceptingContracts bool               `json:"acceptingcontracts"`
-		MaxDuration        types.BlockHeight  `json:"maxduration"`
-		NetAddress         modules.NetAddress `json:"netaddress"`
-		RemainingStorage   uint64             `json:"remainingstorage"`
-		TotalStorage       uint64             `json:"totalstorage"`
-		UnlockHash         types.UnlockHash   `json:"unlockhash"`
-		WindowSize         types.BlockHeight  `json:"windowsize"`
+		FinancialMetrics modules.HostFinancialMetrics `json:"financialmetrics"`
+		InternalSettings modules.HostInternalSettings `json:"internalsettings"`
+		NetworkMetrics   modules.HostNetworkMetrics   `json:"networkmetrics"`
+	}
 
-		Collateral             types.Currency `json:"collateral"`
-		ContractPrice          types.Currency `json:"contractprice"`
-		DownloadBandwidthPrice types.Currency `json:"downloadbandwidthprice"`
-		StoragePrice           types.Currency `json:"storageprice"`
-		UploadBandwidthPrice   types.Currency `json:"uploadbandwidthprice"`
-
-		AnticipatedRevenue types.Currency `json:"anticipatedrevenue"`
-		LostRevenue        types.Currency `json:"lostrevenue"`
-		NumContracts       uint64         `json:"numcontracts"`
-		Revenue            types.Currency `json:"revenue"`
-
-		RPCErrorCalls        uint64 `json:"rpcerrorcalls"`
-		RPCUnrecognizedCalls uint64 `json:"rpcunrecognizedcalls"`
-		RPCDownloadCalls     uint64 `json:"rpcdownloadcalls"`
-		RPCRenewCalls        uint64 `json:"rpcrenewcalls"`
-		RPCReviseCalls       uint64 `json:"rpcrevisecalls"`
-		RPCSettingsCalls     uint64 `json:"rpcsettingscalls"`
-		RPCUploadCalls       uint64 `json:"rpcuploadcalls"`
+	// StorageGET contains the information that is returned after a GET request
+	// to /storage - a bunch of information about the status of storage
+	// management on the host.
+	StorageGET struct {
+		StorageFolderMetadata []modules.StorageFolderMetadata
 	}
 )
 
-// hostHandlerGET handles GET requests to the /host API endpoint.
-func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, "TODO: fix/revamp this call")
-	// settings := srv.host.Settings()
-	// anticipatedRevenue, revenue, lostRevenue := srv.host.Revenue()
-	// rpcCalls := srv.host.RPCMetrics()
-	// hg := HostGET{
-	// 	AcceptingContracts: settings.AcceptingContracts,
-	// 	MaxDuration:        settings.MaxDuration,
-	// 	NetAddress:         settings.NetAddress,
-	// 	RemainingStorage:   srv.host.Capacity(),
-	// 	TotalStorage:       settings.TotalStorage,
-	// 	UnlockHash:         settings.UnlockHash,
-	// 	WindowSize:         settings.WindowSize,
-
-	// 	Collateral:             settings.Collateral,
-	// 	ContractPrice:          settings.ContractPrice,
-	// 	DownloadBandwidthPrice: settings.DownloadBandwidthPrice,
-	// 	StoragePrice:           settings.StoragePrice,
-	// 	UploadBandwidthPrice:   settings.UploadBandwidthPrice,
-
-	// 	AnticipatedRevenue: anticipatedRevenue,
-	// 	LostRevenue:        lostRevenue,
-	// 	NumContracts:       srv.host.Contracts(),
-	// 	Revenue:            revenue,
-
-	// 	RPCErrorCalls:        rpcCalls.ErrorCalls,
-	// 	RPCUnrecognizedCalls: rpcCalls.UnrecognizedCalls,
-	// 	RPCDownloadCalls:     rpcCalls.DownloadCalls,
-	// 	RPCRenewCalls:        rpcCalls.RenewCalls,
-	// 	RPCReviseCalls:       rpcCalls.ReviseCalls,
-	// 	RPCSettingsCalls:     rpcCalls.SettingsCalls,
-	// 	RPCUploadCalls:       rpcCalls.UploadCalls,
-	// }
-	// writeJSON(w, hg)
+// folderIndex determines the index of the storage folder with the provided
+// path.
+func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetadata) (int, error) {
+	for i, sf := range storageFolders {
+		if sf.Path == folderPath {
+			return i, nil
+		}
+	}
+	return -1, errStorageFolderNotFound
 }
 
-// hostHandlerPOST handles POST request to the /host API endpoint.
+// hostHandlerGET handles GET requests to the /host API endpoint, returning key
+// information about the host.
+func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	fm := srv.host.FinancialMetrics()
+	is := srv.host.InternalSettings()
+	nm := srv.host.NetworkMetrics()
+	hg := HostGET{
+		FinancialMetrics: fm,
+		InternalSettings: is,
+		NetworkMetrics:   nm,
+	}
+	writeJSON(w, hg)
+}
+
+// hostHandlerPOST handles POST request to the /host API endpoint, which sets
+// the internal settings of the host.
 func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, "TODO: fix/revamp this call")
-	// // Map each query string to a field in the host settings.
-	// settings := srv.host.Settings()
-	// qsVars := map[string]interface{}{
-	// 	// TODO: I'm not sure that allowing the user to set the netaddress via
-	// 	// SetSettings is a good idea, if they change it to a bad address, or
-	// 	// even a dns address... what happens?
-	// 	"acceptingcontracts": &settings.AcceptingContracts,
-	// 	"maxduration":        &settings.MaxDuration,
-	// 	"netaddress":         &settings.NetAddress,
-	// 	"windowsize":         &settings.WindowSize,
+	// Map each query string to a field in the host settings.
+	settings := srv.host.InternalSettings()
+	qsVars := map[string]interface{}{
+		"acceptingcontracts":   &settings.AcceptingContracts,
+		"maxduration":          &settings.MaxDuration,
+		"maxdownloadbatchsize": &settings.MaxDownloadBatchSize,
+		"maxrevisebatchsize":   &settings.MaxReviseBatchSize,
+		"netaddress":           &settings.NetAddress,
+		"windowsize":           &settings.WindowSize,
 
-	// 	"collateral":             &settings.Collateral,
-	// 	"contractprice":          &settings.ContractPrice,
-	// 	"downloadbandwidthprice": &settings.DownloadBandwidthPrice,
-	// 	"StoragePrice":           &settings.StoragePrice,
-	// 	"uploadbandwidthprice":   &settings.UploadBandwidthPrice,
-	// }
+		"collateral":            &settings.Collateral,
+		"collateralbudget":      &settings.CollateralBudget,
+		"maxcollateralfraction": &settings.MaxCollateralFraction,
+		"maxcollateral":         &settings.MaxCollateral,
 
-	// // Iterate through the query string and replace any fields that have been
-	// // altered.
-	// for qs := range qsVars {
-	// 	if req.FormValue(qs) != "" { // skip empty values
-	// 		_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
-	// 		if err != nil {
-	// 			writeError(w, "Malformed "+qs, http.StatusBadRequest)
-	// 			return
-	// 		}
-	// 	}
-	// }
-	// srv.host.SetSettings(settings)
-	// writeSuccess(w)
+		"downloadlimitgrowth": &settings.DownloadLimitGrowth,
+		"downloadlimitcap":    &settings.DownloadLimitCap,
+		"downloadspeedlimit":  &settings.DownloadSpeedLimit,
+		"uploadlimitgrowth":   &settings.UploadLimitGrowth,
+		"uploadlimitcap":      &settings.UploadLimitCap,
+		"uploadspeedlimit":    &settings.UploadSpeedLimit,
+
+		"minimumcontractprice":          &settings.MinimumContractPrice,
+		"minimumdownloadbandwidthprice": &settings.MinimumDownloadBandwidthPrice,
+		"minimumstorageprice":           &settings.MinimumStoragePrice,
+		"minimumuploadbandwidthprice":   &settings.MinimumUploadBandwidthPrice,
+	}
+
+	// Iterate through the query string and replace any fields that have been
+	// altered.
+	for qs := range qsVars {
+		if req.FormValue(qs) != "" { // skip empty values
+			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
+			if err != nil {
+				writeError(w, "Malformed "+qs, http.StatusBadRequest)
+				return
+			}
+		}
+	}
+	srv.host.SetInternalSettings(settings)
+	writeSuccess(w)
 }
 
 // hostAnnounceHandler handles the API call to get the host to announce itself
 // to the network.
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, "TODO: fix/revamp this call")
-	// var err error
-	// // TODO: should it just announce using the address found in host.Settings?
-	// // What happens if the two are different?
-	// if addr := req.FormValue("netaddress"); addr != "" {
-	// 	err = srv.host.AnnounceAddress(modules.NetAddress(addr))
-	// } else {
-	// 	err = srv.host.Announce()
-	// }
-	// if err != nil {
-	// 	writeError(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// writeSuccess(w)
+	var err error
+	if addr := req.FormValue("netaddress"); addr != "" {
+		err = srv.host.AnnounceAddress(modules.NetAddress(addr))
+	} else {
+		err = srv.host.Announce()
+	}
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
 }
 
-// hostDeleteHandler deletes a file contract from the host.
-func (srv *Server) hostDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	writeJSON(w, "TODO: fix/revamp this call")
-	// hash, err := scanAddress(ps.ByName("filecontractid"))
-	// if err != nil {
-	// 	writeError(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// fcid := types.FileContractID(hash)
-	// err = srv.host.DeleteContract(fcid)
-	// if err != nil {
-	// 	writeError(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// writeSuccess(w)
+// storageHandler returns a bunch of information about storage management on
+// the host.
+func (srv *Server) storageHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	sfs, err := srv.host.StorageFolders()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	sg := StorageGET{
+		StorageFolderMetadata: sfs,
+	}
+	writeJSON(w, sg)
+}
+
+// storageFoldersAddHandler adds a storage folder to the storage manager.
+func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	folderPath := ps.ByName("folder")
+	var folderSize uint64
+	_, err := fmt.Sscan(req.FormValue("size"), &folderSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.AddStorageFolder(folderPath, folderSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// storageFoldersResizeHandler resizes a storage folder in the storage manager.
+func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	folderPath := ps.ByName("folder")
+	storageFolders, err := srv.host.StorageFolders()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	folderIndex, err := folderIndex(folderPath, storageFolders)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var newSize uint64
+	_, err = fmt.Sscan(req.FormValue("newsize"), &newSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.ResizeStorageFolder(folderIndex, newSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// storageFoldersRemoveHandler removes a storage folder from the storage
+// manager.
+func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	folderPath := ps.ByName("folder")
+	storageFolders, err := srv.host.StorageFolders()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	folderIndex, err := folderIndex(folderPath, storageFolders)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	force := req.FormValue("force") == "true"
+	err = srv.host.RemoveStorageFolder(folderIndex, force)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// storageSectorsDeleteHandler handles the call to delete a sector from the
+// storage manager.
+func (srv *Server) storageSectorsDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	sectorRoot, err := scanAddress(ps.ByName("merkleroot"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.DeleteSector(crypto.Hash(sectorRoot))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
 }
