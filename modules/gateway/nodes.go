@@ -22,8 +22,8 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 		return errors.New("node already added")
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address is not routable: " + string(addr))
-	} else if net.ParseIP(addr.Host()).IsLoopback() {
-		return errors.New("cannot add loopback address")
+	} else if addr.IsValid() != nil {
+		return errors.New("address is not valid: " + string(addr))
 	}
 	g.nodes[addr] = struct{}{}
 	return nil
@@ -117,7 +117,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 // sendAddress is the calling end of the RelayNode RPC.
 func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 	// don't send if we aren't connectible
-	if g.Address().IsLoopback() {
+	if g.Address().IsValid() != nil {
 		return errors.New("can't send address without knowing external IP")
 	}
 	return encoding.WriteObject(conn, g.Address())

@@ -206,8 +206,11 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if addr == g.Address() {
 		return errors.New("can't connect to our own address")
 	}
-	if build.Release != "testing" && addr.IsLoopback() {
-		return errors.New("can't connect to loopback address")
+	if err := addr.IsValid(); err != nil {
+		// Allow loopback addresses only in testing.
+		if build.Release != "testing" || err != modules.ErrLoopbackAddr {
+			return errors.New("can't connect to invalid address")
+		}
 	}
 
 	id := g.mu.RLock()
