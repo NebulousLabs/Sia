@@ -192,7 +192,9 @@ func main() {
 	root.AddCommand(stopCmd)
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostFolderCmd, hostSectorCmd)
+	hostFolderCmd.AddCommand(hostFolderAddCmd, hostFolderRemoveCmd, hostFolderResizeCmd)
+	hostSectorCmd.AddCommand(hostSectorDeleteCmd)
 	hostCmd.Flags().BoolVarP(&hostVerbose, "verbose", "v", false, "Display detailed host info")
 
 	root.AddCommand(hostdbCmd)
