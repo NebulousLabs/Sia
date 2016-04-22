@@ -198,7 +198,6 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 		Renew:    renew,
 		// let the renter decide these values; eventually they will be configurable
 		ErasureCode: nil,
-		PieceSize:   0,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)

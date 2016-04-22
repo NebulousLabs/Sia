@@ -43,7 +43,6 @@ type FileUploadParams struct {
 	Duration    types.BlockHeight
 	Renew       bool
 	ErasureCode ErasureCoder
-	PieceSize   uint64
 }
 
 // FileInfo provides information about a file.

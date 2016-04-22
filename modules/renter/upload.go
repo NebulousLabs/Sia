@@ -11,16 +11,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// piece sizes
-	// NOTE: The encryption overhead is subtracted so that encrypted piece
-	// will always be a multiple of 64 (i.e. crypto.SegmentSize). Without this
-	// property, revisions break the file's Merkle root.
-	defaultPieceSize = 1<<22 - crypto.TwofishOverhead // 4 MiB
-	smallPieceSize   = 1<<16 - crypto.TwofishOverhead // 64 KiB
-)
-
 var (
+	// Erasure-coded piece size
+	pieceSize = modules.SectorSize - crypto.TwofishOverhead
+
 	// defaultDuration is the contract length that the renter will use when the
 	// uploader does not specify a duration.
 	defaultDuration = func() types.BlockHeight {
@@ -105,13 +99,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if up.ErasureCode == nil {
 		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
 	}
-	if up.PieceSize == 0 {
-		if fileInfo.Size() > defaultPieceSize {
-			up.PieceSize = defaultPieceSize
-		} else {
-			up.PieceSize = smallPieceSize
-		}
-	}
 
 	// Check that we have enough money to finance the upload.
 	err = r.checkWalletBalance(up)
@@ -120,7 +107,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	f := newFile(up.SiaPath, up.ErasureCode, up.PieceSize, uint64(fileInfo.Size()))
+	f := newFile(up.SiaPath, up.ErasureCode, pieceSize, uint64(fileInfo.Size()))
 	f.mode = uint32(fileInfo.Mode())
 
 	// Add file to renter.
