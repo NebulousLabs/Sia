@@ -310,7 +310,7 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	hostEntry, ok := c.hdb.Host(h.NetworkMetrics().NetAddress)
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -368,7 +368,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	hostEntry, ok := c.hdb.Host(h.NetworkMetrics().NetAddress)
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
@@ -423,7 +423,7 @@ func TestIntegrationModify(t *testing.T) {
 	}
 
 	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	hostEntry, ok := c.hdb.Host(h.NetworkMetrics().NetAddress)
 	if !ok {
 		t.Fatal("no entry for host in db")
 	}
