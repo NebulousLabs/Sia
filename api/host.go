@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
@@ -11,7 +12,7 @@ import (
 
 type (
 	// HostGET contains the information that is returned after a GET request to
-	// /host.
+	// /host - a bunch of information about the status of the host.
 	HostGET struct {
 		FinancialMetrics modules.HostFinancialMetrics `json:"financialmetrics"`
 		InternalSettings modules.HostInternalSettings `json:"internalsettings"`
@@ -33,7 +34,8 @@ func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ ht
 	writeJSON(w, hg)
 }
 
-// hostHandlerPOST handles POST request to the /host API endpoint.
+// hostHandlerPOST handles POST request to the /host API endpoint, which sets
+// the internal settings of the host.
 func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Map each query string to a field in the host settings.
 	settings := srv.host.InternalSettings()
@@ -94,19 +96,18 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 	writeSuccess(w)
 }
 
-// hostDeleteHandler deletes a file contract from the host.
-func (srv *Server) hostDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	writeJSON(w, "TODO: fix/revamp this call")
-	// hash, err := scanAddress(ps.ByName("filecontractid"))
-	// if err != nil {
-	// 	writeError(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// fcid := types.FileContractID(hash)
-	// err = srv.host.DeleteContract(fcid)
-	// if err != nil {
-	// 	writeError(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// writeSuccess(w)
+// storageSectorsDeleteHandler handles the call to delete a sector from the
+// storage manager.
+func (srv *Server) storageSectorsDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	sectorRoot, err := scanAddress(ps.ByName("merkleroot"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.DeleteSector(crypto.Hash(sectorRoot))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
 }
