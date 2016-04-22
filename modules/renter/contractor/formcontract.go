@@ -19,17 +19,18 @@ const (
 
 var (
 	// the contractor will not form contracts above this price
-	maxPrice = modules.StoragePriceToConsensus(500000) // 500k SC / TB / Month
+	maxPrice = modules.StoragePriceToConsensus(500e3) // 500k SC / TB / Month
 
-	errTooExpensive    = errors.New("host price was too high")
+	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
 	errSmallCollateral = errors.New("host collateral was too small")
+	errTooExpensive    = errors.New("host price was too high")
 )
 
 // formContract establishes a connection to a host and negotiates an initial
 // file contract according to the terms of the host.
 func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract, txnBuilder transactionBuilder, tpool transactionPool, renterCost types.Currency) (Contract, error) {
 	// allow 30 seconds for negotiation
-	conn.SetDeadline(time.Now().Add(30 * time.Second))
+	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
 
 	// create our key
 	ourSK, ourPK, err := crypto.GenerateKeyPair()
@@ -334,7 +335,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 		Mul(types.NewCurrency64(modules.SectorSize)).
 		Mul(types.NewCurrency64(uint64(a.Period)))
 	if a.Funds.Cmp(costPerSector) < 0 {
-		return errors.New("insufficient funds")
+		return errInsufficientAllowance
 	}
 
 	// Calculate the filesize of the contracts by using the average host price

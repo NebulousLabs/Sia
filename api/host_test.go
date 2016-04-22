@@ -1,6 +1,5 @@
 package api
 
-/*
 import (
 	"net/url"
 	"path/filepath"
@@ -13,19 +12,14 @@ import (
 // TestIntegrationHosting tests that the host correctly receives payment for
 // hosting files.
 func TestIntegrationHosting(t *testing.T) {
-	t.Skip("TODO: fix host/renter protocol")
-
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st, err := createServerTester("TestIntegrationHosting")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-
-	// Announce the host.
-	err = st.announceHost()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// create a file
 	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationHosting", "test.dat")
@@ -37,18 +31,17 @@ func TestIntegrationHosting(t *testing.T) {
 	// upload to host
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
-	uploadValues.Set("duration", "10")
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10); i++ {
+	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(50 * time.Millisecond)
 	}
-	if len(rf.Files) != 1 || rf.Files[0].UploadProgress != 10 {
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason")
 	}
 
@@ -58,19 +51,9 @@ func TestIntegrationHosting(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		st.miner.AddBlock()
 	}
-
-	// check profit
-	var hg HostGET
-	err = st.getAPI("/host", &hg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expRevenue := "15307662222222127617"
-	if hg.Revenue.String() != expRevenue {
-		t.Fatalf("host's profit was not affected: expected %v, got %v", expRevenue, hg.Revenue)
-	}
 }
 
+/*
 // TestIntegrationRenewing tests that the renter and host manage contract
 // renewals properly.
 func TestIntegrationRenewing(t *testing.T) {

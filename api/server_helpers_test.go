@@ -186,6 +186,21 @@ func createServerTester(name string) (*serverTester, error) {
 		}
 	}
 
+	// Announce the host.
+	err = st.announceHost()
+	if err != nil {
+		return nil, err
+	}
+
+	// Set an allowance for the renter.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "10000000000000000000000000000")
+	allowanceValues.Set("period", "5")
+	err = st.stdPostAPI("/renter/allowance", allowanceValues)
+	if err != nil {
+		return nil, err
+	}
+
 	return st, nil
 }
 

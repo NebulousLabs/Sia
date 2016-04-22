@@ -46,31 +46,6 @@ var (
 	}()
 )
 
-// checkWalletBalance looks at an upload and determines if there is enough
-// money in the wallet to support such an upload. An error is returned if it is
-// determined that there is not enough money.
-func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
-	if !r.wallet.Unlocked() {
-		return errors.New("wallet is locked")
-	}
-	// Get the size of the file.
-	fileInfo, err := os.Stat(up.Source)
-	if err != nil {
-		return err
-	}
-	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
-
-	averagePrice := r.hostDB.AveragePrice()
-	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
-	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
-
-	siacoinBalance, _, _ := r.wallet.ConfirmedBalance()
-	if bufferedCost.Cmp(siacoinBalance) > 0 {
-		return errors.New("insufficient balance for upload")
-	}
-	return nil
-}
-
 // Upload instructs the renter to start tracking a file. The renter will
 // automatically upload and repair tracked files using a background loop.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
@@ -98,12 +73,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	endHeight := r.cs.Height() + up.Duration
 	if up.ErasureCode == nil {
 		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
-	}
-
-	// Check that we have enough money to finance the upload.
-	err = r.checkWalletBalance(up)
-	if err != nil {
-		return err
 	}
 
 	// Create file object.
