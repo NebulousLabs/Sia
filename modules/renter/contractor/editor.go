@@ -23,6 +23,15 @@ var (
 	}()
 )
 
+// cachedRoot calculates the root of a set of existing Merkle roots.
+func cachedRoot(roots []crypto.Hash) crypto.Hash {
+	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
+	for _, h := range roots {
+		tree.Push(h)
+	}
+	return tree.Root()
+}
+
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.
 // Editors are the means by which the renter uploads data to hosts.
@@ -81,6 +90,39 @@ func (he *hostEditor) Close() error {
 	return he.conn.Close()
 }
 
+// runRevisionIteration submits actions and their accompanying revision to the
+// host for approval. If negotiation is successful, it updates the underlying
+// Contract.
+func (he *hostEditor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash, height types.BlockHeight) error {
+	// initiate revision
+	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
+		return err
+	}
+
+	// send actions
+	if err := encoding.WriteObject(he.conn, actions); err != nil {
+		return err
+	}
+
+	// send revision to host and exchange signatures
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
+	if err != nil {
+		return err
+	}
+
+	// update host contract
+	he.contract.LastRevision = rev
+	he.contract.LastRevisionTxn = signedTxn
+	he.contract.MerkleRoots = newRoots
+
+	he.contractor.mu.Lock()
+	he.contractor.contracts[he.contract.ID] = he.contract
+	he.contractor.save()
+	he.contractor.mu.Unlock()
+
+	return nil
+}
+
 // Upload revises an existing file contract with a host, and then uploads a
 // piece to it.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
@@ -104,50 +146,25 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	}
 	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 
-	// calculate the Merkle root of the new data (no error possible with bytes.Reader)
-	pieceRoot := crypto.MerkleRoot(data)
+	// calculate the new Merkle root
+	sectorRoot := crypto.MerkleRoot(data)
+	newRoots := append(he.contract.MerkleRoots, sectorRoot)
+	merkleRoot := cachedRoot(newRoots)
 
-	// calculate the new total Merkle root
-	newRoots := append(he.contract.MerkleRoots, pieceRoot)
-	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
-	for _, h := range newRoots {
-		tree.Push(h)
-	}
-	merkleRoot := tree.Root()
-
-	// initiate revision
-	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
-		return crypto.Hash{}, err
-	}
-
-	// send 'insert' action
-	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	// create the action and revision
+	actions := []modules.RevisionAction{{
 		Type:        modules.ActionInsert,
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
-	}})
-	if err != nil {
-		return crypto.Hash{}, err
-	}
-
-	// create and send revision to host for approval
+	}}
 	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
-	if err != nil {
+
+	// run the revision iteration
+	if err := he.runRevisionIteration(actions, rev, newRoots, height); err != nil {
 		return crypto.Hash{}, err
 	}
 
-	// update host contract
-	he.contract.LastRevision = rev
-	he.contract.LastRevisionTxn = signedTxn
-	he.contract.MerkleRoots = newRoots
-
-	he.contractor.mu.Lock()
-	he.contractor.contracts[he.contract.ID] = he.contract
-	he.contractor.save()
-	he.contractor.mu.Unlock()
-
-	return pieceRoot, nil
+	return sectorRoot, nil
 }
 
 // Delete deletes a sector in a contract.
@@ -177,46 +194,19 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	if index == -1 {
 		return errors.New("no record of that sector root")
 	}
-	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
-	for _, h := range newRoots {
-		tree.Push(h)
-	}
-	merkleRoot := tree.Root()
+	merkleRoot := cachedRoot(newRoots)
 
-	// initiate revision
-	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
-		return err
-	}
-
-	// send 'delete' action
-	err := encoding.WriteObject(he.conn, []modules.RevisionAction{{
+	// create the action and accompanying revision
+	actions := []modules.RevisionAction{{
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
-	}})
-	if err != nil {
-		return err
-	}
-
-	// create and send revision to host for approval
+	}}
 	// NOTE: no funds are transferred for a delete action
 	sectorPrice, sectorCollateral := types.ZeroCurrency, types.ZeroCurrency
 	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
-	if err != nil {
-		return err
-	}
 
-	// update host contract
-	he.contract.LastRevision = rev
-	he.contract.LastRevisionTxn = signedTxn
-	he.contract.MerkleRoots = newRoots
-
-	he.contractor.mu.Lock()
-	he.contractor.contracts[he.contract.ID] = he.contract
-	he.contractor.save()
-	he.contractor.mu.Unlock()
-
-	return nil
+	// run the revision iteration
+	return he.runRevisionIteration(actions, rev, newRoots, height)
 }
 
 // Editor initiates the contract revision process with a host, and returns
