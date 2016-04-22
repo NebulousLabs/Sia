@@ -80,9 +80,11 @@ type (
 		MinimumUploadBandwidthPrice   types.Currency      `json:"minimumuploadbandwidthprice"`
 	}
 
-	// HostRPCMetrics reports the quantity of each type of RPC call that has
-	// been made to the host.
-	HostRPCMetrics struct {
+	// HostNetworkMetrics reports the quantity of each type of RPC call that
+	// has been made to the host.
+	HostNetworkMetrics struct {
+		NetAddress NetAddress
+
 		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
 		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
 
@@ -111,16 +113,15 @@ type (
 		// InternalSettings returns the host's internal settings.
 		InternalSettings() HostInternalSettings
 
-		// NetAddress returns the host's network address
-		NetAddress() NetAddress
-
-		// RPCMetrics returns information on the types of RPC calls that have
-		// been made to the host.
-		RPCMetrics() HostRPCMetrics
+		// NetworkMetrics returns information on the types of RPC calls that
+		// have been made to the host.
+		NetworkMetrics() HostNetworkMetrics
 
 		// SetInternalSettings sets the hosting parameters of the host.
 		SetInternalSettings(HostInternalSettings) error
 
+		// The storage manager provides an interface for adding and removing
+		// storage folders and data sectors to the host.
 		StorageManager
 	}
 )
