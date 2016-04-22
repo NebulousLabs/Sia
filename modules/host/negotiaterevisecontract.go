@@ -246,6 +246,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(storageRevenue)
 	so.ConfirmedRevenue = so.ConfirmedRevenue.Add(bandwidthRevenue)
 	so.RiskedCollateral = so.RiskedCollateral.Add(newCollateral)
+	so.RevisionTransactionSet = []types.Transaction{txn}
 	err = h.modifyStorageObligation(so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)

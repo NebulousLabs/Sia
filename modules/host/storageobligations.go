@@ -448,9 +448,9 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 	}
 	if err != nil {
 		// Because there was an error, all of the sectors that got added need
-		// to be revered.
+		// to be reverted.
 		for j := 0; j < i; j++ {
-			// Error is not checkeed because there's nothing useful that can be
+			// Error is not checked because there's nothing useful that can be
 			// done about an error.
 			_ = h.removeSector(sectorsGained[j], so.expiration())
 		}
@@ -466,9 +466,9 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 	})
 	if err != nil {
 		// Because there was an error, all of the sectors that got added need
-		// to be revered.
+		// to be reverted.
 		for i := range sectorsGained {
-			// Error is not checkeed because there's nothing useful that can be
+			// Error is not checked because there's nothing useful that can be
 			// done about an error.
 			_ = h.removeSector(sectorsGained[i], so.expiration())
 		}

@@ -172,7 +172,7 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	var newRoots []crypto.Hash
 	index := -1
 	for i, h := range he.contract.MerkleRoots {
-		if h != root {
+		if h == root {
 			index = i
 		} else {
 			newRoots = append(newRoots, h)
