@@ -190,7 +190,7 @@ func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	var na modules.NetworkAddress
+	var na modules.NetAddress
 	if h.settings.NetAddress != "" {
 		na = h.settings.NetAddress
 	}

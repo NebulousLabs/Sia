@@ -72,10 +72,17 @@ func (srv *Server) initAPI() {
 
 	// Host API Calls
 	if srv.host != nil {
-		router.GET("/host", srv.hostHandlerGET)
-		router.POST("/host", srv.hostHandlerPOST)
-		router.POST("/host/announce", srv.hostAnnounceHandler)
-		router.POST("/host/delete/:filecontractid", srv.hostDeleteHandler)
+		// Calls directly pertaining to the host.
+		router.GET("/host", srv.hostHandlerGET)                // Get a bunch of information about the host.
+		router.POST("/host", srv.hostHandlerPOST)              // Set HostInternalSettings.
+		router.POST("/host/announce", srv.hostAnnounceHandler) // Announce the host, optionally on a specific address.
+
+		// Calls pertaining to the storage manager that the host uses.
+		router.GET("/storage", srv.storageHandler)
+		router.POST("/storage/addfolder", srv.storageAddfolderHandler)
+		router.POST("/storage/delete/:sectorroot", srv.storageDeleteSectorroot)
+		router.POST("/storage/resizefolder", srv.storageResizefolderHandler)
+		router.POST("/storage/removefolder", srv.storageRemovefolderHandler)
 	}
 
 	// Miner API Calls
