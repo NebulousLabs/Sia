@@ -255,7 +255,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.newContract(hostEntry, 64000, c.blockHeight+100)
+	contract, err := c.newContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,6 +279,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// download the data
+	contract = c.contracts[contract.ID]
 	downloader, err := c.Downloader(contract)
 	if err != nil {
 		t.Fatal(err)
