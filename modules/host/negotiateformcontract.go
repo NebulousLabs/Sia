@@ -174,8 +174,9 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	fullTxn, parentTxns := builder.View()
 	hostPortion := contractCollateral(h.settings, append(parentTxns, fullTxn))
 	so := &storageObligation{
-		ConfirmedRevenue:       h.settings.MinimumContractPrice,
-		LockedCollateral:       hostPortion,
+		ContractCost:     h.settings.MinimumContractPrice,
+		LockedCollateral: hostPortion,
+
 		OriginTransactionSet:   fullTxnSet,
 		RevisionTransactionSet: []types.Transaction{revisionTransaction},
 	}

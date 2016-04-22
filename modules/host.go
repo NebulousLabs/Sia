@@ -25,9 +25,10 @@ type (
 		// Metrics related to storage proofs, collateral, and submitting
 		// transactions to the blockchain.
 		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
+		LostRevenue             types.Currency `json:"lostrevenue"`
 		LostStorageCollateral   types.Currency `json:"loststoragecollateral"`
-		LostStorageRevenue      types.Currency `json:"loststoragerevenue"`
-		PotentialStorageRevenue types.Currency `json:"potentialstoragerevenue"`
+		PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
+		RiskedStorageCollateral types.Currency `json:"riskedstoragecollateral"`
 		StorageRevenue          types.Currency `json:"storagerevenue"`
 		TransactionFeeExpenses  types.Currency `json:"transactionfeeexpenses"`
 

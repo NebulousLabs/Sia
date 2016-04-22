@@ -123,19 +123,16 @@ type storageObligation struct {
 	// Variables about the file contract that enforces the storage obligation.
 	// The origin an revision transaction are stored as a set, where the set
 	// contains potentially unconfirmed transactions.
-	//
-	// Note: as of implementation, the transaction pool does not correctly
-	// handle being given transaction sets where part of the transaction set
-	// has already been confirmed on the blockchain. Therefore, when trying to
-	// submit a transaction set it is important to try several subsets to rule
-	// out the possibility that the transaction set is partially confirmed.
-	AnticipatedRevenue     types.Currency
-	ConfirmedRevenue       types.Currency
-	LockedCollateral       types.Currency
+	ContractCost             types.Currency
+	LockedCollateral         types.Currency
+	PotentialDownloadRevenue types.Currency
+	PotentialStorageRevenue  types.Currency
+	PotentialUploadRevenue   types.Currency
+	RiskedCollateral         types.Currency
+	TransactionFeesAdded     types.Currency
+
 	OriginTransactionSet   []types.Transaction
 	RevisionTransactionSet []types.Transaction
-	RiskedCollateral       types.Currency
-	TransactionFeesAdded   types.Currency
 
 	// Variables indicating whether the critical transactions in a storage
 	// obligation have been confirmed on the blockchain.
@@ -256,6 +253,11 @@ func (so *storageObligation) proofDeadline() types.BlockHeight {
 	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].WindowEnd
 }
 
+// value returns the value of fulfilling the storage obligation to the host.
+func (so *storageObligation) value() types.Currency {
+	return so.ContractCost.Add(so.PotentialDownloadRevenue).Add(so.PotentialStorageRevenue).Add(so.PotentialUploadRevenue).Add(so.RiskedCollateral)
+}
+
 // queueActionItem adds an action item to the host at the input height so that
 // the host knows to perform maintenance on the associated storage obligation
 // when that height is reached.
@@ -352,6 +354,16 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		return err
 	}
 
+	// Update the host financial metrics with regards to this storage
+	// obligation.
+	h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
+	h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
+	h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
+	h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Add(so.PotentialDownloadRevenue)
+	h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Add(so.PotentialUploadRevenue)
+	h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Add(so.RiskedCollateral)
+	h.financialMetrics.TransactionFeeExpenses = h.financialMetrics.TransactionFeeExpenses.Add(so.TransactionFeesAdded)
+
 	// Set an action item that will have the host verify that the file contract
 	// has been submitted to the blockchain, then another to submit the file
 	// contract revision to the blockchain, and another to submit the storage
@@ -443,12 +455,17 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		return err
 	}
 	// Update the database to contain the new storage obligation.
+	var oldSO storageObligation
 	err = h.db.Update(func(tx *bolt.Tx) error {
-		soBytes, err := json.Marshal(*so)
+		// Get the old storage obligation as a reference to know how to upate
+		// the host financial stats.
+		oldSO, err = getStorageObligation(tx, soid)
 		if err != nil {
 			return err
 		}
-		return tx.Bucket(bucketStorageObligations).Put(soid[:], soBytes)
+
+		// Store the new storage obligation to replace the old one.
+		return putStorageObligation(tx, *so)
 	})
 	if err != nil {
 		// Because there was an error, all of the sectors that got added need
@@ -467,6 +484,26 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		// place to be, especially if the host can run consistency checks.
 		_ = h.RemoveSector(sectorsRemoved[k], so.expiration())
 	}
+
+	// Update the financial information for the storage obligation - remove the
+	// old values.
+	h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(oldSO.ContractCost)
+	h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(oldSO.LockedCollateral)
+	h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(oldSO.PotentialStorageRevenue)
+	h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Sub(oldSO.PotentialDownloadRevenue)
+	h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Sub(oldSO.PotentialUploadRevenue)
+	h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Sub(oldSO.RiskedCollateral)
+	h.financialMetrics.TransactionFeeExpenses = h.financialMetrics.TransactionFeeExpenses.Sub(oldSO.TransactionFeesAdded)
+
+	// Update the financial information for the storage obligation - apply the
+	// new values.
+	h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
+	h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
+	h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
+	h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Add(so.PotentialDownloadRevenue)
+	h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Add(so.PotentialUploadRevenue)
+	h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Add(so.RiskedCollateral)
+	h.financialMetrics.TransactionFeeExpenses = h.financialMetrics.TransactionFeeExpenses.Add(so.TransactionFeesAdded)
 	return nil
 }
 
@@ -485,24 +522,42 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 		h.log.Critical("storage obligation confused!")
 	}
 	if sos == obligationRejected {
-		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.AnticipatedRevenue)
-		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.RiskedCollateral)
-		// h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCompensation)
+		// Remove the obligation statistics as potential risk and income.
+		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
+		h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Sub(so.PotentialDownloadRevenue)
+		h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Sub(so.PotentialUploadRevenue)
+		h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Sub(so.RiskedCollateral)
+		h.financialMetrics.TransactionFeeExpenses = h.financialMetrics.TransactionFeeExpenses.Sub(so.TransactionFeesAdded)
 	}
 	if sos == obligationSucceeded {
-		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.AnticipatedRevenue)
-		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.RiskedCollateral)
-		h.financialMetrics.StorageRevenue = h.financialMetrics.StorageRevenue.Add(so.AnticipatedRevenue)
-		// TODO: h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCompensation)
-		// TODO: h.financialMetrics.ContractCompensation = h.financialMetrics.ContractCompensation.Add(so.ContractCompensation)
+		// Remove the obligation statistics as potential risk and income.
+		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
+		h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Sub(so.PotentialDownloadRevenue)
+		h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Sub(so.PotentialUploadRevenue)
+		h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Sub(so.RiskedCollateral)
+
+		// Add the obligation statistics as actual income.
+		h.financialMetrics.ContractCompensation = h.financialMetrics.ContractCompensation.Add(so.ContractCost)
+		h.financialMetrics.StorageRevenue = h.financialMetrics.StorageRevenue.Add(so.PotentialStorageRevenue)
+		h.financialMetrics.DownloadBandwidthRevenue = h.financialMetrics.DownloadBandwidthRevenue.Add(so.PotentialDownloadRevenue)
+		h.financialMetrics.UploadBandwidthRevenue = h.financialMetrics.UploadBandwidthRevenue.Add(so.PotentialUploadRevenue)
 	}
 	if sos == obligationFailed {
-		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.AnticipatedRevenue)
-		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.RiskedCollateral)
+		// Remove the obligation statistics as potential risk and income.
+		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
+		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
+		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
+		h.financialMetrics.PotentialDownloadBandwidthRevenue = h.financialMetrics.PotentialDownloadBandwidthRevenue.Sub(so.PotentialDownloadRevenue)
+		h.financialMetrics.PotentialUploadBandwidthRevenue = h.financialMetrics.PotentialUploadBandwidthRevenue.Sub(so.PotentialUploadRevenue)
+		h.financialMetrics.RiskedStorageCollateral = h.financialMetrics.RiskedStorageCollateral.Sub(so.RiskedCollateral)
+
+		// Add the obligation statistics as loss.
 		h.financialMetrics.LostStorageCollateral = h.financialMetrics.LostStorageCollateral.Add(so.RiskedCollateral)
-		h.financialMetrics.LostStorageRevenue = h.financialMetrics.LostStorageRevenue.Add(so.AnticipatedRevenue)
-		// TODO: h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCompensation)
-		// TODO: h.financialMetrics.ContractCompensation = h.financialMetrics.ContractCompensation.Add(so.ContractCompensation)
+		h.financialMetrics.LostRevenue = h.financialMetrics.LostRevenue.Add(so.ContractCost).Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue)
 	}
 
 	// Delete the storage obligation from the database.
@@ -578,7 +633,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		revisionTxn := so.RevisionTransactionSet[revisionTxnIndex]
 		builder := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
 		feeRecommendation, _ := h.tpool.FeeEstimation()
-		if so.AnticipatedRevenue.Mul(types.NewCurrency64(2)).Cmp(feeRecommendation) < 0 {
+		if so.value().Div(types.NewCurrency64(2)).Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the revision if the fee is more than
 			// half of the anticipated revenue - fee market went up
 			// unexpectedly, and the money that the renter paid to cover the
@@ -658,7 +713,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// Create and build the transaction with the storage proof.
 		builder := h.wallet.StartTransaction()
 		feeRecommendation, _ := h.tpool.FeeEstimation()
-		if so.AnticipatedRevenue.Cmp(feeRecommendation) < 0 {
+		if so.value().Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the storage proof of the fee is more
 			// than the anticipated revenue.
 			return
