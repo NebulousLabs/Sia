@@ -10,27 +10,6 @@ const (
 )
 
 type (
-	// HostBandwidthLimits set limits on the volume, price, and speed of data
-	// that's available to the host. Because different ISPs and setups have
-	// different rules governing appropriate limits, and because there's a
-	// profit incentive to matching the limits as close as possible, and
-	// because there might be intelligent ways to allocate data that require
-	// outside information (for example, more data available at night), the
-	// limits have been created with the idea that some external process will
-	// be able to adjust them constantly to conform to transfer limits and take
-	// advantage of low-traffic or low-cost hours.
-	HostBandwidthLimits struct {
-		DownloadLimitGrowth uint64         `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
-		DownloadLimitCap    uint64         `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.
-		DownloadMinPrice    types.Currency `json:"downloadminprice"`    // The minimum price in Hastings per byte of download bandwidth.
-		DownloadSpeedLimit  uint64         `json:"downloadspeedlimit"`  // The maximum download speed for all combined host connections.
-
-		UploadLimitGrwoth uint64         `json:"uploadlimitgrowth"` // Bytes per second that get added to the limit for how much upload bandwidth the host is allowed to use.
-		UploadLimitCap    uint64         `json:"uploadlimitcap"`    // The maximum size of the limit for how much upload bandwidth the host is allowed to use.
-		UploadMinPrice    types.Currency `json:"uploadminprice"`    // The minimum price in Hastings per byte of download bandwidth.
-		UploadSpeedLimit  uint64         `json:"uploadspeedlimit"`  // The maximum upload speed for all combined host connections.
-	}
-
 	// HostFinancialMetrics provides financial statistics for the host,
 	// including money that is locked in contracts. Though verbose, these
 	// statistics should provide a clear picture of where the host's money is
@@ -73,11 +52,17 @@ type (
 		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
 		MaxCollateral         types.Currency `json:"maxcollateral"`
 
-		BandwidthLimits               HostBandwidthLimits `json:"bandwidthlimits"`
-		MinimumContractPrice          types.Currency      `json:"contractprice"`
-		MinimumDownloadBandwidthPrice types.Currency      `json:"minimumdownloadbandwidthprice"`
-		MinimumStoragePrice           types.Currency      `json:"storageprice"`
-		MinimumUploadBandwidthPrice   types.Currency      `json:"minimumuploadbandwidthprice"`
+		DownloadLimitGrowth uint64 `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
+		DownloadLimitCap    uint64 `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.
+		DownloadSpeedLimit  uint64 `json:"downloadspeedlimit"`  // The maximum download speed for all combined host connections.
+		UploadLimitGrowth   uint64 `json:"uploadlimitgrowth"`   // Bytes per second that get added to the limit for how much upload bandwidth the host is allowed to use.
+		UploadLimitCap      uint64 `json:"uploadlimitcap"`      // The maximum size of the limit for how much upload bandwidth the host is allowed to use.
+		UploadSpeedLimit    uint64 `json:"uploadspeedlimit"`    // The maximum upload speed for all combined host connections.
+
+		MinimumContractPrice          types.Currency `json:"contractprice"`
+		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
+		MinimumStoragePrice           types.Currency `json:"storageprice"`
+		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
 	}
 
 	// HostNetworkMetrics reports the quantity of each type of RPC call that

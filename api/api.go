@@ -79,10 +79,10 @@ func (srv *Server) initAPI() {
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/storage", srv.storageHandler)
-		router.POST("/storage/addfolder", srv.storageAddfolderHandler)
-		router.POST("/storage/delete/:sectorroot", srv.storageDeleteSectorroot)
-		router.POST("/storage/resizefolder", srv.storageResizefolderHandler)
-		router.POST("/storage/removefolder", srv.storageRemovefolderHandler)
+		router.POST("/storage/folders/add/*folder", srv.storageFolderAddHandler)
+		router.POST("/storage/folders/resize/*folder", srv.storageFolderResizeHandler)
+		router.POST("/storage/folders/remove/*folder", srv.storageFolderRemoveHandler)
+		router.POST("/storage/sectors/delete/:sectorroot", srv.storageSectorDeleteHandler)
 	}
 
 	// Miner API Calls
