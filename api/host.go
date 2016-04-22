@@ -196,12 +196,7 @@ func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.
 		return
 	}
 
-	var force bool
-	_, err = fmt.Sscan(req.FormValue("force"), &force)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	force := req.FormValue("force") == "true"
 	err = srv.host.RemoveStorageFolder(folderIndex, force)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
