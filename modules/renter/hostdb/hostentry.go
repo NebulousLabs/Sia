@@ -10,9 +10,9 @@ import (
 type hostEntry struct {
 	modules.HostDBEntry
 
-	weight      types.Currency
-	reliability types.Currency
-	online      bool
+	Weight      types.Currency
+	Reliability types.Currency
+	Online      bool
 }
 
 // insert adds a host entry to the state. The host will be inserted into the
@@ -36,7 +36,7 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 	// Create hostEntry and add to allHosts.
 	h := &hostEntry{
 		HostDBEntry: host,
-		reliability: DefaultReliability,
+		Reliability: DefaultReliability,
 	}
 	hdb.allHosts[host.NetAddress] = h
 
@@ -121,7 +121,7 @@ func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
 		return false
 	}
 	if h, ok := hdb.allHosts[addr]; ok {
-		return !h.online
+		return !h.Online
 	}
 	return false
 }

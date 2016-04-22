@@ -92,7 +92,7 @@ func TestAveragePrice(t *testing.T) {
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
 	h1.ContractPrice = types.NewCurrency64(100)
-	h1.weight = baseWeight
+	h1.Weight = baseWeight
 	hdb.insertNode(h1)
 	if avg := hdb.AveragePrice(); avg.Cmp(h1.ContractPrice) != 0 {
 		t.Error("average of one host should be that host's price:", avg)
@@ -102,7 +102,7 @@ func TestAveragePrice(t *testing.T) {
 	h2 := new(hostEntry)
 	h2.NetAddress = "bar"
 	h2.ContractPrice = types.NewCurrency64(300)
-	h2.weight = baseWeight
+	h2.Weight = baseWeight
 	hdb.insertNode(h2)
 	if len(hdb.activeHosts) != 2 {
 		t.Error("host was not added:", hdb.activeHosts)
@@ -116,9 +116,9 @@ func TestAveragePrice(t *testing.T) {
 func TestIsOffline(t *testing.T) {
 	hdb := &HostDB{
 		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo:1234": &hostEntry{online: true},
-			"bar:1234": &hostEntry{online: false},
-			"baz:1234": &hostEntry{online: true},
+			"foo:1234": &hostEntry{Online: true},
+			"bar:1234": &hostEntry{Online: false},
+			"baz:1234": &hostEntry{Online: true},
 		},
 		activeHosts: map[modules.NetAddress]*hostNode{
 			"foo:1234": nil,

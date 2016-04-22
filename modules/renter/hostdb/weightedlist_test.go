@@ -22,7 +22,7 @@ func fakeAddr(n uint8) modules.NetAddress {
 // every entropy has the same weight.
 func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 	// Check that the weight of the hostTree is what is expected.
-	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdb.hostTree.hostEntry.weight)
+	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdb.hostTree.hostEntry.Weight)
 	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		return errors.New("expected weight is incorrect")
 	}
@@ -105,7 +105,7 @@ func TestWeightedList(t *testing.T) {
 		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
 			HostDBEntry: dbe,
-			weight:      types.NewCurrency64(10),
+			Weight:      types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -151,7 +151,7 @@ func TestWeightedList(t *testing.T) {
 		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
 			HostDBEntry: dbe,
-			weight:      types.NewCurrency64(10),
+			Weight:      types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -184,7 +184,7 @@ func TestVariedWeights(t *testing.T) {
 		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
 			HostDBEntry: dbe,
-			weight:      types.NewCurrency64(uint64(i)),
+			Weight:      types.NewCurrency64(uint64(i)),
 		}
 		hdb.insertNode(&entry)
 		selections += i * expectedPerWeight
@@ -202,7 +202,7 @@ func TestVariedWeights(t *testing.T) {
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
-		selectionMap[node.hostEntry.weight.String()]++
+		selectionMap[node.hostEntry.Weight.String()]++
 	}
 
 	// Check that each host was selected an expected number of times. An error
@@ -238,12 +238,12 @@ func TestRepeatInsert(t *testing.T) {
 	dbe.NetAddress = fakeAddr(0)
 	entry1 := hostEntry{
 		HostDBEntry: dbe,
-		weight:      types.NewCurrency64(1),
+		Weight:      types.NewCurrency64(1),
 	}
 	entry2 := entry1
 	hdb.insertNode(&entry1)
 
-	entry2.weight = types.NewCurrency64(100)
+	entry2.Weight = types.NewCurrency64(100)
 	hdb.insertNode(&entry2)
 	if len(hdb.activeHosts) != 1 {
 		t.Error("insterting the same entry twice should result in only 1 entry in the hostdb")
@@ -255,7 +255,7 @@ func TestNodeAtWeight(t *testing.T) {
 	// create hostTree
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
-	h1.weight = baseWeight
+	h1.Weight = baseWeight
 	ht := createNode(nil, h1)
 
 	// overweight
@@ -287,17 +287,17 @@ func TestRandomHosts(t *testing.T) {
 	dbe.NetAddress = fakeAddr(1)
 	entry1 := hostEntry{
 		HostDBEntry: dbe,
-		weight:      types.NewCurrency64(1),
+		Weight:      types.NewCurrency64(1),
 	}
 	dbe.NetAddress = fakeAddr(2)
 	entry2 := hostEntry{
 		HostDBEntry: dbe,
-		weight:      types.NewCurrency64(2),
+		Weight:      types.NewCurrency64(2),
 	}
 	dbe.NetAddress = fakeAddr(3)
 	entry3 := hostEntry{
 		HostDBEntry: dbe,
-		weight:      types.NewCurrency64(3),
+		Weight:      types.NewCurrency64(3),
 	}
 	hdb.insertNode(&entry1)
 	hdb.insertNode(&entry2)

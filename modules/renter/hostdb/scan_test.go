@@ -24,7 +24,7 @@ func TestDecrementReliability(t *testing.T) {
 	// from activeHosts.
 	h := new(hostEntry)
 	h.NetAddress = "foo"
-	h.reliability = types.NewCurrency64(1)
+	h.Reliability = types.NewCurrency64(1)
 	hdb.allHosts[h.NetAddress] = h
 	hdb.activeHosts[h.NetAddress] = &hostNode{hostEntry: h}
 	hdb.decrementReliability(h.NetAddress, types.NewCurrency64(0))
@@ -33,7 +33,7 @@ func TestDecrementReliability(t *testing.T) {
 	}
 
 	// Decrement reliability to 0. This should remove the host from allHosts.
-	hdb.decrementReliability(h.NetAddress, h.reliability)
+	hdb.decrementReliability(h.NetAddress, h.Reliability)
 	if len(hdb.AllHosts()) != 0 {
 		t.Error("decrementing did not remove host from allHosts")
 	}
@@ -63,7 +63,7 @@ func TestThreadedProbeHosts(t *testing.T) {
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],
 	}
-	h.reliability = baseWeight // enough to withstand a few failures
+	h.Reliability = baseWeight // enough to withstand a few failures
 
 	// define a helper function for running threadedProbeHosts. We send the
 	// hostEntry, close the channel, and then call threadedProbeHosts.
@@ -132,7 +132,7 @@ func TestThreadedScan(t *testing.T) {
 	// create a host to be scanned
 	h := new(hostEntry)
 	h.NetAddress = "foo"
-	h.reliability = types.NewCurrency64(1)
+	h.Reliability = types.NewCurrency64(1)
 	hdb.activeHosts[h.NetAddress] = &hostNode{hostEntry: h}
 
 	// perform one scan
