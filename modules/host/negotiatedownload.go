@@ -171,7 +171,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 	// Update the storage obligation.
 	paymentTransfer := existingRevision.NewValidProofOutputs[0].Value.Sub(paymentRevision.NewValidProofOutputs[0].Value)
-	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(paymentTransfer)
+	so.PotentialDownloadRevenue = so.PotentialDownloadRevenue.Add(paymentTransfer)
 	so.RevisionTransactionSet = []types.Transaction{{
 		FileContractRevisions: []types.FileContractRevision{paymentRevision},
 		TransactionSignatures: []types.TransactionSignature{renterSignature, txn.TransactionSignatures[1]},

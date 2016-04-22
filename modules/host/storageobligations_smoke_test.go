@@ -209,7 +209,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
-	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
+	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)
@@ -394,7 +394,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
-	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
+	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)
@@ -447,7 +447,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot, sectorRoot2}
 	sectorCost2 := types.NewCurrency64(650).Mul(types.SiacoinPrecision)
-	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost2)
+	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost2)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost2)
 	validPayouts, missedPayouts = so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost2)
@@ -609,7 +609,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot}
 	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
-	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(sectorCost)
+	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
 	validPayouts[0].Value = validPayouts[0].Value.Sub(sectorCost)

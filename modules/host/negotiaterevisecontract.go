@@ -143,7 +143,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	// First read all of the modifications. Then make the modifications, but
 	// with the ability to reverse them. Then verify the file contract revision
 	// correctly accounts for the changes.
-	var bandwidthRevenue types.Currency
+	var bandwidthRevenue types.Currency // Upload bandwidth.
 	var storageRevenue types.Currency
 	var newCollateral types.Currency
 	var sectorsRemoved []crypto.Hash
@@ -243,9 +243,9 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 
-	so.AnticipatedRevenue = so.AnticipatedRevenue.Add(storageRevenue)
-	so.ConfirmedRevenue = so.ConfirmedRevenue.Add(bandwidthRevenue)
+	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(storageRevenue)
 	so.RiskedCollateral = so.RiskedCollateral.Add(newCollateral)
+	so.PotentialUploadRevenue = so.PotentialUploadRevenue.Add(bandwidthRevenue)
 	so.RevisionTransactionSet = []types.Transaction{txn}
 	err = h.modifyStorageObligation(so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
