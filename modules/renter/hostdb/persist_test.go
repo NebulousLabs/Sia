@@ -1,6 +1,8 @@
 package hostdb
 
 import (
+	"crypto/rand"
+	"github.com/NebulousLabs/Sia/types"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -64,5 +66,98 @@ func TestSaveLoad(t *testing.T) {
 	_, ok2 = hdb.activeHosts[host3.NetAddress]
 	if !ok0 || !ok1 || !ok2 || len(hdb.activeHosts) != 3 {
 		t.Fatal("active was not restored properly:", hdb.activeHosts)
+	}
+}
+
+// rescanCS is a barebones implementation of a consensus set that can be
+// subscribed to.
+type rescanCS struct {
+	changes []modules.ConsensusChange
+}
+
+func (cs *rescanCS) addBlock(b types.Block) {
+	cc := modules.ConsensusChange{
+		AppliedBlocks: []types.Block{b},
+	}
+	rand.Read(cc.ID[:])
+	cs.changes = append(cs.changes, cc)
+}
+
+func (cs *rescanCS) ConsensusSetPersistentSubscribe(s modules.ConsensusSetSubscriber, lastChange modules.ConsensusChangeID) error {
+	var start int
+	if lastChange != (modules.ConsensusChangeID{}) {
+		start = -1
+		for i, cc := range cs.changes {
+			if cc.ID == lastChange {
+				start = i
+				break
+			}
+		}
+		if start == -1 {
+			return modules.ErrInvalidConsensusChangeID
+		}
+	}
+	for _, cc := range cs.changes[start:] {
+		s.ProcessConsensusChange(cc)
+	}
+	return nil
+}
+
+// TestRescan tests that the hostdb will rescan the blockchain properly.
+func TestRescan(t *testing.T) {
+	// create hostdb with mocked persist dependency
+	hdb := bareHostDB()
+	hdb.persist = new(memPersist)
+
+	// add some fake hosts
+	var host1, host2, host3 hostEntry
+	host1.NetAddress = "foo"
+	host2.NetAddress = "bar"
+	host3.NetAddress = "baz"
+	hdb.allHosts = map[modules.NetAddress]*hostEntry{
+		host1.NetAddress: &host1,
+		host2.NetAddress: &host2,
+		host3.NetAddress: &host3,
+	}
+	hdb.activeHosts = map[modules.NetAddress]*hostNode{
+		host1.NetAddress: &hostNode{hostEntry: &host1},
+		host2.NetAddress: &hostNode{hostEntry: &host2},
+		host3.NetAddress: &hostNode{hostEntry: &host3},
+	}
+
+	// use a bogus change ID
+	hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
+
+	// save the hostdb
+	err := hdb.save()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create a mocked consensus set with a different host announcement
+	annBytes, err := makeSignedAnnouncement("quux:1234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	announceBlock := types.Block{
+		Transactions: []types.Transaction{{
+			ArbitraryData: [][]byte{annBytes},
+		}},
+	}
+	cs := new(rescanCS)
+	cs.addBlock(announceBlock)
+
+	// Reload the hostdb using the same persist and the mocked consensus set.
+	// The old change ID will be rejected, causing a rescan, which should
+	// discover the new announcement.
+	hdb, err = newHostDB(cs, stdDialer{}, stdSleeper{}, hdb.persist, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hdb.allHosts) != 1 {
+		t.Fatal("hostdb rescan resulted in wrong host set:", hdb.allHosts)
+	}
+	if _, exists := hdb.allHosts["quux:1234"]; !exists {
+		t.Fatal("hostdb rescan resulted in wrong host set:", hdb.allHosts)
 	}
 }
