@@ -1,6 +1,5 @@
 package storagemanager
 
-/*
 import (
 	"bytes"
 	"encoding/json"
@@ -18,12 +17,12 @@ import (
 )
 
 // sectorUsageCheck compares a manually maintained sector usage map to the
-// host's internal sector usage map, and returns an error if there are any
+// manager's internal sector usage map, and returns an error if there are any
 // inconsistencies.
-func (ht *hostTester) sectorUsageCheck(sectorUsageMap map[crypto.Hash][]types.BlockHeight) error {
+func (smt *storageManagerTester) sectorUsageCheck(sectorUsageMap map[crypto.Hash][]types.BlockHeight) error {
 	// Check that the in-database representation for the sector usage map
 	// matches the in-memory understanding of what the sector map should be
-	return ht.host.db.View(func(tx *bolt.Tx) error {
+	return smt.sm.db.View(func(tx *bolt.Tx) error {
 		bsu := tx.Bucket(bucketSectorUsage)
 		// Make sure that the number of sectors in the sector usage map and the
 		// number of sectors in the database are the same.
@@ -34,7 +33,7 @@ func (ht *hostTester) sectorUsageCheck(sectorUsageMap map[crypto.Hash][]types.Bl
 		// For every sector in the sector usage map, make sure the database has
 		// a matching sector with the right expiry information.
 		for sectorRoot, expiryHeights := range sectorUsageMap {
-			usageBytes := bsu.Get(ht.host.sectorID(sectorRoot[:]))
+			usageBytes := bsu.Get(smt.sm.sectorID(sectorRoot[:]))
 			if usageBytes == nil {
 				return errors.New("no usage info on known sector")
 			}
@@ -68,56 +67,44 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	ht, err := newHostTester("TestStorageFolderUsage")
+	smt, err := newStorageManagerTester("TestStorageFolderUsage")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Remove the storage folders so that the smoke test can start from a
-	// blank state.
-	for i := 0; i < 2; i++ {
-		err = ht.host.RemoveStorageFolder(0, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 
-	// Start by checking that the initial state of the host has no storage
+	// Start by checking that the initial state of the manager has no storage
 	// added to it.
-	totalStorage, remainingStorage := ht.host.capacity()
+	totalStorage, remainingStorage := smt.sm.capacity()
 	if totalStorage != 0 || remainingStorage != 0 {
-		t.Error("initial capacity of host is not reported at 0 - but no drives have been added!")
+		t.Error("initial capacity of manager is not reported at 0 - but no drives have been added!")
 	}
 
 	// Try adding a sector when there are no storage folders.
-	// Host needs to be locked when the unexported sector function is being
-	// used.
 	sectorRoot, sectorData, err := createSector()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, 10, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, 10, sectorData)
 	if err != errInsufficientStorageForSector {
 		t.Fatal(err)
 	}
 
 	// Add a storage folder, simulating a new drive being connected to the
-	// host.
-	storageFolderOne := filepath.Join(ht.persistDir, "host drive 1")
+	// manager.
+	storageFolderOne := filepath.Join(smt.persistDir, "manager drive 1")
 	// Try using a file size that is too small. Because a filesize check is
 	// quicker than a disk check, the filesize check should come first.
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize-1)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize-1)
 	if err != errSmallStorageFolder {
 		t.Fatal("expecting errSmallStorageFolder:", err)
 	}
 	// Try a file size that is too large.
-	err = ht.host.AddStorageFolder(storageFolderOne, maximumStorageFolderSize+1)
+	err = smt.sm.AddStorageFolder(storageFolderOne, maximumStorageFolderSize+1)
 	if err != errLargeStorageFolder {
 		t.Fatal("expecting errLargeStorageFolder:", err)
 	}
 	// Try linking to a storage folder that does not exist.
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err == nil {
 		t.Fatal("should not be able to link to a storage folder which does not exist")
 	}
@@ -126,7 +113,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err != errStorageFolderNotFolder {
 		t.Fatal(err)
 	}
@@ -139,50 +126,51 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Check that the host has correctly updated the amount of total storage.
-	totalStorage, remainingStorage = ht.host.capacity()
+	// Check that the manager has correctly updated the amount of total storage.
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize {
-		t.Error("host capacity has not been correctly updated after adding a storage folder")
+		t.Error("manager capacity has not been correctly updated after adding a storage folder")
 		t.Error(totalStorage, minimumStorageFolderSize, remainingStorage)
 	}
 
 	// Add a second storage folder.
-	storageFolderTwo := filepath.Join(ht.persistDir, "hostDrive2")
+	storageFolderTwo := filepath.Join(smt.persistDir, "managerDrive2")
 	err = os.Mkdir(storageFolderTwo, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	err = smt.sm.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Check that the host has correctly updated the amount of total storage.
-	totalStorage, remainingStorage = ht.host.capacity()
+	// Check that the manager has correctly updated the amount of total
+	// storage.
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != minimumStorageFolderSize*3 || remainingStorage != minimumStorageFolderSize*3 {
-		t.Error("host capacity has not been correctly updated after adding a storage folder")
+		t.Error("manager capacity has not been correctly updated after adding a storage folder")
 	}
 	// Try removing the storage folder using illegal values.
-	err = ht.host.RemoveStorageFolder(-1, false)
+	err = smt.sm.RemoveStorageFolder(-1, false)
 	if err != errBadStorageFolderIndex {
 		t.Fatal(err)
 	}
-	err = ht.host.RemoveStorageFolder(2, false)
+	err = smt.sm.RemoveStorageFolder(2, false)
 	if err != errBadStorageFolderIndex {
 		t.Fatal(err)
 	}
@@ -190,24 +178,23 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Try removing the second storage folder. Before removing the storage
 	// folder, grab the path of the symlink so we can check later that it was
 	// properly removed from the filesystem.
-	ht.host.mu.Lock()
-	symPath := filepath.Join(ht.host.persistDir, ht.host.storageFolders[1].uidString())
-	ht.host.mu.Unlock()
+	symPath := filepath.Join(smt.sm.persistDir, smt.sm.storageFolders[1].uidString())
 	// Remove the storage folder.
-	err = ht.host.RemoveStorageFolder(1, false)
+	err = smt.sm.RemoveStorageFolder(1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Check that the host has correctly updated the amount of total storage.
-	totalStorage, remainingStorage = ht.host.capacity()
+	// Check that the manager has correctly updated the amount of total
+	// storage.
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize {
-		t.Error("host capacity has not been correctly updated after adding a storage folder")
+		t.Error("manager capacity has not been correctly updated after adding a storage folder")
 	}
 	_, err = os.Stat(symPath)
 	if err == nil || !os.IsNotExist(err) {
@@ -215,7 +202,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 
 	// No sectors added yet, the storage folder statistics should all be clean.
-	for _, sf := range ht.host.storageFolders {
+	for _, sf := range smt.sm.storageFolders {
 		if sf.SuccessfulReads != 0 || sf.SuccessfulWrites != 0 || sf.FailedReads != 0 || sf.FailedWrites != 0 {
 			t.Error("storage folder does not have blank health stats")
 		}
@@ -224,21 +211,19 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Retry adding the sector, the add should succeed and the amount of
 	// remaining storage should be updated.
 	sectorExpiry := types.BlockHeight(10)
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, sectorExpiry, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, sectorExpiry, sectorData)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the capacity has updated to reflected the new sector.
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != minimumStorageFolderSize || remainingStorage != minimumStorageFolderSize-modules.SectorSize {
-		t.Error("host capacity has not been correctly updated after adding a sector", totalStorage, remainingStorage)
+		t.Error("manager capacity has not been correctly updated after adding a sector", totalStorage, remainingStorage)
 	}
 	// Check that the sector has been added to the filesystem correctly - the
 	// file should exist in storageFolderOne, and the data in the file should
 	// match the data of the sector.
-	sectorPath := filepath.Join(storageFolderOne, string(ht.host.sectorID(sectorRoot[:])))
+	sectorPath := filepath.Join(storageFolderOne, string(smt.sm.sectorID(sectorRoot[:])))
 	err = func() error {
 		sectorFile, err := os.Open(sectorPath)
 		defer sectorFile.Close()
@@ -263,9 +248,9 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 	// Check that the sector as represented in the database has the correct
 	// height values.
-	err = ht.host.db.View(func(tx *bolt.Tx) error {
+	err = smt.sm.db.View(func(tx *bolt.Tx) error {
 		bsu := tx.Bucket(bucketSectorUsage)
-		usageBytes := bsu.Get(ht.host.sectorID(sectorRoot[:]))
+		usageBytes := bsu.Get(smt.sm.sectorID(sectorRoot[:]))
 		var usage sectorUsage
 		err := json.Unmarshal(usageBytes, &usage)
 		if err != nil {
@@ -283,7 +268,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check that the disk health stats match the expected values.
-	for _, sf := range ht.host.storageFolders {
+	for _, sf := range smt.sm.storageFolders {
 		if sf.SuccessfulReads != 0 || sf.SuccessfulWrites != 1 || sf.FailedReads != 0 || sf.FailedWrites != 0 {
 			t.Error("storage folder does not have blank health stats")
 		}
@@ -291,39 +276,39 @@ func TestStorageFolderUsage(t *testing.T) {
 
 	// Try to resize the storage folder. While resizing the storage folder, try
 	// a bunch of invalid resize calls.
-	err = ht.host.ResizeStorageFolder(1, minimumStorageFolderSize-1)
+	err = smt.sm.ResizeStorageFolder(1, minimumStorageFolderSize-1)
 	if err != errBadStorageFolderIndex {
 		t.Error(err)
 	}
-	err = ht.host.ResizeStorageFolder(-1, minimumStorageFolderSize-1)
+	err = smt.sm.ResizeStorageFolder(-1, minimumStorageFolderSize-1)
 	if err != errBadStorageFolderIndex {
 		t.Error(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize-1)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize-1)
 	if err != errSmallStorageFolder {
 		t.Error(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, maximumStorageFolderSize+1)
+	err = smt.sm.ResizeStorageFolder(0, maximumStorageFolderSize+1)
 	if err != errLargeStorageFolder {
 		t.Error(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*10)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*10)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*10)
 	if err != errNoResize {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Host should be able to support having uneven storage sizes.
+	// Manager should be able to support having uneven storage sizes.
 	oddStorageSize := (minimumStorageFolderSize) + modules.SectorSize*3 + 3
-	err = ht.host.ResizeStorageFolder(0, oddStorageSize)
+	err = smt.sm.ResizeStorageFolder(0, oddStorageSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,13 +318,13 @@ func TestStorageFolderUsage(t *testing.T) {
 	// sectors are added and removed.
 	sectorUsageMap := make(map[crypto.Hash][]types.BlockHeight)
 	sectorUsageMap[sectorRoot] = []types.BlockHeight{sectorExpiry}
-	// Sanity check - host should not have any sectors in it.
-	totalStorage, remainingStorage = ht.host.capacity()
+	// Sanity check - manager should not have any sectors in it.
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != remainingStorage+modules.SectorSize {
-		t.Fatal("host is not empty at the moment of creating the in-memory sector usage map")
+		t.Fatal("manager is not empty at the moment of creating the in-memory sector usage map")
 	}
 	// Verify that the inital sector usage map was created correctly.
-	err = ht.sectorUsageCheck(sectorUsageMap)
+	err = smt.sectorUsageCheck(sectorUsageMap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,33 +336,29 @@ func TestStorageFolderUsage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = ht.host.addSector(sectorRoot, 86+types.BlockHeight(i), sectorData)
+		err = smt.sm.AddSector(sectorRoot, 86+types.BlockHeight(i), sectorData)
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Do a probabilistic reset of the host, to verify that the persistence
+		// Do a probabilistic reset of the manager, to verify that the persistence
 		// structures can reboot without causing issues.
-		err = ht.probabilisticReset()
+		err = smt.probabilisticReset()
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Now that there is a sector usage map, it must be kept consistent
-		// with the sector usage in the host.
+		// with the sector usage in the manager.
 		sectorUsageMap[sectorRoot] = []types.BlockHeight{86 + types.BlockHeight(i)}
 	}
-	ht.host.mu.Lock()
-	oldSize := ht.host.storageFolders[0].Size
-	ht.host.mu.Unlock()
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	oldSize := smt.sm.storageFolders[0].Size
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != errIncompleteOffload {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
-	size := ht.host.storageFolders[0].Size
-	sizeRemaining := ht.host.storageFolders[0].SizeRemaining
-	ht.host.mu.Unlock()
+	size := smt.sm.storageFolders[0].Size
+	sizeRemaining := smt.sm.storageFolders[0].SizeRemaining
 	if size >= oldSize || sizeRemaining > 0 {
-		t.Fatal("host did not correctly update the size remaining after an incomplete shrink")
+		t.Fatal("manager did not correctly update the size remaining after an incomplete shrink")
 	}
 
 	// Try adding another sector, there should not be enough room.
@@ -385,7 +366,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.addSector(sr, 186, sd)
+	err = smt.sm.AddSector(sr, 186, sd)
 	if err != errInsufficientStorageForSector {
 		t.Fatal(err)
 	}
@@ -393,13 +374,13 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Add a second folder, and add a sector to that folder. There should be
 	// enough space remaining in the first folder for the removal to be
 	// successful.
-	err = ht.host.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
+	err = smt.sm.AddStorageFolder(storageFolderTwo, minimumStorageFolderSize*2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,16 +388,14 @@ func TestStorageFolderUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.addSector(sectorRoot, 81, sectorData)
+	err = smt.sm.AddSector(sectorRoot, 81, sectorData)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sectorUsageMap[sectorRoot] = []types.BlockHeight{81}
 	// Check that the sector ended up in the right storage folder - because the
 	// second storage folder is the least full, the sector should end up there.
-	ht.host.mu.Lock()
-	folderTwoUsage := ht.host.storageFolders[1].Size - ht.host.storageFolders[1].SizeRemaining
-	ht.host.mu.Unlock()
+	folderTwoUsage := smt.sm.storageFolders[1].Size - smt.sm.storageFolders[1].SizeRemaining
 	if folderTwoUsage != modules.SectorSize {
 		t.Error("sector did not appear to land in the right storage folder")
 	}
@@ -441,14 +420,14 @@ func TestStorageFolderUsage(t *testing.T) {
 	// amount. Reduce the size of the first storage folder to minimum, which
 	// should be accepted but will result in sectors being transferred to the
 	// second storage folder.
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	prevStorage := totalStorage
 	usedStorage := totalStorage - remainingStorage
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if usedStorage != totalStorage-remainingStorage {
 		t.Error("the used storage value adjusted after removing a storage folder", usedStorage, totalStorage-remainingStorage)
 	}
@@ -471,17 +450,15 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Remove the first storage folder, which should result in all of the
 	// sectors being moved to the second storage folder. Note that
 	// storageFolderTwo now has an index of '0'.
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	prevStorage = totalStorage
 	usedStorage = totalStorage - remainingStorage
-	ht.host.mu.Lock()
-	symPath = filepath.Join(ht.host.persistDir, ht.host.storageFolders[0].uidString())
-	ht.host.mu.Unlock()
-	err = ht.host.RemoveStorageFolder(0, false)
+	symPath = filepath.Join(smt.sm.persistDir, smt.sm.storageFolders[0].uidString())
+	err = smt.sm.RemoveStorageFolder(0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if usedStorage != totalStorage-remainingStorage {
 		t.Error("the used storage value adjusted after removing a storage folder", usedStorage, totalStorage-remainingStorage)
 	}
@@ -504,17 +481,17 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Add the first storage folder, resize the second storage folder back down
 	// to minimum. Note that storageFolderOne now has an index of '1', and
 	// storageFolderTwo now has an index of '0'.
-	err = ht.host.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
+	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +514,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Add a bunch of sectors and repeat sectors at multiple colliding heights.
 	// Start by resizing the first storage folder so that there is enough room
 	// for the new sectors.
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*3)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -555,10 +532,10 @@ func TestStorageFolderUsage(t *testing.T) {
 				// created such that the collisions happen out of order.
 				// Sectors are added at height 10+j+k, which means that there
 				// will be many collisions for each height, but the collisions
-				// are not happening in sorted order. The host is not expected
-				// to do sorting, but should also not be confused by a random
-				// order.
-				err = ht.host.addSector(sectorRoot, 10+j+k, sectorData)
+				// are not happening in sorted order. The manager is not
+				// expected to do sorting, but should also not be confused by a
+				// random order.
+				err = smt.sm.AddSector(sectorRoot, 10+j+k, sectorData)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -572,9 +549,9 @@ func TestStorageFolderUsage(t *testing.T) {
 					sectorUsageMap[sectorRoot] = []types.BlockHeight{10 + j + k}
 				}
 			}
-			// Do a probabilistic reset of the host, to verify that the persistence
-			// structures can reboot without causing issues.
-			err = ht.probabilisticReset()
+			// Do a probabilistic reset of the manager, to verify that the
+			// persistence structures can reboot without causing issues.
+			err = smt.probabilisticReset()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -582,13 +559,13 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 	// Check that the amount of storage in use represents 10 sectors, and not
 	// more - all the others are repeats and shouldn't be counted.
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-modules.SectorSize*21 {
-		t.Fatal("Host not reporting expected storage capacity:", totalStorage, remainingStorage, minimumStorageFolderSize*4, minimumStorageFolderSize*4-modules.SectorSize*21)
+		t.Fatal("Manager not reporting expected storage capacity:", totalStorage, remainingStorage, minimumStorageFolderSize*4, minimumStorageFolderSize*4-modules.SectorSize*21)
 	}
-	// Check that the internal sector usage database of the host has been
+	// Check that the internal sector usage database of the manager has been
 	// updated correctly.
-	err = ht.sectorUsageCheck(sectorUsageMap)
+	err = smt.sectorUsageCheck(sectorUsageMap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,44 +590,38 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal("sector map doesn't match testing assumptions")
 	}
 	// Try some illegal sector removal operations before trying a legal one.
-	ht.host.mu.Lock()
-	err = ht.host.removeSector(sectorRoot, sectorExpiry+50e6)
-	ht.host.mu.Unlock()
+	err = smt.sm.RemoveSector(sectorRoot, sectorExpiry+50e6)
 	if err != errSectorNotFound {
 		t.Fatal("wrong error when removing illegal sector:", err)
 	}
 	alteredRoot := sectorRoot
 	alteredRoot[0]++
-	ht.host.mu.Lock()
-	err = ht.host.removeSector(alteredRoot, 81)
-	ht.host.mu.Unlock()
+	err = smt.sm.RemoveSector(alteredRoot, 81)
 	if err != errSectorNotFound {
 		t.Fatal("wrong error when removing illegal sector:", err)
 	}
 	// Now try the legal sector removal.
-	ht.host.mu.Lock()
-	sectorPath = filepath.Join(storageFolderOne, string(ht.host.sectorID(sectorRoot[:])))
-	err = ht.host.removeSector(sectorRoot, 81)
-	ht.host.mu.Unlock()
+	sectorPath = filepath.Join(storageFolderOne, string(smt.sm.sectorID(sectorRoot[:])))
+	err = smt.sm.RemoveSector(sectorRoot, 81)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Update the sector usage map to reflect the departure of a sector.
 	delete(sectorUsageMap, sectorRoot)
 	// Check that the new capacity is being reported correctly.
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != minimumStorageFolderSize*4 || remainingStorage != minimumStorageFolderSize*4-modules.SectorSize*20 {
-		t.Fatal("Host not reporting expected storage capacity:")
+		t.Fatal("Manager not reporting expected storage capacity:")
 	}
-	// Run a sector usage check to make sure the host is properly handling the
-	// usage information when deleting a sector.
-	err = ht.sectorUsageCheck(sectorUsageMap)
+	// Run a sector usage check to make sure the manager is properly handling
+	// the usage information when deleting a sector.
+	err = smt.sectorUsageCheck(sectorUsageMap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -691,29 +662,25 @@ func TestStorageFolderUsage(t *testing.T) {
 	for i, root := range targetedRoots {
 		// Grab the initial remaining storage, to make sure that it's not being
 		// changed when one instance of a repeated sector is removed.
-		_, initialRemainingStorage := ht.host.capacity()
+		_, initialRemainingStorage := smt.sm.capacity()
 
 		// Remove the heights one at a time.
 		expiryHeights := sectorUsageMap[root]
 		for len(expiryHeights) > 0 {
 			// Check that the remaining storage is still the same.
-			_, remainingStorage := ht.host.capacity()
+			_, remainingStorage := smt.sm.capacity()
 			if remainingStorage != initialRemainingStorage {
-				t.Fatal("host is changing the amount of storage remaining when removing virtual sectors")
+				t.Fatal("manager is changing the amount of storage remaining when removing virtual sectors")
 			}
 
 			// Try to remove the sector using a wildcard expiry height.
-			ht.host.mu.Lock()
-			err = ht.host.removeSector(root, expiryHeights[0]+548e6)
-			ht.host.mu.Unlock()
+			err = smt.sm.RemoveSector(root, expiryHeights[0]+548e6)
 			if err != errSectorNotFound {
 				t.Fatal(err)
 			}
 
-			// Remove the sector from the host.
-			ht.host.mu.Lock()
-			err = ht.host.removeSector(root, expiryHeights[0])
-			ht.host.mu.Unlock()
+			// Remove the sector from the manager.
+			err = smt.sm.RemoveSector(root, expiryHeights[0])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -747,79 +714,75 @@ func TestStorageFolderUsage(t *testing.T) {
 				expiryHeights = nil
 				delete(sectorUsageMap, root)
 			}
-			err = ht.sectorUsageCheck(sectorUsageMap)
+			err = smt.sectorUsageCheck(sectorUsageMap)
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
-		// Do a probabilistic reset of the host, to verify that the persistence
-		// structures can reboot without causing issues.
-		err = ht.probabilisticReset()
+		// Do a probabilistic reset of the manager, to verify that the
+		// persistence structures can reboot without causing issues.
+		err = smt.probabilisticReset()
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Check that the remaining storage is still the same.
-		_, remainingStorage := ht.host.capacity()
+		_, remainingStorage := smt.sm.capacity()
 		if remainingStorage != initialRemainingStorage+modules.SectorSize {
-			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
+			t.Fatal("manager incorrectly updated remaining space when deleting the final height for a sector")
 		}
 	}
 
 	// Add a third storage folder.
-	prevTotalStorage, prevRemainingStorage := ht.host.capacity()
-	storageFolderThree := filepath.Join(ht.persistDir, "hd3")
+	prevTotalStorage, prevRemainingStorage := smt.sm.capacity()
+	storageFolderThree := filepath.Join(smt.persistDir, "hd3")
 	err = os.Mkdir(storageFolderThree, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.AddStorageFolder(storageFolderThree, minimumStorageFolderSize*2)
+	err = smt.sm.AddStorageFolder(storageFolderThree, minimumStorageFolderSize*2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the total storage and remaining storage updated correctly.
-	totalStorage, remainingStorage = ht.host.capacity()
+	totalStorage, remainingStorage = smt.sm.capacity()
 	if totalStorage != prevTotalStorage+minimumStorageFolderSize*2 || remainingStorage != prevRemainingStorage+minimumStorageFolderSize*2 {
 		t.Fatal("storage folder sizes are not being updated correctly when new storage folders are added")
 	}
 
 	// Add sectors until the storage folders have no more capacity.
-	_, remainingStorage = ht.host.capacity()
+	_, remainingStorage = smt.sm.capacity()
 	remainingSectors := remainingStorage / modules.SectorSize
 	for i := uint64(0); i < remainingSectors; i++ {
 		sectorRoot, sectorData, err := createSector()
 		if err != nil {
 			t.Fatal(err)
 		}
-		ht.host.mu.Lock()
-		err = ht.host.addSector(sectorRoot, 36, sectorData)
-		ht.host.mu.Unlock()
+		err = smt.sm.AddSector(sectorRoot, 36, sectorData)
 		if err != nil {
 			t.Fatal(err)
 		}
 		sectorUsageMap[sectorRoot] = []types.BlockHeight{36}
 	}
-	// Add another sector, which will not fit in the host.
+	// Add another sector, which will not fit in the manager.
 	sectorRoot, sectorData, err = createSector()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.mu.Lock()
-	err = ht.host.addSector(sectorRoot, 36, sectorData)
-	ht.host.mu.Unlock()
+	err = smt.sm.AddSector(sectorRoot, 36, sectorData)
 	if err != errInsufficientStorageForSector {
 		t.Fatal(err)
 	}
-	// Do a probabilistic reset of the host, to verify that the persistence
+	// Do a probabilistic reset of the manager, to verify that the persistence
 	// structures can reboot without causing issues.
-	err = ht.probabilisticReset()
+	err = smt.probabilisticReset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, remainingStorage = ht.host.capacity()
+	_, remainingStorage = smt.sm.capacity()
 	if remainingStorage >= modules.SectorSize {
 		t.Error("remaining storage is reporting incorrect result - should report that there is not enough room for another sector")
 	}
-	err = ht.sectorUsageCheck(sectorUsageMap)
+	err = smt.sectorUsageCheck(sectorUsageMap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -848,29 +811,29 @@ func TestStorageFolderUsage(t *testing.T) {
 
 	// Do some resizing, to cause sectors to be moved around. Every storage
 	// folder should have sectors that get moved off of it.
-	err = ht.host.ResizeStorageFolder(1, minimumStorageFolderSize*6)
+	err = smt.sm.ResizeStorageFolder(1, minimumStorageFolderSize*6)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(2, minimumStorageFolderSize)
+	err = smt.sm.ResizeStorageFolder(2, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(0, minimumStorageFolderSize*6)
+	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*6)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ht.host.ResizeStorageFolder(1, minimumStorageFolderSize)
+	err = smt.sm.ResizeStorageFolder(1, minimumStorageFolderSize)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that all storage folders are reporting successful reads and
 	// writes, with no failures.
-	for _, sf := range ht.host.storageFolders {
+	for _, sf := range smt.sm.storageFolders {
 		if sf.SuccessfulWrites <= 0 || sf.SuccessfulReads <= 0 || sf.FailedWrites > 0 || sf.FailedReads > 0 {
 			t.Error("disk stats aren't making sense")
 		}
@@ -881,20 +844,18 @@ func TestStorageFolderUsage(t *testing.T) {
 	for sectorRoot, expiryHeights := range sectorUsageMap {
 		// Grab the initial remaining storage, to make sure that it's not being
 		// changed when one instance of a repeated sector is removed.
-		_, initialRemainingStorage := ht.host.capacity()
+		_, initialRemainingStorage := smt.sm.capacity()
 
 		// Remove the heights one at a time.
 		for j := range expiryHeights {
 			// Check that the remaining storage is still the same.
-			_, remainingStorage := ht.host.capacity()
+			_, remainingStorage := smt.sm.capacity()
 			if remainingStorage != initialRemainingStorage {
-				t.Fatal("host is changing the amount of storage remaining when removing virtual sectors")
+				t.Fatal("manager is changing the amount of storage remaining when removing virtual sectors")
 			}
 
-			// Remove the sector from the host.
-			ht.host.mu.Lock()
-			err = ht.host.removeSector(sectorRoot, expiryHeights[j])
-			ht.host.mu.Unlock()
+			// Remove the sector from the manager.
+			err = smt.sm.RemoveSector(sectorRoot, expiryHeights[j])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -925,22 +886,22 @@ func TestStorageFolderUsage(t *testing.T) {
 				t.Fatal("sector count is incorrect while managing virtual sectors")
 			}
 		}
-		// Do a probabilistic reset of the host, to verify that the persistence
-		// structures can reboot without causing issues.
-		err = ht.probabilisticReset()
+		// Do a probabilistic reset of the manager, to verify that the
+		// persistence structures can reboot without causing issues.
+		err = smt.probabilisticReset()
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Check that the remaining storage is still the same.
-		_, remainingStorage := ht.host.capacity()
+		_, remainingStorage := smt.sm.capacity()
 		if remainingStorage != initialRemainingStorage+modules.SectorSize {
-			t.Fatal("host incorrectly updated remaining space when deleting the final height for a sector")
+			t.Fatal("manager incorrectly updated remaining space when deleting the final height for a sector")
 		}
 		i++
 	}
 	// Check that all storage folders have successful writes, and no failed
 	// reads or writes.
-	for _, sf := range ht.host.storageFolders {
+	for _, sf := range smt.sm.storageFolders {
 		if sf.SuccessfulWrites <= 0 || sf.SuccessfulReads <= 0 || sf.FailedWrites > 0 || sf.FailedReads > 0 {
 			t.Error("disk stats aren't making sense")
 		}
@@ -948,19 +909,18 @@ func TestStorageFolderUsage(t *testing.T) {
 
 	// Remove all of the storage folders.
 	for i := 0; i < 3; i++ {
-		err = ht.host.RemoveStorageFolder(0, false)
+		err = smt.sm.RemoveStorageFolder(0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	// Check the filesystem, there should be 3 files in the host folder
-	// (host.db, host.json, host.log).
-	infos, err = ioutil.ReadDir(ht.host.persistDir)
+	// Check the filesystem, there should be 3 files in the manager folder
+	// (storagemanager.db, storagemanager.json, storagemanager.log).
+	infos, err = ioutil.ReadDir(smt.sm.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(infos) != 3 {
-		t.Error("unexpected number of files in the host directory")
+		t.Error("unexpected number of files in the manager directory")
 	}
 }
-*/
