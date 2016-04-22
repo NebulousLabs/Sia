@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -8,6 +9,13 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
+)
+
+var (
+	// errStorageFolderNotFound is returned if a call is made looking for a
+	// storage folder which does not appear to exist within the storage
+	// manager.
+	errStorageFolderNotFound = errors.New("storage folder with the provided path could not be found")
 )
 
 type (
@@ -18,7 +26,25 @@ type (
 		InternalSettings modules.HostInternalSettings `json:"internalsettings"`
 		NetworkMetrics   modules.HostNetworkMetrics   `json:"networkmetrics"`
 	}
+
+	// StorageGET contains the information that is returned after a GET request
+	// to /storage - a bunch of information about the status of storage
+	// management on the host.
+	StorageGET struct {
+		StorageFolderMetadata []modules.StorageFolderMetadata
+	}
 )
+
+// folderIndex determines the index of the storage folder with the provided
+// path.
+func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetadata) (int, error) {
+	for i, sf := range storageFolders {
+		if sf.Path == folderPath {
+			return i, nil
+		}
+	}
+	return -1, errStorageFolderNotFound
+}
 
 // hostHandlerGET handles GET requests to the /host API endpoint, returning key
 // information about the host.
@@ -89,6 +115,94 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 	} else {
 		err = srv.host.Announce()
 	}
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// storageHandler returns a bunch of information about storage management on
+// the host.
+func (srv *Server) storageHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	sfs, err := srv.host.StorageFolders()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	sg := StorageGET{
+		StorageFolderMetadata: sfs,
+	}
+	writeJSON(w, sg)
+}
+
+// storageFoldersAddHandler adds a storage folder to the storage manager.
+func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	folderPath := ps.ByName("folder")
+	var folderSize uint64
+	_, err := fmt.Sscan(req.FormValue("size"), &folderSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.AddStorageFolder(folderPath, folderSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// storageFoldersResizeHandler resizes a storage folder in the storage manager.
+func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	folderPath := ps.ByName("folder")
+	storageFolders, err := srv.host.StorageFolders()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	folderIndex, err := folderIndex(folderPath, storageFolders)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var newSize uint64
+	_, err = fmt.Sscan(req.FormValue("newsize"), &newSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.ResizeStorageFolder(folderIndex, newSize)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// storageFoldersRemoveHandler removes a storage folder from the storage
+// manager.
+func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	folderPath := ps.ByName("folder")
+	storageFolders, err := srv.host.StorageFolders()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	folderIndex, err := folderIndex(folderPath, storageFolders)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var force bool
+	_, err = fmt.Sscan(req.FormValue("force"), &force)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.host.RemoveStorageFolder(folderIndex, force)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return

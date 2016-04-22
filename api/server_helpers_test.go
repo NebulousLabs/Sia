@@ -236,7 +236,7 @@ func (st *serverTester) coinAddress() string {
 // announcement to register.
 func (st *serverTester) announceHost() error {
 	announceValues := url.Values{}
-	announceValues.Set("address", string(st.host.NetAddress()))
+	announceValues.Set("address", string(st.host.NetworkMetrics().NetAddress))
 	err := st.stdPostAPI("/host/announce", announceValues)
 	if err != nil {
 		return err

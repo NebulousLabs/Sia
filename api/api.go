@@ -82,7 +82,7 @@ func (srv *Server) initAPI() {
 		router.POST("/storage/folders/add/*folder", srv.storageFoldersAddHandler)
 		router.POST("/storage/folders/resize/*folder", srv.storageFoldersResizeHandler)
 		router.POST("/storage/folders/remove/*folder", srv.storageFoldersRemoveHandler)
-		router.POST("/storage/sectors/delete/:root", srv.storageSectorsDeleteHandler)
+		router.POST("/storage/sectors/delete/:merkleroot", srv.storageSectorsDeleteHandler)
 	}
 
 	// Miner API Calls
