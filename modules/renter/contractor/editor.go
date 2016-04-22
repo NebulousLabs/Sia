@@ -156,17 +156,13 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	he.conn.SetDeadline(time.Now().Add(120 * time.Second))
 	defer he.conn.SetDeadline(time.Now().Add(time.Hour))
 
-	// calculate price
+	// get current height
 	he.contractor.mu.RLock()
 	height := he.contractor.blockHeight
 	he.contractor.mu.RUnlock()
 	if height >= he.contract.FileContract.WindowStart {
 		return errors.New("contract has already ended")
 	}
-	// TODO: is this math correct? (specifically the height)
-	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
-	sectorPrice := he.host.StoragePrice.Mul(blockBytes)
-	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 
 	// calculate the new total Merkle root
 	var newRoots []crypto.Hash
@@ -202,6 +198,8 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 	}
 
 	// create and send revision to host for approval
+	// NOTE: no funds are transferred for a delete action
+	sectorPrice, sectorCollateral := types.ZeroCurrency, types.ZeroCurrency
 	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
 	if err != nil {

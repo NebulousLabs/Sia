@@ -297,3 +297,117 @@ func TestIntegrationUploadDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestIntegrationDelete tests that the contractor can delete a sector from a
+// contract previously formed with a host.
+func TestIntegrationDelete(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationDelete")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.newContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// revise the contract
+	editor, err := c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// delete the sector
+	contract = c.contracts[contract.ID]
+	editor, err = c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Delete(contract.MerkleRoots[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestIntegrationInsertDelete tests that the contractor can insert and delete
+// a sector during the same revision.
+func TestIntegrationInsertDelete(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.NetAddress())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.newContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// revise the contract
+	editor, err := c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// insert the sector
+	_, err = editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// delete the sector
+	err = editor.Delete(crypto.MerkleRoot(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// contract should have no sectors
+	contract = c.contracts[contract.ID]
+	if len(contract.MerkleRoots) != 0 {
+		t.Fatal("contract should have no sectors:", contract.MerkleRoots)
+	}
+}
