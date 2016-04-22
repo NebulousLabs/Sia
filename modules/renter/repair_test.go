@@ -29,10 +29,11 @@ type testHost struct {
 }
 
 // stub implementations of the contractor.Editor methods
-func (h *testHost) Address() modules.NetAddress  { return h.ip }
-func (h *testHost) Delete(crypto.Hash) error     { return nil }
-func (h *testHost) EndHeight() types.BlockHeight { return 0 }
-func (h *testHost) Close() error                 { return nil }
+func (h *testHost) Address() modules.NetAddress                           { return h.ip }
+func (h *testHost) Delete(crypto.Hash) error                              { return nil }
+func (h *testHost) Modify(crypto.Hash, crypto.Hash, uint64, []byte) error { return nil }
+func (h *testHost) EndHeight() types.BlockHeight                          { return 0 }
+func (h *testHost) Close() error                                          { return nil }
 
 // ContractID returns a fake (but unique) file contract ID.
 func (h *testHost) ContractID() types.FileContractID {
