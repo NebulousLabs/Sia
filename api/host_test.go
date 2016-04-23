@@ -21,6 +21,29 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 	defer st.server.Close()
 
+	// announce the host and start accepting contracts
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create contracts
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", "10000000000000000000000000000")
+	allowanceValues.Set("period", "5")
+	err = st.stdPostAPI("/renter/allowance", allowanceValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// create a file
 	path := filepath.Join(build.SiaTestingDir, "api", "TestIntegrationHosting", "test.dat")
 	err = createRandFile(path)
@@ -37,12 +60,12 @@ func TestIntegrationHosting(t *testing.T) {
 	}
 	// only one piece will be uploaded (10% at current redundancy)
 	var rf RenterFiles
-	for i := 0; i < 150 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(50 * time.Millisecond)
 	}
 	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
-		t.Fatal("the uploading is not succeeding for some reason")
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
 	}
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12

@@ -11,6 +11,8 @@ import (
 )
 
 var (
+	errInsufficientContracts = errors.New("not enough contracts to upload file")
+
 	// Erasure-coded piece size
 	pieceSize = modules.SectorSize - crypto.TwofishOverhead
 
@@ -55,6 +57,11 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 	if up.ErasureCode == nil {
 		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
+	}
+
+	// Check that we have contracts to upload to.
+	if len(r.hostContractor.Contracts()) < up.ErasureCode.NumPieces() && build.Release != "testing" {
+		return errInsufficientContracts
 	}
 
 	// Create file object.

@@ -292,6 +292,9 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	if err != nil {
 		return Contract{}, err
 	}
+	if !host.AcceptingContracts {
+		return Contract{}, errors.New("host is not accepting contracts")
+	}
 
 	// create transaction builder
 	txnBuilder := c.wallet.StartTransaction()

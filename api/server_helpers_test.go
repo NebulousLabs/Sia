@@ -232,6 +232,20 @@ func (st *serverTester) coinAddress() string {
 	return addr.Address
 }
 
+// acceptContracts instructs the host to begin accepting contracts.
+func (st *serverTester) acceptContracts() error {
+	settingsValues := url.Values{}
+	settingsValues.Set("acceptingcontracts", "true")
+	return st.stdPostAPI("/host", settingsValues)
+}
+
+// setHostStorage adds a 1 GB folder to the host.
+func (st *serverTester) setHostStorage() error {
+	values := url.Values{}
+	values.Set("size", "1048576")
+	return st.stdPostAPI("/storage/folders/add/"+st.dir, values)
+}
+
 // announceHost announces the host, mines a block, and waits for the
 // announcement to register.
 func (st *serverTester) announceHost() error {
