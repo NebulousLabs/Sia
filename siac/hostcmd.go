@@ -171,7 +171,7 @@ RPC Stats:
 		return
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
-	fmt.Fprintln(w, "\nUsed\tCapacity\t% Used\tPath")
+	fmt.Fprintf(w, "\nUsed\tCapacity\t%% Used\tPath")
 	for _, folder := range sg.StorageFolderMetadata {
 		curSize := int64(folder.Capacity - folder.CapacityRemaining)
 		pctUsed := 100 * (float64(curSize) / float64(folder.Capacity))
