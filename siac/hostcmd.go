@@ -83,8 +83,9 @@ other storage folders.`,
 
 	hostSectorCmd = &cobra.Command{
 		Use:   "sector",
-		Short: "Add or delete a sector",
-		Long:  "Add or delete a sector. Note that deleting a sector may impact host revenue.",
+		Short: "Add or delete a sector (add not supported)",
+		Long: `Add or delete a sector. Adding is not currently supported. Note that
+deleting a sector may impact host revenue.`,
 	}
 
 	hostSectorDeleteCmd = &cobra.Command{
@@ -165,17 +166,19 @@ RPC Stats:
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls, nm.FormContractCalls)
 	}
 
+	fmt.Println("\nStorage Folders:")
+
 	// display storage folder info
 	if len(sg.StorageFolderMetadata) == 0 {
-		fmt.Println("\nNo storage folders configured")
+		fmt.Println("No storage folders configured")
 		return
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
-	fmt.Fprintf(w, "\nUsed\tCapacity\t%% Used\tPath")
+	fmt.Fprintf(w, "\tUsed\tCapacity\t%% Used\tPath\n")
 	for _, folder := range sg.StorageFolderMetadata {
 		curSize := int64(folder.Capacity - folder.CapacityRemaining)
 		pctUsed := 100 * (float64(curSize) / float64(folder.Capacity))
-		fmt.Fprintf(w, "%s\t%s\t%.2f\t%s\n", filesizeUnits(curSize), filesizeUnits(int64(folder.Capacity)), pctUsed, folder.Path)
+		fmt.Fprintf(w, "\t%s\t%s\t%.2f\t%s\n", filesizeUnits(curSize), filesizeUnits(int64(folder.Capacity)), pctUsed, folder.Path)
 	}
 	w.Flush()
 }
