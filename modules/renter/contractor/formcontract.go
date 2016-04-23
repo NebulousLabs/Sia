@@ -22,8 +22,8 @@ var (
 	maxPrice = modules.StoragePriceToConsensus(500e3) // 500k SC / TB / Month
 
 	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
-	errSmallCollateral = errors.New("host collateral was too small")
-	errTooExpensive    = errors.New("host price was too high")
+	errSmallCollateral       = errors.New("host collateral was too small")
+	errTooExpensive          = errors.New("host price was too high")
 )
 
 // formContract establishes a connection to a host and negotiates an initial
