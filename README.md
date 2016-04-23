@@ -46,6 +46,32 @@ access." You can now run `siac` in a separate command prompt to interact with
 siad. From here, you can send money, mine blocks, upload and download
 files, and advertise yourself as a host.
 
+Building From Source
+--------------------
+
+To build from source, [Go 1.6 must be installed](https://golang.org/doc/install)
+on the system. Then run the following to build:
+
+```
+go get github.com/NebulousLabs/Sia
+cd  $GOPATH/src/github.com/NebulousLabs/Sia/
+make dependencies
+make
+```
+
+To start `siad`, the Sia daemon process, run:
+
+```
+$GOPATH/bin/siad
+```
+
+With `siad` running, you can run `siac`, the Sia command-line interface from a
+separate shell:
+
+```
+$GOPATH/bin/siac
+```
+
 Troubleshooting
 ---------------
 
