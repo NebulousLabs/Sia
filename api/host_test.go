@@ -57,8 +57,6 @@ func TestIntegrationHosting(t *testing.T) {
 // TestIntegrationRenewing tests that the renter and host manage contract
 // renewals properly.
 func TestIntegrationRenewing(t *testing.T) {
-	t.Skip("TODO: fix host/renter protocol")
-
 	st, err := createServerTester("TestIntegrationRenewing")
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +79,6 @@ func TestIntegrationRenewing(t *testing.T) {
 	// upload to host, specifying that the file should be renewed
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
-	uploadValues.Set("renew", "true")
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
