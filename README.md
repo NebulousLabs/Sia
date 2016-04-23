@@ -1,4 +1,4 @@
-Sia 0.5.2
+Sia 0.6.0
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -91,16 +91,29 @@ If your issue is not addressed above, you can get in touch with us personally:
 Version Information
 -------------------
 
-- The API changed a great deal in v0.5.0. The majority of routes were changed,
-  though some less dramatically than others. The wallet and miner are mostly
-  unchanged, but the renter was overhauled completely. When in doubt, consult
-  doc/API.md.
+- The renter and host modules have been significantly changed in v0.6.0.
+  The renter now forms long-term file contracts instead of making a new
+  contract for each file. This requires the introduction of "allowances,"
+  which are used to specify how much money the renter should spend on
+  contracts. Before you can upload files, you must first specify an
+  allowance. The renter will then form contracts according to the allowance,
+  which are used to store the uploaded files.
 
-- v0.5.0 introduces folder structure to the renter. This means that Sia behaves
-  more like a traditional storage volume. File names are interpreted as paths,
-  relative to the Sia "root folder." Note that when manipulating such paths,
-  there is no leading slash (`/`); as an example, `foo.sia` lives at the root
-  level, while `bar/baz.sia` lives in the `bar` folder.
+- The host now supports multiple storage folders. Each folder can be configured
+  with a maximum size. If you remove a storage folder, its data will be
+  redistributed to the other folders. You should always remove the storage
+  folder via the API before deleting its contents on your filesystem. The host
+  cannot store any data until you specify at least one storage folder.
+
+  Hosts can also delete individual sectors (identified via Merkle root) in
+  order to comply with take-down requests.
+
+- v0.6.0 introduces some changes that are incompatible with previous versions.
+  For example, host announcements now include a public key, and are signed with
+  that key. This allows hosts to reannounce later with a different IP address.
+  The renter-host communication protocols have also changed significantly. For
+  these reasons, we recommend that you reupload data stored on v0.5.0 to v0.6.0
+  hosts. Apologies for the inconvenience.
 
 Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
@@ -108,6 +121,13 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+April 2016:
+
+v0.6.0 (minor release)
+- Switched to Long-form renter contracts
+- Added support for multiple hosting folders
+- Hosts are now identified by their public key
 
 January 2016:
 
