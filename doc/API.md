@@ -810,18 +810,10 @@ Parameters:
 ```
 siapath  string
 source   string
-duration types.BlockHeight (uint64)
-renew    bool
 ```
 'siapath' is the location where the file will reside in the renter.
 
 'source' is the location on disk of the file being uploaded.
-
-'duration' is the number of blocks for which the file will be available. If
-the renew parameter is true, this parameter will be ignored.
-
-'renew' indicates whether the file's contracts should be automatically renewed
-by the renter. If renew is true, the duration parameter will be ignored.
 
 Response: standard.
 

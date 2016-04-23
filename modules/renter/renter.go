@@ -57,10 +57,6 @@ type hostContractor interface {
 type trackedFile struct {
 	// location of original file on disk
 	RepairPath string
-	// height at which file contracts should end
-	EndHeight types.BlockHeight
-	// whether the file should be renewed (overrides EndHeight if true)
-	Renew bool
 }
 
 // A Renter is responsible for tracking all of the files that a user has

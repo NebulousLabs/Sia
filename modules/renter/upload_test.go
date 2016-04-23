@@ -70,14 +70,13 @@ func TestUploadDownload(t *testing.T) {
 		t.SkipNow()
 	}
 
-	// create renter
-	rt, err := newRenterTester("TestUploadDownload")
+	// create renter with mocked contractor
+	hc := &uploadDownloadContractor{
+		sectors: make(map[crypto.Hash][]byte),
+	}
+	rt, err := newContractorTester("TestUploadDownload", hc)
 	if err != nil {
 		t.Fatal(err)
-	}
-	// swap in our own contractor
-	rt.renter.hostContractor = &uploadDownloadContractor{
-		sectors: make(map[crypto.Hash][]byte),
 	}
 
 	// create a file

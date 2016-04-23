@@ -40,8 +40,6 @@ type ErasureCoder interface {
 type FileUploadParams struct {
 	Source      string
 	SiaPath     string
-	Duration    types.BlockHeight
-	Renew       bool
 	ErasureCode ErasureCoder
 }
 
