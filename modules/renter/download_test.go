@@ -2,7 +2,6 @@ package renter
 
 import (
 	"bytes"
-	"crypto/rand"
 	"io"
 	"testing"
 	"time"
@@ -12,7 +11,7 @@ import (
 
 // a testFetcher simulates a host. It implements the fetcher interface.
 type testFetcher struct {
-	data      []byte
+	sectors   map[crypto.Hash][]byte
 	pieceMap  map[uint64][]pieceData
 	pieceSize uint64
 
@@ -36,10 +35,12 @@ func (f *testFetcher) fetch(p pieceData) ([]byte, error) {
 		return nil, io.EOF
 	}
 	f.nFetch++
-	return f.data[p.Offset : p.Offset+f.pieceSize], nil
+	return f.sectors[p.MerkleRoot], nil
 }
 
-// TestErasureDownload tests parallel downloading of erasure-coded data.
+// TestErasureDownload tests parallel downloading of erasure-coded data. It
+// mocks the fetcher interface in order to directly test the downloading
+// algorithm.
 func TestErasureDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -47,8 +48,10 @@ func TestErasureDownload(t *testing.T) {
 
 	// generate data
 	const dataSize = 777
-	data := make([]byte, dataSize)
-	rand.Read(data)
+	data, err := crypto.RandBytes(dataSize)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create Reed-Solomon encoder
 	rsc, err := NewRSCode(2, 10)
@@ -61,6 +64,7 @@ func TestErasureDownload(t *testing.T) {
 	hosts := make([]fetcher, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testFetcher{
+			sectors:   make(map[crypto.Hash][]byte),
 			pieceMap:  make(map[uint64][]pieceData),
 			pieceSize: pieceSize,
 
@@ -89,13 +93,14 @@ func TestErasureDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for j, p := range pieces {
+			root := crypto.MerkleRoot(p)
 			host := hosts[j%len(hosts)].(*testFetcher) // distribute evenly
 			host.pieceMap[i] = append(host.pieceMap[i], pieceData{
-				uint64(i),
-				uint64(j),
-				uint64(len(host.data)),
+				Chunk:      uint64(i),
+				Piece:      uint64(j),
+				MerkleRoot: root,
 			})
-			host.data = append(host.data, p...)
+			host.sectors[root] = p
 		}
 	}
 

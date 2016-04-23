@@ -16,29 +16,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// oldHostSettings is the HostSettings type used prior to v0.5.0. It is
-// preserved for compatibility with those hosts.
-// COMPATv0.4.8
-type oldHostSettings struct {
-	NetAddress   modules.NetAddress
-	TotalStorage int64
-	MinFilesize  uint64
-	MaxFilesize  uint64
-	MinDuration  types.BlockHeight
-	MaxDuration  types.BlockHeight
-	WindowSize   types.BlockHeight
-	Price        types.Currency
-	Collateral   types.Currency
-	UnlockHash   types.UnlockHash
-}
-
 const (
-	DefaultScanSleep = 1*time.Hour + 37*time.Minute
-	MaxScanSleep     = 4 * time.Hour
-	MinScanSleep     = 1 * time.Hour
+	defaultScanSleep = 1*time.Hour + 37*time.Minute
+	maxScanSleep     = 4 * time.Hour
+	minScanSleep     = 1 * time.Hour
 
-	MaxActiveHosts              = 500
-	InactiveHostCheckupQuantity = 250
+	maxActiveHosts              = 500
+	inactiveHostCheckupQuantity = 250
 
 	maxSettingsLen = 2e3
 
@@ -49,6 +33,7 @@ const (
 	scanningThreads = 25
 )
 
+// Reliability is a measure of a host's uptime.
 var (
 	MaxReliability     = types.NewCurrency64(225) // Given the scanning defaults, about 3 weeks of survival.
 	DefaultReliability = types.NewCurrency64(75)  // Given the scanning defaults, about 1 week of survival.
@@ -74,8 +59,8 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 		// TODO: should panic here
 		return
 	}
-	entry.reliability = entry.reliability.Sub(penalty)
-	entry.online = false
+	entry.Reliability = entry.Reliability.Sub(penalty)
+	entry.Online = false
 
 	// If the entry is in the active database, remove it from the active
 	// database.
@@ -87,7 +72,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 
 	// If the reliability has fallen to 0, remove the host from the
 	// database entirely.
-	if entry.reliability.IsZero() {
+	if entry.Reliability.IsZero() {
 		delete(hdb.allHosts, addr)
 	}
 }
@@ -98,7 +83,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHosts() {
 	for hostEntry := range hdb.scanPool {
 		// Request settings from the queued host entry.
-		var settings modules.HostSettings
+		var settings modules.HostExternalSettings
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
 			if err != nil {
@@ -109,33 +94,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			if err != nil {
 				return err
 			}
-			// COMPATv0.4.8 - If first decoding attempt fails, try decoding
-			// into the old HostSettings type. Because we decode twice, we
-			// must read the data into memory first.
-			settingsBytes, err := encoding.ReadPrefix(conn, maxSettingsLen)
-			if err != nil {
-				return err
-			}
-			err = encoding.Unmarshal(settingsBytes, &settings)
-			if err != nil {
-				var oldSettings oldHostSettings
-				err = encoding.Unmarshal(settingsBytes, &oldSettings)
-				if err != nil {
-					return err
-				}
-				// Convert the old type.
-				settings = modules.HostSettings{
-					NetAddress:   oldSettings.NetAddress,
-					TotalStorage: oldSettings.TotalStorage,
-					MinDuration:  oldSettings.MinDuration,
-					MaxDuration:  oldSettings.MaxDuration,
-					WindowSize:   oldSettings.WindowSize,
-					Price:        oldSettings.Price,
-					Collateral:   oldSettings.Collateral,
-					UnlockHash:   oldSettings.UnlockHash,
-				}
-			}
-			return nil
+			var pubkey crypto.PublicKey
+			copy(pubkey[:], hostEntry.PublicKey.Key)
+			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 
 		// Now that network communication is done, lock the hostdb to modify the
@@ -157,15 +118,15 @@ func (hdb *HostDB) threadedProbeHosts() {
 
 			// Update the host settings, reliability, and weight. The old NetAddress
 			// must be preserved.
-			settings.NetAddress = hostEntry.HostSettings.NetAddress
-			hostEntry.HostSettings = settings
-			hostEntry.reliability = MaxReliability
-			hostEntry.weight = calculateHostWeight(*hostEntry)
-			hostEntry.online = true
+			settings.NetAddress = hostEntry.HostExternalSettings.NetAddress
+			hostEntry.HostExternalSettings = settings
+			hostEntry.Reliability = MaxReliability
+			hostEntry.Weight = calculateHostWeight(*hostEntry)
+			hostEntry.Online = true
 
-			// If 'MaxActiveHosts' has not been reached, add the host to the
+			// If 'maxActiveHosts' has not been reached, add the host to the
 			// activeHosts tree.
-			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; !exists && len(hdb.activeHosts) < MaxActiveHosts {
+			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; !exists && len(hdb.activeHosts) < maxActiveHosts {
 				hdb.insertNode(hostEntry)
 			}
 		}()
@@ -176,7 +137,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
 	for {
-		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
+		// Determine who to scan. At most 'maxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.
 		func() {
@@ -199,9 +160,9 @@ func (hdb *HostDB) threadedScan() {
 				}
 			}
 
-			// Generate a random ordering of up to InactiveHostCheckupQuantity
+			// Generate a random ordering of up to inactiveHostCheckupQuantity
 			// hosts.
-			n := InactiveHostCheckupQuantity
+			n := inactiveHostCheckupQuantity
 			if n > len(entries) {
 				n = len(entries)
 			}
@@ -220,15 +181,15 @@ func (hdb *HostDB) threadedScan() {
 		// scanning. The minimums and maximums keep the scan time reasonable,
 		// while the randomness prevents the scanning from always happening at
 		// the same time of day or week.
-		maxBig := big.NewInt(int64(MaxScanSleep))
-		minBig := big.NewInt(int64(MinScanSleep))
+		maxBig := big.NewInt(int64(maxScanSleep))
+		minBig := big.NewInt(int64(minScanSleep))
 		randSleep, err := rand.Int(rand.Reader, maxBig.Sub(maxBig, minBig))
 		if err != nil {
 			build.Critical(err)
 			// If there's an error, sleep for the default amount of time.
-			defaultBig := big.NewInt(int64(DefaultScanSleep))
+			defaultBig := big.NewInt(int64(defaultScanSleep))
 			randSleep = defaultBig.Sub(defaultBig, minBig)
 		}
-		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep) // this means the MaxScanSleep is actual Max+Min.
+		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + minScanSleep) // this means the maxScanSleep is actual Max+Min.
 	}
 }

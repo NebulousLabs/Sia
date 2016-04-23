@@ -101,6 +101,15 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 	return tp, nil
 }
 
+// FeeEstimation returns an estimation for what fee should be applied to
+// transactions.
+func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
+	// TODO: The fee estimation tool should look at the recent blocks and use
+	// them to guage what sort of fee should be required, as opposed to just
+	// guessing blindly.
+	return types.NewCurrency64(3).Mul(types.SiacoinPrecision).Div(types.NewCurrency64(1e3)), types.NewCurrency64(5).Mul(types.SiacoinPrecision).Div(types.NewCurrency64(1e3))
+}
+
 // TransactionList returns a list of all transactions in the transaction pool.
 // The transactions are provided in an order that can acceptably be put into a
 // block.

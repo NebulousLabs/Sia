@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"crypto/rand"
 	"path/filepath"
 	"testing"
@@ -39,17 +38,6 @@ func randAddress() types.UnlockHash {
 		panic(err)
 	}
 	return uh
-}
-
-// randFile returns a bytes.Reader that is equivalent to a random file of size
-// 'filesize'.
-func randFile(filesize uint64) *bytes.Reader {
-	fileBytes := make([]byte, filesize)
-	_, err := rand.Read(fileBytes)
-	if err != nil {
-		panic(err)
-	}
-	return bytes.NewReader(fileBytes)
 }
 
 // addSiafunds makes a transaction that moves some testing genesis siafunds

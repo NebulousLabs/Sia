@@ -5,10 +5,27 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
+)
+
+var (
+	// TODO: Replace this function by accepting user input.
+	recommendedHosts = func() uint64 {
+		if build.Release == "dev" {
+			return 2
+		}
+		if build.Release == "standard" {
+			return 4
+		}
+		if build.Release == "testing" {
+			return 1
+		}
+		panic("unrecognized release constant in api")
+	}()
 )
 
 // DownloadQueue contains the renter's download queue.
@@ -33,7 +50,54 @@ type RenterShareASCII struct {
 
 // ActiveHosts lists active hosts on the network.
 type ActiveHosts struct {
-	Hosts []modules.HostSettings `json:"hosts"`
+	Hosts []modules.HostDBEntry `json:"hosts"`
+}
+
+// renterAllowanceHandlerGET handles the API call to get the allowance.
+func (srv *Server) renterAllowanceHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	writeJSON(w, srv.renter.Allowance())
+}
+
+// renterAllowanceHandlerPOST handles the API call to set the allowance.
+func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// scan values
+	funds, ok := scanAmount(req.FormValue("funds"))
+	if !ok {
+		writeError(w, "Couldn't parse funds", http.StatusBadRequest)
+		return
+	}
+	// var hosts uint64
+	// _, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
+	// if err != nil {
+	// 	writeError(w, "Couldn't parse hosts: "+err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
+	var period types.BlockHeight
+	_, err := fmt.Sscan(req.FormValue("period"), &period)
+	if err != nil {
+		writeError(w, "Couldn't parse period: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	// var renewWindow types.BlockHeight
+	// _, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
+	// if err != nil {
+	// 	writeError(w, "Couldn't parse renewwindow: "+err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
+
+	err = srv.renter.SetAllowance(modules.Allowance{
+		Funds:  funds,
+		Period: period,
+
+		// TODO: let user specify these
+		Hosts:       recommendedHosts,
+		RenewWindow: period / 2,
+	})
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
 }
 
 // renterDownloadsHandler handles the API call to request the download queue.
@@ -135,23 +199,11 @@ func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Requ
 
 // renterUploadHandler handles the API call to upload a file.
 func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	var duration types.BlockHeight
-	if req.FormValue("duration") != "" {
-		_, err := fmt.Sscan(req.FormValue("duration"), &duration)
-		if err != nil {
-			writeError(w, "Couldn't parse duration: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	renew := req.FormValue("renew") == "true"
 	err := srv.renter.Upload(modules.FileUploadParams{
-		Source:   req.FormValue("source"),
-		SiaPath:  strings.TrimPrefix(ps.ByName("siapath"), "/"),
-		Duration: duration,
-		Renew:    renew,
+		Source:  req.FormValue("source"),
+		SiaPath: strings.TrimPrefix(ps.ByName("siapath"), "/"),
 		// let the renter decide these values; eventually they will be configurable
 		ErasureCode: nil,
-		PieceSize:   0,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)

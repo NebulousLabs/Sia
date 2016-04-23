@@ -6,6 +6,8 @@ import (
 
 // TestHost tests the Host method of the NetAddress type.
 func TestHost(t *testing.T) {
+	t.Parallel()
+
 	testSet := []struct {
 		query           NetAddress
 		desiredResponse string
@@ -33,6 +35,8 @@ func TestHost(t *testing.T) {
 
 // TestIsLoopback tests the IsLoopback method of the NetAddress type.
 func TestIsLoopback(t *testing.T) {
+	t.Parallel()
+
 	testSet := []struct {
 		query           NetAddress
 		desiredResponse bool
@@ -74,6 +78,8 @@ func TestIsLoopback(t *testing.T) {
 // TestIsValid checks where a netaddress matches the regex for what counts as a
 // valid hostname or ip address.
 func TestIsValid(t *testing.T) {
+	t.Parallel()
+
 	testSet := []struct {
 		query           NetAddress
 		desiredResponse bool

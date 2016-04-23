@@ -14,7 +14,9 @@ func TestInsertHost(t *testing.T) {
 	hdb := bareHostDB()
 
 	// invalid host should not be scanned
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo"})
+	var dbe modules.HostDBEntry
+	dbe.NetAddress = "foo"
+	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
 		t.Error("invalid host was added to scan pool")
@@ -22,7 +24,8 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// valid host should be scanned
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
+	dbe.NetAddress = "foo:1234"
+	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
 	case <-time.After(time.Second):
@@ -30,7 +33,7 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// duplicate host should not be scanned
-	hdb.insertHost(modules.HostSettings{NetAddress: "foo:1234"})
+	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
 		t.Error("duplicate host was added to scan pool")
@@ -88,18 +91,18 @@ func TestAveragePrice(t *testing.T) {
 	// with one host
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
-	h1.Price = types.NewCurrency64(100)
-	h1.weight = baseWeight
+	h1.ContractPrice = types.NewCurrency64(100)
+	h1.Weight = baseWeight
 	hdb.insertNode(h1)
-	if avg := hdb.AveragePrice(); avg.Cmp(h1.Price) != 0 {
+	if avg := hdb.AveragePrice(); avg.Cmp(h1.ContractPrice) != 0 {
 		t.Error("average of one host should be that host's price:", avg)
 	}
 
 	// with two hosts
 	h2 := new(hostEntry)
 	h2.NetAddress = "bar"
-	h2.Price = types.NewCurrency64(300)
-	h2.weight = baseWeight
+	h2.ContractPrice = types.NewCurrency64(300)
+	h2.Weight = baseWeight
 	hdb.insertNode(h2)
 	if len(hdb.activeHosts) != 2 {
 		t.Error("host was not added:", hdb.activeHosts)
@@ -113,9 +116,9 @@ func TestAveragePrice(t *testing.T) {
 func TestIsOffline(t *testing.T) {
 	hdb := &HostDB{
 		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo:1234": &hostEntry{online: true},
-			"bar:1234": &hostEntry{online: false},
-			"baz:1234": &hostEntry{online: true},
+			"foo:1234": &hostEntry{Online: true},
+			"bar:1234": &hostEntry{Online: false},
+			"baz:1234": &hostEntry{Online: true},
 		},
 		activeHosts: map[modules.NetAddress]*hostNode{
 			"foo:1234": nil,
@@ -136,15 +139,5 @@ func TestIsOffline(t *testing.T) {
 		if offline := hdb.IsOffline(test.addr); offline != test.offline {
 			t.Errorf("IsOffline(%v) = %v, expected %v", test.addr, offline, test.offline)
 		}
-	}
-
-	// quux should have sent host down scanPool
-	select {
-	case h := <-hdb.scanPool:
-		if h.NetAddress != "quux:1234" {
-			t.Error("wrong host in scan pool:", h.NetAddress)
-		}
-	case <-time.After(time.Second):
-		t.Error("unknown host was not added to scan pool")
 	}
 }

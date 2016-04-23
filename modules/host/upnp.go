@@ -32,22 +32,30 @@ func myExternalIP() (string, error) {
 	return string(buf[:n-1]), nil
 }
 
-// learnHostname discovers the external IP of the Host. The Host cannot
-// announce until the external IP is known.
-func (h *Host) learnHostname() {
+// managedLearnHostname discovers the external IP of the Host. If the host's
+// net address is blank and the host's auto address appears to have changed,
+// the host will make an announcement on the blockchain.
+func (h *Host) managedLearnHostname() {
 	if build.Release == "testing" {
 		return
 	}
-
-	var host string
+	h.mu.RLock()
+	netAddr := h.settings.NetAddress
+	h.mu.RUnlock()
+	// If the settings indicate that an address has been manually set, there is
+	// no reason to learn the hostname.
+	if netAddr != "" {
+		return
+	}
 
 	// try UPnP first, then fallback to myexternalip.com
+	var hostname string
 	d, err := upnp.Discover()
 	if err == nil {
-		host, err = d.ExternalIP()
+		hostname, err = d.ExternalIP()
 	}
 	if err != nil {
-		host, err = myExternalIP()
+		hostname, err = myExternalIP()
 	}
 	if err != nil {
 		h.log.Println("WARN: failed to discover external IP")
@@ -55,15 +63,34 @@ func (h *Host) learnHostname() {
 	}
 
 	h.mu.Lock()
-	h.netAddress = modules.NetAddress(net.JoinHostPort(host, h.netAddress.Port()))
-	h.settings.NetAddress = h.netAddress
-	h.mu.Unlock()
+	defer h.mu.Unlock()
+	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, h.port))
+	if autoAddress == h.autoAddress && h.announced {
+		// Nothing to do - the auto address has not changed and the previous
+		// annoucement was successful.
+		return
+	}
+	err = h.announce(autoAddress)
+	if err != nil {
+		// Set h.announced to false, as the address has changed yet the
+		// renewed annoucement has failed.
+		h.announced = false
+		h.log.Debugln(err)
+	}
+	h.autoAddress = autoAddress
+	err = h.save()
+	if err != nil {
+		h.log.Println(err)
+	}
 }
 
-// forwardPort adds a port mapping to the router.
-func (h *Host) forwardPort(port string) error {
+// managedForwardPort adds a port mapping to the router.
+func (h *Host) managedForwardPort() error {
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
+	h.mu.RLock()
+	port := h.port
+	h.mu.RUnlock()
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
@@ -85,10 +112,13 @@ func (h *Host) forwardPort(port string) error {
 	return nil
 }
 
-// clearPort removes a port mapping from the router.
-func (h *Host) clearPort(port string) error {
+// managedClearPort removes a port mapping from the router.
+func (h *Host) managedClearPort() error {
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
+	h.mu.RLock()
+	port := h.port
+	h.mu.RUnlock()
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err

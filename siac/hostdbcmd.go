@@ -44,6 +44,6 @@ func hostdblistcmd() {
 	}
 	fmt.Println("Active hosts:")
 	for _, host := range info.Hosts {
-		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.NetAddress, host.Price.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
+		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.NetAddress, host.ContractPrice.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
 	}
 }

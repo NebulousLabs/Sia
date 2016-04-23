@@ -22,7 +22,7 @@ func fakeAddr(n uint8) modules.NetAddress {
 // every entropy has the same weight.
 func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 	// Check that the weight of the hostTree is what is expected.
-	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdb.hostTree.hostEntry.weight)
+	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdb.hostTree.hostEntry.Weight)
 	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		return errors.New("expected weight is incorrect")
 	}
@@ -41,11 +41,11 @@ func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 		selectionMap := make(map[modules.NetAddress]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
-			entries := hdb.randomHosts(1, nil)
+			entries := hdb.RandomHosts(1, nil)
 			if len(entries) == 0 {
-				return errors.New("no hosts!")
+				return errors.New("no hosts")
 			}
-			selectionMap[entries[0].NetAddress] = selectionMap[entries[0].NetAddress] + 1
+			selectionMap[entries[0].NetAddress]++
 		}
 
 		// See if each host was selected enough times.
@@ -99,11 +99,13 @@ func TestWeightedList(t *testing.T) {
 	}
 
 	// Create a bunch of host entries of equal weight.
+	var dbe modules.HostDBEntry
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
+		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:       types.NewCurrency64(10),
+			HostDBEntry: dbe,
+			Weight:      types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -146,9 +148,10 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
+		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:       types.NewCurrency64(10),
+			HostDBEntry: dbe,
+			Weight:      types.NewCurrency64(10),
 		}
 		hdb.insertNode(&entry)
 	}
@@ -173,13 +176,15 @@ func TestVariedWeights(t *testing.T) {
 	// insert i hosts with the weights 0, 1, ..., i-1. 100e3 selections will be made
 	// per weight added to the tree, the total number of selections necessary
 	// will be tallied up as hosts are created.
+	var dbe modules.HostDBEntry
 	hostCount := 5
 	expectedPerWeight := int(10e3)
 	selections := 0
 	for i := 0; i < hostCount; i++ {
+		dbe.NetAddress = fakeAddr(uint8(i))
 		entry := hostEntry{
-			HostSettings: modules.HostSettings{NetAddress: fakeAddr(uint8(i))},
-			weight:       types.NewCurrency64(uint64(i)),
+			HostDBEntry: dbe,
+			Weight:      types.NewCurrency64(uint64(i)),
 		}
 		hdb.insertNode(&entry)
 		selections += i * expectedPerWeight
@@ -189,7 +194,7 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry := hdb.randomHosts(1, nil)
+		randEntry := hdb.RandomHosts(1, nil)
 		if len(randEntry) == 0 {
 			t.Fatal("no hosts!")
 		}
@@ -197,7 +202,7 @@ func TestVariedWeights(t *testing.T) {
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
-		selectionMap[node.hostEntry.weight.String()] += 1
+		selectionMap[node.hostEntry.Weight.String()]++
 	}
 
 	// Check that each host was selected an expected number of times. An error
@@ -229,14 +234,16 @@ func TestRepeatInsert(t *testing.T) {
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
 
+	var dbe modules.HostDBEntry
+	dbe.NetAddress = fakeAddr(0)
 	entry1 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(0)},
-		weight:       types.NewCurrency64(1),
+		HostDBEntry: dbe,
+		Weight:      types.NewCurrency64(1),
 	}
 	entry2 := entry1
 	hdb.insertNode(&entry1)
 
-	entry2.weight = types.NewCurrency64(100)
+	entry2.Weight = types.NewCurrency64(100)
 	hdb.insertNode(&entry2)
 	if len(hdb.activeHosts) != 1 {
 		t.Error("insterting the same entry twice should result in only 1 entry in the hostdb")
@@ -248,13 +255,13 @@ func TestNodeAtWeight(t *testing.T) {
 	// create hostTree
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
-	h1.weight = baseWeight
+	h1.Weight = baseWeight
 	ht := createNode(nil, h1)
 
 	// overweight
 	_, err := ht.nodeAtWeight(baseWeight.Mul(types.NewCurrency64(2)))
-	if err != ErrOverweight {
-		t.Errorf("expected %v, got %v", ErrOverweight, err)
+	if err != errOverweight {
+		t.Errorf("expected %v, got %v", errOverweight, err)
 	}
 
 	h, err := ht.nodeAtWeight(baseWeight)
@@ -265,28 +272,32 @@ func TestNodeAtWeight(t *testing.T) {
 	}
 }
 
-// TestRandomHosts probes the randomHosts function.
+// TestRandomHosts probes the RandomHosts function.
 func TestRandomHosts(t *testing.T) {
 	// Create the hostdb.
 	hdb := bareHostDB()
 
 	// Empty.
-	if hosts := hdb.randomHosts(1, nil); len(hosts) != 0 {
+	if hosts := hdb.RandomHosts(1, nil); len(hosts) != 0 {
 		t.Errorf("empty hostdb returns %v hosts: %v", len(hosts), hosts)
 	}
 
 	// Insert 3 hosts to be selected.
+	var dbe modules.HostDBEntry
+	dbe.NetAddress = fakeAddr(1)
 	entry1 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(1)},
-		weight:       types.NewCurrency64(1),
+		HostDBEntry: dbe,
+		Weight:      types.NewCurrency64(1),
 	}
+	dbe.NetAddress = fakeAddr(2)
 	entry2 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(2)},
-		weight:       types.NewCurrency64(2),
+		HostDBEntry: dbe,
+		Weight:      types.NewCurrency64(2),
 	}
+	dbe.NetAddress = fakeAddr(3)
 	entry3 := hostEntry{
-		HostSettings: modules.HostSettings{NetAddress: fakeAddr(3)},
-		weight:       types.NewCurrency64(3),
+		HostDBEntry: dbe,
+		Weight:      types.NewCurrency64(3),
 	}
 	hdb.insertNode(&entry1)
 	hdb.insertNode(&entry2)
@@ -301,13 +312,13 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 1 random host.
-	randHosts := hdb.randomHosts(1, nil)
+	randHosts := hdb.RandomHosts(1, nil)
 	if len(randHosts) != 1 {
 		t.Error("didn't get 1 hosts")
 	}
 
 	// Grab 2 random hosts.
-	randHosts = hdb.randomHosts(2, nil)
+	randHosts = hdb.RandomHosts(2, nil)
 	if len(randHosts) != 2 {
 		t.Error("didn't get 2 hosts")
 	}
@@ -316,7 +327,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 3 random hosts.
-	randHosts = hdb.randomHosts(3, nil)
+	randHosts = hdb.RandomHosts(3, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -325,7 +336,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Grab 4 random hosts. 3 should be returned.
-	randHosts = hdb.randomHosts(4, nil)
+	randHosts = hdb.RandomHosts(4, nil)
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}
@@ -335,7 +346,7 @@ func TestRandomHosts(t *testing.T) {
 
 	// Ask for 3 hosts that are not in randHosts. No hosts should be
 	// returned.
-	uniqueHosts := hdb.randomHosts(3, []modules.NetAddress{
+	uniqueHosts := hdb.RandomHosts(3, []modules.NetAddress{
 		randHosts[0].NetAddress,
 		randHosts[1].NetAddress,
 		randHosts[2].NetAddress,
@@ -345,7 +356,7 @@ func TestRandomHosts(t *testing.T) {
 	}
 
 	// Ask for 3 hosts, blacklisting non-existent hosts. 3 should be returned.
-	randHosts = hdb.randomHosts(3, []modules.NetAddress{"foo", "bar", "baz"})
+	randHosts = hdb.RandomHosts(3, []modules.NetAddress{"foo", "bar", "baz"})
 	if len(randHosts) != 3 {
 		t.Error("didn't get 3 hosts")
 	}

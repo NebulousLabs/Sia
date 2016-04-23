@@ -17,7 +17,7 @@ var (
 // the host database entry. Currently, only the price is considered.
 func calculateHostWeight(entry hostEntry) (weight types.Currency) {
 	// If the price is 0, just return the base weight to avoid divide by zero.
-	price := entry.Price
+	price := entry.ContractPrice
 	if price.IsZero() {
 		return baseWeight
 	}

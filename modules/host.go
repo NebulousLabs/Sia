@@ -5,152 +5,152 @@ import (
 )
 
 const (
-	// AcceptResponse defines the response that is sent to a successful RPC.
-	AcceptResponse = "accept"
-
 	// HostDir names the directory that contains the host persistence.
 	HostDir = "host"
-
-	// MaxFileContractSetLen determines the maximum allowed size of a
-	// transaction set that can be sent when trying to negotiate a file
-	// contract. The transaction set will contain all of the unconfirmed
-	// dependencies of the file contract, meaning that it can be quite large.
-	// The transaction pool's size limit for transaction sets has been chosen
-	// as a reasonable guideline for determining what is too large.
-	MaxFileContractSetLen = TransactionSetSizeLimit - 1e3
-)
-
-var (
-	// RPCSettings is the specifier for requesting settings from the host.
-	RPCSettings = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
-
-	// RPCUpload is the specifier for initiating an upload with the host.
-	RPCUpload = types.Specifier{'U', 'p', 'l', 'o', 'a', 'd'}
-
-	// RPCRenew is the specifier to renewing an existing contract.
-	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w'}
-
-	// RPCRevise is the specifier for revising an existing file contract.
-	RPCRevise = types.Specifier{'R', 'e', 'v', 'i', 's', 'e'}
-
-	// RPCDownload is the specifier for downloading a file from a host.
-	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
-
-	// PrefixHostAnnouncement is used to indicate that a transaction's
-	// Arbitrary Data field contains a host announcement. The encoded
-	// announcement will follow this prefix.
-	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
 )
 
 type (
-	// A DownloadRequest is used to retrieve a particular segment of a file from a
-	// host.
-	DownloadRequest struct {
-		Offset uint64
-		Length uint64
+	// HostFinancialMetrics provides financial statistics for the host,
+	// including money that is locked in contracts. Though verbose, these
+	// statistics should provide a clear picture of where the host's money is
+	// currently being used. The front end can consolidate stats where desired.
+	// Potential revenue refers to revenue that is available in a file
+	// contract, but the file contract window has not yet closed.
+	HostFinancialMetrics struct {
+		// Every time a renter forms a contract with a host, a contract fee is
+		// paid by the renter. These stats track the total contract fees.
+		ContractCompensation          types.Currency `json:"contractcompensation"`
+		PotentialContractCompensation types.Currency `json:"potentialcontractcompensation"`
+
+		// Metrics related to storage proofs, collateral, and submitting
+		// transactions to the blockchain.
+		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
+		LostRevenue             types.Currency `json:"lostrevenue"`
+		LostStorageCollateral   types.Currency `json:"loststoragecollateral"`
+		PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
+		RiskedStorageCollateral types.Currency `json:"riskedstoragecollateral"`
+		StorageRevenue          types.Currency `json:"storagerevenue"`
+		TransactionFeeExpenses  types.Currency `json:"transactionfeeexpenses"`
+
+		// Bandwidth financial metrics.
+		DownloadBandwidthRevenue          types.Currency `json:"downloadbandwidthrevenue"`
+		PotentialDownloadBandwidthRevenue types.Currency `json:"potentialdownloadbandwidthrevenue"`
+		PotentialUploadBandwidthRevenue   types.Currency `json:"potentialuploadbandwidthrevenue"`
+		UploadBandwidthRevenue            types.Currency `json:"uploadbandwidthrevenue"`
 	}
 
-	// HostAnnouncement declares a nodes intent to be a host, providing a net
-	// address that can be used to contact the host.
-	HostAnnouncement struct {
-		IPAddress NetAddress
+	// HostInternalSettings contains a list of settings that can be changed.
+	HostInternalSettings struct {
+		AcceptingContracts   bool              `json:"acceptingcontracts"`
+		MaxDuration          types.BlockHeight `json:"maxduration"`
+		MaxDownloadBatchSize uint64            `json:"maxdownloadbatchsize"`
+		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
+		NetAddress           NetAddress        `json:"netaddress"`
+		WindowSize           types.BlockHeight `json:"windowsize"`
+
+		Collateral            types.Currency `json:"collateral"`
+		CollateralBudget      types.Currency `json:"collateralbudget"`
+		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
+		MaxCollateral         types.Currency `json:"maxcollateral"`
+
+		DownloadLimitGrowth uint64 `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
+		DownloadLimitCap    uint64 `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.
+		DownloadSpeedLimit  uint64 `json:"downloadspeedlimit"`  // The maximum download speed for all combined host connections.
+		UploadLimitGrowth   uint64 `json:"uploadlimitgrowth"`   // Bytes per second that get added to the limit for how much upload bandwidth the host is allowed to use.
+		UploadLimitCap      uint64 `json:"uploadlimitcap"`      // The maximum size of the limit for how much upload bandwidth the host is allowed to use.
+		UploadSpeedLimit    uint64 `json:"uploadspeedlimit"`    // The maximum upload speed for all combined host connections.
+
+		MinimumContractPrice          types.Currency `json:"contractprice"`
+		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
+		MinimumStoragePrice           types.Currency `json:"storageprice"`
+		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
 	}
 
-	// HostSettings are the parameters advertised by the host. These are the
-	// values that the renter will request from the host in order to build its
-	// database.
-	HostSettings struct {
-		AcceptingContracts bool              `json:"acceptingcontracts"`
-		NetAddress         NetAddress        `json:"netaddress"`
-		TotalStorage       int64             `json:"totalstorage"`
-		MinDuration        types.BlockHeight `json:"minduration"`
-		MaxDuration        types.BlockHeight `json:"maxduration"`
-		WindowSize         types.BlockHeight `json:"windowsize"`
-		Price              types.Currency    `json:"price"`
-		Collateral         types.Currency    `json:"collateral"`
-		UnlockHash         types.UnlockHash  `json:"unlockhash"`
-	}
+	// HostNetworkMetrics reports the quantity of each type of RPC call that
+	// has been made to the host.
+	HostNetworkMetrics struct {
+		NetAddress NetAddress
 
-	// HostRPCMetrics reports the quantity of each type of RPC call that has
-	// been made to the host.
-	HostRPCMetrics struct {
-		ErrorCalls        uint64 `json:"errorcalls"` // Calls that resulted in an error.
-		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
+		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
+		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
+
 		DownloadCalls     uint64 `json:"downloadcalls"`
+		ErrorCalls        uint64 `json:"errorcalls"`
+		FormContractCalls uint64 `json:"formcontractcalls"`
 		RenewCalls        uint64 `json:"renewcalls"`
 		ReviseCalls       uint64 `json:"revisecalls"`
 		SettingsCalls     uint64 `json:"settingscalls"`
-		UploadCalls       uint64 `json:"uploadcalls"`
+		UnrecognizedCalls uint64 `json:"unrecognizedcalls"`
 	}
 
-	// Host can take storage from disk and offer it to the network, managing things
-	// such as announcements, settings, and implementing all of the RPCs of the
-	// host protocol.
+	// A Host can take storage from disk and offer it to the network, managing
+	// things such as announcements, settings, and implementing all of the RPCs
+	// of the host protocol.
 	Host interface {
-		// Announce submits a host announcement to the blockchain, returning an
-		// error if its external IP address is unknown. After announcing, the
-		// host will begin accepting contracts.
+		// Announce submits a host announcement to the blockchain.
 		Announce() error
 
-		// AnnounceAddress behaves like Announce, but allows the caller to
-		// specify the address announced. Like Announce, this will cause the
-		// host to start accepting contracts.
+		// AnnounceAddress submits an announcement using the given address.
 		AnnounceAddress(NetAddress) error
 
-		// Capacity returns the amount of storage still available on the
-		// machine. The amount can be negative if the total capacity was
-		// reduced to below the active capacity.
-		Capacity() int64
+		// FinancialMetrics returns the financial statistics of the host.
+		FinancialMetrics() HostFinancialMetrics
 
-		// Contracts returns the number of unresolved file contracts that the
-		// host is responsible for.
-		Contracts() uint64
+		// InternalSettings returns the host's internal settings.
+		InternalSettings() HostInternalSettings
 
-		// DeleteContract deletes a file contract. The revenue and collateral
-		// on the file contract will be lost, and the data will be removed.
-		DeleteContract(types.FileContractID) error
+		// NetworkMetrics returns information on the types of RPC calls that
+		// have been made to the host.
+		NetworkMetrics() HostNetworkMetrics
 
-		// NetAddress returns the host's network address
-		NetAddress() NetAddress
+		// SetInternalSettings sets the hosting parameters of the host.
+		SetInternalSettings(HostInternalSettings) error
 
-		// Revenue returns the amount of revenue that the host has lined up,
-		// the amount of revenue the host has successfully captured, and the
-		// amount of revenue the host has lost.
-		//
-		// TODO: This function will eventually include two more numbers, one
-		// representing current collateral at risk, and one representing total
-		// collateral lost.
-		Revenue() (unresolved, resolved, lost types.Currency)
-
-		// RPCMetrics returns information on the types of RPC calls that have
-		// been made to the host.
-		RPCMetrics() HostRPCMetrics
-
-		// SetConfig sets the hosting parameters of the host.
-		SetSettings(HostSettings) error
-
-		// Settings returns the host's settings.
-		Settings() HostSettings
-
-		// Close saves the state of the host and stops its listener process.
-		Close() error
+		// The storage manager provides an interface for adding and removing
+		// storage folders and data sectors to the host.
+		StorageManager
 	}
 )
 
+// BandwidthPriceToConsensus converts a human bandwidth price, having the unit
+// 'Siacoins per Terabyte', to a consensus storage price, having the unit
+// 'Hastings per Byte'.
+func BandwidthPriceToConsensus(siacoinsTB uint64) (hastingsByte types.Currency) {
+	hastingsTB := types.NewCurrency64(siacoinsTB).Mul(types.SiacoinPrecision)
+	return hastingsTB.Div(types.NewCurrency64(1e12))
+}
+
+// BandwidthPriceToHuman converts a consensus bandwidth price, having the unit
+// 'Hastings per Byte' to a human bandwidth price, having the unit 'Siacoins
+// per Terabyte'.
+func BandwidthPriceToHuman(hastingsByte types.Currency) (siacoinsTB uint64, err error) {
+	hastingsTB := hastingsByte.Mul(types.NewCurrency64(1e12))
+	if hastingsTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
+		// The result of the final division is going to be less than 0.5,
+		// therefore 0 should be returned.
+		return 0, nil
+	}
+	if hastingsTB.Cmp(types.SiacoinPrecision) < 0 {
+		// The result of the final division is going to be greater than or
+		// equal to 0.5, but less than 1, therefore 1 should be returned.
+		return 1, nil
+	}
+	return hastingsTB.Div(types.SiacoinPrecision).Uint64()
+}
+
 // StoragePriceToConsensus converts a human storage price, having the unit
-// 'Siacoins Per Month Per Terabyte', to a consensus storage price, having the
-// unit 'Hastings Per Block Per Byte'.
+// 'Siacoins per Month per Terabyte', to a consensus storage price, having the
+// unit 'Hastings per Block per Byte'.
 func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Currency) {
 	// Perform multiplication first to preserve precision.
 	hastingsMonthTB := types.NewCurrency64(siacoinsMonthTB).Mul(types.SiacoinPrecision)
 	hastingsBlockTB := hastingsMonthTB.Div(types.NewCurrency64(4320))
-	hastingsBlockByte = hastingsBlockTB.Div(types.NewCurrency64(1e12))
-	return hastingsBlockByte
+	return hastingsBlockTB.Div(types.NewCurrency64(1e12))
 }
 
 // StoragePriceToHuman converts a consensus storage price, having the unit
-// 'Hastings Per Block Per Byte', to a human storage price, having the unit
-// 'Siacoins Per Month Per Terabyte'. An error is returned if the result would
+// 'Hastings per Block per Byte', to a human storage price, having the unit
+// 'Siacoins per Month per Terabyte'. An error is returned if the result would
 // overflow a uint64. If the result is between 0 and 1, the value is rounded to
 // the nearest value.
 func StoragePriceToHuman(hastingsBlockByte types.Currency) (siacoinsMonthTB uint64, err error) {

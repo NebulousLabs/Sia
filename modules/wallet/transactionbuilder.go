@@ -2,20 +2,35 @@ package wallet
 
 import (
 	"bytes"
+	"errors"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// errBuilderAlreadySigned indicates that the transaction builder has
+	// already added at least one successful signature to the transaction,
+	// meaning that future calls to Sign will result in an invalid transaction.
+	errBuilderAlreadySigned = errors.New("sign has already been called on this transaction builder, multiple calls can cause issues")
 )
 
 // transactionBuilder allows transactions to be manually constructed, including
 // the ability to fund transactions with siacoins and siafunds from the wallet.
 type transactionBuilder struct {
-	parents       []types.Transaction
-	transaction   types.Transaction
-	siacoinInputs []int
-	siafundInputs []int
+	// 'signed' indicates that at least one transaction signature has been
+	// added to the wallet, meaning that future calls to 'Sign' will fail.
+	parents     []types.Transaction
+	signed      bool
+	transaction types.Transaction
+
+	newParents            []int
+	siacoinInputs         []int
+	siafundInputs         []int
+	transactionSignatures []int
 
 	wallet *Wallet
 }
@@ -23,7 +38,7 @@ type transactionBuilder struct {
 // addSignatures will sign a transaction using a spendable key, with support
 // for multisig spendable keys. Because of the restricted input, the function
 // is compatible with both siacoin inputs and siafund inputs.
-func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, spendKey spendableKey) error {
+func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.UnlockConditions, parentID crypto.Hash, spendKey spendableKey) (newSigIndices []int, err error) {
 	// Try to find the matching secret key for each public key - some public
 	// keys may not have a match. Some secret keys may be used multiple times,
 	// which is why public keys are used as the outer loop.
@@ -42,12 +57,13 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 				CoveredFields:  cf,
 				PublicKeyIndex: uint64(i),
 			}
+			newSigIndices = append(newSigIndices, len(txn.TransactionSignatures))
 			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
 			sigIndex := len(txn.TransactionSignatures) - 1
 			sigHash := txn.SigHash(sigIndex)
 			encodedSig, err := crypto.SignHash(sigHash, spendKey.SecretKeys[j])
 			if err != nil {
-				return err
+				return nil, err
 			}
 			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 
@@ -63,7 +79,7 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 			break
 		}
 	}
-	return nil
+	return newSigIndices, nil
 }
 
 // FundSiacoins will add a siacoin input of exaclty 'amount' to the
@@ -172,7 +188,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 
 	// Sign all of the inputs to the parent trancstion.
 	for _, sci := range parentTxn.SiacoinInputs {
-		err := addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
+		_, err := addSignatures(&parentTxn, types.FullCoveredFields, sci.UnlockConditions, crypto.Hash(sci.ParentID), tb.wallet.keys[sci.UnlockConditions.UnlockHash()])
 		if err != nil {
 			return err
 		}
@@ -186,6 +202,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		ParentID:         parentTxn.SiacoinOutputID(0),
 		UnlockConditions: parentUnlockConditions,
 	}
+	tb.newParents = append(tb.newParents, len(tb.parents))
 	tb.parents = append(tb.parents, parentTxn)
 	tb.siacoinInputs = append(tb.siacoinInputs, len(tb.transaction.SiacoinInputs))
 	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, newInput)
@@ -282,7 +299,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 
 	// Sign all of the inputs to the parent trancstion.
 	for _, sfi := range parentTxn.SiafundInputs {
-		err := addSignatures(&parentTxn, types.FullCoveredFields, sfi.UnlockConditions, crypto.Hash(sfi.ParentID), tb.wallet.keys[sfi.UnlockConditions.UnlockHash()])
+		_, err := addSignatures(&parentTxn, types.FullCoveredFields, sfi.UnlockConditions, crypto.Hash(sfi.ParentID), tb.wallet.keys[sfi.UnlockConditions.UnlockHash()])
 		if err != nil {
 			return err
 		}
@@ -298,6 +315,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		UnlockConditions: parentUnlockConditions,
 		ClaimUnlockHash:  claimUnlockConditions.UnlockHash(),
 	}
+	tb.newParents = append(tb.newParents, len(tb.parents))
 	tb.parents = append(tb.parents, parentTxn)
 	tb.siafundInputs = append(tb.siafundInputs, len(tb.transaction.SiafundInputs))
 	tb.transaction.SiafundInputs = append(tb.transaction.SiafundInputs, newInput)
@@ -307,6 +325,11 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		tb.wallet.spentOutputs[types.OutputID(sfoid)] = tb.wallet.consensusSetHeight
 	}
 	return nil
+}
+
+// AddParents adds a set of parents to the transaction.
+func (tb *transactionBuilder) AddParents(newParents []types.Transaction) {
+	tb.parents = append(tb.parents, newParents...)
 }
 
 // AddMinerFee adds a miner fee to the transaction, returning the index of the
@@ -401,9 +424,13 @@ func (tb *transactionBuilder) Drop() {
 	}
 
 	tb.parents = nil
+	tb.signed = false
 	tb.transaction = types.Transaction{}
+
+	tb.newParents = nil
 	tb.siacoinInputs = nil
 	tb.siafundInputs = nil
+	tb.transactionSignatures = nil
 }
 
 // Sign will sign any inputs added by 'FundSiacoins' or 'FundSiafunds' and
@@ -411,49 +438,55 @@ func (tb *transactionBuilder) Drop() {
 // transaction. If more fields need to be added, a new transaction builder will
 // need to be created.
 //
-// If the whole transaction flag  is set to true, then the whole transaction
+// If the whole transaction flag is set to true, then the whole transaction
 // flag will be set in the covered fields object. If the whole transaction flag
 // is set to false, then the covered fields object will cover all fields that
 // have already been added to the transaction, but will also leave room for
 // more fields to be added.
+//
+// Sign should not be called more than once. If, for some reason, there is an
+// error while calling Sign, the builder should be dropped.
 func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, error) {
+	if tb.signed {
+		return nil, errBuilderAlreadySigned
+	}
+
 	// Create the coveredfields struct.
-	txn := tb.transaction
 	var coveredFields types.CoveredFields
 	if wholeTransaction {
 		coveredFields = types.CoveredFields{WholeTransaction: true}
 	} else {
-		for i := range txn.MinerFees {
+		for i := range tb.transaction.MinerFees {
 			coveredFields.MinerFees = append(coveredFields.MinerFees, uint64(i))
 		}
-		for i := range txn.SiacoinInputs {
+		for i := range tb.transaction.SiacoinInputs {
 			coveredFields.SiacoinInputs = append(coveredFields.SiacoinInputs, uint64(i))
 		}
-		for i := range txn.SiacoinOutputs {
+		for i := range tb.transaction.SiacoinOutputs {
 			coveredFields.SiacoinOutputs = append(coveredFields.SiacoinOutputs, uint64(i))
 		}
-		for i := range txn.FileContracts {
+		for i := range tb.transaction.FileContracts {
 			coveredFields.FileContracts = append(coveredFields.FileContracts, uint64(i))
 		}
-		for i := range txn.FileContractRevisions {
+		for i := range tb.transaction.FileContractRevisions {
 			coveredFields.FileContractRevisions = append(coveredFields.FileContractRevisions, uint64(i))
 		}
-		for i := range txn.StorageProofs {
+		for i := range tb.transaction.StorageProofs {
 			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
 		}
-		for i := range txn.SiafundInputs {
+		for i := range tb.transaction.SiafundInputs {
 			coveredFields.SiafundInputs = append(coveredFields.SiafundInputs, uint64(i))
 		}
-		for i := range txn.SiafundOutputs {
+		for i := range tb.transaction.SiafundOutputs {
 			coveredFields.SiafundOutputs = append(coveredFields.SiafundOutputs, uint64(i))
 		}
-		for i := range txn.ArbitraryData {
+		for i := range tb.transaction.ArbitraryData {
 			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
 		}
 	}
 	// TransactionSignatures don't get covered by the 'WholeTransaction' flag,
 	// and must be covered manually.
-	for i := range txn.TransactionSignatures {
+	for i := range tb.transaction.TransactionSignatures {
 		coveredFields.TransactionSignatures = append(coveredFields.TransactionSignatures, uint64(i))
 	}
 
@@ -462,24 +495,28 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 	tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock()
 	for _, inputIndex := range tb.siacoinInputs {
-		input := txn.SiacoinInputs[inputIndex]
+		input := tb.transaction.SiacoinInputs[inputIndex]
 		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
-		err := addSignatures(&txn, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+		newSigIndices, err := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		if err != nil {
 			return nil, err
 		}
+		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
+		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 	}
 	for _, inputIndex := range tb.siafundInputs {
-		input := txn.SiafundInputs[inputIndex]
+		input := tb.transaction.SiafundInputs[inputIndex]
 		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
-		err := addSignatures(&txn, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+		newSigIndices, err := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		if err != nil {
 			return nil, err
 		}
+		tb.transactionSignatures = append(tb.transactionSignatures, newSigIndices...)
+		tb.signed = true // Signed is set to true after one successful signature to indicate that future signings can cause issues.
 	}
 
 	// Get the transaction set and delete the transaction from the registry.
-	txnSet := append(tb.parents, txn)
+	txnSet := append(tb.parents, tb.transaction)
 	return txnSet, nil
 }
 
@@ -491,14 +528,37 @@ func (tb *transactionBuilder) View() (types.Transaction, []types.Transaction) {
 	return tb.transaction, tb.parents
 }
 
+// ViewAdded returns all of the siacoin inputs, siafund inputs, and parent
+// transactions that have been automatically added by the builder.
+func (tb *transactionBuilder) ViewAdded() (newParents, siacoinInputs, siafundInputs, transactionSignatures []int) {
+	return tb.newParents, tb.siacoinInputs, tb.siafundInputs, tb.transactionSignatures
+}
+
 // RegisterTransaction takes a transaction and its parents and returns a
 // TransactionBuilder which can be used to expand the transaction. The most
 // typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
 // registers a new transaction without parents.
 func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
+	// Create a deep copy of the transaction and parents by encoding them. A
+	// deep copy ensures that there are no pointer or slice related errors -
+	// the builder will be working directly on the transaction, and the
+	// transaction may be in use elsewhere (in this case, the host is using the
+	// transaction.
+	pBytes := encoding.Marshal(parents)
+	var pCopy []types.Transaction
+	err := encoding.Unmarshal(pBytes, &pCopy)
+	if err != nil {
+		panic(err)
+	}
+	tBytes := encoding.Marshal(t)
+	var tCopy types.Transaction
+	err = encoding.Unmarshal(tBytes, &tCopy)
+	if err != nil {
+		panic(err)
+	}
 	return &transactionBuilder{
-		parents:     parents,
-		transaction: t,
+		parents:     pCopy,
+		transaction: tCopy,
 
 		wallet: w,
 	}

@@ -1,56 +1,136 @@
 package host
 
 import (
+	"bytes"
 	"testing"
-	"time"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestAnnouncement has a host announce itself to the blockchain and then
-// checks that the announcement makes it correctly.
-func TestAnnouncement(t *testing.T) {
+// announcementFinder is a quick module that parses the blockchain for host
+// announcements, keeping a record of all the announcements that get found.
+type announcementFinder struct {
+	cs modules.ConsensusSet
+
+	// Announcements that have been seen. The two slices are wedded.
+	netAddresses []modules.NetAddress
+	publicKeys   []types.SiaPublicKey
+}
+
+// ProcessConsensusChange receives consensus changes from the consensus set and
+// parses them for valid host announcements.
+func (af *announcementFinder) ProcessConsensusChange(cc modules.ConsensusChange) {
+	for _, block := range cc.AppliedBlocks {
+		for _, txn := range block.Transactions {
+			for _, arb := range txn.ArbitraryData {
+				addr, pubKey, err := modules.DecodeAnnouncement(arb)
+				if err == nil {
+					af.netAddresses = append(af.netAddresses, addr)
+					af.publicKeys = append(af.publicKeys, pubKey)
+				}
+			}
+		}
+	}
+}
+
+// Close will shut down the announcement finder.
+func (af *announcementFinder) Close() error {
+	af.cs.Unsubscribe(af)
+	return nil
+}
+
+// newAnnouncementFinder will create and return an announcement finder.
+func newAnnouncementFinder(cs modules.ConsensusSet) (*announcementFinder, error) {
+	af := &announcementFinder{
+		cs: cs,
+	}
+	err := cs.ConsensusSetPersistentSubscribe(af, modules.ConsensusChangeID{})
+	if err != nil {
+		return nil, err
+	}
+	return af, nil
+}
+
+// TestHostAnnounce checks that the host announce function is operating
+// correctly.
+func TestHostAnnounce(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	ht, err := newHostTester("TestAnnouncement")
+	t.Parallel()
+	ht, err := newHostTester("TestHostAnnounce")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Place the announcement.
-	ht.host.mu.RLock()
-	addr := ht.host.netAddress
-	ht.host.mu.RUnlock()
-	err = ht.host.AnnounceAddress(addr)
+	// Create an announcement finder to scan the blockchain for host
+	// announcements.
+	af, err := newAnnouncementFinder(ht.cs)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer af.Close()
 
-	// Check that the announcement made it into the transaction pool correctly.
-	txns := ht.tpool.TransactionList()
-	if len(txns) != 1 {
-		t.Fatal("Expecting 1 transaction in transaction pool, instead there was", len(txns))
-	}
-	encodedAnnouncement := txns[0].ArbitraryData[0][types.SpecifierLen:]
-	var ha modules.HostAnnouncement
-	err = encoding.Unmarshal([]byte(encodedAnnouncement), &ha)
+	// Create an announcement, then use the address finding module to scan the
+	// blockchain for the host's address.
+	err = ht.host.Announce()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-
-	// Mine a block to get the announcement into the blockchain, and then wait
-	// until the hostdb recognizes the host.
 	_, err = ht.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 50 && len(ht.renter.ActiveHosts()) == 0; i++ {
-		time.Sleep(time.Millisecond * 50)
+	if len(af.publicKeys) != 1 {
+		t.Fatal("could not find host announcement in blockchain")
 	}
-	if len(ht.renter.ActiveHosts()) == 0 {
-		t.Fatal("no active hosts in hostdb after host made an announcement")
+	if af.netAddresses[0] != ht.host.autoAddress {
+		t.Error("announcement has wrong address")
+	}
+	if !bytes.Equal(af.publicKeys[0].Key, ht.host.publicKey.Key) {
+		t.Error("announcement has wrong host key")
+	}
+}
+
+// TestHostAnnounceAddress checks that the host announce address function is
+// operating correctly.
+func TestHostAnnounceAddress(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester("TestHostAnnounceAddress")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an announcement finder to scan the blockchain for host
+	// announcements.
+	af, err := newAnnouncementFinder(ht.cs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer af.Close()
+
+	// Create an announcement, then use the address finding module to scan the
+	// blockchain for the host's address.
+	addr := modules.NetAddress("foo:1234")
+	err = ht.host.AnnounceAddress(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ht.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(af.netAddresses) != 1 {
+		t.Fatal("could not find host announcement in blockchain")
+	}
+	if af.netAddresses[0] != addr {
+		t.Error("announcement has wrong address")
+	}
+	if !bytes.Equal(af.publicKeys[0].Key, ht.host.publicKey.Key) {
+		t.Error("announcement has wrong host key")
 	}
 }

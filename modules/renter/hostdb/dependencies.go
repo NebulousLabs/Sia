@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // These interfaces define the HostDB's dependencies. Using the smallest
@@ -15,28 +14,6 @@ import (
 type (
 	consensusSet interface {
 		ConsensusSetPersistentSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error
-	}
-	// in order to restrict the modules.TransactionBuilder interface, we must
-	// provide a shim to bridge the gap between modules.Wallet and
-	// transactionBuilder.
-	walletShim interface {
-		NextAddress() (types.UnlockConditions, error)
-		StartTransaction() modules.TransactionBuilder
-	}
-	wallet interface {
-		NextAddress() (types.UnlockConditions, error)
-		StartTransaction() transactionBuilder
-	}
-	transactionBuilder interface {
-		AddArbitraryData([]byte) uint64
-		AddFileContract(types.FileContract) uint64
-		Drop()
-		FundSiacoins(types.Currency) error
-		Sign(bool) ([]types.Transaction, error)
-		View() (types.Transaction, []types.Transaction)
-	}
-	transactionPool interface {
-		AcceptTransactionSet([]types.Transaction) error
 	}
 
 	dialer interface {
@@ -56,15 +33,6 @@ type (
 		Println(...interface{})
 	}
 )
-
-// because wallet is not directly compatible with modules.Wallet (wrong
-// type signature for StartTransaction), we must provide a bridge type.
-type walletBridge struct {
-	w walletShim
-}
-
-func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
-func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
 
 // stdDialer implements the dialer interface via net.DialTimeout.
 type stdDialer struct{}

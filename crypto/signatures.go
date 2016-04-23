@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	"errors"
 	"io"
 
@@ -24,6 +23,12 @@ const (
 	SignatureSize = ed25519.SignatureSize
 )
 
+var (
+	// ErrInvalidSignature is returned if a signature is provided that does not
+	// match the data and public key.
+	ErrInvalidSignature = errors.New("invalid signature")
+)
+
 type (
 	// PublicKey is an object that can be used to verify signatures.
 	PublicKey [PublicKeySize]byte
@@ -36,11 +41,11 @@ type (
 	Signature [SignatureSize]byte
 )
 
-var (
-	// errInvalidSignature is returned if a signature is provided that does not
-	// match the data and public key.
-	errInvalidSignature = errors.New("invalid signature")
-)
+// PublicKey returns the public key that corresponds to a secret key.
+func (sk SecretKey) PublicKey() (pk PublicKey) {
+	copy(pk[:], sk[SecretKeySize-PublicKeySize:])
+	return
+}
 
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and verify
 // messages.
@@ -54,7 +59,31 @@ func GenerateKeyPairDeterministic(entropy [EntropySize]byte) (SecretKey, PublicK
 	return stdKeyGen.generateDeterministic(entropy)
 }
 
-// SignHash signs a message using a secret key.
+// ReadSignedObject reads a length-prefixed object prefixed by its signature,
+// and verifies the signature.
+func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) error {
+	// read the signature
+	var sig Signature
+	err := encoding.NewDecoder(r).Decode(&sig)
+	if err != nil {
+		return err
+	}
+	// read the encoded object
+	encObj, err := encoding.ReadPrefix(r, maxLen)
+	if err != nil {
+		return err
+	}
+	// verify the signature
+	if err := VerifyHash(HashBytes(encObj), pk, sig); err != nil {
+		return err
+	}
+	// decode the object
+	return encoding.Unmarshal(encObj, obj)
+}
+
+// SignHash signs a message using a secret key. Though the current
+// implementation will never return an error, switching libraries in the future
+// may result in errors that can be returned.
 func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
 	skNorm := [SecretKeySize]byte(sk)
 	sig = *ed25519.Sign(&skNorm, data[:])
@@ -67,56 +96,17 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	sigNorm := [SignatureSize]byte(sig)
 	verifies := ed25519.Verify(&pkNorm, data[:], &sigNorm)
 	if !verifies {
-		return errInvalidSignature
+		return ErrInvalidSignature
 	}
 	return nil
 }
 
-// WriteSignedObject writes a length-prefixed object followed by its signature.
+// WriteSignedObject writes a length-prefixed object prefixed by its signature.
 func WriteSignedObject(w io.Writer, obj interface{}, sk SecretKey) error {
-	encObj := encoding.Marshal(obj)
-	sig, _ := SignHash(HashBytes(encObj), sk) // no error possible
-	return encoding.NewEncoder(w).EncodeAll(encObj, sig)
-}
-
-// ReadSignedObject reads a length-prefixed object followed by its signature,
-// and verifies the signature.
-func ReadSignedObject(r io.Reader, obj interface{}, maxLen uint64, pk PublicKey) error {
-	// read the encoded object
-	encObj, err := encoding.ReadPrefix(r, maxLen)
+	objBytes := encoding.Marshal(obj)
+	sig, err := SignHash(HashBytes(objBytes), sk)
 	if err != nil {
 		return err
 	}
-	// read the signature
-	var sig Signature
-	err = encoding.NewDecoder(r).Decode(&sig)
-	if err != nil {
-		return err
-	}
-	// verify the signature
-	if err := VerifyHash(HashBytes(encObj), pk, sig); err != nil {
-		return err
-	}
-	// decode the object
-	return encoding.Unmarshal(encObj, obj)
-}
-
-// SignObject encodes an object and its signature.
-func SignObject(obj interface{}, sk SecretKey) []byte {
-	b := new(bytes.Buffer)
-	WriteSignedObject(b, obj, sk) // no error possible with bytes.Buffer
-	return b.Bytes()
-}
-
-// VerifyObject decodes an object and verifies its signature.
-func VerifyObject(data []byte, obj interface{}, pk PublicKey) error {
-	r := bytes.NewReader(data)
-	// since object is already in memory, no need to enforce a maxLen
-	return ReadSignedObject(r, obj, ^uint64(0), pk)
-}
-
-// PublicKey returns the public key that corresponds to a secret key.
-func (sk SecretKey) PublicKey() (pk PublicKey) {
-	copy(pk[:], sk[SecretKeySize-PublicKeySize:])
-	return
+	return encoding.NewEncoder(w).EncodeAll(sig, objBytes)
 }

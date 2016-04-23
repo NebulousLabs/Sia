@@ -12,14 +12,14 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// a testHost simulates a host. It implements the hostdb.Uploader interface.
+// a testHost simulates a host. It implements the contractor.Editor interface.
 type testHost struct {
-	ip   modules.NetAddress
-	data []byte
+	ip      modules.NetAddress
+	sectors map[crypto.Hash][]byte
 
 	// used to simulate real-world conditions
 	delay    time.Duration // transfers will take this long
@@ -28,10 +28,12 @@ type testHost struct {
 	sync.Mutex
 }
 
-// stub implementations of the hostdb.Uploader methods
-func (h *testHost) Address() modules.NetAddress  { return h.ip }
-func (h *testHost) EndHeight() types.BlockHeight { return 0 }
-func (h *testHost) Close() error                 { return nil }
+// stub implementations of the contractor.Editor methods
+func (h *testHost) Address() modules.NetAddress                           { return h.ip }
+func (h *testHost) Delete(crypto.Hash) error                              { return nil }
+func (h *testHost) Modify(crypto.Hash, crypto.Hash, uint64, []byte) error { return nil }
+func (h *testHost) EndHeight() types.BlockHeight                          { return 0 }
+func (h *testHost) Close() error                                          { return nil }
 
 // ContractID returns a fake (but unique) file contract ID.
 func (h *testHost) ContractID() types.FileContractID {
@@ -42,7 +44,7 @@ func (h *testHost) ContractID() types.FileContractID {
 
 // Upload adds a piece to the testHost. It randomly fails according to the
 // testHost's parameters.
-func (h *testHost) Upload(data []byte) (offset uint64, err error) {
+func (h *testHost) Upload(data []byte) (crypto.Hash, error) {
 	// simulate I/O delay
 	time.Sleep(h.delay)
 
@@ -51,11 +53,12 @@ func (h *testHost) Upload(data []byte) (offset uint64, err error) {
 
 	// randomly fail
 	if n, _ := crypto.RandIntn(h.failRate); n == 0 {
-		return 0, errors.New("no data")
+		return crypto.Hash{}, errors.New("no data")
 	}
 
-	h.data = append(h.data, data...)
-	return uint64(len(h.data) - len(data)), nil
+	root := crypto.MerkleRoot(data)
+	h.sectors[root] = data
+	return root, nil
 }
 
 // TestRepair tests the repair method of the file type.
@@ -77,9 +80,10 @@ func TestRepair(t *testing.T) {
 
 	// create hosts
 	const pieceSize = 10
-	hosts := make([]hostdb.Uploader, rsc.NumPieces())
+	hosts := make([]contractor.Editor, rsc.NumPieces())
 	for i := range hosts {
 		hosts[i] = &testHost{
+			sectors:  make(map[crypto.Hash][]byte),
 			ip:       modules.NetAddress(strconv.Itoa(i)),
 			delay:    time.Duration(i) * time.Millisecond,
 			failRate: 5, // 20% failure rate
@@ -111,7 +115,7 @@ func TestRepair(t *testing.T) {
 			continue
 		}
 		for _, p := range contract.Pieces {
-			encPiece := h.(*testHost).data[p.Offset : p.Offset+pieceSize+crypto.TwofishOverhead]
+			encPiece := h.(*testHost).sectors[p.MerkleRoot]
 			piece, err := deriveKey(f.masterKey, p.Chunk, p.Piece).DecryptBytes(encPiece)
 			if err != nil {
 				t.Fatal(err)
@@ -150,37 +154,33 @@ func TestRepair(t *testing.T) {
 // offlineHostDB is a mocked hostDB, used for testing the offlineChunks method
 // of the file type. It is implemented as a map from NetAddresses to booleans,
 // where the bool indicates whether the host is active.
-type offlineHostDB map[modules.NetAddress]bool
-
-// IsOffline is a stub implementation of the IsOffline method.
-func (hdb offlineHostDB) IsOffline(addr modules.NetAddress) bool {
-	return !hdb[addr]
+type offlineHostDB struct {
+	stubHostDB
+	hosts map[modules.NetAddress]bool
 }
 
-// Stub implementations of other hostDB methods.
-func (offlineHostDB) NewPool(uint64, types.BlockHeight) (hostdb.HostPool, error) { return nil, nil }
-func (offlineHostDB) ActiveHosts() []modules.HostSettings                        { return nil }
-func (offlineHostDB) AllHosts() []modules.HostSettings                           { return nil }
-func (offlineHostDB) AveragePrice() types.Currency                               { return types.Currency{} }
-func (offlineHostDB) Renew(types.FileContractID, types.BlockHeight) (types.FileContractID, error) {
-	return types.FileContractID{}, nil
+// IsOffline is a stub implementation of the IsOffline method.
+func (hdb *offlineHostDB) IsOffline(addr modules.NetAddress) bool {
+	return !hdb.hosts[addr]
 }
 
 // TestOfflineChunks tests the offlineChunks method of the file type.
 func TestOfflineChunks(t *testing.T) {
 	// Create a mock hostdb.
 	hdb := &offlineHostDB{
-		"foo": false,
-		"bar": false,
-		"baz": true,
+		hosts: map[modules.NetAddress]bool{
+			"foo": false,
+			"bar": false,
+			"baz": true,
+		},
 	}
 	rsc, _ := NewRSCode(1, 1)
 	f := &file{
 		erasureCode: rsc,
 		contracts: map[types.FileContractID]fileContract{
-			{0}: {IP: "foo", Pieces: []pieceData{{0, 0, 0}, {1, 0, 0}}},
-			{1}: {IP: "bar", Pieces: []pieceData{{0, 1, 0}}},
-			{2}: {IP: "baz", Pieces: []pieceData{{1, 1, 0}}},
+			{0}: {IP: "foo", Pieces: []pieceData{{0, 0, crypto.Hash{}}, {1, 0, crypto.Hash{}}}},
+			{1}: {IP: "bar", Pieces: []pieceData{{0, 1, crypto.Hash{}}}},
+			{2}: {IP: "baz", Pieces: []pieceData{{1, 1, crypto.Hash{}}}},
 		},
 	}
 

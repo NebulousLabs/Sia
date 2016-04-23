@@ -1,5 +1,8 @@
 package transactionpool
 
+// TODO: It seems like the transaction pool is not properly detecting conflicts
+// between a file contract revision and a file contract.
+
 import (
 	"errors"
 

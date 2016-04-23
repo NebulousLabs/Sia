@@ -3,49 +3,63 @@ package host
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// errAnnWalletLocked is returned during a host announcement if the wallet
+	// is locked.
+	errAnnWalletLocked = errors.New("cannot announce the host while the wallet is locked")
+
+	// errUnknownAddress is returned if the host is unable to determine a
+	// public address for itself to use in the announcement.
+	errUnknownAddress = errors.New("host cannot announce, does not seem to have a valid address.")
 )
 
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
-	// Generate an unlock hash, if necessary.
-	if h.settings.UnlockHash == (types.UnlockHash{}) {
-		uc, err := h.wallet.NextAddress()
-		if err != nil {
-			return err
-		}
-		h.settings.UnlockHash = uc.UnlockHash()
-		err = h.save()
-		if err != nil {
-			return err
-		}
+	// The wallet needs to be unlocked to add fees to the transaction, and the
+	// host needs to have an active unlock hash that renters can make payment
+	// to.
+	if !h.wallet.Unlocked() {
+		return errAnnWalletLocked
 	}
-
-	// Create a transaction with a host announcement.
-	txnBuilder := h.wallet.StartTransaction()
-	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: addr,
-	})
-	_ = txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], announcement...))
-	txn, parents := txnBuilder.View()
-	txnSet := append(parents, txn)
-
-	// Add the transaction to the transaction pool.
-	err := h.tpool.AcceptTransactionSet(txnSet)
-	if err == modules.ErrDuplicateTransactionSet {
-		return errors.New("you have already announced yourself")
-	}
+	err := h.checkUnlockHash()
 	if err != nil {
 		return err
 	}
+
+	// Create the announcement that's going to be added to the arbitrary data
+	// field of the transaction.
+	signedAnnouncement, err := modules.CreateAnnouncement(addr, h.publicKey, h.secretKey)
+	if err != nil {
+		return err
+	}
+
+	// Create a transaction, with a fee, that contains the full announcement.
+	txnBuilder := h.wallet.StartTransaction()
+	_, fee := h.tpool.FeeEstimation()
+	err = txnBuilder.FundSiacoins(fee)
+	if err != nil {
+		txnBuilder.Drop()
+		return err
+	}
+	_ = txnBuilder.AddMinerFee(fee)
+	_ = txnBuilder.AddArbitraryData(signedAnnouncement)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		txnBuilder.Drop()
+		return err
+	}
+
+	// Add the transactions to the transaction pool.
+	err = h.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		txnBuilder.Drop()
+		return err
+	}
+	h.announced = true
 	h.log.Printf("INFO: Successfully announced as %v", addr)
-
-	// Start accepting contracts.
-	h.settings.AcceptingContracts = true
-
 	return nil
 }
 
@@ -53,26 +67,22 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()
 	if h.closed {
 		return errHostClosed
 	}
 
-	// Get the external IP again; it may have changed.
-	h.learnHostname()
-	h.mu.RLock()
-	addr := h.netAddress
-	h.mu.RUnlock()
-
-	// Check that the host's ip address is known.
-	if addr.IsLoopback() && build.Release != "testing" {
-		return errors.New("can't announce without knowing external IP")
+	// Determine whether to use the settings.NetAddress or autoAddress.
+	if h.settings.NetAddress != "" {
+		return h.announce(h.settings.NetAddress)
 	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.announce(addr)
+	if h.autoAddress == "" {
+		return errUnknownAddress
+	}
+	return h.announce(h.autoAddress)
 }
 
 // AnnounceAddress submits a host announcement to the blockchain to announce a
@@ -85,5 +95,6 @@ func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	if h.closed {
 		return errHostClosed
 	}
+
 	return h.announce(addr)
 }

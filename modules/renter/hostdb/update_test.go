@@ -2,20 +2,37 @@ package hostdb
 
 import (
 	"testing"
+	"time"
 
-	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// makeSignedAnnouncement creates a []byte that contains an encoded and signed
+// host announcement for the given net address.
+func makeSignedAnnouncement(na modules.NetAddress) ([]byte, error) {
+	sk, pk, err := crypto.GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+	spk := types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
+	return modules.CreateAnnouncement(na, spk, sk)
+}
+
 // TestFindHostAnnouncements probes the findHostAnnouncements function
 func TestFindHostAnnouncements(t *testing.T) {
-	// Create a block with a host announcement.
-	announcement := append(modules.PrefixHostAnnouncement[:], encoding.Marshal(modules.HostAnnouncement{})...)
+	annBytes, err := makeSignedAnnouncement("foo:1234")
+	if err != nil {
+		t.Fatal(err)
+	}
 	b := types.Block{
 		Transactions: []types.Transaction{
 			types.Transaction{
-				ArbitraryData: [][]byte{announcement},
+				ArbitraryData: [][]byte{annBytes},
 			},
 		},
 	}
@@ -43,43 +60,34 @@ func TestFindHostAnnouncements(t *testing.T) {
 // TestReceiveConsensusSetUpdate probes the ReveiveConsensusSetUpdate method of
 // the hostdb type.
 func TestReceiveConsensusSetUpdate(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	ht, err := newHostDBTester("TestFindHostAnnouncements")
+	// create hostdb
+	hdb := bareHostDB()
+
+	// Put a host announcement into a block.
+	annBytes, err := makeSignedAnnouncement("foo:1234")
 	if err != nil {
 		t.Fatal(err)
+	}
+	cc := modules.ConsensusChange{
+		AppliedBlocks: []types.Block{{
+			Transactions: []types.Transaction{{
+				ArbitraryData: [][]byte{annBytes},
+			}},
+		}},
 	}
 
-	// Put a host announcement into the blockchain.
-	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: ht.gateway.Address(),
-	})
-	txnBuilder := ht.wallet.StartTransaction()
-	txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], announcement...))
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ht.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// call ProcessConsensusChange
+	hdb.ProcessConsensusChange(cc)
 
-	// Check that, prior to mining, the hostdb has no hosts.
-	if len(ht.hostdb.AllHosts()) != 0 {
-		t.Fatal("Hostdb should not yet have any hosts")
-	}
-
-	// Mine a block to get the transaction into the consensus set.
-	b, _ := ht.miner.FindBlock()
-	err = ht.cs.AcceptBlock(b)
-	if err != nil {
-		t.Fatal(err)
+	// host should be sent to scanPool
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("announcement not seen")
+	case <-hdb.scanPool:
 	}
 
 	// Check that there is now a host in the hostdb.
-	if len(ht.hostdb.AllHosts()) != 1 {
+	if len(hdb.AllHosts()) != 1 {
 		t.Fatal("hostdb should have a host after getting a host announcement transcation")
 	}
 }

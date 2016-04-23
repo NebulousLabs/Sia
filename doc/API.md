@@ -569,6 +569,8 @@ Renter
 
 Queries:
 
+* /renter/allowance          [GET]
+* /renter/allowance          [POST]
 * /renter/downloads          [GET]
 * /renter/files              [GET]
 * /renter/load               [POST]
@@ -581,6 +583,46 @@ Queries:
 * /renter/upload/{siapath}   [POST]
 * /renter/hosts/active       [GET]
 * /renter/hosts/all          [GET]
+
+#### /renter/allowance [GET]
+
+Function: Returns the current contract allowance.
+
+Parameters: none
+
+Response:
+```
+struct {
+	funds  types.Currency    (string)
+	hosts  uint64
+	period types.BlockHeight (uint64)
+}
+```
+'funds' is the number of hastings allocated for file contracts in the given
+period.
+
+'hosts' is the number of hosts that contracts will be formed with.
+
+'period' is the duration of contracts formed.
+
+#### /renter/allowance [POST]
+
+Function: Sets the contract allowance.
+
+Parameters: none
+```
+funds  types.Currency    (string)
+hosts  uint64
+period types.BlockHeight (uint64)
+```
+'funds' is the number of hastings allocated for file contracts in the given
+period.
+
+'hosts' is the number of hosts that contracts will be formed with.
+
+'period' is the duration of contracts formed.
+
+Response: standard
 
 #### /renter/downloads [GET]
 
@@ -768,18 +810,10 @@ Parameters:
 ```
 siapath  string
 source   string
-duration types.BlockHeight (uint64)
-renew    bool
 ```
 'siapath' is the location where the file will reside in the renter.
 
 'source' is the location on disk of the file being uploaded.
-
-'duration' is the number of blocks for which the file will be available. If
-the renew parameter is true, this parameter will be ignored.
-
-'renew' indicates whether the file's contracts should be automatically renewed
-by the renter. If renew is true, the duration parameter will be ignored.
 
 Response: standard.
 

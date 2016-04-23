@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrOverweight = errors.New("requested a too-heavy weight")
+	errOverweight = errors.New("requested a too-heavy weight")
 )
 
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
@@ -43,7 +43,7 @@ type hostNode struct {
 func createNode(parent *hostNode, entry *hostEntry) *hostNode {
 	return &hostNode{
 		parent: parent,
-		weight: entry.weight,
+		weight: entry.Weight,
 		count:  1,
 
 		taken:     true,
@@ -57,7 +57,7 @@ func createNode(parent *hostNode, entry *hostEntry) *hostNode {
 func (hn *hostNode) nodeAtWeight(weight types.Currency) (*hostNode, error) {
 	// Sanity check - weight must be less than the total weight of the tree.
 	if weight.Cmp(hn.weight) > 0 {
-		return nil, ErrOverweight
+		return nil, errOverweight
 	}
 
 	// Check if the left or right child should be returned.
@@ -82,12 +82,12 @@ func (hn *hostNode) nodeAtWeight(weight types.Currency) (*hostNode, error) {
 	return hn, nil
 }
 
-// recursiveInsert is a recurisve function for adding a hostNode to an existing tree
+// recursiveInsert is a recursive function for adding a hostNode to an existing tree
 // of hostNodes. The first call should always be on hostdb.hostTree. Running
 // time of recursiveInsert is log(n) in the maximum number of elements that have
 // ever been in the tree.
 func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *hostNode) {
-	hn.weight = hn.weight.Add(entry.weight)
+	hn.weight = hn.weight.Add(entry.Weight)
 
 	// If the current node is empty, add the entry but don't increase the
 	// count.
@@ -118,7 +118,7 @@ func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *
 }
 
 // insertNode inserts a host entry into the host tree, removing
-// any conflicts. The host settings are assummed to be correct. Though hosts
+// any conflicts. The host settings are assumed to be correct. Though hosts
 // with 0 weight will never be selected, they are accepted into the tree.
 func (hdb *HostDB) insertNode(entry *hostEntry) {
 	// If there's already a host of the same id, remove that host.
@@ -140,11 +140,11 @@ func (hdb *HostDB) insertNode(entry *hostEntry) {
 // remove takes a node and removes it from the tree by climbing through the
 // list of parents. remove does not delete nodes.
 func (hn *hostNode) removeNode() {
-	hn.weight = hn.weight.Sub(hn.hostEntry.weight)
+	hn.weight = hn.weight.Sub(hn.hostEntry.Weight)
 	hn.taken = false
 	current := hn.parent
 	for current != nil {
-		current.weight = current.weight.Sub(hn.hostEntry.weight)
+		current.weight = current.weight.Sub(hn.hostEntry.Weight)
 		current = current.parent
 	}
 }
@@ -154,12 +154,14 @@ func (hdb *HostDB) isEmpty() bool {
 	return hdb.hostTree == nil || hdb.hostTree.weight.IsZero()
 }
 
-// randomHosts will pull up to 'n' random hosts from the hostdb. There will be
+// RandomHosts will pull up to 'n' random hosts from the hostdb. There will be
 // no repeats, but the length of the slice returned may be less than 'n', and
 // may even be 0. The hosts that get returned first have the higher priority.
 // Hosts specified in 'ignore' will not be considered; pass 'nil' if no
 // blacklist is desired.
-func (hdb *HostDB) randomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostSettings) {
+func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modules.HostDBEntry) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	if hdb.isEmpty() {
 		return
 	}
@@ -189,7 +191,7 @@ func (hdb *HostDB) randomHosts(n int, ignore []modules.NetAddress) (hosts []modu
 		if err != nil {
 			break
 		}
-		hosts = append(hosts, node.hostEntry.HostSettings)
+		hosts = append(hosts, node.hostEntry.HostDBEntry)
 
 		node.removeNode()
 		delete(hdb.activeHosts, node.hostEntry.NetAddress)

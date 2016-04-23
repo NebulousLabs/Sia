@@ -1,5 +1,8 @@
 package wallet
 
+// TODO: Theoretically, the transaction builder in this wallet supports
+// multisig, but there are no automated tests to verify that.
+
 import (
 	"errors"
 	"sort"

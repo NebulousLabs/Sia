@@ -44,6 +44,9 @@ func (x Target) Cmp(y Target) int {
 
 // Difficulty returns the difficulty associated with a given target.
 func (t Target) Difficulty() Currency {
+	if t == (Target{}) {
+		return NewCurrency(RootDepth.Int())
+	}
 	return NewCurrency(new(big.Int).Div(RootDepth.Int(), t.Int()))
 }
 

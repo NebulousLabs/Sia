@@ -233,12 +233,6 @@ func (r *Renter) load() error {
 	}
 	if data.Tracking != nil {
 		r.tracking = data.Tracking
-	} else if data.Repairing != nil {
-		// COMPATv0.4.8
-		for nick, path := range data.Repairing {
-			// these files will be renewed indefinitely
-			r.tracking[nick] = trackedFile{RepairPath: path, Renew: true}
-		}
 	}
 
 	return nil

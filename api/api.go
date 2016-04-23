@@ -72,10 +72,17 @@ func (srv *Server) initAPI() {
 
 	// Host API Calls
 	if srv.host != nil {
-		router.GET("/host", srv.hostHandlerGET)
-		router.POST("/host", srv.hostHandlerPOST)
-		router.POST("/host/announce", srv.hostAnnounceHandler)
-		router.POST("/host/delete/:filecontractid", srv.hostDeleteHandler)
+		// Calls directly pertaining to the host.
+		router.GET("/host", srv.hostHandlerGET)                // Get a bunch of information about the host.
+		router.POST("/host", srv.hostHandlerPOST)              // Set HostInternalSettings.
+		router.POST("/host/announce", srv.hostAnnounceHandler) // Announce the host, optionally on a specific address.
+
+		// Calls pertaining to the storage manager that the host uses.
+		router.GET("/storage", srv.storageHandler)
+		router.POST("/storage/folders/add/*folder", srv.storageFoldersAddHandler)
+		router.POST("/storage/folders/remove/*folder", srv.storageFoldersRemoveHandler)
+		router.POST("/storage/folders/resize/*folder", srv.storageFoldersResizeHandler)
+		router.POST("/storage/sectors/delete/:merkleroot", srv.storageSectorsDeleteHandler)
 	}
 
 	// Miner API Calls
@@ -93,6 +100,8 @@ func (srv *Server) initAPI() {
 	if srv.renter != nil {
 		router.GET("/renter/downloads", srv.renterDownloadsHandler)
 		router.GET("/renter/files", srv.renterFilesHandler)
+		router.GET("/renter/allowance", srv.renterAllowanceHandlerGET)
+		router.POST("/renter/allowance", srv.renterAllowanceHandlerPOST)
 
 		router.POST("/renter/load", srv.renterLoadHandler)
 		router.POST("/renter/loadascii", srv.renterLoadAsciiHandler)
