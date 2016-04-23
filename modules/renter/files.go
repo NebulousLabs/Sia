@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"math"
 	"os"
 	"path/filepath"
@@ -168,23 +169,45 @@ func newFile(name string, code modules.ErasureCoder, pieceSize, fileSize uint64)
 	}
 }
 
-// DeleteFile removes a file entry from the renter.
+// DeleteFile removes a file entry from the renter and deletes its data from
+// the hosts it is stored on.
 func (r *Renter) DeleteFile(nickname string) error {
 	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
-
 	f, exists := r.files[nickname]
 	if !exists {
+		r.mu.Unlock(lockID)
 		return ErrUnknownPath
 	}
 	delete(r.files, nickname)
+	os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
+	r.save()
+	r.mu.Unlock(lockID)
 
-	err := os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
-	if err != nil {
-		return err
+	// delete the file's associated contract data.
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// TODO: this is ugly because we only have the Contracts method for
+	// looking up contracts.
+	var contracts []contractor.Contract
+	for _, c := range r.hostContractor.Contracts() {
+		if _, ok := f.contracts[c.ID]; ok {
+			contracts = append(contracts, c)
+		}
+	}
+	for _, c := range contracts {
+		editor, err := r.hostContractor.Editor(c)
+		if err != nil {
+			// TODO: what if the host isn't online?
+			continue
+		}
+		for _, root := range c.MerkleRoots {
+			editor.Delete(root)
+		}
+		delete(f.contracts, c.ID)
 	}
 
-	return r.save()
+	return nil
 }
 
 // FileList returns all of the files that the renter has.
@@ -194,10 +217,7 @@ func (r *Renter) FileList() []modules.FileInfo {
 
 	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
-		var renewing bool
-		if meta, ok := r.tracking[f.name]; ok {
-			renewing = meta.Renew
-		}
+		_, renewing := r.tracking[f.name]
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,

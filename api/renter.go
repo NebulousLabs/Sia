@@ -199,20 +199,9 @@ func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Requ
 
 // renterUploadHandler handles the API call to upload a file.
 func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	var duration types.BlockHeight
-	if req.FormValue("duration") != "" {
-		_, err := fmt.Sscan(req.FormValue("duration"), &duration)
-		if err != nil {
-			writeError(w, "Couldn't parse duration: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	renew := req.FormValue("renew") == "true"
 	err := srv.renter.Upload(modules.FileUploadParams{
-		Source:   req.FormValue("source"),
-		SiaPath:  strings.TrimPrefix(ps.ByName("siapath"), "/"),
-		Duration: duration,
-		Renew:    renew,
+		Source:  req.FormValue("source"),
+		SiaPath: strings.TrimPrefix(ps.ByName("siapath"), "/"),
 		// let the renter decide these values; eventually they will be configurable
 		ErasureCode: nil,
 	})

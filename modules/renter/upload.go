@@ -8,25 +8,11 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
 	// Erasure-coded piece size
 	pieceSize = modules.SectorSize - crypto.TwofishOverhead
-
-	// defaultDuration is the contract length that the renter will use when the
-	// uploader does not specify a duration.
-	defaultDuration = func() types.BlockHeight {
-		switch build.Release {
-		case "testing":
-			return 20
-		case "dev":
-			return 200
-		default:
-			return 144 * 60 // 60 days - to soon be 6 months.
-		}
-	}()
 
 	// defaultDataPieces is the number of data pieces per erasure-coded chunk
 	defaultDataPieces = func() int {
@@ -67,10 +53,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if err != nil {
 		return err
 	}
-	if up.Duration == 0 {
-		up.Duration = defaultDuration
-	}
-	endHeight := r.cs.Height() + up.Duration
 	if up.ErasureCode == nil {
 		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
 	}
@@ -84,8 +66,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.files[up.SiaPath] = f
 	r.tracking[up.SiaPath] = trackedFile{
 		RepairPath: up.Source,
-		EndHeight:  endHeight,
-		Renew:      up.Renew,
 	}
 	r.save()
 	r.mu.Unlock(lockID)
