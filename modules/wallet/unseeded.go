@@ -168,7 +168,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if err != nil {
 		return err
 	}
-	err = w.saveSettings()
+	err = w.saveSettingsSync()
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 			seedsLoaded++
 		}
 	}
-	err = w.saveSettings()
+	err = w.saveSettingsSync()
 	if err != nil {
 		return err
 	}

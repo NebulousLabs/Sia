@@ -79,7 +79,7 @@ func (w *Wallet) encryptAndSaveSeedFile(masterKey crypto.TwofishKey, seed module
 		return SeedFile{}, err
 	}
 	seedFilename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
-	err = persist.SaveFile(seedMetadata, sf, seedFilename)
+	err = persist.SaveFileSync(seedMetadata, sf, seedFilename)
 	if err != nil {
 		return SeedFile{}, err
 	}
@@ -146,7 +146,7 @@ func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 	// Add the seed file to the wallet's set of tracked seeds and save the
 	// wallet settings.
 	w.persist.AuxiliarySeedFiles = append(w.persist.AuxiliarySeedFiles, seedFile)
-	err = w.saveSettings()
+	err = w.saveSettingsSync()
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey, seed modules.Seed) erro
 		spendableKey := generateSpendableKey(seed, i)
 		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	}
-	return w.saveSettings()
+	return w.saveSettingsSync()
 }
 
 // initPrimarySeed loads the primary seed into the wallet.
@@ -221,7 +221,7 @@ func (w *Wallet) nextPrimarySeedAddress() (types.UnlockConditions, error) {
 	spendableKey := generateSpendableKey(w.primarySeed, w.persist.PrimarySeedProgress+modules.WalletSeedPreloadDepth)
 	w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
 	w.persist.PrimarySeedProgress++
-	err := w.saveSettings()
+	err := w.saveSettingsSync()
 	if err != nil {
 		return types.UnlockConditions{}, err
 	}

@@ -185,7 +185,7 @@ func (w *Wallet) Lock() error {
 	// calling 'Unlock' again.
 	w.wipeSecrets()
 	w.unlocked = false
-	return w.saveSettings()
+	return nil
 }
 
 // Unlock will decrypt the wallet seed and load all of the addresses into

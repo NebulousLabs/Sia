@@ -88,7 +88,7 @@ func (sm *StorageManager) Close() (composedError error) {
 
 	// Save the latest host state.
 	sm.mu.Lock()
-	err = sm.save()
+	err = sm.saveSync()
 	sm.mu.Unlock()
 	if err != nil {
 		composedError = composeErrors(composedError, err)

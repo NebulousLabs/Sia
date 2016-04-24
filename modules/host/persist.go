@@ -171,3 +171,33 @@ func (h *Host) save() error {
 	}
 	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
 }
+
+// saveSync stores all of the persist data to disk and then syncs to disk.
+func (h *Host) saveSync() error {
+	p := persistence{
+		// RPC Metrics.
+		DownloadCalls:       atomic.LoadUint64(&h.atomicDownloadCalls),
+		ErroredCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
+		FormContractCalls:   atomic.LoadUint64(&h.atomicFormContractCalls),
+		RenewCalls:          atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:         atomic.LoadUint64(&h.atomicReviseCalls),
+		RecentRevisionCalls: atomic.LoadUint64(&h.atomicRecentRevisionCalls),
+		SettingsCalls:       atomic.LoadUint64(&h.atomicSettingsCalls),
+		UnrecognizedCalls:   atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+
+		// Consensus Tracking.
+		BlockHeight:  h.blockHeight,
+		RecentChange: h.recentChange,
+
+		// Host Identity.
+		Announced:        h.announced,
+		AutoAddress:      h.autoAddress,
+		FinancialMetrics: h.financialMetrics,
+		PublicKey:        h.publicKey,
+		RevisionNumber:   h.revisionNumber,
+		SecretKey:        h.secretKey,
+		Settings:         h.settings,
+		UnlockHash:       h.unlockHash,
+	}
+	return persist.SaveFileSync(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+}

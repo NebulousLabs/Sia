@@ -121,7 +121,7 @@ func TestRelativePathSafeFile(t *testing.T) {
 	}
 	os.Chdir(tmpChdir)
 	defer os.Chdir(wd)
-	err = sf.Commit()
+	err = sf.CommitSync()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,6 +24,19 @@ func (hdb *HostDB) save() error {
 	return hdb.persist.save(data)
 }
 
+// saveSync saves the hostdb persistence data to disk and then syncs to disk.
+func (hdb *HostDB) saveSync() error {
+	var data hdbPersist
+	for _, entry := range hdb.allHosts {
+		data.AllHosts = append(data.AllHosts, *entry)
+	}
+	for _, node := range hdb.activeHosts {
+		data.ActiveHosts = append(data.ActiveHosts, *node.hostEntry)
+	}
+	data.LastChange = hdb.lastChange
+	return hdb.persist.saveSync(data)
+}
+
 // load loads the hostdb persistence data from disk.
 func (hdb *HostDB) load() error {
 	var data hdbPersist

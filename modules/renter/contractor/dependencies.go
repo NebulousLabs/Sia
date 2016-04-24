@@ -57,6 +57,7 @@ type (
 
 	persister interface {
 		save(contractorPersist) error
+		saveSync(contractorPersist) error
 		load(*contractorPersist) error
 	}
 
@@ -91,6 +92,10 @@ type stdPersist struct {
 
 func (p *stdPersist) save(data contractorPersist) error {
 	return persist.SaveFile(p.meta, data, p.filename)
+}
+
+func (p *stdPersist) saveSync(data contractorPersist) error {
+	return persist.SaveFileSync(p.meta, data, p.filename)
 }
 
 func (p *stdPersist) load(data *contractorPersist) error {

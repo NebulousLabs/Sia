@@ -200,7 +200,7 @@ func (m *Miner) Close() error {
 	m.cs.Unsubscribe(m)
 
 	var errs []error
-	if err := m.save(); err != nil {
+	if err := m.saveSync(); err != nil {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	if err := m.log.Close(); err != nil {

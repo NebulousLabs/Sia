@@ -186,6 +186,14 @@ func (r *Renter) save() error {
 	return persist.SaveFile(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
 }
 
+// saveSync stores the current renter data to disk and then syncs to disk.
+func (r *Renter) saveSync() error {
+	data := struct {
+		Tracking map[string]trackedFile
+	}{r.tracking}
+	return persist.SaveFileSync(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
+}
+
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
 	// Recursively load all files found in renter directory. Errors

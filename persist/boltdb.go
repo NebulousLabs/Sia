@@ -13,25 +13,7 @@ type BoltDatabase struct {
 	*bolt.DB
 }
 
-// updateDbMetadata will set the contents of the metadata bucket to be
-// what is stored inside the metadata argument
-func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
-	bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
-	if err != nil {
-		return err
-	}
-	err = bucket.Put([]byte("Header"), []byte(db.Header))
-	if err != nil {
-		return err
-	}
-	err = bucket.Put([]byte("Version"), []byte(db.Version))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// checkDbMetadata confirms that the metadata in the database is
+// checkMetadata confirms that the metadata in the database is
 // correct. If there is no metadata, correct metadata is inserted
 func (db *BoltDatabase) checkMetadata(md Metadata) error {
 	err := db.Update(func(tx *bolt.Tx) error {
@@ -60,7 +42,25 @@ func (db *BoltDatabase) checkMetadata(md Metadata) error {
 	return err
 }
 
-// CloseDatabase saves the bolt database to a file, and updates metadata
+// updatbMetadata will set the contents of the metadata bucket to be
+// what is stored inside the metadata argument
+func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
+	bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
+	if err != nil {
+		return err
+	}
+	err = bucket.Put([]byte("Header"), []byte(db.Header))
+	if err != nil {
+		return err
+	}
+	err = bucket.Put([]byte("Version"), []byte(db.Version))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Close saves the bolt database to a file, and updates metadata
 func (db *BoltDatabase) Close() error {
 	return db.DB.Close()
 }

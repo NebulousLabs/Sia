@@ -180,7 +180,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 	}
 	delete(r.files, nickname)
 	os.RemoveAll(filepath.Join(r.persistDir, f.name+ShareExtension))
-	r.save()
+	r.saveSync()
 	r.mu.Unlock(lockID)
 
 	// delete the file's associated contract data.
@@ -260,7 +260,7 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 	// Update the entries in the renter.
 	delete(r.files, currentName)
 	r.files[newName] = file
-	err = r.save()
+	err = r.saveSync()
 	if err != nil {
 		return err
 	}

@@ -26,13 +26,10 @@ func (cf *closeableFile) Close() error {
 	if cf.closed {
 		build.Critical("cannot close the file; already closed")
 	}
-	// Don't sync during testing as it can take too long and causes tests to fail.
-	// TODO: mock the os package so that Sync() is a no-op during testing.
-	if build.Release != "testing" {
-		// Ensure that all data has actually hit the disk.
-		if err := cf.Sync(); err != nil {
-			return err
-		}
+
+	// Ensure that all data has actually hit the disk.
+	if err := cf.Sync(); err != nil {
+		return err
 	}
 	cf.closed = true
 	return cf.File.Close()
@@ -90,7 +87,7 @@ func (l *Logger) Debug(v ...interface{}) {
 	}
 }
 
-// Debug is equivalent to Logger.Printf when build.DEBUG is true. Otherwise it
+// Debugf is equivalent to Logger.Printf when build.DEBUG is true. Otherwise it
 // is a no-op.
 func (l *Logger) Debugf(format string, v ...interface{}) {
 	if build.DEBUG {
@@ -98,8 +95,8 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 	}
 }
 
-// Debug is equivalent to Logger.Println when build.DEBUG is true. Otherwise it
-// is a no-op.
+// Debugln is equivalent to Logger.Println when build.DEBUG is true. Otherwise
+// it is a no-op.
 func (l *Logger) Debugln(v ...interface{}) {
 	if build.DEBUG {
 		l.Println(v...)
