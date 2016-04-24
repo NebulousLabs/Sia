@@ -153,18 +153,17 @@ func (cs *ConsensusSet) initializePersistentSubscribe(subscriber modules.Consens
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
 func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	cs.mu.Lock()
+	cs.subscribers = append(cs.subscribers, subscriber)
+	cs.mu.Demote()
+	defer cs.mu.DemotedUnlock()
+
 	// Get the input module caught up to the currenct consnesus set.
-	cs.mu.RLock()
 	err := cs.initializePersistentSubscribe(subscriber, start)
-	cs.mu.RUnlock()
 	if err != nil {
 		return err
 	}
-
 	// Only add the module as a subscriber if there was no error.
-	cs.mu.Lock()
-	cs.subscribers = append(cs.subscribers, subscriber)
-	cs.mu.Unlock()
 	return nil
 }
 
