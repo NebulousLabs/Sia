@@ -42,6 +42,19 @@ func newStorageManagerTester(name string) (*storageManagerTester, error) {
 	return smt, nil
 }
 
+// capacity returns the amount of storage still available on the machine. The
+// amount can be negative if the total capacity was reduced to below the active
+// capacity.
+func (sm *StorageManager) capacity() (total, remaining uint64) {
+	// Total storage can be computed by summing the size of all the storage
+	// folders.
+	for _, sf := range sm.storageFolders {
+		total += sf.Size
+		remaining += sf.SizeRemaining
+	}
+	return total, remaining
+}
+
 // probabilisticReset will probabilistically reboot the storage manager before
 // continuing. This helps to verify that the persistence is working correctly.
 // The reset is probabilistic to make sure that the test is not passing because

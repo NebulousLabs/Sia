@@ -66,6 +66,43 @@ type StorageManager struct {
 	resourceLock sync.RWMutex
 }
 
+// Close will shut down the storage manager.
+func (sm *StorageManager) Close() (composedError error) {
+	// Grab the resource lock and indicate that the host is closing. Concurrent
+	// functions hold the resource lock until they terminate, meaning that no
+	// threaded function will be running by the time the resource lock is
+	// acquired.
+	sm.resourceLock.Lock()
+	closed := sm.closed
+	sm.closed = true
+	sm.resourceLock.Unlock()
+	if closed {
+		return nil
+	}
+
+	// Close the bolt database.
+	err := sm.db.Close()
+	if err != nil {
+		composedError = composeErrors(composedError, err)
+	}
+
+	// Save the latest host state.
+	sm.mu.Lock()
+	err = sm.save()
+	sm.mu.Unlock()
+	if err != nil {
+		composedError = composeErrors(composedError, err)
+	}
+
+	// Close the logger. The logger should be the last thing to shut down so
+	// that all other objects have access to logging while closing.
+	err = sm.log.Close()
+	if err != nil {
+		composedError = composeErrors(composedError, err)
+	}
+	return composedError
+}
+
 // newStorageManager creates a new storage manager.
 func newStorageManager(dependencies dependencies, persistDir string) (*StorageManager, error) {
 	sm := &StorageManager{
@@ -119,41 +156,4 @@ func newStorageManager(dependencies dependencies, persistDir string) (*StorageMa
 // New returns an initialized StorageManager.
 func New(persistDir string) (*StorageManager, error) {
 	return newStorageManager(productionDependencies{}, persistDir)
-}
-
-// Close will shut down the storage manager.
-func (sm *StorageManager) Close() (composedError error) {
-	// Grab the resource lock and indicate that the host is closing. Concurrent
-	// functions hold the resource lock until they terminate, meaning that no
-	// threaded function will be running by the time the resource lock is
-	// acquired.
-	sm.resourceLock.Lock()
-	closed := sm.closed
-	sm.closed = true
-	sm.resourceLock.Unlock()
-	if closed {
-		return nil
-	}
-
-	// Close the bolt database.
-	err := sm.db.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Save the latest host state.
-	sm.mu.Lock()
-	err = sm.save()
-	sm.mu.Unlock()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Close the logger. The logger should be the last thing to shut down so
-	// that all other objects have access to logging while closing.
-	err = sm.log.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-	return composedError
 }
