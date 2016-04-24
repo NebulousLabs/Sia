@@ -952,7 +952,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.gateway.Connect(cst1.cs.gateway.Address()) // TODO: why is this Connect call necessary? Shouldn't they connect to eachother with one Connect?
+	err = cst2.cs.gateway.Connect(cst1.cs.gateway.Address())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1227,23 +1227,45 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// Make sure cst1 is not connected to cst3.
 	cst1.gateway.Disconnect(cst3.gateway.Address())
 	cst3.gateway.Disconnect(cst1.gateway.Address())
-	// Give the gateway's time for all of the OnConnectRPCs to complete.
-	time.Sleep(200 * time.Millisecond)
 
-	// Mine a block on cst1.
+	// Spin until the connection calls have completed.
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if len(cst1.gateway.Peers()) >= 1 && len(cst3.gateway.Peers()) >= 1 {
+			break
+		}
+	}
+	if len(cst1.gateway.Peers()) < 1 || len(cst3.gateway.Peers()) < 1 {
+		t.Fatal("Peer connection has failed.")
+	}
+
+	// Mine a block on cst1, expecting the block to propagate from cst1 to
+	// cst2, and then to cst3.
 	b, err := cst1.miner.AddBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep to allow the block to propogate.
-	time.Sleep(200 * time.Millisecond)
-	// Check that cst1 relayed it to cst2.
-	if cst2.cs.CurrentBlock().ID() != b.ID() {
-		t.Fatal("cst1 did not relay the block to cst2")
+
+	// Spin until the block has propagated to cst2.
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if cst2.cs.CurrentBlock().ID() == b.ID() {
+			break
+		}
 	}
-	// Check that cst2 relayed it to cst3.
+	if cst2.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("Block propagation has failed")
+	}
+
+	// Spin until the block has propagated to cst3.
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if cst3.cs.CurrentBlock().ID() == b.ID() {
+			break
+		}
+	}
 	if cst3.cs.CurrentBlock().ID() != b.ID() {
-		t.Fatal("cst2 did not relay the block to cst3")
+		t.Fatal("Block propagation has failed")
 	}
 
 	// Mine a block on cst2.
@@ -1251,15 +1273,24 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep to allow the block to propogate.
-	time.Sleep(200 * time.Millisecond)
-	// Check that cst2 relayed it to cst1.
-	if cst1.cs.CurrentBlock().ID() != b.ID() {
-		t.Fatal("cst2 did not relay the block to cst1")
+	// Spin until the block has propagated.
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if cst1.cs.CurrentBlock().ID() == b.ID() {
+			break
+		}
 	}
-	// Check that cst2 relayed it to cst3.
+	if cst1.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("block propagation has failed")
+	}
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if cst3.cs.CurrentBlock().ID() == b.ID() {
+			break
+		}
+	}
 	if cst3.cs.CurrentBlock().ID() != b.ID() {
-		t.Fatal("cst2 did not relay the block to cst3")
+		t.Fatal("block propagation has failed")
 	}
 
 	// Mine a block on cst3.
@@ -1267,15 +1298,34 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Sleep to allow the block to propogate.
-	time.Sleep(200 * time.Millisecond)
-	// Check that cst3 relayed it to cst2.
-	if cst2.cs.CurrentBlock().ID() != b.ID() {
-		t.Fatal("cst3 did not relay the block to cst2")
+	// Spin until the block has propagated.
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if cst1.cs.CurrentBlock().ID() == b.ID() {
+			break
+		}
 	}
-	// Check that cst2 relayed it to cst1.
 	if cst1.cs.CurrentBlock().ID() != b.ID() {
-		t.Fatal("cst2 did not relay the block to cst1")
+		t.Fatal("block propagation has failed")
+	}
+	for i := 0; i < 100; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if cst2.cs.CurrentBlock().ID() == b.ID() {
+			break
+		}
+	}
+	if cst2.cs.CurrentBlock().ID() != b.ID() {
+		t.Fatal("block propagation has failed")
+	}
+
+	// Check that cst1 and cst3 are not peers, if they are peers then this test
+	// is invalid because it has failed to be certain that blocks can make
+	// multiple hops.
+	if len(cst1.gateway.Peers()) != 1 || cst1.gateway.Peers()[0].NetAddress == cst3.gateway.Address() {
+		t.Fatal("Test is invalid, cst1 and cst3 have connected to eachother")
+	}
+	if len(cst3.gateway.Peers()) != 1 || cst3.gateway.Peers()[0].NetAddress == cst1.gateway.Address() {
+		t.Fatal("Test is invalid, cst3 and cst1 have connected to eachother")
 	}
 }
 
