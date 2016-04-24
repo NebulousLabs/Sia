@@ -27,7 +27,10 @@ func (m *Miner) blockForWork() types.Block {
 	}
 
 	// Update the address + payouts.
-	_ = m.checkAddress() // Err is ignored - address generation failed but can't do anything about it (log maybe).
+	err := m.checkAddress()
+	if err != nil {
+		m.log.Println(err)
+	}
 	b.MinerPayouts = []types.SiacoinOutput{{Value: b.CalculateSubsidy(m.persist.Height + 1), UnlockHash: m.persist.Address}}
 
 	// Add an arb-data txn to the block to create a unique merkle root.

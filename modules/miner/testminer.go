@@ -55,21 +55,28 @@ func (m *Miner) AddBlock() (types.Block, error) {
 
 // FindBlock finds at most one block that extends the current blockchain.
 func (m *Miner) FindBlock() (types.Block, error) {
-	m.mu.Lock()
-	if !m.wallet.Unlocked() {
-		return types.Block{}, modules.ErrLockedWallet
-	}
-	err := m.checkAddress()
+	var bfw types.Block
+	var target types.Target
+	err := func() error {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		if !m.wallet.Unlocked() {
+			return modules.ErrLockedWallet
+		}
+		err := m.checkAddress()
+		if err != nil {
+			return err
+		}
+
+		// Get a block for work.
+		bfw = m.blockForWork()
+		target = m.persist.Target
+		return nil
+	}()
 	if err != nil {
 		return types.Block{}, err
 	}
-	m.mu.Unlock()
-
-	// Get a block for work.
-	m.mu.Lock()
-	bfw := m.blockForWork()
-	target := m.persist.Target
-	m.mu.Unlock()
 
 	block, ok := m.SolveBlock(bfw, target)
 	if !ok {
