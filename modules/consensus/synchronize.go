@@ -156,10 +156,12 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 
 	// Get blockIDs to send.
 	var history [32]types.BlockID
+	cs.mu.RLock()
 	err = cs.db.View(func(tx *bolt.Tx) error {
 		history = blockHistory(tx)
 		return nil
 	})
+	cs.mu.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -295,7 +297,7 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 		// Get the set of blocks to send.
 		var blocks []types.Block
 		cs.mu.RLock()
-		cs.db.View(func(tx *bolt.Tx) error {
+		err = cs.db.View(func(tx *bolt.Tx) error {
 			height := blockHeight(tx)
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
 				id, err := getPath(tx, i)
@@ -408,6 +410,7 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	}
 	// Lookup the corresponding block.
 	var b types.Block
+	cs.mu.RLock()
 	err = cs.db.View(func(tx *bolt.Tx) error {
 		pb, err := getBlockMap(tx, id)
 		if err != nil {
@@ -416,6 +419,7 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 		b = pb.Block
 		return nil
 	})
+	cs.mu.RUnlock()
 	if err != nil {
 		return err
 	}
