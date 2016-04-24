@@ -103,12 +103,6 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 		return nil, err
 	}
 
-	// Begin listening to consensus and looking for hosts.
-	for i := 0; i < scanningThreads; i++ {
-		go hdb.threadedProbeHosts()
-	}
-	go hdb.threadedScan()
-
 	err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		hdb.lastChange = modules.ConsensusChangeID{}
@@ -122,5 +116,10 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 		return nil, errors.New("hostdb subscription failed: " + err.Error())
 	}
 
+	// Begin listening to consensus and looking for hosts.
+	for i := 0; i < scanningThreads; i++ {
+		go hdb.threadedProbeHosts()
+	}
+	go hdb.threadedScan()
 	return hdb, nil
 }
