@@ -93,6 +93,8 @@ type (
 		// AnnounceAddress submits an announcement using the given address.
 		AnnounceAddress(NetAddress) error
 
+		ExternalSettings() (HostExternalSettings, error)
+
 		// FinancialMetrics returns the financial statistics of the host.
 		FinancialMetrics() HostFinancialMetrics
 

@@ -26,54 +26,60 @@ func (h *Host) capacity() (total, remaining uint64, err error) {
 	return total, remaining, nil
 }
 
+// externalSettings compiles and returns the external settings for the host.
+func (h *Host) externalSettings() (modules.HostExternalSettings, error) {
+	totalStorage, remainingStorage, err := h.capacity()
+	if err != nil {
+		return modules.HostExternalSettings{}, err
+	}
+	var netAddr modules.NetAddress
+	if h.settings.NetAddress != "" {
+		netAddr = h.settings.NetAddress
+	} else {
+		netAddr = h.autoAddress
+	}
+	return modules.HostExternalSettings{
+		AcceptingContracts:   h.settings.AcceptingContracts,
+		MaxDownloadBatchSize: h.settings.MaxDownloadBatchSize,
+		MaxDuration:          h.settings.MaxDuration,
+		MaxReviseBatchSize:   h.settings.MaxReviseBatchSize,
+		NetAddress:           netAddr,
+		RemainingStorage:     remainingStorage,
+		SectorSize:           modules.SectorSize,
+		TotalStorage:         totalStorage,
+		UnlockHash:           h.unlockHash,
+		WindowSize:           h.settings.WindowSize,
+
+		Collateral:            h.settings.Collateral,
+		MaxCollateralFraction: h.settings.MaxCollateralFraction,
+		MaxCollateral:         h.settings.MaxCollateral,
+
+		ContractPrice:          h.settings.MinimumContractPrice,
+		DownloadBandwidthPrice: h.settings.MinimumDownloadBandwidthPrice,
+		StoragePrice:           h.settings.MinimumStoragePrice,
+		UploadBandwidthPrice:   h.settings.MinimumUploadBandwidthPrice,
+
+		RevisionNumber: h.revisionNumber,
+		Version:        build.Version,
+	}, nil
+}
+
 // managedRPCSettings is an rpc that returns the host's settings.
 func (h *Host) managedRPCSettings(conn net.Conn) error {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateSettingsTime))
 
+	var err error
 	var hes modules.HostExternalSettings
 	var secretKey crypto.SecretKey
-	err := func() error {
+	err = func() error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 
 		h.revisionNumber++
 		secretKey = h.secretKey
-		totalStorage, remainingStorage, err := h.capacity()
-		if err != nil {
-			return err
-		}
-		var netAddr modules.NetAddress
-		if h.settings.NetAddress != "" {
-			netAddr = h.settings.NetAddress
-		} else {
-			netAddr = h.autoAddress
-		}
-		hes = modules.HostExternalSettings{
-			AcceptingContracts:   h.settings.AcceptingContracts,
-			MaxDownloadBatchSize: h.settings.MaxDownloadBatchSize,
-			MaxDuration:          h.settings.MaxDuration,
-			MaxReviseBatchSize:   h.settings.MaxReviseBatchSize,
-			NetAddress:           netAddr,
-			RemainingStorage:     remainingStorage,
-			SectorSize:           modules.SectorSize,
-			TotalStorage:         totalStorage,
-			UnlockHash:           h.unlockHash,
-			WindowSize:           h.settings.WindowSize,
-
-			Collateral:            h.settings.Collateral,
-			MaxCollateralFraction: h.settings.MaxCollateralFraction,
-			MaxCollateral:         h.settings.MaxCollateral,
-
-			ContractPrice:          h.settings.MinimumContractPrice,
-			DownloadBandwidthPrice: h.settings.MinimumDownloadBandwidthPrice,
-			StoragePrice:           h.settings.MinimumStoragePrice,
-			UploadBandwidthPrice:   h.settings.MinimumUploadBandwidthPrice,
-
-			RevisionNumber: h.revisionNumber,
-			Version:        build.Version,
-		}
-		return nil
+		hes, err = h.externalSettings()
+		return err
 	}()
 	if err != nil {
 		return err

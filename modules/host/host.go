@@ -378,6 +378,15 @@ func (h *Host) Close() (composedError error) {
 	return composedError
 }
 
+// ExternalSettings returns the hosts external settings. These values cannot be
+// set by the user (host is configured through InternalSettings), and are the
+// values that get displayed to other hosts on the network.
+func (h *Host) ExternalSettings() (modules.HostExternalSettings, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.externalSettings()
+}
+
 // FinancialMetrics returns information about the financial commitments,
 // rewards, and activities of the host.
 func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {

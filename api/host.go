@@ -22,6 +22,7 @@ type (
 	// HostGET contains the information that is returned after a GET request to
 	// /host - a bunch of information about the status of the host.
 	HostGET struct {
+		ExternalSettings modules.HostExternalSettings `json:"externalsettings"`
 		FinancialMetrics modules.HostFinancialMetrics `json:"financialmetrics"`
 		InternalSettings modules.HostInternalSettings `json:"internalsettings"`
 		NetworkMetrics   modules.HostNetworkMetrics   `json:"networkmetrics"`
@@ -49,10 +50,16 @@ func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetada
 // hostHandlerGET handles GET requests to the /host API endpoint, returning key
 // information about the host.
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	es, err := srv.host.ExternalSettings()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	fm := srv.host.FinancialMetrics()
 	is := srv.host.InternalSettings()
 	nm := srv.host.NetworkMetrics()
 	hg := HostGET{
+		ExternalSettings: es,
 		FinancialMetrics: fm,
 		InternalSettings: is,
 		NetworkMetrics:   nm,
