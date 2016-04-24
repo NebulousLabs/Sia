@@ -937,6 +937,9 @@ func TestThreadedReceiveBlock(t *testing.T) {
 // TestIntegrationSendBlkRPC probes the SendBlk RPC and tests that blocks are
 // correctly requested, received, and accepted into the consensus set.
 func TestIntegrationSendBlkRPC(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst1, err := blankConsensusSetTester("TestIntegrationSendBlkRPC1")
 	if err != nil {
 		t.Fatal(err)
@@ -956,13 +959,16 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Sleep to give the consensus sets time to finish the background startup
+	// routines - if the block mined below is mined before the sets finish
+	// synchronizing to eachother, it screws up the test.
+	time.Sleep(500 * time.Millisecond)
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
 	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(types.GenesisBlock.ID()))
 	if err != modules.ErrBlockKnown {
 		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
 	}
-
 	// Test that cst2 errors when it doesn't recognize the requested block.
 	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(types.BlockID{}))
 	if err != io.EOF {
