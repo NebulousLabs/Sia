@@ -19,12 +19,12 @@ var persistMetadata = persist.Metadata{
 	Version: "0.3.3",
 }
 
-func (g *Gateway) save() error {
+func (g *Gateway) save(fsync bool) error {
 	var nodes []modules.NetAddress
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
-	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.persistDir, nodesFile))
+	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.persistDir, nodesFile), fsync)
 }
 
 func (g *Gateway) load() error {

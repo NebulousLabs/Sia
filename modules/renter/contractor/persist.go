@@ -16,7 +16,7 @@ type contractorPersist struct {
 }
 
 // save saves the hostdb persistence data to disk.
-func (c *Contractor) save() error {
+func (c *Contractor) save(fsync bool) error {
 	data := contractorPersist{
 		Allowance:   c.allowance,
 		LastChange:  c.lastChange,
@@ -27,7 +27,7 @@ func (c *Contractor) save() error {
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
 	}
-	return c.persist.save(data)
+	return c.persist.save(data, fsync)
 }
 
 // load loads the Contractor persistence data from disk.

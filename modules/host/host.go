@@ -208,7 +208,7 @@ func (h *Host) checkUnlockHash() error {
 		// the host will be using this unlock hash to establish identity, and
 		// losing it will mean silently losing part of the host identity.
 		h.unlockHash = uc.UnlockHash()
-		err = h.save()
+		err = h.save(false)
 		if err != nil {
 			return err
 		}
@@ -363,7 +363,7 @@ func (h *Host) Close() (composedError error) {
 
 	// Save the latest host state.
 	h.mu.Lock()
-	err = h.save()
+	err = h.save(true)
 	h.mu.Unlock()
 	if err != nil {
 		composedError = composeErrors(composedError, err)
@@ -414,7 +414,7 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 
 	h.settings = settings
 	h.revisionNumber++
-	return h.save()
+	return h.save(true)
 }
 
 // InternalSettings returns the settings of a host.

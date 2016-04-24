@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+// TestSaveLoad checks that saving and loading data behaves as expected.
 func TestSaveLoad(t *testing.T) {
 	var meta = Metadata{"TestSaveLoad", "0.1"}
 	var saveData int = 3
@@ -58,13 +59,38 @@ func TestSaveLoad(t *testing.T) {
 	}
 }
 
+// TestSaveLoadFile tests that saving and loading a file without fsync properly
+// stores and fetches data.
 func TestSaveLoadFile(t *testing.T) {
 	var meta = Metadata{"TestSaveLoadFile", "0.1"}
 	var saveData int = 3
 
 	os.MkdirAll(build.TempDir("persist"), 0777)
 	filename := build.TempDir("persist", "TestSaveLoadFile")
-	err := SaveFile(meta, saveData, filename)
+	err := SaveFile(meta, saveData, filename, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var loadData int
+	err = LoadFile(meta, &loadData, filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadData != saveData {
+		t.Fatalf("loaded data (%v) does not match saved data (%v)", loadData, saveData)
+	}
+}
+
+// TestSaveLoadFileFsync test that saving and loading a file with fsync
+// properly stores and fetches data.
+func TestSaveLoadFileFsync(t *testing.T) {
+	var meta = Metadata{"TestSaveLoadFileFsync", "0.1"}
+	var saveData int = 3
+
+	os.MkdirAll(build.TempDir("persist"), 0777)
+	filename := build.TempDir("persist", "TestSaveLoadFile")
+	err := SaveFile(meta, saveData, filename, true)
 	if err != nil {
 		t.Fatal(err)
 	}

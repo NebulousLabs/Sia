@@ -77,7 +77,7 @@ func (h *Host) establishDefaults() error {
 	if err != nil {
 		return err
 	}
-	return h.save()
+	return h.save(false)
 }
 
 // initDB will check that the database has been initialized and if not, will
@@ -143,7 +143,7 @@ func (h *Host) load() error {
 }
 
 // save stores all of the persist data to disk.
-func (h *Host) save() error {
+func (h *Host) save(fsync bool) error {
 	p := persistence{
 		// RPC Metrics.
 		DownloadCalls:       atomic.LoadUint64(&h.atomicDownloadCalls),
@@ -169,5 +169,5 @@ func (h *Host) save() error {
 		Settings:         h.settings,
 		UnlockHash:       h.unlockHash,
 	}
-	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile), fsync)
 }

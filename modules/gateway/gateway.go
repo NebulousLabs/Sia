@@ -58,7 +58,7 @@ func (g *Gateway) Close() error {
 
 	// save the latest gateway state
 	id := g.mu.RLock()
-	if err := g.save(); err != nil {
+	if err := g.save(true); err != nil {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	g.mu.RUnlock(id)
@@ -130,7 +130,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		for _, addr := range modules.BootstrapPeers {
 			g.addNode(addr)
 		}
-		g.save()
+		g.save(false)
 	}
 
 	// Create listener and set address.

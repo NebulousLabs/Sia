@@ -75,7 +75,7 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, erro
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	err = w.saveSettings()
+	err = w.saveSettings(false)
 	if err != nil {
 		return modules.Seed{}, err
 	}
@@ -185,7 +185,7 @@ func (w *Wallet) Lock() error {
 	// calling 'Unlock' again.
 	w.wipeSecrets()
 	w.unlocked = false
-	return w.saveSettings()
+	return nil
 }
 
 // Unlock will decrypt the wallet seed and load all of the addresses into

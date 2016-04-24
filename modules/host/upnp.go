@@ -78,7 +78,7 @@ func (h *Host) managedLearnHostname() {
 		h.log.Debugln(err)
 	}
 	h.autoAddress = autoAddress
-	err = h.save()
+	err = h.save(false)
 	if err != nil {
 		h.log.Println(err)
 	}

@@ -39,7 +39,7 @@ func (m *Miner) initSettings() error {
 	filename := filepath.Join(m.persistDir, settingsFile)
 	_, err := os.Stat(filename)
 	if os.IsNotExist(err) {
-		return m.save()
+		return m.save(false)
 	} else if err != nil {
 		return err
 	}
@@ -69,6 +69,6 @@ func (m *Miner) load() error {
 }
 
 // save saves the miner persistence to disk.
-func (m *Miner) save() error {
-	return persist.SaveFile(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
+func (m *Miner) save(fsync bool) error {
+	return persist.SaveFile(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile), fsync)
 }

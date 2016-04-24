@@ -57,7 +57,7 @@ func (h *Host) initRescan() error {
 			return err
 		}
 
-		return h.save()
+		return h.save(false)
 	}()
 	if err != nil {
 		return err
@@ -292,7 +292,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.recentChange = cc.ID
 
 	// Save the host.
-	err = h.save()
+	err = h.save(false)
 	if err != nil {
 		h.log.Println("ERROR: could not save during ProcessConsensusChange:", err)
 	}

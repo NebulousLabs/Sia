@@ -8,7 +8,7 @@ func TestLoad(t *testing.T) {
 	g := newTestingGateway("TestLoad", t)
 	id := g.mu.Lock()
 	g.addNode(dummyNode)
-	g.save()
+	g.save(false)
 	g.mu.Unlock(id)
 	g.Close()
 

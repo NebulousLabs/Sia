@@ -61,10 +61,10 @@ func (sm *StorageManager) load() error {
 }
 
 // save stores all of the persistent data of the storage manager to disk.
-func (sm *StorageManager) save() error {
+func (sm *StorageManager) save(fsync bool) error {
 	p := persistence{
 		SectorSalt:     sm.sectorSalt,
 		StorageFolders: sm.storageFolders,
 	}
-	return persist.SaveFile(persistMetadata, p, filepath.Join(sm.persistDir, settingsFile))
+	return persist.SaveFile(persistMetadata, p, filepath.Join(sm.persistDir, settingsFile), fsync)
 }

@@ -118,7 +118,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	c.spentPeriod = c.spentPeriod.Add(fc.Payout)
 	c.spentTotal = c.spentTotal.Add(fc.Payout)
 	c.cachedAddress = types.UnlockHash{} // clear cachedAddress
-	err = c.save()
+	err = c.save(true)
 	c.mu.Unlock()
 	if err != nil {
 		c.log.Println("WARN: failed to save the contractor:", err)
