@@ -141,9 +141,6 @@ func (srv *Server) initAPI(password string) {
 		router.POST("/miner/header", requirePassword(srv.minerHeaderHandlerPOST, password))
 		router.GET("/miner/start", requirePassword(srv.minerStartHandler, password))
 		router.GET("/miner/stop", requirePassword(srv.minerStopHandler, password))
-		// TODO: doesn't adding authentication break compatibility?
-		router.GET("/miner/headerforwork", requirePassword(srv.minerHeaderHandlerGET, password))  // COMPATv0.4.8
-		router.POST("/miner/submitheader", requirePassword(srv.minerHeaderHandlerPOST, password)) // COMPATv0.4.8
 	}
 
 	// Renter API Calls
@@ -190,8 +187,6 @@ func (srv *Server) initAPI(password string) {
 		router.GET("/wallet/transactions", srv.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", srv.walletTransactionsAddrHandler)
 		router.POST("/wallet/unlock", requirePassword(srv.walletUnlockHandler, password))
-		// TODO: doesn't authentication break compatibility?
-		router.POST("/wallet/encrypt", requirePassword(srv.walletInitHandler, password)) // COMPATv0.4.0
 	}
 
 	// Apply UserAgent middleware and create HTTP server
