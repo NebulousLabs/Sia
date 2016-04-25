@@ -50,13 +50,10 @@ Building From Source
 --------------------
 
 To build from source, [Go 1.6 must be installed](https://golang.org/doc/install)
-on the system. Then run the following to build:
+on the system. Then run the following command to build and install:
 
 ```
-go get github.com/NebulousLabs/Sia
-cd  $GOPATH/src/github.com/NebulousLabs/Sia/
-make dependencies
-make
+go get -u github.com/NebulousLabs/Sia
 ```
 
 To start `siad`, the Sia daemon process, run:
@@ -65,9 +62,9 @@ To start `siad`, the Sia daemon process, run:
 $GOPATH/bin/siad
 ```
 
-With `siad` running, you can run `siac`, the Sia command-line interface from a
-separate shell:
-
+`siad` is a daemon which runs in the background and collaborates with the Sia
+network. The daemon can be controlled via an http api, or by `siac`, a command
+line utility that can be run from a separate shell:
 ```
 $GOPATH/bin/siac
 ```
