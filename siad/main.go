@@ -33,6 +33,7 @@ type Config struct {
 		Modules           string
 		NoBootstrap       bool
 		RequiredUserAgent string
+		AuthenticateAPI   bool
 
 		Profile    bool
 		ProfileDir string
@@ -146,6 +147,7 @@ func main() {
 	root.Flags().BoolVarP(&globalConfig.Siad.Profile, "profile", "p", false, "enable profiling")
 	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules, see 'siad modules' for more info")
+	root.Flags().BoolVarP(&globalConfig.Siad.AuthenticateAPI, "authenticate-api", "", false, "enable API password protection")
 
 	// Deprecate shorthand flags that aren't commonly used.
 	// COMPATv0.5.2

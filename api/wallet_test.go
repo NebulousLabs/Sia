@@ -40,7 +40,7 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", cs, nil, g, nil, nil, nil, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, nil, nil, nil, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", cs, nil, g, nil, nil, nil, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, nil, nil, nil, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,16 +125,16 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	}()
 	defer st.server.Close()
 
-	// Make a call to /wallet/encrypt and get the seed. Provide no encryption
+	// Make a call to /wallet/init and get the seed. Provide no encryption
 	// key so that the encryption key is the seed that gets returned.
-	var wep WalletEncryptPOST
-	err = st.postAPI("/wallet/encrypt", url.Values{}, &wep)
+	var wip WalletInitPOST
+	err = st.postAPI("/wallet/init", url.Values{}, &wip)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Use the seed to call /wallet/unlock.
 	unlockValues := url.Values{}
-	unlockValues.Set("encryptionpassword", wep.PrimarySeed)
+	unlockValues.Set("encryptionpassword", wip.PrimarySeed)
 	err = st.stdPostAPI("/wallet/unlock", unlockValues)
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 	sendSiacoinsValues := url.Values{}
 	sendSiacoinsValues.Set("amount", "1234")
-	sendSiacoinsValues.Add("destination", wag.Address.String())
+	sendSiacoinsValues.Set("destination", wag.Address.String())
 	err = st.stdPostAPI("/wallet/siacoins", sendSiacoinsValues)
 	if err != nil {
 		t.Fatal(err)

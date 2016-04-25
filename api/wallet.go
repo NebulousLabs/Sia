@@ -45,14 +45,6 @@ type (
 		PrimarySeed string `json:"primaryseed"`
 	}
 
-	// WalletEncryptPOST contains the primary seed that gets generated during a
-	// POST call to /wallet/encrypt.
-	//
-	// COMPATv0.4.0
-	WalletEncryptPOST struct {
-		PrimarySeed string `json:"primaryseed"`
-	}
-
 	// WalletSiacoinsPOST contains the transaction sent in the POST call to
 	// /wallet/siafunds.
 	WalletSiacoinsPOST struct {
@@ -253,7 +245,7 @@ func (srv *Server) walletLockHandler(w http.ResponseWriter, req *http.Request, _
 	writeSuccess(w)
 }
 
-// walletSeedHandler handles API calls to /wallet/seed.
+// walletSeedsHandler handles API calls to /wallet/seeds.
 func (srv *Server) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	dictionary := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictionary == "" {
@@ -263,26 +255,26 @@ func (srv *Server) walletSeedsHandler(w http.ResponseWriter, req *http.Request, 
 	// Get the primary seed information.
 	primarySeed, progress, err := srv.wallet.PrimarySeed()
 	if err != nil {
-		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error after call to /wallet/seeds: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	primarySeedStr, err := modules.SeedToString(primarySeed, dictionary)
 	if err != nil {
-		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error after call to /wallet/seeds: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Get the list of seeds known to the wallet.
 	allSeeds, err := srv.wallet.AllSeeds()
 	if err != nil {
-		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "error after call to /wallet/seeds: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	var allSeedsStrs []string
 	for _, seed := range allSeeds {
 		str, err := modules.SeedToString(seed, dictionary)
 		if err != nil {
-			writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+			writeError(w, "error after call to /wallet/seeds: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		allSeedsStrs = append(allSeedsStrs, str)
