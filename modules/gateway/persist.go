@@ -15,13 +15,22 @@ const (
 	logFile = modules.GatewayDir + ".log"
 )
 
-// persistMetadata contains all of the
+// persistMetadata contains the header and version strings that identify the
+// gateway persist file.
 var persistMetadata = persist.Metadata{
 	Header:  "Sia Node List",
 	Version: "0.3.3",
 }
 
-// load pulls the gateway persistent data off disk and into memory.
+// persistData returns the data in the Gateway that will be saved to disk.
+func (g *Gateway) persistData() (nodes []modules.NetAddress) {
+	for node := range g.nodes {
+		nodes = append(nodes, node)
+	}
+	return
+}
+
+// load loads the Gateway's persistent data from disk.
 func (g *Gateway) load() error {
 	var nodes []modules.NetAddress
 	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.persistDir, nodesFile))
@@ -34,21 +43,13 @@ func (g *Gateway) load() error {
 	return nil
 }
 
-// save stores the gateway's persistent data on disk.
+// save stores the Gateway's persistent data on disk.
 func (g *Gateway) save() error {
-	var nodes []modules.NetAddress
-	for node := range g.nodes {
-		nodes = append(nodes, node)
-	}
-	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.persistDir, nodesFile))
+	return persist.SaveFile(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
 }
 
-// saveSync stores the gateway's persistent data on disk, and then syncs to
+// saveSync stores the Gateway's persistent data on disk, and then syncs to
 // disk to minimize the possibility of data loss.
 func (g *Gateway) saveSync() error {
-	var nodes []modules.NetAddress
-	for node := range g.nodes {
-		nodes = append(nodes, node)
-	}
-	return persist.SaveFileSync(persistMetadata, nodes, filepath.Join(g.persistDir, nodesFile))
+	return persist.SaveFileSync(persistMetadata, g.persistData(), filepath.Join(g.persistDir, nodesFile))
 }

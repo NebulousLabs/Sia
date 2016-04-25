@@ -42,8 +42,8 @@ func (db *BoltDatabase) checkMetadata(md Metadata) error {
 	return err
 }
 
-// updatbMetadata will set the contents of the metadata bucket to be
-// what is stored inside the metadata argument
+// updateMetadata will set the contents of the metadata bucket to the values
+// in db.Metadata.
 func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
 	bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
 	if err != nil {
@@ -60,12 +60,12 @@ func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
 	return nil
 }
 
-// Close saves the bolt database to a file, and updates metadata
+// Close closes the database.
 func (db *BoltDatabase) Close() error {
 	return db.DB.Close()
 }
 
-// OpenDatabase opens a database filename and checks metadata
+// OpenDatabase opens a database and validates its metadata.
 func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 	// Open the database using a 1 second timeout (without the timeout,
 	// database will potentially hang indefinitely.
@@ -81,7 +81,6 @@ func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 	}
 	err = boltDB.checkMetadata(md)
 	if err != nil {
-		// Database opening failed, and therefore needs to be closed.
 		db.Close()
 		return nil, err
 	}
