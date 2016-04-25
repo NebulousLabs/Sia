@@ -50,11 +50,7 @@ func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetada
 // hostHandlerGET handles GET requests to the /host API endpoint, returning key
 // information about the host.
 func (srv *Server) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	es, err := srv.host.ExternalSettings()
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	es := srv.host.ExternalSettings()
 	fm := srv.host.FinancialMetrics()
 	is := srv.host.InternalSettings()
 	nm := srv.host.NetworkMetrics()
@@ -132,11 +128,7 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 // storageHandler returns a bunch of information about storage management on
 // the host.
 func (srv *Server) storageHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	sfs, err := srv.host.StorageFolders()
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	sfs := srv.host.StorageFolders()
 	sg := StorageGET{
 		StorageFolderMetadata: sfs,
 	}
@@ -163,11 +155,7 @@ func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Req
 // storageFoldersResizeHandler resizes a storage folder in the storage manager.
 func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	folderPath := ps.ByName("folder")
-	storageFolders, err := srv.host.StorageFolders()
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -192,11 +180,7 @@ func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.
 // manager.
 func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	folderPath := ps.ByName("folder")
-	storageFolders, err := srv.host.StorageFolders()
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)

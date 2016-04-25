@@ -146,7 +146,8 @@ var (
 // filesystem is never returning errors, but if errors are being returned they
 // will be tracked and can be reported to the user.
 type storageFolder struct {
-	UID []byte
+	Path string
+	UID  []byte
 
 	Size          uint64
 	SizeRemaining uint64
@@ -409,6 +410,8 @@ func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
 
 	// Create a storage folder object.
 	newSF := &storageFolder{
+		Path: path,
+
 		Size:          size,
 		SizeRemaining: size,
 	}
@@ -571,30 +574,15 @@ func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize ui
 
 // StorageFolders provides information about all of the storage folders in the
 // host.
-func (sm *StorageManager) StorageFolders() (sfms []modules.StorageFolderMetadata, err error) {
+func (sm *StorageManager) StorageFolders() (sfms []modules.StorageFolderMetadata) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	sm.resourceLock.RLock()
-	defer sm.resourceLock.RUnlock()
-	if sm.closed {
-		return nil, errStorageManagerClosed
-	}
 
 	for _, sf := range sm.storageFolders {
-		// The actual path of the storage folder is managed by the host via a
-		// symlink to a folder in the host directory that has the UID name.
-		// Read the sym link and then parse the path that it points to for the
-		// path of the storage folder.
-		symPath := filepath.Join(sm.persistDir, sf.uidString())
-		realPath, err := filepath.EvalSymlinks(symPath)
-		if err != nil {
-			return nil, err
-		}
-
 		sfms = append(sfms, modules.StorageFolderMetadata{
 			Capacity:          sf.Size,
 			CapacityRemaining: sf.SizeRemaining,
-			Path:              realPath,
+			Path:              sf.Path,
 
 			FailedReads:      sf.FailedReads,
 			FailedWrites:     sf.FailedWrites,
@@ -602,5 +590,5 @@ func (sm *StorageManager) StorageFolders() (sfms []modules.StorageFolderMetadata
 			SuccessfulWrites: sf.SuccessfulWrites,
 		})
 	}
-	return sfms, nil
+	return sfms
 }

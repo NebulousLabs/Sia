@@ -88,10 +88,7 @@ func TestAddFolderNoRand(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Number of storage folders should be zero.
-	storageFolders, err := smt.sm.StorageFolders()
-	if err != nil {
-		t.Fatal(err)
-	}
+	storageFolders := smt.sm.StorageFolders()
 	if len(storageFolders) != 0 {
 		t.Error("storage folder was added to the storage manager despite a dependency failure")
 	}

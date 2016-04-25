@@ -12,26 +12,20 @@ import (
 // capacity returns the amount of storage still available on the machine. The
 // amount can be negative if the total capacity was reduced to below the active
 // capacity.
-func (h *Host) capacity() (total, remaining uint64, err error) {
+func (h *Host) capacity() (total, remaining uint64) {
 	// Total storage can be computed by summing the size of all the storage
 	// folders.
-	sfs, err := h.StorageFolders()
-	if err != nil {
-		return 0, 0, err
-	}
+	sfs := h.StorageFolders()
 	for _, sf := range sfs {
 		total += sf.Capacity
 		remaining += sf.CapacityRemaining
 	}
-	return total, remaining, nil
+	return total, remaining
 }
 
 // externalSettings compiles and returns the external settings for the host.
-func (h *Host) externalSettings() (modules.HostExternalSettings, error) {
-	totalStorage, remainingStorage, err := h.capacity()
-	if err != nil {
-		return modules.HostExternalSettings{}, err
-	}
+func (h *Host) externalSettings() modules.HostExternalSettings {
+	totalStorage, remainingStorage := h.capacity()
 	var netAddr modules.NetAddress
 	if h.settings.NetAddress != "" {
 		netAddr = h.settings.NetAddress
@@ -61,7 +55,7 @@ func (h *Host) externalSettings() (modules.HostExternalSettings, error) {
 
 		RevisionNumber: h.revisionNumber,
 		Version:        build.Version,
-	}, nil
+	}
 }
 
 // managedRPCSettings is an rpc that returns the host's settings.
@@ -69,20 +63,12 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateSettingsTime))
 
-	var err error
 	var hes modules.HostExternalSettings
 	var secretKey crypto.SecretKey
-	err = func() error {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-
-		h.revisionNumber++
-		secretKey = h.secretKey
-		hes, err = h.externalSettings()
-		return err
-	}()
-	if err != nil {
-		return err
-	}
+	h.mu.Lock()
+	h.revisionNumber++
+	secretKey = h.secretKey
+	hes = h.externalSettings()
+	h.mu.Unlock()
 	return crypto.WriteSignedObject(conn, hes, secretKey)
 }

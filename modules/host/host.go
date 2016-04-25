@@ -381,7 +381,7 @@ func (h *Host) Close() (composedError error) {
 // ExternalSettings returns the hosts external settings. These values cannot be
 // set by the user (host is configured through InternalSettings), and are the
 // values that get displayed to other hosts on the network.
-func (h *Host) ExternalSettings() (modules.HostExternalSettings, error) {
+func (h *Host) ExternalSettings() modules.HostExternalSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.externalSettings()
