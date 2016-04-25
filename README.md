@@ -27,10 +27,10 @@ record, we advise against using it as a sole means of storing important data.
 
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon," that runs the Sia protocol, and siac is a client that is
-used to interact with siad. Siad exposes an API on 'localhost:9980' which can
-be used to interact with the daemon. There is a front-end program called Sia-UI
-which can be used to interact with the daemon in a more user-friendly way.
-Documentation on the API can be found in doc/API.md.
+used to interact with siad. Siad exposes an HTTP API on 'localhost:9980' which
+can be used to interact with the daemon. There is a front-end program called
+Sia-UI which can be used to interact with the daemon in a more user-friendly
+way. Documentation on the API can be found in doc/API.md.
 
 Usage
 -----
@@ -50,24 +50,22 @@ Building From Source
 --------------------
 
 To build from source, [Go 1.6 must be installed](https://golang.org/doc/install)
-on the system. Then run the following command to build and install:
+on the system. Then simply use `go get`:
 
 ```
-go get -u github.com/NebulousLabs/Sia
+go get github.com/NebulousLabs/Sia/...
 ```
 
-To start `siad`, the Sia daemon process, run:
+This will download the Sia repo to your `$GOPATH/src` folder, and install the
+`siad` and `siac` binaries in your `$GOPATH/bin` folder.
 
-```
-$GOPATH/bin/siad
-```
-
-`siad` is a daemon which runs in the background and collaborates with the Sia
-network. The daemon can be controlled via an http api, or by `siac`, a command
-line utility that can be run from a separate shell:
-```
-$GOPATH/bin/siac
-```
+To stay up-to-date, you can run the previous `go get` command with the `-u`
+flag. Alternatively, you can use the Makefile provided in this repo. Run
+`git pull origin master` to pull the latest changes, and `make release-std` to
+build the new binaries. You can also run `make test` and `make test-long` to
+run the short and full test suites, respectively. Finally, `make cover` will
+generate code coverage reports for each package; they are stored in the `cover`
+folder and can be viewed in your browser.
 
 Troubleshooting
 ---------------
