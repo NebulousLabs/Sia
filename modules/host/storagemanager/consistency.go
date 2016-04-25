@@ -15,6 +15,8 @@ import (
 // or two to complete, even for a host that has millions of sectors. This means
 // that certain consistency checks are off-limits.
 
+// TODO: Check that 'Path' and the symlinked path point to the same place.
+
 // TODO: Consistency checks should be accompanied by repair tools. Perhaps that
 // means instead of calling build.Critical... it just returns some sort of
 // diagnostic?

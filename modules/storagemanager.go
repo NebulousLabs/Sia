@@ -93,6 +93,6 @@ type (
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// manager.
-		StorageFolders() ([]StorageFolderMetadata, error)
+		StorageFolders() []StorageFolderMetadata
 	}
 )
