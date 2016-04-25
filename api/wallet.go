@@ -45,14 +45,6 @@ type (
 		PrimarySeed string `json:"primaryseed"`
 	}
 
-	// WalletEncryptPOST contains the primary seed that gets generated during a
-	// POST call to /wallet/encrypt.
-	//
-	// COMPATv0.4.0
-	WalletEncryptPOST struct {
-		PrimarySeed string `json:"primaryseed"`
-	}
-
 	// WalletSiacoinsPOST contains the transaction sent in the POST call to
 	// /wallet/siafunds.
 	WalletSiacoinsPOST struct {

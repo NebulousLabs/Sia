@@ -125,16 +125,16 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	}()
 	defer st.server.Close()
 
-	// Make a call to /wallet/encrypt and get the seed. Provide no encryption
+	// Make a call to /wallet/init and get the seed. Provide no encryption
 	// key so that the encryption key is the seed that gets returned.
-	var wep WalletEncryptPOST
-	err = st.postAPI("/wallet/encrypt", url.Values{}, &wep)
+	var wip WalletInitPOST
+	err = st.postAPI("/wallet/init", url.Values{}, &wip)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Use the seed to call /wallet/unlock.
 	unlockValues := url.Values{}
-	unlockValues.Set("encryptionpassword", wep.PrimarySeed)
+	unlockValues.Set("encryptionpassword", wip.PrimarySeed)
 	err = st.stdPostAPI("/wallet/unlock", unlockValues)
 	if err != nil {
 		t.Fatal(err)
