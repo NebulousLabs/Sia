@@ -11,8 +11,8 @@ import (
 // memPersist implements the persister interface in-memory.
 type memPersist hdbPersist
 
-func (m *memPersist) save(data hdbPersist) error { *m = memPersist(data); return nil }
-func (m memPersist) load(data *hdbPersist) error { *data = hdbPersist(m); return nil }
+func (m *memPersist) save(data hdbPersist, fsync bool) error { *m = memPersist(data); return nil }
+func (m memPersist) load(data *hdbPersist) error             { *data = hdbPersist(m); return nil }
 
 // TestSaveLoad tests that the hostdb can save and load itself.
 func TestSaveLoad(t *testing.T) {
@@ -38,7 +38,7 @@ func TestSaveLoad(t *testing.T) {
 	hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
 
 	// save and reload
-	err := hdb.save()
+	err := hdb.save(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestRescan(t *testing.T) {
 	hdb.lastChange = modules.ConsensusChangeID{1, 2, 3}
 
 	// save the hostdb
-	err := hdb.save()
+	err := hdb.save(false)
 	if err != nil {
 		t.Fatal(err)
 	}

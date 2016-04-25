@@ -25,7 +25,7 @@ type (
 	}
 
 	persister interface {
-		save(hdbPersist) error
+		save(hdbPersist, bool) error
 		load(*hdbPersist) error
 	}
 
@@ -54,8 +54,8 @@ type stdPersist struct {
 	filename string
 }
 
-func (p *stdPersist) save(data hdbPersist) error {
-	return persist.SaveFile(p.meta, data, p.filename)
+func (p *stdPersist) save(data hdbPersist, fsync bool) error {
+	return persist.SaveFile(p.meta, data, p.filename, fsync)
 }
 
 func (p *stdPersist) load(data *hdbPersist) error {

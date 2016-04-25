@@ -60,7 +60,7 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = sf.Commit()
+	err = sf.Commit(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestRelativePathSafeFile(t *testing.T) {
 	}
 	os.Chdir(tmpChdir)
 	defer os.Chdir(wd)
-	err = sf.Commit()
+	err = sf.Commit(false)
 	if err != nil {
 		t.Fatal(err)
 	}

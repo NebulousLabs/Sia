@@ -449,7 +449,7 @@ func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
 
 	// Add the storage folder to the list of folders for the host.
 	sm.storageFolders = append(sm.storageFolders, newSF)
-	return sm.save()
+	return sm.save(true)
 }
 
 // ResetStorageFolderHealth will reset the read and write statistics for the
@@ -473,7 +473,7 @@ func (sm *StorageManager) ResetStorageFolderHealth(index int) error {
 	sm.storageFolders[index].FailedWrites = 0
 	sm.storageFolders[index].SuccessfulReads = 0
 	sm.storageFolders[index].SuccessfulWrites = 0
-	return sm.save()
+	return sm.save(false)
 }
 
 // RemoveStorageFolder removes a storage folder from the host.
@@ -508,7 +508,7 @@ func (sm *StorageManager) RemoveStorageFolder(removalIndex int, force bool) erro
 	// Remove the storage folder from the host and then save the host.
 	sm.storageFolders = append(sm.storageFolders[0:removalIndex], sm.storageFolders[removalIndex+1:]...)
 	removeErr := sm.dependencies.removeFile(filepath.Join(sm.persistDir, removalFolder.uidString()))
-	saveErr := sm.save()
+	saveErr := sm.save(true)
 	return composeErrors(saveErr, removeErr)
 }
 
@@ -549,7 +549,7 @@ func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize ui
 	if resizeFolderSizeConsumed <= newSize {
 		resizeFolder.SizeRemaining = newSize - resizeFolderSizeConsumed
 		resizeFolder.Size = newSize
-		return sm.save()
+		return sm.save(true)
 	}
 
 	// Calculate the number of sectors that need to be offloaded from the
@@ -569,7 +569,7 @@ func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize ui
 	}
 	resizeFolder.Size = newSize
 	resizeFolder.SizeRemaining = 0
-	return sm.save()
+	return sm.save(true)
 }
 
 // StorageFolders provides information about all of the storage folders in the

@@ -175,15 +175,15 @@ func (r *Renter) saveFile(f *file) error {
 	}
 
 	// Commit the SafeFile.
-	return handle.Commit()
+	return handle.Commit(false)
 }
 
 // save stores the current renter data to disk.
-func (r *Renter) save() error {
+func (r *Renter) save(fsync bool) error {
 	data := struct {
 		Tracking map[string]trackedFile
 	}{r.tracking}
-	return persist.SaveFile(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename))
+	return persist.SaveFile(saveMetadata, data, filepath.Join(r.persistDir, PersistFilename), fsync)
 }
 
 // load fetches the saved renter data from disk.

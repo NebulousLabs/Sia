@@ -228,7 +228,7 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 	if err != nil {
 		return err
 	}
-	return sm.save()
+	return sm.save(false)
 }
 
 // ReadSector will pull a sector from disk into memory.
@@ -337,7 +337,7 @@ func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight type
 		}
 		folder.SizeRemaining += modules.SectorSize
 		folder.SuccessfulWrites++
-		err = sm.save()
+		err = sm.save(false)
 		if err != nil {
 			return err
 		}
@@ -396,7 +396,7 @@ func (sm *StorageManager) DeleteSector(sectorRoot crypto.Hash) error {
 		}
 		folder.SizeRemaining += modules.SectorSize
 		folder.SuccessfulWrites++
-		err = sm.save()
+		err = sm.save(false)
 		if err != nil {
 			return err
 		}

@@ -77,7 +77,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	for _, node := range nodes {
 		g.addNode(node)
 	}
-	g.save()
+	g.save(false)
 	g.mu.Unlock(id)
 	return nil
 }
@@ -100,7 +100,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 		if err := g.addNode(addr); err != nil {
 			return err
 		}
-		if err := g.save(); err != nil {
+		if err := g.save(false); err != nil {
 			return err
 		}
 		return nil
@@ -161,7 +161,7 @@ func (g *Gateway) threadedNodeManager() {
 		if err != nil {
 			id = g.mu.Lock()
 			g.removeNode(node)
-			g.save()
+			g.save(false)
 			g.mu.Unlock(id)
 			continue
 		}

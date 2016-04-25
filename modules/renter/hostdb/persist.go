@@ -12,7 +12,7 @@ type hdbPersist struct {
 }
 
 // save saves the hostdb persistence data to disk.
-func (hdb *HostDB) save() error {
+func (hdb *HostDB) save(fsync bool) error {
 	var data hdbPersist
 	for _, entry := range hdb.allHosts {
 		data.AllHosts = append(data.AllHosts, *entry)
@@ -21,7 +21,7 @@ func (hdb *HostDB) save() error {
 		data.ActiveHosts = append(data.ActiveHosts, *node.hostEntry)
 	}
 	data.LastChange = hdb.lastChange
-	return hdb.persist.save(data)
+	return hdb.persist.save(data, fsync)
 }
 
 // load loads the hostdb persistence data from disk.

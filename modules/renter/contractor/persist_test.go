@@ -11,8 +11,8 @@ import (
 // memPersist implements the persister interface in-memory.
 type memPersist contractorPersist
 
-func (m *memPersist) save(data contractorPersist) error { *m = memPersist(data); return nil }
-func (m memPersist) load(data *contractorPersist) error { *data = contractorPersist(m); return nil }
+func (m *memPersist) save(data contractorPersist, fsync bool) error { *m = memPersist(data); return nil }
+func (m memPersist) load(data *contractorPersist) error             { *data = contractorPersist(m); return nil }
 
 // TestSaveLoad tests that the contractor can save and load itself.
 func TestSaveLoad(t *testing.T) {
@@ -29,7 +29,7 @@ func TestSaveLoad(t *testing.T) {
 		{2}: {IP: "baz"},
 	}
 	// save and reload
-	err := c.save()
+	err := c.save(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestSaveLoad(t *testing.T) {
 	os.MkdirAll(build.TempDir("contractor", "TestSaveLoad"), 0700)
 
 	// save and reload
-	err = c.save()
+	err = c.save(false)
 	if err != nil {
 		t.Fatal(err)
 	}

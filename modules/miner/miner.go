@@ -122,7 +122,7 @@ func (m *Miner) startupRescan() error {
 		m.persist.RecentChange = modules.ConsensusChangeID{}
 		m.persist.Height = 0
 		m.persist.Target = types.Target{}
-		return m.save()
+		return m.save(false)
 	}()
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	m.tpool.TransactionPoolSubscribe(m)
 
 	// Save after synchronizing with consensus
-	err = m.save()
+	err = m.save(false)
 	if err != nil {
 		return nil, errors.New("miner could not save during startup: " + err.Error())
 	}
@@ -200,7 +200,7 @@ func (m *Miner) Close() error {
 	m.cs.Unsubscribe(m)
 
 	var errs []error
-	if err := m.save(); err != nil {
+	if err := m.save(true); err != nil {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	if err := m.log.Close(); err != nil {

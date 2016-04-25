@@ -90,7 +90,7 @@ func (l *Logger) Debug(v ...interface{}) {
 	}
 }
 
-// Debug is equivalent to Logger.Printf when build.DEBUG is true. Otherwise it
+// Debugf is equivalent to Logger.Printf when build.DEBUG is true. Otherwise it
 // is a no-op.
 func (l *Logger) Debugf(format string, v ...interface{}) {
 	if build.DEBUG {
@@ -98,8 +98,8 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 	}
 }
 
-// Debug is equivalent to Logger.Println when build.DEBUG is true. Otherwise it
-// is a no-op.
+// Debugln is equivalent to Logger.Println when build.DEBUG is true. Otherwise
+// it is a no-op.
 func (l *Logger) Debugln(v ...interface{}) {
 	if build.DEBUG {
 		l.Println(v...)
