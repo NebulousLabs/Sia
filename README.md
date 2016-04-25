@@ -53,19 +53,19 @@ To build from source, [Go 1.6 must be installed](https://golang.org/doc/install)
 on the system. Then simply use `go get`:
 
 ```
-go get github.com/NebulousLabs/Sia/...
+go get -u github.com/NebulousLabs/Sia/...
 ```
 
 This will download the Sia repo to your `$GOPATH/src` folder, and install the
 `siad` and `siac` binaries in your `$GOPATH/bin` folder.
 
-To stay up-to-date, you can run the previous `go get` command with the `-u`
-flag. Alternatively, you can use the Makefile provided in this repo. Run
-`git pull origin master` to pull the latest changes, and `make release-std` to
-build the new binaries. You can also run `make test` and `make test-long` to
-run the short and full test suites, respectively. Finally, `make cover` will
-generate code coverage reports for each package; they are stored in the `cover`
-folder and can be viewed in your browser.
+To stay up-to-date, run the previous `go get` command again. Alternatively, you
+can use the Makefile provided in this repo. Run `git pull origin master` to
+pull the latest changes, and `make release-std` to build the new binaries. You
+can also run `make test` and `make test-long` to run the short and full test
+suites, respectively. Finally, `make cover` will generate code coverage reports
+for each package; they are stored in the `cover` folder and can be viewed in
+your browser.
 
 Troubleshooting
 ---------------
