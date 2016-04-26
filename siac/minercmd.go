@@ -16,13 +16,6 @@ var (
 		Run:   wrap(minercmd),
 	}
 
-	// DEPRECATED v0.5.0
-	minerDeprecatedStatusCmd = &cobra.Command{
-		Use:        "status",
-		Deprecated: "use `siac miner` instead.",
-		Run:        wrap(minercmd),
-	}
-
 	minerStartCmd = &cobra.Command{
 		Use:   "start",
 		Short: "Start cpu mining",

@@ -16,20 +16,6 @@ var (
 		Long:  "Add and remove hosts, or list active hosts on the network.",
 		Run:   wrap(hostdbcmd),
 	}
-
-	// DEPRECATED v0.5.2
-	hostdbDeprecatedCmd = &cobra.Command{
-		Use:        "hostdb",
-		Deprecated: "use `siac hostdb` instead.",
-		Run:        wrap(hostdblistcmd),
-	}
-
-	hostdbListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List active hosts on the network",
-		Long:  "List active hosts on the network.",
-		Run:   wrap(hostdblistcmd),
-	}
 )
 
 func hostdbcmd() {
