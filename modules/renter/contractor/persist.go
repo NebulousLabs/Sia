@@ -15,8 +15,8 @@ type contractorPersist struct {
 	SpentTotal  types.Currency
 }
 
-// save saves the hostdb persistence data to disk.
-func (c *Contractor) save() error {
+// persistData returns the data in the Contractor that will be saved to disk.
+func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
 		Allowance:   c.allowance,
 		LastChange:  c.lastChange,
@@ -27,7 +27,7 @@ func (c *Contractor) save() error {
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
 	}
-	return c.persist.save(data)
+	return data
 }
 
 // load loads the Contractor persistence data from disk.
@@ -46,4 +46,14 @@ func (c *Contractor) load() error {
 	c.spentPeriod = data.SpentPeriod
 	c.spentTotal = data.SpentTotal
 	return nil
+}
+
+// save saves the Contractor persistence data to disk.
+func (c *Contractor) save() error {
+	return c.persist.save(c.persistData())
+}
+
+// saveSync saves the Contractor persistence data to disk and then syncs to disk.
+func (c *Contractor) saveSync() error {
+	return c.persist.saveSync(c.persistData())
 }

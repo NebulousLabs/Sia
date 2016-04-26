@@ -122,7 +122,7 @@ func (he *hostEditor) runRevisionIteration(actions []modules.RevisionAction, rev
 
 	he.contractor.mu.Lock()
 	he.contractor.contracts[he.contract.ID] = he.contract
-	he.contractor.save()
+	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
 
 	return nil

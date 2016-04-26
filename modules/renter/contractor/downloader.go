@@ -102,7 +102,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 	hd.contractor.mu.Lock()
 	hd.contractor.contracts[hd.contract.ID] = hd.contract
-	hd.contractor.save()
+	hd.contractor.saveSync()
 	hd.contractor.mu.Unlock()
 
 	return sector, nil

@@ -74,7 +74,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.tracking[up.SiaPath] = trackedFile{
 		RepairPath: up.Source,
 	}
-	r.save()
+	r.saveSync()
 	r.mu.Unlock(lockID)
 
 	// Save the .sia file to the renter directory.

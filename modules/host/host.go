@@ -363,7 +363,7 @@ func (h *Host) Close() (composedError error) {
 
 	// Save the latest host state.
 	h.mu.Lock()
-	err = h.save()
+	err = h.saveSync()
 	h.mu.Unlock()
 	if err != nil {
 		composedError = composeErrors(composedError, err)
@@ -423,7 +423,7 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 
 	h.settings = settings
 	h.revisionNumber++
-	return h.save()
+	return h.saveSync()
 }
 
 // InternalSettings returns the settings of a host.

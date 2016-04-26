@@ -76,6 +76,12 @@ func (w *Wallet) saveSettings() error {
 	return persist.SaveFile(settingsMetadata, w.persist, filepath.Join(w.persistDir, settingsFile))
 }
 
+// saveSettingsSync writes the wallet's settings to the wallet's settings file,
+// replacing the existing file, and then syncs to disk.
+func (w *Wallet) saveSettingsSync() error {
+	return persist.SaveFileSync(settingsMetadata, w.persist, filepath.Join(w.persistDir, settingsFile))
+}
+
 // initSettings creates the settings object at startup. If a settings file
 // exists, the settings file will be loaded into memory. If the settings file
 // does not exist, a new.persist file will be created.
@@ -123,7 +129,7 @@ func (w *Wallet) initPersist() error {
 
 // createBackup creates a backup file at the desired filepath.
 func (w *Wallet) createBackup(backupFilepath string) error {
-	return persist.SaveFile(settingsMetadata, w.persist, backupFilepath)
+	return persist.SaveFileSync(settingsMetadata, w.persist, backupFilepath)
 }
 
 // CreateBackup creates a backup file at the desired filepath.

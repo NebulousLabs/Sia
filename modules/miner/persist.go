@@ -72,3 +72,8 @@ func (m *Miner) load() error {
 func (m *Miner) save() error {
 	return persist.SaveFile(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
 }
+
+// saveSync saves the miner persistence to disk, and then syncs to disk.
+func (m *Miner) saveSync() error {
+	return persist.SaveFileSync(settingsMetadata, m.persist, filepath.Join(m.persistDir, settingsFile))
+}

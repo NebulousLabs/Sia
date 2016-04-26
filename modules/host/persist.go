@@ -40,6 +40,35 @@ type persistence struct {
 	UnlockHash       types.UnlockHash
 }
 
+// persistData returns the data in the Host that will be saved to disk.
+func (h *Host) persistData() persistence {
+	return persistence{
+		// RPC Metrics.
+		DownloadCalls:       atomic.LoadUint64(&h.atomicDownloadCalls),
+		ErroredCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
+		FormContractCalls:   atomic.LoadUint64(&h.atomicFormContractCalls),
+		RenewCalls:          atomic.LoadUint64(&h.atomicRenewCalls),
+		ReviseCalls:         atomic.LoadUint64(&h.atomicReviseCalls),
+		RecentRevisionCalls: atomic.LoadUint64(&h.atomicRecentRevisionCalls),
+		SettingsCalls:       atomic.LoadUint64(&h.atomicSettingsCalls),
+		UnrecognizedCalls:   atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+
+		// Consensus Tracking.
+		BlockHeight:  h.blockHeight,
+		RecentChange: h.recentChange,
+
+		// Host Identity.
+		Announced:        h.announced,
+		AutoAddress:      h.autoAddress,
+		FinancialMetrics: h.financialMetrics,
+		PublicKey:        h.publicKey,
+		RevisionNumber:   h.revisionNumber,
+		SecretKey:        h.secretKey,
+		Settings:         h.settings,
+		UnlockHash:       h.unlockHash,
+	}
+}
+
 // establishDefaults configures the default settings for the host, overwriting
 // any existing settings.
 func (h *Host) establishDefaults() error {
@@ -100,7 +129,7 @@ func (h *Host) initDB() error {
 	})
 }
 
-// load extrats the save data from disk and populates the host.
+// load loads the Hosts's persistent data from disk.
 func (h *Host) load() error {
 	p := new(persistence)
 	err := h.dependencies.loadFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
@@ -144,30 +173,10 @@ func (h *Host) load() error {
 
 // save stores all of the persist data to disk.
 func (h *Host) save() error {
-	p := persistence{
-		// RPC Metrics.
-		DownloadCalls:       atomic.LoadUint64(&h.atomicDownloadCalls),
-		ErroredCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
-		FormContractCalls:   atomic.LoadUint64(&h.atomicFormContractCalls),
-		RenewCalls:          atomic.LoadUint64(&h.atomicRenewCalls),
-		ReviseCalls:         atomic.LoadUint64(&h.atomicReviseCalls),
-		RecentRevisionCalls: atomic.LoadUint64(&h.atomicRecentRevisionCalls),
-		SettingsCalls:       atomic.LoadUint64(&h.atomicSettingsCalls),
-		UnrecognizedCalls:   atomic.LoadUint64(&h.atomicUnrecognizedCalls),
+	return persist.SaveFile(persistMetadata, h.persistData(), filepath.Join(h.persistDir, settingsFile))
+}
 
-		// Consensus Tracking.
-		BlockHeight:  h.blockHeight,
-		RecentChange: h.recentChange,
-
-		// Host Identity.
-		Announced:        h.announced,
-		AutoAddress:      h.autoAddress,
-		FinancialMetrics: h.financialMetrics,
-		PublicKey:        h.publicKey,
-		RevisionNumber:   h.revisionNumber,
-		SecretKey:        h.secretKey,
-		Settings:         h.settings,
-		UnlockHash:       h.unlockHash,
-	}
-	return persist.SaveFile(persistMetadata, p, filepath.Join(h.persistDir, settingsFile))
+// saveSync stores all of the persist data to disk and then syncs to disk.
+func (h *Host) saveSync() error {
+	return persist.SaveFileSync(persistMetadata, h.persistData(), filepath.Join(h.persistDir, settingsFile))
 }

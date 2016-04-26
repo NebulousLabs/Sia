@@ -11,8 +11,8 @@ type hdbPersist struct {
 	LastChange  modules.ConsensusChangeID
 }
 
-// save saves the hostdb persistence data to disk.
-func (hdb *HostDB) save() error {
+// persistData returns the data in the hostdb that will be saved to disk.
+func (hdb *HostDB) persistData() hdbPersist {
 	var data hdbPersist
 	for _, entry := range hdb.allHosts {
 		data.AllHosts = append(data.AllHosts, *entry)
@@ -21,7 +21,17 @@ func (hdb *HostDB) save() error {
 		data.ActiveHosts = append(data.ActiveHosts, *node.hostEntry)
 	}
 	data.LastChange = hdb.lastChange
-	return hdb.persist.save(data)
+	return data
+}
+
+// save saves the hostdb persistence data to disk.
+func (hdb *HostDB) save() error {
+	return hdb.persist.save(hdb.persistData())
+}
+
+// saveSync saves the hostdb persistence data to disk and then syncs to disk.
+func (hdb *HostDB) saveSync() error {
+	return hdb.persist.saveSync(hdb.persistData())
 }
 
 // load loads the hostdb persistence data from disk.

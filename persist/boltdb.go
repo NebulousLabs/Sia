@@ -13,25 +13,7 @@ type BoltDatabase struct {
 	*bolt.DB
 }
 
-// updateDbMetadata will set the contents of the metadata bucket to be
-// what is stored inside the metadata argument
-func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
-	bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
-	if err != nil {
-		return err
-	}
-	err = bucket.Put([]byte("Header"), []byte(db.Header))
-	if err != nil {
-		return err
-	}
-	err = bucket.Put([]byte("Version"), []byte(db.Version))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// checkDbMetadata confirms that the metadata in the database is
+// checkMetadata confirms that the metadata in the database is
 // correct. If there is no metadata, correct metadata is inserted
 func (db *BoltDatabase) checkMetadata(md Metadata) error {
 	err := db.Update(func(tx *bolt.Tx) error {
@@ -60,12 +42,30 @@ func (db *BoltDatabase) checkMetadata(md Metadata) error {
 	return err
 }
 
-// CloseDatabase saves the bolt database to a file, and updates metadata
+// updateMetadata will set the contents of the metadata bucket to the values
+// in db.Metadata.
+func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
+	bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
+	if err != nil {
+		return err
+	}
+	err = bucket.Put([]byte("Header"), []byte(db.Header))
+	if err != nil {
+		return err
+	}
+	err = bucket.Put([]byte("Version"), []byte(db.Version))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Close closes the database.
 func (db *BoltDatabase) Close() error {
 	return db.DB.Close()
 }
 
-// OpenDatabase opens a database filename and checks metadata
+// OpenDatabase opens a database and validates its metadata.
 func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 	// Open the database using a 1 second timeout (without the timeout,
 	// database will potentially hang indefinitely.
@@ -81,7 +81,6 @@ func OpenDatabase(md Metadata, filename string) (*BoltDatabase, error) {
 	}
 	err = boltDB.checkMetadata(md)
 	if err != nil {
-		// Database opening failed, and therefore needs to be closed.
 		db.Close()
 		return nil, err
 	}

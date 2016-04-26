@@ -58,7 +58,7 @@ func (g *Gateway) Close() error {
 
 	// save the latest gateway state
 	id := g.mu.RLock()
-	if err := g.save(); err != nil {
+	if err := g.saveSync(); err != nil {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	g.mu.RUnlock(id)

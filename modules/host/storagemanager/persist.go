@@ -17,11 +17,25 @@ type persistence struct {
 	StorageFolders []*storageFolder
 }
 
+// persistData returns the data in the StorageManager that will be saved to
+// disk.
+func (sm *StorageManager) persistData() persistence {
+	return persistence{
+		SectorSalt:     sm.sectorSalt,
+		StorageFolders: sm.storageFolders,
+	}
+}
+
 // establishDefaults configures the default settings for the storage manager,
 // overwriting any existing settings.
 func (sm *StorageManager) establishDefaults() error {
 	_, err := rand.Read(sm.sectorSalt[:])
-	return err
+	if err != nil {
+		return err
+	}
+	// If the sector salt is lost, the storage manager is not going to be able
+	// to figure out where sectors are stored on disk.
+	return sm.saveSync()
 }
 
 // initDB will check that the database has been initialized and if not, will
@@ -62,9 +76,10 @@ func (sm *StorageManager) load() error {
 
 // save stores all of the persistent data of the storage manager to disk.
 func (sm *StorageManager) save() error {
-	p := persistence{
-		SectorSalt:     sm.sectorSalt,
-		StorageFolders: sm.storageFolders,
-	}
-	return persist.SaveFile(persistMetadata, p, filepath.Join(sm.persistDir, settingsFile))
+	return persist.SaveFile(persistMetadata, sm.persistData(), filepath.Join(sm.persistDir, settingsFile))
+}
+
+// save stores all of the persistent data of the storage manager to disk.
+func (sm *StorageManager) saveSync() error {
+	return persist.SaveFileSync(persistMetadata, sm.persistData(), filepath.Join(sm.persistDir, settingsFile))
 }
