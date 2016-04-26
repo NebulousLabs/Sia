@@ -13,7 +13,7 @@ import (
 // interface possible makes it easier to mock these dependencies in testing.
 type (
 	consensusSet interface {
-		ConsensusSetPersistentSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error
+		ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error
 	}
 
 	dialer interface {

@@ -17,7 +17,7 @@ import (
 type newStub struct{}
 
 // consensus set stubs
-func (newStub) ConsensusSetPersistentSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
+func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
 	return nil
 }
 

@@ -65,7 +65,7 @@ func (h *Host) initRescan() error {
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the host has fully caught up to the current block.
-	err = h.cs.ConsensusSetPersistentSubscribe(h, modules.ConsensusChangeID{})
+	err = h.cs.ConsensusSetSubscribe(h, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (h *Host) initRescan() error {
 
 // initConsensusSubscription subscribes the host to the consensus set.
 func (h *Host) initConsensusSubscription() error {
-	err := h.cs.ConsensusSetPersistentSubscribe(h, h.recentChange)
+	err := h.cs.ConsensusSetSubscribe(h, h.recentChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id that the host
 		// has is unrecognized by the consensus set. This will typically only

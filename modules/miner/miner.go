@@ -119,7 +119,7 @@ func (m *Miner) startupRescan() error {
 		defer m.mu.Unlock()
 
 		m.log.Println("Performing a miner rescan.")
-		m.persist.RecentChange = modules.ConsensusChangeID{}
+		m.persist.RecentChange = modules.ConsensusChangeBeginning
 		m.persist.Height = 0
 		m.persist.Target = types.Target{}
 		return m.save()
@@ -130,7 +130,7 @@ func (m *Miner) startupRescan() error {
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the miner has fully caught up to the current block.
-	return m.cs.ConsensusSetPersistentSubscribe(m, modules.ConsensusChangeID{})
+	return m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeID{})
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -167,7 +167,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		return nil, errors.New("miner persistence startup failed: " + err.Error())
 	}
 
-	err = m.cs.ConsensusSetPersistentSubscribe(m, m.persist.RecentChange)
+	err = m.cs.ConsensusSetSubscribe(m, m.persist.RecentChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id is not found.
 		// The id will only be not found if there has been desynchronization

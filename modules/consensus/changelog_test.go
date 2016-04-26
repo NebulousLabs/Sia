@@ -24,7 +24,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	// Add a mocked subscriber and check that it receives the correct number of
 	// blocks.
 	ms := newMockSubscriber()
-	cst.cs.ConsensusSetPersistentSubscribe(&ms, modules.ConsensusChangeID{})
+	cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeID{})
 	if ms.updates[0].AppliedBlocks[0].ID() != cst.cs.blockRoot.Block.ID() {
 		t.Fatal("subscription did not correctly receive the genesis block")
 	}
@@ -35,7 +35,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	// Create a copy of the subscriber that will subscribe to the consensus at
 	// the tail of the updates.
 	tailSubscriber := ms.copySub()
-	cst.cs.ConsensusSetPersistentSubscribe(&tailSubscriber, tailSubscriber.updates[len(tailSubscriber.updates)-1].ID)
+	cst.cs.ConsensusSetSubscribe(&tailSubscriber, tailSubscriber.updates[len(tailSubscriber.updates)-1].ID)
 	if len(tailSubscriber.updates) != 1 {
 		t.Fatal("subscription resulted in the wrong number of blocks being sent")
 	}
@@ -44,7 +44,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	behindSubscriber := ms.copySub()
 	cst.addSiafunds()
 	cst.mineSiacoins()
-	cst.cs.ConsensusSetPersistentSubscribe(&behindSubscriber, behindSubscriber.updates[len(behindSubscriber.updates)-1].ID)
+	cst.cs.ConsensusSetSubscribe(&behindSubscriber, behindSubscriber.updates[len(behindSubscriber.updates)-1].ID)
 	if types.BlockHeight(len(behindSubscriber.updates)) != cst.cs.dbBlockHeight()+1 {
 		t.Fatal("subscription resulted in the wrong number of blocks being sent")
 	}

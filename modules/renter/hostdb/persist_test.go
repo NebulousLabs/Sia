@@ -84,7 +84,7 @@ func (cs *rescanCS) addBlock(b types.Block) {
 	cs.changes = append(cs.changes, cc)
 }
 
-func (cs *rescanCS) ConsensusSetPersistentSubscribe(s modules.ConsensusSetSubscriber, lastChange modules.ConsensusChangeID) error {
+func (cs *rescanCS) ConsensusSetSubscribe(s modules.ConsensusSetSubscriber, lastChange modules.ConsensusChangeID) error {
 	var start int
 	if lastChange != (modules.ConsensusChangeID{}) {
 		start = -1

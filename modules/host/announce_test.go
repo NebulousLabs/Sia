@@ -45,7 +45,7 @@ func newAnnouncementFinder(cs modules.ConsensusSet) (*announcementFinder, error)
 	af := &announcementFinder{
 		cs: cs,
 	}
-	err := cs.ConsensusSetPersistentSubscribe(af, modules.ConsensusChangeID{})
+	err := cs.ConsensusSetSubscribe(af, modules.ConsensusChangeID{})
 	if err != nil {
 		return nil, err
 	}
