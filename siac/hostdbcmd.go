@@ -14,7 +14,7 @@ var (
 		Use:   "hostdb",
 		Short: "View or modify the host database",
 		Long:  "Add and remove hosts, or list active hosts on the network.",
-		Run:   wrap(hostdblistcmd),
+		Run:   wrap(hostdbcmd),
 	}
 
 	// DEPRECATED v0.5.2
@@ -32,7 +32,7 @@ var (
 	}
 )
 
-func hostdblistcmd() {
+func hostdbcmd() {
 	info := new(api.ActiveHosts)
 	err := getAPI("/renter/hosts/active", info)
 	if err != nil {
@@ -44,6 +44,6 @@ func hostdblistcmd() {
 	}
 	fmt.Println("Active hosts:")
 	for _, host := range info.Hosts {
-		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.NetAddress, host.ContractPrice.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
+		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.NetAddress, host.StoragePrice.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
 	}
 }
