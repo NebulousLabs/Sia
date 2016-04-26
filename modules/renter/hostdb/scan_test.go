@@ -51,6 +51,7 @@ func (dial probeDialer) DialTimeout(addr modules.NetAddress, timeout time.Durati
 // TestThreadedProbeHosts tests the threadedProbeHosts method.
 func TestThreadedProbeHosts(t *testing.T) {
 	hdb := bareHostDB()
+	hdb.persist = &memPersist{}
 
 	// create a host to send to threadedProbeHosts
 	sk, pk, err := crypto.GenerateKeyPair()
@@ -121,6 +122,8 @@ func TestThreadedProbeHosts(t *testing.T) {
 // TestThreadedScan tests the threadedScan method.
 func TestThreadedScan(t *testing.T) {
 	hdb := bareHostDB()
+	hdb.persist = &memPersist{}
+
 	// use a real sleeper; this will prevent threadedScan from looping too
 	// quickly.
 	hdb.sleeper = stdSleeper{}

@@ -77,7 +77,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	}
 }
 
-// threadedProbeHost tries to fetch the settings of a host. If successful, the
+// threadedProbeHosts tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
 func (hdb *HostDB) threadedProbeHosts() {
@@ -129,6 +129,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; !exists && len(hdb.activeHosts) < maxActiveHosts {
 				hdb.insertNode(hostEntry)
 			}
+			hdb.save()
 		}()
 	}
 }

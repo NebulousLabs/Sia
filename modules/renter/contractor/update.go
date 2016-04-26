@@ -32,4 +32,8 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// }
 
 	c.lastChange = cc.ID
+	err := c.save()
+	if err != nil {
+		c.log.Println(err)
+	}
 }

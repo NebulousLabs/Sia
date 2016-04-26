@@ -45,4 +45,10 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 			hdb.insertHost(host)
 		}
 	}
+
+	hdb.lastChange = cc.ID
+	err := hdb.save()
+	if err != nil {
+		hdb.log.Println(err)
+	}
 }

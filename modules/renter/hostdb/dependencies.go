@@ -60,7 +60,7 @@ func (p *stdPersist) save(data hdbPersist) error {
 }
 
 func (p *stdPersist) saveSync(data hdbPersist) error {
-	return persist.SaveFile(p.meta, data, p.filename)
+	return persist.SaveFileSync(p.meta, data, p.filename)
 }
 
 func (p *stdPersist) load(data *hdbPersist) error {

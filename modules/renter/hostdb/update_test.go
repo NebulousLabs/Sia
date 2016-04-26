@@ -62,6 +62,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 func TestReceiveConsensusSetUpdate(t *testing.T) {
 	// create hostdb
 	hdb := bareHostDB()
+	hdb.persist = &memPersist{}
 
 	// Put a host announcement into a block.
 	annBytes, err := makeSignedAnnouncement("foo:1234")
