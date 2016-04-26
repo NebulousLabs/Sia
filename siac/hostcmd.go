@@ -26,16 +26,29 @@ var (
 		Short: "Modify host settings",
 		Long: `Modify host settings.
 Available settings:
-	totalstorage
-	minduration
-	maxduration
-	windowsize
-	price (in SC per GB per month)
-	acceptingcontracts
 
-To configure the host to not accept new contracts, set acceptingcontracts
-to false, e.g.:
-	siac host config acceptingcontracts false
+Parameter                        Unit
+
+acceptingcontracts               boolean
+collateral                       currency/TB
+collateralbudget                 currency
+maxcollateral                    currency
+maxdownloadbatchsize             int
+maxduration                      int
+maxrevisebatchsize               int
+minimumcontractprice             currency
+minimumdownloadbandwidthprice    currency/TB
+minimumstorageprice              currency/TB/month
+minimumuploadbandwidthprice      currency/TB
+netaddress                       string
+windowsize                       int
+
+Currency units can be specified, e.g. 10SC; run 'siac help wallet' for details.
+
+For a description of each parameter, see doc/API.md.
+
+To configure the host to accept new contracts, set acceptingcontracts to true:
+	siac host config acceptingcontracts true
 `,
 		Run: wrap(hostconfigcmd),
 	}
@@ -187,24 +200,40 @@ RPC Stats:
 // Modifies host settings.
 func hostconfigcmd(param, value string) {
 	switch param {
-	case "price":
-		// convert price to hastings/byte/block
-		p, ok := new(big.Rat).SetString(value)
-		if !ok {
-			die("Could not parse price")
-		}
-		p.Mul(p, big.NewRat(1e24/1e9, 4320))
-		value = new(big.Int).Div(p.Num(), p.Denom()).String()
-	case "totalstorage":
-		// parse sizes of form 10GB, 10TB, 1TiB etc
-		var err error
-		value, err = parseSize(value)
+	// currency (convert to hastings)
+	case "collateralbudget", "maxcollateral", "minimumcontractprice":
+		hastings, err := coinUnits(value)
 		if err != nil {
-			die("Could not parse totalstorage:", err)
+			die("Could not parse "+param+":", err)
 		}
-	case "minduration", "maxduration", "windowsize", "acceptingcontracts": // Other valid settings.
+		value = hastings
+
+	// currency/TB (convert to hastings/byte)
+	case "collateral", "minimumdownloadbandwidthprice", "minimumuploadbandwidthprice":
+		hastings, err := coinUnits(value)
+		if err != nil {
+			die("Could not parse "+param+":", err)
+		}
+		i, _ := new(big.Int).SetString(hastings, 10)
+		i.Div(i, big.NewInt(1e12)) // divide by 1e12 bytes/TB
+		value = i.String()
+
+	// currency/TB/month (convert to hastings/byte/block)
+	case "minimumstorageprice":
+		hastings, err := coinUnits(value)
+		if err != nil {
+			die("Could not parse "+param+":", err)
+		}
+		i, _ := new(big.Int).SetString(hastings, 10)
+		i.Div(i, big.NewInt(1e12)) // divide by 1e12 bytes/TB
+		value = i.String()
+
+	// other valid settings
+	case "acceptingcontracts", "maxdownloadbatchsize", "maxduration",
+		"maxrevisebatchsize", "netaddress", "windowsize":
+
+	// invalid settings
 	default:
-		// Reject invalid host config commands.
 		die("\"" + param + "\" is not a host setting")
 	}
 	err := post("/host", param+"="+value)
