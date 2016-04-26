@@ -103,14 +103,14 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 		return nil, err
 	}
 
-	err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
+	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		hdb.lastChange = modules.ConsensusChangeID{}
+		hdb.lastChange = modules.ConsensusChangeBeginning
 		// clear the host sets
 		hdb.activeHosts = make(map[modules.NetAddress]*hostNode)
 		hdb.allHosts = make(map[modules.NetAddress]*hostEntry)
 		// subscribe again using the new ID
-		err = cs.ConsensusSetPersistentSubscribe(hdb, hdb.lastChange)
+		err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	}
 	if err != nil {
 		return nil, errors.New("hostdb subscription failed: " + err.Error())

@@ -47,8 +47,8 @@ func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
 	defer cst.Close()
 
 	ms := newMockSubscriber()
-	badCCID := modules.ConsensusChangeID{1}
-	err = cst.cs.ConsensusSetPersistentSubscribe(&ms, badCCID)
+	badCCID := modules.ConsensusChangeID{255, 255, 255}
+	err = cst.cs.ConsensusSetSubscribe(&ms, badCCID)
 	if err != modules.ErrInvalidConsensusChangeID {
 		t.Error("consensus set returning the wrong error during an invalid subscription:", err)
 	}
@@ -68,7 +68,7 @@ func TestUnitUnsubscribe(t *testing.T) {
 
 	// Subscribe the mock subscriber to the consensus set.
 	ms := newMockSubscriber()
-	err = cst.cs.ConsensusSetPersistentSubscribe(&ms, modules.ConsensusChangeID{})
+	err = cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeBeginning)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -56,8 +56,7 @@ type (
 		// been sent to the transaction pool. When a new subscriber joins the
 		// transaction pool, all prior consensus changes are sent to the new
 		// subscriber.
-		consensusChangeIndex int
-		subscribers          []modules.TransactionPoolSubscriber
+		subscribers []modules.TransactionPoolSubscriber
 
 		mu demotemutex.DemoteMutex
 	}
@@ -81,11 +80,6 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		knownObjects:        make(map[ObjectID]TransactionSetID),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
-
-		// The consensus change index is intialized to '-1', which indicates
-		// that no consensus changes have been sent yet. The first consensus
-		// change will then have an index of '0'.
-		consensusChangeIndex: -1,
 	}
 	// Register RPCs
 	// TODO: rename RelayTransactionSet so that the conflicting RPC
@@ -93,7 +87,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
-	err := cs.ConsensusSetPersistentSubscribe(tp, modules.ConsensusChangeID{})
+	err := cs.ConsensusSetSubscribe(tp, modules.ConsensusChangeRecent)
 	if err != nil {
 		return nil, errors.New("transactionpool subscription failed: " + err.Error())
 	}

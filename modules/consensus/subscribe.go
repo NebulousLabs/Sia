@@ -97,25 +97,31 @@ func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	}
 }
 
-// initializePersistentSubscribe will take a subscriber and feed them all of the
+// initializeSubscribe will take a subscriber and feed them all of the
 // consensus changes that have occurred since the change provided.
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
-func (cs *ConsensusSet) initializePersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
 	return cs.db.View(func(tx *bolt.Tx) error {
 		// 'exists' and 'entry' are going to be pointed to the first entry that
 		// has not yet been seen by subscriber.
 		var exists bool
 		var entry changeEntry
 
-		if start == (modules.ConsensusChangeID{}) {
-			// Special case: if 'start' is blank, create an initial node
-			// pointing to the genesis block. The subscriber will recieve the
-			// diffs for all blocks in the consensus set, including the genesis
-			// block.
+		if start == modules.ConsensusChangeBeginning {
+			// Special case: for modules.ConsensusChangeBeginning, create an
+			// initial node pointing to the genesis block. The subscriber will
+			// recieve the diffs for all blocks in the consensus set, including
+			// the genesis block.
 			entry = cs.genesisEntry()
 			exists = true
+		} else if start == modules.ConsensusChangeRecent {
+			// Special case: for modules.ConsensusChangeRecent, set up the
+			// subscriber to start receiving only new blocks, but the
+			// subscriber does not need to do any catch-up. For this
+			// implementation, a no-op will have this effect.
+			return nil
 		} else {
 			// The subscriber has provided an existing consensus change.
 			// Because the subscriber already has this consensus change,
@@ -146,20 +152,20 @@ func (cs *ConsensusSet) initializePersistentSubscribe(subscriber modules.Consens
 	})
 }
 
-// ConsensusSetPersistentSubscribe adds a subscriber to the list of
-// subscribers, and gives them every consensus change that has occured since
-// the change with the provided id.
+// ConsensusSetSubscribe adds a subscriber to the list of subscribers, and
+// gives them every consensus change that has occured since the change with the
+// provided id.
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
-func (cs *ConsensusSet) ConsensusSetPersistentSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
 	cs.mu.Lock()
 	cs.subscribers = append(cs.subscribers, subscriber)
 	cs.mu.Demote()
 	defer cs.mu.DemotedUnlock()
 
 	// Get the input module caught up to the currenct consnesus set.
-	err := cs.initializePersistentSubscribe(subscriber, start)
+	err := cs.initializeSubscribe(subscriber, start)
 	if err != nil {
 		return err
 	}

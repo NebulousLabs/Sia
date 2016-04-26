@@ -21,6 +21,16 @@ const (
 )
 
 var (
+	// ConsensusChangeBeginning is a special consensus change id that tells the
+	// consensus set to provide all consensus changes starting from the very
+	// first diff, which includes the genesis block diff.
+	ConsensusChangeBeginning = ConsensusChangeID{}
+
+	// ConsensusChangeRecent is a special consensus change id that tells the
+	// consensus set to provide the most recent consensus change, instead of
+	// starting from a specific value (which many not be known to the caller).
+	ConsensusChangeRecent = ConsensusChangeID{1}
+
 	// ErrBlockKnown is an error indicating that a block is already in the
 	// database.
 	ErrBlockKnown = errors.New("block already present in database")
@@ -170,10 +180,11 @@ type (
 		// run any required closing routines.
 		Close() error
 
-		// ConsensusSetPersistentSubscribe adds a subscriber to the list of
-		// subscribers, and gives them every consensus change that has occured
-		// since the change with the provided id.
-		ConsensusSetPersistentSubscribe(ConsensusSetSubscriber, ConsensusChangeID) error
+		// ConsensusSetSubscribe adds a subscriber to the list of subscribers,
+		// and gives them every consensus change that has occured since the
+		// change with the provided id. There are a few special cases,
+		// described by the ConsensusChangeX variables in this package.
+		ConsensusSetSubscribe(ConsensusSetSubscriber, ConsensusChangeID) error
 
 		// CurrentBlock returns the latest block in the heaviest known
 		// blockchain.
