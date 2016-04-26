@@ -49,7 +49,16 @@ func die(args ...interface{}) {
 
 // versionCmd is a cobra command that prints the version of siad.
 func versionCmd(*cobra.Command, []string) {
-	fmt.Println("Sia Daemon v" + build.Version)
+	switch build.Release {
+	case "dev":
+		fmt.Println("Sia Daemon v" + build.Version + "-dev")
+	case "standard":
+		fmt.Println("Sia Daemon v" + build.Version)
+	case "testing":
+		fmt.Println("Sia Daemon v" + build.Version + "-testing")
+	default:
+		fmt.Println("Sia Daemon v" + build.Version + "-???")
+	}
 }
 
 // modulesCmd is a cobra command that prints help info about modules.
