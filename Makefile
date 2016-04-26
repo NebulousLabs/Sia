@@ -5,6 +5,7 @@ all: install
 # dependencies installs all of the dependencies that are required for building
 # Sia.
 dependencies:
+	go install ./...
 	# Consensus Dependencies
 	go get -u github.com/NebulousLabs/demotemutex
 	go get -u github.com/NebulousLabs/ed25519
@@ -64,9 +65,9 @@ install: REBUILD
 
 # release builds and installs release binaries.
 release: REBUILD
-	go install -a -race -tags='debug profile' $(pkgs)
+	go install -race -tags='debug profile' $(pkgs)
 release-std: REBUILD
-	go install -a $(pkgs)
+	go install $(pkgs)
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
