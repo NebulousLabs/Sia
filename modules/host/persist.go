@@ -157,11 +157,19 @@ func (h *Host) load() error {
 	// Copy over host identity.
 	h.announced = p.Announced
 	h.autoAddress = p.AutoAddress
+	if err := p.AutoAddress.IsValid(); err != nil {
+		h.log.Printf("WARN: AutoAddress '%v' loaded from persist is invalid: %v", p.AutoAddress, err)
+		h.autoAddress = ""
+	}
 	h.financialMetrics = p.FinancialMetrics
 	h.publicKey = p.PublicKey
 	h.revisionNumber = p.RevisionNumber
 	h.secretKey = p.SecretKey
 	h.settings = p.Settings
+	if err := p.Settings.NetAddress.IsValid(); err != nil {
+		h.log.Printf("WARN: NetAddress '%v' loaded from persist is invalid: %v", p.Settings.NetAddress, err)
+		h.settings.NetAddress = ""
+	}
 	h.unlockHash = p.UnlockHash
 
 	err = h.initConsensusSubscription()

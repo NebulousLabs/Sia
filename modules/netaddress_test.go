@@ -1,34 +1,91 @@
 package modules
 
 import (
+	"net"
 	"testing"
 )
 
-// TestHost tests the Host method of the NetAddress type.
-func TestHost(t *testing.T) {
+var (
+	// Networks such as 10.0.0.x have been omitted from testing - behavior
+	// for these networks is currently undefined.
+
+	invalidAddrs = []string{
+		// Garbage addresses
+		"",
+		"foo:bar:baz",
+		"garbage:6146:616",
+		// Missing host / port
+		":",
+		"111.111.111.111",
+		"12.34.45.64",
+		"[::2]",
+		"::2",
+		"foo",
+		"hn.com",
+		"世界",
+		"foo:",
+		"世界:",
+		":foo",
+		":世界",
+		// Invalid host / port chars
+		" foo:bar",
+		"foo :bar",
+		"f oo:bar",
+		"foo: bar",
+		"foo:bar ",
+		"foo:b ar",
+		"\x00:bar",
+		"foo:\x00",
+		// Unspecified address
+		"[::]:bar",
+		"0.0.0.0:bar",
+	}
+	validAddrs = []string{
+		// Loopback address (valid in testing only, can't really test this well)
+		"localhost:bar",
+		"127.0.0.1:bar",
+		"[::1]:bar",
+		// Valid addresses.
+		"foo:bar",
+		"hn.com:8811",
+		"[::2]:bar",
+		"111.111.111.111:111",
+		"12.34.45.64:7777",
+		"世界:bar",
+		"bar:世界",
+		"世:界",
+		`":"`, // yeah, okay
+	}
+)
+
+// TestHostPort tests the Host and Port methods of the NetAddress type.
+func TestHostPort(t *testing.T) {
 	t.Parallel()
 
-	testSet := []struct {
-		query           NetAddress
-		desiredResponse string
-	}{
-		{"localhost", ""},
-		{"localhost:1234", "localhost"},
-		{"127.0.0.1", ""},
-		{"127.0.0.1:6723", "127.0.0.1"},
-		{"bbc.com", ""},
-		{"bbc.com:6434", "bbc.com"},
-		{"bitcoin.ninja", ""},
-		{"bitcoin.ninja:6752", "bitcoin.ninja"},
-		{"garbage:64:77", ""},
-		{"::1:5856", ""},
-		{"[::1]:5856", "::1"},
-		{"[::1]", ""},
-		{"::1", ""},
+	for _, addr := range validAddrs {
+		na := NetAddress(addr)
+		host := na.Host()
+		port := na.Port()
+		expectedHost, expectedPort, err := net.SplitHostPort(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if host != expectedHost {
+			t.Errorf("Host() returned unexpected host for NetAddress '%v': expected '%v', got '%v'", na, expectedHost, host)
+		}
+		if port != expectedPort {
+			t.Errorf("Port() returned unexpected port for NetAddress '%v': expected '%v', got '%v'", na, expectedPort, port)
+		}
 	}
-	for _, test := range testSet {
-		if test.query.Host() != test.desiredResponse {
-			t.Error("test failed:", test, test.query.Host())
+	for _, addr := range invalidAddrs {
+		na := NetAddress(addr)
+		host := na.Host()
+		port := na.Port()
+		if host != "" {
+			t.Errorf("Expected Host() to return blank string for invalid NetAddress '%v', but got '%v'", na, host)
+		}
+		if port != "" {
+			t.Errorf("Expected Port() to return blank string for invalid NetAddress '%v', but got '%v'", na, port)
 		}
 	}
 }
@@ -71,72 +128,26 @@ func TestIsLoopback(t *testing.T) {
 		{"[::1]", false},
 	}
 	for _, test := range testSet {
-		if test.query.IsLoopback() != test.desiredResponse {
-			t.Error("test failed:", test, test.query.IsLoopback())
+		if test.query.isLoopback() != test.desiredResponse {
+			t.Error("test failed:", test, test.query.isLoopback())
 		}
 	}
 }
 
-// TestIsValid tests that IsValid only returns nil for valid addresses, and
-// that it only returns ErrLoopbackAddr for loopback addresses.
+// TestIsValid tests that IsValid only returns nil for valid addresses.
 func TestIsValid(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		addr       NetAddress
-		valid      bool
-		isLoopback bool
-	}{
-		// Networks such as 10.0.0.x have been omitted from testing - behavior
-		// for these networks is currently undefined.
-
-		// Garbage addresses
-		{addr: "", valid: false},
-		{addr: "foo:bar:baz", valid: false},
-		{addr: "garbage:6146:616", valid: false},
-		// Missing host / port
-		{addr: ":", valid: false},
-		{addr: "111.111.111.111", valid: false},
-		{addr: "12.34.45.64", valid: false},
-		{addr: "[::2]", valid: false},
-		{addr: "::2", valid: false},
-		{addr: "foo", valid: false},
-		{addr: "hn.com", valid: false},
-		{addr: "世界", valid: false},
-		{addr: "foo:", valid: false},
-		{addr: "世界:", valid: false},
-		{addr: ":foo", valid: false},
-		{addr: ":世界", valid: false},
-		// Invalid host / port chars
-		{addr: " foo:bar", valid: false},
-		{addr: "foo :bar", valid: false},
-		{addr: "f oo:bar", valid: false},
-		{addr: "foo: bar", valid: false},
-		{addr: "foo:bar ", valid: false},
-		{addr: "foo:b ar", valid: false},
-		{addr: "\x00:bar", valid: false},
-		{addr: "foo:\x00", valid: false},
-		// Loopback address
-		{addr: "localhost:bar", valid: false, isLoopback: true},
-		{addr: "127.0.0.1:bar", valid: false, isLoopback: true},
-		{addr: "[::1]:bar", valid: false, isLoopback: true},
-		// Unspecified address
-		{addr: "[::]:bar", valid: false},
-		{addr: "0.0.0.0:bar", valid: false},
-		// Valid addresses.
-		{addr: "foo:bar", valid: true},
-		{addr: "hn.com:8811", valid: true},
-		{addr: "[::2]:bar", valid: true},
-		{addr: "111.111.111.111:111", valid: true},
-		{addr: "12.34.45.64:7777", valid: true},
-		{addr: "世界:bar", valid: true},
-		{addr: "bar:世界", valid: true},
-		{addr: "世:界", valid: true},
+	for _, addr := range validAddrs {
+		na := NetAddress(addr)
+		if err := na.IsValid(); err != nil {
+			t.Error("IsValid returned non-nil for a valid NetAddress:", err)
+		}
 	}
-	for _, tt := range tests {
-		err := tt.addr.IsValid()
-		if (err == nil) != tt.valid || (err == ErrLoopbackAddr) != tt.isLoopback {
-			t.Errorf("test failed: got err: '%v', in test: '%v'", err, tt)
+	for _, addr := range invalidAddrs {
+		na := NetAddress(addr)
+		if err := na.IsValid(); err == nil {
+			t.Error("IsValid returned nil for an invalid NetAddress")
 		}
 	}
 }

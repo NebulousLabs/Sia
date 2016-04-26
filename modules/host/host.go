@@ -233,12 +233,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		return nil, errNilWallet
 	}
 
-	// Parse the port from the address.
-	_, port, err := net.SplitHostPort(listenerAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the host object.
 	h := &Host{
 		cs:           cs,
@@ -249,8 +243,9 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 
 		persistDir: persistDir,
-		port:       port,
 	}
+
+	var err error
 
 	// Add the storage manager to the host.
 	//

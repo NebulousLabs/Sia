@@ -4,12 +4,8 @@ import (
 	"errors"
 	"net"
 	"unicode"
-)
 
-var (
-	// ErrLoopbackAddr is returned by IsValid() to indicate a NetAddress is a
-	// loopback address.
-	ErrLoopbackAddr = errors.New("host is a loopback address")
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // A NetAddress contains the information needed to contact a peer.
@@ -23,6 +19,9 @@ func (na NetAddress) Host() string {
 	if err != nil {
 		return ""
 	}
+	if na.IsValid() != nil {
+		return ""
+	}
 	return host
 }
 
@@ -34,15 +33,18 @@ func (na NetAddress) Port() string {
 	if err != nil {
 		return ""
 	}
+	if na.IsValid() != nil {
+		return ""
+	}
 	return port
 }
 
-// IsLoopback returns true for ip addresses that are on the same machine.
-func (na NetAddress) IsLoopback() bool {
-	if _, _, err := net.SplitHostPort(string(na)); err != nil {
+// isLoopback returns true for ip addresses that are on the same machine.
+func (na NetAddress) isLoopback() bool {
+	host, _, err := net.SplitHostPort(string(na))
+	if err != nil {
 		return false
 	}
-	host := na.Host()
 	if host == "localhost" {
 		return true
 	}
@@ -53,15 +55,15 @@ func (na NetAddress) IsLoopback() bool {
 }
 
 // IsValid returns nil if the NetAddress is valid. Valid is defined as being of
-// the form "host:port" such that "host" is not a loopback address or localhost
-// nor an unspecified IP address, and such that neither the host nor port are
-// blank, contain white space, or contain the null character.
+// the form "host:port" such that "host" is not a loopback address (except in
+// testing) nor an unspecified IP address, and such that neither the host nor
+// port are blank, contain white space, or contain the null character.
 func (na NetAddress) IsValid() error {
-	if _, _, err := net.SplitHostPort(string(na)); err != nil {
+	host, port, err := net.SplitHostPort(string(na))
+	if err != nil {
 		return err
 	}
 
-	host := na.Host()
 	for _, runeValue := range host {
 		if unicode.IsSpace(runeValue) || runeValue == 0 {
 			return errors.New("host has invalid characters")
@@ -74,7 +76,6 @@ func (na NetAddress) IsValid() error {
 		return errors.New("host is the unspecified address")
 	}
 
-	port := na.Port()
 	for _, runeValue := range port {
 		if unicode.IsSpace(runeValue) || runeValue == 0 {
 			return errors.New("port has invalid characters")
@@ -84,11 +85,8 @@ func (na NetAddress) IsValid() error {
 		return errors.New("port is blank")
 	}
 
-	// This check must be last, as it is common to check for ErrLoopbackAddr and
-	// ignore the error during testing. If this check was not last, an invalid
-	// port could be mistaken as a loopback but otherwise valid address.
-	if na.IsLoopback() {
-		return ErrLoopbackAddr
+	if build.Release != "testing" && na.isLoopback() {
+		return errors.New("host is a loopback address")
 	}
 	return nil
 }

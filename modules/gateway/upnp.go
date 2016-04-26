@@ -41,7 +41,7 @@ func myExternalIP() (string, error) {
 // learnHostname discovers the external IP of the Gateway. Once the IP has
 // been discovered, it registers the ShareNodes RPC to be called on new
 // connections, advertising the IP to other nodes.
-func (g *Gateway) learnHostname() {
+func (g *Gateway) learnHostname(port string) {
 	if build.Release == "testing" {
 		return
 	}
@@ -62,7 +62,7 @@ func (g *Gateway) learnHostname() {
 	}
 
 	id := g.mu.Lock()
-	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
+	g.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
 	g.mu.Unlock(id)
 
 	g.log.Println("INFO: our address is", g.myAddr)

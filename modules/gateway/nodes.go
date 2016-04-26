@@ -75,7 +75,10 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	}
 	id := g.mu.Lock()
 	for _, node := range nodes {
-		g.addNode(node)
+		err := g.addNode(node)
+		if err != nil {
+			g.log.Printf("WARN: peer '%v' send the invalid addr '%v'", conn.RemoteAddr(), node)
+		}
 	}
 	g.save()
 	g.mu.Unlock(id)

@@ -25,8 +25,11 @@ func TestAddNode(t *testing.T) {
 	if err := g.addNode("foo"); err == nil {
 		t.Error("addNode added unroutable address")
 	}
-	if err := g.addNode("[::1]:9981"); err == nil {
-		t.Error("addNode added loopback address")
+	if err := g.addNode("foo:9981"); err == nil {
+		t.Error("addNode added a non-IP address")
+	}
+	if err := g.addNode("[::]:9981"); err == nil {
+		t.Error("addNode added unspecified address")
 	}
 }
 
@@ -50,24 +53,44 @@ func TestRandomNode(t *testing.T) {
 	g := newTestingGateway("TestRandomNode", t)
 	defer g.Close()
 
+	// Test with 0 nodes.
 	id := g.mu.RLock()
-	if addr, err := g.randomNode(); err != nil {
+	_, err := g.randomNode()
+	g.mu.RUnlock(id)
+	if err != errNoPeers {
+		t.Fatal("randomNode should fail when the gateway has 0 nodes")
+	}
+
+	// Test with 1 node.
+	id = g.mu.Lock()
+	if err = g.addNode(dummyNode); err != nil {
+		t.Fatal(err)
+	}
+	g.mu.Unlock(id)
+	id = g.mu.RLock()
+	addr, err := g.randomNode()
+	g.mu.RUnlock(id)
+	if err != nil {
 		t.Fatal("randomNode failed:", err)
-	} else if addr != g.Address() {
+	} else if addr != dummyNode {
 		t.Fatal("randomNode returned wrong address:", addr)
 	}
-	g.mu.RUnlock(id)
 
+	// Test again with 0 nodes.
 	id = g.mu.Lock()
-	g.removeNode(g.myAddr)
+	err = g.removeNode(dummyNode)
 	g.mu.Unlock(id)
-
+	if err != nil {
+		t.Fatal(err)
+	}
 	id = g.mu.RLock()
-	if _, err := g.randomNode(); err != errNoPeers {
+	_, err = g.randomNode()
+	g.mu.RUnlock(id)
+	if err != errNoPeers {
 		t.Fatalf("randomNode returned wrong error: expected %v, got %v", errNoPeers, err)
 	}
-	g.mu.RUnlock(id)
 
+	// Test with 3 nodes.
 	nodes := map[modules.NetAddress]int{
 		"111.111.111.111:1111": 0,
 		"111.111.111.111:2222": 0,
@@ -75,19 +98,22 @@ func TestRandomNode(t *testing.T) {
 	}
 	id = g.mu.Lock()
 	for addr := range nodes {
-		g.addNode(addr)
+		err := g.addNode(addr)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 	g.mu.Unlock(id)
 
-	id = g.mu.RLock()
 	for i := 0; i < len(nodes)*10; i++ {
+		id = g.mu.RLock()
 		addr, err := g.randomNode()
+		g.mu.RUnlock(id)
 		if err != nil {
 			t.Fatal("randomNode failed:", err)
 		}
 		nodes[addr]++
 	}
-	g.mu.RUnlock(id)
 	for node, count := range nodes {
 		if count == 0 { // 1-in-200000 chance of occuring naturally
 			t.Errorf("node %v was never selected", node)
@@ -169,12 +195,6 @@ func TestRelayNodes(t *testing.T) {
 	g3 := newTestingGateway("TestRelayNodes3", t)
 	defer g3.Close()
 
-	// overwrite g3's address with a non-loopback address;
-	// otherwise it will be rejected
-	id := g3.mu.Lock()
-	g3.myAddr = dummyNode
-	g3.mu.Unlock(id)
-
 	// normally the Gateway will only register this RPC if has discovered its
 	// IP through external means.
 	g3.RegisterConnectCall("RelayNode", g3.sendAddress)
@@ -193,7 +213,7 @@ func TestRelayNodes(t *testing.T) {
 
 	// g2 should have received g3's address from g1
 	time.Sleep(200 * time.Millisecond)
-	id = g2.mu.Lock()
+	id := g2.mu.Lock()
 	defer g2.mu.Unlock(id)
 	if _, ok := g2.nodes[g3.Address()]; !ok {
 		t.Fatal("node was not relayed:", g2.nodes)

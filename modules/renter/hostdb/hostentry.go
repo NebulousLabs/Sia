@@ -1,7 +1,6 @@
 package hostdb
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -23,10 +22,8 @@ type hostEntry struct {
 func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 	// Remove garbage hosts and local hosts (but allow local hosts in testing).
 	if err := host.NetAddress.IsValid(); err != nil {
-		// Allow loopback addresses in testing.
-		if build.Release != "testing" || err != modules.ErrLoopbackAddr {
-			return
-		}
+		hdb.log.Printf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
+		return
 	}
 	// Don't do anything if we've already seen this host.
 	if _, exists := hdb.allHosts[host.NetAddress]; exists {
