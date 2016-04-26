@@ -27,10 +27,10 @@ record, we advise against using it as a sole means of storing important data.
 
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon," that runs the Sia protocol, and siac is a client that is
-used to interact with siad. Siad exposes an API on 'localhost:9980' which can
-be used to interact with the daemon. There is a front-end program called Sia-UI
-which can be used to interact with the daemon in a more user-friendly way.
-Documentation on the API can be found in doc/API.md.
+used to interact with siad. Siad exposes an HTTP API on 'localhost:9980' which
+can be used to interact with the daemon. There is a front-end program called
+Sia-UI which can be used to interact with the daemon in a more user-friendly
+way. Documentation on the API can be found in doc/API.md.
 
 Usage
 -----
@@ -45,6 +45,27 @@ both boxes ("Private networks" and "Public networks") and click "Allow
 access." You can now run `siac` in a separate command prompt to interact with
 siad. From here, you can send money, mine blocks, upload and download
 files, and advertise yourself as a host.
+
+Building From Source
+--------------------
+
+To build from source, [Go 1.6 must be installed](https://golang.org/doc/install)
+on the system. Then simply use `go get`:
+
+```
+go get -u github.com/NebulousLabs/Sia/...
+```
+
+This will download the Sia repo to your `$GOPATH/src` folder, and install the
+`siad` and `siac` binaries in your `$GOPATH/bin` folder.
+
+To stay up-to-date, run the previous `go get` command again. Alternatively, you
+can use the Makefile provided in this repo. Run `git pull origin master` to
+pull the latest changes, and `make release-std` to build the new binaries. You
+can also run `make test` and `make test-long` to run the short and full test
+suites, respectively. Finally, `make cover` will generate code coverage reports
+for each package; they are stored in the `cover` folder and can be viewed in
+your browser.
 
 Troubleshooting
 ---------------
