@@ -5,7 +5,6 @@ all: install
 # dependencies installs all of the dependencies that are required for building
 # Sia.
 dependencies:
-	go install ./...
 	# Consensus Dependencies
 	go get -u github.com/NebulousLabs/demotemutex
 	go get -u github.com/NebulousLabs/ed25519
@@ -53,25 +52,19 @@ lint:
 		&& test -z $$(golint -min_confidence=1.0 $$package) ; \
 	done
 
-# REBUILD touches all of the build-dependent source files, forcing them to be
-# rebuilt. This is necessary because the go tool is not smart enough to trigger
-# a rebuild when build tags have been changed.
-REBUILD:
-	@touch build/*.go
-
 # install builds and installs developer binaries.
-install: REBUILD
+install:
 	go install -race -tags='dev debug profile' $(pkgs)
 
 # release builds and installs release binaries.
-release: REBUILD
+release:
 	go install -race -tags='debug profile' $(pkgs)
-release-std: REBUILD
+release-std:
 	go install $(pkgs)
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
-xc: dependencies test test-long REBUILD
+xc: dependencies test test-long
 	goxc -arch="386 amd64 arm" -bc="darwin linux windows" -d=release \
 	     -pv=v0.6.0 -br=rc1 -include=LICENSE,README.md,doc/API.md   \
 	     -tasks-=archive,rmbin,deb,deb-dev,deb-source,go-test -n=Sia
@@ -81,15 +74,15 @@ xc: dependencies test test-long REBUILD
 clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
-test: REBUILD
+test:
 	go test -short -tags='debug testing' -timeout=5s $(pkgs) -run=$(run)
-test-v: REBUILD
+test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
-test-long: clean fmt vet lint REBUILD
+test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=300s $(pkgs) -run=$(run)
-bench: clean fmt REBUILD
+bench: clean fmt
 	go test -tags='testing' -timeout=300s -run=XXX -bench=. $(pkgs)
-cover: clean REBUILD
+cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
@@ -97,7 +90,7 @@ cover: clean REBUILD
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
-cover-integration: clean REBUILD
+cover-integration: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
@@ -105,7 +98,7 @@ cover-integration: clean REBUILD
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
-cover-unit: clean REBUILD
+cover-unit: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@for package in $(pkgs); do                                                                                     \
@@ -120,4 +113,4 @@ whitepaper:
 	@pdflatex -output-directory=doc whitepaper.tex > /dev/null
 	pdflatex -output-directory=doc whitepaper.tex
 
-.PHONY: all dependencies fmt REBUILD install release release-std xc clean test test-v test-long cover cover-integration cover-unit whitepaper
+.PHONY: all dependencies fmt install release release-std xc clean test test-v test-long cover cover-integration cover-unit whitepaper
