@@ -1,11 +1,13 @@
 package main
 
 import (
-	"fmt"
+	"math/big"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
-func TestParseSize(t *testing.T) {
+func TestParseFilesize(t *testing.T) {
 	tests := []struct {
 		in, out string
 		err     error
@@ -33,9 +35,40 @@ func TestParseSize(t *testing.T) {
 		{"1.2345KB", "1234", nil},
 	}
 	for _, test := range tests {
-		res, err := parseSize(test.in)
+		res, err := parseFilesize(test.in)
 		if res != test.out || err != test.err {
-			t.Error(fmt.Sprintf("parseSize(%v): expected %v %v, got %v %v", test.in, test.out, test.err, res, err))
+			t.Errorf("parseFilesize(%v): expected %v %v, got %v %v", test.in, test.out, test.err, res, err)
+		}
+	}
+}
+
+func TestCurrencyUnits(t *testing.T) {
+	tests := []struct {
+		in, out string
+	}{
+		{"1", "1 H"},
+		{"1000", "1000 H"},
+		{"100000000000", "100000000000 H"},
+		{"1000000000000", "1 pS"},
+		{"1234560000000", "1.2346 pS"},
+		{"12345600000000", "12.346 pS"},
+		{"123456000000000", "123.46 pS"},
+		{"1000000000000000", "1 nS"},
+		{"1000000000000000000", "1 uS"},
+		{"1000000000000000000000", "1 mS"},
+		{"1000000000000000000000000", "1 SC"},
+		{"1000000000000000000000000000", "1 KS"},
+		{"1000000000000000000000000000000", "1 MS"},
+		{"1000000000000000000000000000000000", "1 GS"},
+		{"1000000000000000000000000000000000000", "1 TS"},
+		{"1234560000000000000000000000000000000", "1.2346 TS"},
+		{"1234560000000000000000000000000000000000", "1234.6 TS"},
+	}
+	for _, test := range tests {
+		i, _ := new(big.Int).SetString(test.in, 10)
+		out := currencyUnits(types.NewCurrency(i))
+		if out != test.out {
+			t.Errorf("currencyUnits(%v): expected %v, got %v", test.in, test.out, out)
 		}
 	}
 }
