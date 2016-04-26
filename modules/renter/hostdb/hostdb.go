@@ -105,7 +105,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*Ho
 
 	err = cs.ConsensusSetSubscribe(hdb, hdb.lastChange)
 	if err == modules.ErrInvalidConsensusChangeID {
-		hdb.lastChange = modules.ConsensusChangeID{}
+		hdb.lastChange = modules.ConsensusChangeBeginning
 		// clear the host sets
 		hdb.activeHosts = make(map[modules.NetAddress]*hostNode)
 		hdb.allHosts = make(map[modules.NetAddress]*hostEntry)

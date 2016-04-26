@@ -128,7 +128,7 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		return nil, err
 	}
 
-	err = cs.ConsensusSetSubscribe(e, modules.ConsensusChangeID{})
+	err = cs.ConsensusSetSubscribe(e, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return nil, errors.New("explorer subscription failed: " + err.Error())
 	}

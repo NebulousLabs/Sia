@@ -24,7 +24,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	// Add a mocked subscriber and check that it receives the correct number of
 	// blocks.
 	ms := newMockSubscriber()
-	cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeID{})
+	cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeBeginning)
 	if ms.updates[0].AppliedBlocks[0].ID() != cst.cs.blockRoot.Block.ID() {
 		t.Fatal("subscription did not correctly receive the genesis block")
 	}

@@ -130,7 +130,7 @@ func (m *Miner) startupRescan() error {
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the miner has fully caught up to the current block.
-	return m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeID{})
+	return m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeBeginning)
 }
 
 // New returns a ready-to-go miner that is not mining.

@@ -68,7 +68,7 @@ func TestUnitUnsubscribe(t *testing.T) {
 
 	// Subscribe the mock subscriber to the consensus set.
 	ms := newMockSubscriber()
-	err = cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeID{})
+	err = cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeBeginning)
 	if err != nil {
 		t.Fatal(err)
 	}
