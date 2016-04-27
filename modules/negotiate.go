@@ -134,7 +134,7 @@ var (
 	// PrefixHostAnnouncement is used to indicate that a transaction's
 	// Arbitrary Data field contains a host announcement. The encoded
 	// announcement will follow this prefix.
-	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', '2'}
+	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
 
 	// RPCDownload is the specifier for downloading a file from a host.
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
