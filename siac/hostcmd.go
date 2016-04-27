@@ -176,7 +176,7 @@ RPC Stats:
 	Revise Calls:       %v
 	Settings Calls:     %v
 	FormContract Calls: %v
-`, is.NetAddress, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
+`, nm.NetAddress, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls, nm.FormContractCalls)
 	}
 
