@@ -13,7 +13,7 @@ import (
 const (
 	// hashrateEstimationBlocks is the number of blocks that are used to
 	// estimate the current hashrate.
-	hashrateEstimationBlocks = 72 // 12 hours
+	hashrateEstimationBlocks = 200 // 33 hours
 )
 
 var (
