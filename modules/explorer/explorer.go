@@ -4,16 +4,16 @@ package explorer
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	// hashrateEstimationBlocks is the number of blocks that are used to
 	// estimate the current hashrate.
-	hashrateEstimationBlocks = 72 // 12 hours
+	hashrateEstimationBlocks = 200 // 33 hours
 )
 
 var (
@@ -25,73 +25,28 @@ type (
 	// revisions that have affected a file contract through the life of the
 	// blockchain.
 	fileContractHistory struct {
-		contract     types.FileContract
-		revisions    []types.FileContractRevision
-		storageProof types.StorageProof
+		Contract     types.FileContract
+		Revisions    []types.FileContractRevision
+		StorageProof types.StorageProof
 	}
 
-	// blockFacts contians a set of facts about the consensus set related to a
+	// blockFacts contains a set of facts about the consensus set related to a
 	// certain block. The explorer needs some additional information in the
 	// history so that it can calculate certain values, which is one of the
 	// reasons that the explorer uses a separate struct instead of
 	// modules.BlockFacts.
 	blockFacts struct {
-		// Block information.
-		currentBlock      types.BlockID
-		blockchainHeight  types.BlockHeight
-		target            types.Target
-		timestamp         types.Timestamp
-		maturityTimestamp types.Timestamp
-		estimatedHashrate types.Currency
-		totalCoins        types.Currency
+		modules.BlockFacts
 
-		// Transaction type counts.
-		minerPayoutCount          uint64
-		transactionCount          uint64
-		siacoinInputCount         uint64
-		siacoinOutputCount        uint64
-		fileContractCount         uint64
-		fileContractRevisionCount uint64
-		storageProofCount         uint64
-		siafundInputCount         uint64
-		siafundOutputCount        uint64
-		minerFeeCount             uint64
-		arbitraryDataCount        uint64
-		transactionSignatureCount uint64
-
-		// Factoids about file contracts.
-		activeContractCost  types.Currency
-		activeContractCount uint64
-		activeContractSize  types.Currency
-		totalContractCost   types.Currency
-		totalContractSize   types.Currency
-		totalRevisionVolume types.Currency
+		Timestamp types.Timestamp
 	}
 
-	// Basic structure to store the blockchain. Metadata may also be
-	// stored here in the future
+	// An Explorer contains a more comprehensive view of the blockchain,
+	// including various statistics and metrics.
 	Explorer struct {
-		// Stat tracking information.
-		blocksDifficulty      types.Target // cumulative difficulty from the past hashrateEstimationDepth blocks.
-		blockHashes           map[types.BlockID]types.BlockHeight
-		blockTargets          map[types.BlockID]types.Target
-		transactionHashes     map[types.TransactionID]types.BlockHeight
-		unlockHashes          map[types.UnlockHash]map[types.TransactionID]struct{} // sometimes, 'txnID' is a block.
-		siacoinOutputIDs      map[types.SiacoinOutputID]map[types.TransactionID]struct{}
-		siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
-		fileContractIDs       map[types.FileContractID]map[types.TransactionID]struct{}
-		fileContractHistories map[types.FileContractID]*fileContractHistory
-		siafundOutputIDs      map[types.SiafundOutputID]map[types.TransactionID]struct{}
-		siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
-
-		// Utilities.
 		cs         modules.ConsensusSet
+		db         *persist.BoltDatabase
 		persistDir string
-		mu         sync.RWMutex
-
-		// Factoids about the current block.
-		historicFacts []blockFacts
-		blockFacts
 	}
 )
 
@@ -105,22 +60,9 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 	// Initialize the explorer.
 	e := &Explorer{
-		blocksDifficulty:      types.RootDepth,
-		blockHashes:           make(map[types.BlockID]types.BlockHeight),
-		blockTargets:          make(map[types.BlockID]types.Target),
-		transactionHashes:     make(map[types.TransactionID]types.BlockHeight),
-		unlockHashes:          make(map[types.UnlockHash]map[types.TransactionID]struct{}),
-		siacoinOutputIDs:      make(map[types.SiacoinOutputID]map[types.TransactionID]struct{}),
-		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		fileContractIDs:       make(map[types.FileContractID]map[types.TransactionID]struct{}),
-		fileContractHistories: make(map[types.FileContractID]*fileContractHistory),
-		siafundOutputIDs:      make(map[types.SiafundOutputID]map[types.TransactionID]struct{}),
-		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
-
 		cs:         cs,
 		persistDir: persistDir,
 	}
-	e.blockchainHeight-- // Set to -1 so the genesis block sets the height to 0.
 
 	// Intialize the persistent structures, including the database.
 	err := e.initPersist()
@@ -128,8 +70,16 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		return nil, err
 	}
 
-	err = cs.ConsensusSetSubscribe(e, modules.ConsensusChangeBeginning)
+	// retrieve the current ConsensusChangeID
+	var recentChange modules.ConsensusChangeID
+	err = e.db.View(dbGetInternal(internalRecentChange, &recentChange))
 	if err != nil {
+		return nil, err
+	}
+
+	err = cs.ConsensusSetSubscribe(e, recentChange)
+	if err != nil {
+		// TODO: restart from 0
 		return nil, errors.New("explorer subscription failed: " + err.Error())
 	}
 
@@ -138,5 +88,5 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 
 // Close closes the explorer.
 func (e *Explorer) Close() error {
-	return nil
+	return e.db.Close()
 }
