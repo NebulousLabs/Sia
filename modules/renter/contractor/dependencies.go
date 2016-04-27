@@ -60,10 +60,6 @@ type (
 		saveSync(contractorPersist) error
 		load(*contractorPersist) error
 	}
-
-	logger interface {
-		Println(...interface{})
-	}
 )
 
 // because wallet is not directly compatible with modules.Wallet (wrong
@@ -110,9 +106,4 @@ func newPersist(dir string) *stdPersist {
 		},
 		filename: filepath.Join(dir, "contractor.json"),
 	}
-}
-
-// newLogger creates a persist.Logger with the standard filename.
-func newLogger(dir string) (*persist.Logger, error) {
-	return persist.NewFileLogger(filepath.Join(dir, "contractor.log"))
 }

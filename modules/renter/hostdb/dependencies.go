@@ -29,10 +29,6 @@ type (
 		saveSync(hdbPersist) error
 		load(*hdbPersist) error
 	}
-
-	logger interface {
-		Println(...interface{})
-	}
 )
 
 // stdDialer implements the dialer interface via net.DialTimeout.
@@ -75,9 +71,4 @@ func newPersist(dir string) *stdPersist {
 		},
 		filename: filepath.Join(dir, "hostdb.json"),
 	}
-}
-
-// newLogger creates a persist.Logger with the standard filename.
-func newLogger(dir string) (*persist.Logger, error) {
-	return persist.NewFileLogger(filepath.Join(dir, "hostdb.log"))
 }
