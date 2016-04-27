@@ -94,7 +94,7 @@ func StartContinuousProfile(profileDir string) {
 	// Continuously log statistics about the running Sia application.
 	go func() {
 		// Create the logger.
-		log, err := persist.NewLogger(filepath.Join(profileDir, "continuousProfiling.log"))
+		log, err := persist.NewFileLogger(filepath.Join(profileDir, "continuousProfiling.log"))
 		if err != nil {
 			fmt.Println("Profile logging failed:", err)
 			return

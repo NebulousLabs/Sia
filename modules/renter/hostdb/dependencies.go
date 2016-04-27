@@ -79,5 +79,5 @@ func newPersist(dir string) *stdPersist {
 
 // newLogger creates a persist.Logger with the standard filename.
 func newLogger(dir string) (*persist.Logger, error) {
-	return persist.NewLogger(filepath.Join(dir, "hostdb.log"))
+	return persist.NewFileLogger(filepath.Join(dir, "hostdb.log"))
 }

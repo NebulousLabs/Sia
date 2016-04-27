@@ -109,7 +109,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Create the logger.
-	g.log, err = persist.NewLogger(filepath.Join(g.persistDir, logFile))
+	g.log, err = persist.NewFileLogger(filepath.Join(g.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
