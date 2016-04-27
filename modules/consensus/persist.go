@@ -63,7 +63,7 @@ func (cs *ConsensusSet) initPersist() error {
 	}
 
 	// Initialize the logger.
-	cs.log, err = persist.NewLogger(filepath.Join(cs.persistDir, logFile))
+	cs.log, err = persist.NewFileLogger(filepath.Join(cs.persistDir, logFile))
 	if err != nil {
 		return err
 	}

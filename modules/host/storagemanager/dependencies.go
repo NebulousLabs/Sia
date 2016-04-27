@@ -103,7 +103,7 @@ func (productionDependencies) mkdirAll(s string, fm os.FileMode) error {
 // newLogger creates a logger that the host can use to log messages and write
 // critical statements.
 func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
-	return persist.NewLogger(s)
+	return persist.NewFileLogger(s)
 }
 
 // openDatabase creates a database that the host can use to interact with large

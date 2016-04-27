@@ -3,10 +3,12 @@ package contractor
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -35,7 +37,7 @@ type Contractor struct {
 	// dependencies
 	dialer  dialer
 	hdb     hostDB
-	log     logger
+	log     *persist.Logger
 	persist persister
 	tpool   transactionPool
 	wallet  wallet
@@ -141,7 +143,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 		return nil, err
 	}
 	// Create the logger.
-	logger, err := newLogger(persistDir)
+	logger, err := persist.NewFileLogger(filepath.Join(persistDir, "contractor.log"))
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +153,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 }
 
 // newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d dialer, p persister, l logger) (*Contractor, error) {
+func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d dialer, p persister, l *persist.Logger) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
 		dialer:  d,

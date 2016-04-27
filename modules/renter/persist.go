@@ -406,7 +406,7 @@ func (r *Renter) initPersist() error {
 	}
 
 	// Initialize the logger.
-	r.log, err = persist.NewLogger(filepath.Join(r.persistDir, logFile))
+	r.log, err = persist.NewFileLogger(filepath.Join(r.persistDir, logFile))
 	if err != nil {
 		return err
 	}

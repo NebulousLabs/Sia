@@ -7,9 +7,11 @@ package hostdb
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -30,7 +32,7 @@ var (
 type HostDB struct {
 	// dependencies
 	dialer  dialer
-	log     logger
+	log     *persist.Logger
 	persist persister
 	sleeper sleeper
 
@@ -71,7 +73,7 @@ func New(cs consensusSet, persistDir string) (*HostDB, error) {
 		return nil, err
 	}
 	// Create the logger.
-	logger, err := newLogger(persistDir)
+	logger, err := persist.NewFileLogger(filepath.Join(persistDir, "hostdb.log"))
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +85,7 @@ func New(cs consensusSet, persistDir string) (*HostDB, error) {
 // newHostDB creates a HostDB using the provided dependencies. It loads the old
 // persistence data, spawns the HostDB's scanning threads, and subscribes it to
 // the consensusSet.
-func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l logger) (*HostDB, error) {
+func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Logger) (*HostDB, error) {
 	// Create the HostDB object.
 	hdb := &HostDB{
 		dialer:  d,

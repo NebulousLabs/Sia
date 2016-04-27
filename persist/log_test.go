@@ -22,7 +22,7 @@ func TestLogger(t *testing.T) {
 
 	// Create the logger.
 	logFilename := filepath.Join(testdir, "test.log")
-	fl, err := NewLogger(logFilename)
+	fl, err := NewFileLogger(logFilename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestLoggerCritical(t *testing.T) {
 
 	// Create the logger.
 	logFilename := filepath.Join(testdir, "test.log")
-	fl, err := NewLogger(logFilename)
+	fl, err := NewFileLogger(logFilename)
 	if err != nil {
 		t.Fatal(err)
 	}
