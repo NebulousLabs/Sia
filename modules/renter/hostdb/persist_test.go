@@ -2,10 +2,10 @@ package hostdb
 
 import (
 	"crypto/rand"
-	"github.com/NebulousLabs/Sia/types"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // memPersist implements the persister interface in-memory.
@@ -151,7 +151,7 @@ func TestRescan(t *testing.T) {
 	// Reload the hostdb using the same persist and the mocked consensus set.
 	// The old change ID will be rejected, causing a rescan, which should
 	// discover the new announcement.
-	hdb, err = newHostDB(cs, stdDialer{}, stdSleeper{}, hdb.persist, nil)
+	hdb, err = newHostDB(cs, stdDialer{}, stdSleeper{}, hdb.persist, hdb.log)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -83,6 +83,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHosts() {
 	for hostEntry := range hdb.scanPool {
 		// Request settings from the queued host entry.
+		hdb.log.Debugln("Scanning", hostEntry.NetAddress)
 		var settings modules.HostExternalSettings
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
@@ -98,6 +99,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			copy(pubkey[:], hostEntry.PublicKey.Key)
 			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
+		if err != nil {
+			hdb.log.Debugln("Scanning", hostEntry.NetAddress, "failed", err)
+		}
 
 		// Now that network communication is done, lock the hostdb to modify the
 		// host entry.
@@ -153,11 +157,9 @@ func (hdb *HostDB) threadedScan() {
 			// Assemble all of the inactive hosts into a single array.
 			var entries []*hostEntry
 			for _, entry := range hdb.allHosts {
-				entry2, exists := hdb.activeHosts[entry.NetAddress]
+				_, exists := hdb.activeHosts[entry.NetAddress]
 				if !exists {
 					entries = append(entries, entry)
-				} else if entry2.hostEntry != entry {
-					build.Critical("allHosts + activeHosts mismatch!")
 				}
 			}
 
@@ -191,6 +193,6 @@ func (hdb *HostDB) threadedScan() {
 			defaultBig := big.NewInt(int64(defaultScanSleep))
 			randSleep = defaultBig.Sub(defaultBig, minBig)
 		}
-		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + minScanSleep) // this means the maxScanSleep is actual Max+Min.
+		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + minScanSleep)
 	}
 }

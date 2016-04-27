@@ -42,6 +42,7 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Add hosts announced in blocks that were applied.
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
+			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey.Key)
 			hdb.insertHost(host)
 		}
 	}
