@@ -3,15 +3,28 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var errUnableToParseSize = errors.New("unable to parse size")
 
-// parseSize converts strings of form 10GB to a size in bytes. Fractional sizes
-// are truncated at the byte size. If parsing fails an error is returned.
-func parseSize(strSize string) (string, error) {
+// filesize returns a string that displays a filesize in human-readable units.
+func filesizeUnits(size int64) string {
+	if size == 0 {
+		return "0 B"
+	}
+	sizes := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
+	i := int(math.Log10(float64(size)) / 3)
+	return fmt.Sprintf("%.*f %s", i, float64(size)/math.Pow10(3*i), sizes[i])
+}
+
+// parseFilesize converts strings of form 10GB to a size in bytes. Fractional
+// sizes are truncated at the byte size.
+func parseFilesize(strSize string) (string, error) {
 	units := []struct {
 		suffix     string
 		multiplier int64
@@ -47,8 +60,37 @@ func parseSize(strSize string) (string, error) {
 	return "", errUnableToParseSize
 }
 
-// coinUnits converts a siacoin amount to base units.
-func coinUnits(amount string) (string, error) {
+// currencyUnits converts a types.Currency to a string with human-readable
+// units. The unit used will be the largest unit that results in a value
+// greater than 1. The value is rounded to 4 significant digits.
+func currencyUnits(c types.Currency) string {
+	pico := types.SiacoinPrecision.Div(types.NewCurrency64(1e12))
+	if c.Cmp(pico) < 0 {
+		return c.String() + " H"
+	}
+
+	// iterate until we find a unit greater than c
+	mag := pico
+	unit := ""
+	for _, unit = range []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"} {
+		if c.Cmp(mag.Mul(types.NewCurrency64(1e3))) < 0 {
+			break
+		} else if unit != "TS" {
+			// don't want to perform this multiply on the last iter; that
+			// would give us 1.235 TS instead of 1235 TS
+			mag = mag.Mul(types.NewCurrency64(1e3))
+		}
+	}
+
+	num := new(big.Rat).SetInt(c.Big())
+	denom := new(big.Rat).SetInt(mag.Big())
+	res, _ := new(big.Rat).Mul(num, denom.Inv(denom)).Float64()
+
+	return fmt.Sprintf("%.4g %s", res, unit)
+}
+
+// parseCurrency converts a siacoin amount to base units.
+func parseCurrency(amount string) (string, error) {
 	units := []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"}
 	for i, unit := range units {
 		if strings.HasSuffix(amount, unit) {

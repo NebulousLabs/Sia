@@ -142,6 +142,7 @@ func hostcmd() {
 	if err != nil {
 		price = ^uint64(0)
 	}
+	// calculate total revenue
 	totalRevenue := fm.ContractCompensation.
 		Add(fm.StorageRevenue).
 		Add(fm.DownloadBandwidthRevenue).
@@ -159,11 +160,21 @@ func hostcmd() {
 	Anticipated Revenue: %v
 	Revenue:             %v
 	Lost Revenue:        %v
+	Lost Collateral:     %v
 `, filesizeUnits(int64(totalstorage)), filesizeUnits(int64(totalstorage-storageremaining)),
-		price, is.MaxDuration, accept, totalPotentialRevenue, totalRevenue, fm.LostRevenue)
+		price, is.MaxDuration, accept, currencyUnits(totalPotentialRevenue),
+		currencyUnits(totalRevenue), currencyUnits(fm.LostRevenue),
+		currencyUnits(fm.LostStorageCollateral))
 
 	// display more info if verbose flag is set
 	if hostVerbose {
+		// describe net address
+		netaddr := nm.NetAddress
+		if is.NetAddress == "" {
+			netaddr += " (automatically determined)"
+		} else {
+			netaddr += " (manually specified)"
+		}
 		fmt.Printf(`
 	Net Address: %v
 
@@ -175,7 +186,7 @@ RPC Stats:
 	Revise Calls:       %v
 	Settings Calls:     %v
 	FormContract Calls: %v
-`, is.NetAddress, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
+`, netaddr, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls, nm.FormContractCalls)
 	}
 
@@ -202,7 +213,7 @@ func hostconfigcmd(param, value string) {
 	switch param {
 	// currency (convert to hastings)
 	case "collateralbudget", "maxcollateral", "minimumcontractprice":
-		hastings, err := coinUnits(value)
+		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
 		}
@@ -210,7 +221,7 @@ func hostconfigcmd(param, value string) {
 
 	// currency/TB (convert to hastings/byte)
 	case "collateral", "minimumdownloadbandwidthprice", "minimumuploadbandwidthprice":
-		hastings, err := coinUnits(value)
+		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
 		}
@@ -220,7 +231,7 @@ func hostconfigcmd(param, value string) {
 
 	// currency/TB/month (convert to hastings/byte/block)
 	case "minimumstorageprice":
-		hastings, err := coinUnits(value)
+		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
 		}
@@ -265,7 +276,7 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 
 // hostfolderaddcmd adds a folder to the host.
 func hostfolderaddcmd(path, size string) {
-	size, err := parseSize(size)
+	size, err := parseFilesize(size)
 	if err != nil {
 		die("Could not parse size:", err)
 	}
@@ -287,7 +298,7 @@ func hostfolderremovecmd(path string) {
 
 // hostfolderresizecmd resizes a folder in the host.
 func hostfolderresizecmd(path, newsize string) {
-	newsize, err := parseSize(newsize)
+	newsize, err := parseFilesize(newsize)
 	if err != nil {
 		die("Could not parse size:", err)
 	}

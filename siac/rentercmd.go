@@ -16,16 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// filesize returns a string that displays a filesize in human-readable units.
-func filesizeUnits(size int64) string {
-	if size == 0 {
-		return "0 B"
-	}
-	sizes := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
-	i := int(math.Log10(float64(size)) / 3)
-	return fmt.Sprintf("%.*f %s", i, float64(size)/math.Pow10(3*i), sizes[i])
-}
-
 var (
 	renterCmd = &cobra.Command{
 		Use:   "renter",
@@ -241,11 +231,11 @@ func renterallowancecmd() {
 
 // rentersetallowancecmd allows the user to set the allowance.
 func rentersetallowancecmd(amount, period string) {
-	adjAmount, err := coinUnits(amount)
+	hastings, err := parseCurrency(amount)
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	err = post("/renter/allowance", fmt.Sprintf("funds=%s&period=%s", adjAmount, period))
+	err = post("/renter/allowance", fmt.Sprintf("funds=%s&period=%s", hastings, period))
 	if err != nil {
 		die("Could not set allowance:", err)
 	}

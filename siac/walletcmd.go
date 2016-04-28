@@ -263,15 +263,15 @@ func walletseedscmd() {
 
 // walletsendsiacoinscmd sends siacoins to a destination address.
 func walletsendsiacoinscmd(amount, dest string) {
-	adjAmount, err := coinUnits(amount)
+	hastings, err := parseCurrency(amount)
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
+	err = post("/wallet/siacoins", fmt.Sprintf("amount=%s&destination=%s", hastings, dest))
 	if err != nil {
 		die("Could not send siacoins:", err)
 	}
-	fmt.Printf("Sent %s hastings to %s\n", adjAmount, dest)
+	fmt.Printf("Sent %s hastings to %s\n", hastings, dest)
 }
 
 // walletsendsiafundscmd sends siafunds to a destination address.
