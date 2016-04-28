@@ -41,11 +41,11 @@ func (hdb *HostDB) load() error {
 	if err != nil {
 		return err
 	}
-	for _, entry := range data.AllHosts {
-		hdb.allHosts[entry.NetAddress] = &entry
+	for i := range data.AllHosts {
+		hdb.allHosts[data.AllHosts[i].NetAddress] = &data.AllHosts[i]
 	}
-	for _, entry := range data.ActiveHosts {
-		hdb.insertNode(&entry)
+	for i := range data.ActiveHosts {
+		hdb.insertNode(&data.AllHosts[i])
 	}
 	hdb.lastChange = data.LastChange
 	return nil
