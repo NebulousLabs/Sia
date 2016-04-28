@@ -75,7 +75,7 @@ var (
 	// file contract opens too soon into the future - the host needs time to
 	// submit the file contract and all revisions to the blockchain before the
 	// storage proof window opens.
-	errWindowStartTooSoon = errors.New("the storage proof window is opening to soon")
+	errWindowStartTooSoon = errors.New("the storage proof window is opening too soon")
 )
 
 // contractCollateral returns the amount of collateral that the host is
@@ -363,6 +363,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	// WindowStart must be at least revisionSubmissionBuffer blocks into the
 	// future.
 	if fc.WindowStart <= blockHeight+revisionSubmissionBuffer {
+		h.log.Debugf("A renter tried to form a contract that had a window start which was too soon. The contract started at %v, the current height is %v, the revisionSubmissionBuffer is %v, and the comparison was %v <= %v\n", fc.WindowStart, blockHeight, revisionSubmissionBuffer, fc.WindowStart, blockHeight+revisionSubmissionBuffer)
 		return errWindowStartTooSoon
 	}
 	// WindowEnd must be at least settings.WindowSize blocks after

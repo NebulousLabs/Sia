@@ -4,6 +4,16 @@
 // set of hosts it has found and updates who is online.
 package hostdb
 
+// TODO: There should be some mechanism that detects if the number of active
+// hosts is low. Then either the user can be informed, or the hostdb can start
+// scanning hosts that have been offline for a while and are no longer
+// prioritized by the scan loop.
+
+// TODO: There should be some mechanism for detecting if the hostdb cannot
+// connect to the internet. If it cannot, hosts should not be penalized for
+// appearing to be offline, because they may not actually be offline and it'll
+// unfairly over-penalize the hosts with the highest uptime.
+
 import (
 	"errors"
 	"os"
