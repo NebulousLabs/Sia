@@ -142,6 +142,7 @@ func hostcmd() {
 	if err != nil {
 		price = ^uint64(0)
 	}
+	// calculate total revenue
 	totalRevenue := fm.ContractCompensation.
 		Add(fm.StorageRevenue).
 		Add(fm.DownloadBandwidthRevenue).
@@ -167,6 +168,13 @@ func hostcmd() {
 
 	// display more info if verbose flag is set
 	if hostVerbose {
+		// describe net address
+		netaddr := nm.NetAddress
+		if is.NetAddress == "" {
+			netaddr += " (automatically determined)"
+		} else {
+			netaddr += " (manually specified)"
+		}
 		fmt.Printf(`
 	Net Address: %v
 
@@ -178,7 +186,7 @@ RPC Stats:
 	Revise Calls:       %v
 	Settings Calls:     %v
 	FormContract Calls: %v
-`, nm.NetAddress, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
+`, netaddr, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
 			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls, nm.FormContractCalls)
 	}
 
