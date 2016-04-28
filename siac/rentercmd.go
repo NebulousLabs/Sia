@@ -245,7 +245,7 @@ func rentersetallowancecmd(amount, period string) {
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	err = post("/renter/allowance", fmt.Sprintf("amount=%s&period=%s", adjAmount, period))
+	err = post("/renter/allowance", fmt.Sprintf("funds=%s&period=%s", adjAmount, period))
 	if err != nil {
 		die("Could not set allowance:", err)
 	}
