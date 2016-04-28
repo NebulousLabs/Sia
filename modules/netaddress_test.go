@@ -28,33 +28,41 @@ var (
 		":foo",
 		":世界",
 		// Invalid host / port chars
-		" foo:bar",
-		"foo :bar",
-		"f oo:bar",
-		"foo: bar",
-		"foo:bar ",
-		"foo:b ar",
-		"\x00:bar",
+		"foo:{}",
+		"{}:123",
+		" foo:123",
+		"foo :123",
+		"f oo:123",
+		"foo: 123",
+		"foo:123 ",
+		"foo:1 23",
+		"\x00:123",
 		"foo:\x00",
+		"世界:123",
+		"bar:世界",
+		"世:界",
+		`":"`,
 		// Unspecified address
 		"[::]:bar",
 		"0.0.0.0:bar",
+		// invalid port numbers
+		"foo:0",
+		"foo:65536",
+		"foo:-100",
+		"foo:1000000",
 	}
 	validAddrs = []string{
 		// Loopback address (valid in testing only, can't really test this well)
-		"localhost:bar",
-		"127.0.0.1:bar",
-		"[::1]:bar",
+		"localhost:123",
+		"127.0.0.1:123",
+		"[::1]:123",
 		// Valid addresses.
-		"foo:bar",
+		"foo:1",
+		"FOO:1",
 		"hn.com:8811",
-		"[::2]:bar",
+		"[::2]:65535",
 		"111.111.111.111:111",
 		"12.34.45.64:7777",
-		"世界:bar",
-		"bar:世界",
-		"世:界",
-		`":"`, // yeah, okay
 	}
 )
 
@@ -141,13 +149,13 @@ func TestIsValid(t *testing.T) {
 	for _, addr := range validAddrs {
 		na := NetAddress(addr)
 		if err := na.IsValid(); err != nil {
-			t.Error("IsValid returned non-nil for a valid NetAddress:", err)
+			t.Errorf("IsValid returned non-nil for valid NetAddress %q: %v", addr, err)
 		}
 	}
 	for _, addr := range invalidAddrs {
 		na := NetAddress(addr)
 		if err := na.IsValid(); err == nil {
-			t.Error("IsValid returned nil for an invalid NetAddress")
+			t.Errorf("IsValid returned nil for an invalid NetAddress %q: %v", addr, err)
 		}
 	}
 }
