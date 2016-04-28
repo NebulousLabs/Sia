@@ -72,10 +72,8 @@ func (hn *hostNode) nodeAtWeight(weight types.Currency) (*hostNode, error) {
 	}
 
 	// Sanity check
-	if build.DEBUG {
-		if !hn.taken {
-			panic("should not be returning a nil entry")
-		}
+	if build.DEBUG && !hn.taken {
+		build.Critical("nodeAtWeight should not be returning a nil entry")
 	}
 
 	// Return the root entry.

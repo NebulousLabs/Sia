@@ -47,14 +47,15 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
-	delete(hdb.allHosts, addr)
-
 	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
 		delete(hdb.activeHosts, addr)
 		node.removeNode()
 	}
+
+	// Remove the node from all hosts.
+	delete(hdb.allHosts, addr)
 
 	return nil
 }
@@ -111,8 +112,9 @@ func (hdb *HostDB) AveragePrice() types.Currency {
 }
 
 // IsOffline reports whether a host is offline. If the HostDB has no record of
-// the host, IsOffline will return false and spawn a goroutine to the scan the
-// host.
+// the host, IsOffline will return false.
+//
+// TODO: Is this behavior that makes sense?
 func (hdb *HostDB) IsOffline(addr modules.NetAddress) bool {
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()

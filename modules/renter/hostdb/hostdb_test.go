@@ -1,18 +1,22 @@
 package hostdb
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 // bareHostDB returns a HostDB with its fields initialized, but without any
 // dependencies or scanning threads. It is only intended for use in unit tests.
 func bareHostDB() *HostDB {
 	return &HostDB{
+		log: persist.NewLogger(ioutil.Discard),
+
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
