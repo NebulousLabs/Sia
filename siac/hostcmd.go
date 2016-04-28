@@ -159,9 +159,11 @@ func hostcmd() {
 	Anticipated Revenue: %v
 	Revenue:             %v
 	Lost Revenue:        %v
+	Lost Collateral:     %v
 `, filesizeUnits(int64(totalstorage)), filesizeUnits(int64(totalstorage-storageremaining)),
 		price, is.MaxDuration, accept, currencyUnits(totalPotentialRevenue),
-		currencyUnits(totalRevenue), currencyUnits(fm.LostRevenue))
+		currencyUnits(totalRevenue), currencyUnits(fm.LostRevenue),
+		currencyUnits(fm.LostStorageCollateral))
 
 	// display more info if verbose flag is set
 	if hostVerbose {
