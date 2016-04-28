@@ -8,6 +8,7 @@ import (
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
 	Allowance   modules.Allowance
+	BlockHeight types.BlockHeight
 	Contracts   []Contract
 	LastChange  modules.ConsensusChangeID
 	RenewHeight types.BlockHeight
@@ -19,6 +20,7 @@ type contractorPersist struct {
 func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
 		Allowance:   c.allowance,
+		BlockHeight: c.blockHeight,
 		LastChange:  c.lastChange,
 		RenewHeight: c.renewHeight,
 		SpentPeriod: c.spentPeriod,
@@ -38,6 +40,7 @@ func (c *Contractor) load() error {
 		return err
 	}
 	c.allowance = data.Allowance
+	c.blockHeight = data.BlockHeight
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
 	}
