@@ -62,7 +62,7 @@ func parseFilesize(strSize string) (string, error) {
 
 // currencyUnits converts a types.Currency to a string with human-readable
 // units. The unit used will be the largest unit that results in a value
-// greater than 1. The value is rounded to 3 decimal places.
+// greater than 1. The value is rounded to 4 significant digits.
 func currencyUnits(c types.Currency) string {
 	pico := types.SiacoinPrecision.Div(types.NewCurrency64(1e12))
 	if c.Cmp(pico) < 0 {
@@ -77,7 +77,7 @@ func currencyUnits(c types.Currency) string {
 			break
 		} else if unit != "TS" {
 			// don't want to perform this multiply on the last iter; that
-			// would give us 1.2345 TB instead of 1234.5 TB
+			// would give us 1.235 TS instead of 1235 TS
 			mag = mag.Mul(types.NewCurrency64(1e3))
 		}
 	}
@@ -86,7 +86,7 @@ func currencyUnits(c types.Currency) string {
 	denom := new(big.Rat).SetInt(mag.Big())
 	res, _ := new(big.Rat).Mul(num, denom.Inv(denom)).Float64()
 
-	return fmt.Sprintf("%.5g %s", res, unit)
+	return fmt.Sprintf("%.4g %s", res, unit)
 }
 
 // parseCurrency converts a siacoin amount to base units.
