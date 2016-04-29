@@ -61,8 +61,14 @@ func (g *Gateway) learnHostname(port string) {
 		return
 	}
 
+	addr := modules.NetAddress(net.JoinHostPort(host, port))
+	if err := addr.IsValid(); err != nil {
+		g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
+		return
+	}
+
 	id := g.mu.Lock()
-	g.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
+	g.myAddr = addr
 	g.mu.Unlock(id)
 
 	g.log.Println("INFO: our address is", g.myAddr)

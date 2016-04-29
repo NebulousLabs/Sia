@@ -66,7 +66,7 @@ func (h *Host) managedLearnHostname() {
 	defer h.mu.Unlock()
 	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, h.port))
 	if err := autoAddress.IsValid(); err != nil {
-		h.log.Printf("WARN: discovered net address '%v' is invalid: %v", autoAddress, err)
+		h.log.Printf("WARN: discovered hostname %q is invalid: %v", autoAddress, err)
 		return
 	}
 	if autoAddress == h.autoAddress && h.announced {
