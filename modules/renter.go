@@ -65,12 +65,27 @@ type DownloadInfo struct {
 }
 
 // An Allowance dictates how much the Renter is allowed to spend in a given
-// period.
+// period. Note that funds are spent on both storage and bandwidth.
 type Allowance struct {
 	Funds       types.Currency    `json:"funds"`
 	Hosts       uint64            `json:"hosts"`
 	Period      types.BlockHeight `json:"period"`
 	RenewWindow types.BlockHeight `json:"renewwindow"`
+}
+
+// RenterFinancialMetrics contains metrics about how much the Renter has
+// spent on storage, uploads, and downloads.
+type RenterFinancialMetrics struct {
+	// ContractSpending is how much the Renter has paid into file contracts
+	// formed with hosts. Note that some of this money may be returned to the
+	// Renter when the contract ends. To calculate how much will be returned,
+	// subtract the storage, upload, and download metrics from
+	// ContractSpending.
+	ContractSpending types.Currency `json:"contractspending"`
+
+	DownloadSpending types.Currency `json:"downloadspending"`
+	StorageSpending  types.Currency `json:"storagespending"`
+	UploadSpending   types.Currency `json:"uploadspending"`
 }
 
 // A HostDBEntry represents one host entry in the Renter's host DB. It
@@ -104,6 +119,9 @@ type Renter interface {
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo
+
+	// FinancialMetrics returns the financial metrics of the Renter.
+	FinancialMetrics() RenterFinancialMetrics
 
 	// LoadSharedFiles loads a '.sia' file into the renter. A .sia file may
 	// contain multiple files. The paths of the added files are returned.

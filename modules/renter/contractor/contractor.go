@@ -48,8 +48,11 @@ type Contractor struct {
 	contracts     map[types.FileContractID]Contract
 	lastChange    modules.ConsensusChangeID
 	renewHeight   types.BlockHeight // height at which to renew contracts
-	spentPeriod   types.Currency    // number of coins spent on file contracts this period
-	spentTotal    types.Currency    // number of coins spent on file contracts ever
+
+	// metrics
+	downloadSpending types.Currency
+	storageSpending  types.Currency
+	uploadSpending   types.Currency
 
 	mu sync.RWMutex
 }
@@ -61,11 +64,21 @@ func (c *Contractor) Allowance() modules.Allowance {
 	return c.allowance
 }
 
-// Spending returns the number of coins spent on file contracts.
-func (c *Contractor) Spending() (period, total types.Currency) {
+// FinancialMetrics returns the financial metrics of the Contractor.
+func (c *Contractor) FinancialMetrics() modules.RenterFinancialMetrics {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.spentPeriod, c.spentTotal
+	// calculate contract spending
+	var contractSpending types.Currency
+	for _, contract := range c.contracts {
+		contractSpending = contractSpending.Add(contract.FileContract.Payout)
+	}
+	return modules.RenterFinancialMetrics{
+		ContractSpending: contractSpending,
+		DownloadSpending: c.downloadSpending,
+		StorageSpending:  c.storageSpending,
+		UploadSpending:   c.uploadSpending,
+	}
 }
 
 // SetAllowance sets the amount of money the Contractor is allowed to spend on

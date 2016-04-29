@@ -170,6 +170,13 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 		return crypto.Hash{}, err
 	}
 
+	// update spending metrics
+	he.contractor.mu.Lock()
+	he.contractor.storageSpending = he.contractor.storageSpending.Add(sectorStoragePrice)
+	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(sectorBandwidthPrice)
+	he.contractor.save()
+	he.contractor.mu.Unlock()
+
 	return sectorRoot, nil
 }
 
@@ -265,6 +272,12 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	if err := he.runRevisionIteration(actions, rev, newRoots, height); err != nil {
 		return err
 	}
+
+	// update spending metrics
+	he.contractor.mu.Lock()
+	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(sectorPrice)
+	he.contractor.save()
+	he.contractor.mu.Unlock()
 
 	return nil
 }

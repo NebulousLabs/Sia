@@ -45,6 +45,9 @@ type hostContractor interface {
 	// modified.
 	Editor(contractor.Contract) (contractor.Editor, error)
 
+	// FinancialMetrics returns the financial metrics of the contractor.
+	FinancialMetrics() modules.RenterFinancialMetrics
+
 	// Downloader creates a Downloader from the specified contract, allowing
 	// the retrieval of sectors.
 	Downloader(contractor.Contract) (contractor.Downloader, error)
@@ -122,6 +125,9 @@ func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts(
 // contractor passthroughs
 func (r *Renter) Allowance() modules.Allowance           { return r.hostContractor.Allowance() }
 func (r *Renter) SetAllowance(a modules.Allowance) error { return r.hostContractor.SetAllowance(a) }
+func (r *Renter) FinancialMetrics() modules.RenterFinancialMetrics {
+	return r.hostContractor.FinancialMetrics()
+}
 
 // enforce that Renter satisfies the modules.Renter interface
 var _ modules.Renter = (*Renter)(nil)
