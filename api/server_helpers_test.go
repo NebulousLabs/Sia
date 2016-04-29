@@ -250,7 +250,7 @@ func (st *serverTester) setHostStorage() error {
 // announcement to register.
 func (st *serverTester) announceHost() error {
 	announceValues := url.Values{}
-	announceValues.Set("address", string(st.host.NetworkMetrics().NetAddress))
+	announceValues.Set("address", string(st.host.ExternalSettings().NetAddress))
 	err := st.stdPostAPI("/host/announce", announceValues)
 	if err != nil {
 		return err
