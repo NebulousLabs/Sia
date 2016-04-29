@@ -31,6 +31,11 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 	}
 	// TODO: check recvSettings against host.HostExternalSettings. If there is
 	// a discrepancy, write the error to conn and update the hostdb
+	if recvSettings.NetAddress != host.NetAddress {
+		// for now, just overwrite the NetAddress, since we know that
+		// host.NetAddress works (it was the one we dialed to get conn)
+		recvSettings.NetAddress = host.NetAddress
+	}
 	host.HostExternalSettings = recvSettings
 	return host, nil
 }
