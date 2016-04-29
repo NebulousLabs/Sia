@@ -319,12 +319,16 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 
 // formContracts forms contracts with hosts using the allowance parameters.
 func (c *Contractor) formContracts(a modules.Allowance) error {
-	// Get hosts.
-	hosts := c.hdb.RandomHosts(int(2*a.Hosts), nil)
+	// Sample at least 10 hosts.
+	nRandomHosts := 2 * int(a.Hosts)
+	if nRandomHosts < 10 {
+		nRandomHosts = 10
+	}
+	hosts := c.hdb.RandomHosts(nRandomHosts, nil)
 	if uint64(len(hosts)) < a.Hosts {
 		return errors.New("not enough hosts")
 	}
-	// Calculate average host price
+	// Calculate average host price.
 	var sum types.Currency
 	for _, h := range hosts {
 		sum = sum.Add(h.StoragePrice)
@@ -363,6 +367,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 			// negotiate with because they'll probably be more expensive than
 			// we can afford.
 			c.log.Println("WARN: failed to negotiate contract:", h.NetAddress, err)
+			continue
 		}
 		if numContracts++; numContracts >= a.Hosts {
 			break

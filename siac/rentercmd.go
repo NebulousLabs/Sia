@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"math/big"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -220,13 +218,10 @@ func renterallowancecmd() {
 	}
 
 	// convert to SC
-	r := new(big.Rat).SetFrac(allowance.Funds.Big(), types.SiacoinPrecision.Big())
-	sc, _ := r.Float64()
-
 	fmt.Printf(`Allowance:
-	Amount: %+.2f SC
-	Period: %v
-`, sc, allowance.Period)
+	Amount: %v
+	Period: %v blocks
+`, currencyUnits(allowance.Funds), allowance.Period)
 }
 
 // rentersetallowancecmd allows the user to set the allowance.

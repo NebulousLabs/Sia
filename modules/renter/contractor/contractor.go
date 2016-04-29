@@ -92,9 +92,10 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// Set the allowance.
 	c.mu.Lock()
 	c.allowance = a
+	err = c.saveSync()
 	c.mu.Unlock()
 
-	return nil
+	return err
 
 	/*
 		// If this is the first time the allowance has been set, form contracts
