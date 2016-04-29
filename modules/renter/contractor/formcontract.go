@@ -363,6 +363,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 			// negotiate with because they'll probably be more expensive than
 			// we can afford.
 			c.log.Println("WARN: failed to negotiate contract:", h.NetAddress, err)
+			continue
 		}
 		if numContracts++; numContracts >= a.Hosts {
 			break
