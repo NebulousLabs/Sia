@@ -24,7 +24,7 @@ func TestInsertHost(t *testing.T) {
 	}
 
 	// valid host should be scanned
-	dbe.NetAddress = "foo:1234"
+	dbe.NetAddress = "foo.com:1234"
 	hdb.insertHost(dbe)
 	select {
 	case <-hdb.scanPool:
@@ -116,12 +116,12 @@ func TestAveragePrice(t *testing.T) {
 func TestIsOffline(t *testing.T) {
 	hdb := &HostDB{
 		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo:1234": &hostEntry{Online: true},
-			"bar:1234": &hostEntry{Online: false},
-			"baz:1234": &hostEntry{Online: true},
+			"foo.com:1234": &hostEntry{Online: true},
+			"bar.com:1234": &hostEntry{Online: false},
+			"baz.com:1234": &hostEntry{Online: true},
 		},
 		activeHosts: map[modules.NetAddress]*hostNode{
-			"foo:1234": nil,
+			"foo.com:1234": nil,
 		},
 		scanPool: make(chan *hostEntry),
 	}
@@ -130,10 +130,10 @@ func TestIsOffline(t *testing.T) {
 		addr    modules.NetAddress
 		offline bool
 	}{
-		{"foo:1234", false},
-		{"bar:1234", true},
-		{"baz:1234", false},
-		{"quux:1234", false},
+		{"foo.com:1234", false},
+		{"bar.com:1234", true},
+		{"baz.com:1234", false},
+		{"quux.com:1234", false},
 	}
 	for _, test := range tests {
 		if offline := hdb.IsOffline(test.addr); offline != test.offline {

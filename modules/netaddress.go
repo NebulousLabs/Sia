@@ -62,13 +62,25 @@ func (na NetAddress) isLoopback() bool {
 // testing). Valid IPv4 addresses, IPv6 addresses, and hostnames are detailed
 // in RFCs 791, 2460, and 952, respectively.
 func (na NetAddress) IsValid() error {
-	if build.Release != "testing" && na.isLoopback() {
-		return errors.New("host is a loopback address")
-	}
-
 	host, port, err := net.SplitHostPort(string(na))
 	if err != nil {
 		return err
+	}
+
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		return errors.New("port is not an integer")
+	} else if portInt < 1 || portInt > 65535 {
+		return errors.New("port is invalid")
+	}
+
+	// This check must come after the valid port check so that a host such as
+	// "localhost:badport" will fail.
+	if na.isLoopback() {
+		if build.Release == "testing" {
+			return nil
+		}
+		return errors.New("host is a loopback address")
 	}
 
 	// First try to parse host as an IP address; if that fails, assume it is a
@@ -78,12 +90,24 @@ func (na NetAddress) IsValid() error {
 			return errors.New("host is the unspecified address")
 		}
 	} else {
+		// Hostnames can have a trailing dot (which indicates that the hostname is
+		// fully qualified), but we ignore it for validation purposes.
+		if strings.HasSuffix(host, ".") {
+			host = host[:len(host)-1]
+		}
 		if len(host) < 1 || len(host) > 253 {
 			return errors.New("invalid hostname length")
 		}
-		for _, label := range strings.Split(host, ".") {
+		labels := strings.Split(host, ".")
+		if len(labels) == 1 {
+			return errors.New("unqualified hostname")
+		}
+		for _, label := range labels {
 			if len(label) < 1 || len(label) > 63 {
 				return errors.New("hostname contains label with invalid length")
+			}
+			if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+				return errors.New("hostname contains label that starts or ends with a hyphen")
 			}
 			for _, r := range strings.ToLower(label) {
 				isLetter := 'a' <= r && r <= 'z'
@@ -94,13 +118,6 @@ func (na NetAddress) IsValid() error {
 				}
 			}
 		}
-	}
-
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		return errors.New("port is not an integer")
-	} else if portInt < 1 || portInt > 65535 {
-		return errors.New("port is invalid")
 	}
 
 	return nil

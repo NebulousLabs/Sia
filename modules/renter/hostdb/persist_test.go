@@ -136,7 +136,7 @@ func TestRescan(t *testing.T) {
 	}
 
 	// create a mocked consensus set with a different host announcement
-	annBytes, err := makeSignedAnnouncement("quux:1234")
+	annBytes, err := makeSignedAnnouncement("quux.com:1234")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestRescan(t *testing.T) {
 	if len(hdb.allHosts) != 1 {
 		t.Fatal("hostdb rescan resulted in wrong host set:", hdb.allHosts)
 	}
-	if _, exists := hdb.allHosts["quux:1234"]; !exists {
+	if _, exists := hdb.allHosts["quux.com:1234"]; !exists {
 		t.Fatal("hostdb rescan resulted in wrong host set:", hdb.allHosts)
 	}
 }

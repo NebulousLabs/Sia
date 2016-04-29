@@ -2,6 +2,7 @@ package modules
 
 import (
 	"net"
+	"strings"
 	"testing"
 )
 
@@ -27,7 +28,11 @@ var (
 		"世界:",
 		":foo",
 		":世界",
+		"localhost:",
+		"[::1]:",
 		// Invalid host / port chars
+		"localhost:-",
+		"[::1]:-",
 		"foo:{}",
 		"{}:123",
 		" foo:123",
@@ -45,11 +50,30 @@ var (
 		// Unspecified address
 		"[::]:bar",
 		"0.0.0.0:bar",
+		// Invalid hostnames
+		"unqualifiedhost:123",
+		"Yo-Amazon.we-are-really-happy-for-you.and-we-will-let-you-finish.but-Sia-is-the-best-cloud-storage-of-all-time.of-all-time-of-all-time-of-all-time-of-all-time-of-all-time.of-all-time-of-all-time-of-all-time-of-all-time-of-all-time.of-all-time-of-all-time:123",
+		strings.Repeat("a", 64) + ".com:123",                       // 64 char long label too long.
+		strings.Repeat(strings.Repeat("a", 62)+".", 4) + "co:123",  // 254 char long hostname too long.
+		strings.Repeat(strings.Repeat("a", 62)+".", 4) + "co.:123", // 254 char long hostname with trailing dot too long.
+		"-foo.bar:123",
+		"foo-.bar:123",
+		"foo.-bar:123",
+		"foo.bar-:123",
+		"foo-bar.-baz:123",
+		"foo-bar.baz-:123",
+		"foo.-bar.baz:123",
+		"foo.bar-.baz:123",
+		".:123",
+		".foo.com:123",
+		"foo.com..:123",
 		// invalid port numbers
 		"foo:0",
 		"foo:65536",
 		"foo:-100",
 		"foo:1000000",
+		"localhost:0",
+		"[::1]:0",
 	}
 	validAddrs = []string{
 		// Loopback address (valid in testing only, can't really test this well)
@@ -57,9 +81,19 @@ var (
 		"127.0.0.1:123",
 		"[::1]:123",
 		// Valid addresses.
-		"foo:1",
-		"FOO:1",
+		"foo.com:1",
+		"foo.com.:1",
+		"a.b.c:1",
+		"a.b.c.:1",
+		"foo-bar.com:123",
+		"FOO.com:1",
+		"1foo.com:1",
+		"tld.foo.com:1",
 		"hn.com:8811",
+		strings.Repeat("foo.", 63) + "f:123",                     // 253 chars long
+		strings.Repeat("foo.", 63) + "f.:123",                    // 254 chars long, 253 chars long without trailing dot
+		strings.Repeat(strings.Repeat("a", 63)+".", 3) + "a:123", // 3x63 char length labels + 1x1 char length label without trailing dot
+		strings.Repeat(strings.Repeat("a", 63)+".", 3) + ":123",  // 3x63 char length labels with trailing dot
 		"[::2]:65535",
 		"111.111.111.111:111",
 		"12.34.45.64:7777",
