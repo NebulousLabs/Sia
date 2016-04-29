@@ -38,7 +38,7 @@ func TestRPC(t *testing.T) {
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 
-	if err := g1.RPC("foo", "", nil); err == nil {
+	if err := g1.RPC("foo.com:123", "", nil); err == nil {
 		t.Fatal("RPC on unconnected peer succeded")
 	}
 

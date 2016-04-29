@@ -132,11 +132,14 @@ func TestShareNodes(t *testing.T) {
 
 	// add a node to g2
 	id := g2.mu.Lock()
-	g2.addNode(dummyNode)
+	err := g2.addNode(dummyNode)
 	g2.mu.Unlock(id)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// connect
-	err := g1.Connect(g2.Address())
+	err = g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("couldn't connect:", err)
 	}
@@ -144,10 +147,11 @@ func TestShareNodes(t *testing.T) {
 	// g1 should have received the node
 	time.Sleep(100 * time.Millisecond)
 	id = g1.mu.Lock()
-	if g1.addNode(dummyNode) == nil {
+	err = g1.addNode(dummyNode)
+	g1.mu.Unlock(id)
+	if err == nil {
 		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
 	}
-	g1.mu.Unlock(id)
 
 	// remove all nodes from both peers
 	id = g1.mu.Lock()
@@ -170,8 +174,13 @@ func TestShareNodes(t *testing.T) {
 	}
 
 	// sharing should be capped at maxSharedNodes
-	for i := 0; i < maxSharedNodes+10; i++ {
-		g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
+	for i := 1; i < maxSharedNodes+11; i++ {
+		id := g2.mu.Lock()
+		err := g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
+		g2.mu.Unlock(id)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
 		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
