@@ -124,6 +124,7 @@ func hostcmd() {
 		die("Could not fetch storage info:", err)
 	}
 
+	es := hg.ExternalSettings
 	fm := hg.FinancialMetrics
 	is := hg.InternalSettings
 	nm := hg.NetworkMetrics
@@ -169,7 +170,7 @@ func hostcmd() {
 	// display more info if verbose flag is set
 	if hostVerbose {
 		// describe net address
-		netaddr := nm.NetAddress
+		netaddr := es.NetAddress
 		if is.NetAddress == "" {
 			netaddr += " (automatically determined)"
 		} else {

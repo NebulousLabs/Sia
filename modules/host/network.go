@@ -189,15 +189,7 @@ func (h *Host) NetAddress() modules.NetAddress {
 func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-
-	var na modules.NetAddress
-	if h.settings.NetAddress != "" {
-		na = h.settings.NetAddress
-	}
-	na = h.autoAddress
 	return modules.HostNetworkMetrics{
-		NetAddress: na,
-
 		// TODO: Up/Down bandwidth
 
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),

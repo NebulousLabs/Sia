@@ -69,8 +69,6 @@ type (
 	// HostNetworkMetrics reports the quantity of each type of RPC call that
 	// has been made to the host.
 	HostNetworkMetrics struct {
-		NetAddress NetAddress
-
 		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
 		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
 
