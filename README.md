@@ -146,7 +146,7 @@ Version History
 April 2016:
 
 v0.6.0 (minor release)
-- Switched to Long-form renter contracts
+- Switched to long-form renter contracts
 - Added support for multiple hosting folders
 - Hosts are now identified by their public key
 
