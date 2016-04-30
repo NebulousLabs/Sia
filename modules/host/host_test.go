@@ -255,6 +255,125 @@ func TestNilValues(t *testing.T) {
 	}
 }
 
+// TestSetAndGetInternalSettings checks that the functions for interacting with
+// the host's internal settings object are working as expected.
+func TestSetAndGetInternalSettings(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	ht, err := newHostTester("TestSetAndGetInternalSettings")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the default settings get returned at first call.
+	settings := ht.host.InternalSettings()
+	if settings.AcceptingContracts != false {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MaxDuration != defaultMaxDuration {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MaxDownloadBatchSize != uint64(defaultMaxDownloadBatchSize) {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MaxReviseBatchSize != uint64(defaultMaxReviseBatchSize) {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.NetAddress != "" {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.WindowSize != defaultWindowSize {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.Collateral.Cmp(defaultCollateral) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.CollateralBudget.Cmp(defaultCollateralBudget) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MaxCollateralFraction.Cmp(defaultCollateralFraction) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MaxCollateral.Cmp(defaultMaxCollateral) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.DownloadLimitGrowth != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.DownloadLimitCap != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.DownloadSpeedLimit != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.UploadLimitGrowth != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.UploadLimitCap != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.UploadSpeedLimit != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MinimumContractPrice.Cmp(defaultContractPrice) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MinimumDownloadBandwidthPrice.Cmp(defaultDownloadBandwidthPrice) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MinimumStoragePrice.Cmp(defaultStoragePrice) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+	if settings.MinimumUploadBandwidthPrice.Cmp(defaultUploadBandwidthPrice) != 0 {
+		t.Error("settings retrieval did not return default value")
+	}
+
+	// Check that calling SetInternalSettings with valid settings updates the settings.
+	settings.AcceptingContracts = true
+	settings.NetAddress = "foo.com:123"
+	err = ht.host.SetInternalSettings(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings = ht.host.InternalSettings()
+	if settings.AcceptingContracts != true {
+		t.Fatal("SetInternalSettings failed to update settings")
+	}
+	if settings.NetAddress != "foo.com:123" {
+		t.Fatal("SetInternalSettings failed to update settings")
+	}
+
+	// Check that calling SetInternalSettings with invalid settings does not update the settings.
+	settings.NetAddress = "invalid"
+	err = ht.host.SetInternalSettings(settings)
+	if err == nil {
+		t.Fatal("expected SetInternalSettings to error with invalid settings")
+	}
+	settings = ht.host.InternalSettings()
+	if settings.NetAddress != "foo.com:123" {
+		t.Fatal("SetInternalSettings should not modify the settings if the new settings are invalid")
+	}
+
+	// Reload the host and verify that the altered settings persisted.
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootHost, err := New(ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebootSettings := rebootHost.InternalSettings()
+	if rebootSettings.AcceptingContracts != settings.AcceptingContracts {
+		t.Error("settings retrieval did not return updated value")
+	}
+	if rebootSettings.NetAddress != settings.NetAddress {
+		t.Error("settings retrieval did not return updated value")
+	}
+}
+
 /*
 // TestSetAndGetSettings checks that the functions for interacting with the
 // hosts settings object are working as expected.

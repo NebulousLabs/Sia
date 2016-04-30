@@ -405,7 +405,14 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 	if settings.AcceptingContracts {
 		err := h.checkUnlockHash()
 		if err != nil {
-			return err
+			return errors.New("internal settings not updated, no unlock hash: " + err.Error())
+		}
+	}
+
+	if settings.NetAddress != "" {
+		err := settings.NetAddress.IsValid()
+		if err != nil {
+			return errors.New("internal settings not updated, invalid NetAddress: " + err.Error())
 		}
 	}
 
@@ -418,7 +425,12 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 
 	h.settings = settings
 	h.revisionNumber++
-	return h.saveSync()
+
+	err := h.saveSync()
+	if err != nil {
+		return errors.New("internal settings updated, but failed saving to disk: " + err.Error())
+	}
+	return nil
 }
 
 // InternalSettings returns the settings of a host.
