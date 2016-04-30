@@ -98,10 +98,11 @@ func (srv *Server) initAPI() {
 
 	// Renter API Calls
 	if srv.renter != nil {
-		router.GET("/renter/downloads", srv.renterDownloadsHandler)
-		router.GET("/renter/files", srv.renterFilesHandler)
+		router.GET("/renter", srv.renterHandler)
 		router.GET("/renter/allowance", srv.renterAllowanceHandlerGET)
 		router.POST("/renter/allowance", srv.renterAllowanceHandlerPOST)
+		router.GET("/renter/downloads", srv.renterDownloadsHandler)
+		router.GET("/renter/files", srv.renterFilesHandler)
 
 		router.POST("/renter/load", srv.renterLoadHandler)
 		router.POST("/renter/loadascii", srv.renterLoadAsciiHandler)

@@ -28,29 +28,43 @@ var (
 	}()
 )
 
-// DownloadQueue contains the renter's download queue.
-type RenterDownloadQueue struct {
-	Downloads []modules.DownloadInfo `json:"downloads"`
-}
+type (
+	// RenterGET contains various renter metrics.
+	RenterGET struct {
+		FinancialMetrics modules.RenterFinancialMetrics `json:"financialmetrics"`
+	}
 
-// RenterFiles lists the files known to the renter.
-type RenterFiles struct {
-	Files []modules.FileInfo `json:"files"`
-}
+	// DownloadQueue contains the renter's download queue.
+	RenterDownloadQueue struct {
+		Downloads []modules.DownloadInfo `json:"downloads"`
+	}
 
-// RenterLoad lists files that were loaded into the renter.
-type RenterLoad struct {
-	FilesAdded []string `json:"filesadded"`
-}
+	// RenterFiles lists the files known to the renter.
+	RenterFiles struct {
+		Files []modules.FileInfo `json:"files"`
+	}
 
-// RenterShareASCII contains an ASCII-encoded .sia file.
-type RenterShareASCII struct {
-	ASCIIsia string `json:"asciisia"`
-}
+	// RenterLoad lists files that were loaded into the renter.
+	RenterLoad struct {
+		FilesAdded []string `json:"filesadded"`
+	}
 
-// ActiveHosts lists active hosts on the network.
-type ActiveHosts struct {
-	Hosts []modules.HostDBEntry `json:"hosts"`
+	// RenterShareASCII contains an ASCII-encoded .sia file.
+	RenterShareASCII struct {
+		ASCIIsia string `json:"asciisia"`
+	}
+
+	// ActiveHosts lists active hosts on the network.
+	ActiveHosts struct {
+		Hosts []modules.HostDBEntry `json:"hosts"`
+	}
+)
+
+// renterHandler handles the API call to /renter.
+func (srv *Server) renterHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	writeJSON(w, RenterGET{
+		FinancialMetrics: srv.renter.FinancialMetrics(),
+	})
 }
 
 // renterAllowanceHandlerGET handles the API call to get the allowance.

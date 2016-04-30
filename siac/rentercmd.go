@@ -19,7 +19,7 @@ var (
 		Use:   "renter",
 		Short: "Perform renter actions",
 		Long:  "Upload, download, rename, delete, load, or share files.",
-		Run:   wrap(renterfileslistcmd),
+		Run:   wrap(rentercmd),
 	}
 
 	renterUploadsCmd = &cobra.Command{
@@ -131,6 +131,31 @@ func abs(path string) string {
 		return path
 	}
 	return abspath
+}
+
+// rentercmd displays the renter's financial metrics and lists the files it is
+// tracking.
+func rentercmd() {
+	var rg api.RenterGET
+	err := getAPI("/renter", &rg)
+	if err != nil {
+		die("Could not get renter info:", err)
+	}
+	fm := rg.FinancialMetrics
+	unspent := fm.ContractSpending.Sub(fm.DownloadSpending).Sub(fm.StorageSpending).Sub(fm.UploadSpending)
+	fmt.Printf(`Renter info:
+	Storage Spending:  %v
+	Upload Spending:   %v
+	Download Spending: %v
+	Unspent Funds:     %v
+	Total Allocated:   %v
+
+`, currencyUnits(fm.StorageSpending), currencyUnits(fm.UploadSpending),
+		currencyUnits(fm.DownloadSpending), currencyUnits(unspent),
+		currencyUnits(fm.ContractSpending))
+
+	// also list files
+	renterfileslistcmd()
 }
 
 // renteruploadscmd is the handler for the command `siac renter uploads`.

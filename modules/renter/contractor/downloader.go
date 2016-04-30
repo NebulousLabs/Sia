@@ -82,7 +82,6 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	}
 
 	// read sector data, completing one iteration of the download loop
-	// TODO: optimize this
 	var sectors [][]byte
 	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+16); err != nil {
 		return nil, err
@@ -102,6 +101,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 
 	hd.contractor.mu.Lock()
 	hd.contractor.contracts[hd.contract.ID] = hd.contract
+	hd.contractor.downloadSpending = hd.contractor.downloadSpending.Add(sectorPrice)
 	hd.contractor.saveSync()
 	hd.contractor.mu.Unlock()
 

@@ -308,8 +308,6 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
-	c.spentPeriod = c.spentPeriod.Add(fc.Payout)
-	c.spentTotal = c.spentTotal.Add(fc.Payout)
 	c.cachedAddress = types.UnlockHash{} // clear the cached address
 	c.saveSync()
 	c.mu.Unlock()
