@@ -57,6 +57,9 @@ To configure the host to accept new contracts, set acceptingcontracts to true:
 		Use:   "announce",
 		Short: "Announce yourself as a host",
 		Long: `Announce yourself as a host on the network.
+Announcing will also configure the host to start accepting contracts.
+You can revert this by running:
+	siac host config acceptingcontracts false
 You may also supply a specific address to be announced, e.g.:
 	siac host announce my-host-domain.com:9001
 Doing so will override the standard connectivity checks.`,
@@ -273,6 +276,17 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 		die("Could not announce host:", err)
 	}
 	fmt.Println("Host announcement submitted to network.")
+
+	// start accepting contracts
+	err = post("/host", "acceptingcontracts=true")
+	if err != nil {
+		die("Could not configure host to accept contracts:", err)
+	}
+	fmt.Println(`
+The host has also been configured to accept contracts.
+To revert this, run:
+	siac host config acceptingcontracts false
+`)
 }
 
 // hostfolderaddcmd adds a folder to the host.
