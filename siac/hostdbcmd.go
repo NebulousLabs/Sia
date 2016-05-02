@@ -30,6 +30,7 @@ func hostdbcmd() {
 	}
 	fmt.Println("Active hosts:")
 	for _, host := range info.Hosts {
-		fmt.Printf("\t%v - %v SC / GB / Mo\n", host.NetAddress, host.StoragePrice.Mul(types.NewCurrency64(4320e9)).Div(types.SiacoinPrecision))
+		price := host.StoragePrice.Mul(types.NewCurrency64(4320e12))
+		fmt.Printf("\t%v - %v / TB / Month\n", host.NetAddress, currencyUnits(price))
 	}
 }

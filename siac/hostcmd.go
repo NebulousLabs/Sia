@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/NebulousLabs/Sia/api"
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/spf13/cobra"
 )
@@ -141,11 +141,8 @@ func hostcmd() {
 
 	// convert accepting bool
 	accept := yesNo(is.AcceptingContracts)
-	// convert price to SC/TB/mo
-	price, err := modules.StoragePriceToHuman(is.MinimumStoragePrice)
-	if err != nil {
-		price = ^uint64(0)
-	}
+	// convert price from bytes/block to TB/Month
+	price := currencyUnits(is.MinimumStoragePrice.Mul(types.NewCurrency64(4320e12)))
 	// calculate total revenue
 	totalRevenue := fm.ContractCompensation.
 		Add(fm.StorageRevenue).
@@ -157,7 +154,7 @@ func hostcmd() {
 		Add(fm.PotentialUploadBandwidthRevenue)
 	fmt.Printf(`Host info:
 	Storage:      %v (%v used)
-	Price:        %v SC per TB per month
+	Price:        %v / TB / Month
 	Max Duration: %v Blocks
 
 	Accepting Contracts: %v
