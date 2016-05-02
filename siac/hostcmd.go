@@ -241,6 +241,7 @@ func hostconfigcmd(param, value string) {
 		}
 		i, _ := new(big.Int).SetString(hastings, 10)
 		i.Div(i, big.NewInt(1e12)) // divide by 1e12 bytes/TB
+		i.Div(i, big.NewInt(4320)) // divide by 4320 blocks/month
 		value = i.String()
 
 	// other valid settings
