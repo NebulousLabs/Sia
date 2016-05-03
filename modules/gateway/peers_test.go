@@ -197,7 +197,11 @@ func TestConnect(t *testing.T) {
 // addresses.
 func TestConnectRejectsInvalidAddrs(t *testing.T) {
 	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
+	defer g.Close()
+
 	g2 := newTestingGateway("TestConnectRejectsInvalidAddrs2", t)
+	defer g2.Close()
+
 	_, g2Port, err := net.SplitHostPort(string(g2.Address()))
 	if err != nil {
 		t.Fatal(err)
@@ -248,6 +252,7 @@ func TestConnectRejectsInvalidVersions(t *testing.T) {
 		t.SkipNow()
 	}
 	g := newTestingGateway("TestConnectRejectsInvalidVersions", t)
+	defer g.Close()
 	// Setup a listener that mocks Gateway.acceptConn, but sends the
 	// version sent over mockVersionChan instead of build.Version.
 	listener, err := net.Listen("tcp", "localhost:0")
