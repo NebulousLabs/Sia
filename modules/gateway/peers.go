@@ -131,7 +131,7 @@ func (g *Gateway) listen() {
 // acceptConn adds a connecting node as a peer.
 func (g *Gateway) acceptConn(conn net.Conn) {
 	addr := modules.NetAddress(conn.RemoteAddr().String())
-	g.log.Printf("INFO: %v wants to connect", addr)
+	g.log.Debugf("INFO: %v wants to connect", addr)
 
 	// read version
 	var remoteVersion string
@@ -197,7 +197,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	})
 	g.mu.Unlock(id)
 
-	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
+	g.log.Debugf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
@@ -249,7 +249,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return insufficientVersionError(remoteVersion)
 	}
 
-	g.log.Println("INFO: connected to new peer", addr)
+	g.log.Debugln("INFO: connected to new peer", addr)
 
 	id = g.mu.Lock()
 	g.addPeer(&peer{
@@ -273,7 +273,12 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	// call initRPCs
 	id = g.mu.RLock()
 	for name, fn := range g.initRPCs {
-		go g.RPC(addr, name, fn)
+		go func(name string, fn modules.RPCFunc) {
+			err := g.RPC(addr, name, fn)
+			if err != nil {
+				g.log.Debugf("INFO: RPC %q on peer %q failed: %v", name, addr, err)
+			}
+		}(name, fn)
 	}
 	g.mu.RUnlock(id)
 
