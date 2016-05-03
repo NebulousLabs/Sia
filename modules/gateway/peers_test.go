@@ -306,7 +306,11 @@ func TestUnitAcceptableVersion(t *testing.T) {
 // addresses.
 func TestConnectRejectsInvalidAddrs(t *testing.T) {
 	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
+	defer g.Close()
+
 	g2 := newTestingGateway("TestConnectRejectsInvalidAddrs2", t)
+	defer g2.Close()
+
 	_, g2Port, err := net.SplitHostPort(string(g2.Address()))
 	if err != nil {
 		t.Fatal(err)
