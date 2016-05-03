@@ -76,9 +76,9 @@ func TestAbsolutePathSafeFile(t *testing.T) {
 }
 
 // TestRelativePathSafeFile tests creating and committing safe files with
-// relative paths. Relative paths are testing to test that calling os.Chdir
-// inbetween creating and committing a safe file doesn't affect the safe file's
-// final path. The relative path tested is relative to the working directory.
+// relative paths. Specifically, we test that calling os.Chdir between creating
+// and committing a safe file doesn't affect the safe file's final path. The
+// relative path tested is relative to the working directory.
 func TestRelativePathSafeFile(t *testing.T) {
 	tmpDir := build.TempDir(persistDir, "TestRelativePathSafeFile")
 	err := os.MkdirAll(tmpDir, 0700)

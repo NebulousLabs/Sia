@@ -207,7 +207,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error("no panic occurred when misusing applySiacoinInput")
 		}
 	}()
 	cst.cs.applySiacoinOutputs(pb, txn)
@@ -306,7 +306,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error("no panic occurred when misusing applySiacoinInput")
 		}
 	}()
 	cst.cs.applyFileContracts(pb, txn)
@@ -433,7 +433,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != errNilItem {
-			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error("no panic occurred when misusing applySiacoinInput")
 		}
 	}()
 	txn := types.Transaction{
@@ -584,7 +584,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != errNilItem {
-			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error("no panic occurred when misusing applySiacoinInput")
 		}
 	}()
 	txn := types.Transaction{
@@ -725,7 +725,7 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != ErrMisuseApplySiafundInput {
-			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error("no panic occurred when misusing applySiacoinInput")
 			t.Error(r)
 		}
 	}()
@@ -826,7 +826,7 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != ErrMisuseApplySiafundOutput {
-			t.Error("no panic occured when misusing applySiafundInput")
+			t.Error("no panic occurred when misusing applySiafundInput")
 		}
 	}()
 	cst.cs.applySiafundOutputs(pb, txn)

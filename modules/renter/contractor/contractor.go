@@ -180,7 +180,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d 
 		contracts: make(map[types.FileContractID]Contract),
 	}
 
-	// Load the prior persistance structures.
+	// Load the prior persistence structures.
 	err := c.load()
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err

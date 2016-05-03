@@ -98,7 +98,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	}
 	defer conn.Close()
 
-	// Read a specifier indicating which action is beeing called.
+	// Read a specifier indicating which action is being called.
 	var id types.Specifier
 	if err := encoding.ReadObject(conn, &id, 16); err != nil {
 		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)

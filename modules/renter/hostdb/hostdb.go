@@ -109,7 +109,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		scanPool:    make(chan *hostEntry, scanPoolSize),
 	}
 
-	// Load the prior persistance structures.
+	// Load the prior persistence structures.
 	err := hdb.load()
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err

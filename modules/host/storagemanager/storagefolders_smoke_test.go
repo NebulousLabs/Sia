@@ -323,7 +323,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	if totalStorage != remainingStorage+modules.SectorSize {
 		t.Fatal("manager is not empty at the moment of creating the in-memory sector usage map")
 	}
-	// Verify that the inital sector usage map was created correctly.
+	// Verify that the initial sector usage map was created correctly.
 	err = smt.sectorUsageCheck(sectorUsageMap)
 	if err != nil {
 		t.Fatal(err)

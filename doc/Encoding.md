@@ -15,7 +15,7 @@ Unmarshal([]byte{3, 0, 0, 0, 0, 0, 0, 0}, &x)
 ```
 
 Note that this leads to some ambiguity. Since an `int64` and a `uint64` are
-both 8 bytes long, it is possible to encode an `int64` and succesfully decode
+both 8 bytes long, it is possible to encode an `int64` and successfully decode
 it as a `uint64`. As a result, it is imperative that *the decoder knows
 exactly what it is decoding*. Developers must rely on context to determine
 what type to decode into.

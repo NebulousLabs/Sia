@@ -147,7 +147,7 @@ Run 'wallet send --help' to see a list of available units.`,
 )
 
 // walletaddresscmd fetches a new address from the wallet that will be able to
-// recieve coins.
+// receive coins.
 func walletaddresscmd() {
 	addr := new(api.WalletAddressGET)
 	err := getAPI("/wallet/address", addr)

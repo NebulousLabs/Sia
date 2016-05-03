@@ -397,7 +397,7 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 }
 
 // initPersist handles all of the persistence initialization, such as creating
-// the persistance directory and starting the logger.
+// the persistence directory and starting the logger.
 func (r *Renter) initPersist() error {
 	// Create the perist directory if it does not yet exist.
 	err := os.MkdirAll(r.persistDir, 0700)
@@ -411,7 +411,7 @@ func (r *Renter) initPersist() error {
 		return err
 	}
 
-	// Load the prior persistance structures.
+	// Load the prior persistence structures.
 	err = r.load()
 	if err != nil && !os.IsNotExist(err) {
 		return err

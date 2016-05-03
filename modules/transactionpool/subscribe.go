@@ -23,7 +23,7 @@ func (tp *TransactionPool) updateSubscribersTransactions() {
 
 // TransactionPoolSubscribe adds a subscriber to the transaction pool.
 // Subscribers will receive the full transaction set every time there is a
-// signficant change to the transaction pool.
+// significant change to the transaction pool.
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	tp.mu.Lock()
 	defer tp.mu.Unlock()

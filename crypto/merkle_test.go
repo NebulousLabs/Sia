@@ -16,7 +16,7 @@ func TestTreeBuilder(t *testing.T) {
 	// function is really for code coverage.
 }
 
-// TestCalculateLeaves probes the CalulateLeaves function.
+// TestCalculateLeaves probes the CalculateLeaves function.
 func TestCalculateLeaves(t *testing.T) {
 	tests := []struct {
 		size, expSegs uint64

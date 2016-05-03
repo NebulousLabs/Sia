@@ -321,7 +321,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 	}
 	txn.TransactionSignatures[0] = tmpTxn0
 
-	// Try to point to a nonexistant public key.
+	// Try to point to a nonexistent public key.
 	txn.TransactionSignatures[0] = TransactionSignature{PublicKeyIndex: 5}
 	err = txn.validSignatures(10)
 	if err != ErrInvalidPubKeyIndex {

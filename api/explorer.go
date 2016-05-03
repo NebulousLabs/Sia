@@ -225,7 +225,7 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 		// payouts, the block might be the transaction.
 		block, height, exists := srv.explorer.Transaction(txid)
 		if !exists && build.DEBUG {
-			panic("explorer pointing to nonexistant txn")
+			panic("explorer pointing to nonexistent txn")
 		}
 
 		// Check if the block is the transaction.

@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-// consistency.go contians a bunch of consistency checks for the host. Because
+// consistency.go contains a bunch of consistency checks for the host. Because
 // a lot of the consistency is checking that different parts of the host match
 // up, it was decided that all consistency checking should go into a single
 // file. As an example, the state of the storage obligations sets the standard

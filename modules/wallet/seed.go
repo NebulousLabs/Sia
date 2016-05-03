@@ -248,7 +248,7 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 	return w.primarySeed, w.persist.PrimarySeedProgress, nil
 }
 
-// NextAddress returns an unlock hash that is ready to recieve siacoins or
+// NextAddress returns an unlock hash that is ready to receive siacoins or
 // siafunds. The address is generated using the primary address seed.
 func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 	w.mu.Lock()

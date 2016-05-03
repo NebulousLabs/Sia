@@ -26,7 +26,7 @@ var (
 )
 
 // These interfaces define the Host's dependencies. Mocking implementation
-// complexity can be reduced by defining each dependency as the minimium
+// complexity can be reduced by defining each dependency as the minimum
 // possible subset of the real dependency.
 type (
 	// dependencies defines all of the dependencies of the Host.

@@ -37,7 +37,7 @@ func StartCPUProfile(profileDir, identifier string) error {
 	cpuLock.Unlock()
 
 	// Start profiling into the profile dir, using the identifer. The timestamp
-	// of the start time of the profiling will be included in the filenmae.
+	// of the start time of the profiling will be included in the filename.
 	cpuProfileFile, err := os.Create(filepath.Join(profileDir, "cpu-profile-"+identifier+"-"+time.Now().Format(time.RFC3339Nano)+".prof"))
 	if err != nil {
 		return err

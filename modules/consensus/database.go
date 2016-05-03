@@ -92,7 +92,7 @@ func dbInitialized(tx *bolt.Tx) bool {
 }
 
 // initDB is run if there is no existing consensus database, creating a
-// database with all the required buckets and sane inital values.
+// database with all the required buckets and sane initial values.
 func (cs *ConsensusSet) initDB(tx *bolt.Tx) error {
 	// Create the compononents of the database.
 	err := cs.createConsensusDB(tx)

@@ -112,7 +112,7 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 		if start == modules.ConsensusChangeBeginning {
 			// Special case: for modules.ConsensusChangeBeginning, create an
 			// initial node pointing to the genesis block. The subscriber will
-			// recieve the diffs for all blocks in the consensus set, including
+			// receive the diffs for all blocks in the consensus set, including
 			// the genesis block.
 			entry = cs.genesisEntry()
 			exists = true
@@ -153,8 +153,8 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 }
 
 // ConsensusSetSubscribe adds a subscriber to the list of subscribers, and
-// gives them every consensus change that has occured since the change with the
-// provided id.
+// gives them every consensus change that has occurred since the change with
+// the provided id.
 //
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.

@@ -68,7 +68,7 @@ func TestIntegrationTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The partial should include one transaction for a block, and 2 for the
-	// send that occured.
+	// send that occurred.
 	if len(txns) != 3 {
 		t.Error(len(txns))
 	}

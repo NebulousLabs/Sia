@@ -26,7 +26,7 @@ var (
 
 // These interfaces define the StorageManager's dependencies. Mocking
 // implementation complexity can be reduced by defining each dependency as the
-// minimium possible subset of the real dependency.
+// minimum possible subset of the real dependency.
 type (
 	// dependencies defines all of the dependencies of the StorageManager.
 	dependencies interface {

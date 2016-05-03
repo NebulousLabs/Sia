@@ -162,7 +162,7 @@ func newContractorTester(name string, hc hostContractor) (*renterTester, error) 
 	return rt, nil
 }
 
-// stubHostDB is the minimal implemention of the hostDB interface. It can be
+// stubHostDB is the minimal implementation of the hostDB interface. It can be
 // embedded in other mock hostDB types, removing the need to reimplement all
 // of the hostDB's methods on every mock.
 type stubHostDB struct{}

@@ -130,7 +130,7 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	// another one repeatedly - enough times to exceed the 256 possible folder
 	// UIDs that can be chosen in the testing environment.
 	for i := 0; i < 300; i++ {
-		// Repalce the very first storage folder.
+		// Replace the very first storage folder.
 		err = smt.sm.RemoveStorageFolder(0, false)
 		if err != nil {
 			t.Fatal(err)

@@ -164,7 +164,7 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 }
 
 // createServerTester creates a server tester object that is ready for testing,
-// including money in the wallet and all modules initalized.
+// including money in the wallet and all modules initialized.
 func createServerTester(name string) (*serverTester, error) {
 	// Create the testing directory.
 	testdir := build.TempDir("api", name)
@@ -189,7 +189,7 @@ func createServerTester(name string) (*serverTester, error) {
 	return st, nil
 }
 
-// createExplorerServerTester creates a server tester object contianing only
+// createExplorerServerTester creates a server tester object containing only
 // the explorer and some presets that match standard explorer setups.
 func createExplorerServerTester(name string) (*serverTester, error) {
 	testdir := build.TempDir("api", name)

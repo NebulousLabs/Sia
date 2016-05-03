@@ -74,7 +74,7 @@ var (
 	// actually frustrate price planning. 32 GB has been chosen as a minimum
 	// for the early days of the network, to allow people to experiment in the
 	// beta, but in the future I think something like 256GB would be much more
-	// appropraite.
+	// appropriate.
 	minimumStorageFolderSize = func() uint64 {
 		if build.Release == "dev" {
 			return 1 << 25 // 32 MiB

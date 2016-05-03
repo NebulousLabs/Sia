@@ -227,7 +227,7 @@ func TestNegativeCurrencyMulRat(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Error("no panic occured when trying to create a negative currency")
+			t.Error("no panic occurred when trying to create a negative currency")
 		}
 	}()
 
@@ -242,7 +242,7 @@ func TestNegativeCurrencySub(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Error("no panic occured when trying to create a negative currency")
+			t.Error("no panic occurred when trying to create a negative currency")
 		}
 	}()
 
@@ -291,7 +291,7 @@ func TestNegativeNewCurrency(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Error("no panic occured when trying to create a negative currency")
+			t.Error("no panic occurred when trying to create a negative currency")
 		}
 	}()
 

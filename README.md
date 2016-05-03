@@ -177,7 +177,7 @@ v0.4.7 (patch)
 - Dropped support for v0.3.3.x
 
 v0.4.6 (patch)
-- Removed over-agressive consistency check
+- Removed over-aggressive consistency check
 
 v0.4.5 (patch)
 - Fixed last prominent bug in block database

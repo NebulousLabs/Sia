@@ -14,7 +14,7 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// initRescan is a helper funtion of initConsensusSubscribe, and is called when
+// initRescan is a helper function of initConsensusSubscribe, and is called when
 // the host and the consensus set have become desynchronized. Desynchronization
 // typically happens if the user is replacing or altering the persistent files
 // in the consensus set or the host.

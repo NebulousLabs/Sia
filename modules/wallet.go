@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// WalletDir is the directory that contains the wallet persistance.
+	// WalletDir is the directory that contains the wallet persistence.
 	WalletDir = "wallet"
 
 	// SeedChecksumSize is the number of bytes that are used to checksum
@@ -101,7 +101,7 @@ type (
 	}
 
 	// TransactionBuilder is used to construct custom transactions. A transaction
-	// builder is intialized via 'RegisterTransaction' and then can be modified by
+	// builder is initialized via 'RegisterTransaction' and then can be modified by
 	// adding funds or other fields. The transaction is completed by calling
 	// 'Sign', which will sign all inputs added via the 'FundSiacoins' or
 	// 'FundSiafunds' call. All modifications are additive.

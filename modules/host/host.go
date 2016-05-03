@@ -170,7 +170,7 @@ type Host struct {
 	// Storage is broken up into sectors. The sectors are distributed across a
 	// set of storage folders using a strategy that tries to create even
 	// distributions, but not aggressively. Uneven distributions could be
-	// manufactured by an attacker given sufficent knowledge about the disk
+	// manufactured by an attacker given sufficient knowledge about the disk
 	// layout (knowledge which should be unavailable), but a limited amount of
 	// damage can be done even with this attack.
 	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
@@ -279,9 +279,9 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		_ = h.log.Close()
 		return nil, err
 	}
-	// After opening the database, it must be initalized. Most commonly,
+	// After opening the database, it must be initialized. Most commonly,
 	// nothing happens. But for new databases, a set of buckets must be
-	// created. Intialization is also a good time to run sanity checks.
+	// created. Initialization is also a good time to run sanity checks.
 	err = h.initDB()
 	if err != nil {
 		_ = h.log.Close()
@@ -289,7 +289,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		return nil, err
 	}
 
-	// Load the prior persistance structures.
+	// Load the prior persistence structures.
 	err = h.load()
 	if err != nil {
 		_ = h.log.Close()

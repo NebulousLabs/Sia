@@ -149,7 +149,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (ce changeEntry, err error
 
 		// modules.ErrNonExtendingBlock should be returned if the block does
 		// not extend the current blockchain, however the changes from newChild
-		// should be comitted (which means 'nil' must be returned). A flag is
+		// should be committed (which means 'nil' must be returned). A flag is
 		// set to indicate that modules.ErrNonExtending should be returned.
 		nonExtending = !newNode.heavierThan(currentNode)
 		if nonExtending {

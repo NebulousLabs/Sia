@@ -12,7 +12,7 @@ import (
 
 var (
 	// errDownloadBadHostValidOutputs is returned if the renter requests a
-	// download and pays an insufficent amount to the host valid addresses.
+	// download and pays an insufficient amount to the host valid addresses.
 	errDownloadBadHostValidOutputs = errors.New("download request rejected for bad host valid outputs")
 
 	// errDownloadBadNewFileMerkleRoot is returned if the renter requests a

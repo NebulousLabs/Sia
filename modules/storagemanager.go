@@ -12,7 +12,7 @@ const (
 )
 
 type (
-	// StorageFolderMetadata contians metadata about a storage folder that is
+	// StorageFolderMetadata contains metadata about a storage folder that is
 	// tracked by the storage folder manager.
 	StorageFolderMetadata struct {
 		Capacity          uint64 `json:"capacity"`

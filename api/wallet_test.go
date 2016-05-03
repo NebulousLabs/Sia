@@ -157,7 +157,7 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	// Check the intial wallet is encrypted, unlocked, and has the siacoins
+	// Check the initial wallet is encrypted, unlocked, and has the siacoins
 	// that got mined.
 	var wg WalletGET
 	err = st.getAPI("/wallet", &wg)
