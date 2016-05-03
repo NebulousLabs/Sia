@@ -302,6 +302,54 @@ func TestUnitAcceptableVersion(t *testing.T) {
 	}
 }
 
+// TestConnectRejectsInvalidAddrs tests that Connect only connects to valid IP
+// addresses.
+func TestConnectRejectsInvalidAddrs(t *testing.T) {
+	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
+	g2 := newTestingGateway("TestConnectRejectsInvalidAddrs2", t)
+	_, g2Port, err := net.SplitHostPort(string(g2.Address()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		addr    modules.NetAddress
+		wantErr bool
+		msg     string
+	}{
+		{
+			addr:    "127.0.0.1:123",
+			wantErr: true,
+			msg:     "Connect should reject unreachable addresses",
+		},
+		{
+			addr:    "111.111.111.111:0",
+			wantErr: true,
+			msg:     "Connect should reject invalid NetAddresses",
+		},
+		{
+			addr:    modules.NetAddress(net.JoinHostPort("localhost", g2Port)),
+			wantErr: true,
+			msg:     "Connect should reject non-IP addresses",
+		},
+		{
+			addr: g2.Address(),
+			msg:  "Connect failed to connect to another gateway",
+		},
+		{
+			addr:    g2.Address(),
+			wantErr: true,
+			msg:     "Connect should reject an address it's already connected to",
+		},
+	}
+	for _, tt := range tests {
+		err := g.Connect(tt.addr)
+		if tt.wantErr != (err != nil) {
+			t.Errorf("%v, wantErr: %v, err: %v", tt.msg, tt.wantErr, err)
+		}
+	}
+}
+
 // TestConnectRejectsVersions tests that Gateway.Connect only accepts peers
 // with sufficient and valid versions.
 func TestConnectRejectsVersions(t *testing.T) {

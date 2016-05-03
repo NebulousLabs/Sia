@@ -12,18 +12,22 @@ import (
 
 const (
 	maxSharedNodes = 10
-	maxAddrLength  = 100
+	maxAddrLength  = 100 // TODO: max NetAddress length is 254 for the hostname (including the trailing dot, 253 without) + 1 for the : + 5 for the port.
 	minPeers       = 3
+)
+
+var (
+	errNodeExists = errors.New("node already added")
 )
 
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
 	if _, exists := g.nodes[addr]; exists {
-		return errors.New("node already added")
-	} else if net.ParseIP(addr.Host()) == nil {
-		return errors.New("address is not routable: " + string(addr))
+		return errNodeExists
 	} else if addr.IsValid() != nil {
 		return errors.New("address is not valid: " + string(addr))
+	} else if net.ParseIP(addr.Host()) == nil {
+		return errors.New("address must be an IP address: " + string(addr))
 	}
 	g.nodes[addr] = struct{}{}
 	return nil

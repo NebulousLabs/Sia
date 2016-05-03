@@ -320,7 +320,15 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		},
 		sess: muxado.Client(conn),
 	})
+	// addNode must be called after addPeer so that threadedPeerManager doesn't
+	// try to Connect to the node before we do (although in this particular case
+	// it doesn't matter as a lock is held over both calls).
+	err = g.addNode(addr)
 	g.mu.Unlock()
+	if err != nil && err != errNodeExists {
+		g.Disconnect(addr)
+		return err
+	}
 
 	// call initRPCs
 	g.mu.RLock()
