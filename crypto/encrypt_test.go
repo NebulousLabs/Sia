@@ -154,7 +154,7 @@ func TestUnitCiphertextUnmarshalInvalidJSON(t *testing.T) {
 	// Test unmarshalling invalid JSON.
 	invalidJSONBytes := [][]byte{
 		nil,
-		[]byte{},
+		{},
 		[]byte("\""),
 	}
 	for _, jsonBytes := range invalidJSONBytes {

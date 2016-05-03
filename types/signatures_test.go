@@ -11,7 +11,7 @@ func TestUnlockHash(t *testing.T) {
 	uc := UnlockConditions{
 		Timelock: 1,
 		PublicKeys: []SiaPublicKey{
-			SiaPublicKey{
+			{
 				Algorithm: SignatureEntropy,
 				Key:       []byte{'f', 'a', 'k', 'e'},
 			},
@@ -25,22 +25,22 @@ func TestUnlockHash(t *testing.T) {
 // TestSigHash runs the SigHash function of the transaction type.
 func TestSigHash(t *testing.T) {
 	txn := Transaction{
-		SiacoinInputs:         []SiacoinInput{SiacoinInput{}},
-		SiacoinOutputs:        []SiacoinOutput{SiacoinOutput{}},
-		FileContracts:         []FileContract{FileContract{}},
-		FileContractRevisions: []FileContractRevision{FileContractRevision{}},
-		StorageProofs:         []StorageProof{StorageProof{}},
-		SiafundInputs:         []SiafundInput{SiafundInput{}},
-		SiafundOutputs:        []SiafundOutput{SiafundOutput{}},
-		MinerFees:             []Currency{Currency{}},
-		ArbitraryData:         [][]byte{[]byte{'o'}, []byte{'t'}},
+		SiacoinInputs:         []SiacoinInput{{}},
+		SiacoinOutputs:        []SiacoinOutput{{}},
+		FileContracts:         []FileContract{{}},
+		FileContractRevisions: []FileContractRevision{{}},
+		StorageProofs:         []StorageProof{{}},
+		SiafundInputs:         []SiafundInput{{}},
+		SiafundOutputs:        []SiafundOutput{{}},
+		MinerFees:             []Currency{{}},
+		ArbitraryData:         [][]byte{{'o'}, {'t'}},
 		TransactionSignatures: []TransactionSignature{
-			TransactionSignature{
+			{
 				CoveredFields: CoveredFields{
 					WholeTransaction: true,
 				},
 			},
-			TransactionSignature{
+			{
 				CoveredFields: CoveredFields{
 					SiacoinInputs:         []uint64{0},
 					SiacoinOutputs:        []uint64{0},
@@ -101,17 +101,17 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 	// Create a transaction with all fields filled in minimally. The first
 	// check has a legal CoveredFields object with 'WholeTransaction' set.
 	txn := Transaction{
-		SiacoinInputs:         []SiacoinInput{SiacoinInput{}},
-		SiacoinOutputs:        []SiacoinOutput{SiacoinOutput{}},
-		FileContracts:         []FileContract{FileContract{}},
-		FileContractRevisions: []FileContractRevision{FileContractRevision{}},
-		StorageProofs:         []StorageProof{StorageProof{}},
-		SiafundInputs:         []SiafundInput{SiafundInput{}},
-		SiafundOutputs:        []SiafundOutput{SiafundOutput{}},
-		MinerFees:             []Currency{Currency{}},
-		ArbitraryData:         [][]byte{[]byte{'o'}, []byte{'t'}},
+		SiacoinInputs:         []SiacoinInput{{}},
+		SiacoinOutputs:        []SiacoinOutput{{}},
+		FileContracts:         []FileContract{{}},
+		FileContractRevisions: []FileContractRevision{{}},
+		StorageProofs:         []StorageProof{{}},
+		SiafundInputs:         []SiafundInput{{}},
+		SiafundOutputs:        []SiafundOutput{{}},
+		MinerFees:             []Currency{{}},
+		ArbitraryData:         [][]byte{{'o'}, {'t'}},
 		TransactionSignatures: []TransactionSignature{
-			TransactionSignature{
+			{
 				CoveredFields: CoveredFields{
 					WholeTransaction: true,
 				},

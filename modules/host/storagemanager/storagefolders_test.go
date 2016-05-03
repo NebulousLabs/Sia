@@ -187,7 +187,7 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// Single valid storage folder.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: minimumStorageFolderSize,
 				},
@@ -197,7 +197,7 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// Single full storage folder.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: 0,
 				},
@@ -207,7 +207,7 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// Single nearly full storage folder.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize - 1,
 				},
@@ -217,11 +217,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// Two valid storage folders, first is emptier.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize + 1,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize,
 				},
@@ -231,11 +231,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// Two valid storage folders, second is emptier.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize + 1,
 				},
@@ -246,11 +246,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// hold a new sector.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize - 1,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 5,
 					SizeRemaining: modules.SectorSize,
 				},
@@ -261,11 +261,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// percentage.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 4,
 					SizeRemaining: modules.SectorSize * 2,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize,
 				},
@@ -276,11 +276,11 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// percentage.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 4,
 					SizeRemaining: modules.SectorSize * 2,
 				},
@@ -291,15 +291,15 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// volume.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 4,
 					SizeRemaining: modules.SectorSize * 2,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: modules.SectorSize,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 4,
 					SizeRemaining: modules.SectorSize * 2,
 				},
@@ -309,15 +309,15 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		// Three storage folders, none have room for a sector.
 		{
 			[]*storageFolder{
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 4,
 					SizeRemaining: modules.SectorSize - 1,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize,
 					SizeRemaining: 0,
 				},
-				&storageFolder{
+				{
 					Size:          minimumStorageFolderSize * 4,
 					SizeRemaining: 1,
 				},

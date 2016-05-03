@@ -76,12 +76,12 @@ func TestUnitProcessConfig(t *testing.T) {
 		expectedOutputs [][]string
 	}{
 		inputs: [][]string{
-			[]string{"9980", "9981", "9982", "cghmrtwe"},
-			[]string{":9980", ":9981", ":9982", "CGHMRTWE"},
+			{"9980", "9981", "9982", "cghmrtwe"},
+			{":9980", ":9981", ":9982", "CGHMRTWE"},
 		},
 		expectedOutputs: [][]string{
-			[]string{":9980", ":9981", ":9982", "cghmrtwe"},
-			[]string{":9980", ":9981", ":9982", "cghmrtwe"},
+			{":9980", ":9981", ":9982", "cghmrtwe"},
+			{":9980", ":9981", ":9982", "cghmrtwe"},
 		},
 	}
 	var config Config

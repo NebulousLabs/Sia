@@ -94,9 +94,9 @@ func TestNew(t *testing.T) {
 func TestContracts(t *testing.T) {
 	c := &Contractor{
 		contracts: map[types.FileContractID]Contract{
-			{1}: Contract{ID: types.FileContractID{1}, IP: "foo"},
-			{2}: Contract{ID: types.FileContractID{2}, IP: "bar"},
-			{3}: Contract{ID: types.FileContractID{3}, IP: "baz"},
+			{1}: {ID: types.FileContractID{1}, IP: "foo"},
+			{2}: {ID: types.FileContractID{2}, IP: "bar"},
+			{3}: {ID: types.FileContractID{3}, IP: "baz"},
 		},
 	}
 	for _, contract := range c.Contracts() {

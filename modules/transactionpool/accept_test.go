@@ -37,10 +37,10 @@ func TestAcceptTransactionSetBroadcasts(t *testing.T) {
 		t.Fatal(err)
 	}
 	mockPeers := []modules.Peer{
-		modules.Peer{Version: "0.0.0"},
-		modules.Peer{Version: "0.4.6"},
-		modules.Peer{Version: "0.4.7"},
-		modules.Peer{Version: "9.9.9"},
+		{Version: "0.0.0"},
+		{Version: "0.4.6"},
+		{Version: "0.4.7"},
+		{Version: "9.9.9"},
 	}
 	mg := &mockGatewayCheckBroadcast{
 		Gateway:          tpt.tpool.gateway,

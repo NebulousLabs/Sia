@@ -31,7 +31,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	}
 	b := types.Block{
 		Transactions: []types.Transaction{
-			types.Transaction{
+			{
 				ArbitraryData: [][]byte{annBytes},
 			},
 		},
