@@ -13,28 +13,27 @@ import (
 type NetAddress string
 
 // Host removes the port from a NetAddress, returning just the host. If the
-// address is invalid, the empty string is returned.
+// address is not of the form "host:port" the empty string is returned. The
+// port will still be returned for invalid NetAddresses (e.g. "unqualified:0"
+// will return "unqualified"), but in general you should only call Host on
+// valid addresses.
 func (na NetAddress) Host() string {
 	host, _, err := net.SplitHostPort(string(na))
 	// 'host' is not always the empty string if an error is returned.
 	if err != nil {
 		return ""
 	}
-	if na.IsValid() != nil {
-		return ""
-	}
 	return host
 }
 
-// Port returns the NetAddress object's port number. The empty string is
-// returned if the NetAddress is invalid.
+// Port returns the NetAddress object's port number. If the address is not of
+// the form "host:port" the empty string is returned. The port will still be
+// returned for invalid NetAddresses (e.g. "localhost:0" will return "0"), but
+// in general you should only call Port on valid addresses.
 func (na NetAddress) Port() string {
 	_, port, err := net.SplitHostPort(string(na))
 	// 'port' will not always be the empty string if an error is returned.
 	if err != nil {
-		return ""
-	}
-	if na.IsValid() != nil {
 		return ""
 	}
 	return port

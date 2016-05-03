@@ -104,6 +104,7 @@ var (
 func TestHostPort(t *testing.T) {
 	t.Parallel()
 
+	// Test valid addrs.
 	for _, addr := range validAddrs {
 		na := NetAddress(addr)
 		host := na.Host()
@@ -119,16 +120,16 @@ func TestHostPort(t *testing.T) {
 			t.Errorf("Port() returned unexpected port for NetAddress '%v': expected '%v', got '%v'", na, expectedPort, port)
 		}
 	}
-	for _, addr := range invalidAddrs {
-		na := NetAddress(addr)
-		host := na.Host()
-		port := na.Port()
-		if host != "" {
-			t.Errorf("Expected Host() to return blank string for invalid NetAddress '%v', but got '%v'", na, host)
-		}
-		if port != "" {
-			t.Errorf("Expected Port() to return blank string for invalid NetAddress '%v', but got '%v'", na, port)
-		}
+
+	// Test that Host / Port return "" when net.SplitHostPort errors
+	na := NetAddress("::")
+	host := na.Host()
+	port := na.Port()
+	if host != "" {
+		t.Error("expected Host() to return blank for an un-splittable NetAddress, but it returned:", host)
+	}
+	if port != "" {
+		t.Error("expected Port() to return blank for an un-splittable NetAddress, but it returned:", port)
 	}
 }
 
