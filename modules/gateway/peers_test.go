@@ -193,13 +193,61 @@ func TestConnect(t *testing.T) {
 	g.mu.RUnlock(id)
 }
 
-// TestConnectRejects tests that Gateway.Connect only accepts peers with
-// sufficient and valid versions.
-func TestConnectRejects(t *testing.T) {
+// TestConnectRejectsInvalidAddrs tests that Connect only connects to valid IP
+// addresses.
+func TestConnectRejectsInvalidAddrs(t *testing.T) {
+	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
+	g2 := newTestingGateway("TestConnectRejectsInvalidAddrs2", t)
+	_, g2Port, err := net.SplitHostPort(string(g2.Address()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		addr    modules.NetAddress
+		wantErr bool
+		msg     string
+	}{
+		{
+			addr:    "127.0.0.1:123",
+			wantErr: true,
+			msg:     "Connect should reject unreachable addresses",
+		},
+		{
+			addr:    "111.111.111.111:0",
+			wantErr: true,
+			msg:     "Connect should reject invalid NetAddresses",
+		},
+		{
+			addr:    modules.NetAddress(net.JoinHostPort("localhost", g2Port)),
+			wantErr: true,
+			msg:     "Connect should reject non-IP addresses",
+		},
+		{
+			addr: g2.Address(),
+			msg:  "Connect failed to connect to another gateway",
+		},
+		{
+			addr:    g2.Address(),
+			wantErr: true,
+			msg:     "Connect should reject an address it's already connected to",
+		},
+	}
+	for _, tt := range tests {
+		err := g.Connect(tt.addr)
+		if tt.wantErr != (err != nil) {
+			t.Errorf("%v, wantErr: %v, err: %v", tt.msg, tt.wantErr, err)
+		}
+	}
+}
+
+// TestConnectRejectsInvalidVersions tests that Gateway.Connect only accepts
+// peers with sufficient and valid versions.
+func TestConnectRejectsInvalidVersions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	g := newTestingGateway("TestConnectRejects", t)
+	g := newTestingGateway("TestConnectRejectsInvalidVersions", t)
 	// Setup a listener that mocks Gateway.acceptConn, but sends the
 	// version sent over mockVersionChan instead of build.Version.
 	listener, err := net.Listen("tcp", "localhost:0")
@@ -349,16 +397,16 @@ func (g mockGatewayWithVersion) Connect(addr modules.NetAddress) error {
 	return nil
 }
 
-// TestAcceptConnRejects tests that Gateway.acceptConn only accepts peers with
-// sufficient and valid versions.
-func TestAcceptConnRejects(t *testing.T) {
+// TestAcceptConnRejectsInvalidVersions tests that Gateway.acceptConn only
+// accepts peers with sufficient and valid versions.
+func TestAcceptConnRejectsInvalidVersions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	g := newTestingGateway("TestAcceptConnRejects1", t)
+	g := newTestingGateway("TestAcceptConnRejectsInvalidVersions1", t)
 	defer g.Close()
 	mg := mockGatewayWithVersion{
-		Gateway:    newTestingGateway("TestAcceptConnRejects2", t),
+		Gateway:    newTestingGateway("TestAcceptConnRejectsInvalidVersions2", t),
 		versionACK: make(chan string),
 	}
 	defer mg.Close()
