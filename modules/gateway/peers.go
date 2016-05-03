@@ -223,15 +223,18 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// send our version
 	if err := encoding.WriteObject(conn, build.Version); err != nil {
+		conn.Close()
 		return err
 	}
 	// read version ack
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+		conn.Close()
 		return err
 	}
 	// decide whether to accept this version
 	if remoteVersion == "reject" {
+		conn.Close()
 		return errPeerRejectedConn
 	}
 	// Check that version is acceptable.
