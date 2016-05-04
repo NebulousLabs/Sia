@@ -65,7 +65,9 @@ func (g *Gateway) Close() error {
 	// send close signal
 	close(g.closeChan)
 	// clear the port mapping (no effect if UPnP not supported)
+	id = g.mu.RLock()
 	g.clearPort(g.myAddr.Port())
+	g.mu.RUnlock(id)
 	// shut down the listener
 	if err := g.listener.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
@@ -128,7 +130,10 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Add the bootstrap peers to the node list.
 	if build.Release == "standard" {
 		for _, addr := range modules.BootstrapPeers {
-			g.addNode(addr)
+			err := g.addNode(addr)
+			if err != nil {
+				g.log.Printf("WARN: failed to add the bootstrap node '%v': %v", addr, err)
+			}
 		}
 		g.save()
 	}
@@ -138,15 +143,21 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return
 	}
-	g.myAddr = modules.NetAddress(g.listener.Addr().String())
+	_, port, portErr := net.SplitHostPort(g.listener.Addr().String())
+	if portErr != nil {
+		return nil, portErr
+	}
+	if build.Release == "testing" {
+		g.myAddr = modules.NetAddress(g.listener.Addr().String())
+	}
 
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	go g.forwardPort(g.myAddr.Port())
+	go g.forwardPort(port)
 
 	// Learn our external IP.
-	go g.learnHostname()
+	go g.learnHostname(port)
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.

@@ -31,7 +31,7 @@ func TestAddPeer(t *testing.T) {
 	defer g.mu.Unlock(id)
 	g.addPeer(&peer{
 		Peer: modules.Peer{
-			NetAddress: "foo",
+			NetAddress: "foo.com:123",
 		},
 		sess: muxado.Client(new(dummyConn)),
 	})
@@ -52,7 +52,7 @@ func TestRandomInboundPeer(t *testing.T) {
 
 	g.addPeer(&peer{
 		Peer: modules.Peer{
-			NetAddress: "foo",
+			NetAddress: "foo.com:123",
 			Inbound:    true,
 		},
 		sess: muxado.Client(new(dummyConn)),
@@ -61,7 +61,7 @@ func TestRandomInboundPeer(t *testing.T) {
 		t.Fatal("gateway did not add peer")
 	}
 	addr, err := g.randomInboundPeer()
-	if err != nil || addr != "foo" {
+	if err != nil || addr != "foo.com:123" {
 		t.Fatal("gateway did not select random peer")
 	}
 }
@@ -461,7 +461,7 @@ func TestDisconnect(t *testing.T) {
 	g := newTestingGateway("TestDisconnect", t)
 	defer g.Close()
 
-	if err := g.Disconnect("bar"); err == nil {
+	if err := g.Disconnect("bar.com:123"); err == nil {
 		t.Fatal("disconnect removed unconnected peer")
 	}
 
@@ -485,12 +485,12 @@ func TestDisconnect(t *testing.T) {
 	id := g.mu.Lock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
-			NetAddress: "foo",
+			NetAddress: "foo.com:123",
 		},
 		sess: muxado.Client(conn),
 	})
 	g.mu.Unlock(id)
-	if err := g.Disconnect("foo"); err != nil {
+	if err := g.Disconnect("foo.com:123"); err != nil {
 		t.Fatal("disconnect failed:", err)
 	}
 }

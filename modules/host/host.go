@@ -233,12 +233,6 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		return nil, errNilWallet
 	}
 
-	// Parse the port from the address.
-	_, port, err := net.SplitHostPort(listenerAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the host object.
 	h := &Host{
 		cs:           cs,
@@ -249,8 +243,9 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		lockedStorageObligations: make(map[types.FileContractID]struct{}),
 
 		persistDir: persistDir,
-		port:       port,
 	}
+
+	var err error
 
 	// Add the storage manager to the host.
 	//
@@ -410,7 +405,14 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 	if settings.AcceptingContracts {
 		err := h.checkUnlockHash()
 		if err != nil {
-			return err
+			return errors.New("internal settings not updated, no unlock hash: " + err.Error())
+		}
+	}
+
+	if settings.NetAddress != "" {
+		err := settings.NetAddress.IsValid()
+		if err != nil {
+			return errors.New("internal settings not updated, invalid NetAddress: " + err.Error())
 		}
 	}
 
@@ -423,7 +425,12 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 
 	h.settings = settings
 	h.revisionNumber++
-	return h.saveSync()
+
+	err := h.saveSync()
+	if err != nil {
+		return errors.New("internal settings updated, but failed saving to disk: " + err.Error())
+	}
+	return nil
 }
 
 // InternalSettings returns the settings of a host.

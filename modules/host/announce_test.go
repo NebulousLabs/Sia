@@ -115,7 +115,7 @@ func TestHostAnnounceAddress(t *testing.T) {
 
 	// Create an announcement, then use the address finding module to scan the
 	// blockchain for the host's address.
-	addr := modules.NetAddress("foo:1234")
+	addr := modules.NetAddress("foo.com:1234")
 	err = ht.host.AnnounceAddress(addr)
 	if err != nil {
 		t.Fatal(err)

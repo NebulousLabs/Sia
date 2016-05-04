@@ -35,7 +35,7 @@ func TestHostFailedMkdirAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	_, err = newHost(dependencyErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrMkdirAll {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestHostFailedNewLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrNewLogger{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	_, err = newHost(dependencyErrNewLogger{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrNewLogger {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	_, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrOpenDatabase {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestHostFailedLoadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrLoadFile{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	_, err = newHost(dependencyErrLoadFile{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrLoadFile {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestHostFailedListen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrListen{}, ht.cs, ht.tpool, ht.wallet, ":0", filepath.Join(ht.persistDir, modules.HostDir))
+	_, err = newHost(dependencyErrListen{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrListen {
 		t.Fatal(err)
 	}

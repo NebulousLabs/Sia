@@ -256,13 +256,22 @@ func (st *serverTester) announceHost() error {
 		return err
 	}
 	// mine block
-	st.miner.AddBlock()
+	_, err = st.miner.AddBlock()
+	if err != nil {
+		return err
+	}
 	// wait for announcement
 	var hosts ActiveHosts
-	st.getAPI("/renter/hosts/active", &hosts)
+	err = st.getAPI("/renter/hosts/active", &hosts)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < 20 && len(hosts.Hosts) == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
-		st.getAPI("/renter/hosts/active", &hosts)
+		err = st.getAPI("/renter/hosts/active", &hosts)
+		if err != nil {
+			return err
+		}
 	}
 	if len(hosts.Hosts) == 0 {
 		return errors.New("host announcement not seen")

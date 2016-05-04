@@ -22,7 +22,7 @@ func TestAnnouncementHandling(t *testing.T) {
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],
 	}
-	addr := NetAddress("foo:1234")
+	addr := NetAddress("f.o:1234")
 
 	// Generate the announcement.
 	annBytes, err := CreateAnnouncement(addr, spk, sk)

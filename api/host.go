@@ -105,7 +105,11 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 			}
 		}
 	}
-	srv.host.SetInternalSettings(settings)
+	err := srv.host.SetInternalSettings(settings)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	writeSuccess(w)
 }
 

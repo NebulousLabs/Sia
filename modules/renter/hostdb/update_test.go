@@ -25,7 +25,7 @@ func makeSignedAnnouncement(na modules.NetAddress) ([]byte, error) {
 
 // TestFindHostAnnouncements probes the findHostAnnouncements function
 func TestFindHostAnnouncements(t *testing.T) {
-	annBytes, err := makeSignedAnnouncement("foo:1234")
+	annBytes, err := makeSignedAnnouncement("foo.com:1234")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	hdb.persist = &memPersist{}
 
 	// Put a host announcement into a block.
-	annBytes, err := makeSignedAnnouncement("foo:1234")
+	annBytes, err := makeSignedAnnouncement("foo.com:1234")
 	if err != nil {
 		t.Fatal(err)
 	}

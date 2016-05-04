@@ -45,8 +45,12 @@ func (h *Host) initNetworking(address string) (err error) {
 	if err != nil {
 		return err
 	}
+	_, port, err := net.SplitHostPort(h.listener.Addr().String())
+	if err != nil {
+		return err
+	}
 	h.mu.Lock()
-	h.port = modules.NetAddress(h.listener.Addr().String()).Port()
+	h.port = port
 	if build.Release == "testing" {
 		h.autoAddress = modules.NetAddress(net.JoinHostPort("localhost", h.port))
 	}

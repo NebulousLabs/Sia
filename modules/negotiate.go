@@ -340,6 +340,10 @@ func WriteNegotiationStop(w io.Writer) error {
 // the exact []byte that should be added to the arbitrary data of a
 // transaction.
 func CreateAnnouncement(addr NetAddress, pk types.SiaPublicKey, sk crypto.SecretKey) (signedAnnouncement []byte, err error) {
+	if err := addr.IsValid(); err != nil {
+		return nil, err
+	}
+
 	// Create the HostAnnouncement and marshal it.
 	annBytes := encoding.Marshal(HostAnnouncement{
 		Specifier:  PrefixHostAnnouncement,

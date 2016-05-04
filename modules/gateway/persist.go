@@ -38,7 +38,10 @@ func (g *Gateway) load() error {
 		return err
 	}
 	for _, node := range nodes {
-		g.addNode(node)
+		err := g.addNode(node)
+		if err != nil {
+			g.log.Printf("WARN: error loading node '%v' from persist: %v", node, err)
+		}
 	}
 	return nil
 }

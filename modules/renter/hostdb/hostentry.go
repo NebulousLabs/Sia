@@ -1,7 +1,6 @@
 package hostdb
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -15,17 +14,15 @@ type hostEntry struct {
 	Online      bool
 }
 
-// insert adds a host entry to the state. The host will be inserted into the
-// set of all hosts, and if it is online and responding to requests it will be
-// put into the list of active hosts.
+// insertHost adds a host entry to the state. The host will be inserted into
+// the set of all hosts, and if it is online and responding to requests it will
+// be put into the list of active hosts.
 //
 // TODO: Function should return an error.
 func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
-	// Remove garbage hosts and local hosts.
-	if !host.NetAddress.IsValid() {
-		return
-	}
-	if host.NetAddress.IsLoopback() && build.Release != "testing" {
+	// Remove garbage hosts and local hosts (but allow local hosts in testing).
+	if err := host.NetAddress.IsValid(); err != nil {
+		hdb.log.Printf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
 		return
 	}
 	// Don't do anything if we've already seen this host.
