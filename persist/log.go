@@ -21,7 +21,7 @@ type Logger struct {
 // Critical logs a message with a CRITICAL prefix. If debug mode is enabled,
 // it will also write the message to os.Stderr and panic.
 func (l *Logger) Critical(v ...interface{}) {
-	l.Print("CRITICAL:", fmt.Sprintln(v...))
+	l.Output(2, "CRITICAL: "+fmt.Sprintln(v...))
 	build.Critical(v...)
 }
 
@@ -29,7 +29,7 @@ func (l *Logger) Critical(v ...interface{}) {
 // is a no-op.
 func (l *Logger) Debug(v ...interface{}) {
 	if build.DEBUG {
-		l.Print(v...)
+		l.Output(2, fmt.Sprint(v...))
 	}
 }
 
@@ -37,7 +37,7 @@ func (l *Logger) Debug(v ...interface{}) {
 // is a no-op.
 func (l *Logger) Debugf(format string, v ...interface{}) {
 	if build.DEBUG {
-		l.Printf(format, v...)
+		l.Output(2, fmt.Sprintf(format, v...))
 	}
 }
 
@@ -45,14 +45,14 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 // it is a no-op.
 func (l *Logger) Debugln(v ...interface{}) {
 	if build.DEBUG {
-		l.Println(v...)
+		l.Output(2, fmt.Sprintln(v...))
 	}
 }
 
 // Close logs a shutdown message and closes the Logger's underlying io.Writer,
 // if it is also an io.Closer.
 func (l *Logger) Close() error {
-	l.Println("SHUTDOWN: Logging has terminated.")
+	l.Output(2, "SHUTDOWN: Logging has terminated.")
 	if c, ok := l.w.(io.Closer); ok {
 		return c.Close()
 	}
@@ -63,7 +63,7 @@ func (l *Logger) Close() error {
 // the logger after 'Close' has been called.
 func NewLogger(w io.Writer) *Logger {
 	l := log.New(w, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.LUTC)
-	l.Println("STARTUP: Logging has started.")
+	l.Output(3, "STARTUP: Logging has started.") // Call depth is 3 because NewLogger is usually called by NewFileLogger
 	return &Logger{l, w}
 }
 
