@@ -159,12 +159,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	}
 	avgPrice := sum.Div64(numHosts)
 
-	costPerSector := avgPrice.Mul64(
-		allowance.Hosts).Mul64(
-
-		modules.SectorSize).Mul64(
-
-		uint64(allowance.Period))
+	costPerSector := avgPrice.Mul64(allowance.Hosts).Mul64(modules.SectorSize).Mul64(uint64(allowance.Period))
 
 	if allowance.Funds.Cmp(costPerSector) < 0 {
 		// errors.New("insufficient funds")

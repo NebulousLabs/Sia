@@ -335,13 +335,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.
-	costPerSector := avgPrice.Mul64(
-		a.Hosts).Mul64(
-
-		modules.SectorSize).Mul64(
-
-		uint64(a.Period))
-
+	costPerSector := avgPrice.Mul64(a.Hosts).Mul64(modules.SectorSize).Mul64(uint64(a.Period))
 	if a.Funds.Cmp(costPerSector) < 0 {
 		return errInsufficientAllowance
 	}
