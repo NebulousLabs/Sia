@@ -124,5 +124,5 @@ func CalculateFee(ts []types.Transaction) types.Currency {
 		}
 	}
 	size := len(encoding.Marshal(ts))
-	return sum.Div(types.NewCurrency64(uint64(size)))
+	return sum.Div64(uint64(size))
 }

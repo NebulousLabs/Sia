@@ -157,7 +157,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 		// ??? get more
 		return
 	}
-	avgPrice := sum.Div(types.NewCurrency64(numHosts))
+	avgPrice := sum.Div64(numHosts)
 
 	costPerSector := avgPrice.Mul64(
 		allowance.Hosts).Mul64(

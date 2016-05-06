@@ -64,7 +64,7 @@ func parseFilesize(strSize string) (string, error) {
 // units. The unit used will be the largest unit that results in a value
 // greater than 1. The value is rounded to 4 significant digits.
 func currencyUnits(c types.Currency) string {
-	pico := types.SiacoinPrecision.Div(types.NewCurrency64(1e12))
+	pico := types.SiacoinPrecision.Div64(1e12)
 	if c.Cmp(pico) < 0 {
 		return c.String() + " H"
 	}

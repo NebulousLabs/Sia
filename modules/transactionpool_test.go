@@ -60,7 +60,7 @@ func TestCalculateFee(t *testing.T) {
 		},
 	}}
 	setLen := uint64(len(encoding.Marshal(txnSet)))
-	expectedFee := baseFee.Div(types.NewCurrency64(setLen))
+	expectedFee := baseFee.Div64(setLen)
 	if CalculateFee(txnSet).Cmp(expectedFee) != 0 {
 		t.Error("CalculateFee doesn't seem to be calculating the correct transaction fee")
 	}
@@ -72,7 +72,7 @@ func TestCalculateFee(t *testing.T) {
 	if newSetLen <= setLen {
 		t.Fatal("transaction set did not grow after adding a file contract")
 	}
-	newExpectedFee := baseFee.Div(types.NewCurrency64(newSetLen))
+	newExpectedFee := baseFee.Div64(newSetLen)
 	if newExpectedFee.Cmp(expectedFee) >= 0 {
 		t.Error("the new expected fee should go down as the txn size increases")
 	}

@@ -244,12 +244,12 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 		// TODO: check that this isn't too small
 		hostCollateral = host.MaxCollateral
 	}
-	saneCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(duration)).Mul64(2).Div(types.NewCurrency64(3))
+	saneCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(duration)).Mul64(2).Div64(3)
 	if hostCollateral.Cmp(saneCollateral) < 0 {
 		return Contract{}, errSmallCollateral
 	}
 	hostPayout := hostCollateral.Add(host.ContractPrice)
-	payout := storageAllocation.Add(hostPayout).Mul64(uint64(10406)).Div(types.NewCurrency64(uint64(10000)))
+	payout := storageAllocation.Add(hostPayout).Mul64(uint64(10406)).Div64(uint64(10000))
 	renterCost := payout.Sub(hostCollateral)
 
 	// create file contract
@@ -331,7 +331,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	for _, h := range hosts {
 		sum = sum.Add(h.StoragePrice)
 	}
-	avgPrice := sum.Div(types.NewCurrency64(uint64(len(hosts))))
+	avgPrice := sum.Div64(uint64(len(hosts)))
 
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.

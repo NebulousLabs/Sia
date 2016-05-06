@@ -633,7 +633,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		revisionTxn := so.RevisionTransactionSet[revisionTxnIndex]
 		builder := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
 		feeRecommendation, _ := h.tpool.FeeEstimation()
-		if so.value().Div(types.NewCurrency64(2)).Cmp(feeRecommendation) < 0 {
+		if so.value().Div64(2).Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the revision if the fee is more than
 			// half of the anticipated revenue - fee market went up
 			// unexpectedly, and the money that the renter paid to cover the
