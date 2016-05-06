@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
-	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -30,7 +30,7 @@ func hostdbcmd() {
 	}
 	fmt.Println("Active hosts:")
 	for _, host := range info.Hosts {
-		price := host.StoragePrice.Mul(types.NewCurrency64(4320e12))
+		price := modules.StoragePriceToHuman(host.StoragePrice)
 		fmt.Printf("\t%v - %v / TB / Month\n", host.NetAddress, currencyUnits(price))
 	}
 }
