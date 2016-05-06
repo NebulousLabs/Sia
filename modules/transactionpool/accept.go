@@ -35,7 +35,7 @@ var (
 	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 	errEmptySet            = errors.New("transaction set is empty")
 
-	TransactionMinFee = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
+	TransactionMinFee = types.SiacoinPrecision.Mul64(2)
 )
 
 // relatedObjectIDs determines all of the object ids related to a transaction.

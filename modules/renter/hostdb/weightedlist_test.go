@@ -22,7 +22,7 @@ func fakeAddr(n uint8) modules.NetAddress {
 // every entropy has the same weight.
 func uniformTreeVerification(hdb *HostDB, numEntries int) error {
 	// Check that the weight of the hostTree is what is expected.
-	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdb.hostTree.hostEntry.Weight)
+	expectedWeight := hdb.hostTree.hostEntry.Weight.Mul64(uint64(numEntries))
 	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		return errors.New("expected weight is incorrect")
 	}

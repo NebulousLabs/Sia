@@ -51,7 +51,7 @@ var (
 	// host is going to allocate towards collateral. 10 million has been chosen
 	// as a number that is large, but not so large that someone would be
 	// furious for losing access to it for a few weeks.
-	defaultCollateralBudget = types.NewCurrency64(10e6).Mul(types.SiacoinPrecision)
+	defaultCollateralBudget = types.SiacoinPrecision.Mul64(10e6)
 
 	// defaultCollateralFraction defines the percentage of the payout that the
 	// host is comfortable having as the collateral. A default of 650e3
@@ -66,12 +66,12 @@ var (
 	// proof can have 15 siacoins put towards it, with 5 left over for the
 	// host, a sort of compensation for keeping and backing up the storage
 	// obligation data.
-	defaultContractPrice = types.NewCurrency64(40).Mul(types.SiacoinPrecision) // 40 siacoins
+	defaultContractPrice = types.SiacoinPrecision.Mul64(40) // 40 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
 	// download bandwidth is expected to be plentiful but also in-demand.
-	defaultDownloadBandwidthPrice = types.NewCurrency64(10e3).Mul(types.SiacoinPrecision).Div(modules.BytesPerTerabyte) // 10k SC / TB
+	defaultDownloadBandwidthPrice = types.SiacoinPrecision.Mul64(10e3).Div(modules.BytesPerTerabyte) // 10k SC / TB
 
 	// defaultMaxDownloadBatchSize defines the maximum number of bytes that the
 	// host will allow to be requested by a single download request. 17 MiB has
@@ -98,12 +98,12 @@ var (
 	// away by only a few hundred file contracts. As the ecosystem matures, it
 	// is expected that the safe default for this value will increase quite a
 	// bit.
-	defaultMaxCollateral = types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
+	defaultMaxCollateral = types.SiacoinPrecision.Mul64(10e3)
 
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
-	defaultStoragePrice = types.NewCurrency64(20e3).Mul(types.SiacoinPrecision).Div(modules.BlockBytesPerMonthTerabyte) // 20k SC / TB / Month
+	defaultStoragePrice = types.SiacoinPrecision.Mul64(20e3).Div(modules.BlockBytesPerMonthTerabyte) // 20k SC / TB / Month
 
 	// defaultUploadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 1 siacoin per GB, because the host is
@@ -111,7 +111,7 @@ var (
 	// the host is typically only downloading data if it is planning to store
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
-	defaultUploadBandwidthPrice = types.NewCurrency64(1e3).Mul(types.SiacoinPrecision).Div(modules.BytesPerTerabyte) // 1 SC / TB
+	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(1e3).Div(modules.BytesPerTerabyte) // 1 SC / TB
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window

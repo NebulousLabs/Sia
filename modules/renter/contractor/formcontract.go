@@ -19,7 +19,7 @@ const (
 
 var (
 	// the contractor will not form contracts above this price
-	maxPrice = types.NewCurrency64(500e3).Mul(types.SiacoinPrecision).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
+	maxPrice = types.SiacoinPrecision.Mul64(500e3).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
 
 	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
 	errSmallCollateral       = errors.New("host collateral was too small")
