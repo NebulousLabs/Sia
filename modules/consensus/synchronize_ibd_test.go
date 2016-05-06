@@ -286,7 +286,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 
 	// Set minIBDWaitTime to 1s for just this test because no blocks are
-	// transfered between peers so the wait time can be very short.
+	// transferred between peers so the wait time can be very short.
 	actualMinIBDWaitTime := minIBDWaitTime
 	defer func() {
 		minIBDWaitTime = actualMinIBDWaitTime

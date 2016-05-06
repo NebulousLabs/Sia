@@ -64,7 +64,7 @@ func New(cs modules.ConsensusSet, persistDir string) (*Explorer, error) {
 		persistDir: persistDir,
 	}
 
-	// Intialize the persistent structures, including the database.
+	// Initialize the persistent structures, including the database.
 	err := e.initPersist()
 	if err != nil {
 		return nil, err

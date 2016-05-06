@@ -16,7 +16,8 @@ func (m *Miner) threadedMine() {
 	m.mining = true
 	m.mu.Unlock()
 
-	// Solve blocks repeatedly, keeping track of how fast hashing is occuring.
+	// Solve blocks repeatedly, keeping track of how fast hashing is
+	// occurring.
 	cycleStart := time.Now()
 	for {
 		// Kill the thread if mining has been turned off.

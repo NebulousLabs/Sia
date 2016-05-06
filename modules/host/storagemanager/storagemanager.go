@@ -133,9 +133,9 @@ func newStorageManager(dependencies dependencies, persistDir string) (*StorageMa
 		_ = sm.log.Close()
 		return nil, err
 	}
-	// After opening the database, it must be initalized. Most commonly,
+	// After opening the database, it must be initialized. Most commonly,
 	// nothing happens. But for new databases, a set of buckets must be
-	// created. Intialization is also a good time to run sanity checks.
+	// created. Initialization is also a good time to run sanity checks.
 	err = sm.initDB()
 	if err != nil {
 		_ = sm.log.Close()
@@ -143,7 +143,7 @@ func newStorageManager(dependencies dependencies, persistDir string) (*StorageMa
 		return nil, err
 	}
 
-	// Load the prior persistance structures.
+	// Load the prior persistence structures.
 	err = sm.load()
 	if err != nil {
 		_ = sm.log.Close()

@@ -37,7 +37,7 @@ pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/con
 
 # fmt calls go fmt on all packages.
 fmt:
-	go fmt $(pkgs)
+	gofmt -s -l -w $(pkgs)
 
 # vet calls go vet on all packages.
 # NOTE: go vet requires packages to be built in order to obtain type info.

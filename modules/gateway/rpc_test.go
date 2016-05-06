@@ -23,9 +23,9 @@ func TestRPCID(t *testing.T) {
 
 func TestHandlerName(t *testing.T) {
 	cases := map[string]rpcID{
-		"":          rpcID{},
-		"foo":       rpcID{'f', 'o', 'o'},
-		"foobarbaz": rpcID{'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a'},
+		"":          {},
+		"foo":       {'f', 'o', 'o'},
+		"foobarbaz": {'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a'},
 	}
 	for s, id := range cases {
 		if hid := handlerName(s); hid != id {
@@ -39,7 +39,7 @@ func TestRPC(t *testing.T) {
 	defer g1.Close()
 
 	if err := g1.RPC("foo.com:123", "", nil); err == nil {
-		t.Fatal("RPC on unconnected peer succeded")
+		t.Fatal("RPC on unconnected peer succeeded")
 	}
 
 	g2 := newTestingGateway("TestRPC2", t)
@@ -319,7 +319,7 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 	// Call the "recv" RPC on g1. We don't know g1's address as g2 sees it, so we
 	// get it from the first address in g2's peer list.
 	var addr modules.NetAddress
-	for p_addr, _ := range g2.peers {
+	for p_addr := range g2.peers {
 		addr = p_addr
 		break
 	}

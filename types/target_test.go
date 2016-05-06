@@ -106,7 +106,7 @@ func TestTargetMul(t *testing.T) {
 	target14[crypto.HashSize-1] = 14
 	target20[crypto.HashSize-1] = 20
 
-	// Multiplying the difficulty of a target at '10' by 5 will yeild a target
+	// Multiplying the difficulty of a target at '10' by 5 will yield a target
 	// of '2'. Similar math follows for the remaining checks.
 	expect2 := target10.MulDifficulty(big.NewRat(5, 1))
 	if expect2 != target2 {
@@ -164,7 +164,7 @@ func TestTargetNegativeIntToTarget(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != ErrNegativeTarget {
-			t.Error("no panic occured when trying to create a negative target")
+			t.Error("no panic occurred when trying to create a negative target")
 		}
 	}()
 	b := big.NewInt(-3)
@@ -183,7 +183,7 @@ func TestTargetNegativeRatToTarget(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r != ErrNegativeTarget {
-			t.Error("no panic occured when trying to create a negative target")
+			t.Error("no panic occurred when trying to create a negative target")
 		}
 	}()
 	r := big.NewRat(3, -5)

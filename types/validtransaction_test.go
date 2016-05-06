@@ -445,7 +445,7 @@ func TestTransactionStandaloneValid(t *testing.T) {
 	txn.FileContractRevisions = nil
 
 	// Violate validUnlockConditions
-	txn.SiacoinInputs = []SiacoinInput{SiacoinInput{}}
+	txn.SiacoinInputs = []SiacoinInput{{}}
 	txn.SiacoinInputs[0].UnlockConditions.Timelock = 1
 	err = txn.StandaloneValid(0)
 	if err == nil {

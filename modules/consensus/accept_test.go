@@ -222,7 +222,7 @@ func TestUnitValidateHeaderAndBlock(t *testing.T) {
 			block: mockValidBlock,
 			// Create a dosBlocks map where mockValidBlock is marked as a bad block.
 			dosBlocks: map[types.BlockID]struct{}{
-				mockValidBlock.ID(): struct{}{},
+				mockValidBlock.ID(): {},
 			},
 			earliestValidTimestamp: mockValidBlock.Timestamp,
 			marshaler:              parentBlockUnmarshaler,
@@ -355,7 +355,7 @@ func TestUnitValidateHeader(t *testing.T) {
 			header: mockValidBlock.Header(),
 			// Create a dosBlocks map where mockValidBlock is marked as a bad block.
 			dosBlocks: map[types.BlockID]struct{}{
-				mockValidBlock.ID(): struct{}{},
+				mockValidBlock.ID(): {},
 			},
 			blockMapPairs:          serializedParentBlockMap,
 			earliestValidTimestamp: mockValidBlock.Timestamp,

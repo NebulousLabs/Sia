@@ -259,7 +259,7 @@ output spendable by the 'missed proof spend hash'.
 
 All contracts must have a non-zero payout, 'start' must be before 'end', and
 'start' must be greater than the current height of the blockchain. A storage
-proof is acceptible if it is submitted in the block of height 'end'.
+proof is acceptable if it is submitted in the block of height 'end'.
 
 File contracts are created with a 'Revision Hash', which is the Merkle root of
 an unlock conditions object. A 'file contract revision' can be submitted which

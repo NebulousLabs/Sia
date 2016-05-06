@@ -159,7 +159,7 @@ will be overwritten.
 
 * `siac renter share [nickname] [filepath]` writes a .sia file
 pointing to the file specified by `nickname` on the network. The file
-is written to `filepath`. Note that the `.sia` extention will not be
+is written to `filepath`. Note that the `.sia` extension will not be
 automatically added, and must be part of the path.
 
 * `siac renter shareascii [nickname]` writes the .sia file specified

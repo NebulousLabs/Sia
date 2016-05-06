@@ -7,7 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestArbDataOnly tries submitting a transaction with only aribtrary data to
+// TestArbDataOnly tries submitting a transaction with only arbitrary data to
 // the transaction pool. Then a block is mined, putting the transaction on the
 // blockchain. The arb data transaction should no longer be in the transaction
 // pool.

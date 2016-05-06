@@ -757,7 +757,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		h.log.Println(err)
 	}
 
-	// Check if all items have succeded with the required confirmations. Report
+	// Check if all items have succeeded with the required confirmations. Report
 	// success, delete the obligation.
 	//
 	// TODO: This doesn't actually wait enough blocks?

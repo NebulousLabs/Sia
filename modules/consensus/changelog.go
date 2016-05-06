@@ -93,7 +93,7 @@ func appendChangeLog(tx *bolt.Tx, ce changeEntry) error {
 }
 
 // getEntry returns the change entry with a given id, using a bool to indicate
-// existance.
+// existence.
 func getEntry(tx *bolt.Tx, id modules.ConsensusChangeID) (ce changeEntry, exists bool) {
 	var cn changeNode
 	cl := tx.Bucket(ChangeLog)

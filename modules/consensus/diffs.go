@@ -22,7 +22,7 @@ var (
 	errWrongRevertDiffSet            = errors.New("reverting a diff set that isn't the current block")
 )
 
-// commitDiffSetSanity performs a series of sanity checks before commiting a
+// commitDiffSetSanity performs a series of sanity checks before committing a
 // diff set.
 func commitDiffSetSanity(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) {
 	// This function is purely sanity checks.

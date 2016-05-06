@@ -198,7 +198,7 @@ func newHostTester(name string) (*hostTester, error) {
 	return ht, nil
 }
 
-// TestHostInitialization checks that the host intializes to sensisble default
+// TestHostInitialization checks that the host initializes to sensible default
 // values.
 func TestHostInitialization(t *testing.T) {
 	if testing.Short() {

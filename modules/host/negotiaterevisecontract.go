@@ -14,7 +14,7 @@ import (
 var (
 	// errBadModificationIndex is returned if the renter requests a change on a
 	// sector root that is not in the file contract.
-	errBadModificationIndex = errors.New("renter has made a modification that points to a nonexistant sector")
+	errBadModificationIndex = errors.New("renter has made a modification that points to a nonexistent sector")
 
 	// badSectorSize is returned if the renter provides a sector to be inserted
 	// that is the wrong size.

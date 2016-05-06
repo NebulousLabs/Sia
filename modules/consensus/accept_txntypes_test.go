@@ -1004,7 +1004,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		}
 		refundTxn.TransactionSignatures[0].Signature = cryptoSig1[:]
 
-		// Recieving entity never communitcates, funding entity must reclaim
+		// Receiving entity never communitcates, funding entity must reclaim
 		// the 'channelSize' coins that were intended to go to the channel.
 		reclaimUC, err := cst.wallet.NextAddress()
 		reclaimAddr := reclaimUC.UnlockHash()

@@ -83,7 +83,7 @@ func (faultyRemove) removeFile(s string) error {
 }
 
 // TestStorageFolderTolerance tests the tolerance of storage folders in the
-// presense of disk failures. Disk failures should be recorded, and the
+// presence of disk failures. Disk failures should be recorded, and the
 // failures should be handled gracefully - nonfailing disks should not have
 // problems.
 func TestStorageFolderTolerance(t *testing.T) {

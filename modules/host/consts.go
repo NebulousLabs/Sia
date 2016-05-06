@@ -192,7 +192,7 @@ var (
 	// store the heights sorted in numerical order. The action item itself is
 	// an array of file contract ids. The host is able to contextually figure
 	// out what the necessary actions for that item are based on the file
-	// contract id and the associated storage obligation that can be retreived
+	// contract id and the associated storage obligation that can be retrieved
 	// using the id.
 	bucketActionItems = []byte("BucketActionItems")
 

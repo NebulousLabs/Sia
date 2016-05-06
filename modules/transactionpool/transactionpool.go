@@ -27,7 +27,7 @@ type (
 	// rejecting them based on internal criteria such as fees and unconfirmed
 	// double spends.
 	TransactionPool struct {
-		// Depedencies of the transaction pool.
+		// Dependencies of the transaction pool.
 		consensusSet modules.ConsensusSet
 		gateway      modules.Gateway
 

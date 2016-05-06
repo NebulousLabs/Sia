@@ -12,7 +12,7 @@ untrusted environment. Managing data on Sia happens through several protocols:
   performed to verify that the renter is able to create the signatures to
   modify the file contract revision.
 
-+ File Contract Creation - no data is uploaded during the inital creation of a
++ File Contract Creation - no data is uploaded during the initial creation of a
   file contract, but funds are allocated so that the file contract can be
   iteratively revised in the future.
 
@@ -68,7 +68,7 @@ Revision Request
 ----------------
 
 The renter requests a recent revision from the host. Often, this request
-preceeds modifications. A file contract can only be open for revision with one
+precedes modifications. A file contract can only be open for revision with one
 party at a time. To prevent DoS attacks, the party must authenticate here by
 performing a challenge-response protocol during the revision request. Putting
 this challenge-response requirement in the revision-request can help improve
@@ -76,7 +76,7 @@ privacy, though the host is under no cryptographic or incentive-based
 obligation to preserve the privacy of the revision.
 
 1. The renter makes an RPC to the host, opening a connection. The connection
-   deadline sould be at least 120 seconds. The renter sends the file contract
+   deadline should be at least 120 seconds. The renter sends the file contract
    id for the revision being requested.
 
 2. The host writes 32 bytes of random data that the renter must sign for the

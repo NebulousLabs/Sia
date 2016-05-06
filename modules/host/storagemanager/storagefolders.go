@@ -120,7 +120,7 @@ var (
 // files. These files have long, cryptographic names and may take up as much as
 // a gigabyte of space in filesystem overhead, depending on how the filesystem
 // is architected. The host is programmed to gracefully handle full disks, so
-// wihle it might cause the user surprise that the host can't break past 99%
+// while it might cause the user surprise that the host can't break past 99%
 // utilization, there should not be any issues if the user overestimates how
 // much storage is available in the folder they have offered to Sia. The host
 // will put the drive at 100% utilization, which may cause performance

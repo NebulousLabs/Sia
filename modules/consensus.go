@@ -70,7 +70,7 @@ type (
 		ProcessConsensusChange(ConsensusChange)
 	}
 
-	// A ConsensusChange enumerates a set of changes that occured to the consensus set.
+	// A ConsensusChange enumerates a set of changes that occurred to the consensus set.
 	ConsensusChange struct {
 		// ID is a unique id for the consensus change derived from the reverted
 		// and applied blocks.
@@ -181,7 +181,7 @@ type (
 		Close() error
 
 		// ConsensusSetSubscribe adds a subscriber to the list of subscribers,
-		// and gives them every consensus change that has occured since the
+		// and gives them every consensus change that has occurred since the
 		// change with the provided id. There are a few special cases,
 		// described by the ConsensusChangeX variables in this package.
 		ConsensusSetSubscribe(ConsensusSetSubscriber, ConsensusChangeID) error

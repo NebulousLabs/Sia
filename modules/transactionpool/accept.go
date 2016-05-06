@@ -66,7 +66,7 @@ func relatedObjectIDs(ts []types.Transaction) []ObjectID {
 	}
 
 	var oids []ObjectID
-	for oid, _ := range oidMap {
+	for oid := range oidMap {
 		oids = append(oids, oid)
 	}
 	return oids

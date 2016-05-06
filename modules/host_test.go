@@ -94,11 +94,11 @@ func TestUnitStoragePriceConversions(t *testing.T) {
 	if toHuman != 1 {
 		t.Error("rounding is not happening correctly in StoragePriceToHuman")
 	}
-	toHuman, err = StoragePriceToHuman(notOverflow)
+	_, err = StoragePriceToHuman(notOverflow)
 	if err != nil {
 		t.Error(err)
 	}
-	toHuman, err = StoragePriceToHuman(causeOverflow)
+	_, err = StoragePriceToHuman(causeOverflow)
 	if err != types.ErrUint64Overflow {
 		t.Error(err)
 	}
@@ -173,7 +173,7 @@ func TestUnitBandwidthPriceConversions(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	toHuman, err = BandwidthPriceToHuman(causeOverflow)
+	_, err = BandwidthPriceToHuman(causeOverflow)
 	if err != types.ErrUint64Overflow {
 		t.Error(err)
 	}

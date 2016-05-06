@@ -54,7 +54,7 @@ func TestActiveHosts(t *testing.T) {
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
 	hdb.activeHosts = map[modules.NetAddress]*hostNode{
-		h1.NetAddress: &hostNode{hostEntry: h1},
+		h1.NetAddress: {hostEntry: h1},
 	}
 	if hosts := hdb.ActiveHosts(); len(hosts) != 1 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 1, len(hosts))
@@ -66,8 +66,8 @@ func TestActiveHosts(t *testing.T) {
 	h2 := new(hostEntry)
 	h2.NetAddress = "bar"
 	hdb.activeHosts = map[modules.NetAddress]*hostNode{
-		h1.NetAddress: &hostNode{hostEntry: h1},
-		h2.NetAddress: &hostNode{hostEntry: h2},
+		h1.NetAddress: {hostEntry: h1},
+		h2.NetAddress: {hostEntry: h2},
 	}
 	if hosts := hdb.ActiveHosts(); len(hosts) != 2 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 2, len(hosts))
@@ -116,9 +116,9 @@ func TestAveragePrice(t *testing.T) {
 func TestIsOffline(t *testing.T) {
 	hdb := &HostDB{
 		allHosts: map[modules.NetAddress]*hostEntry{
-			"foo.com:1234": &hostEntry{Online: true},
-			"bar.com:1234": &hostEntry{Online: false},
-			"baz.com:1234": &hostEntry{Online: true},
+			"foo.com:1234": {Online: true},
+			"bar.com:1234": {Online: false},
+			"baz.com:1234": {Online: true},
 		},
 		activeHosts: map[modules.NetAddress]*hostNode{
 			"foo.com:1234": nil,

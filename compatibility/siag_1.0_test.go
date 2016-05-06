@@ -42,7 +42,7 @@ func verifyKeysSiag_1_0(uc types.UnlockConditions, folder string, keyname string
 	}
 	txn := types.Transaction{
 		SiafundInputs: []types.SiafundInput{
-			types.SiafundInput{
+			{
 				UnlockConditions: loadedKeys[0].UnlockConditions,
 			},
 		},
