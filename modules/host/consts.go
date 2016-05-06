@@ -71,7 +71,7 @@ var (
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
 	// download bandwidth is expected to be plentiful but also in-demand.
-	defaultDownloadBandwidthPrice = modules.BandwidthPriceToConsensus(10e3) // 10 SC / GB
+	defaultDownloadBandwidthPrice = types.NewCurrency64(10e3).Mul(types.SiacoinPrecision).Div(modules.BytesPerTerabyte) // 10k SC / TB
 
 	// defaultMaxDownloadBatchSize defines the maximum number of bytes that the
 	// host will allow to be requested by a single download request. 17 MiB has
@@ -103,7 +103,7 @@ var (
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
-	defaultStoragePrice = modules.StoragePriceToConsensus(20e3) // 20 SC / GB / Month
+	defaultStoragePrice = types.NewCurrency64(20e3).Mul(types.SiacoinPrecision).Div(modules.BlockBytesPerMonthTerabyte) // 20k SC / TB / Month
 
 	// defaultUploadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 1 siacoin per GB, because the host is
@@ -111,7 +111,7 @@ var (
 	// the host is typically only downloading data if it is planning to store
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
-	defaultUploadBandwidthPrice = modules.BandwidthPriceToConsensus(1e3) // 1 SC / GB
+	defaultUploadBandwidthPrice = types.NewCurrency64(1e3).Mul(types.SiacoinPrecision).Div(modules.BytesPerTerabyte) // 1 SC / TB
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
