@@ -14,7 +14,7 @@ var (
 	BytesPerTerabyte = types.NewCurrency64(1e12)
 
 	// BlockBytesPerMonthTerabyte is the conversion rate between block-bytes and month-TB.
-	BlockBytesPerMonthTerabyte = BytesPerTerabyte.Mul(types.NewCurrency64(4320))
+	BlockBytesPerMonthTerabyte = BytesPerTerabyte.Mul64(4320)
 )
 
 type (

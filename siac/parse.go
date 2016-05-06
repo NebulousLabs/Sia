@@ -73,12 +73,12 @@ func currencyUnits(c types.Currency) string {
 	mag := pico
 	unit := ""
 	for _, unit = range []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"} {
-		if c.Cmp(mag.Mul(types.NewCurrency64(1e3))) < 0 {
+		if c.Cmp(mag.Mul64(1e3)) < 0 {
 			break
 		} else if unit != "TS" {
 			// don't want to perform this multiply on the last iter; that
 			// would give us 1.235 TS instead of 1235 TS
-			mag = mag.Mul(types.NewCurrency64(1e3))
+			mag = mag.Mul64(1e3)
 		}
 	}
 

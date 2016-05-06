@@ -641,7 +641,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			return
 		}
 		txnSize := uint64(len(encoding.MarshalAll(so.RevisionTransactionSet)) + 300)
-		requiredFee := feeRecommendation.Mul(types.NewCurrency64(txnSize))
+		requiredFee := feeRecommendation.Mul64(txnSize)
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
 			h.log.Println(err)
@@ -719,7 +719,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			return
 		}
 		txnSize := uint64(len(encoding.Marshal(sp)) + 300)
-		requiredFee := feeRecommendation.Mul(types.NewCurrency64(txnSize))
+		requiredFee := feeRecommendation.Mul64(txnSize)
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
 			return

@@ -77,8 +77,8 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 	)
 	curSectors := rev.NewFileSize / modules.SectorSize
 	if numSectors > curSectors {
-		diffPrice := sectorPrice.Mul(types.NewCurrency64(numSectors - curSectors))
-		diffCollateral := sectorCollateral.Mul(types.NewCurrency64(numSectors - curSectors))
+		diffPrice := sectorPrice.Mul64(numSectors - curSectors)
+		diffCollateral := sectorCollateral.Mul64(numSectors - curSectors)
 		// move valid payout from renter to host
 		valid0, valid1 = move(diffPrice, valid0, valid1)
 		// move missed payout from renter to void
@@ -86,8 +86,8 @@ func newRevision(rev types.FileContractRevision, merkleRoot crypto.Hash, numSect
 		// move missed collateral from host to void
 		missed1, missed2 = move(diffCollateral, missed1, missed2)
 	} else if numSectors < curSectors {
-		diffPrice := sectorPrice.Mul(types.NewCurrency64(curSectors - numSectors))
-		diffCollateral := sectorCollateral.Mul(types.NewCurrency64(curSectors - numSectors))
+		diffPrice := sectorPrice.Mul64(curSectors - numSectors)
+		diffCollateral := sectorCollateral.Mul64(curSectors - numSectors)
 		// move valid payout from host to renter
 		valid1, valid0 = move(diffPrice, valid1, valid0)
 		// move missed payout from void to renter

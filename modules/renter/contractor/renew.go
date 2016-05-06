@@ -48,7 +48,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	}
 
 	// TODO: what if this isn't enough money??
-	renterCost := host.StoragePrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(newEndHeight - height)))
+	renterCost := host.StoragePrice.Mul64(filesize).Mul64(uint64(newEndHeight - height))
 	payout := renterCost // no collateral
 
 	// create file contract
@@ -159,10 +159,13 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	}
 	avgPrice := sum.Div(types.NewCurrency64(numHosts))
 
-	costPerSector := avgPrice.
-		Mul(types.NewCurrency64(allowance.Hosts)).
-		Mul(types.NewCurrency64(modules.SectorSize)).
-		Mul(types.NewCurrency64(uint64(allowance.Period)))
+	costPerSector := avgPrice.Mul64(
+		allowance.Hosts).Mul64(
+
+		modules.SectorSize).Mul64(
+
+		uint64(allowance.Period))
+
 	if allowance.Funds.Cmp(costPerSector) < 0 {
 		// errors.New("insufficient funds")
 	}

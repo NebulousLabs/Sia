@@ -52,7 +52,7 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 
 	// calculate transaction fee
 	_, maxFee := tpool.FeeEstimation()
-	fee := maxFee.Mul(types.NewCurrency64(estTxnSize))
+	fee := maxFee.Mul64(estTxnSize)
 
 	// build transaction containing fc
 	err = txnBuilder.FundSiacoins(renterCost.Add(fee))
@@ -238,18 +238,18 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 
 	// calculate cost to renter and cost to host
 	// TODO: clarify/abstract this math
-	storageAllocation := host.StoragePrice.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration)))
+	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(duration))
 	hostCollateral := storageAllocation.Mul(host.MaxCollateralFraction).Div(types.NewCurrency64(1e6).Sub(host.MaxCollateralFraction))
 	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
 		// TODO: check that this isn't too small
 		hostCollateral = host.MaxCollateral
 	}
-	saneCollateral := host.Collateral.Mul(types.NewCurrency64(filesize)).Mul(types.NewCurrency64(uint64(duration))).Mul(types.NewCurrency64(2)).Div(types.NewCurrency64(3))
+	saneCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(duration)).Mul64(2).Div(types.NewCurrency64(3))
 	if hostCollateral.Cmp(saneCollateral) < 0 {
 		return Contract{}, errSmallCollateral
 	}
 	hostPayout := hostCollateral.Add(host.ContractPrice)
-	payout := storageAllocation.Add(hostPayout).Mul(types.NewCurrency64(uint64(10406))).Div(types.NewCurrency64(uint64(10000)))
+	payout := storageAllocation.Add(hostPayout).Mul64(uint64(10406)).Div(types.NewCurrency64(uint64(10000)))
 	renterCost := payout.Sub(hostCollateral)
 
 	// create file contract
@@ -335,10 +335,13 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.
-	costPerSector := avgPrice.
-		Mul(types.NewCurrency64(a.Hosts)).
-		Mul(types.NewCurrency64(modules.SectorSize)).
-		Mul(types.NewCurrency64(uint64(a.Period)))
+	costPerSector := avgPrice.Mul64(
+		a.Hosts).Mul64(
+
+		modules.SectorSize).Mul64(
+
+		uint64(a.Period))
+
 	if a.Funds.Cmp(costPerSector) < 0 {
 		return errInsufficientAllowance
 	}

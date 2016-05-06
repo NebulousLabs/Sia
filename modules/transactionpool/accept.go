@@ -92,7 +92,7 @@ func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
 				feeSum = feeSum.Add(fee)
 			}
 		}
-		feeRequired := TransactionMinFee.Mul(types.NewCurrency64(uint64(len(ts))))
+		feeRequired := TransactionMinFee.Mul64(uint64(len(ts)))
 		if feeSum.Cmp(feeRequired) < 0 {
 			return errLowMinerFees
 		}

@@ -402,7 +402,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	}
 	// Check that the collateral for the host is not too high.
 	expectedCollateral := contractCollateral(settings, txnSet)
-	expectedCollateralFraction := expectedCollateral.Mul(types.NewCurrency64(1e6)).Div(fc.Payout)
+	expectedCollateralFraction := expectedCollateral.Mul64(1e6).Div(fc.Payout)
 	if expectedCollateralFraction.Cmp(settings.MaxCollateralFraction) > 0 {
 		return errBadCollateralFraction
 	}

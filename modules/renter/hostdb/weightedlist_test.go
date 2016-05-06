@@ -259,7 +259,7 @@ func TestNodeAtWeight(t *testing.T) {
 	ht := createNode(nil, h1)
 
 	// overweight
-	_, err := ht.nodeAtWeight(baseWeight.Mul(types.NewCurrency64(2)))
+	_, err := ht.nodeAtWeight(baseWeight.Mul64(2))
 	if err != errOverweight {
 		t.Errorf("expected %v, got %v", errOverweight, err)
 	}
