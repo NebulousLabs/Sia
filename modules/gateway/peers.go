@@ -148,7 +148,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	//
 	// NOTE: this version must be bumped whenever the gateway or consensus
 	// breaks compatibility.
-	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
+	if !build.IsVersion(remoteVersion) || build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		encoding.WriteObject(conn, "reject")
 		conn.Close()
 		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
@@ -244,7 +244,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	//
 	// NOTE: this version must be bumped whenever the gateway or consensus
 	// breaks compatibility.
-	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
+	if !build.IsVersion(remoteVersion) || build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		conn.Close()
 		return insufficientVersionError(remoteVersion)
 	}

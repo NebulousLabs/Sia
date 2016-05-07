@@ -297,9 +297,29 @@ func TestConnectRejectsInvalidVersions(t *testing.T) {
 			insufficientVersion: true,
 			msg:                 "Connect should fail when the remote peer's version is ascii gibberish",
 		},
+		{
+			version:             "999.foobar",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is ascii gibberish",
+		},
+		{
+			version:             "foobar.0",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is ascii gibberish",
+		},
 		// Test that Connect fails when the remote peer's version is utf8 gibberish.
 		{
 			version:             "世界",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is utf8 gibberish",
+		},
+		{
+			version:             "999.世界",
+			insufficientVersion: true,
+			msg:                 "Connect should fail when the remote peer's version is utf8 gibberish",
+		},
+		{
+			version:             "世界.0",
 			insufficientVersion: true,
 			msg:                 "Connect should fail when the remote peer's version is utf8 gibberish",
 		},
@@ -433,9 +453,29 @@ func TestAcceptConnRejectsInvalidVersions(t *testing.T) {
 			versionResponseWant: "reject",
 			msg:                 "acceptConn shouldn't accept a remote peer whose version is ascii giberish",
 		},
+		{
+			remoteVersion:       "999.foobar",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is ascii giberish",
+		},
+		{
+			remoteVersion:       "foobar.0",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is ascii giberish",
+		},
 		// Test that acceptConn fails when the remote peer's version is utf8 gibberish.
 		{
 			remoteVersion:       "世界",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is utf8 giberish",
+		},
+		{
+			remoteVersion:       "999.世界",
+			versionResponseWant: "reject",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is utf8 giberish",
+		},
+		{
+			remoteVersion:       "世界.0",
 			versionResponseWant: "reject",
 			msg:                 "acceptConn shouldn't accept a remote peer whose version is utf8 giberish",
 		},
