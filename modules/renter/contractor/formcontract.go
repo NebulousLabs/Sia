@@ -2,7 +2,9 @@ package contractor
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -354,19 +356,26 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	endHeight := c.blockHeight + a.Period
 	c.mu.RUnlock()
 	var numContracts uint64
+	var errs []string
 	for _, h := range hosts {
 		_, err := c.newContract(h, filesize, endHeight)
 		if err != nil {
-			// TODO: is there a better way to handle failure here? Should we
-			// prefer an all-or-nothing approach? We can't pick new hosts to
-			// negotiate with because they'll probably be more expensive than
-			// we can afford.
-			c.log.Println("WARN: failed to negotiate contract:", h.NetAddress, err)
+			errs = append(errs, fmt.Sprintf("\t%v: %v", h.NetAddress, err))
 			continue
 		}
 		if numContracts++; numContracts >= a.Hosts {
 			break
 		}
+	}
+	// If we couldn't form any contracts, return an error. Otherwise, just log
+	// the failures.
+	// TODO: is there a better way to handle failure here? Should we prefer an
+	// all-or-nothing approach? We can't pick new hosts to negotiate with
+	// because they'll probably be more expensive than we can afford.
+	if numContracts == 0 {
+		return errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
+	} else if numContracts < a.Hosts {
+		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v): %v", a.Hosts, numContracts, strings.Join(errs, "\n"))
 	}
 	c.mu.Lock()
 	c.renewHeight = endHeight
