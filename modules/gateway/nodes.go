@@ -18,11 +18,14 @@ const (
 
 var (
 	errNodeExists = errors.New("node already added")
+	errOurAddress = errors.New("can't add our own address")
 )
 
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
-	if _, exists := g.nodes[addr]; exists {
+	if addr == g.myAddr {
+		return errOurAddress
+	} else if _, exists := g.nodes[addr]; exists {
 		return errNodeExists
 	} else if addr.IsValid() != nil {
 		return errors.New("address is not valid: " + string(addr))
@@ -80,8 +83,8 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	g.mu.Lock()
 	for _, node := range nodes {
 		err := g.addNode(node)
-		if err != nil {
-			g.log.Printf("WARN: peer '%v' send the invalid addr '%v'", conn.RemoteAddr(), node)
+		if err != nil && err != errNodeExists && err != errOurAddress {
+			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RemoteAddr(), node)
 		}
 	}
 	g.save()
@@ -112,7 +115,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 		}
 		return nil
 	}()
-	if err != nil {
+	if err != nil && err != errNodeExists {
 		return err
 	}
 	// relay

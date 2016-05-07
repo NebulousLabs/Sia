@@ -23,7 +23,7 @@ func TestAddNode(t *testing.T) {
 	if err := g.addNode(dummyNode); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
-	if err := g.addNode(dummyNode); err == nil {
+	if err := g.addNode(dummyNode); err != errNodeExists {
 		t.Error("addNode added duplicate node")
 	}
 	if err := g.addNode("foo"); err == nil {
@@ -34,6 +34,9 @@ func TestAddNode(t *testing.T) {
 	}
 	if err := g.addNode("[::]:9981"); err == nil {
 		t.Error("addNode added unspecified address")
+	}
+	if err := g.addNode(g.myAddr); err != errOurAddress {
+		t.Error("addNode added our own address")
 	}
 }
 
