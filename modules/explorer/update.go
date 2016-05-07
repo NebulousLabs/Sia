@@ -465,7 +465,7 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 			oldestTimestamp = b.Timestamp
 		}
 		secondsPassed := bf.Timestamp - oldestTimestamp
-		estimatedHashrate = totalDifficulty.Difficulty().Div(types.NewCurrency64(uint64(secondsPassed)))
+		estimatedHashrate = totalDifficulty.Difficulty().Div64(uint64(secondsPassed))
 	}
 	bf.EstimatedHashrate = estimatedHashrate
 

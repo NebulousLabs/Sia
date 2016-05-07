@@ -8,7 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // An Downloader retrieves sectors from with a host. It requests one sector at
@@ -54,7 +53,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	if height >= hd.contract.FileContract.WindowStart {
 		return nil, errors.New("contract has already ended")
 	}
-	sectorPrice := hd.host.DownloadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize))
+	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if sectorPrice.Cmp(hd.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
 		return nil, errors.New("contract has insufficient funds to support download")
 	}

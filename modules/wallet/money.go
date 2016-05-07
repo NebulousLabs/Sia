@@ -53,7 +53,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: better fee algo.
+	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -80,7 +80,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 // SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: better fee algo.
+	tpoolFee := types.SiacoinPrecision.Mul64(10) // TODO: better fee algo.
 	output := types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,

@@ -58,12 +58,39 @@ func TestCurrencyDiv(t *testing.T) {
 	}
 }
 
+// TestCurrencyDiv64 checks that the Div64 function has been correctly implemented.
+func TestCurrencyDiv64(t *testing.T) {
+	c9 := NewCurrency64(9)
+	u10 := uint64(10)
+	c90 := NewCurrency64(90)
+	c97 := NewCurrency64(97)
+
+	c90D10 := c90.Div64(u10)
+	if c90D10.Cmp(c9) != 0 {
+		t.Error("Dividing 90 by 10 should produce 9")
+	}
+	c97D10 := c97.Div64(u10)
+	if c97D10.Cmp(c9) != 0 {
+		t.Error("Dividing 97 by 10 should produce 9")
+	}
+}
+
 // TestCurrencyMul probes the Mul function of the currency type.
 func TestCurrencyMul(t *testing.T) {
 	c5 := NewCurrency64(5)
 	c6 := NewCurrency64(6)
 	c30 := NewCurrency64(30)
 	if c5.Mul(c6).Cmp(c30) != 0 {
+		t.Error("Multiplying 5 by 6 should equal 30")
+	}
+}
+
+// TestCurrencyMul64 probes the Mul64 function of the currency type.
+func TestCurrencyMul64(t *testing.T) {
+	c5 := NewCurrency64(5)
+	u6 := uint64(6)
+	c30 := NewCurrency64(30)
+	if c5.Mul64(u6).Cmp(c30) != 0 {
 		t.Error("Multiplying 5 by 6 should equal 30")
 	}
 }

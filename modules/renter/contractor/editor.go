@@ -145,7 +145,7 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	// calculate price
 	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
 	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
-	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize))
+	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(modules.SectorSize)
 	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
 	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
 		return crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
@@ -238,7 +238,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	}
 
 	// calculate price
-	sectorPrice := he.host.UploadBandwidthPrice.Mul(types.NewCurrency64(uint64(len(newData))))
+	sectorPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
 	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
 		return errors.New("contract has insufficient funds to support upload")
 	}

@@ -179,8 +179,8 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 
 				// Update finances.
 				blocksRemaining := so.proofDeadline() - blockHeight
-				blockBytesCurrency := types.NewCurrency64(uint64(blocksRemaining)).Mul(types.NewCurrency64(modules.SectorSize))
-				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(modules.SectorSize)))
+				blockBytesCurrency := types.NewCurrency64(uint64(blocksRemaining)).Mul64(modules.SectorSize)
+				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul64(modules.SectorSize))
 				storageRevenue = storageRevenue.Add(settings.MinimumStoragePrice.Mul(blockBytesCurrency))
 				newCollateral = newCollateral.Add(settings.Collateral.Mul(blockBytesCurrency))
 
@@ -206,7 +206,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 				copy(sector[modification.Offset:], modification.Data)
 
 				// Update finances.
-				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul(types.NewCurrency64(uint64(len(modification.Data)))))
+				bandwidthRevenue = bandwidthRevenue.Add(settings.MinimumUploadBandwidthPrice.Mul64(uint64(len(modification.Data))))
 
 				// Update the sectors removed and gained to indicate that the old
 				// sector has been replaced with a new sector.

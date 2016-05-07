@@ -34,7 +34,7 @@ func (ht *hostTester) newTesterStorageObligation() (*storageObligation, error) {
 	// Fund the file contract with a payout. The payout needs to be big enough
 	// that the expected revenue is larger than the fee that the host may end
 	// up paying.
-	payout := types.NewCurrency64(1e3).Mul(types.SiacoinPrecision)
+	payout := types.SiacoinPrecision.Mul64(1e3)
 	err := builder.FundSiacoins(payout)
 	if err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot}
-	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
+	sectorCost := types.SiacoinPrecision.Mul64(550)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
@@ -393,7 +393,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot}
-	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
+	sectorCost := types.SiacoinPrecision.Mul64(550)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()
@@ -446,7 +446,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot, sectorRoot2}
-	sectorCost2 := types.NewCurrency64(650).Mul(types.SiacoinPrecision)
+	sectorCost2 := types.SiacoinPrecision.Mul64(650)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost2)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost2)
 	validPayouts, missedPayouts = so.payouts()
@@ -608,7 +608,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	so.SectorRoots = []crypto.Hash{sectorRoot}
-	sectorCost := types.NewCurrency64(550).Mul(types.SiacoinPrecision)
+	sectorCost := types.SiacoinPrecision.Mul64(550)
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(sectorCost)
 	ht.host.financialMetrics.PotentialStorageRevenue = ht.host.financialMetrics.PotentialStorageRevenue.Add(sectorCost)
 	validPayouts, missedPayouts := so.payouts()

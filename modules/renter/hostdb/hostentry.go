@@ -105,7 +105,7 @@ func (hdb *HostDB) AveragePrice() types.Currency {
 	for _, host := range hosts {
 		totalPrice = totalPrice.Add(host.ContractPrice)
 	}
-	return totalPrice.Div(types.NewCurrency64(uint64(len(hosts))))
+	return totalPrice.Div64(uint64(len(hosts)))
 }
 
 // IsOffline reports whether a host is offline. If the HostDB has no record of

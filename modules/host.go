@@ -9,6 +9,14 @@ const (
 	HostDir = "host"
 )
 
+var (
+	// BytesPerTerabyte is conversion rate between bytes and terabytes.
+	BytesPerTerabyte = types.NewCurrency64(1e12)
+
+	// BlockBytesPerMonthTerabyte is the conversion rate between block-bytes and month-TB.
+	BlockBytesPerMonthTerabyte = BytesPerTerabyte.Mul64(4320)
+)
+
 type (
 	// HostFinancialMetrics provides financial statistics for the host,
 	// including money that is locked in contracts. Though verbose, these
@@ -111,61 +119,3 @@ type (
 		StorageManager
 	}
 )
-
-// BandwidthPriceToConsensus converts a human bandwidth price, having the unit
-// 'Siacoins per Terabyte', to a consensus storage price, having the unit
-// 'Hastings per Byte'.
-func BandwidthPriceToConsensus(siacoinsTB uint64) (hastingsByte types.Currency) {
-	hastingsTB := types.NewCurrency64(siacoinsTB).Mul(types.SiacoinPrecision)
-	return hastingsTB.Div(types.NewCurrency64(1e12))
-}
-
-// BandwidthPriceToHuman converts a consensus bandwidth price, having the unit
-// 'Hastings per Byte' to a human bandwidth price, having the unit 'Siacoins
-// per Terabyte'.
-func BandwidthPriceToHuman(hastingsByte types.Currency) (siacoinsTB uint64, err error) {
-	hastingsTB := hastingsByte.Mul(types.NewCurrency64(1e12))
-	if hastingsTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
-		// The result of the final division is going to be less than 0.5,
-		// therefore 0 should be returned.
-		return 0, nil
-	}
-	if hastingsTB.Cmp(types.SiacoinPrecision) < 0 {
-		// The result of the final division is going to be greater than or
-		// equal to 0.5, but less than 1, therefore 1 should be returned.
-		return 1, nil
-	}
-	return hastingsTB.Div(types.SiacoinPrecision).Uint64()
-}
-
-// StoragePriceToConsensus converts a human storage price, having the unit
-// 'Siacoins per Month per Terabyte', to a consensus storage price, having the
-// unit 'Hastings per Block per Byte'.
-func StoragePriceToConsensus(siacoinsMonthTB uint64) (hastingsBlockByte types.Currency) {
-	// Perform multiplication first to preserve precision.
-	hastingsMonthTB := types.NewCurrency64(siacoinsMonthTB).Mul(types.SiacoinPrecision)
-	hastingsBlockTB := hastingsMonthTB.Div(types.NewCurrency64(4320))
-	return hastingsBlockTB.Div(types.NewCurrency64(1e12))
-}
-
-// StoragePriceToHuman converts a consensus storage price, having the unit
-// 'Hastings per Block per Byte', to a human storage price, having the unit
-// 'Siacoins per Month per Terabyte'. An error is returned if the result would
-// overflow a uint64. If the result is between 0 and 1, the value is rounded to
-// the nearest value.
-func StoragePriceToHuman(hastingsBlockByte types.Currency) (siacoinsMonthTB uint64, err error) {
-	// Perform multiplication first to preserve precision.
-	hastingsMonthByte := hastingsBlockByte.Mul(types.NewCurrency64(4320))
-	hastingsMonthTB := hastingsMonthByte.Mul(types.NewCurrency64(1e12))
-	if hastingsMonthTB.Cmp(types.SiacoinPrecision.Div(types.NewCurrency64(2))) < 0 {
-		// The result of the final division is going to be less than 0.5,
-		// therefore 0 should be returned.
-		return 0, nil
-	}
-	if hastingsMonthTB.Cmp(types.SiacoinPrecision) < 0 {
-		// The result of the final division is going to be greater than or
-		// equal to 0.5, but less than 1, therefore 1 should be returned.
-		return 1, nil
-	}
-	return hastingsMonthTB.Div(types.SiacoinPrecision).Uint64()
-}

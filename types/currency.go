@@ -84,9 +84,21 @@ func (x Currency) Div(y Currency) (c Currency) {
 	return
 }
 
+// Div64 returns a new Currency value c = x / y.
+func (x Currency) Div64(y uint64) (c Currency) {
+	c.i.Div(&x.i, new(big.Int).SetUint64(y))
+	return
+}
+
 // Mul returns a new Currency value c = x * y.
 func (x Currency) Mul(y Currency) (c Currency) {
 	c.i.Mul(&x.i, &y.i)
+	return
+}
+
+// Mul64 returns a new Currency value c = x * y.
+func (x Currency) Mul64(y uint64) (c Currency) {
+	c.i.Mul(&x.i, new(big.Int).SetUint64(y))
 	return
 }
 

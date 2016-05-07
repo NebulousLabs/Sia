@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/spf13/cobra"
 )
@@ -141,11 +142,8 @@ func hostcmd() {
 
 	// convert accepting bool
 	accept := yesNo(is.AcceptingContracts)
-	// convert price to SC/TB/mo
-	price, err := modules.StoragePriceToHuman(is.MinimumStoragePrice)
-	if err != nil {
-		price = ^uint64(0)
-	}
+	// convert price from bytes/block to TB/Month
+	price := currencyUnits(is.MinimumStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte))
 	// calculate total revenue
 	totalRevenue := fm.ContractCompensation.
 		Add(fm.StorageRevenue).
@@ -157,7 +155,7 @@ func hostcmd() {
 		Add(fm.PotentialUploadBandwidthRevenue)
 	fmt.Printf(`Host info:
 	Storage:      %v (%v used)
-	Price:        %v SC per TB per month
+	Price:        %v / TB / Month
 	Max Duration: %v Blocks
 
 	Accepting Contracts: %v
@@ -230,8 +228,8 @@ func hostconfigcmd(param, value string) {
 			die("Could not parse "+param+":", err)
 		}
 		i, _ := new(big.Int).SetString(hastings, 10)
-		i.Div(i, big.NewInt(1e12)) // divide by 1e12 bytes/TB
-		value = i.String()
+		c := types.NewCurrency(i).Div(modules.BytesPerTerabyte)
+		value = c.String()
 
 	// currency/TB/month (convert to hastings/byte/block)
 	case "minimumstorageprice":
@@ -240,8 +238,8 @@ func hostconfigcmd(param, value string) {
 			die("Could not parse "+param+":", err)
 		}
 		i, _ := new(big.Int).SetString(hastings, 10)
-		i.Div(i, big.NewInt(1e12)) // divide by 1e12 bytes/TB
-		value = i.String()
+		c := types.NewCurrency(i).Div(modules.BlockBytesPerMonthTerabyte)
+		value = c.String()
 
 	// other valid settings
 	case "acceptingcontracts", "maxdownloadbatchsize", "maxduration",
