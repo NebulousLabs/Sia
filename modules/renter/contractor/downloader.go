@@ -129,9 +129,7 @@ func (c *Contractor) Downloader(contract Contract) (Downloader, error) {
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
-	// download price should be no more than 3x the cost to store the same
-	// amount of data for a month
-	if host.DownloadBandwidthPrice.Cmp(host.StoragePrice.Mul64(3*4320)) > 0 {
+	if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
 

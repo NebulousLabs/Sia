@@ -21,7 +21,9 @@ const (
 
 var (
 	// the contractor will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Mul64(500e3).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
+	maxStoragePrice = types.SiacoinPrecision.Mul64(500e3).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
+	// the contractor will not download data above this price (3x the maximum monthly storage price)
+	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
 
 	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
 	errSmallCollateral       = errors.New("host collateral was too small")
@@ -216,7 +218,7 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 // and returns a Contract. The contract is also saved by the HostDB.
 func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
-	if host.StoragePrice.Cmp(maxPrice) > 0 {
+	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return Contract{}, errTooExpensive
 	}
 

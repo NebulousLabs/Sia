@@ -24,7 +24,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 	host, ok := c.hdb.Host(contract.IP)
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that host")
-	} else if host.StoragePrice.Cmp(maxPrice) > 0 {
+	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return types.FileContractID{}, errTooExpensive
 	}
 
