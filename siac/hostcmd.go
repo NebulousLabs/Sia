@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -293,7 +292,7 @@ func hostfolderaddcmd(path, size string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
-	err = post("/storage/folders/add"+filepath.ToSlash(abs(path)), "size="+size)
+	err = post("/storage/folders/add", fmt.Sprintf("path=%s&size=%s", abs(path), size))
 	if err != nil {
 		die("Could not add folder:", err)
 	}
@@ -302,7 +301,7 @@ func hostfolderaddcmd(path, size string) {
 
 // hostfolderremovecmd removes a folder from the host.
 func hostfolderremovecmd(path string) {
-	err := post("/storage/folders/remove"+filepath.ToSlash(abs(path)), "")
+	err := post("/storage/folders/remove", "path="+abs(path))
 	if err != nil {
 		die("Could not remove folder:", err)
 	}
@@ -315,7 +314,7 @@ func hostfolderresizecmd(path, newsize string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
-	err = post("/storage/folders/resize"+filepath.ToSlash(abs(path)), "newsize="+newsize)
+	err = post("/storage/folders/resize", fmt.Sprintf("path=%s&newsize=%s", abs(path), newsize))
 	if err != nil {
 		die("Could not resize folder:", err)
 	}
