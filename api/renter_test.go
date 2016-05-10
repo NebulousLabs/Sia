@@ -12,8 +12,8 @@ import (
 )
 
 // createRandFile creates a file on disk and fills it with random bytes.
-func createRandFile(path string) error {
-	data, err := crypto.RandBytes(1024)
+func createRandFile(path string, size int) error {
+	data, err := crypto.RandBytes(size)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func TestRenterPaths(t *testing.T) {
 
 	// Create a file.
 	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterPaths", "test.dat")
-	err = createRandFile(path)
+	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestRenterConflicts(t *testing.T) {
 
 	// Create a file.
 	path := filepath.Join(build.SiaTestingDir, "api", "TestRenterConflicts", "test.dat")
-	err = createRandFile(path)
+	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}

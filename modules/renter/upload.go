@@ -19,7 +19,7 @@ var (
 	// defaultDataPieces is the number of data pieces per erasure-coded chunk
 	defaultDataPieces = func() int {
 		if build.Release == "testing" {
-			return 2
+			return 1
 		}
 		return 1 // RC; orig value: 4
 	}()
