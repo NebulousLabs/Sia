@@ -2,8 +2,10 @@ package renter
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -187,6 +189,10 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
+	if !r.wallet.Unlocked() {
+		return errors.New("wallet must be unlocked before downloading")
+	}
+
 	// Copy the file's metadata
 	// TODO: this is ugly because we only have the Contracts method for
 	// looking up contracts.
@@ -200,16 +206,25 @@ func (r *Renter) Download(path, destination string) error {
 	}
 	file.mu.RUnlock()
 
+	if len(contracts) == 0 {
+		return errors.New("no record of that file's contracts")
+	}
+
 	// Initiate connections to each host.
 	var hosts []fetcher
+	var errs []string
 	for fc, c := range contracts {
 		// TODO: connect in parallel
 		d, err := r.hostContractor.Downloader(c)
 		if err != nil {
+			errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
 			continue
 		}
 		defer d.Close()
 		hosts = append(hosts, newHostFetcher(d, *fc, file.masterKey))
+	}
+	if len(hosts) == 0 {
+		return errors.New("Could not connect to any hosts:\n" + strings.Join(errs, "\n"))
 	}
 
 	// Check that this host set is sufficient to download the file.

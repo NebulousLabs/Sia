@@ -2,7 +2,9 @@ package contractor
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -19,7 +21,9 @@ const (
 
 var (
 	// the contractor will not form contracts above this price
-	maxPrice = types.SiacoinPrecision.Mul64(500e3).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
+	maxStoragePrice = types.SiacoinPrecision.Mul64(500e3).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
+	// the contractor will not download data above this price (3x the maximum monthly storage price)
+	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
 
 	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
 	errSmallCollateral       = errors.New("host collateral was too small")
@@ -214,7 +218,7 @@ func formContract(conn net.Conn, host modules.HostDBEntry, fc types.FileContract
 // and returns a Contract. The contract is also saved by the HostDB.
 func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (Contract, error) {
 	// reject hosts that are too expensive
-	if host.StoragePrice.Cmp(maxPrice) > 0 {
+	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return Contract{}, errTooExpensive
 	}
 
@@ -354,19 +358,26 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	endHeight := c.blockHeight + a.Period
 	c.mu.RUnlock()
 	var numContracts uint64
+	var errs []string
 	for _, h := range hosts {
 		_, err := c.newContract(h, filesize, endHeight)
 		if err != nil {
-			// TODO: is there a better way to handle failure here? Should we
-			// prefer an all-or-nothing approach? We can't pick new hosts to
-			// negotiate with because they'll probably be more expensive than
-			// we can afford.
-			c.log.Println("WARN: failed to negotiate contract:", h.NetAddress, err)
+			errs = append(errs, fmt.Sprintf("\t%v: %v", h.NetAddress, err))
 			continue
 		}
 		if numContracts++; numContracts >= a.Hosts {
 			break
 		}
+	}
+	// If we couldn't form any contracts, return an error. Otherwise, just log
+	// the failures.
+	// TODO: is there a better way to handle failure here? Should we prefer an
+	// all-or-nothing approach? We can't pick new hosts to negotiate with
+	// because they'll probably be more expensive than we can afford.
+	if numContracts == 0 {
+		return errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
+	} else if numContracts < a.Hosts {
+		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v): %v", a.Hosts, numContracts, strings.Join(errs, "\n"))
 	}
 	c.mu.Lock()
 	c.renewHeight = endHeight

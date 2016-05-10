@@ -295,7 +295,7 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
-	if host.StoragePrice.Cmp(maxPrice) > 0 {
+	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return nil, errTooExpensive
 	}
 

@@ -129,7 +129,7 @@ func (c *Contractor) Downloader(contract Contract) (Downloader, error) {
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
-	if host.StoragePrice.Cmp(maxPrice) > 0 {
+	if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
 
