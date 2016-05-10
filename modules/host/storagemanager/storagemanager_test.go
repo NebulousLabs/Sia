@@ -1,11 +1,13 @@
 package storagemanager
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 // storageManagerTester holds a testing-initialized storage manager and any
@@ -14,6 +16,30 @@ type storageManagerTester struct {
 	sm *StorageManager
 
 	persistDir string
+}
+
+// addRandFolder connects a storage folder to a random directory in the
+// tester's persist dir.
+func (smt *storageManagerTester) addRandFolder(size uint64) error {
+	dir := filepath.Join(smt.persistDir, persist.RandomSuffix())
+	err := os.Mkdir(dir, 0700)
+	if err != nil {
+		return err
+	}
+	return smt.sm.AddStorageFolder(dir, size)
+}
+
+// capacity returns the amount of storage still available on the machine. The
+// amount can be negative if the total capacity was reduced to below the active
+// capacity.
+func (sm *StorageManager) capacity() (total, remaining uint64) {
+	// Total storage can be computed by summing the size of all the storage
+	// folders.
+	for _, sf := range sm.storageFolders {
+		total += sf.Size
+		remaining += sf.SizeRemaining
+	}
+	return total, remaining
 }
 
 // createSector makes a random, unique sector that can be inserted into the
@@ -40,19 +66,6 @@ func newStorageManagerTester(name string) (*storageManagerTester, error) {
 		persistDir: testdir,
 	}
 	return smt, nil
-}
-
-// capacity returns the amount of storage still available on the machine. The
-// amount can be negative if the total capacity was reduced to below the active
-// capacity.
-func (sm *StorageManager) capacity() (total, remaining uint64) {
-	// Total storage can be computed by summing the size of all the storage
-	// folders.
-	for _, sf := range sm.storageFolders {
-		total += sf.Size
-		remaining += sf.SizeRemaining
-	}
-	return total, remaining
 }
 
 // probabilisticReset will probabilistically reboot the storage manager before

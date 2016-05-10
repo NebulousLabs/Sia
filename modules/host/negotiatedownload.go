@@ -137,7 +137,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		// Verify that the correct amount of money has been moved from the
 		// renter's contract funds to the host's contract funds.
 		expectedTransfer := settings.MinimumDownloadBandwidthPrice.Mul64(totalSize)
-		err = verifyPaymentRevision(existingRevision, paymentRevision, expectedTransfer)
+		err = verifyPaymentRevision(existingRevision, paymentRevision, blockHeight, expectedTransfer)
 		if err != nil {
 			return err
 		}
@@ -198,10 +198,16 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 // verifyPaymentRevision verifies that the revision being provided to pay for
 // the data has transferred the expected amount of money from the renter to the
 // host.
-func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, expectedTransfer types.Currency) error {
+func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, blockHeight types.BlockHeight, expectedTransfer types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(paymentRevision.NewValidProofOutputs) != 2 || len(paymentRevision.NewMissedProofOutputs) != 3 {
 		return errInsaneFileContractRevisionOutputCounts
+	}
+
+	// Check that the time to finalize and submit the file contract revision
+	// has not already passed.
+	if existingRevision.NewWindowStart-revisionSubmissionBuffer <= blockHeight {
+		return errLateRevision
 	}
 
 	// The new revenue comes out of the renter's valid outputs.

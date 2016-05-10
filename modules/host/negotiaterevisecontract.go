@@ -29,6 +29,12 @@ var (
 	// data which creates a sector that is larger than what the host uses.
 	errLargeSector = errors.New("renter has sent a sector that exceeds the host's sector size")
 
+	// errLateRevision is returned if the renter is attempting to revise a
+	// revision after the revision deadline. The host needs time to submit the
+	// final revision to the blockchain to guarantee payment, and therefore
+	// will not accept revisions once the window start is too close.
+	errLateRevision = errors.New("renter is attempting to revise a revision which the host has closed")
+
 	// errReviseBadCollateralDeduction is returned if a proposed file contrct
 	// revision does not correctly deduct value from the host's missed proof
 	// output - which is the host's collateral pool.
@@ -220,7 +226,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 			}
 		}
 		newRevenue := storageRevenue.Add(bandwidthRevenue)
-		return verifyRevision(so, revision, newRevenue, newCollateral)
+		return verifyRevision(so, revision, blockHeight, newRevenue, newCollateral)
 	}()
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
@@ -305,10 +311,16 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 
 // verifyRevision checks that the revision pays the host correctly, and that
 // the revision does not attempt any malicious or unexpected changes.
-func verifyRevision(so *storageObligation, revision types.FileContractRevision, newRevenue, newCollateral types.Currency) error {
+func verifyRevision(so *storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, newRevenue, newCollateral types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
 		return errInsaneFileContractRevisionOutputCounts
+	}
+
+	// Check that the time to finalize and submit the file contract revision
+	// has not already passed.
+	if so.expiration()-revisionSubmissionBuffer <= blockHeight {
+		return errLateRevision
 	}
 
 	oldFCR := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0]

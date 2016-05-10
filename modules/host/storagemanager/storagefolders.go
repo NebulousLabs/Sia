@@ -99,6 +99,11 @@ var (
 	// that is the same as the current size of the storage folder.
 	errNoResize = errors.New("storage folder selected for resize, but new size is same as current size")
 
+	// errRepeatFolder is returned if a storage folder is added which links to
+	// a path that is already in use by another storage folder. Only exact path
+	// matches will trigger the error.
+	errRepeatFolder = errors.New("selected path is already in use as a storage folder, please use 'resize'")
+
 	// errSmallStorageFolder is returned if a new storage folder is not large
 	// enough to meet the requirements for the minimum storage folder size.
 	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
@@ -389,14 +394,18 @@ func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
 	if len(sm.storageFolders) >= maximumStorageFolders {
 		return errMaxStorageFolders
 	}
-
-	// Check that the storage folder being added meets the minimum requirement
-	// for the size of a storage folder.
+	// Check that the storage folder being added meets the size requirements.
 	if size > maximumStorageFolderSize {
 		return errLargeStorageFolder
 	}
 	if size < minimumStorageFolderSize {
 		return errSmallStorageFolder
+	}
+	// Check that the folder being linked to is not already in use.
+	for _, sf := range sm.storageFolders {
+		if sf.Path == path {
+			return errRepeatFolder
+		}
 	}
 
 	// Check that the folder being linked to both exists and is a folder.
