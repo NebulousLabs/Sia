@@ -105,7 +105,7 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	// guaranteed, and running into repeated collisions (where two UIDs
 	// consecutively collide with existing UIDs) are highly likely.
 	for i := 0; i < maximumStorageFolders; i++ {
-		err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+		err = smt.addRandFolder(minimumStorageFolderSize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +121,7 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 	}
 	// For coverage purposes, try adding a storage folder after the maximum
 	// number of storage folders has been reached.
-	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+	err = smt.addRandFolder(minimumStorageFolderSize)
 	if err != errMaxStorageFolders {
 		t.Fatal("expecting errMaxStorageFolders:", err)
 	}
@@ -135,7 +135,7 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+		err = smt.addRandFolder(minimumStorageFolderSize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func TestAddStorageFolderUIDCollisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+		err = smt.addRandFolder(minimumStorageFolderSize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -336,5 +336,28 @@ func TestEmptiestStorageFolder(t *testing.T) {
 		if index < 0 && sf != nil {
 			t.Error("non-nil storage folder returned but there was no winner")
 		}
+	}
+}
+
+// TestRepeatStorageFolderPath checks that the host correctly rejects a storage
+// folder if there is already a storage folder linked to the same path.
+func TestRepeatStorageFolderPath(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	smt, err := newStorageManagerTester("TestRepeatStorageFolderPath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer smt.Close()
+
+	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+	if err != errRepeatFolder {
+		t.Fatal("expected errRepeatFolder, got", err)
 	}
 }
