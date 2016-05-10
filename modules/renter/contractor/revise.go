@@ -41,7 +41,7 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	}
 	// read the host's acceptance and transaction signature
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
+		return types.Transaction{}, errors.New("host did not accept transaction signature: " + err.Error())
 	}
 	var hostSig types.TransactionSignature
 	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
