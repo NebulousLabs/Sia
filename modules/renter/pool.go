@@ -86,6 +86,7 @@ func (p *hostPool) uniqueHosts(n int, exclude []modules.NetAddress) (hosts []con
 			continue
 		}
 		hosts = append(hosts, hu)
+		excludeSet[hu.Address()] = struct{}{}
 		if len(hosts) >= n {
 			break
 		}
