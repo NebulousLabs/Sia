@@ -90,10 +90,14 @@ func TestUploadDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// use 1-1 erasure code, because we'll only have one host
+	rsc, _ := NewRSCode(1, 1)
+
 	// upload file
 	err = rt.renter.Upload(modules.FileUploadParams{
-		Source:  source,
-		SiaPath: "foo",
+		Source:      source,
+		SiaPath:     "foo",
+		ErasureCode: rsc,
 		// Upload will use sane defaults for other params
 	})
 	if err != nil {
@@ -105,9 +109,12 @@ func TestUploadDownload(t *testing.T) {
 	}
 
 	// wait for repair loop for fully upload file
-	for files[0].UploadProgress != 100 {
+	for i := 0; i < 10 && !files[0].Available; i++ {
 		files = rt.renter.FileList()
 		time.Sleep(time.Second)
+	}
+	if !files[0].Available {
+		t.Fatal("file did not reach full availability:", files[0].UploadProgress)
 	}
 
 	// download the file
