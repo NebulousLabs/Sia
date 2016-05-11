@@ -23,6 +23,7 @@ var (
 type Gateway struct {
 	listener net.Listener
 	myAddr   modules.NetAddress
+	port     string
 
 	// handlers are the RPCs that the Gateway can handle.
 	handlers map[rpcID]modules.RPCFunc
@@ -143,9 +144,9 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return
 	}
-	_, port, portErr := net.SplitHostPort(g.listener.Addr().String())
-	if portErr != nil {
-		return nil, portErr
+	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
+	if err != nil {
+		return nil, err
 	}
 	if build.Release == "testing" {
 		g.myAddr = modules.NetAddress(g.listener.Addr().String())
@@ -154,10 +155,10 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	go g.forwardPort(port)
+	go g.forwardPort(g.port)
 
 	// Learn our external IP.
-	go g.learnHostname(port)
+	go g.learnHostname()
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.
