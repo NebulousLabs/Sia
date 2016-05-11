@@ -72,9 +72,6 @@ func (g *Gateway) learnHostname() {
 	g.mu.Unlock(id)
 
 	g.log.Println("INFO: our address is", g.myAddr)
-
-	// now that we know our address, we can start advertising it
-	g.RegisterConnectCall("RelayNode", g.sendAddress)
 }
 
 // forwardPort adds a port mapping to the router.

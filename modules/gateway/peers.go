@@ -240,6 +240,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	var err error
 	if build.VersionCmp(remoteVersion, "0.6.1") >= 0 {
 		err = g.addNode(remoteAddr)
+		// TODO: call g.save?
 	}
 	g.mu.Unlock(id)
 	if err != nil && err != errNodeExists {
@@ -324,6 +325,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	// try to Connect to the node before we do (although in this particular case
 	// it doesn't matter as a lock is held over both calls).
 	err = g.addNode(addr)
+	// TODO: call g.save?
 	g.mu.Unlock(id)
 	if err != nil && err != errNodeExists {
 		g.Disconnect(addr)
