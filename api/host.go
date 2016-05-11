@@ -140,8 +140,8 @@ func (srv *Server) storageHandler(w http.ResponseWriter, req *http.Request, _ ht
 }
 
 // storageFoldersAddHandler adds a storage folder to the storage manager.
-func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	folderPath := ps.ByName("folder")
+func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	folderPath := req.FormValue("path")
 	var folderSize uint64
 	_, err := fmt.Sscan(req.FormValue("size"), &folderSize)
 	if err != nil {
@@ -157,8 +157,8 @@ func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Req
 }
 
 // storageFoldersResizeHandler resizes a storage folder in the storage manager.
-func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	folderPath := ps.ByName("folder")
+func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	folderPath := req.FormValue("path")
 	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
@@ -182,8 +182,8 @@ func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.
 
 // storageFoldersRemoveHandler removes a storage folder from the storage
 // manager.
-func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	folderPath := ps.ByName("folder")
+func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	folderPath := req.FormValue("path")
 	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
