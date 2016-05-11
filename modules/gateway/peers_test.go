@@ -91,6 +91,14 @@ func TestListen(t *testing.T) {
 	} else if ack != "reject" {
 		t.Fatal("gateway should have rejected old version")
 	}
+	// g should not add the peer
+	time.Sleep(200 * time.Millisecond)
+	id := g.mu.RLock()
+	_, ok := g.peers[addr]
+	g.mu.RUnlock(id)
+	if ok {
+		t.Fatal("gateway should not have added a peer with too old of a version")
+	}
 
 	// a simple 'conn.Close' would not obey the muxado disconnect protocol
 	muxado.Client(conn).Close()
@@ -111,22 +119,29 @@ func TestListen(t *testing.T) {
 	} else if ack == "reject" {
 		t.Fatal("gateway should have given ack")
 	}
+	// send port
+	if err := encoding.WriteObject(conn, addr.Port()); err != nil {
+		t.Fatal(err)
+	}
 
 	// g should add the peer
-	var ok bool
-	for !ok {
-		id := g.mu.RLock()
-		_, ok = g.peers[addr]
-		g.mu.RUnlock(id)
+	time.Sleep(200 * time.Millisecond)
+	id = g.mu.RLock()
+	_, ok = g.peers[addr]
+	g.mu.RUnlock(id)
+	if !ok {
+		t.Fatal("gateway should have added the peer")
 	}
 
 	muxado.Client(conn).Close()
 
 	// g should remove the peer
-	for ok {
-		id := g.mu.RLock()
-		_, ok = g.peers[addr]
-		g.mu.RUnlock(id)
+	time.Sleep(200 * time.Millisecond)
+	id = g.mu.RLock()
+	_, ok = g.peers[addr]
+	g.mu.RUnlock(id)
+	if ok {
+		t.Fatal("gateway should have removed the peer")
 	}
 
 	// uncompliant connect
@@ -265,16 +280,23 @@ func TestConnectRejectsInvalidVersions(t *testing.T) {
 			mockVersion := <-mockVersionChan
 			conn, err := listener.Accept()
 			if err != nil {
-				t.Fatal(err)
+				// Panic because t.Fatal doesn't work from goroutines.
+				panic(err)
 			}
 			// Read remote peer version.
 			var remoteVersion string
 			if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 			// Write our mock version.
 			if err := encoding.WriteObject(conn, mockVersion); err != nil {
-				t.Fatal(err)
+				panic(err)
+			}
+			if build.IsVersion(mockVersion) && build.VersionCmp(mockVersion, "0.6.1") >= 0 {
+				var port string
+				if err := encoding.ReadObject(conn, &port, 13); err != nil {
+					panic(err)
+				}
 			}
 		}
 	}()
@@ -417,6 +439,12 @@ func (g mockGatewayWithVersion) Connect(addr modules.NetAddress) error {
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		return err
 	}
+	// send port
+	if build.IsVersion(g.version) && build.VersionCmp(g.version, "0.6.1") >= 0 {
+		if err := encoding.WriteObject(conn, g.port); err != nil {
+			return err
+		}
+	}
 	g.versionACK <- remoteVersion
 
 	return nil
@@ -534,18 +562,45 @@ func TestAcceptConnRejectsInvalidVersions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		// g should not be connected to any peers.
+		id := g.mu.Lock()
+		if len(g.peers) != 0 {
+			t.Errorf("Gateway should not be connected to any peers: %v", g.peers)
+		}
+		g.mu.Unlock(id)
+		// Connect mg to g.
 		mg.version = tt.remoteVersion
 		go func() {
 			err := mg.Connect(g.Address())
 			if err != nil {
-				t.Fatal(err)
+				// Panic because t.Fatal doesn't work from goroutines.
+				panic(err)
 			}
 		}()
+		// Check that the version response is correct and that the gateway's
+		// connected if it was.
 		remoteVersion := <-mg.versionACK
 		if remoteVersion != tt.versionResponseWant {
 			t.Fatalf(tt.msg)
 		}
-		g.Disconnect(mg.Address())
+		if remoteVersion != "reject" {
+			time.Sleep(200 * time.Millisecond)
+			id := g.mu.Lock()
+			numPeers := len(g.peers)
+			g.mu.Unlock(id)
+			if numPeers != 1 {
+				t.Error("Gateway should have connected to peer")
+			}
+		}
+		// Disconnect
+		// TODO: figure out why g.Disconnect(g.Address()) doesn't work.
+		id = g.mu.Lock()
+		var mgAddress modules.NetAddress
+		for mgAddress = range g.peers {
+			break
+		}
+		g.mu.Unlock(id)
+		g.Disconnect(mgAddress)
 		mg.Disconnect(g.Address())
 	}
 }

@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -162,6 +163,40 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
+	// Read the peer's port that we can dial them back on. Peers older than v0.6.1
+	// will only be discovered by newer peers via the ShareNodes RPC.
+	var remoteAddr modules.NetAddress
+	if build.VersionCmp(remoteVersion, "0.6.1") >= 0 {
+		var dialbackPort string
+		err := encoding.ReadObject(conn, &dialbackPort, 13) // Max port # is 65535 (5 digits long) + 8 byte string length prefix
+		if err != nil {
+			conn.Close()
+			g.log.Printf("INFO: could not read remote peer's (%v) port: %v", addr, err)
+			return
+		}
+		if _, err := strconv.Atoi(dialbackPort); err != nil {
+			conn.Close()
+			g.log.Printf("INFO: peer (%v) sent an invalid dialback port: %v", addr, err)
+			return
+		}
+		remoteAddr = modules.NetAddress(net.JoinHostPort(addr.Host(), dialbackPort))
+		// This check should only fail if dialbackPort == 0, which we could check
+		// manually, but there's no harm in validating the entire address.
+		if err := remoteAddr.IsValid(); err != nil {
+			conn.Close()
+			g.log.Printf("INFO: peer's address (%v) is invalid: %v", remoteAddr, err)
+			return
+		}
+		id := g.mu.Lock()
+		_, exists := g.peers[remoteAddr]
+		g.mu.Unlock(id)
+		if exists {
+			conn.Close()
+			g.log.Printf("INFO: rejecting connection, already connected to a peer on that address: %v", remoteAddr)
+			return
+		}
+	}
+
 	// If we are already fully connected, kick out an old peer to make room
 	// for the new one. Importantly, prioritize kicking a peer with the same
 	// IP as the connecting peer. This protects against Sybil attacks.
@@ -187,15 +222,31 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		g.log.Printf("INFO: disconnected from %v to make room for %v", kick, addr)
 	}
 	// add the peer
-	g.addPeer(&peer{
+	p := peer{
 		Peer: modules.Peer{
 			NetAddress: addr,
 			Inbound:    true,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Server(conn),
-	})
+	}
+	if build.VersionCmp(remoteVersion, "0.6.1") >= 0 {
+		p.NetAddress = remoteAddr
+	}
+	g.addPeer(&p)
+	// addNode must be called after addPeer so that threadedPeerManager doesn't
+	// try to Connect to the node before we do (although in this particular case
+	// it doesn't matter as a lock is held over both calls).
+	var err error
+	if build.VersionCmp(remoteVersion, "0.6.1") >= 0 {
+		err = g.addNode(remoteAddr)
+	}
 	g.mu.Unlock(id)
+	if err != nil && err != errNodeExists {
+		g.Disconnect(remoteAddr)
+		g.log.Debugf("INFO: %v wanted to connect, but we could not add node %q: %v", addr, remoteAddr, err)
+		return
+	}
 
 	g.log.Debugf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
@@ -247,6 +298,15 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if !build.IsVersion(remoteVersion) || build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		conn.Close()
 		return insufficientVersionError(remoteVersion)
+	}
+
+	// Share our port with the peer so they can connect to us in the future.
+	if build.VersionCmp(remoteVersion, "0.6.1") >= 0 {
+		err := encoding.WriteObject(conn, g.port)
+		if err != nil {
+			conn.Close()
+			return errors.New("could not write port #: " + err.Error())
+		}
 	}
 
 	g.log.Debugln("INFO: connected to new peer", addr)
