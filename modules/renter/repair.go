@@ -1,9 +1,9 @@
 package renter
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -57,14 +57,13 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	if len(hosts) < numPieces {
 		numPieces = len(hosts)
 	}
-	var wg sync.WaitGroup
-	wg.Add(numPieces)
+	errChan := make(chan error)
 	for i := 0; i < numPieces; i++ {
 		go func(pieceIndex uint64, host contractor.Editor) {
-			defer wg.Done()
 			// upload data to host
 			root, err := host.Upload(pieces[pieceIndex])
 			if err != nil {
+				errChan <- fmt.Errorf("\t%v: %v", host.Address(), err)
 				return
 			}
 
@@ -87,9 +86,19 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 			})
 			f.contracts[host.ContractID()] = contract
 			f.mu.Unlock()
+			errChan <- nil
 		}(missingPieces[i], hosts[i])
 	}
-	wg.Wait()
+	var errs []error
+	for i := 0; i < numPieces; i++ {
+		err := <-errChan
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == numPieces {
+		return fmt.Errorf("could not upload any sectors:\n%v", build.JoinErrors(errs, "\n"))
+	}
 
 	return nil
 }
