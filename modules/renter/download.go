@@ -205,6 +205,7 @@ func (r *Renter) Download(path, destination string) error {
 		}
 	}
 	file.mu.RUnlock()
+	r.log.Debugf("Starting Download, found %v contracts\n", len(contracts))
 
 	if len(contracts) == 0 {
 		return errors.New("no record of that file's contracts")
@@ -223,8 +224,8 @@ func (r *Renter) Download(path, destination string) error {
 		defer d.Close()
 		hosts = append(hosts, newHostFetcher(d, *fc, file.masterKey))
 	}
-	if len(hosts) == 0 {
-		return errors.New("Could not connect to any hosts:\n" + strings.Join(errs, "\n"))
+	if len(hosts) < file.erasureCode.MinPieces() {
+		return errors.New("Could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
 	}
 
 	// Check that this host set is sufficient to download the file.
