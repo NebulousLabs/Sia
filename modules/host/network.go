@@ -11,6 +11,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// rpcSettingsDeprecated is a specifier for a deprecated settings request.
+var rpcSettingsDeprecated = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
+
 // threadedUpdateHostname periodically runs 'managedLearnHostname', which
 // checks if the host's hostname has changed, and makes an updated host
 // announcement if so.
@@ -127,10 +130,13 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)
-
 	default:
-		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
 		h.log.Debugf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		if id != rpcSettingsDeprecated {
+			// Only mark the call as unrecognized if it is not one of the
+			// legacy calls.
+			atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
+		}
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
