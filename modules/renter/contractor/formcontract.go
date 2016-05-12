@@ -16,7 +16,7 @@ import (
 const (
 	// estTxnSize is the estimated size of an encoded file contract
 	// transaction set.
-	estTxnSize = 1024
+	estTxnSize = 2048
 )
 
 var (
