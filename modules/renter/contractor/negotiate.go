@@ -47,8 +47,7 @@ func startRevision(conn net.Conn, host modules.HostDBEntry, hdb hostDB) error {
 	// TODO: return new host, so we can calculate price accurately
 	recvSettings, err := verifySettings(conn, host, hdb)
 	if err != nil {
-		// TODO: doesn't make sense to reject here if the err is an I/O error.
-		return modules.WriteNegotiationRejection(conn, err)
+		return err
 	} else if !recvSettings.AcceptingContracts {
 		// no need to reject; host will already have disconnected at this point
 		return errors.New("host is not accepting contracts")
