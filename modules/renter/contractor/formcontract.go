@@ -316,6 +316,8 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	c.saveSync()
 	c.mu.Unlock()
 
+	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, renterCost.Div(types.SiacoinPrecision))
+
 	return contract, nil
 }
 
