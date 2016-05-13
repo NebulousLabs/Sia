@@ -40,6 +40,17 @@ func (p *hostPool) add(contract contractor.Contract) (contractor.Editor, error) 
 	return hu, nil
 }
 
+// remove disconnects from a host and adds it to the blacklist.
+func (p *hostPool) remove(addr modules.NetAddress) {
+	for _, h := range p.hosts {
+		if h.Address() == addr {
+			h.Close()
+			p.blacklist = append(p.blacklist, addr)
+			return
+		}
+	}
+}
+
 // uniqueHosts will return up to 'n' unique hosts that are not in 'exclude'.
 // The pool draws from its set of active connections first, and then negotiates
 // new contracts if more hosts are required. Note that this latter case

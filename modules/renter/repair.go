@@ -1,9 +1,9 @@
 package renter
 
 import (
+	"fmt"
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -29,6 +29,29 @@ var renewThreshold = func() types.BlockHeight {
 		return 144 * 7 * 3 // 3 weeks - to soon be 6 weeks.
 	}
 }()
+
+// hostErr and hostErrs are helpers for reporting repair errors. The actual
+// Error implementations aren't that important; we just need to be able to
+// extract the NetAddress of the failed host.
+
+type hostErr struct {
+	host modules.NetAddress
+	err  error
+}
+
+func (he hostErr) Error() string {
+	return fmt.Sprintf("host %v failed: %v", he.host, he.err)
+}
+
+type hostErrs []*hostErr
+
+func (hs hostErrs) Error() string {
+	var errs []error
+	for _, h := range hs {
+		errs = append(errs, h)
+	}
+	return build.JoinErrors(errs, "\n").Error()
+}
 
 // repair attempts to repair a file chunk by uploading its pieces to more
 // hosts.
@@ -57,14 +80,13 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 	if len(hosts) < numPieces {
 		numPieces = len(hosts)
 	}
-	var wg sync.WaitGroup
-	wg.Add(numPieces)
+	errChan := make(chan *hostErr)
 	for i := 0; i < numPieces; i++ {
 		go func(pieceIndex uint64, host contractor.Editor) {
-			defer wg.Done()
 			// upload data to host
 			root, err := host.Upload(pieces[pieceIndex])
 			if err != nil {
+				errChan <- &hostErr{host.Address(), err}
 				return
 			}
 
@@ -87,9 +109,19 @@ func (f *file) repair(chunkIndex uint64, missingPieces []uint64, r io.ReaderAt, 
 			})
 			f.contracts[host.ContractID()] = contract
 			f.mu.Unlock()
+			errChan <- nil
 		}(missingPieces[i], hosts[i])
 	}
-	wg.Wait()
+	var errs hostErrs
+	for i := 0; i < numPieces; i++ {
+		err := <-errChan
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if errs != nil {
+		return errs
+	}
 
 	return nil
 }
@@ -264,8 +296,17 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 		// upload to new hosts
 		err := f.repair(chunk, pieces, handle, hosts)
 		if err != nil {
-			r.log.Printf("aborting repair of %v: %v", f.name, err)
-			return
+			if he, ok := err.(hostErrs); ok {
+				// if a specific host failed, remove it from the pool
+				for _, h := range he {
+					r.log.Printf("failed to upload to host %v: %v", h.host, h.err)
+					pool.remove(h.host)
+				}
+			} else {
+				// any other type of error indicates a serious problem
+				r.log.Printf("aborting repair of %v: %v", f.name, err)
+				return
+			}
 		}
 
 		// save the new contract

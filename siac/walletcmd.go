@@ -193,12 +193,12 @@ func walletinitcmd() {
 }
 
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
-func walletload033xcmd(filepath string) {
+func walletload033xcmd(source string) {
 	password, err := speakeasy.Ask("Wallet password: ")
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	qs := fmt.Sprintf("filepath=%s&encryptionpassword=%s", filepath, password)
+	qs := fmt.Sprintf("source=%s&encryptionpassword=%s", abs(source), password)
 	err = post("/wallet/033x", qs)
 	if err != nil {
 		die("Loading wallet failed:", err)
