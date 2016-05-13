@@ -291,7 +291,7 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 		// repeats of other hosts of this chunk.
 		hosts := pool.uniqueHosts(len(pieces), f.chunkHosts(chunk))
 		if len(hosts) == 0 {
-			r.log.Printf("aborting repair of %v: not enough hosts", f.name)
+			r.log.Debugf("aborting repair of %v: host pool is empty", f.name)
 			return
 		}
 		// upload to new hosts
@@ -300,7 +300,10 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 			if he, ok := err.(hostErrs); ok {
 				// if a specific host failed, remove it from the pool
 				for _, h := range he {
-					r.log.Printf("failed to upload to host %v: %v", h.host, h.err)
+					// only log non-graceful errors
+					if h.err != modules.ErrStopResponse {
+						r.log.Printf("failed to upload to host %v: %v", h.host, h.err)
+					}
 					pool.remove(h.host)
 				}
 			} else {
