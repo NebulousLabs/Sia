@@ -142,7 +142,7 @@ File Contract Revision
 
 1. The renter makes an RPC to the host, opening a connection. The minimum
    deadline for the connection is 600 seconds. The renter then sends a file
-   contract ID, indicting the file contract that is getting revised during the
+   contract ID, indicating the file contract that is getting revised during the
    RPC.
 
 2. The host will respond with a 32 byte challenge - a random 32 bytes that the
@@ -199,31 +199,47 @@ File Contract Renewal
 ---------------------
 
 1. The renter makes an RPC to the host, opening a connection. The minimum
-   deadline for the connection is 600 seconds. The host needs extra time
-   because a significant amount of metadata modifications may be necessary on
-   the host's end, especially when renewing larger file contracts.
+   deadline for the connection is 600 seconds. The renter then sends a file
+   contract ID, indicating the file contract that is getting revised during the
+   RPC.
 
-2. The host sends the most recent copy of the settings to the renter, signed.
-   along with the most recent file contract revision. If the host is not
-   accepting new file contracts, the connection is closed.
+2. The host will respond with a 32 byte challenge - a random 32 bytes that the
+   renter will need to sign.
 
-3. The renter either accepts or rejects the settings. If accepted, the renter
-   sends an unsigned file contract to the host, containing the same Merkle root
-   as the previous file contract, and also containing a renewed payout with
-   conditional payments to the host to cover the host storing the data for the
-   extended duration.
+3. The renter will sign the challenge with the renter key that protects the
+   file contract. This is to prove that the renter has access to the file
+   contract.
 
-4. The host will accept or reject the renewed file contract. If accepted, the
-   host will add collateral (and miner fees if desired) and return the file
-   contract unsigned to the renter.
+4. The host will verify the challenge signature, then send an acceptance or
+   rejection. If accetped, the host will send the most recent file contract
+   revision for the file contract along with the transaction signagtures that
+   validate the revision. The host will lock the file contract, meaning no
+   other changes can be made to the revision file contract until this
+   connection has closed. The host sends the most recent revision of the host
+   settings to the renter, signed. If the host is not accepting new file
+   contracts, the connection is closed.
 
-5. The renter will accept or reject the host's additions. If accepting, the
-   renter will sign the file contract and return it to the host.
+5. The renter either accepts or rejects the settings. If accepted, the renter
+   sends a funded, unsigned file contract to the host, containing the same
+   Merkle root as the previous file contract, and also containing a renewed
+   payout with conditional payments to the host to cover the host storing the
+   data for the extended duration.
 
-6. The host will accept or reject the renter's signature on the file contract.
-   If accepting, the host will add its signature and return the complete, fully
-   signed file contract to the renter. The renter and the host may each now
-   submit the file contract to their transaction pools.
+6. The host will accept or reject the renewed file contract. If accepted, the
+   host will add collateral (and miner fees if desired) and send the inputs +
+   outputs for the collateral, along with any new parent transactions. The
+   length of any of these may be zero.
+
+7. The renter will accept or reject the host's additions. If accepting, the
+   renter will send signatures for the transaction to the host. The renter will
+   also send a signature for a no-op file contract revision that follows the
+   file contract.
+
+8. The host may only reject the file contract in the event that the renter has
+   sent invalid signatures, so the acceptance step is skipped. The host signs
+   the file contract and sends the transaction signatures to the renter, and
+   the host creates and sends a signature for the no-op revision that follows
+   the file contract. The connection is closed.
 
 Data Request
 ------------

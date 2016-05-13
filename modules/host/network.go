@@ -113,11 +113,9 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
 		err = h.managedRPCDownload(conn)
-	/*
-		case modules.RPCRenew:
-			atomic.AddUint64(&h.atomicRenewCalls, 1)
-			err = h.managedRPCRenew(conn)
-	*/
+	case modules.RPCRenewContract:
+		atomic.AddUint64(&h.atomicRenewCalls, 1)
+		err = h.managedRPCRenewContract(conn)
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)
 		err = h.managedRPCFormContract(conn)
@@ -146,9 +144,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		// running into issues. Ultimately though, this error can be triggered
 		// by a malicious actor, and therefore should not be logged except for
 		// DEBUG builds.
-		//
-		// TODO: After the upgraded renter-host have more maturity, the
-		// non-debug log call can be removed.
 		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
 		if erroredCalls < 1e3 {
 			h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)

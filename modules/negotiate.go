@@ -47,6 +47,13 @@ const (
 	// running Tor.
 	NegotiateRecentRevisionTime = 120 * time.Second
 
+	// NegotiateRenewContractTime defines the minimum amount of time that the
+	// renter and host have to negotiate a final contract renewal. The time is
+	// high enough that the negotiation can occur over a Tor connection, and
+	// that both the host and the renter can have time to process large Merkle
+	// tree calculations that may be involved with renewing a file contract.
+	NegotiateRenewContractTime = 600 * time.Second
+
 	// NegotiateSettingsTime establishes the minimum amount of time that the
 	// connection deadline is expected to be set to when settings are being
 	// requested from the host. The deadline is long enough that the connection
@@ -142,8 +149,8 @@ var (
 	// RPCFormContract is the specifier for forming a contract with a host.
 	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
-	// RPCRenew is the specifier to renewing an existing contract.
-	RPCRenew = types.Specifier{'R', 'e', 'n', 'e', 'w', 2}
+	// RPCRenewContract is the specifier to renewing an existing contract.
+	RPCRenewContract = types.Specifier{'R', 'e', 'n', 'e', 'w', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
 	// RPCReviseContract is the specifier for revising an existing file
 	// contract.
