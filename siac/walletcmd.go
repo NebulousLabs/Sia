@@ -294,28 +294,31 @@ func walletbalancecmd() {
 	if status.Encrypted {
 		encStatus = "Encrypted"
 	}
-	lockStatus := "Locked"
-	balance := "Unlock the wallet to view balance"
-	if status.Unlocked {
-		lockStatus = "Unlocked"
-		// Divide by 1e24 to get SC.
-		r := new(big.Rat).SetFrac(status.ConfirmedSiacoinBalance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-		sc, _ := r.Float64()
-		unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
-		unconfirmedDifference := new(big.Int).Sub(unconfirmedBalance.Big(), status.ConfirmedSiacoinBalance.Big())
-		r = new(big.Rat).SetFrac(unconfirmedDifference, new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-		usc, _ := r.Float64()
-		balance = fmt.Sprintf(`Confirmed Balance:   %.2f SC
-Unconfirmed Delta:  %+.2f SC
+	if !status.Unlocked {
+		fmt.Printf(`Wallet status:
+%v, Locked
+Unlock the wallet to view balance
+`, encStatus)
+		return
+	}
+
+	unconfirmedBalance := status.ConfirmedSiacoinBalance.Add(status.UnconfirmedIncomingSiacoins).Sub(status.UnconfirmedOutgoingSiacoins)
+	var delta string
+	if unconfirmedBalance.Cmp(status.ConfirmedSiacoinBalance) >= 0 {
+		delta = "+" + currencyUnits(unconfirmedBalance.Sub(status.ConfirmedSiacoinBalance))
+	} else {
+		delta = "-" + currencyUnits(status.ConfirmedSiacoinBalance.Sub(unconfirmedBalance))
+	}
+
+	fmt.Printf(`Wallet status:
+%s, Unlocked
+Confirmed Balance:   %v
+Unconfirmed Delta:  %v
 Exact:               %v H
 Siafunds:            %v SF
 Siafund Claims:      %v H
-`, sc, usc, status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
-	}
-	fmt.Printf(`Wallet status:
-%s, %s
-%s
-`, encStatus, lockStatus, balance)
+`, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
+		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,

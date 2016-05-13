@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -47,8 +48,7 @@ func startRevision(conn net.Conn, host modules.HostDBEntry, hdb hostDB) error {
 	// TODO: return new host, so we can calculate price accurately
 	recvSettings, err := verifySettings(conn, host, hdb)
 	if err != nil {
-		// TODO: doesn't make sense to reject here if the err is an I/O error.
-		return modules.WriteNegotiationRejection(conn, err)
+		return err
 	} else if !recvSettings.AcceptingContracts {
 		// no need to reject; host will already have disconnected at this point
 		return errors.New("host is not accepting contracts")
@@ -101,6 +101,14 @@ func verifyRecentRevision(conn net.Conn, contract Contract) error {
 	if err := encoding.ReadObject(conn, &hostSignatures, 2048); err != nil {
 		return errors.New("couldn't read host signatures: " + err.Error())
 	}
+	// check that revision number matches; if it does, do a more thorough
+	// check by comparing unlock hashes.
+	if lastRevision.NewRevisionNumber != contract.LastRevision.NewRevisionNumber {
+		return fmt.Errorf("our revision number (%v) does not match the host's (%v)", lastRevision.NewRevisionNumber, contract.LastRevision.NewRevisionNumber)
+	} else if lastRevision.UnlockConditions.UnlockHash() != contract.LastRevision.UnlockConditions.UnlockHash() {
+		return errors.New("unlock conditions do not match")
+	}
+
 	// verify the revision and signatures
 	// NOTE: we can fake the blockheight here because it doesn't affect
 	// verification; it just needs to be above the fork height and below the
