@@ -42,9 +42,10 @@ func (p *hostPool) add(contract contractor.Contract) (contractor.Editor, error) 
 
 // remove disconnects from a host and adds it to the blacklist.
 func (p *hostPool) remove(addr modules.NetAddress) {
-	for _, h := range p.hosts {
+	for i, h := range p.hosts {
 		if h.Address() == addr {
 			h.Close()
+			p.hosts = append(p.hosts[:i], p.hosts[i+1:]...)
 			p.blacklist = append(p.blacklist, addr)
 			return
 		}
