@@ -251,6 +251,7 @@ func (r *Renter) threadedRepairFile(name string, meta trackedFile, pool *hostPoo
 		r.log.Printf(fmt, args...)
 		id := r.mu.Lock()
 		delete(r.tracking, name)
+		r.save()
 		r.mu.Unlock(id)
 	}
 
