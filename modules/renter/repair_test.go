@@ -99,7 +99,10 @@ func TestRepair(t *testing.T) {
 	r := bytes.NewReader(data)
 	for chunk, pieces := range f.incompleteChunks() {
 		err = f.repair(chunk, pieces, r, hosts)
-		if err != nil {
+		// hostErrs are non-fatal
+		if _, ok := err.(hostErrs); ok {
+			continue
+		} else if err != nil {
 			t.Fatal(err)
 		}
 	}
