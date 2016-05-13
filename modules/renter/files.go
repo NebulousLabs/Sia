@@ -217,7 +217,9 @@ func (r *Renter) FileList() []modules.FileInfo {
 
 	files := make([]modules.FileInfo, 0, len(r.files))
 	for _, f := range r.files {
-		_, renewing := r.tracking[f.name]
+		// _, renewing := r.tracking[f.name]
+		// TODO: get renewing working again
+		renewing := false
 		files = append(files, modules.FileInfo{
 			SiaPath:        f.name,
 			Filesize:       f.size,

@@ -16,7 +16,7 @@ import (
 const (
 	// estTxnSize is the estimated size of an encoded file contract
 	// transaction set.
-	estTxnSize = 1024
+	estTxnSize = 2048
 )
 
 var (
@@ -315,6 +315,8 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, endH
 	c.cachedAddress = types.UnlockHash{} // clear the cached address
 	c.saveSync()
 	c.mu.Unlock()
+
+	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, renterCost.Div(types.SiacoinPrecision))
 
 	return contract, nil
 }
