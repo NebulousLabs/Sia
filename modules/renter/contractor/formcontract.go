@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 

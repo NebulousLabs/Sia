@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 )
 
 // An Downloader retrieves sectors from with a host. It requests one sector at

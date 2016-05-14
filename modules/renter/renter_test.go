@@ -10,7 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
-	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
