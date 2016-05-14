@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
 )
 
 var (
@@ -196,7 +197,7 @@ func (r *Renter) Download(path, destination string) error {
 	// Copy the file's metadata
 	// TODO: this is ugly because we only have the Contracts method for
 	// looking up contracts.
-	contracts := make(map[*fileContract]contractor.Contract)
+	contracts := make(map[*fileContract]proto.Contract)
 	file.mu.RLock()
 	for _, c := range r.hostContractor.Contracts() {
 		fc, ok := file.contracts[c.ID]

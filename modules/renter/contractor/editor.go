@@ -2,35 +2,12 @@ package contractor
 
 import (
 	"errors"
-	"net"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-var (
-	// sectorHeight is the height of a Merkle tree that covers a single
-	// sector. It is log2(modules.SectorSize / crypto.SegmentSize)
-	sectorHeight = func() uint64 {
-		height := uint64(0)
-		for 1<<height < (modules.SectorSize / crypto.SegmentSize) {
-			height++
-		}
-		return height
-	}()
-)
-
-// cachedMerkleRoot calculates the root of a set of existing Merkle roots.
-func cachedMerkleRoot(roots []crypto.Hash) crypto.Hash {
-	tree := crypto.NewCachedTree(sectorHeight) // NOTE: height is not strictly necessary here
-	for _, h := range roots {
-		tree.Push(h)
-	}
-	return tree.Root()
-}
 
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.
@@ -65,10 +42,8 @@ type Editor interface {
 // implements the Editor interface. hostEditors are NOT thread-safe; calls to
 // Upload must happen in serial.
 type hostEditor struct {
-	host       modules.HostDBEntry
-	contract   Contract
-	conn       net.Conn
-	stopped    bool
+	editor     *proto.Editor
+	contract   proto.Contract
 	contractor *Contractor
 }
 
@@ -84,216 +59,68 @@ func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.FileCon
 
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
-func (he *hostEditor) Close() error {
-	// don't care about these errors
-	_, _ = verifySettings(he.conn, he.host, he.contractor.hdb)
-	_ = modules.WriteNegotiationStop(he.conn)
-	return he.conn.Close()
-}
-
-// runRevisionIteration submits actions and their accompanying revision to the
-// host for approval. If negotiation is successful, it updates the underlying
-// Contract.
-func (he *hostEditor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash, height types.BlockHeight) error {
-	// initiate revision
-	if err := startRevision(he.conn, he.host, he.contractor.hdb); err != nil {
-		return err
-	}
-
-	// send actions
-	if err := encoding.WriteObject(he.conn, actions); err != nil {
-		return err
-	}
-
-	// send revision to host and exchange signatures
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
-	if err == modules.ErrStopResponse {
-		// if the host disconnected gracefully, set the "stopped" flag, but
-		// continue processing
-		he.stopped = true
-	} else if err != nil {
-		return err
-	}
-
-	// update host contract
-	he.contract.LastRevision = rev
-	he.contract.LastRevisionTxn = signedTxn
-	he.contract.MerkleRoots = newRoots
-
-	he.contractor.mu.Lock()
-	he.contractor.contracts[he.contract.ID] = he.contract
-	he.contractor.saveSync()
-	he.contractor.mu.Unlock()
-
-	return nil
-}
+func (he *hostEditor) Close() error { return he.editor.Close() }
 
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
-	if he.stopped {
-		return crypto.Hash{}, modules.ErrStopResponse
-	}
-	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
-	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
-
-	// get current height
-	he.contractor.mu.RLock()
-	height := he.contractor.blockHeight
-	he.contractor.mu.RUnlock()
-	if height >= he.contract.FileContract.WindowStart {
-		return crypto.Hash{}, errors.New("contract has already ended")
-	}
-
-	// calculate price
-	blockBytes := types.NewCurrency64(modules.SectorSize * uint64(he.contract.FileContract.WindowEnd-height))
-	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
-	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(modules.SectorSize)
-	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
-	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
-		return crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
-	}
-	sectorCollateral := he.host.Collateral.Mul(blockBytes)
-
-	// calculate the new Merkle root
-	sectorRoot := crypto.MerkleRoot(data)
-	newRoots := append(he.contract.MerkleRoots, sectorRoot)
-	merkleRoot := cachedMerkleRoot(newRoots)
-
-	// create the action and revision
-	actions := []modules.RevisionAction{{
-		Type:        modules.ActionInsert,
-		SectorIndex: uint64(len(he.contract.MerkleRoots)),
-		Data:        data,
-	}}
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
-
-	// run the revision iteration
-	if err := he.runRevisionIteration(actions, rev, newRoots, height); err != nil {
+	oldUploadSpending := he.editor.UploadSpending
+	oldStorageSpending := he.editor.StorageSpending
+	contract, sectorRoot, err := he.editor.Upload(data)
+	if err != nil {
 		return crypto.Hash{}, err
 	}
+	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
+	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
 
-	// update spending metrics
 	he.contractor.mu.Lock()
-	he.contractor.storageSpending = he.contractor.storageSpending.Add(sectorStoragePrice)
-	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(sectorBandwidthPrice)
-	he.contractor.save()
+	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(uploadDelta)
+	he.contractor.storageSpending = he.contractor.storageSpending.Add(storageDelta)
+	he.contractor.contracts[contract.ID] = contract
+	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
+	he.contract = contract
 
 	return sectorRoot, nil
 }
 
 // Delete negotiates a revision that removes a sector from a file contract.
 func (he *hostEditor) Delete(root crypto.Hash) error {
-	if he.stopped {
-		return modules.ErrStopResponse
-	}
-	// allot 2 minutes for this exchange
-	he.conn.SetDeadline(time.Now().Add(120 * time.Second))
-	defer he.conn.SetDeadline(time.Now().Add(time.Hour))
-
-	// get current height
-	he.contractor.mu.RLock()
-	height := he.contractor.blockHeight
-	he.contractor.mu.RUnlock()
-	if height >= he.contract.FileContract.WindowStart {
-		return errors.New("contract has already ended")
+	contract, err := he.editor.Delete(root)
+	if err != nil {
+		return err
 	}
 
-	// calculate price
-	sectorPrice, sectorCollateral := types.ZeroCurrency, types.ZeroCurrency
+	he.contractor.mu.Lock()
+	he.contractor.contracts[contract.ID] = contract
+	he.contractor.saveSync()
+	he.contractor.mu.Unlock()
+	he.contract = contract
 
-	// calculate the new Merkle root
-	newRoots := make([]crypto.Hash, 0, len(he.contract.MerkleRoots))
-	index := -1
-	for i, h := range he.contract.MerkleRoots {
-		if h == root {
-			index = i
-		} else {
-			newRoots = append(newRoots, h)
-		}
-	}
-	if index == -1 {
-		return errors.New("no record of that sector root")
-	}
-	merkleRoot := cachedMerkleRoot(newRoots)
-
-	// create the action and accompanying revision
-	actions := []modules.RevisionAction{{
-		Type:        modules.ActionDelete,
-		SectorIndex: uint64(index),
-	}}
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
-
-	// run the revision iteration
-	return he.runRevisionIteration(actions, rev, newRoots, height)
+	return nil
 }
 
 // Modify negotiates a revision that edits a sector in a file contract.
 func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
-	if he.stopped {
-		return modules.ErrStopResponse
-	}
-	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
-	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
-
-	// get current height
-	he.contractor.mu.RLock()
-	height := he.contractor.blockHeight
-	he.contractor.mu.RUnlock()
-	if height >= he.contract.FileContract.WindowStart {
-		return errors.New("contract has already ended")
-	}
-
-	// calculate price
-	sectorPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
-	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
-		return errors.New("contract has insufficient funds to support upload")
-	}
-
-	// calculate the new Merkle root
-	newRoots := make([]crypto.Hash, len(he.contract.MerkleRoots))
-	index := -1
-	for i, h := range he.contract.MerkleRoots {
-		if h == oldRoot {
-			index = i
-			newRoots[i] = newRoot
-		} else {
-			newRoots[i] = h
-		}
-	}
-	if index == -1 {
-		return errors.New("no record of that sector root")
-	}
-	merkleRoot := cachedMerkleRoot(newRoots)
-
-	// create the action and revision
-	actions := []modules.RevisionAction{{
-		Type:        modules.ActionModify,
-		SectorIndex: uint64(index),
-		Offset:      offset,
-		Data:        newData,
-	}}
-	rev := newModifyRevision(he.contract.LastRevision, merkleRoot, sectorPrice)
-
-	// run the revision iteration
-	if err := he.runRevisionIteration(actions, rev, newRoots, height); err != nil {
+	oldUploadSpending := he.editor.UploadSpending
+	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
+	if err != nil {
 		return err
 	}
+	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
 
-	// update spending metrics
 	he.contractor.mu.Lock()
-	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(sectorPrice)
-	he.contractor.save()
+	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(uploadDelta)
+	he.contractor.contracts[contract.ID] = contract
+	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
+	he.contract = contract
 
 	return nil
 }
 
 // Editor initiates the contract revision process with a host, and returns
 // an Editor.
-func (c *Contractor) Editor(contract Contract) (Editor, error) {
+func (c *Contractor) Editor(contract proto.Contract) (Editor, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
@@ -308,40 +135,14 @@ func (c *Contractor) Editor(contract Contract) (Editor, error) {
 		return nil, errTooExpensive
 	}
 
-	// check that contract has enough value to support an upload
-	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
-		return nil, errors.New("invalid contract")
-	}
-	if !host.StoragePrice.IsZero() {
-		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(host.StoragePrice).Uint64()
-		if errOverflow == nil && bytes < modules.SectorSize {
-			return nil, errors.New("contract has insufficient capacity")
-		}
-	}
-
-	// initiate revision loop
-	conn, err := c.dialer.DialTimeout(contract.IP, 15*time.Second)
+	// create editor
+	e, err := proto.NewEditor(host, contract, height)
 	if err != nil {
 		return nil, err
 	}
-	// allot 2 minutes for RPC request + revision exchange
-	conn.SetDeadline(time.Now().Add(120 * time.Second))
-	defer conn.SetDeadline(time.Now().Add(time.Hour))
-	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
-		return nil, errors.New("couldn't initiate RPC: " + err.Error())
-	}
-	if err := verifyRecentRevision(conn, contract); err != nil {
-		return nil, errors.New("revision exchange failed: " + err.Error())
-	}
 
-	// the host is now ready to accept revisions
-	he := &hostEditor{
-		contract: contract,
-		host:     host,
-
-		conn:       conn,
+	return &hostEditor{
+		editor:     e,
 		contractor: c,
-	}
-
-	return he, nil
+	}, nil
 }

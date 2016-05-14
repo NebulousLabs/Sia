@@ -1,4 +1,4 @@
-package contractor
+package proto
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
-func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, blockheight types.BlockHeight) (types.Transaction, error) {
+func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
@@ -40,10 +40,8 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
 	}
 	// read the host's acceptance and transaction signature
-	// NOTE: if the host sends StopResponse, finish the protocol but also return the error
-	acceptErr := modules.ReadNegotiationAcceptance(conn)
-	if acceptErr != nil && acceptErr != modules.ErrStopResponse {
-		return types.Transaction{}, errors.New("host did not accept transaction signature: " + acceptErr.Error())
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return types.Transaction{}, errors.New("host did not accept transaction signature: " + err.Error())
 	}
 	var hostSig types.TransactionSignature
 	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
@@ -51,12 +49,15 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	}
 
 	// add the signature to the transaction and verify it
+	// NOTE: we can fake the blockheight here because it doesn't affect
+	// verification; it just needs to be above the fork height and below the
+	// contract expiration (which was checked earlier).
+	verificationHeight := rev.NewWindowStart - 1
 	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
-	if err := signedTxn.StandaloneValid(blockheight); err != nil {
+	if err := signedTxn.StandaloneValid(verificationHeight); err != nil {
 		return types.Transaction{}, err
 	}
-
-	return signedTxn, acceptErr
+	return signedTxn, nil
 }
 
 // newRevision revises the current revision to cover a different number of

@@ -1,13 +1,11 @@
 package contractor
 
 import (
-	"github.com/NebulousLabs/Sia/crypto"
-	"net"
 	"testing"
-	"time"
 
-	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -22,14 +20,8 @@ func (hdb editorHostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool
 	return h, ok
 }
 
-// editorDialer is used to test the Editor method.
-type editorDialer func() (net.Conn, error)
-
-func (dial editorDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
-	return dial()
-}
-
-// TestEditor tests the Editor method.
+// TestEditor tests the failure conditions of the Editor method. The method is
+// more fully tested in the host integration test.
 func TestEditor(t *testing.T) {
 	// use a mock hostdb to supply hosts
 	hdb := &editorHostDB{
@@ -40,14 +32,14 @@ func TestEditor(t *testing.T) {
 	}
 
 	// empty contract
-	_, err := c.Editor(Contract{})
+	_, err := c.Editor(proto.Contract{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// expired contract
 	c.blockHeight = 3
-	_, err = c.Editor(Contract{})
+	_, err = c.Editor(proto.Contract{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -64,7 +56,7 @@ func TestEditor(t *testing.T) {
 	dbe.AcceptingContracts = true
 	dbe.StoragePrice = types.NewCurrency64(^uint64(0))
 	hdb.hosts["foo"] = dbe
-	_, err = c.Editor(Contract{IP: "foo"})
+	_, err = c.Editor(proto.Contract{IP: "foo"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -72,13 +64,13 @@ func TestEditor(t *testing.T) {
 	// invalid contract
 	dbe.StoragePrice = types.NewCurrency64(500)
 	hdb.hosts["bar"] = dbe
-	_, err = c.Editor(Contract{IP: "bar"})
+	_, err = c.Editor(proto.Contract{IP: "bar"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// spent contract
-	contract := Contract{
+	contract := proto.Contract{
 		IP: "bar",
 		LastRevision: types.FileContractRevision{
 			NewValidProofOutputs: []types.SiacoinOutput{
@@ -90,44 +82,5 @@ func TestEditor(t *testing.T) {
 	_, err = c.Editor(contract)
 	if err == nil {
 		t.Error("expected error, got nil")
-	}
-
-	// give contract more value; it should be valid now
-	contract.LastRevision.NewValidProofOutputs[0].Value = types.NewCurrency64(modules.SectorSize * 500)
-
-	// contract with unresponsive host
-	c.dialer = editorDialer(func() (net.Conn, error) {
-		return nil, net.ErrWriteToConnected
-	})
-	_, err = c.Editor(contract)
-	if err != net.ErrWriteToConnected {
-		t.Error("expected ErrWriteToConnected, got", err)
-	}
-
-	// contract with a disconnecting host
-	c.dialer = editorDialer(func() (net.Conn, error) {
-		ourPipe, theirPipe := net.Pipe()
-		ourPipe.Close()
-		return theirPipe, nil
-	})
-	_, err = c.Editor(contract)
-	if err == nil {
-		t.Errorf("expected err, got nil")
-	}
-
-	// contract with a disconnecting host
-	c.dialer = editorDialer(func() (net.Conn, error) {
-		// create an in-memory conn and spawn a goroutine to handle our half
-		ourConn, theirConn := net.Pipe()
-		go func() {
-			// read the RPC and immediately close
-			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
-			ourConn.Close()
-		}()
-		return theirConn, nil
-	})
-	_, err = c.Editor(contract)
-	if err == nil {
-		t.Error("expected err, got nil")
 	}
 }

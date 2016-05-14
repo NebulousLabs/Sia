@@ -6,36 +6,22 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
-	errNilCS           = errors.New("cannot create contractor with nil consensus set")
-	errNilWallet       = errors.New("cannot create contractor with nil wallet")
-	errNilTpool        = errors.New("cannot create contractor with nil transaction pool")
-	errUnknownContract = errors.New("no record of that contract")
+	errNilCS     = errors.New("cannot create contractor with nil consensus set")
+	errNilWallet = errors.New("cannot create contractor with nil wallet")
+	errNilTpool  = errors.New("cannot create contractor with nil transaction pool")
 )
-
-// A Contract includes the original contract made with a host, along with
-// the most recent revision.
-type Contract struct {
-	IP              modules.NetAddress
-	ID              types.FileContractID
-	FileContract    types.FileContract
-	MerkleRoots     []crypto.Hash
-	LastRevision    types.FileContractRevision
-	LastRevisionTxn types.Transaction
-	SecretKey       crypto.SecretKey
-}
 
 // A Contractor negotiates, revises, renews, and provides access to file
 // contracts.
 type Contractor struct {
 	// dependencies
-	dialer  dialer
 	hdb     hostDB
 	log     *persist.Logger
 	persist persister
@@ -45,7 +31,7 @@ type Contractor struct {
 	allowance     modules.Allowance
 	blockHeight   types.BlockHeight
 	cachedAddress types.UnlockHash // to prevent excessive address creation
-	contracts     map[types.FileContractID]Contract
+	contracts     map[types.FileContractID]proto.Contract
 	lastChange    modules.ConsensusChangeID
 	renewHeight   types.BlockHeight // height at which to renew contracts
 
@@ -129,7 +115,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 }
 
 // Contracts returns the contracts formed by the contractor.
-func (c *Contractor) Contracts() (cs []Contract) {
+func (c *Contractor) Contracts() (cs []proto.Contract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, c := range c.contracts {
@@ -163,21 +149,20 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 	}
 
 	// Create Contractor using production dependencies.
-	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, stdDialer{}, newPersist(persistDir), logger)
+	return newContractor(cs, &walletBridge{w: wallet}, tpool, hdb, newPersist(persistDir), logger)
 }
 
 // newContractor creates a Contractor using the provided dependencies.
-func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, d dialer, p persister, l *persist.Logger) (*Contractor, error) {
+func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p persister, l *persist.Logger) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
-		dialer:  d,
 		hdb:     hdb,
 		log:     l,
 		persist: p,
 		tpool:   tp,
 		wallet:  w,
 
-		contracts: make(map[types.FileContractID]Contract),
+		contracts: make(map[types.FileContractID]proto.Contract),
 	}
 
 	// Load the prior persistence structures.
