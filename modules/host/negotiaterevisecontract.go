@@ -106,7 +106,7 @@ var (
 // managedRevisionIteration handles one iteration of the revision loop. As a
 // performance optimization, multiple iterations of revisions are allowed to be
 // made over the same connection.
-func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) error {
+func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, finalIter bool) error {
 	// Send the settings to the renter. The host will keep going even if it is
 	// not accepting contracts, because in this case the contract already
 	// exists.
@@ -259,8 +259,14 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation) er
 	}
 
 	// Host will now send acceptance and its signature to the renter. This
-	// iteration is complete.
-	err = modules.WriteNegotiationAcceptance(conn)
+	// iteration is complete. If the finalIter flag is set, StopResponse will
+	// be sent instead. This indicates to the renter that the host wishes to
+	// terminate the revision loop.
+	if finalIter {
+		err = modules.WriteNegotiationStop(conn)
+	} else {
+		err = modules.WriteNegotiationAcceptance(conn)
+	}
 	if err != nil {
 		return err
 	}
@@ -298,8 +304,9 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 
 	// Begin the revision loop. The host will process revisions until a
 	// timeout is reached, or until the renter sends a StopResponse.
-	for time.Now().Before(startTime.Add(iteratedConnectionTime)) {
-		err := h.managedRevisionIteration(conn, so)
+	for timeoutReached := false; !timeoutReached; {
+		timeoutReached = time.Since(startTime) > iteratedConnectionTime
+		err := h.managedRevisionIteration(conn, so, timeoutReached)
 		if err == modules.ErrStopResponse {
 			return nil
 		} else if err != nil {

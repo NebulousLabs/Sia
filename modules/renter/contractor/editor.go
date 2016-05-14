@@ -65,14 +65,10 @@ type Editor interface {
 // implements the Editor interface. hostEditors are NOT thread-safe; calls to
 // Upload must happen in serial.
 type hostEditor struct {
-	// constants
-	host modules.HostDBEntry
-
-	// updated after each revision
-	contract Contract
-
-	// resources
+	host       modules.HostDBEntry
+	contract   Contract
 	conn       net.Conn
+	stopped    bool
 	contractor *Contractor
 }
 
@@ -111,7 +107,11 @@ func (he *hostEditor) runRevisionIteration(actions []modules.RevisionAction, rev
 
 	// send revision to host and exchange signatures
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, height)
-	if err != nil {
+	if err == modules.ErrStopResponse {
+		// if the host disconnected gracefully, set the "stopped" flag, but
+		// continue processing
+		he.stopped = true
+	} else if err != nil {
 		return err
 	}
 
@@ -130,6 +130,9 @@ func (he *hostEditor) runRevisionIteration(actions []modules.RevisionAction, rev
 
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
+	if he.stopped {
+		return crypto.Hash{}, modules.ErrStopResponse
+	}
 	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
 	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
 	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
@@ -182,6 +185,9 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 
 // Delete negotiates a revision that removes a sector from a file contract.
 func (he *hostEditor) Delete(root crypto.Hash) error {
+	if he.stopped {
+		return modules.ErrStopResponse
+	}
 	// allot 2 minutes for this exchange
 	he.conn.SetDeadline(time.Now().Add(120 * time.Second))
 	defer he.conn.SetDeadline(time.Now().Add(time.Hour))
@@ -225,6 +231,9 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 
 // Modify negotiates a revision that edits a sector in a file contract.
 func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
+	if he.stopped {
+		return modules.ErrStopResponse
+	}
 	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
 	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
 	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
