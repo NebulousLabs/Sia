@@ -28,26 +28,20 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, star
 		return proto.Contract{}, errTooExpensive
 	}
 
-	// TODO: move this outside this function?
-	c.mu.Lock()
 	// get an address to use for negotiation
-	if c.cachedAddress == (types.UnlockHash{}) {
-		uc, err := c.wallet.NextAddress()
-		if err != nil {
-			c.mu.Unlock()
-			return proto.Contract{}, err
-		}
-		c.cachedAddress = uc.UnlockHash()
+	uc, err := c.wallet.NextAddress()
+	if err != nil {
+		return proto.Contract{}, err
 	}
+
 	// create contract params
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      filesize,
 		StartHeight:   startHeight,
 		EndHeight:     endHeight,
-		RefundAddress: c.cachedAddress,
+		RefundAddress: uc.UnlockHash(),
 	}
-	c.mu.Unlock()
 
 	// create transaction builder
 	txnBuilder := c.wallet.StartTransaction()
@@ -60,7 +54,6 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, star
 
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
-	c.cachedAddress = types.UnlockHash{} // clear the cached address
 	c.saveSync()
 	c.mu.Unlock()
 

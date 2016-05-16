@@ -28,12 +28,11 @@ type Contractor struct {
 	tpool   transactionPool
 	wallet  wallet
 
-	allowance     modules.Allowance
-	blockHeight   types.BlockHeight
-	cachedAddress types.UnlockHash // to prevent excessive address creation
-	contracts     map[types.FileContractID]proto.Contract
-	lastChange    modules.ConsensusChangeID
-	renewHeight   types.BlockHeight // height at which to renew contracts
+	allowance   modules.Allowance
+	blockHeight types.BlockHeight
+	contracts   map[types.FileContractID]proto.Contract
+	lastChange  modules.ConsensusChangeID
+	renewHeight types.BlockHeight // height at which to renew contracts
 
 	// metrics
 	downloadSpending types.Currency
