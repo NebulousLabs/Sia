@@ -48,7 +48,7 @@ var (
 
 	// errEmptyFileContractTransactionSet is returned if the renter provides a
 	// nil file contract transaction set during file contract negotiation.
-	errEmptyFileContractTransactionSet = errors.New("file contract transaction set is nil - invalid!")
+	errEmptyFileContractTransactionSet = errors.New("file contract transaction set is empty")
 
 	// errLowHostPayout is returned if the host is not getting paid enough in
 	// the file contract to cover the contract price.
@@ -84,8 +84,7 @@ var (
 // contractCollateral returns the amount of collateral that the host is
 // expected to add to the file contract based on the payout of the file
 // contract and based on the host settings.
-func contractCollateral(settings modules.HostInternalSettings, txnSet []types.Transaction) types.Currency {
-	fc := txnSet[len(txnSet)-1].FileContracts[0]
+func contractCollateral(settings modules.HostInternalSettings, fc types.FileContract) types.Currency {
 	return fc.ValidProofOutputs[1].Value.Sub(settings.MinimumContractPrice)
 }
 
@@ -95,9 +94,10 @@ func contractCollateral(settings modules.HostInternalSettings, txnSet []types.Tr
 // set. The builder that is used to add the collateral is also returned,
 // because the new transaction has not yet been signed.
 func (h *Host) managedAddCollateral(settings modules.HostInternalSettings, txnSet []types.Transaction) (builder modules.TransactionBuilder, newParents []types.Transaction, newInputs []types.SiacoinInput, newOutputs []types.SiacoinOutput, err error) {
-	hostPortion := contractCollateral(settings, txnSet)
 	txn := txnSet[len(txnSet)-1]
 	parents := txnSet[:len(txnSet)-1]
+	fc := txn.FileContracts[0]
+	hostPortion := contractCollateral(settings, fc)
 	builder = h.wallet.RegisterTransaction(txn, parents)
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
@@ -174,8 +174,8 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// Create and add the storage obligation for this file contract.
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	fullTxn, parentTxns := builder.View()
-	hostPortion := contractCollateral(h.settings, append(parentTxns, fullTxn))
+	fullTxn, _ := builder.View()
+	hostPortion := contractCollateral(h.settings, fc)
 	so := &storageObligation{
 		ContractCost:     h.settings.MinimumContractPrice,
 		LockedCollateral: hostPortion,
@@ -409,7 +409,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	}
 	// Check that the collateral does not exceed the maximum amount of
 	// collateral allowed.
-	expectedCollateral := contractCollateral(settings, txnSet)
+	expectedCollateral := contractCollateral(settings, fc)
 	if expectedCollateral.Cmp(settings.MaxCollateral) > 0 {
 		return errMaxCollateralReached
 	}

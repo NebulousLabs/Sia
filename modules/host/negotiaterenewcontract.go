@@ -19,16 +19,14 @@ var (
 
 // renewBaseCollateral returns the base collateral on the storage in the file
 // contract, using the host's external settings and the starting file contract.
-func renewBaseCollateral(so *storageObligation, settings modules.HostExternalSettings, txnSet []types.Transaction) types.Currency {
-	fc := txnSet[len(txnSet)-1].FileContracts[0]
+func renewBaseCollateral(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
 	timeExtension := fc.WindowEnd - so.proofDeadline()
 	return settings.Collateral.Mul64(fc.FileSize).Mul64(uint64(timeExtension))
 }
 
 // renewBasePrice returns the base cost of the storage in the file contract,
 // using the host external settings and the starting file contract.
-func renewBasePrice(so *storageObligation, settings modules.HostExternalSettings, txnSet []types.Transaction) types.Currency {
-	fc := txnSet[len(txnSet)-1].FileContracts[0]
+func renewBasePrice(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
 	timeExtension := fc.WindowEnd - so.proofDeadline()
 	return settings.StoragePrice.Mul64(fc.FileSize).Mul64(uint64(timeExtension))
 }
@@ -36,17 +34,17 @@ func renewBasePrice(so *storageObligation, settings modules.HostExternalSettings
 // renewContractCollateral returns the amount of collateral that the host is
 // expected to add to the file contract based on the file contract and host
 // settings.
-func renewContractCollateral(so *storageObligation, settings modules.HostExternalSettings, txnSet []types.Transaction) types.Currency {
-	fc := txnSet[len(txnSet)-1].FileContracts[0]
-	return fc.ValidProofOutputs[1].Value.Sub(settings.ContractPrice).Sub(renewBasePrice(so, settings, txnSet))
+func renewContractCollateral(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
+	return fc.ValidProofOutputs[1].Value.Sub(settings.ContractPrice).Sub(renewBasePrice(so, settings, fc))
 }
 
 // managedAddRenewCollateral adds the host's collateral to the renewed file
 // contract.
 func (h *Host) managedAddRenewCollateral(so *storageObligation, settings modules.HostExternalSettings, txnSet []types.Transaction) (builder modules.TransactionBuilder, newParents []types.Transaction, newInputs []types.SiacoinInput, newOutputs []types.SiacoinOutput, err error) {
-	hostPortion := renewContractCollateral(so, settings, txnSet)
 	txn := txnSet[len(txnSet)-1]
 	parents := txnSet[:len(txnSet)-1]
+	fc := txn.FileContracts[0]
+	hostPortion := renewContractCollateral(so, settings, fc)
 	builder = h.wallet.RegisterTransaction(txn, parents)
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
@@ -261,7 +259,7 @@ func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []type
 
 	// Check that the collateral does not exceed the maximum amount of
 	// collateral allowed.
-	expectedCollateral := renewContractCollateral(so, externalSettings, txnSet)
+	expectedCollateral := renewContractCollateral(so, externalSettings, fc)
 	if expectedCollateral.Cmp(externalSettings.MaxCollateral) > 0 {
 		return errMaxCollateralReached
 	}
@@ -273,8 +271,8 @@ func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []type
 	// Check that the missed proof outputs contains enough money, and that the
 	// void contains enough money. Before calculating the expected value, check
 	// that the subtraction won't cause a negative currency.
-	basePrice := renewBasePrice(so, externalSettings, txnSet)
-	baseCollateral := renewBaseCollateral(so, externalSettings, txnSet)
+	basePrice := renewBasePrice(so, externalSettings, fc)
+	baseCollateral := renewBaseCollateral(so, externalSettings, fc)
 	if fc.ValidProofOutputs[1].Value.Cmp(basePrice.Add(baseCollateral)) < 0 {
 		return errBadPayoutsAmounts
 	}
