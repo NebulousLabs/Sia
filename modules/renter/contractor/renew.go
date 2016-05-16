@@ -78,7 +78,7 @@ func (c *Contractor) managedRenew(contract Contract, filesize uint64, newEndHeig
 		return types.FileContractID{}, err
 	}
 	defer conn.Close()
-	if err := encoding.WriteObject(conn, modules.RPCRenew); err != nil {
+	if err := encoding.WriteObject(conn, modules.RPCRenewContract); err != nil {
 		return types.FileContractID{}, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 

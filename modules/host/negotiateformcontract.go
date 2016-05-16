@@ -12,15 +12,18 @@ import (
 )
 
 var (
-	// errBadCollateralFraction is returned if the host is provided with a
-	// collateral fraction which is greater than the maximum collateral that
-	// the host accepts as indicated in the settings.
-	errBadCollateralFraction = errors.New("file contract has too high of a collateral fraction")
-
 	// errBadContractUnlockHash is returned when the host receives a file
 	// contract where it does not understand the unlock hash driving the
 	// contract.
 	errBadContractUnlockHash = errors.New("file contract has an unexpected unlock hash")
+
+	// errBadFileSize is returned if a file contract is provided by the renter
+	// which does not have the right file size.
+	errBadFileSize = errors.New("new file contract does not have the right file size")
+
+	// errBadFileMerkleRoot is returned if a file contract is provided by the
+	// renter which does not have the right file size.
+	errBadFileMerkleRoot = errors.New("new file contract does not have the right file Merkle root")
 
 	// errBadPayoutsLen is returned if a new file contract is presented that
 	// has the wrong number of valid or missed proof payouts.
@@ -43,6 +46,10 @@ var (
 	// which is longer than the host's maximum duration.
 	errDurationTooLong = errors.New("file contract has a duration which exceeds the duration permitted by the host")
 
+	// errEmptyFileContractTransactionSet is returned if the renter provides a
+	// nil file contract transaction set during file contract negotiation.
+	errEmptyFileContractTransactionSet = errors.New("file contract transaction set is empty")
+
 	// errLowHostPayout is returned if the host is not getting paid enough in
 	// the file contract to cover the contract price.
 	errLowHostPayout = errors.New("file contract payout does not cover the contract cost")
@@ -57,13 +64,9 @@ var (
 	// per file contract.
 	errMaxCollateralReached = errors.New("file contract proposal expects the host to pay more than the maximum allowed collateral")
 
-	// errEmptyFileContractTransactionSet is returned if the renter provides a
-	// nil file contract transaction set during file contract negotiation.
-	errEmptyFileContractTransactionSet = errors.New("file contract transaction set is nil - invalid!")
-
-	// errNonEmptyFC is returned if a renter tries to make a new file contract
-	// that has a FileSize which is not zero.
-	errNonEmptyFC = errors.New("new file contract should have no data in it")
+	// errNoFileContract is returned if a transaction set is sent that does not
+	// have a file contract.
+	errNoFileContract = errors.New("transaction set does not have a file contract")
 
 	// errWindowSizeTooSmall is returned if a file contract has a window size
 	// (defined by fc.WindowEnd - fc.WindowStart) which is too small to be
@@ -81,8 +84,7 @@ var (
 // contractCollateral returns the amount of collateral that the host is
 // expected to add to the file contract based on the payout of the file
 // contract and based on the host settings.
-func contractCollateral(settings modules.HostInternalSettings, txnSet []types.Transaction) types.Currency {
-	fc := txnSet[len(txnSet)-1].FileContracts[0]
+func contractCollateral(settings modules.HostInternalSettings, fc types.FileContract) types.Currency {
 	return fc.ValidProofOutputs[1].Value.Sub(settings.MinimumContractPrice)
 }
 
@@ -91,10 +93,11 @@ func contractCollateral(settings modules.HostInternalSettings, txnSet []types.Tr
 // transaction, as well as any new parents that get added to the transaction
 // set. The builder that is used to add the collateral is also returned,
 // because the new transaction has not yet been signed.
-func (h *Host) managedAddCollateral(txnSet []types.Transaction, settings modules.HostInternalSettings) (builder modules.TransactionBuilder, newParents []types.Transaction, newInputs []types.SiacoinInput, newOutputs []types.SiacoinOutput, err error) {
-	hostPortion := contractCollateral(settings, txnSet)
+func (h *Host) managedAddCollateral(settings modules.HostInternalSettings, txnSet []types.Transaction) (builder modules.TransactionBuilder, newParents []types.Transaction, newInputs []types.SiacoinInput, newOutputs []types.SiacoinOutput, err error) {
 	txn := txnSet[len(txnSet)-1]
 	parents := txnSet[:len(txnSet)-1]
+	fc := txn.FileContracts[0]
+	hostPortion := contractCollateral(settings, fc)
 	builder = h.wallet.RegisterTransaction(txn, parents)
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
@@ -171,8 +174,8 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// Create and add the storage obligation for this file contract.
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	fullTxn, parentTxns := builder.View()
-	hostPortion := contractCollateral(h.settings, append(parentTxns, fullTxn))
+	fullTxn, _ := builder.View()
+	hostPortion := contractCollateral(h.settings, fc)
 	so := &storageObligation{
 		ContractCost:     h.settings.MinimumContractPrice,
 		LockedCollateral: hostPortion,
@@ -266,7 +269,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	// The host adds collateral to the transaction.
-	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(txnSet, settings)
+	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(settings, txnSet)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
@@ -339,26 +342,30 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 // managedVerifyNewContract checks that an incoming file contract matches the host's
 // expectations for a valid contract.
 func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK crypto.PublicKey) error {
-	// Check that the transaction set is not nil - a nil transaction set could
-	// cause a panic and is therefore not allowed.
+	// Check that the transaction set is not empty.
 	if len(txnSet) < 1 {
 		return errEmptyFileContractTransactionSet
+	}
+	// Check that there is a file contract in the txnSet.
+	if len(txnSet[len(txnSet)-1].FileContracts) < 1 {
+		return errNoFileContract
 	}
 
 	h.mu.RLock()
 	blockHeight := h.blockHeight
+	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	publicKey := h.publicKey
 	settings := h.settings
 	unlockHash := h.unlockHash
-	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	h.mu.RUnlock()
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 
-	// A new file contract should have a file size of zero. The Merkle root is
-	// actually irrelevant, because the consensus set will not accept storage
-	// proof on empty file contracts.
+	// A new file contract should have a file size of zero.
 	if fc.FileSize != 0 {
-		return errNonEmptyFC
+		return errBadFileSize
+	}
+	if fc.FileMerkleRoot != (crypto.Hash{}) {
+		return errBadFileMerkleRoot
 	}
 	// WindowStart must be at least revisionSubmissionBuffer blocks into the
 	// future.
@@ -400,14 +407,9 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	if fc.ValidProofOutputs[1].Value.Cmp(settings.MinimumContractPrice) < 0 {
 		return errLowHostPayout
 	}
-	// Check that the collateral for the host is not too high.
-	expectedCollateral := contractCollateral(settings, txnSet)
-	expectedCollateralFraction := expectedCollateral.Mul64(1e6).Div(fc.Payout)
-	if expectedCollateralFraction.Cmp(settings.MaxCollateralFraction) > 0 {
-		return errBadCollateralFraction
-	}
 	// Check that the collateral does not exceed the maximum amount of
 	// collateral allowed.
+	expectedCollateral := contractCollateral(settings, fc)
 	if expectedCollateral.Cmp(settings.MaxCollateral) > 0 {
 		return errMaxCollateralReached
 	}
@@ -425,10 +427,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 				Algorithm: types.SignatureEd25519,
 				Key:       renterPK[:],
 			},
-			{
-				Algorithm: types.SignatureEd25519,
-				Key:       publicKey.Key,
-			},
+			publicKey,
 		},
 		SignaturesRequired: 2,
 	}.UnlockHash()

@@ -173,6 +173,14 @@ func (so *storageObligation) expiration() types.BlockHeight {
 	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].WindowStart
 }
 
+// fileSize returns the size of the data protected by the obligation.
+func (so *storageObligation) fileSize() uint64 {
+	if len(so.RevisionTransactionSet) > 0 {
+		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewFileSize
+	}
+	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].FileSize
+}
+
 // id returns the id of the storage obligation, which is definied by the file
 // contract id of the file contract that governs the storage contract.
 func (so *storageObligation) id() types.FileContractID {
@@ -227,6 +235,14 @@ func (so *storageObligation) isSane() error {
 		}
 	}
 	return nil
+}
+
+// merkleRoot returns the file merkle root of a storage obligation.
+func (so *storageObligation) merkleRoot() crypto.Hash {
+	if len(so.RevisionTransactionSet) > 0 {
+		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewFileMerkleRoot
+	}
+	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContracts[0].FileMerkleRoot
 }
 
 // payous returns the set of valid payouts and missed payouts that represent
