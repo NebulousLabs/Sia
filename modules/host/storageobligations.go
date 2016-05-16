@@ -539,6 +539,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	}
 	if sos == obligationRejected {
 		// Remove the obligation statistics as potential risk and income.
+		h.log.Printf("Rejecting storage obligation expiring at block %v, current height is %v. Potential revenue is %v.\n", so.expiration(), h.blockHeight, h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -549,6 +550,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	}
 	if sos == obligationSucceeded {
 		// Remove the obligation statistics as potential risk and income.
+		h.log.Printf("Succesfully submitted a storage proof. Revenue is %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -564,6 +566,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	}
 	if sos == obligationFailed {
 		// Remove the obligation statistics as potential risk and income.
+		h.log.Printf("Missed storage proof. Revenue would have been %v.\n", h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
 		h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Sub(so.ContractCost)
 		h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Sub(so.LockedCollateral)
 		h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Sub(so.PotentialStorageRevenue)
@@ -594,25 +597,31 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// confirmed.
 		err := h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
 		if err != nil {
-			h.log.Println(err)
-		}
-		// Check if the transaction is invalid with the current consensus set.
-		// If so, the transaction is highly unlikely to ever be confirmed, and
-		// the storage obligation should be removed. This check should come
-		// after logging the errror so that the function can quit.
-		_, t := err.(modules.ConsensusConflict)
-		if t {
-			err = h.removeStorageObligation(so, obligationRejected)
-			if err != nil {
-				h.log.Println(err)
+			h.log.Debugln("Could not get origin transaction set accepted", err)
+
+			// Check if the transaction is invalid with the current consensus set.
+			// If so, the transaction is highly unlikely to ever be confirmed, and
+			// the storage obligation should be removed. This check should come
+			// after logging the errror so that the function can quit.
+			//
+			// TODO: If the host or tpool is behind consensus, might be difficult
+			// to have certainty about the issue. If some but not all of the
+			// parents are confirmed, might be some difficulty.
+			_, t := err.(modules.ConsensusConflict)
+			if t {
+				h.log.Debugln("Consensus conflict on the origin transaction set")
+				err = h.removeStorageObligation(so, obligationRejected)
+				if err != nil {
+					h.log.Println("Error removing storage obligation:", err)
+				}
+				return
 			}
-			return
 		}
 
 		// Queue another action item to check the status of the transaction.
 		err = h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error queuing action item:", err)
 		}
 	}
 
@@ -633,6 +642,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			// be confirmed, and the origin transaction may be confirmed, which
 			// would confuse the revenue stuff a bit. Might happen frequently
 			// due to the dynamic fee pool.
+			h.log.Debugln("Full time has elapsed, but the revision transaction could not be submitted to consensus")
 			h.removeStorageObligation(so, obligationRejected)
 			return
 		}
@@ -640,7 +650,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// Queue another action item to check the status of the transaction.
 		err := h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error queuing action item:", err)
 		}
 
 		// Add a miner fee to the transaction and submit it to the blockchain.
@@ -660,19 +670,19 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		requiredFee := feeRecommendation.Mul64(txnSize)
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error funding transaction fees", err)
 		}
 		builder.AddMinerFee(requiredFee)
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error adding miner fees", err)
 		}
 		feeAddedRevisionTransactionSet, err := builder.Sign(true)
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error signing transaction", err)
 		}
 		err = h.tpool.AcceptTransactionSet(feeAddedRevisionTransactionSet)
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error submitting transaction to transaction pool", err)
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
 		// return
@@ -686,7 +696,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
 			err := h.removeStorageObligation(so, obligationFailed)
 			if err != nil {
-				h.log.Println(err)
+				h.log.Println("Error removing storage obligation:", err)
 			}
 			return
 		}
@@ -756,7 +766,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// got confirmed.
 		err = h.queueActionItem(h.blockHeight+types.BlockHeight(storageProofConfirmations), so.id())
 		if err != nil {
-			h.log.Println(err)
+			h.log.Println("Error queuing action item:", err)
 		}
 	}
 
@@ -770,14 +780,14 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		return tx.Bucket(bucketStorageObligations).Put(soid[:], soBytes)
 	})
 	if err != nil {
-		h.log.Println(err)
+		h.log.Println("Error updating the storage obligations", err)
 	}
 
 	// Check if all items have succeeded with the required confirmations. Report
 	// success, delete the obligation.
 	//
 	// TODO: This doesn't actually wait enough blocks?
-	if so.ProofConfirmed && h.blockHeight >= so.expiration()+types.BlockHeight(storageProofConfirmations) {
+	if so.ProofConfirmed && h.blockHeight >= so.proofDeadline() {
 		h.removeStorageObligation(so, obligationSucceeded)
 	}
 }

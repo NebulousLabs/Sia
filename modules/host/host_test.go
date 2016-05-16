@@ -261,6 +261,7 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	ht, err := newHostTester("TestSetAndGetInternalSettings")
 	if err != nil {
