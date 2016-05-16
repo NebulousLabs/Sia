@@ -22,7 +22,7 @@ var (
 
 // newContract negotiates an initial file contract with the specified host,
 // saves it, and returns it.
-func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, duration types.BlockHeight) (proto.Contract, error) {
+func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, startHeight, endHeight types.BlockHeight) (proto.Contract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return proto.Contract{}, errTooExpensive
@@ -43,8 +43,8 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, dura
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      filesize,
-		StartHeight:   c.blockHeight,
-		EndHeight:     c.blockHeight + duration,
+		StartHeight:   startHeight,
+		EndHeight:     endHeight,
 		RefundAddress: c.cachedAddress,
 	}
 	c.mu.Unlock()
@@ -104,11 +104,18 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	}
 	filesize := numSectors * modules.SectorSize
 
+	c.mu.RLock()
+	endHeight := c.blockHeight + a.Period
+	c.mu.RUnlock()
+
 	// Form contracts with each host.
 	var numContracts uint64
 	var errs []string
 	for _, h := range hosts {
-		_, err := c.newContract(h, filesize, a.Period)
+		c.mu.RLock()
+		startHeight := c.blockHeight
+		c.mu.RUnlock()
+		_, err := c.newContract(h, filesize, startHeight, endHeight)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("\t%v: %v", h.NetAddress, err))
 			continue
@@ -128,7 +135,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v): %v", a.Hosts, numContracts, strings.Join(errs, "\n"))
 	}
 	c.mu.Lock()
-	c.renewHeight = c.blockHeight + a.Period // TODO: this risks desync
+	c.renewHeight = endHeight
 	c.mu.Unlock()
 	return nil
 }
