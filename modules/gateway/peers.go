@@ -136,7 +136,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 
 	// read version
 	var remoteVersion string
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 		conn.Close()
 		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", addr, err)
 		return
@@ -280,7 +280,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// read version ack
 	var remoteVersion string
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 		conn.Close()
 		return err
 	}

@@ -86,7 +86,7 @@ func TestListen(t *testing.T) {
 	}
 	// read ack
 	var ack string
-	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &ack, build.MaxEncodedVersionLength); err != nil {
 		t.Fatal(err)
 	} else if ack != "reject" {
 		t.Fatal("gateway should have rejected old version")
@@ -114,7 +114,7 @@ func TestListen(t *testing.T) {
 		t.Fatal("couldn't write version")
 	}
 	// read ack
-	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &ack, build.MaxEncodedVersionLength); err != nil {
 		t.Fatal(err)
 	} else if ack == "reject" {
 		t.Fatal("gateway should have given ack")
@@ -285,7 +285,7 @@ func TestConnectRejectsInvalidVersions(t *testing.T) {
 			}
 			// Read remote peer version.
 			var remoteVersion string
-			if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+			if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 				panic(err)
 			}
 			// Write our mock version.
@@ -436,7 +436,7 @@ func (g mockGatewayWithVersion) Connect(addr modules.NetAddress) error {
 	}
 	// read version ack
 	var remoteVersion string
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 		return err
 	}
 	// send port
