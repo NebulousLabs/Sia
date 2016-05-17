@@ -9,6 +9,12 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+// MaxEncodedNetAddressLength is the maximum length of a NetAddress encoded
+// with the encode package. 266 was chosen because the maximum length for the
+// hostname is 254 + 1 for the separating colon + 5 for the port + 8 byte
+// string length prefix.
+const MaxEncodedNetAddressLength = 266
+
 // A NetAddress contains the information needed to contact a peer.
 type NetAddress string
 
