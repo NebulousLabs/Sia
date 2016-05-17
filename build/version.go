@@ -5,8 +5,17 @@ import (
 	"strings"
 )
 
-// Version is the current version of siad.
-const Version = "0.6.1"
+const (
+	// Version is the current version of siad.
+	Version = "0.6.1"
+
+	// MaxEncodedVersionLength is the maximum length of a version string encoded
+	// with the encode package. 100 is much larger than any version number we send
+	// now, but it allows us to send additional information in the version string
+	// later if we choose. For example appending the version string with the HEAD
+	// commit hash.
+	MaxEncodedVersionLength = 100
+)
 
 // IsVersion returns whether str is a valid version number.
 func IsVersion(str string) bool {
