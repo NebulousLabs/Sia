@@ -111,12 +111,10 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	fn, ok := g.handlers[id]
 	g.mu.RUnlock(lockid)
 	if !ok {
-		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		g.log.Debugf("WARN: incoming conn %v requested unknown RPC %q", conn.RemoteAddr(), id)
 		return
 	}
-	if build.DEBUG {
-		g.log.Printf("INFO: incoming conn %v requested RPC \"%v\"", conn.RemoteAddr(), id)
-	}
+	g.log.Debugf("INFO: incoming conn %v requested RPC %q", conn.RemoteAddr(), id)
 
 	// call fn
 	err := fn(conn)
@@ -125,7 +123,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		err = nil
 	}
 	if err != nil {
-		g.log.Printf("WARN: incoming RPC \"%v\" from conn %v failed: %v", id, conn.RemoteAddr(), err)
+		g.log.Debugf("WARN: incoming RPC %q from conn %v failed: %v", id, conn.RemoteAddr(), err)
 	}
 }
 
@@ -134,7 +132,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 // object and disconnect. This is why Broadcast takes an interface{} instead of
 // an RPCFunc.
 func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) {
-	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
+	g.log.Printf("INFO: broadcasting RPC %q to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
