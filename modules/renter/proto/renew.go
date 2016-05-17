@@ -11,35 +11,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// estTxnSize is the estimated size of an encoded file contract
-	// transaction set.
-	estTxnSize = 2048
-)
-
-// FormContract forms a contract with a host and submits the contract
-// transaction to tpool.
-func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
+// Renew negotiates a new contract for data already stored with a host, and
+// submits the new contract transaction to tpool.
+func Renew(contract Contract, params ContractParams, txnBuilder transactionBuilder, tpool transactionPool) (Contract, error) {
 	// extract vars from params, for convenience
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
-
-	// create our key
-	ourSK, ourPK, err := crypto.GenerateKeyPair()
-	if err != nil {
-		return Contract{}, err
-	}
-	ourPublicKey := types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       ourPK[:],
-	}
-	// create unlock conditions
-	uc := types.UnlockConditions{
-		PublicKeys:         []types.SiaPublicKey{ourPublicKey, host.PublicKey},
-		SignaturesRequired: 2,
-	}
+	ourSK := contract.SecretKey
 
 	// calculate cost to renter and cost to host
-	// TODO: clarify/abstract this math
 	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
@@ -47,32 +26,38 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 		// (ok within a factor of 2)
 		hostCollateral = host.MaxCollateral
 	}
-	hostPayout := hostCollateral.Add(host.ContractPrice)
-	payout := storageAllocation.Add(hostPayout).Mul64(10406).Div64(10000) // renter pays for siafund fee
+
+	timeExtension := uint64((endHeight + host.WindowSize) - contract.LastRevision.NewWindowEnd)
+	basePrice := host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
+	baseCollateral := host.Collateral.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension) // same but collateral
+
+	hostPayout := hostCollateral.Add(host.ContractPrice).Add(basePrice)
+
+	payout := storageAllocation.Add(hostCollateral.Add(host.ContractPrice)).Mul64(10406).Div64(10000) // renter covers siafund fee
 	renterCost := payout.Sub(hostCollateral)
 
 	// create file contract
 	fc := types.FileContract{
-		FileSize:       0,
-		FileMerkleRoot: crypto.Hash{}, // no proof possible without data
+		FileSize:       contract.LastRevision.NewFileSize,
+		FileMerkleRoot: contract.LastRevision.NewFileMerkleRoot,
 		WindowStart:    endHeight,
 		WindowEnd:      endHeight + host.WindowSize,
 		Payout:         payout,
-		UnlockHash:     uc.UnlockHash(),
+		UnlockHash:     contract.LastRevision.NewUnlockHash,
 		RevisionNumber: 0,
 		ValidProofOutputs: []types.SiacoinOutput{
-			// outputs need to account for tax
+			// renter
 			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
-			// collateral is returned to host
+			// host
 			{Value: hostPayout, UnlockHash: host.UnlockHash},
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
-			// same as above
+			// renter
 			{Value: types.PostTax(startHeight, payout).Sub(hostPayout), UnlockHash: refundAddress},
-			// same as above
-			{Value: hostPayout, UnlockHash: host.UnlockHash},
-			// once we start doing revisions, we'll move some coins to the host and some to the void
-			{Value: types.ZeroCurrency, UnlockHash: types.UnlockHash{}},
+			// host gets its unused collateral back, plus the contract price
+			{Value: hostCollateral.Sub(baseCollateral).Add(host.ContractPrice), UnlockHash: host.UnlockHash},
+			// void gets the spent storage fees, plus the collateral being risked
+			{Value: basePrice.Add(baseCollateral), UnlockHash: types.UnlockHash{}},
 		},
 	}
 
@@ -81,7 +66,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	fee := maxFee.Mul64(estTxnSize)
 
 	// build transaction containing fc
-	err = txnBuilder.FundSiacoins(renterCost.Add(fee))
+	err := txnBuilder.FundSiacoins(renterCost.Add(fee))
 	if err != nil {
 		return Contract{}, err
 	}
@@ -101,23 +86,26 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	}
 	defer func() { _ = conn.Close() }()
 
-	// allot time for sending RPC ID + verifySettings
-	extendDeadline(conn, modules.NegotiateSettingsTime)
-	if err = encoding.WriteObject(conn, modules.RPCFormContract); err != nil {
-		return Contract{}, err
+	// allot time for sending RPC ID, verifyRecentRevision, and verifySettings
+	extendDeadline(conn, modules.NegotiateRecentRevisionTime+modules.NegotiateSettingsTime)
+	if err = encoding.WriteObject(conn, modules.RPCRenewContract); err != nil {
+		return Contract{}, errors.New("couldn't initiate RPC: " + err.Error())
 	}
-
+	// verify that both parties are renewing the same contract
+	if err = verifyRecentRevision(conn, contract); err != nil {
+		return Contract{}, errors.New("revision exchange failed: " + err.Error())
+	}
 	// verify the host's settings and confirm its identity
 	host, err = verifySettings(conn, host)
 	if err != nil {
-		return Contract{}, err
+		return Contract{}, errors.New("settings exchange failed: " + err.Error())
 	}
 	if !host.AcceptingContracts {
 		return Contract{}, errors.New("host is not accepting contracts")
 	}
 
 	// allot time for negotiation
-	extendDeadline(conn, modules.NegotiateFileContractTime)
+	extendDeadline(conn, modules.NegotiateRenewContractTime)
 
 	// send acceptance, txn signed by us, and pubkey
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
@@ -174,7 +162,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	// create initial (no-op) revision, transaction, and signature
 	initRevision := types.FileContractRevision{
 		ParentID:          signedTxnSet[len(signedTxnSet)-1].FileContractID(0),
-		UnlockConditions:  uc,
+		UnlockConditions:  contract.LastRevision.UnlockConditions,
 		NewRevisionNumber: 1,
 
 		NewFileSize:           fc.FileSize,

@@ -76,10 +76,9 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 		"netaddress":           &settings.NetAddress,
 		"windowsize":           &settings.WindowSize,
 
-		"collateral":            &settings.Collateral,
-		"collateralbudget":      &settings.CollateralBudget,
-		"maxcollateralfraction": &settings.MaxCollateralFraction,
-		"maxcollateral":         &settings.MaxCollateral,
+		"collateral":       &settings.Collateral,
+		"collateralbudget": &settings.CollateralBudget,
+		"maxcollateral":    &settings.MaxCollateral,
 
 		"downloadlimitgrowth": &settings.DownloadLimitGrowth,
 		"downloadlimitcap":    &settings.DownloadLimitCap,

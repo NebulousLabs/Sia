@@ -44,9 +44,8 @@ func (h *Host) externalSettings() modules.HostExternalSettings {
 		UnlockHash:           h.unlockHash,
 		WindowSize:           h.settings.WindowSize,
 
-		Collateral:            h.settings.Collateral,
-		MaxCollateralFraction: h.settings.MaxCollateralFraction,
-		MaxCollateral:         h.settings.MaxCollateral,
+		Collateral:    h.settings.Collateral,
+		MaxCollateral: h.settings.MaxCollateral,
 
 		ContractPrice:          h.settings.MinimumContractPrice,
 		DownloadBandwidthPrice: h.settings.MinimumDownloadBandwidthPrice,
