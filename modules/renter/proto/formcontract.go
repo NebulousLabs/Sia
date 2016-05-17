@@ -41,12 +41,14 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	// calculate cost to renter and cost to host
 	// TODO: clarify/abstract this math
 	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
-	hostCollateral := storageAllocation.Mul(host.MaxCollateralFraction).Div(types.NewCurrency64(1e6).Sub(host.MaxCollateralFraction))
+	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	if hostCollateral.Cmp(host.MaxCollateral) > 0 {
+		// TODO: if we have to cap the collateral, it probably means we shouldn't be using this host
+		// (ok within a factor of 2)
 		hostCollateral = host.MaxCollateral
 	}
 	hostPayout := hostCollateral.Add(host.ContractPrice)
-	payout := storageAllocation.Add(hostPayout).Mul64(uint64(10406)).Div64(uint64(10000)) // TODO: wtf??
+	payout := storageAllocation.Add(hostPayout).Mul64(10406).Div64(10000) // renter pays for siafund fee
 	renterCost := payout.Sub(hostCollateral)
 
 	// create file contract

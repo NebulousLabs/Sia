@@ -233,21 +233,10 @@ type (
 		// never uses, meaning the host will not have collateral for other
 		// clients.
 		//
-		// To mitigate the effects of this attack, the host has a collateral
-		// fraction and a max collateral. CollateralFraction is a number that
-		// gets divided by 1e6 and then represents the ratio of funds that the
-		// host is willing to put into the contract relative to the number of
-		// funds that the renter put into the contract. For example, if
-		// 'CollateralFraction' is set to 1e6 and the renter adds 1 siacoin of
-		// funding to the file contract, the host will also add 1 siacoin of
-		// funding to the contract. if 'CollateralFraction' is set to 2e6, the
-		// host would add 2 siacoins of funding to the contract.
-		//
 		// MaxCollateral indicates the maximum number of coins that a host is
 		// willing to put into a file contract.
-		Collateral            types.Currency `json:"collateral"`
-		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
-		MaxCollateral         types.Currency `json:"maxcollateral"`
+		Collateral    types.Currency `json:"collateral"`
+		MaxCollateral types.Currency `json:"maxcollateral"`
 
 		// ContractPrice is the number of coins that the renter needs to pay to
 		// the host just to open a file contract with them. Generally, the

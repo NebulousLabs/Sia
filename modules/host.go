@@ -56,10 +56,9 @@ type (
 		NetAddress           NetAddress        `json:"netaddress"`
 		WindowSize           types.BlockHeight `json:"windowsize"`
 
-		Collateral            types.Currency `json:"collateral"`
-		CollateralBudget      types.Currency `json:"collateralbudget"`
-		MaxCollateralFraction types.Currency `json:"maxcollateralfraction"`
-		MaxCollateral         types.Currency `json:"maxcollateral"`
+		Collateral       types.Currency `json:"collateral"`
+		CollateralBudget types.Currency `json:"collateralbudget"`
+		MaxCollateral    types.Currency `json:"maxcollateral"`
 
 		DownloadLimitGrowth uint64 `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
 		DownloadLimitCap    uint64 `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.

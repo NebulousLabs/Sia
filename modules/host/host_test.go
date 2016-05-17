@@ -294,9 +294,6 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if settings.CollateralBudget.Cmp(defaultCollateralBudget) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.MaxCollateralFraction.Cmp(defaultCollateralFraction) != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
 	if settings.MaxCollateral.Cmp(defaultMaxCollateral) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}

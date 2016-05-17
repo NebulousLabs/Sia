@@ -79,10 +79,9 @@ func (h *Host) establishDefaults() error {
 		MaxReviseBatchSize:   uint64(defaultMaxReviseBatchSize),
 		WindowSize:           defaultWindowSize,
 
-		Collateral:            defaultCollateral,
-		CollateralBudget:      defaultCollateralBudget,
-		MaxCollateralFraction: defaultCollateralFraction,
-		MaxCollateral:         defaultMaxCollateral,
+		Collateral:       defaultCollateral,
+		CollateralBudget: defaultCollateralBudget,
+		MaxCollateral:    defaultMaxCollateral,
 
 		MinimumStoragePrice:           defaultStoragePrice,
 		MinimumContractPrice:          defaultContractPrice,
