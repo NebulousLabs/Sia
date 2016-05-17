@@ -507,7 +507,7 @@ func TestIntegrationRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 	// insert the sector
-	_, err = editor.Upload(data)
+	root, err := editor.Upload(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,7 +518,36 @@ func TestIntegrationRenew(t *testing.T) {
 
 	// renew the contract
 	contract = c.contracts[contract.ID]
-	_, err = c.managedRenew(contract, modules.SectorSize*10, c.blockHeight+200)
+	newID, err := c.managedRenew(contract, modules.SectorSize*10, c.blockHeight+200)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check renewed contract
+	contract = c.contracts[newID]
+	if contract.FileContract.FileMerkleRoot != root {
+		t.Fatal(contract.FileContract.FileMerkleRoot)
+	} else if contract.FileContract.FileSize != modules.SectorSize {
+		t.Fatal(contract.FileContract.FileSize)
+	} else if contract.FileContract.RevisionNumber != 0 {
+		t.Fatal(contract.FileContract.RevisionNumber)
+	} else if contract.FileContract.WindowStart != c.blockHeight+200 {
+		t.Fatal(contract.FileContract.WindowStart)
+	}
+
+	// download the renewed contract
+	downloader, err := c.Downloader(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrieved, err := downloader.Sector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, retrieved) {
+		t.Fatal("downloaded data does not match original")
+	}
+	err = downloader.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
