@@ -138,7 +138,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", addr, err)
+		g.log.Debugf("INFO: %v wanted to connect, but we could not read their version: %v", addr, err)
 		return
 	}
 
@@ -152,14 +152,14 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	if !build.IsVersion(remoteVersion) || build.VersionCmp(remoteVersion, "0.4.0") < 0 {
 		encoding.WriteObject(conn, "reject")
 		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
+		g.log.Debugf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
 		return
 	}
 
 	// respond with our version
 	if err := encoding.WriteObject(conn, build.Version); err != nil {
 		conn.Close()
-		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
+		g.log.Debugf("INFO: could not write version ack to %v: %v", addr, err)
 		return
 	}
 
@@ -171,12 +171,12 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		err := encoding.ReadObject(conn, &dialbackPort, 13) // Max port # is 65535 (5 digits long) + 8 byte string length prefix
 		if err != nil {
 			conn.Close()
-			g.log.Printf("INFO: could not read remote peer's (%v) port: %v", addr, err)
+			g.log.Debugf("INFO: %v wanted to connect, but we could not read their port: %v", addr, err)
 			return
 		}
 		if _, err := strconv.Atoi(dialbackPort); err != nil {
 			conn.Close()
-			g.log.Printf("INFO: peer (%v) sent an invalid dialback port: %v", addr, err)
+			g.log.Debugf("INFO: %v wanted to connect, but sent an invalid dialback port: %v", addr, err)
 			return
 		}
 		remoteAddr = modules.NetAddress(net.JoinHostPort(addr.Host(), dialbackPort))
@@ -184,7 +184,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		// manually, but there's no harm in validating the entire address.
 		if err := remoteAddr.IsValid(); err != nil {
 			conn.Close()
-			g.log.Printf("INFO: peer's address (%v) is invalid: %v", remoteAddr, err)
+			g.log.Debugf("INFO: %v wanted to connect, but their dialback address (%v) is invalid: %v", addr, remoteAddr, err)
 			return
 		}
 		id := g.mu.Lock()
@@ -192,7 +192,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		g.mu.Unlock(id)
 		if exists {
 			conn.Close()
-			g.log.Printf("INFO: rejecting connection, already connected to a peer on that address: %v", remoteAddr)
+			g.log.Debugf("INFO: %v wanted to connect, but we're already connected to a peer on that address (%v)", addr, remoteAddr)
 			return
 		}
 	}
