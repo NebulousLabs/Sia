@@ -20,9 +20,9 @@ var (
 	errTooExpensive          = errors.New("host price was too high")
 )
 
-// newContract negotiates an initial file contract with the specified host,
-// saves it, and returns it.
-func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, startHeight, endHeight types.BlockHeight) (proto.Contract, error) {
+// managedNewContract negotiates an initial file contract with the specified
+// host, saves it, and returns it.
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (proto.Contract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return proto.Contract{}, errTooExpensive
@@ -35,13 +35,15 @@ func (c *Contractor) newContract(host modules.HostDBEntry, filesize uint64, star
 	}
 
 	// create contract params
+	c.mu.RLock()
 	params := proto.ContractParams{
 		Host:          host,
 		Filesize:      filesize,
-		StartHeight:   startHeight,
+		StartHeight:   c.blockHeight,
 		EndHeight:     endHeight,
 		RefundAddress: uc.UnlockHash(),
 	}
+	c.mu.RUnlock()
 
 	// create transaction builder
 	txnBuilder := c.wallet.StartTransaction()
@@ -105,10 +107,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	var numContracts uint64
 	var errs []string
 	for _, h := range hosts {
-		c.mu.RLock()
-		startHeight := c.blockHeight
-		c.mu.RUnlock()
-		_, err := c.newContract(h, filesize, startHeight, endHeight)
+		_, err := c.managedNewContract(h, filesize, endHeight)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("\t%v: %v", h.NetAddress, err))
 			continue
