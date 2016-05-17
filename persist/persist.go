@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 const (
@@ -60,11 +62,16 @@ func (sf *safeFile) Commit() error {
 }
 
 // CommitSync syncs the file, closes it, and then renames it to the intended
-// final filename. CommitSync should not be called from a defer if the
-// function it is being called from can return an error.
+// final filename. CommitSync should not be called from a defer if the function
+// it is being called from can return an error. CommitSync does not call Sync()
+// in testing.
 func (sf *safeFile) CommitSync() error {
-	if err := sf.Sync(); err != nil {
-		return err
+	// Don't sync during testing as it can take too long and causes tests to fail.
+	// TODO: mock the os package so that Sync() is a no-op during testing.
+	if build.Release != "testing" {
+		if err := sf.Sync(); err != nil {
+			return err
+		}
 	}
 	return sf.Commit()
 }
