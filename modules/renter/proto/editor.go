@@ -86,8 +86,8 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *Editor) Upload(data []byte) (Contract, crypto.Hash, error) {
 	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	he.conn.SetDeadline(time.Now().Add(60 * time.Second))
-	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
+	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
+	defer extendDeadline(he.conn, time.Hour) // reset deadline
 
 	// calculate price
 	// TODO: height is never updated, so we'll wind up overpaying on long-running uploads
@@ -128,8 +128,8 @@ func (he *Editor) Upload(data []byte) (Contract, crypto.Hash, error) {
 // Delete negotiates a revision that removes a sector from a file contract.
 func (he *Editor) Delete(root crypto.Hash) (Contract, error) {
 	// allot 2 minutes for this exchange
-	he.conn.SetDeadline(time.Now().Add(120 * time.Second))
-	defer he.conn.SetDeadline(time.Now().Add(time.Hour))
+	extendDeadline(he.conn, 120*time.Second)
+	defer extendDeadline(he.conn, time.Hour) // reset deadline
 
 	// calculate price
 	sectorPrice, sectorCollateral := types.ZeroCurrency, types.ZeroCurrency
@@ -166,8 +166,8 @@ func (he *Editor) Delete(root crypto.Hash) (Contract, error) {
 // Modify negotiates a revision that edits a sector in a file contract.
 func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) (Contract, error) {
 	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	he.conn.SetDeadline(time.Now().Add(600 * time.Second))
-	defer he.conn.SetDeadline(time.Now().Add(time.Hour)) // reset deadline
+	extendDeadline(he.conn, modules.NegotiateFileContractRevisionTime)
+	defer extendDeadline(he.conn, time.Hour) // reset deadline
 
 	// calculate price
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
@@ -231,8 +231,8 @@ func NewEditor(host modules.HostDBEntry, contract Contract, currentHeight types.
 		return nil, err
 	}
 	// allot 2 minutes for RPC request + revision exchange
-	conn.SetDeadline(time.Now().Add(120 * time.Second))
-	defer conn.SetDeadline(time.Now().Add(time.Hour))
+	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
+	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}

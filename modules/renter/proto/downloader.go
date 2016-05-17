@@ -26,9 +26,8 @@ type Downloader struct {
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
 func (hd *Downloader) Sector(root crypto.Hash) (Contract, []byte, error) {
-	// allot 10 minutes for this exchange; sufficient to transfer 4 MB over 50 kbps
-	hd.conn.SetDeadline(time.Now().Add(600 * time.Second))
-	defer hd.conn.SetDeadline(time.Now().Add(time.Hour))
+	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
+	defer extendDeadline(hd.conn, time.Hour) // reset deadline when finished
 
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
@@ -83,6 +82,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (Contract, []byte, error) {
 // Close cleanly terminates the download loop with the host and closes the
 // connection.
 func (hd *Downloader) Close() error {
+	extendDeadline(hd.conn, modules.NegotiateSettingsTime)
 	// don't care about these errors
 	_, _ = verifySettings(hd.conn, hd.host)
 	_ = modules.WriteNegotiationStop(hd.conn)
@@ -109,8 +109,8 @@ func NewDownloader(host modules.HostDBEntry, contract Contract) (*Downloader, er
 		return nil, err
 	}
 	// allot 2 minutes for RPC request + revision exchange
-	conn.SetDeadline(time.Now().Add(120 * time.Second))
-	defer conn.SetDeadline(time.Now().Add(time.Hour))
+	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
+	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}

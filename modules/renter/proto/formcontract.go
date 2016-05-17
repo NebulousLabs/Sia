@@ -97,7 +97,10 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	if err != nil {
 		return Contract{}, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
+
+	// allot time for sending RPC ID + verifySettings
+	extendDeadline(conn, modules.NegotiateSettingsTime)
 	if err = encoding.WriteObject(conn, modules.RPCFormContract); err != nil {
 		return Contract{}, err
 	}
@@ -112,7 +115,7 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	}
 
 	// allot time for negotiation
-	conn.SetDeadline(time.Now().Add(modules.NegotiateFileContractTime))
+	extendDeadline(conn, modules.NegotiateFileContractTime)
 
 	// send acceptance, txn signed by us, and pubkey
 	if err = modules.WriteNegotiationAcceptance(conn); err != nil {
