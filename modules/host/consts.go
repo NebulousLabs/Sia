@@ -54,13 +54,10 @@ var (
 	defaultCollateralBudget = types.SiacoinPrecision.Mul64(10e6)
 
 	// defaultContractPrice defines the default price of creating a contract
-	// with the host. The default is set to 50 siacoins, which means that the
-	// opening file contract can have 5 siacoins put towards it, the file
+	// with the host. The default is set to 30 siacoins, which the file
 	// contract revision can have 15 siacoins put towards it, and the storage
-	// proof can have 15 siacoins put towards it, with 5 left over for the
-	// host, a sort of compensation for keeping and backing up the storage
-	// obligation data.
-	defaultContractPrice = types.SiacoinPrecision.Mul64(40) // 40 siacoins
+	// proof can have 15 siacoins put towards it.
+	defaultContractPrice = types.SiacoinPrecision.Mul64(30) // 30 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
