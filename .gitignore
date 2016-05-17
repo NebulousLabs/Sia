@@ -1,5 +1,6 @@
 # vim
 *.swp
+*.swo
 
 # build artifacts
 cover
