@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -23,19 +24,19 @@ type uploadDownloadContractor struct {
 	mu      sync.Mutex
 }
 
-func (uc *uploadDownloadContractor) Contracts() []contractor.Contract {
-	return make([]contractor.Contract, 24) // exact number shouldn't matter, as long as its large enough
+func (uc *uploadDownloadContractor) Contracts() []proto.Contract {
+	return make([]proto.Contract, 24) // exact number shouldn't matter, as long as its large enough
 }
 
 // Editor simply returns the uploadDownloadContractor, since it also implements the
 // Editor interface.
-func (uc *uploadDownloadContractor) Editor(contractor.Contract) (contractor.Editor, error) {
+func (uc *uploadDownloadContractor) Editor(proto.Contract) (contractor.Editor, error) {
 	return uc, nil
 }
 
 // Downloader simply returns the uploadDownloadContractor, since it also
 // implements the Downloader interface.
-func (uc *uploadDownloadContractor) Downloader(contractor.Contract) (contractor.Downloader, error) {
+func (uc *uploadDownloadContractor) Downloader(proto.Contract) (contractor.Downloader, error) {
 	return uc, nil
 }
 

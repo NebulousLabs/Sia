@@ -1,5 +1,7 @@
 package contractor
 
+/*
+
 import (
 	"errors"
 	"time"
@@ -185,3 +187,5 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	// TODO: reset renewHeight if too many rewewals failed.
 	// TODO: form more contracts if numRenewed < allowance.Hosts
 }
+
+*/

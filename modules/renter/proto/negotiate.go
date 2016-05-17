@@ -1,9 +1,10 @@
-package contractor
+package proto
 
 import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -12,11 +13,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// extendDeadline is a helper function for extending the connection timeout.
+func extendDeadline(conn net.Conn, d time.Duration) { _ = conn.SetDeadline(time.Now().Add(d)) }
+
 // verifySettings reads a signed HostSettings object from conn, validates the
 // signature, and checks for discrepancies between the known settings and the
 // received settings. If there is a discrepancy, the hostDB is notified. The
 // received settings are returned.
-func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (modules.HostDBEntry, error) {
+func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntry, error) {
 	// convert host key (types.SiaPublicKey) to a crypto.PublicKey
 	if host.PublicKey.Algorithm != types.SignatureEd25519 || len(host.PublicKey.Key) != crypto.PublicKeySize {
 		build.Critical("hostdb did not filter out host with wrong signature algorithm:", host.PublicKey.Algorithm)
@@ -31,7 +35,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 		return modules.HostDBEntry{}, errors.New("couldn't read host's settings: " + err.Error())
 	}
 	// TODO: check recvSettings against host.HostExternalSettings. If there is
-	// a discrepancy, write the error to conn and update the hostdb
+	// a discrepancy, write the error to conn.
 	if recvSettings.NetAddress != host.NetAddress {
 		// for now, just overwrite the NetAddress, since we know that
 		// host.NetAddress works (it was the one we dialed to get conn)
@@ -43,10 +47,9 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry, hdb hostDB) (module
 
 // startRevision is run at the beginning of each revision iteration. It reads
 // the host's settings confirms that the values are acceptable, and writes an acceptance.
-func startRevision(conn net.Conn, host modules.HostDBEntry, hdb hostDB) error {
+func startRevision(conn net.Conn, host modules.HostDBEntry) error {
 	// verify the host's settings and confirm its identity
-	// TODO: return new host, so we can calculate price accurately
-	recvSettings, err := verifySettings(conn, host, hdb)
+	recvSettings, err := verifySettings(conn, host)
 	if err != nil {
 		return err
 	} else if !recvSettings.AcceptingContracts {
@@ -58,13 +61,11 @@ func startRevision(conn net.Conn, host modules.HostDBEntry, hdb hostDB) error {
 
 // startDownload is run at the beginning of each download iteration. It reads
 // the host's settings confirms that the values are acceptable, and writes an acceptance.
-func startDownload(conn net.Conn, host modules.HostDBEntry, hdb hostDB) error {
+func startDownload(conn net.Conn, host modules.HostDBEntry) error {
 	// verify the host's settings and confirm its identity
-	// TODO: return new host, so we can calculate price accurately
-	_, err := verifySettings(conn, host, hdb)
+	_, err := verifySettings(conn, host)
 	if err != nil {
-		// TODO: doesn't make sense to reject here if the err is an I/O error.
-		return modules.WriteNegotiationRejection(conn, err)
+		return err
 	}
 	return modules.WriteNegotiationAcceptance(conn)
 }
@@ -108,8 +109,6 @@ func verifyRecentRevision(conn net.Conn, contract Contract) error {
 	} else if lastRevision.UnlockConditions.UnlockHash() != contract.LastRevision.UnlockConditions.UnlockHash() {
 		return errors.New("unlock conditions do not match")
 	}
-
-	// verify the revision and signatures
 	// NOTE: we can fake the blockheight here because it doesn't affect
 	// verification; it just needs to be above the fork height and below the
 	// contract expiration (which was checked earlier).

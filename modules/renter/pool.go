@@ -3,6 +3,7 @@ package renter
 import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 )
 
 // A hostPool is a collection of active host connections, in the form of
@@ -25,7 +26,7 @@ func (p *hostPool) Close() error {
 }
 
 // add adds a contract's host to the hostPool and returns it as an Editor.
-func (p *hostPool) add(contract contractor.Contract) (contractor.Editor, error) {
+func (p *hostPool) add(contract proto.Contract) (contractor.Editor, error) {
 	for _, h := range p.hosts {
 		if h.Address() == contract.IP {
 			return h, nil

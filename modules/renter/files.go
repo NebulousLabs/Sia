@@ -2,7 +2,6 @@ package renter
 
 import (
 	"errors"
-	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"math"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -189,7 +189,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 
 	// TODO: this is ugly because we only have the Contracts method for
 	// looking up contracts.
-	var contracts []contractor.Contract
+	var contracts []proto.Contract
 	for _, c := range r.hostContractor.Contracts() {
 		if _, ok := f.contracts[c.ID]; ok {
 			contracts = append(contracts, c)

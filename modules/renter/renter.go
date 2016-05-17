@@ -4,6 +4,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -39,18 +40,18 @@ type hostContractor interface {
 	Allowance() modules.Allowance
 
 	// Contracts returns the contracts formed by the contractor.
-	Contracts() []contractor.Contract
+	Contracts() []proto.Contract
 
 	// Editor creates an Editor from the specified contract, allowing it to be
 	// modified.
-	Editor(contractor.Contract) (contractor.Editor, error)
+	Editor(proto.Contract) (contractor.Editor, error)
 
 	// FinancialMetrics returns the financial metrics of the contractor.
 	FinancialMetrics() modules.RenterFinancialMetrics
 
 	// Downloader creates a Downloader from the specified contract, allowing
 	// the retrieval of sectors.
-	Downloader(contractor.Contract) (contractor.Downloader, error)
+	Downloader(proto.Contract) (contractor.Downloader, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.

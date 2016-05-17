@@ -1,9 +1,7 @@
 package contractor
 
 import (
-	"net"
 	"path/filepath"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -51,10 +49,6 @@ type (
 		RandomHosts(n int, exclude []modules.NetAddress) []modules.HostDBEntry
 	}
 
-	dialer interface {
-		DialTimeout(modules.NetAddress, time.Duration) (net.Conn, error)
-	}
-
 	persister interface {
 		save(contractorPersist) error
 		saveSync(contractorPersist) error
@@ -70,13 +64,6 @@ type walletBridge struct {
 
 func (ws *walletBridge) NextAddress() (types.UnlockConditions, error) { return ws.w.NextAddress() }
 func (ws *walletBridge) StartTransaction() transactionBuilder         { return ws.w.StartTransaction() }
-
-// stdDialer implements the dialer interface via net.DialTimeout.
-type stdDialer struct{}
-
-func (d stdDialer) DialTimeout(addr modules.NetAddress, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("tcp", string(addr), timeout)
-}
 
 // stdPersist implements the persister interface via persist.SaveFile and
 // persist.LoadFile. The metadata and filename required by these functions is
