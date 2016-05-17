@@ -111,7 +111,7 @@ func (he *Editor) Upload(data []byte) (Contract, crypto.Hash, error) {
 		SectorIndex: uint64(len(he.contract.MerkleRoots)),
 		Data:        data,
 	}}
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
+	rev := newUploadRevision(he.contract.LastRevision, merkleRoot, sectorPrice, sectorCollateral)
 
 	// run the revision iteration
 	if err := he.runRevisionIteration(actions, rev, newRoots); err != nil {
@@ -130,9 +130,6 @@ func (he *Editor) Delete(root crypto.Hash) (Contract, error) {
 	// allot 2 minutes for this exchange
 	extendDeadline(he.conn, 120*time.Second)
 	defer extendDeadline(he.conn, time.Hour) // reset deadline
-
-	// calculate price
-	sectorPrice, sectorCollateral := types.ZeroCurrency, types.ZeroCurrency
 
 	// calculate the new Merkle root
 	newRoots := make([]crypto.Hash, 0, len(he.contract.MerkleRoots))
@@ -154,7 +151,7 @@ func (he *Editor) Delete(root crypto.Hash) (Contract, error) {
 		Type:        modules.ActionDelete,
 		SectorIndex: uint64(index),
 	}}
-	rev := newRevision(he.contract.LastRevision, merkleRoot, uint64(len(newRoots)), sectorPrice, sectorCollateral)
+	rev := newDeleteRevision(he.contract.LastRevision, merkleRoot)
 
 	// run the revision iteration
 	if err := he.runRevisionIteration(actions, rev, newRoots); err != nil {
