@@ -58,7 +58,7 @@ func (p *peer) open() (modules.PeerConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peerConn{conn}, nil
+	return &peerConn{conn, p.NetAddress}, nil
 }
 
 func (p *peer) accept() (modules.PeerConn, error) {
@@ -66,7 +66,7 @@ func (p *peer) accept() (modules.PeerConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peerConn{conn}, nil
+	return &peerConn{conn, p.NetAddress}, nil
 }
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
