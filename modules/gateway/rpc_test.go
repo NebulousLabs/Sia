@@ -308,7 +308,8 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(10 * time.Millisecond)
+	// Give time for on connect RPCs to finish.
+	time.Sleep(200 * time.Millisecond)
 
 	err = g1.RPC(g2.Address(), "recv", func(conn modules.PeerConn) error { return nil })
 	if err != nil {
@@ -316,14 +317,7 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 	}
 	<-rpcChanG2
 
-	// Call the "recv" RPC on g1. We don't know g1's address as g2 sees it, so we
-	// get it from the first address in g2's peer list.
-	var addr modules.NetAddress
-	for p_addr := range g2.peers {
-		addr = p_addr
-		break
-	}
-	err = g2.RPC(addr, "recv", func(conn modules.PeerConn) error { return nil })
+	err = g2.RPC(g1.Address(), "recv", func(conn modules.PeerConn) error { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +333,7 @@ func TestCallingRPCFromRPC(t *testing.T) {
 
 	errChan := make(chan error)
 	g1.RegisterRPC("FOO", func(conn modules.PeerConn) error {
-		err := g1.RPC(modules.NetAddress(conn.RemoteAddr().String()), "BAR", func(conn modules.PeerConn) error { return nil })
+		err := g1.RPC(conn.RPCAddr(), "BAR", func(conn modules.PeerConn) error { return nil })
 		errChan <- err
 		return err
 	})
@@ -354,15 +348,10 @@ func TestCallingRPCFromRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Give time for on connect RPCs to finish.
+	time.Sleep(200 * time.Millisecond)
 
-	// Call the "FOO" RPC on g1. We don't know g1's address as g2 sees it, so we
-	// get it from the first address in g2's peer list.
-	var addr modules.NetAddress
-	for _, p := range g2.Peers() {
-		addr = p.NetAddress
-		break
-	}
-	err = g2.RPC(addr, "FOO", func(conn modules.PeerConn) error { return nil })
+	err = g2.RPC(g1.Address(), "FOO", func(conn modules.PeerConn) error { return nil })
 
 	select {
 	case err = <-errChan:
