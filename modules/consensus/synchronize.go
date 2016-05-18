@@ -349,7 +349,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
 		go func() {
-			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan block:", err)
 			}
@@ -380,7 +380,7 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
 		go func() {
-			err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.threadedReceiveBlocks)
+			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
@@ -392,7 +392,7 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	// If the header is valid and extends the heaviest chain, fetch, accept it,
 	// and broadcast it.
 	go func() {
-		err := cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+		err := cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.threadedReceiveBlock(h.ID()))
 		if err != nil {
 			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
 		}

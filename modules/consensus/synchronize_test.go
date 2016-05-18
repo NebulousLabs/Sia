@@ -705,11 +705,14 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 
 // mock PeerConns for testing peer conns that fail reading or writing.
 type (
+	mockPeerConn struct {
+		net.Conn
+	}
 	mockPeerConnFailingReader struct {
-		modules.PeerConn
+		mockPeerConn
 	}
 	mockPeerConnFailingWriter struct {
-		modules.PeerConn
+		mockPeerConn
 	}
 )
 
@@ -717,6 +720,11 @@ var (
 	errFailingReader = errors.New("failing reader")
 	errFailingWriter = errors.New("failing writer")
 )
+
+// RPCAddr implements this method of the modules.PeerConn interface.
+func (pc mockPeerConn) RPCAddr() modules.NetAddress {
+	return "mockPeerConn dialback addr"
+}
 
 // Read is a mock implementation of modules.PeerConn.Read that always returns
 // an error.
@@ -740,6 +748,7 @@ func TestSendBlk(t *testing.T) {
 	defer cst.Close()
 
 	p1, p2 := net.Pipe()
+	mockP1 := mockPeerConn{p1}
 	fnErr := make(chan error)
 
 	tests := []struct {
@@ -752,14 +761,14 @@ func TestSendBlk(t *testing.T) {
 		// TODO: Test with a failing database.
 		// Test with a failing reader.
 		{
-			conn:    mockPeerConnFailingReader{PeerConn: p1},
+			conn:    mockPeerConnFailingReader{mockP1},
 			fn:      func() { fnErr <- nil },
 			errWant: errFailingReader,
 			msg:     "expected rpcSendBlk to error with a failing reader conn",
 		},
 		// Test with a block id not found in the blockmap.
 		{
-			conn: p1,
+			conn: mockP1,
 			fn: func() {
 				// Write a block id to the conn.
 				fnErr <- encoding.WriteObject(p2, types.BlockID{})
@@ -769,7 +778,7 @@ func TestSendBlk(t *testing.T) {
 		},
 		// Test with a failing writer.
 		{
-			conn: mockPeerConnFailingWriter{PeerConn: p1},
+			conn: mockPeerConnFailingWriter{mockP1},
 			fn: func() {
 				// Write a valid block id to the conn.
 				fnErr <- encoding.WriteObject(p2, types.GenesisBlock.ID())
@@ -779,7 +788,7 @@ func TestSendBlk(t *testing.T) {
 		},
 		// Test with a valid conn and valid block.
 		{
-			conn: p1,
+			conn: mockP1,
 			fn: func() {
 				// Write a valid block id to the conn.
 				if err := encoding.WriteObject(p2, types.GenesisBlock.ID()); err != nil {
@@ -827,6 +836,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	defer cst.Close()
 
 	p1, p2 := net.Pipe()
+	mockP1 := mockPeerConn{p1}
 	fnErr := make(chan error)
 
 	tests := []struct {
@@ -838,14 +848,14 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	}{
 		// Test with failing writer.
 		{
-			conn:    mockPeerConnFailingWriter{PeerConn: p1},
+			conn:    mockPeerConnFailingWriter{mockP1},
 			fn:      func() { fnErr <- nil },
 			errWant: errFailingWriter,
 			msg:     "the function returned from threadedReceiveBlock should fail with a PeerConn with a failing writer",
 		},
 		// Test with failing reader.
 		{
-			conn: mockPeerConnFailingReader{PeerConn: p1},
+			conn: mockPeerConnFailingReader{mockP1},
 			fn: func() {
 				// Read the id written to conn.
 				var id types.BlockID
@@ -865,7 +875,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 		// Test with a valid conn, but an invalid block.
 		{
 			id:   types.BlockID{1},
-			conn: p1,
+			conn: mockP1,
 			fn: func() {
 				// Read the id written to conn.
 				var id types.BlockID
@@ -892,7 +902,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 		// Test with a valid conn and a valid block.
 		{
 			id:   types.BlockID{2},
-			conn: p1,
+			conn: mockP1,
 			fn: func() {
 				// Read the id written to conn.
 				var id types.BlockID
@@ -952,10 +962,6 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	defer cst2.Close()
 
 	err = cst1.cs.gateway.Connect(cst2.cs.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst2.cs.gateway.Connect(cst1.cs.gateway.Address())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1052,6 +1058,7 @@ func TestRelayHeader(t *testing.T) {
 	cst.cs.gateway = mg
 
 	p1, p2 := net.Pipe()
+	mockP2 := mockPeerConn{p2}
 
 	// Valid block that rpcRelayHeader should accept.
 	validBlock, err := cst.miner.FindBlock()
@@ -1111,7 +1118,7 @@ func TestRelayHeader(t *testing.T) {
 		go func() {
 			errChan <- encoding.WriteObject(p1, tt.header)
 		}()
-		err = cst.cs.rpcRelayHeader(p2)
+		err = cst.cs.rpcRelayHeader(mockP2)
 		if err != tt.errWant {
 			t.Errorf("%s: expected '%v', got '%v'", tt.errMSG, tt.errWant, err)
 		}
@@ -1165,6 +1172,8 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Give time for on connect RPCs to finish.
+	time.Sleep(200 * time.Millisecond)
 
 	// Test that broadcasting an invalid block header over RelayHeader on cst1.cs
 	// does not result in cst2.cs.gateway receiving a broadcast.
@@ -1335,30 +1344,31 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	}
 }
 
-// mockConnMockReadWrite is a mock implementation of net.Conn that returns
-// fails reading or writing if readErr or writeErr is non-nil, respectively.
-type mockConnMockReadWrite struct {
-	net.Conn
+// mockPeerConnMockReadWrite is a mock implementation of modules.PeerConn that
+// returns fails reading or writing if readErr or writeErr is non-nil,
+// respectively.
+type mockPeerConnMockReadWrite struct {
+	modules.PeerConn
 	readErr  error
 	writeErr error
 }
 
 // Read is a mock implementation of conn.Read that fails with the mock error if
 // readErr != nil.
-func (conn mockConnMockReadWrite) Read(b []byte) (n int, err error) {
+func (conn mockPeerConnMockReadWrite) Read(b []byte) (n int, err error) {
 	if conn.readErr != nil {
 		return 0, conn.readErr
 	}
-	return conn.Conn.Read(b)
+	return conn.PeerConn.Read(b)
 }
 
 // Write is a mock implementation of conn.Write that fails with the mock error
 // if writeErr != nil.
-func (conn mockConnMockReadWrite) Write(b []byte) (n int, err error) {
+func (conn mockPeerConnMockReadWrite) Write(b []byte) (n int, err error) {
 	if conn.writeErr != nil {
 		return 0, conn.writeErr
 	}
-	return conn.Conn.Write(b)
+	return conn.PeerConn.Write(b)
 }
 
 // mockNetError is a mock net.Error.
@@ -1393,40 +1403,42 @@ func TestThreadedReceiveBlocksStalls(t *testing.T) {
 	defer cst.Close()
 
 	p1, p2 := net.Pipe()
-	writeTimeoutConn := mockConnMockReadWrite{
-		Conn: p2,
+	mockP2 := mockPeerConn{p2}
+
+	writeTimeoutConn := mockPeerConnMockReadWrite{
+		PeerConn: mockP2,
 		writeErr: mockNetError{
 			error:   errors.New("Write timeout"),
 			timeout: true,
 		},
 	}
-	readTimeoutConn := mockConnMockReadWrite{
-		Conn: p2,
+	readTimeoutConn := mockPeerConnMockReadWrite{
+		PeerConn: mockP2,
 		readErr: mockNetError{
 			error:   errors.New("Read timeout"),
 			timeout: true,
 		},
 	}
 
-	readNetErrConn := mockConnMockReadWrite{
-		Conn: p2,
+	readNetErrConn := mockPeerConnMockReadWrite{
+		PeerConn: mockP2,
 		readErr: mockNetError{
 			error: errors.New("mock read net.Error"),
 		},
 	}
-	writeNetErrConn := mockConnMockReadWrite{
-		Conn: p2,
+	writeNetErrConn := mockPeerConnMockReadWrite{
+		PeerConn: mockP2,
 		writeErr: mockNetError{
 			error: errors.New("mock write net.Error"),
 		},
 	}
 
-	readErrConn := mockConnMockReadWrite{
-		Conn:    p2,
-		readErr: errors.New("mock read err"),
+	readErrConn := mockPeerConnMockReadWrite{
+		PeerConn: mockP2,
+		readErr:  errors.New("mock read err"),
 	}
-	writeErrConn := mockConnMockReadWrite{
-		Conn:     p2,
+	writeErrConn := mockPeerConnMockReadWrite{
+		PeerConn: mockP2,
 		writeErr: errors.New("mock write err"),
 	}
 
