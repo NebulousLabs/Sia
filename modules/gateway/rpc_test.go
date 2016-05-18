@@ -492,7 +492,7 @@ func TestCallingRPCFromRPC(t *testing.T) {
 
 	errChan := make(chan error)
 	g1.RegisterRPC("FOO", func(conn modules.PeerConn) error {
-		err := g1.RPC(modules.NetAddress(conn.RemoteAddr().String()), "BAR", func(conn modules.PeerConn) error { return nil })
+		err := g1.RPC(conn.RPCAddr(), "BAR", func(conn modules.PeerConn) error { return nil })
 		errChan <- err
 		return err
 	})

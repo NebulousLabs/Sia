@@ -84,7 +84,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	for _, node := range nodes {
 		err := g.addNode(node)
 		if err != nil && err != errNodeExists && err != errOurAddress {
-			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RemoteAddr(), node)
+			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RPCAddr(), node)
 		}
 	}
 	g.save()

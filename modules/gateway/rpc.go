@@ -169,10 +169,10 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	fn, ok := g.handlers[id]
 	g.mu.RUnlock()
 	if !ok {
-		g.log.Debugf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		g.log.Debugf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RPCAddr(), id)
 		return
 	}
-	g.log.Debugf("INFO: incoming conn %v requested RPC \"%v\"", conn.RemoteAddr(), id)
+	g.log.Debugf("INFO: incoming conn %v requested RPC \"%v\"", conn.RPCAddr(), id)
 
 	// call fn
 	err := fn(conn)
@@ -181,7 +181,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		err = nil
 	}
 	if err != nil {
-		g.log.Debugf("WARN: incoming RPC \"%v\" from conn %v failed: %v", id, conn.RemoteAddr(), err)
+		g.log.Debugf("WARN: incoming RPC \"%v\" from conn %v failed: %v", id, conn.RPCAddr(), err)
 	}
 }
 
