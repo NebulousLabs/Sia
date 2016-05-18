@@ -440,7 +440,7 @@ func (g mockGatewayWithVersion) Connect(addr modules.NetAddress) error {
 		return err
 	}
 	// send port
-	if build.IsVersion(g.version) && build.VersionCmp(g.version, "0.6.1") >= 0 {
+	if remoteVersion != "reject" && build.IsVersion(g.version) && build.VersionCmp(g.version, "0.6.1") >= 0 && build.VersionCmp(remoteVersion, "0.6.1") >= 0 {
 		if err := encoding.WriteObject(conn, g.port); err != nil {
 			return err
 		}
@@ -586,14 +586,14 @@ func TestAcceptConnRejectsInvalidVersions(t *testing.T) {
 		if remoteVersion != "reject" {
 			time.Sleep(200 * time.Millisecond)
 			id := g.mu.Lock()
-			numPeers := len(g.peers)
-			g.mu.Unlock(id)
-			if numPeers != 1 {
-				t.Error("Gateway should have connected to peer")
+			if len(g.peers) != 1 {
+				t.Errorf("Gateway should be connected to only the one peer, but it is connected to: %v", g.peers)
 			}
+			g.mu.Unlock(id)
 		}
 		// Disconnect
-		// TODO: figure out why g.Disconnect(g.Address()) doesn't work.
+		// We can't do g.Disconnect(mg.Address()) because the identifying address for
+		// mg might be a random port if it's version # is < v0.6.1.
 		id = g.mu.Lock()
 		var mgAddress modules.NetAddress
 		for mgAddress = range g.peers {
@@ -601,7 +601,6 @@ func TestAcceptConnRejectsInvalidVersions(t *testing.T) {
 		}
 		g.mu.Unlock(id)
 		g.Disconnect(mgAddress)
-		mg.Disconnect(g.Address())
 	}
 }
 
