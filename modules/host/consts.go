@@ -38,14 +38,14 @@ var (
 	// collateral per-byte by default. The collateral should be considered as
 	// an absolute instead of as a percentage, because low prices result in
 	// collaterals which may be significant by percentage, but insignificant
-	// overall. A default of 50 SC / GB / Month has been chosen, which is 2.5x
+	// overall. A default of 25 KS / TB / Month has been chosen, which is 2.5x
 	// the default price for storage. The host is expected to put up a
 	// significant amount of collateral as a commitment to faithfulness,
 	// because this guarantees that the incentives are aligned for the host to
 	// keep the data even if the price of siacoin fluctuates, the price of raw
 	// storage fluctuates, or the host realizes that there is unexpected
 	// opportunity cost in being a host.
-	defaultCollateral = types.NewCurrency64(50) // 50 SC / GB / Month
+	defaultCollateral = types.SiacoinPrecision.Mul64(25e3).Div(modules.BlockBytesPerMonthTerabyte) // 25 KS / TB / Month
 
 	// defaultCollateralBudget defines the maximum number of siacoins that the
 	// host is going to allocate towards collateral. 10 million has been chosen
@@ -94,7 +94,7 @@ var (
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
-	defaultStoragePrice = types.SiacoinPrecision.Mul64(20e3).Div(modules.BlockBytesPerMonthTerabyte) // 20k SC / TB / Month
+	defaultStoragePrice = types.SiacoinPrecision.Mul64(10e3).Div(modules.BlockBytesPerMonthTerabyte) // 10k SC / TB / Month
 
 	// defaultUploadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 1 siacoin per GB, because the host is
