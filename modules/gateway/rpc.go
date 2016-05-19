@@ -61,7 +61,7 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG && build.Release != "testing" {
+	if build.DEBUG {
 		if _, ok := g.handlers[handlerName(name)]; ok {
 			panic("refusing to overwrite RPC " + name)
 		}
