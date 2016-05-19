@@ -110,6 +110,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 }
 
 func (tp *TransactionPool) Close() error {
+	tp.gateway.UnregisterRPC("RelayTransactionSet")
 	tp.consensusSet.Unsubscribe(tp)
 	return tp.db.Close()
 }
