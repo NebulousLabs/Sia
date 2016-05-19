@@ -56,7 +56,7 @@ func TestEditor(t *testing.T) {
 	dbe.AcceptingContracts = true
 	dbe.StoragePrice = types.NewCurrency64(^uint64(0))
 	hdb.hosts["foo"] = dbe
-	_, err = c.Editor(proto.Contract{IP: "foo"})
+	_, err = c.Editor(proto.Contract{NetAddress: "foo"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -64,14 +64,14 @@ func TestEditor(t *testing.T) {
 	// invalid contract
 	dbe.StoragePrice = types.NewCurrency64(500)
 	hdb.hosts["bar"] = dbe
-	_, err = c.Editor(proto.Contract{IP: "bar"})
+	_, err = c.Editor(proto.Contract{NetAddress: "bar"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// spent contract
 	contract := proto.Contract{
-		IP: "bar",
+		NetAddress: "bar",
 		LastRevision: types.FileContractRevision{
 			NewValidProofOutputs: []types.SiacoinOutput{
 				{Value: types.NewCurrency64(0)},

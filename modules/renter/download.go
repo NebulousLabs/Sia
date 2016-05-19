@@ -219,7 +219,7 @@ func (r *Renter) Download(path, destination string) error {
 		// TODO: connect in parallel
 		d, err := r.hostContractor.Downloader(c)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
+			errs = append(errs, fmt.Sprintf("\t%v: %v", c.NetAddress, err))
 			continue
 		}
 		defer d.Close()

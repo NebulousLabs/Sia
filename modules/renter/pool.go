@@ -28,13 +28,13 @@ func (p *hostPool) Close() error {
 // add adds a contract's host to the hostPool and returns it as an Editor.
 func (p *hostPool) add(contract proto.Contract) (contractor.Editor, error) {
 	for _, h := range p.hosts {
-		if h.Address() == contract.IP {
+		if h.Address() == contract.NetAddress {
 			return h, nil
 		}
 	}
 	hu, err := p.hostContractor.Editor(contract)
 	if err != nil {
-		p.blacklist = append(p.blacklist, contract.IP)
+		p.blacklist = append(p.blacklist, contract.NetAddress)
 		return nil, err
 	}
 	p.hosts = append(p.hosts, hu)
@@ -91,7 +91,7 @@ func (p *hostPool) uniqueHosts(n int, exclude []modules.NetAddress) (hosts []con
 
 	// Next try to reuse existing contracts.
 	for _, contract := range p.hostContractor.Contracts() {
-		if _, ok := excludeSet[contract.IP]; ok {
+		if _, ok := excludeSet[contract.NetAddress]; ok {
 			continue
 		}
 		hu, err := p.add(contract)

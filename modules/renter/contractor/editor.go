@@ -48,7 +48,7 @@ type hostEditor struct {
 }
 
 // Address returns the NetAddress of the host.
-func (he *hostEditor) Address() modules.NetAddress { return he.contract.IP }
+func (he *hostEditor) Address() modules.NetAddress { return he.contract.NetAddress }
 
 // ContractID returns the ID of the contract being revised.
 func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID }
@@ -127,7 +127,7 @@ func (c *Contractor) Editor(contract proto.Contract) (Editor, error) {
 	if height > contract.FileContract.WindowStart {
 		return nil, errors.New("contract has already ended")
 	}
-	host, ok := c.hdb.Host(contract.IP)
+	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}

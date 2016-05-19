@@ -19,7 +19,7 @@ func (c *Contractor) managedRenew(contract proto.Contract, filesize uint64, newE
 	if newEndHeight < height {
 		return types.FileContractID{}, errors.New("cannot renew below current height")
 	}
-	host, ok := c.hdb.Host(contract.IP)
+	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
 		return types.FileContractID{}, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
@@ -72,7 +72,7 @@ func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeig
 	var sum types.Currency
 	var numHosts uint64
 	for _, contract := range contracts {
-		if h, ok := c.hdb.Host(contract.IP); ok {
+		if h, ok := c.hdb.Host(contract.NetAddress); ok {
 			sum = sum.Add(h.StoragePrice)
 			numHosts++
 		}

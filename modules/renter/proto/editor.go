@@ -226,7 +226,7 @@ func NewEditor(host modules.HostDBEntry, contract Contract, currentHeight types.
 	}
 
 	// initiate revision loop
-	conn, err := net.DialTimeout("tcp", string(contract.IP), 15*time.Second)
+	conn, err := net.DialTimeout("tcp", string(contract.NetAddress), 15*time.Second)
 	if err != nil {
 		return nil, err
 	}

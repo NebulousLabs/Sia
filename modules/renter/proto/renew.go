@@ -237,11 +237,11 @@ func Renew(contract Contract, params ContractParams, txnBuilder transactionBuild
 	fcid := txn.FileContractID(0)
 
 	return Contract{
-		IP:              host.NetAddress,
-		ID:              fcid,
 		FileContract:    fc,
+		ID:              fcid,
 		LastRevision:    initRevision,
 		LastRevisionTxn: revisionTxn,
+		NetAddress:      host.NetAddress,
 		SecretKey:       ourSK,
 	}, nil
 }

@@ -32,10 +32,10 @@ type (
 type Contract struct {
 	FileContract    types.FileContract         `json:"filecontract"`
 	ID              types.FileContractID       `json:"id"`
-	IP              modules.NetAddress         `json:"ip"`
 	LastRevision    types.FileContractRevision `json:"lastrevision"`
 	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
 	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
+	NetAddress      modules.NetAddress         `json:"netaddress"`
 	SecretKey       crypto.SecretKey           `json:"secretkey"`
 }
 

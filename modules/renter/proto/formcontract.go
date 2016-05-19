@@ -249,11 +249,11 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	fcid := txn.FileContractID(0)
 
 	return Contract{
-		IP:              host.NetAddress,
-		ID:              fcid,
 		FileContract:    fc,
+		ID:              fcid,
 		LastRevision:    initRevision,
 		LastRevisionTxn: revisionTxn,
+		NetAddress:      host.NetAddress,
 		SecretKey:       ourSK,
 	}, nil
 }

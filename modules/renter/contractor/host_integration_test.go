@@ -188,7 +188,7 @@ func TestIntegrationFormContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if contract.IP != h.ExternalSettings().NetAddress {
+	if contract.NetAddress != h.ExternalSettings().NetAddress {
 		t.Fatal("bad contract")
 	}
 }

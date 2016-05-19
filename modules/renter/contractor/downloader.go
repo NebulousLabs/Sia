@@ -61,7 +61,7 @@ func (c *Contractor) Downloader(contract proto.Contract) (Downloader, error) {
 	if height > contract.FileContract.WindowStart {
 		return nil, errors.New("contract has already ended")
 	}
-	host, ok := c.hdb.Host(contract.IP)
+	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}
