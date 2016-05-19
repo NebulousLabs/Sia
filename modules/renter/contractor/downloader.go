@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 )
 
@@ -54,7 +55,7 @@ func (hd *hostDownloader) Close() error { return hd.downloader.Close() }
 
 // Downloader initiates the download request loop with a host, and returns a
 // Downloader.
-func (c *Contractor) Downloader(contract proto.Contract) (Downloader, error) {
+func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()

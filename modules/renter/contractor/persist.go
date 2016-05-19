@@ -2,7 +2,6 @@ package contractor
 
 import (
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -10,7 +9,7 @@ import (
 type contractorPersist struct {
 	Allowance   modules.Allowance
 	BlockHeight types.BlockHeight
-	Contracts   []proto.Contract
+	Contracts   []modules.RenterContract
 	LastChange  modules.ConsensusChangeID
 	RenewHeight types.BlockHeight
 	// metrics

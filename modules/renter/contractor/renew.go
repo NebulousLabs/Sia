@@ -12,7 +12,7 @@ import (
 // It returns the ID of the new contract. This is a blocking call that
 // performs network I/O.
 // TODO: take an allowance and renew with those parameters
-func (c *Contractor) managedRenew(contract proto.Contract, filesize uint64, newEndHeight types.BlockHeight) (types.FileContractID, error) {
+func (c *Contractor) managedRenew(contract modules.RenterContract, filesize uint64, newEndHeight types.BlockHeight) (types.FileContractID, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()

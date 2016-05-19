@@ -43,7 +43,7 @@ type Editor interface {
 // Upload must happen in serial.
 type hostEditor struct {
 	editor     *proto.Editor
-	contract   proto.Contract
+	contract   modules.RenterContract
 	contractor *Contractor
 }
 
@@ -120,7 +120,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 
 // Editor initiates the contract revision process with a host, and returns
 // an Editor.
-func (c *Contractor) Editor(contract proto.Contract) (Editor, error) {
+func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()

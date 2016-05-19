@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -25,7 +25,7 @@ func TestSaveLoad(t *testing.T) {
 	c.persist = new(memPersist)
 
 	// add some fake contracts
-	c.contracts = map[types.FileContractID]proto.Contract{
+	c.contracts = map[types.FileContractID]modules.RenterContract{
 		{0}: {NetAddress: "foo"},
 		{1}: {NetAddress: "bar"},
 		{2}: {NetAddress: "baz"},

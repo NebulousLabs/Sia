@@ -9,7 +9,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -94,7 +93,7 @@ func TestNew(t *testing.T) {
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
 	c := &Contractor{
-		contracts: map[types.FileContractID]proto.Contract{
+		contracts: map[types.FileContractID]modules.RenterContract{
 			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
 			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
 			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},

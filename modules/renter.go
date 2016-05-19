@@ -4,6 +4,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -93,6 +94,18 @@ type RenterFinancialMetrics struct {
 type HostDBEntry struct {
 	HostExternalSettings
 	PublicKey types.SiaPublicKey
+}
+
+// A RenterContract contains all the metadata necessary to revise or renew a
+// file contract.
+type RenterContract struct {
+	FileContract    types.FileContract         `json:"filecontract"`
+	ID              types.FileContractID       `json:"id"`
+	LastRevision    types.FileContractRevision `json:"lastrevision"`
+	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
+	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
+	NetAddress      NetAddress                 `json:"netaddress"`
+	SecretKey       crypto.SecretKey           `json:"secretkey"`
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the

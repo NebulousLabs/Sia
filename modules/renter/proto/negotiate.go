@@ -72,7 +72,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntr
 
 // verifyRecentRevision confirms that the host and contractor agree upon the current
 // state of the contract being revisde.
-func verifyRecentRevision(conn net.Conn, contract Contract) error {
+func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error {
 	// send contract ID
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
 		return errors.New("couldn't send contract ID: " + err.Error())
