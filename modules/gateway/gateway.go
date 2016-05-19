@@ -56,6 +56,11 @@ func (g *Gateway) Address() modules.NetAddress {
 func (g *Gateway) Close() error {
 	var errs []error
 
+	// Unregister RPCs. Not strictly necessary for clean shutdown in this specific
+	// case, as the handlers should only contain references to the gateway itself,
+	// but do it anyways as an example for other modules to follow.
+	g.UnregisterRPC("ShareNodes")
+	g.UnregisterConnectCall("ShareNodes")
 	// save the latest gateway state
 	id := g.mu.RLock()
 	if err := g.saveSync(); err != nil {
