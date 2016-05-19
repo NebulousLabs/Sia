@@ -101,6 +101,7 @@ func (srv *Server) initAPI() {
 		router.GET("/renter", srv.renterHandler)
 		router.GET("/renter/allowance", srv.renterAllowanceHandlerGET)
 		router.POST("/renter/allowance", srv.renterAllowanceHandlerPOST)
+		router.GET("/renter/contracts", srv.renterContractsHandler)
 		router.GET("/renter/downloads", srv.renterDownloadsHandler)
 		router.GET("/renter/files", srv.renterFilesHandler)
 

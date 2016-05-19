@@ -124,6 +124,7 @@ func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts(
 
 // contractor passthroughs
 func (r *Renter) Allowance() modules.Allowance           { return r.hostContractor.Allowance() }
+func (r *Renter) Contracts() []modules.RenterContract    { return r.hostContractor.Contracts() }
 func (r *Renter) SetAllowance(a modules.Allowance) error { return r.hostContractor.SetAllowance(a) }
 func (r *Renter) FinancialMetrics() modules.RenterFinancialMetrics {
 	return r.hostContractor.FinancialMetrics()

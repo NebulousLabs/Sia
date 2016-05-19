@@ -34,6 +34,11 @@ type (
 		FinancialMetrics modules.RenterFinancialMetrics `json:"financialmetrics"`
 	}
 
+	// RenterContracts contains the renter's contracts.
+	RenterContracts struct {
+		Contracts []modules.RenterContract `json:"contracts"`
+	}
+
 	// DownloadQueue contains the renter's download queue.
 	RenterDownloadQueue struct {
 		Downloads []modules.DownloadInfo `json:"downloads"`
@@ -114,8 +119,15 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 	writeSuccess(w)
 }
 
+// renterContractsHandler handles the API call to request the Renter's contracts.
+func (srv *Server) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	writeJSON(w, RenterContracts{
+		Contracts: srv.renter.Contracts(),
+	})
+}
+
 // renterDownloadsHandler handles the API call to request the download queue.
-func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterDownloadQueue{
 		Downloads: srv.renter.DownloadQueue(),
 	})

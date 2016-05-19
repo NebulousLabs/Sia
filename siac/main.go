@@ -213,9 +213,9 @@ func main() {
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,
 		renterDownloadsCmd, renterAllowanceCmd, renterSetAllowanceCmd,
-		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd,
-		renterFilesRenameCmd, renterFilesShareCmd, renterFilesShareASCIICmd,
-		renterFilesUploadCmd, renterUploadsCmd)
+		renterContractsCmd, renterFilesListCmd, renterFilesLoadCmd,
+		renterFilesLoadASCIICmd, renterFilesRenameCmd, renterFilesShareCmd,
+		renterFilesShareASCIICmd, renterFilesUploadCmd, renterUploadsCmd)
 	renterCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 	renterDownloadsCmd.Flags().BoolVarP(&renterShowHistory, "history", "H", false, "Show download history in addition to the download queue")
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")

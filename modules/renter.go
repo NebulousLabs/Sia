@@ -121,6 +121,9 @@ type Renter interface {
 	// AllHosts returns the full list of hosts known to the renter.
 	AllHosts() []HostDBEntry
 
+	// Contracts returns the contracts formed by the renter.
+	Contracts() []RenterContract
+
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error
 

@@ -55,6 +55,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run: wrap(rentersetallowancecmd),
 	}
 
+	renterContractsCmd = &cobra.Command{
+		Use:   "contracts",
+		Short: "View the Renter's contracts",
+		Long:  "View the contracts that the Renter has formed with hosts.",
+		Run:   wrap(rentercontractscmd),
+	}
+
 	renterFilesDeleteCmd = &cobra.Command{
 		Use:     "delete [path]",
 		Aliases: []string{"rm"},
@@ -260,6 +267,40 @@ func rentersetallowancecmd(amount, period string) {
 		die("Could not set allowance:", err)
 	}
 	fmt.Println("Allowance updated.")
+}
+
+// byHeight sorts contracts by their expiration, high to low. If two contracts
+// expire at the same height, they are sorted by their host's address.
+type byHeight []modules.RenterContract
+
+func (s byHeight) Len() int      { return len(s) }
+func (s byHeight) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s byHeight) Less(i, j int) bool {
+	hi, hj := s[i].LastRevision.NewWindowStart, s[j].LastRevision.NewWindowStart
+	if hi == hj {
+		return s[i].NetAddress < s[j].NetAddress
+	}
+	return hi > hj
+}
+
+// rentercontractscmd is the handler for the comand `siac renter contracts`.
+// It lists the Renter's contracts.
+func rentercontractscmd() {
+	var rc api.RenterContracts
+	err := getAPI("/renter/contracts", &rc)
+	if err != nil {
+		die("Could not get contracts:", err)
+	}
+	sort.Sort(byHeight(rc.Contracts))
+	fmt.Println("Contracts:")
+	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Host\tValue\tData\tEnd Height\tID")
+	for _, c := range rc.Contracts {
+		value := currencyUnits(c.LastRevision.NewValidProofOutputs[0].Value)
+		data := filesizeUnits(int64(modules.SectorSize) * int64(len(c.MerkleRoots)))
+		fmt.Fprintf(w, "%v\t%8s\t%v\t%v\t%v\n", c.NetAddress, value, data, c.LastRevision.NewWindowStart, c.ID)
+	}
+	w.Flush()
 }
 
 // renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
