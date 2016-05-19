@@ -24,6 +24,8 @@ type tpoolTester struct {
 	miner     modules.TestMiner
 	wallet    modules.Wallet
 	walletKey crypto.TwofishKey
+
+	persistDir string
 }
 
 // createTpoolTester returns a ready-to-use tpool tester, with all modules
@@ -39,7 +41,7 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	tp, err := New(cs, g)
+	tp, err := New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +75,8 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 		miner:     m,
 		wallet:    w,
 		walletKey: key,
+
+		persistDir: testdir,
 	}
 
 	// Mine blocks until there is money in the wallet.
@@ -99,21 +103,22 @@ func TestIntegrationNewNilInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	tpDir := filepath.Join(testdir, modules.TransactionPoolDir)
 
 	// Try all combinations of nil inputs.
-	_, err = New(nil, nil)
+	_, err = New(nil, nil, tpDir)
 	if err == nil {
 		t.Error(err)
 	}
-	_, err = New(nil, g)
+	_, err = New(nil, g, tpDir)
 	if err != errNilCS {
 		t.Error(err)
 	}
-	_, err = New(cs, nil)
+	_, err = New(cs, nil, tpDir)
 	if err != errNilGateway {
 		t.Error(err)
 	}
-	_, err = New(cs, g)
+	_, err = New(cs, g, tpDir)
 	if err != nil {
 		t.Error(err)
 	}

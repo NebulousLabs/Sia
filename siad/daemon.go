@@ -104,7 +104,7 @@ func startDaemon(config Config) (err error) {
 	if strings.Contains(config.Siad.Modules, "t") {
 		i++
 		fmt.Printf("(%d/%d) Loading transaction pool...\n", i, len(config.Siad.Modules))
-		tpool, err = transactionpool.New(cs, g)
+		tpool, err = transactionpool.New(cs, g, filepath.Join(config.Siad.SiaDir, modules.TransactionPoolDir))
 		if err != nil {
 			return err
 		}
