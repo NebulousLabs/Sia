@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"io"
 	"testing"
 	"time"
 
@@ -32,6 +33,138 @@ func TestHandlerName(t *testing.T) {
 			t.Errorf("handlerName mismatch: expected %v, got %v", id, hid)
 		}
 	}
+}
+
+// TestRegisterRPC tests that registering the same RPC twice causes a panic.
+func TestRegisterRPC(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	g := newTestingGateway("TestRegisterRPC", t)
+	defer g.Close()
+
+	g.RegisterRPC("Foo", func(conn modules.PeerConn) error { return nil })
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Registering the same RPC twice did not cause a panic")
+		}
+	}()
+	g.RegisterRPC("Foo", func(conn modules.PeerConn) error { return nil })
+}
+
+// TestUnregisterRPC tests that unregistering an RPC causes calls to it to
+// fail, and checks that unregistering a non-registered RPC causes a panic.
+func TestUnregisterRPC(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	g1 := newTestingGateway("TestUnregisterRPC1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestUnregisterRPC2", t)
+	defer g2.Close()
+
+	err := g2.Connect(g1.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dummyFunc := func(conn modules.PeerConn) error {
+		var str string
+		return encoding.ReadObject(conn, &str, 11)
+	}
+
+	// Register RPC and check that calling it succeeds.
+	g1.RegisterRPC("Foo", func(conn modules.PeerConn) error {
+		return encoding.WriteObject(conn, "foo")
+	})
+	err = g2.RPC(g1.Address(), "Foo", dummyFunc)
+	if err != nil {
+		t.Errorf("calling registered RPC on g1 returned %q", err)
+	}
+	// Unregister RPC and check that calling it fails.
+	g1.UnregisterRPC("Foo")
+	err = g2.RPC(g1.Address(), "Foo", dummyFunc)
+	if err != io.EOF {
+		t.Errorf("calling unregistered RPC on g1 returned %q instead of io.EOF", err)
+	}
+
+	// Unregister again and check that it panics.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Unregistering an unregistered RPC did not cause a panic")
+		}
+	}()
+	g1.UnregisterRPC("Foo")
+}
+
+// TestRegisterConnectCall tests that registering the same on-connect call
+// twice causes a panic.
+func TestRegisterConnectCall(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	g := newTestingGateway("TestRegisterConnectCall", t)
+	defer g.Close()
+
+	// Register an on-connect call.
+	g.RegisterConnectCall("Foo", func(conn modules.PeerConn) error { return nil })
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Registering the same on-connect call twice did not cause a panic")
+		}
+	}()
+	g.RegisterConnectCall("Foo", func(conn modules.PeerConn) error { return nil })
+}
+
+// TestUnregisterConnectCallPanics tests that unregistering the same on-connect
+// call twice causes a panic.
+func TestUnregisterConnectCallPanics(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	g1 := newTestingGateway("TestUnregisterConnectCall1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestUnregisterConnectCall2", t)
+	defer g2.Close()
+
+	rpcChan := make(chan struct{})
+
+	// Register on-connect call and test that RPC is called on connect.
+	g1.RegisterConnectCall("Foo", func(conn modules.PeerConn) error {
+		rpcChan <- struct{}{}
+		return nil
+	})
+	err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-rpcChan:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("ConnectCall not called on Connect after it was registered")
+	}
+	// Disconnect, unregister on-connect call, and test that RPC is not called on connect.
+	err = g1.Disconnect(g2.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	g1.UnregisterConnectCall("Foo")
+	err = g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-rpcChan:
+		t.Fatal("ConnectCall called on Connect after it was unregistered")
+	case <-time.After(200 * time.Millisecond):
+	}
+	// Unregister again and check that it panics.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Unregistering an unregistered on-connect call did not cause a panic")
+		}
+	}()
+	g1.UnregisterConnectCall("Foo")
 }
 
 func TestRPC(t *testing.T) {
