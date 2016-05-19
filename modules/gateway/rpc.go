@@ -61,10 +61,8 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG {
-		if _, ok := g.handlers[handlerName(name)]; ok {
-			panic("refusing to overwrite RPC " + name)
-		}
+	if _, ok := g.handlers[handlerName(name)]; ok {
+		build.Critical("RPC already registered: " + name)
 	}
 	g.handlers[handlerName(name)] = fn
 }
@@ -74,10 +72,8 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 func (g *Gateway) UnregisterRPC(name string) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG {
-		if _, ok := g.handlers[handlerName(name)]; !ok {
-			panic("RPC is not registered: " + name)
-		}
+	if _, ok := g.handlers[handlerName(name)]; !ok {
+		build.Critical("RPC not registered: " + name)
 	}
 	delete(g.handlers, handlerName(name))
 }
@@ -87,10 +83,8 @@ func (g *Gateway) UnregisterRPC(name string) {
 func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG {
-		if _, ok := g.initRPCs[name]; ok {
-			panic("refusing to overwrite RPC " + name)
-		}
+	if _, ok := g.initRPCs[name]; ok {
+		build.Critical("ConnectCall already registered: " + name)
 	}
 	g.initRPCs[name] = fn
 }
@@ -101,10 +95,8 @@ func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
 func (g *Gateway) UnregisterConnectCall(name string) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG {
-		if _, ok := g.initRPCs[name]; !ok {
-			panic("ConnectCall is not registered: " + name)
-		}
+	if _, ok := g.initRPCs[name]; !ok {
+		build.Critical("ConnectCall not registered: " + name)
 	}
 	delete(g.initRPCs, name)
 }
