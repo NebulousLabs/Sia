@@ -42,7 +42,7 @@ func createExplorerTester(name string) (*explorerTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (et *explorerTester) reorgToBlank() error {
 	if err != nil {
 		return err
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(dir, modules.TransactionPoolDir))
 	if err != nil {
 		return err
 	}

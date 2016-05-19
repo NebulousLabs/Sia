@@ -7,10 +7,20 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	dbFilename = "transactionpool.db"
+)
+
 var (
+	dbMetadata = persist.Metadata{
+		Header:  "Sia Transaction Pool DB",
+		Version: "0.6.0",
+	}
+
 	errNilCS      = errors.New("transaction pool cannot initialize with a nil consensus set")
 	errNilGateway = errors.New("transaction pool cannot initialize with a nil gateway")
 )
@@ -58,12 +68,15 @@ type (
 		// subscriber.
 		subscribers []modules.TransactionPoolSubscriber
 
-		mu demotemutex.DemoteMutex
+		// Utilities.
+		db         *persist.BoltDatabase
+		mu         demotemutex.DemoteMutex
+		persistDir string
 	}
 )
 
 // New creates a transaction pool that is ready to receive transactions.
-func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
+func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*TransactionPool, error) {
 	// Check that the input modules are non-nil.
 	if cs == nil {
 		return nil, errNilCS
@@ -80,19 +93,25 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 		knownObjects:        make(map[ObjectID]TransactionSetID),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
+
+		persistDir: persistDir,
 	}
+
+	// Open the tpool database.
+	err := tp.initPersist()
+	if err != nil {
+		return nil, err
+	}
+
 	// Register RPCs
-	// TODO: rename RelayTransactionSet so that the conflicting RPC
-	// RelayTransaction calls v0.4.6 clients and earlier are ignored.
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
-	// Subscribe the transaction pool to the consensus set.
-	err := cs.ConsensusSetSubscribe(tp, modules.ConsensusChangeRecent)
-	if err != nil {
-		return nil, errors.New("transactionpool subscription failed: " + err.Error())
-	}
-
 	return tp, nil
+}
+
+func (tp *TransactionPool) Close() error {
+	tp.consensusSet.Unsubscribe(tp)
+	return tp.db.Close()
 }
 
 // FeeEstimation returns an estimation for what fee should be applied to
@@ -101,7 +120,7 @@ func (tp *TransactionPool) FeeEstimation() (min, max types.Currency) {
 	// TODO: The fee estimation tool should look at the recent blocks and use
 	// them to guage what sort of fee should be required, as opposed to just
 	// guessing blindly.
-	return types.SiacoinPrecision.Mul64(3).Div64(1e3), types.SiacoinPrecision.Mul64(5).Div64(1e3)
+	return types.SiacoinPrecision.Mul64(10).Div64(1e3), types.SiacoinPrecision.Mul64(25).Div64(1e3)
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.

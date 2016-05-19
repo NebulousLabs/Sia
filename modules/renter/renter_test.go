@@ -49,7 +49,7 @@ func newRenterTester(name string) (*renterTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func newContractorTester(name string, hc hostContractor) (*renterTester, error) 
 	if err != nil {
 		return nil, err
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		return nil, err
 	}

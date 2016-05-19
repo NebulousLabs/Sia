@@ -32,7 +32,7 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create consensus set:", err)
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		t.Fatal("Failed to create tpool:", err)
 	}
@@ -97,7 +97,7 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		t.Fatal(err)
 	}

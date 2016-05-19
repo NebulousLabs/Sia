@@ -10,6 +10,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -239,9 +241,28 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 		return errEmptySet
 	}
 
+	// Remove all transactions that have been confirmed in the transaction set.
+	err := tp.db.Update(func(tx *bolt.Tx) error {
+		oldTS := ts
+		ts = []types.Transaction{}
+		for _, txn := range oldTS {
+			if !tp.transactionConfirmed(tx, txn.ID()) {
+				ts = append(ts, txn)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// If no transactions remain, return a dublicate error.
+	if len(ts) == 0 {
+		return modules.ErrDuplicateTransactionSet
+	}
+
 	// Check the composition of the transaction set, including fees and
 	// IsStandard rules.
-	err := tp.checkTransactionSetComposition(ts)
+	err = tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
 	}

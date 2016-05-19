@@ -3,6 +3,8 @@ package transactionpool
 import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // purge removes all transactions from the transaction pool.
@@ -17,6 +19,30 @@ func (tp *TransactionPool) purge() {
 // to the consensus set.
 func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	tp.mu.Lock()
+
+	// Update the database of confirmed transactions.
+	err := tp.db.Update(func(tx *bolt.Tx) error {
+		for _, block := range cc.RevertedBlocks {
+			for _, txn := range block.Transactions {
+				err := tp.deleteTransaction(tx, txn.ID())
+				if err != nil {
+					return err
+				}
+			}
+		}
+		for _, block := range cc.AppliedBlocks {
+			for _, txn := range block.Transactions {
+				err := tp.addTransaction(tx, txn.ID())
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return tp.putRecentConsensusChange(tx, cc.ID)
+	})
+	if err != nil {
+		// TODO: Handle error
+	}
 
 	// Scan the applied blocks for transactions that got accepted. This will
 	// help to determine which transactions to remove from the transaction

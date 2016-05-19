@@ -43,7 +43,7 @@ func createMinerTester(name string) (*minerTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	tp, err := transactionpool.New(cs, g)
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
 	if err != nil {
 		return nil, err
 	}
