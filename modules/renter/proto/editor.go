@@ -95,10 +95,13 @@ func (he *Editor) Upload(data []byte) (Contract, crypto.Hash, error) {
 	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(modules.SectorSize)
 	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
-	if sectorPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
+	if he.contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorPrice) < 0 {
 		return Contract{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
 	}
 	sectorCollateral := he.host.Collateral.Mul(blockBytes)
+	if he.contract.LastRevision.NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
+		return Contract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
+	}
 
 	// calculate the new Merkle root
 	sectorRoot := crypto.MerkleRoot(data)
@@ -168,8 +171,8 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 
 	// calculate price
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
-	if sectorBandwidthPrice.Cmp(he.contract.LastRevision.NewValidProofOutputs[0].Value) >= 0 {
-		return Contract{}, errors.New("contract has insufficient funds to support upload")
+	if he.contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorBandwidthPrice) < 0 {
+		return Contract{}, errors.New("contract has insufficient funds to support modification")
 	}
 
 	// calculate the new Merkle root
