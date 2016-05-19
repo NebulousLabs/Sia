@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
@@ -152,11 +153,13 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 			if i%1000 == 0 {
 				bid := cc.AppliedBlocks[0].ID()
 				pb, err := getBlockMap(tx, bid)
-				if err == nil {
-					if i == 0 {
-						fmt.Println("A consensus rescan has been requested. This can take a while.")
+				if err == nil && build.Release != "testing" {
+					if height := blockHeight(tx); height != 0 {
+						if i == 0 {
+							fmt.Println("A consensus rescan has been requested. This can take a while.")
+						}
+						fmt.Println("Rescan has hit height", pb.Height, "out of", height)
 					}
-					fmt.Println("Rescan has hit height", pb.Height, "out of", blockHeight(tx))
 				} else {
 					// Didn't get to print for this block, because it was not
 					// recognized in the current path. Try printing for the
