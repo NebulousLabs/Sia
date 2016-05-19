@@ -4,6 +4,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -95,6 +96,18 @@ type HostDBEntry struct {
 	PublicKey types.SiaPublicKey
 }
 
+// A RenterContract contains all the metadata necessary to revise or renew a
+// file contract.
+type RenterContract struct {
+	FileContract    types.FileContract         `json:"filecontract"`
+	ID              types.FileContractID       `json:"id"`
+	LastRevision    types.FileContractRevision `json:"lastrevision"`
+	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
+	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
+	NetAddress      NetAddress                 `json:"netaddress"`
+	SecretKey       crypto.SecretKey           `json:"secretkey"`
+}
+
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
@@ -107,6 +120,9 @@ type Renter interface {
 
 	// AllHosts returns the full list of hosts known to the renter.
 	AllHosts() []HostDBEntry
+
+	// Contracts returns the contracts formed by the renter.
+	Contracts() []RenterContract
 
 	// DeleteFile deletes a file entry from the renter.
 	DeleteFile(path string) error

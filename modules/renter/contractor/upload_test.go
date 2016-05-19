@@ -5,7 +5,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -32,14 +31,14 @@ func TestEditor(t *testing.T) {
 	}
 
 	// empty contract
-	_, err := c.Editor(proto.Contract{})
+	_, err := c.Editor(modules.RenterContract{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// expired contract
 	c.blockHeight = 3
-	_, err = c.Editor(proto.Contract{})
+	_, err = c.Editor(modules.RenterContract{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -56,7 +55,7 @@ func TestEditor(t *testing.T) {
 	dbe.AcceptingContracts = true
 	dbe.StoragePrice = types.NewCurrency64(^uint64(0))
 	hdb.hosts["foo"] = dbe
-	_, err = c.Editor(proto.Contract{IP: "foo"})
+	_, err = c.Editor(modules.RenterContract{NetAddress: "foo"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -64,14 +63,14 @@ func TestEditor(t *testing.T) {
 	// invalid contract
 	dbe.StoragePrice = types.NewCurrency64(500)
 	hdb.hosts["bar"] = dbe
-	_, err = c.Editor(proto.Contract{IP: "bar"})
+	_, err = c.Editor(modules.RenterContract{NetAddress: "bar"})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// spent contract
-	contract := proto.Contract{
-		IP: "bar",
+	contract := modules.RenterContract{
+		NetAddress: "bar",
 		LastRevision: types.FileContractRevision{
 			NewValidProofOutputs: []types.SiacoinOutput{
 				{Value: types.NewCurrency64(0)},

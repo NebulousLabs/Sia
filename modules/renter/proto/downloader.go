@@ -2,20 +2,20 @@ package proto
 
 import (
 	"errors"
-	"github.com/NebulousLabs/Sia/types"
 	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Downloader retrieves sectors by calling the download RPC on a host.
 // Downloaders are NOT thread- safe; calls to Sector must be serialized.
 type Downloader struct {
 	host     modules.HostDBEntry
-	contract Contract // updated after each revision
+	contract modules.RenterContract // updated after each revision
 	conn     net.Conn
 
 	// metrics
@@ -25,19 +25,19 @@ type Downloader struct {
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
-func (hd *Downloader) Sector(root crypto.Hash) (Contract, []byte, error) {
+func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, error) {
 	extendDeadline(hd.conn, modules.NegotiateDownloadTime)
 	defer extendDeadline(hd.conn, time.Hour) // reset deadline when finished
 
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
 	if hd.contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorPrice) < 0 {
-		return Contract{}, nil, errors.New("contract has insufficient funds to support download")
+		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
 	}
 
 	// initiate download by confirming host settings
 	if err := startDownload(hd.conn, hd.host); err != nil {
-		return Contract{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	// send download action
@@ -47,28 +47,28 @@ func (hd *Downloader) Sector(root crypto.Hash) (Contract, []byte, error) {
 		Length:     modules.SectorSize,
 	}})
 	if err != nil {
-		return Contract{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	// create and send revision to host for approval
 	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
 	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
 	if err != nil {
-		return Contract{}, nil, err
+		return modules.RenterContract{}, nil, err
 	}
 
 	// read sector data, completing one iteration of the download loop
 	var sectors [][]byte
 	if err := encoding.ReadObject(hd.conn, &sectors, modules.SectorSize+16); err != nil {
-		return Contract{}, nil, err
+		return modules.RenterContract{}, nil, err
 	} else if len(sectors) != 1 {
-		return Contract{}, nil, errors.New("host did not send enough sectors")
+		return modules.RenterContract{}, nil, errors.New("host did not send enough sectors")
 	}
 	sector := sectors[0]
 	if uint64(len(sector)) != modules.SectorSize {
-		return Contract{}, nil, errors.New("host did not send enough sector data")
+		return modules.RenterContract{}, nil, errors.New("host did not send enough sector data")
 	} else if crypto.MerkleRoot(sector) != root {
-		return Contract{}, nil, errors.New("host sent bad sector data")
+		return modules.RenterContract{}, nil, errors.New("host sent bad sector data")
 	}
 
 	// update contract and metrics
@@ -91,7 +91,7 @@ func (hd *Downloader) Close() error {
 
 // NewDownloader initiates the download request loop with a host, and returns a
 // Downloader.
-func NewDownloader(host modules.HostDBEntry, contract Contract) (*Downloader, error) {
+func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*Downloader, error) {
 	// check that contract has enough value to support a download
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
@@ -104,7 +104,7 @@ func NewDownloader(host modules.HostDBEntry, contract Contract) (*Downloader, er
 	}
 
 	// initiate download loop
-	conn, err := net.DialTimeout("tcp", string(contract.IP), 15*time.Second)
+	conn, err := net.DialTimeout("tcp", string(contract.NetAddress), 15*time.Second)
 	if err != nil {
 		return nil, err
 	}

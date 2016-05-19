@@ -22,16 +22,16 @@ var (
 
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
-func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (proto.Contract, error) {
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		return proto.Contract{}, errTooExpensive
+		return modules.RenterContract{}, errTooExpensive
 	}
 
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
 	if err != nil {
-		return proto.Contract{}, err
+		return modules.RenterContract{}, err
 	}
 
 	// create contract params
@@ -51,7 +51,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint6
 	contract, err := proto.FormContract(params, txnBuilder, c.tpool)
 	if err != nil {
 		txnBuilder.Drop()
-		return proto.Contract{}, err
+		return modules.RenterContract{}, err
 	}
 
 	c.mu.Lock()

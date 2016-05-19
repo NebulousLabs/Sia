@@ -43,12 +43,12 @@ type Editor interface {
 // Upload must happen in serial.
 type hostEditor struct {
 	editor     *proto.Editor
-	contract   proto.Contract
+	contract   modules.RenterContract
 	contractor *Contractor
 }
 
 // Address returns the NetAddress of the host.
-func (he *hostEditor) Address() modules.NetAddress { return he.contract.IP }
+func (he *hostEditor) Address() modules.NetAddress { return he.contract.NetAddress }
 
 // ContractID returns the ID of the contract being revised.
 func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID }
@@ -120,14 +120,14 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 
 // Editor initiates the contract revision process with a host, and returns
 // an Editor.
-func (c *Contractor) Editor(contract proto.Contract) (Editor, error) {
+func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
 	if height > contract.FileContract.WindowStart {
 		return nil, errors.New("contract has already ended")
 	}
-	host, ok := c.hdb.Host(contract.IP)
+	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}

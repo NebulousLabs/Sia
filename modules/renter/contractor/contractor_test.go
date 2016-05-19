@@ -9,7 +9,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -94,15 +93,15 @@ func TestNew(t *testing.T) {
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
 	c := &Contractor{
-		contracts: map[types.FileContractID]proto.Contract{
-			{1}: {ID: types.FileContractID{1}, IP: "foo"},
-			{2}: {ID: types.FileContractID{2}, IP: "bar"},
-			{3}: {ID: types.FileContractID{3}, IP: "baz"},
+		contracts: map[types.FileContractID]modules.RenterContract{
+			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
+			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
+			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
 		},
 	}
 	for _, contract := range c.Contracts() {
-		if exp := c.contracts[contract.ID]; exp.IP != contract.IP {
-			t.Errorf("contract does not match: expected %v, got %v", exp.IP, contract.IP)
+		if exp := c.contracts[contract.ID]; exp.NetAddress != contract.NetAddress {
+			t.Errorf("contract does not match: expected %v, got %v", exp.NetAddress, contract.NetAddress)
 		}
 	}
 }

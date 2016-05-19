@@ -10,7 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -179,7 +178,9 @@ type stubContractor struct{}
 
 func (stubContractor) SetAllowance(modules.Allowance) error                     { return nil }
 func (stubContractor) Allowance() modules.Allowance                             { return modules.Allowance{} }
-func (stubContractor) Contracts() []proto.Contract                              { return nil }
+func (stubContractor) Contracts() []modules.RenterContract                      { return nil }
 func (stubContractor) FinancialMetrics() (m modules.RenterFinancialMetrics)     { return }
-func (stubContractor) Editor(proto.Contract) (contractor.Editor, error)         { return nil, nil }
-func (stubContractor) Downloader(proto.Contract) (contractor.Downloader, error) { return nil, nil }
+func (stubContractor) Editor(modules.RenterContract) (contractor.Editor, error) { return nil, nil }
+func (stubContractor) Downloader(modules.RenterContract) (contractor.Downloader, error) {
+	return nil, nil
+}

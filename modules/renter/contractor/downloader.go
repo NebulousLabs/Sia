@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 )
 
@@ -54,14 +55,14 @@ func (hd *hostDownloader) Close() error { return hd.downloader.Close() }
 
 // Downloader initiates the download request loop with a host, and returns a
 // Downloader.
-func (c *Contractor) Downloader(contract proto.Contract) (Downloader, error) {
+func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
 	if height > contract.FileContract.WindowStart {
 		return nil, errors.New("contract has already ended")
 	}
-	host, ok := c.hdb.Host(contract.IP)
+	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
 		return nil, errors.New("no record of that host")
 	}

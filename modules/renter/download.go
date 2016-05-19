@@ -12,7 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 )
 
 var (
@@ -197,7 +196,7 @@ func (r *Renter) Download(path, destination string) error {
 	// Copy the file's metadata
 	// TODO: this is ugly because we only have the Contracts method for
 	// looking up contracts.
-	contracts := make(map[*fileContract]proto.Contract)
+	contracts := make(map[*fileContract]modules.RenterContract)
 	file.mu.RLock()
 	for _, c := range r.hostContractor.Contracts() {
 		fc, ok := file.contracts[c.ID]
@@ -219,7 +218,7 @@ func (r *Renter) Download(path, destination string) error {
 		// TODO: connect in parallel
 		d, err := r.hostContractor.Downloader(c)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
+			errs = append(errs, fmt.Sprintf("\t%v: %v", c.NetAddress, err))
 			continue
 		}
 		defer d.Close()

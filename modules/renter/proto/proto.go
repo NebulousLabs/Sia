@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -26,18 +25,6 @@ type (
 		FeeEstimation() (min types.Currency, max types.Currency)
 	}
 )
-
-// A Contract contains all the metadata necessary to revise or renew a file
-// contract.
-type Contract struct {
-	IP              modules.NetAddress
-	ID              types.FileContractID
-	FileContract    types.FileContract
-	MerkleRoots     []crypto.Hash
-	LastRevision    types.FileContractRevision
-	LastRevisionTxn types.Transaction
-	SecretKey       crypto.SecretKey
-}
 
 // ContractParams are supplied as an argument to FormContract.
 type ContractParams struct {

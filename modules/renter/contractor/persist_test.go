@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -20,15 +20,15 @@ func (m memPersist) load(data *contractorPersist) error     { *data = contractor
 func TestSaveLoad(t *testing.T) {
 	// create contractor with mocked persist dependency
 	c := &Contractor{
-		contracts: make(map[types.FileContractID]proto.Contract),
+		contracts: make(map[types.FileContractID]modules.RenterContract),
 	}
 	c.persist = new(memPersist)
 
 	// add some fake contracts
-	c.contracts = map[types.FileContractID]proto.Contract{
-		{0}: {IP: "foo"},
-		{1}: {IP: "bar"},
-		{2}: {IP: "baz"},
+	c.contracts = map[types.FileContractID]modules.RenterContract{
+		{0}: {NetAddress: "foo"},
+		{1}: {NetAddress: "bar"},
+		{2}: {NetAddress: "baz"},
 	}
 	// save and reload
 	err := c.save()

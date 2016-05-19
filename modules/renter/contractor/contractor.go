@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -30,7 +29,7 @@ type Contractor struct {
 
 	allowance   modules.Allowance
 	blockHeight types.BlockHeight
-	contracts   map[types.FileContractID]proto.Contract
+	contracts   map[types.FileContractID]modules.RenterContract
 	lastChange  modules.ConsensusChangeID
 	renewHeight types.BlockHeight // height at which to renew contracts
 
@@ -114,7 +113,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 }
 
 // Contracts returns the contracts formed by the contractor.
-func (c *Contractor) Contracts() (cs []proto.Contract) {
+func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, c := range c.contracts {
@@ -161,7 +160,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		tpool:   tp,
 		wallet:  w,
 
-		contracts: make(map[types.FileContractID]proto.Contract),
+		contracts: make(map[types.FileContractID]modules.RenterContract),
 	}
 
 	// Load the prior persistence structures.

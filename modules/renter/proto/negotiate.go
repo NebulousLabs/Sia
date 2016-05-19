@@ -16,6 +16,31 @@ import (
 // extendDeadline is a helper function for extending the connection timeout.
 func extendDeadline(conn net.Conn, d time.Duration) { _ = conn.SetDeadline(time.Now().Add(d)) }
 
+// startRevision is run at the beginning of each revision iteration. It reads
+// the host's settings confirms that the values are acceptable, and writes an acceptance.
+func startRevision(conn net.Conn, host modules.HostDBEntry) error {
+	// verify the host's settings and confirm its identity
+	recvSettings, err := verifySettings(conn, host)
+	if err != nil {
+		return err
+	} else if !recvSettings.AcceptingContracts {
+		// no need to reject; host will already have disconnected at this point
+		return errors.New("host is not accepting contracts")
+	}
+	return modules.WriteNegotiationAcceptance(conn)
+}
+
+// startDownload is run at the beginning of each download iteration. It reads
+// the host's settings confirms that the values are acceptable, and writes an acceptance.
+func startDownload(conn net.Conn, host modules.HostDBEntry) error {
+	// verify the host's settings and confirm its identity
+	_, err := verifySettings(conn, host)
+	if err != nil {
+		return err
+	}
+	return modules.WriteNegotiationAcceptance(conn)
+}
+
 // verifySettings reads a signed HostSettings object from conn, validates the
 // signature, and checks for discrepancies between the known settings and the
 // received settings. If there is a discrepancy, the hostDB is notified. The
@@ -45,34 +70,9 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntr
 	return host, nil
 }
 
-// startRevision is run at the beginning of each revision iteration. It reads
-// the host's settings confirms that the values are acceptable, and writes an acceptance.
-func startRevision(conn net.Conn, host modules.HostDBEntry) error {
-	// verify the host's settings and confirm its identity
-	recvSettings, err := verifySettings(conn, host)
-	if err != nil {
-		return err
-	} else if !recvSettings.AcceptingContracts {
-		// no need to reject; host will already have disconnected at this point
-		return errors.New("host is not accepting contracts")
-	}
-	return modules.WriteNegotiationAcceptance(conn)
-}
-
-// startDownload is run at the beginning of each download iteration. It reads
-// the host's settings confirms that the values are acceptable, and writes an acceptance.
-func startDownload(conn net.Conn, host modules.HostDBEntry) error {
-	// verify the host's settings and confirm its identity
-	_, err := verifySettings(conn, host)
-	if err != nil {
-		return err
-	}
-	return modules.WriteNegotiationAcceptance(conn)
-}
-
 // verifyRecentRevision confirms that the host and contractor agree upon the current
 // state of the contract being revisde.
-func verifyRecentRevision(conn net.Conn, contract Contract) error {
+func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error {
 	// send contract ID
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
 		return errors.New("couldn't send contract ID: " + err.Error())
@@ -113,4 +113,117 @@ func verifyRecentRevision(conn net.Conn, contract Contract) error {
 	// verification; it just needs to be above the fork height and below the
 	// contract expiration (which was checked earlier).
 	return modules.VerifyFileContractRevisionTransactionSignatures(lastRevision, hostSignatures, contract.FileContract.WindowStart-1)
+}
+
+// negotiateRevision sends a revision and actions to the host for approval,
+// completing one iteration of the revision loop.
+func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
+	// create transaction containing the revision
+	signedTxn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{rev},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(rev.ParentID),
+			CoveredFields:  types.CoveredFields{FileContractRevisions: []uint64{0}},
+			PublicKeyIndex: 0, // renter key is always first -- see formContract
+		}},
+	}
+	// sign the transaction
+	encodedSig, _ := crypto.SignHash(signedTxn.SigHash(0), secretKey) // no error possible
+	signedTxn.TransactionSignatures[0].Signature = encodedSig[:]
+
+	// send the revision
+	if err := encoding.WriteObject(conn, rev); err != nil {
+		return types.Transaction{}, errors.New("couldn't send revision: " + err.Error())
+	}
+	// read acceptance
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
+	}
+
+	// send the new transaction signature
+	if err := encoding.WriteObject(conn, signedTxn.TransactionSignatures[0]); err != nil {
+		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
+	}
+	// read the host's acceptance and transaction signature
+	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
+		return types.Transaction{}, errors.New("host did not accept transaction signature: " + err.Error())
+	}
+	var hostSig types.TransactionSignature
+	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
+		return types.Transaction{}, errors.New("couldn't read host's signature: " + err.Error())
+	}
+
+	// add the signature to the transaction and verify it
+	// NOTE: we can fake the blockheight here because it doesn't affect
+	// verification; it just needs to be above the fork height and below the
+	// contract expiration (which was checked earlier).
+	verificationHeight := rev.NewWindowStart - 1
+	signedTxn.TransactionSignatures = append(signedTxn.TransactionSignatures, hostSig)
+	if err := signedTxn.StandaloneValid(verificationHeight); err != nil {
+		return types.Transaction{}, err
+	}
+	return signedTxn, nil
+}
+
+// newRevision creates a copy of current with its revision number incremented,
+// and with cost transferred from the renter to the host.
+func newRevision(current types.FileContractRevision, cost types.Currency) types.FileContractRevision {
+	rev := current
+
+	// need to manually copy slice memory
+	rev.NewValidProofOutputs = make([]types.SiacoinOutput, 2)
+	rev.NewMissedProofOutputs = make([]types.SiacoinOutput, 3)
+	copy(rev.NewValidProofOutputs, current.NewValidProofOutputs)
+	copy(rev.NewMissedProofOutputs, current.NewMissedProofOutputs)
+
+	// move valid payout from renter to host
+	rev.NewValidProofOutputs[0].Value = current.NewValidProofOutputs[0].Value.Sub(cost)
+	rev.NewValidProofOutputs[1].Value = current.NewValidProofOutputs[1].Value.Add(cost)
+
+	// move missed payout from renter to void
+	rev.NewMissedProofOutputs[0].Value = current.NewMissedProofOutputs[0].Value.Sub(cost)
+	rev.NewMissedProofOutputs[2].Value = current.NewMissedProofOutputs[2].Value.Add(cost)
+
+	// increment revision number
+	rev.NewRevisionNumber++
+
+	return rev
+}
+
+// newDownloadRevision revises the current revision to cover the cost of
+// downloading data.
+func newDownloadRevision(current types.FileContractRevision, downloadCost types.Currency) types.FileContractRevision {
+	return newRevision(current, downloadCost)
+}
+
+// newUploadRevision revises the current revision to cover the cost of
+// uploading a sector.
+func newUploadRevision(current types.FileContractRevision, merkleRoot crypto.Hash, price, collateral types.Currency) types.FileContractRevision {
+	rev := newRevision(current, price)
+
+	// move collateral from host to void
+	rev.NewMissedProofOutputs[1].Value = rev.NewMissedProofOutputs[1].Value.Sub(collateral)
+	rev.NewMissedProofOutputs[2].Value = rev.NewMissedProofOutputs[2].Value.Add(collateral)
+
+	// set new filesize and Merkle root
+	rev.NewFileSize += modules.SectorSize
+	rev.NewFileMerkleRoot = merkleRoot
+	return rev
+}
+
+// newDeleteRevision revises the current revision to cover the cost of
+// deleting a sector.
+func newDeleteRevision(current types.FileContractRevision, merkleRoot crypto.Hash) types.FileContractRevision {
+	rev := newRevision(current, types.ZeroCurrency)
+	rev.NewFileSize -= modules.SectorSize
+	rev.NewFileMerkleRoot = merkleRoot
+	return rev
+}
+
+// newModifyRevision revises the current revision to cover the cost of
+// modifying a sector.
+func newModifyRevision(current types.FileContractRevision, merkleRoot crypto.Hash, uploadCost types.Currency) types.FileContractRevision {
+	rev := newRevision(current, uploadCost)
+	rev.NewFileMerkleRoot = merkleRoot
+	return rev
 }
