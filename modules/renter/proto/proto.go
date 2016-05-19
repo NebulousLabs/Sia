@@ -30,13 +30,13 @@ type (
 // A Contract contains all the metadata necessary to revise or renew a file
 // contract.
 type Contract struct {
-	IP              modules.NetAddress
-	ID              types.FileContractID
-	FileContract    types.FileContract
-	MerkleRoots     []crypto.Hash
-	LastRevision    types.FileContractRevision
-	LastRevisionTxn types.Transaction
-	SecretKey       crypto.SecretKey
+	FileContract    types.FileContract         `json:"filecontract"`
+	ID              types.FileContractID       `json:"id"`
+	IP              modules.NetAddress         `json:"ip"`
+	LastRevision    types.FileContractRevision `json:"lastrevision"`
+	LastRevisionTxn types.Transaction          `json:"lastrevisiontxn"`
+	MerkleRoots     []crypto.Hash              `json:"merkleroots"`
+	SecretKey       crypto.SecretKey           `json:"secretkey"`
 }
 
 // ContractParams are supplied as an argument to FormContract.
