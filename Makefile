@@ -58,6 +58,8 @@ install:
 
 # release builds and installs release binaries.
 release:
+	go install -tags='debug profile' $(pkgs)
+release-race:
 	go install -race -tags='debug profile' $(pkgs)
 release-std:
 	go install $(pkgs)
