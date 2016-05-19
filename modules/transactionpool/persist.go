@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -60,7 +59,7 @@ func (tp *TransactionPool) initPersist() error {
 	}
 
 	// Create the database and get the most recent consensus change.
-	cc := modules.ConsensusChangeBeginning
+	var cc modules.ConsensusChangeID
 	err = tp.db.Update(func(tx *bolt.Tx) error {
 		// Create the database buckets.
 		buckets := [][]byte{
@@ -126,16 +125,12 @@ func (tp *TransactionPool) transactionConfirmed(tx *bolt.Tx, id types.Transactio
 	if confirmedBytes == nil {
 		return false
 	}
-	if confirmedBytes[0] == 1 {
-		return true
-	}
-	build.Critical("transaction database has an illegal value for a txid")
-	return false
+	return true
 }
 
 // addTransaction adds a transaction to the list of confirmed transactions.
 func (tp *TransactionPool) addTransaction(tx *bolt.Tx, id types.TransactionID) error {
-	return tx.Bucket(bucketConfirmedTransactions).Put(id[:], []byte{1})
+	return tx.Bucket(bucketConfirmedTransactions).Put(id[:], []byte{})
 }
 
 // deleteTransaction deletes a transaction from the list of confirmed
