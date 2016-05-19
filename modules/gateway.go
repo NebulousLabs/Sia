@@ -78,9 +78,21 @@ type (
 		// supply the given RPC ID.
 		RegisterRPC(string, RPCFunc)
 
+		// UnregisterRPC unregisters an RPC and removes all references to the RPCFunc
+		// supplied in the corresponding RegisterRPC call. References to RPCFuncs
+		// registered with RegisterConnectCall are not removed and should be removed
+		// with UnregisterConnectCall. If the RPC does not exist no action is taken.
+		UnregisterRPC(string)
+
 		// RegisterConnectCall registers an RPC name and function to be called
 		// upon connecting to a peer.
 		RegisterConnectCall(string, RPCFunc)
+
+		// UnregisterConnectCall unregisters an RPC and removes all references to the
+		// RPCFunc supplied in the corresponding RegisterConnectCall call. References
+		// to RPCFuncs registered with RegisterRPC are not removed and should be
+		// removed with UnregisterRPC. If the RPC does not exist no action is taken.
+		UnregisterConnectCall(string)
 
 		// RPC calls an RPC on the given address. RPC cannot be called on an
 		// address that the Gateway is not connected to.
