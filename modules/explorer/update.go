@@ -128,7 +128,7 @@ func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 			tbid := types.TransactionID(bid)
 
 			// special handling for genesis block
-			if bid == types.GenesisBlock.ID() {
+			if bid == types.GenesisID {
 				dbAddGenesisBlock(tx)
 				continue
 			}
@@ -498,7 +498,7 @@ func dbCalculateBlockFacts(tx *bolt.Tx, cs modules.ConsensusSet, block types.Blo
 
 // Special handling for the genesis block. No other functions are called on it.
 func dbAddGenesisBlock(tx *bolt.Tx) {
-	id := types.GenesisBlock.ID()
+	id := types.GenesisID
 	dbAddBlockID(tx, id, 0)
 	txid := types.GenesisBlock.Transactions[0].ID()
 	dbAddTransactionID(tx, txid, 0)

@@ -22,6 +22,9 @@ type hostDB interface {
 	// AveragePrice returns the average price of a host.
 	AveragePrice() types.Currency
 
+	// Close closes the hostdb.
+	Close() error
+
 	// IsOffline reports whether a host is consider offline.
 	IsOffline(modules.NetAddress) bool
 }
@@ -116,6 +119,11 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 	go r.threadedRepairLoop()
 
 	return r, nil
+}
+
+// Close closes the Renter and its dependencies
+func (r *Renter) Close() error {
+	return r.hostDB.Close()
 }
 
 // hostdb passthroughs

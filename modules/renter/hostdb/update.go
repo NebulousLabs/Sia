@@ -34,7 +34,7 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	if hdb.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisBlock.ID() {
+	if hdb.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisID {
 		hdb.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
 		hdb.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	}

@@ -64,6 +64,12 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
+	// closeChan is used to shutdown the scanning threads.
+	closeChan chan struct{}
+
+	// threadGroup is used to wait for scanning threads to shutdown.
+	threadGroup sync.WaitGroup
+
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
 
@@ -107,6 +113,8 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 		scanPool:    make(chan *hostEntry, scanPoolSize),
+
+		closeChan: make(chan struct{}),
 	}
 
 	// Load the prior persistence structures.
@@ -129,9 +137,20 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 	}
 
 	// Begin listening to consensus and looking for hosts.
+	hdb.threadGroup.Add(scanningThreads)
 	for i := 0; i < scanningThreads; i++ {
 		go hdb.threadedProbeHosts()
 	}
+	hdb.threadGroup.Add(1)
 	go hdb.threadedScan()
 	return hdb, nil
+}
+
+// Close closes the hostdb, terminating its scanning threads
+func (hdb *HostDB) Close() error {
+	close(hdb.scanPool)
+	close(hdb.closeChan)
+	// wait for threads to exit
+	hdb.threadGroup.Wait()
+	return nil
 }

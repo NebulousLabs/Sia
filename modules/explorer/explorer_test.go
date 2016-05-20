@@ -176,11 +176,11 @@ func TestExplorerGenesisHeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	block, height, exists := e.Block(types.GenesisBlock.ID())
+	block, height, exists := e.Block(types.GenesisID)
 	if !exists {
 		t.Error("explorer missing genesis block after initialization")
 	}
-	if block.ID() != types.GenesisBlock.ID() {
+	if block.ID() != types.GenesisID {
 		t.Error("explorer returned wrong genesis block")
 	}
 	if height != 0 {

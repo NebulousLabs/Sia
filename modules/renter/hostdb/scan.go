@@ -82,8 +82,10 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
 func (hdb *HostDB) threadedProbeHosts() {
+	defer hdb.threadGroup.Done()
 	for hostEntry := range hdb.scanPool {
 		// Request settings from the queued host entry.
+		// TODO: use dialer.Cancel to shutdown quickly
 		hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey)
 		var settings modules.HostExternalSettings
 		err := func() error {
@@ -151,6 +153,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 // threadedScan is an ongoing function which will query the full set of hosts
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
+	defer hdb.threadGroup.Done()
 	for {
 		// Determine who to scan. At most 'maxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
@@ -199,6 +202,12 @@ func (hdb *HostDB) threadedScan() {
 			defaultBig := big.NewInt(int64(defaultScanSleep))
 			randSleep = defaultBig.Sub(defaultBig, minBig)
 		}
-		hdb.sleeper.Sleep(time.Duration(randSleep.Int64()) + minScanSleep)
+
+		select {
+		// awaken and exit if hostdb is closing
+		case <-hdb.closeChan:
+			return
+		case <-time.After(time.Duration(randSleep.Int64()) + minScanSleep):
+		}
 	}
 }

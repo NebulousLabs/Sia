@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -109,22 +110,9 @@ func (srv *Server) Close() error {
 	srv.wg.Wait()
 
 	// Safely close each module.
-	if srv.host != nil {
-		if err := srv.host.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("host.Close failed: %v", err))
-		}
-	}
-	// TODO: close renter (which should close hostdb as well)
-	if srv.explorer != nil {
-		if err := srv.explorer.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("explorer.Close failed: %v", err))
-		}
-	}
-	if srv.miner != nil {
-		if err := srv.miner.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("miner.Close failed: %v", err))
-		}
-	}
+	// TODO: close transaction pool
+
+	// wallet has special closing mechanics
 	if srv.wallet != nil {
 		// TODO: close wallet and lock the wallet in the wallet's Close method.
 		if srv.wallet.Unlocked() {
@@ -133,15 +121,23 @@ func (srv *Server) Close() error {
 			}
 		}
 	}
-	// TODO: close transaction pool
-	if srv.cs != nil {
-		if err := srv.cs.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("consensusset.Close failed: %v", err))
-		}
+
+	mods := []struct {
+		name string
+		c    io.Closer
+	}{
+		{"host", srv.host},
+		{"renter", srv.renter},
+		{"explorer", srv.explorer},
+		{"miner", srv.miner},
+		{"consensus", srv.cs},
+		{"gateway", srv.gateway},
 	}
-	if srv.gateway != nil {
-		if err := srv.gateway.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("gateway.Close failed: %v", err))
+	for _, mod := range mods {
+		if mod.c != nil {
+			if err := mod.c.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("%v.Close failed: %v", mod.name, err))
+			}
 		}
 	}
 

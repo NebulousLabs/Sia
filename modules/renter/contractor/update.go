@@ -12,12 +12,12 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	defer c.mu.Unlock()
 
 	for _, block := range cc.RevertedBlocks {
-		if block.ID() != types.GenesisBlock.ID() {
+		if block.ID() != types.GenesisID {
 			c.blockHeight--
 		}
 	}
 	for _, block := range cc.AppliedBlocks {
-		if block.ID() != types.GenesisBlock.ID() {
+		if block.ID() != types.GenesisID {
 			c.blockHeight++
 		}
 	}

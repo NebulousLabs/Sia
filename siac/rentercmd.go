@@ -291,6 +291,10 @@ func rentercontractscmd() {
 	if err != nil {
 		die("Could not get contracts:", err)
 	}
+	if len(rc.Contracts) == 0 {
+		fmt.Println("No contracts have been formed.")
+		return
+	}
 	sort.Sort(byHeight(rc.Contracts))
 	fmt.Println("Contracts:")
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
