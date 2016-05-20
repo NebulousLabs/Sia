@@ -785,8 +785,6 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 	// Check if all items have succeeded with the required confirmations. Report
 	// success, delete the obligation.
-	//
-	// TODO: This doesn't actually wait enough blocks?
 	if so.ProofConfirmed && h.blockHeight >= so.proofDeadline() {
 		h.removeStorageObligation(so, obligationSucceeded)
 	}
