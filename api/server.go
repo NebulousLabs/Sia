@@ -110,7 +110,6 @@ func (srv *Server) Close() error {
 	srv.wg.Wait()
 
 	// Safely close each module.
-	// TODO: close renter
 	// TODO: close transaction pool
 
 	// wallet has special closing mechanics
@@ -128,6 +127,7 @@ func (srv *Server) Close() error {
 		c    io.Closer
 	}{
 		{"host", srv.host},
+		{"renter", srv.renter},
 		{"explorer", srv.explorer},
 		{"miner", srv.miner},
 		{"consensus", srv.cs},

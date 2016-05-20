@@ -121,6 +121,9 @@ type Renter interface {
 	// AllHosts returns the full list of hosts known to the renter.
 	AllHosts() []HostDBEntry
 
+	// Close closes the Renter.
+	Close() error
+
 	// Contracts returns the contracts formed by the renter.
 	Contracts() []RenterContract
 
