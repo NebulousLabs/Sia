@@ -70,6 +70,11 @@ func TestThreadedProbeHosts(t *testing.T) {
 	// hostEntry, close the channel, and then call threadedProbeHosts.
 	// threadedProbeHosts will receive the host, loop once, and return after
 	// seeing the channel has closed.
+	//
+	// NOTE: since threadedProbeHosts decrements hdb.threadGroup, we Add(100)
+	// to prevent it from going negative. This is acceptable because we don't
+	// call hdb.Close in this test.
+	hdb.threadGroup.Add(100)
 	runProbe := func(h *hostEntry) {
 		hdb.scanPool <- h
 		close(hdb.scanPool)
