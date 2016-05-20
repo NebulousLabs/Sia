@@ -124,7 +124,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 	if numContracts == 0 {
 		return errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
 	} else if numContracts < a.Hosts {
-		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v): %v", a.Hosts, numContracts, strings.Join(errs, "\n"))
+		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v):\n%v", a.Hosts, numContracts, strings.Join(errs, "\n"))
 	}
 	c.mu.Lock()
 	c.renewHeight = endHeight
