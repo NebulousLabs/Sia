@@ -136,7 +136,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if build.Release == "standard" {
 		for _, addr := range modules.BootstrapPeers {
 			err := g.addNode(addr)
-			if err != nil {
+			if err != nil && err != errNodeExists {
 				g.log.Printf("WARN: failed to add the bootstrap node '%v': %v", addr, err)
 			}
 		}
