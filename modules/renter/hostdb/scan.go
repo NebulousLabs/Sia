@@ -5,6 +5,7 @@ package hostdb
 // settings of the hosts.
 
 import (
+	"bytes"
 	"crypto/rand"
 	"math/big"
 	"time"
@@ -83,7 +84,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHosts() {
 	for hostEntry := range hdb.scanPool {
 		// Request settings from the queued host entry.
-		hdb.log.Debugln("Scanning", hostEntry.NetAddress)
+		hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey)
 		var settings modules.HostExternalSettings
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
@@ -100,7 +101,9 @@ func (hdb *HostDB) threadedProbeHosts() {
 			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 		if err != nil {
-			hdb.log.Debugln("Scanning", hostEntry.NetAddress, "failed", err)
+			hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey, "failed", err)
+		} else {
+			hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey, "succeeded")
 		}
 
 		// Now that network communication is done, lock the hostdb to modify the
@@ -110,13 +113,20 @@ func (hdb *HostDB) threadedProbeHosts() {
 			defer hdb.mu.Unlock()
 
 			// Regardless of whether the host responded, add it to allHosts.
-			if _, exists := hdb.allHosts[hostEntry.NetAddress]; !exists {
+			priorHost, exists := hdb.allHosts[hostEntry.NetAddress]
+			if !exists {
 				hdb.allHosts[hostEntry.NetAddress] = hostEntry
 			}
 
 			// If the scan was unsuccessful, decrement the host's reliability.
 			if err != nil {
-				hdb.decrementReliability(hostEntry.NetAddress, UnreachablePenalty)
+				if exists && bytes.Equal(priorHost.PublicKey.Key, hostEntry.PublicKey.Key) {
+					// Only decrement the reliability if the public key in the
+					// hostdb matches the public key in the host announcement -
+					// the failure may just be a failed signature, indicating
+					// the wrong public key.
+					hdb.decrementReliability(hostEntry.NetAddress, UnreachablePenalty)
+				}
 				return
 			}
 

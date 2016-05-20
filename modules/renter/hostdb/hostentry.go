@@ -1,6 +1,8 @@
 package hostdb
 
 import (
+	"bytes"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -25,8 +27,9 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 		hdb.log.Printf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
 		return
 	}
-	// Don't do anything if we've already seen this host.
-	if _, exists := hdb.allHosts[host.NetAddress]; exists {
+	// Don't do anything if we've already seen this host and the public key is
+	// the same.
+	if knownHost, exists := hdb.allHosts[host.NetAddress]; exists && bytes.Equal(host.PublicKey.Key, knownHost.PublicKey.Key) {
 		return
 	}
 
