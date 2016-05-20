@@ -14,7 +14,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.RevertedBlocks {
 		// Only doing the block check if the height is above zero saves hashing
 		// and saves a nontrivial amount of time during IBD.
-		if m.persist.Height > 0 || block.ID() != types.GenesisBlock.ID() {
+		if m.persist.Height > 0 || block.ID() != types.GenesisID {
 			m.persist.Height--
 		} else if m.persist.Height != 0 {
 			// Sanity check - if the current block is the genesis block, the
@@ -26,7 +26,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		// Only doing the block check if the height is above zero saves hashing
 		// and saves a nontrivial amount of time during IBD.
-		if m.persist.Height > 0 || block.ID() != types.GenesisBlock.ID() {
+		if m.persist.Height > 0 || block.ID() != types.GenesisID {
 			m.persist.Height++
 		} else if m.persist.Height != 0 {
 			// Sanity check - if the current block is the genesis block, the

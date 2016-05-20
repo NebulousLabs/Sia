@@ -772,7 +772,7 @@ func TestSendBlk(t *testing.T) {
 			conn: mockPeerConnFailingWriter{PeerConn: p1},
 			fn: func() {
 				// Write a valid block id to the conn.
-				fnErr <- encoding.WriteObject(p2, types.GenesisBlock.ID())
+				fnErr <- encoding.WriteObject(p2, types.GenesisID)
 			},
 			errWant: errFailingWriter,
 			msg:     "expected rpcSendBlk to error with a failing writer conn",
@@ -782,7 +782,7 @@ func TestSendBlk(t *testing.T) {
 			conn: p1,
 			fn: func() {
 				// Write a valid block id to the conn.
-				if err := encoding.WriteObject(p2, types.GenesisBlock.ID()); err != nil {
+				if err := encoding.WriteObject(p2, types.GenesisID); err != nil {
 					fnErr <- err
 				}
 
@@ -792,8 +792,8 @@ func TestSendBlk(t *testing.T) {
 					fnErr <- err
 				}
 				// Verify the block is the expected block.
-				if block.ID() != types.GenesisBlock.ID() {
-					fnErr <- fmt.Errorf("rpcSendBlk wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisBlock.ID(), block.ID())
+				if block.ID() != types.GenesisID {
+					fnErr <- fmt.Errorf("rpcSendBlk wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisID, block.ID())
 				}
 
 				fnErr <- nil
@@ -965,7 +965,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(types.GenesisBlock.ID()))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(types.GenesisID))
 	if err != modules.ErrBlockKnown {
 		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
 	}

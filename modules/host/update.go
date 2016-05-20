@@ -175,7 +175,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// the default height is 0 and the genesis block height is 0. If
 			// removing the genesis block, height will already be at height 0 and
 			// should not update, lest an underflow occur.
-			if block.ID() != types.GenesisBlock.ID() {
+			if block.ID() != types.GenesisID {
 				h.blockHeight--
 			}
 		}
@@ -245,7 +245,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// the default height is 0 and the genesis block height is 0. If adding
 			// the genesis block, height will already be at height 0 and should not
 			// update.
-			if block.ID() != types.GenesisBlock.ID() {
+			if block.ID() != types.GenesisID {
 				h.blockHeight++
 			}
 

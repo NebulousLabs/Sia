@@ -35,6 +35,10 @@ var (
 
 	GenesisSiafundAllocation []SiafundOutput
 	GenesisBlock             Block
+
+	// The GenesisID is used in many places. Calculating it once saves lots of
+	// redundant computation.
+	GenesisID BlockID
 )
 
 // init checks which build constant is in place and initializes the variables
@@ -369,4 +373,6 @@ func init() {
 			{SiafundOutputs: GenesisSiafundAllocation},
 		},
 	}
+	// Calculate the genesis ID.
+	GenesisID = GenesisBlock.ID()
 }
