@@ -107,7 +107,7 @@ func (g *Gateway) listenPeer(p *peer) {
 	for {
 		conn, err := p.accept()
 		if err != nil {
-			g.log.Println("WARN: lost connection to peer", p.NetAddress)
+			g.log.Debugf("WARN: lost connection to peer %q: %v", p.NetAddress, err)
 			break
 		}
 
@@ -130,10 +130,10 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	fn, ok := g.handlers[id]
 	g.mu.RUnlock(lockid)
 	if !ok {
-		g.log.Debugf("WARN: incoming conn %v requested unknown RPC %q", conn.RemoteAddr(), id)
+		g.log.Debugf("WARN: peer %v requested unknown RPC %q", conn.RPCAddr(), id)
 		return
 	}
-	g.log.Debugf("INFO: incoming conn %v requested RPC %q", conn.RemoteAddr(), id)
+	g.log.Debugf("INFO: peer %v requested RPC %q", conn.RPCAddr(), id)
 
 	// call fn
 	err := fn(conn)
@@ -142,7 +142,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		err = nil
 	}
 	if err != nil {
-		g.log.Debugf("WARN: incoming RPC %q from conn %v failed: %v", id, conn.RemoteAddr(), err)
+		g.log.Debugf("WARN: incoming RPC %q from peer %v failed: %v", id, conn.RPCAddr(), err)
 	}
 }
 
