@@ -62,17 +62,6 @@ func (h *Host) verifyChallengeResponse(fcid types.FileContractID, challenge cryp
 	if err != nil {
 		return nil, types.FileContractRevision{}, nil, err
 	}
-
-	// Sanity check - verify that the host has a valid revision and set of
-	// signatures.
-	h.mu.RLock()
-	blockHeight := h.blockHeight
-	h.mu.RUnlock()
-	err = modules.VerifyFileContractRevisionTransactionSignatures(recentRevision, revisionSigs, blockHeight)
-	if err != nil {
-		h.log.Critical("host is inconsistent, bad file contract revision transaction", err)
-		return nil, types.FileContractRevision{}, nil, err
-	}
 	return so, recentRevision, revisionSigs, nil
 }
 
