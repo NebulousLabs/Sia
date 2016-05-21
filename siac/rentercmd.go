@@ -47,7 +47,7 @@ var (
 		Short: "Set the allowance",
 		Long: `Set the amount of money that can be spent over a given period.
 amount is given in currency units (SC, KS, etc.)
-period is given in blocks; 1000 blocks roughly equals 1 week
+period is given in weeks; 1 week is roughly 1000 blocks
 
 Note that setting the allowance will cause siad to immediately begin forming
 contracts! You should only set the allowance once you are fully synced and you
@@ -262,7 +262,11 @@ func rentersetallowancecmd(amount, period string) {
 	if err != nil {
 		die("Could not parse amount:", err)
 	}
-	err = post("/renter/allowance", fmt.Sprintf("funds=%s&period=%s", hastings, period))
+	blocks, err := parsePeriod(period)
+	if err != nil {
+		die("Could not parse period")
+	}
+	err = post("/renter/allowance", fmt.Sprintf("funds=%s&period=%s", hastings, blocks))
 	if err != nil {
 		die("Could not set allowance:", err)
 	}

@@ -60,6 +60,17 @@ func parseFilesize(strSize string) (string, error) {
 	return "", errUnableToParseSize
 }
 
+// parsePeriod converts a number of weeks to a number of blocks.
+func parsePeriod(period string) (string, error) {
+	var weeks float64
+	_, err := fmt.Sscan(period, &weeks)
+	if err != nil {
+		return "", errUnableToParseSize
+	}
+	blocks := int(weeks * 1008) // 1008 blocks per week
+	return fmt.Sprint(blocks), nil
+}
+
 // currencyUnits converts a types.Currency to a string with human-readable
 // units. The unit used will be the largest unit that results in a value
 // greater than 1. The value is rounded to 4 significant digits.

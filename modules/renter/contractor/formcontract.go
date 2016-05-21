@@ -73,7 +73,7 @@ func (c *Contractor) formContracts(a modules.Allowance) error {
 		nRandomHosts = 10
 	}
 	hosts := c.hdb.RandomHosts(nRandomHosts, nil)
-	if uint64(len(hosts)) < a.Hosts {
+	if uint64(len(hosts)) < a.Hosts/2 { // TODO: /2 is temporary until more hosts are online
 		return errors.New("not enough hosts")
 	}
 	// Calculate average host price.
