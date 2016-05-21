@@ -764,7 +764,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 		// Queue another action item to check whether there the storage proof
 		// got confirmed.
-		err = h.queueActionItem(h.blockHeight+types.BlockHeight(storageProofConfirmations), so.id())
+		err = h.queueActionItem(so.proofDeadline(), so.id())
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
