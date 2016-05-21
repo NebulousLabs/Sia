@@ -159,11 +159,14 @@ func hostcmd() {
 
 	Accepting Contracts: %v
 	Anticipated Revenue: %v
+	Locked Collateral:   %v
+	Risked Collateral:   %v
 	Revenue:             %v
 	Lost Revenue:        %v
 	Lost Collateral:     %v
 `, filesizeUnits(int64(totalstorage)), filesizeUnits(int64(totalstorage-storageremaining)),
 		price, is.MaxDuration, accept, currencyUnits(totalPotentialRevenue),
+		currencyUnits(fm.LockedStorageCollateral), currencyUnits(fm.RiskedStorageCollateral),
 		currencyUnits(totalRevenue), currencyUnits(fm.LostRevenue),
 		currencyUnits(fm.LostStorageCollateral))
 
