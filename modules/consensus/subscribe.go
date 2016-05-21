@@ -1,9 +1,6 @@
 package consensus
 
 import (
-	"fmt"
-
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/NebulousLabs/bolt"
@@ -143,32 +140,11 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 		}
 
 		// Send all remaining consensus changes to the subscriber.
-		for i := 0; exists; i++ {
+		for exists {
 			cc, err := cs.computeConsensusChange(tx, entry)
 			if err != nil {
 				return err
 			}
-
-			// Get the height of the block to print out.
-			if i%1000 == 0 {
-				bid := cc.AppliedBlocks[0].ID()
-				pb, err := getBlockMap(tx, bid)
-				if err == nil && build.Release != "testing" {
-					if height := blockHeight(tx); height != 0 {
-						if i == 0 {
-							fmt.Println("A consensus rescan has been requested. This can take a while.")
-						}
-						fmt.Println("Rescan has hit height", pb.Height, "out of", height)
-					}
-				} else {
-					// Didn't get to print for this block, because it was not
-					// recognized in the current path. Try printing for the
-					// next block. Decrement of `i` is okay because it's only
-					// used to decide when to print.
-					i--
-				}
-			}
-
 			subscriber.ProcessConsensusChange(cc)
 			entry, exists = entry.NextEntry(tx)
 		}
