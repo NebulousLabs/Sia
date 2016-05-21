@@ -22,6 +22,19 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
+	// delete expired contracts
+	var expired []types.FileContractID
+	for id, contract := range c.contracts {
+		// TODO: offset this by some sort of confirmation height?
+		if c.blockHeight > contract.LastRevision.NewWindowStart {
+			expired = append(expired, id)
+		}
+	}
+	for _, id := range expired {
+		delete(c.contracts, id)
+		c.log.Debugln("INFO: deleted expired contract", id)
+	}
+
 	// renew contracts
 	// TODO: re-enable this functionality
 	// if c.blockHeight+c.allowance.RenewWindow >= c.renewHeight {
