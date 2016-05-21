@@ -71,15 +71,11 @@ your browser.
 Troubleshooting
 ---------------
 
-- The client does not appear to join the network.
+- I can't add storage folders on Windows.
 
-  There should be at least one peer online for you to connect to, so if you
-  cannot connect, you may be experiencing connection issues. Ensure that you
-  are connected to the Internet. If you are confident that your connection is
-  okay, contact us! Our server may be experiencing problems.
-
-  You can also opt not to connect to join the network by passing the
-  "--no-bootstrap" flag to siad.
+  Currently, admin privileges are required to add storage folders on Windows.
+  Close siad and run it from an admin command prompt. Future versions will not
+  require admin privileges.
 
 - I can't connect to more than 8 peers.
 
@@ -144,7 +140,7 @@ on what we do in the next few months. Thank you!
 Version History
 ---------------
 
-April 2016:
+May 2016:
 
 v0.6.0 (minor release)
 - Switched to long-form renter contracts
