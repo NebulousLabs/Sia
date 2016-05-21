@@ -19,7 +19,7 @@ var (
 			return 2
 		}
 		if build.Release == "standard" {
-			return 6
+			return 24
 		}
 		if build.Release == "testing" {
 			return 1

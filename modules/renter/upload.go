@@ -21,7 +21,7 @@ var (
 		if build.Release == "testing" {
 			return 1
 		}
-		return 1 // RC; orig value: 4
+		return 4
 	}()
 
 	// defaultParityPieces is the number of parity pieces per erasure-coded
@@ -30,7 +30,7 @@ var (
 		if build.Release == "testing" {
 			return 8
 		}
-		return 4 // RC; orig value: 20
+		return 20
 	}()
 )
 
