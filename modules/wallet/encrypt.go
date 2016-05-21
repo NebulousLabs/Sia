@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -206,6 +207,23 @@ func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 	// Subscribe to the consensus set if this is the first unlock for the
 	// wallet object.
 	if !subscribed {
+		// During rescan, print height every 3 seconds.
+		if build.Release != "testing" {
+			go func() {
+				println("Rescanning consensus set...")
+				for range time.Tick(time.Second * 3) {
+					w.mu.RLock()
+					height := w.consensusSetHeight
+					done := w.subscribed
+					w.mu.RUnlock()
+					if done {
+						println("\nDone!")
+						break
+					}
+					print("\rScanned to height ", height, "...")
+				}
+			}()
+		}
 		err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 		if err != nil {
 			return errors.New("wallet subscription failed: " + err.Error())
