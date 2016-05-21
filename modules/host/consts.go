@@ -48,10 +48,10 @@ var (
 	defaultCollateral = types.SiacoinPrecision.Mul64(25e3).Div(modules.BlockBytesPerMonthTerabyte) // 25 KS / TB / Month
 
 	// defaultCollateralBudget defines the maximum number of siacoins that the
-	// host is going to allocate towards collateral. 10 million has been chosen
+	// host is going to allocate towards collateral. The number has been chosen
 	// as a number that is large, but not so large that someone would be
 	// furious for losing access to it for a few weeks.
-	defaultCollateralBudget = types.SiacoinPrecision.Mul64(10e6)
+	defaultCollateralBudget = types.SiacoinPrecision.Mul64(5e6)
 
 	// defaultContractPrice defines the default price of creating a contract
 	// with the host. The default is set to 30 siacoins, which the file
@@ -89,7 +89,7 @@ var (
 	// away by only a few hundred file contracts. As the ecosystem matures, it
 	// is expected that the safe default for this value will increase quite a
 	// bit.
-	defaultMaxCollateral = types.SiacoinPrecision.Mul64(10e3)
+	defaultMaxCollateral = types.SiacoinPrecision.Mul64(250e3)
 
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
@@ -156,21 +156,6 @@ var (
 			return 4
 		}
 		panic("unrecognized release constant in host - revision submission buffer")
-	}()
-
-	// storageProofConfirmations determines the number of confirmations for a
-	// storage proof that the host will wait before
-	storageProofConfirmations = func() int {
-		if build.Release == "dev" {
-			return 20 // About 2 minutes
-		}
-		if build.Release == "standard" {
-			return 72 // About 12 hours
-		}
-		if build.Release == "testing" {
-			return 3
-		}
-		panic("unrecognized release constant in host - storageProofConfirmations")
 	}()
 )
 

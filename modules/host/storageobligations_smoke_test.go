@@ -275,7 +275,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	}
 
 	// Mine until the host submits a storage proof.
-	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+2+resubmissionTimeout; i++ {
+	for i := ht.host.blockHeight; i <= so.expiration()+resubmissionTimeout; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -303,7 +303,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 
 	// Mine blocks until the storage proof has enough confirmations that the
 	// host will delete the file entirely.
-	for i := 0; i <= storageProofConfirmations; i++ {
+	for i := 0; i <= int(defaultWindowSize); i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -515,7 +515,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	}
 
 	// Mine until the host submits a storage proof.
-	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+1+resubmissionTimeout; i++ {
+	for i := ht.host.blockHeight; i <= so.expiration()+resubmissionTimeout; i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -543,7 +543,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 
 	// Mine blocks until the storage proof has enough confirmations that the
 	// host will delete the file entirely.
-	for i := 0; i <= storageProofConfirmations; i++ {
+	for i := 0; i <= int(defaultWindowSize); i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -677,7 +677,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 
 	// Mine blocks until the storage proof has enough confirmations that the
 	// host will delete the file entirely.
-	for i := 0; i <= storageProofConfirmations; i++ {
+	for i := 0; i <= int(defaultWindowSize); i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
