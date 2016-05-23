@@ -363,8 +363,6 @@ func (srv *Server) walletTransactionHandler(w http.ResponseWriter, req *http.Req
 
 // walletTransactionsHandler handles API calls to /wallet/transactions.
 func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// If 'startheight' or 'endheight' query parameters don't exist,
-	// return a descriptive error message along with a HTTP 400 Bad Request response code.
 	startheightStr, endheightStr := req.FormValue("startheight"), req.FormValue("endheight")
 	if startheightStr == "" || endheightStr == "" {
 		writeError(w, "startheight and endheight must be provided to a /wallet/transactions call.", http.StatusBadRequest)
