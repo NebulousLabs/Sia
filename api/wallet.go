@@ -371,12 +371,12 @@ func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Re
 	// Get the start and end blocks.
 	start, err := strconv.Atoi(startheightStr)
 	if err != nil {
-		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "parsing integer value for parameter `startheight` failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	end, err := strconv.Atoi(endheightStr)
 	if err != nil {
-		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "parsing integer value for parameter `endheight` failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	confirmedTxns, err := srv.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
