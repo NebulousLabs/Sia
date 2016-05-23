@@ -12,6 +12,10 @@ import (
 const dummyNode = "111.111.111.111:1111"
 
 func TestAddNode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestAddNode", t)
 	defer g.Close()
 	id := g.mu.Lock()
@@ -34,6 +38,10 @@ func TestAddNode(t *testing.T) {
 }
 
 func TestRemoveNode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestRemoveNode", t)
 	defer g.Close()
 	id := g.mu.Lock()
@@ -50,6 +58,10 @@ func TestRemoveNode(t *testing.T) {
 }
 
 func TestRandomNode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestRandomNode", t)
 	defer g.Close()
 

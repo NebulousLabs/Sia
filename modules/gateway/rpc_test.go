@@ -168,6 +168,10 @@ func TestUnregisterConnectCallPanics(t *testing.T) {
 }
 
 func TestRPC(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 
@@ -240,6 +244,10 @@ func TestRPC(t *testing.T) {
 }
 
 func TestThreadedHandleConn(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestThreadedHandleConn1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestThreadedHandleConn2", t)
@@ -300,6 +308,10 @@ func TestThreadedHandleConn(t *testing.T) {
 // TestBroadcast tests that calling broadcast with a slice of peers only
 // broadcasts to those peers.
 func TestBroadcast(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestBroadcast1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestBroadcast2", t)
@@ -420,6 +432,10 @@ func TestBroadcast(t *testing.T) {
 // TestOutboundAndInboundRPCs tests that both inbound and outbound connections
 // can successfully make RPC calls.
 func TestOutboundAndInboundRPCs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRPC2", t)
@@ -465,6 +481,10 @@ func TestOutboundAndInboundRPCs(t *testing.T) {
 
 // TestCallingRPCFromRPC tests that calling an RPC from an RPC works.
 func TestCallingRPCFromRPC(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestCallingRPCFromRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestCallingRPCFromRPC2", t)

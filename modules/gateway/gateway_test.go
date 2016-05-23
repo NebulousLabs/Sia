@@ -24,6 +24,10 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 // Also tests that the address is not unspecified and is a loopback address.
 // The address must be a loopback address for testing.
 func TestAddress(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestAddress", t)
 	defer g.Close()
 	if g.Address() != g.myAddr {
@@ -43,6 +47,10 @@ func TestAddress(t *testing.T) {
 }
 
 func TestPeers(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRPC2", t)

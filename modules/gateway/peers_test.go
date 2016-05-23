@@ -25,6 +25,10 @@ func (dc *dummyConn) Close() error { return nil }
 func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestAddPeer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestAddPeer", t)
 	defer g.Close()
 	id := g.mu.Lock()
@@ -41,6 +45,10 @@ func TestAddPeer(t *testing.T) {
 }
 
 func TestRandomInboundPeer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestRandomInboundPeer", t)
 	defer g.Close()
 	id := g.mu.Lock()
@@ -458,6 +466,10 @@ func TestAcceptConnRejects(t *testing.T) {
 }
 
 func TestDisconnect(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestDisconnect", t)
 	defer g.Close()
 

@@ -5,6 +5,10 @@ import (
 )
 
 func TestLoad(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestLoad", t)
 	id := g.mu.Lock()
 	g.addNode(dummyNode)
