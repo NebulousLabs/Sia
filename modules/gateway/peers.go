@@ -132,7 +132,11 @@ func (g *Gateway) listen() {
 		// will accept new connections. The intent here is to prevent new
 		// incoming connections from kicking out old ones before they have a
 		// chance to request additional nodes.
-		time.Sleep(acceptInterval)
+		select {
+		case <-time.After(acceptInterval):
+		case <-g.closeChan:
+			return
+		}
 	}
 }
 

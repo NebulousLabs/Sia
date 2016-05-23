@@ -172,7 +172,11 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 			err := g.RPC(addr, name, fn)
 			if err != nil {
 				// try one more time before giving up
-				time.Sleep(10 * time.Second)
+				select {
+				case <-time.After(10 * time.Second):
+				case <-g.closeChan:
+					return
+				}
 				g.RPC(addr, name, fn)
 			}
 			wg.Done()
