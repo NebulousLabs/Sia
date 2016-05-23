@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	// the gateway will abort a connection attempt after this long
-	dialTimeout = 2 * time.Minute
 	// the gateway will not accept inbound connections above this threshold
 	fullyConnectedThreshold = 128
 	// the gateway will ask for more addresses below this threshold
@@ -31,6 +29,19 @@ var (
 			return 3 * time.Second
 		case "testing":
 			return 10 * time.Millisecond
+		default:
+			panic("unrecognized build.Release")
+		}
+	}()
+	// the gateway will abort a connection attempt after this long
+	dialTimeout = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 2 * time.Minute
+		case "standard":
+			return 2 * time.Minute
+		case "testing":
+			return 2 * time.Second
 		default:
 			panic("unrecognized build.Release")
 		}
