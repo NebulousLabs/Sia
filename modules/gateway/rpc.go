@@ -112,7 +112,11 @@ func (g *Gateway) listenPeer(p *peer) {
 		}
 
 		// it is the handler's responsibility to close the connection
-		go g.threadedHandleConn(conn)
+		g.closeWG.Add(1)
+		go func() {
+			defer g.closeWG.Done()
+			g.threadedHandleConn(conn)
+		}()
 	}
 	g.Disconnect(p.NetAddress)
 }

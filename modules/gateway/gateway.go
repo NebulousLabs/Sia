@@ -6,12 +6,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"time"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/sync"
+	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
 var (
@@ -38,11 +38,13 @@ type Gateway struct {
 
 	// closeChan is used to shut down the Gateway's goroutines.
 	closeChan chan struct{}
+	// closeWG is used to wait for all goroutines to exit before returning from Close().
+	closeWG sync.WaitGroup
 
 	persistDir string
 
 	log *persist.Logger
-	mu  *sync.RWMutex
+	mu  *siasync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.
@@ -83,11 +85,8 @@ func (g *Gateway) Close() error {
 			errs = append(errs, fmt.Errorf("Disconnect failed: %v", err))
 		}
 	}
-	// Sleep to give time for all goroutines to exit. This is necessary because
-	// some goroutines write to the logger so we must give them time to exit
-	// before closing the logger.
-	// TODO: block until goroutines exit instead of sleeping.
-	time.Sleep(100 * time.Millisecond)
+	// Wait for goroutines to exit.
+	g.closeWG.Wait()
 	// Close the logger. The logger should be the last thing to shut down so that
 	// all other objects have access to logging while closing.
 	if err := g.log.Close(); err != nil {
@@ -112,7 +111,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		nodes:      make(map[modules.NetAddress]struct{}),
 		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 2),
+		mu:         siasync.New(modules.SafeMutexDelay, 2),
 	}
 
 	// Create the logger.
@@ -159,18 +158,38 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	go g.forwardPort(port)
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.forwardPort(port)
+	}()
 
 	// Learn our external IP.
-	go g.learnHostname(port)
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.learnHostname(port)
+	}()
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.
-	go g.threadedPeerManager()
-	go g.threadedNodeManager()
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.threadedPeerManager()
+	}()
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.threadedNodeManager()
+	}()
 
 	// Spawn the primary listener.
-	go g.listen()
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.listen()
+	}()
 
 	return
 }

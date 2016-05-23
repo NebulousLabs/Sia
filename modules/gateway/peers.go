@@ -72,7 +72,11 @@ func (p *peer) accept() (modules.PeerConn, error) {
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
 	g.peers[p.NetAddress] = p
-	go g.listenPeer(p)
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.listenPeer(p)
+	}()
 }
 
 // randomPeer returns a random peer from the gateway's peer list.
@@ -118,7 +122,11 @@ func (g *Gateway) listen() {
 			return
 		}
 
-		go g.acceptConn(conn)
+		g.closeWG.Add(1)
+		go func() {
+			defer g.closeWG.Done()
+			g.acceptConn(conn)
+		}()
 
 		// Sleep after each accept. This limits the rate at which the Gateway
 		// will accept new connections. The intent here is to prevent new
@@ -262,7 +270,11 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	// call initRPCs
 	id = g.mu.RLock()
 	for name, fn := range g.initRPCs {
-		go g.RPC(addr, name, fn)
+		g.closeWG.Add(1)
+		go func(name string, fn modules.RPCFunc) {
+			defer g.closeWG.Done()
+			g.RPC(addr, name, fn)
+		}(name, fn)
 	}
 	g.mu.RUnlock(id)
 
@@ -315,7 +327,11 @@ func (g *Gateway) threadedPeerManager() {
 		// spawn a goroutine and sleep for five seconds. This allows us to
 		// continue making connections if the node is unresponsive.
 		if err == nil {
-			go g.Connect(addr)
+			g.closeWG.Add(1)
+			go func() {
+				defer g.closeWG.Done()
+				g.Connect(addr)
+			}()
 		}
 		select {
 		case <-time.After(5 * time.Second):

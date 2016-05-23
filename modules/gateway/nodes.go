@@ -113,7 +113,11 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 	}
 	// relay
 	peers := g.Peers()
-	go g.Broadcast("RelayNode", addr, peers)
+	g.closeWG.Add(1)
+	go func() {
+		defer g.closeWG.Done()
+		g.Broadcast("RelayNode", addr, peers)
+	}()
 	return nil
 }
 
