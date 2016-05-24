@@ -11,7 +11,6 @@ dependencies:
 	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/NebulousLabs/bolt
 	go get -u github.com/dchest/blake2b
-	go get -u golang.org/x/crypto/twofish
 	# Module + Daemon Dependencies
 	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
