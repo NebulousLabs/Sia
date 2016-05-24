@@ -334,7 +334,10 @@ func (g *Gateway) threadedPeerManager() {
 			g.closeWG.Add(1)
 			go func() {
 				defer g.closeWG.Done()
-				g.Connect(addr)
+				connectErr := g.Connect(addr)
+				if connectErr != nil {
+					g.log.Debugln("WARN: automatic connect failed:", connectErr)
+				}
 			}()
 		}
 		select {
