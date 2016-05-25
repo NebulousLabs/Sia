@@ -89,7 +89,7 @@ func TestThreadGroupConcurrentAdd(t *testing.T) {
 // TestThreadGroupOnce tests that a zero-valued ThreadGroup's stopChan is
 // properly initialized.
 func TestThreadGroupOnce(t *testing.T) {
-	var tg ThreadGroup
+	tg := new(ThreadGroup)
 	if tg.stopChan != nil {
 		t.Error("expected nil stopChan")
 	}
@@ -100,26 +100,26 @@ func TestThreadGroupOnce(t *testing.T) {
 		t.Error("stopChan should have been initialized by StopChan")
 	}
 
-	tg = ThreadGroup{}
+	tg = new(ThreadGroup)
 	tg.IsStopped()
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by IsStopped")
 	}
 
-	tg = ThreadGroup{}
+	tg = new(ThreadGroup)
 	tg.Add(1)
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Add")
 	}
 
-	tg = ThreadGroup{}
+	tg = new(ThreadGroup)
 	tg.Stop()
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Stop")
 	}
 
 	// try to trigger the race detector
-	tg = ThreadGroup{}
+	tg = new(ThreadGroup)
 	go tg.IsStopped()
 	go tg.Add(1)
 	err := tg.Stop()
