@@ -34,7 +34,7 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 	walletAddressCmd = &cobra.Command{
 		Use:   "address",
 		Short: "Get a new wallet address",
-		Long:  "Generate a new wallet address.",
+		Long:  "Generate a new wallet address from the wallet's primary seed.",
 		Run:   wrap(walletaddresscmd),
 	}
 
@@ -48,15 +48,14 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 	walletInitCmd = &cobra.Command{
 		Use:   "init",
 		Short: "Initialize and encrypt a new wallet",
-		Long: `Generate a new wallet from a seed string, and encrypt it.
-The seed string, which is also the encryption password, will be returned.`,
+		Long: `Generate a new wallet from a randomly generated seed, and encrypt it.
+By default the wallet encryption / unlock password is the same as the generated seed.`,
 		Run: wrap(walletinitcmd),
 	}
 
 	walletLoadCmd = &cobra.Command{
 		Use:   "load",
 		Short: "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
-		Long:  "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
 		// Run field is not set, as the load command itself is not a valid command.
 		// A subcommand must be provided.
 	}
@@ -184,11 +183,11 @@ func walletinitcmd() {
 	if err != nil {
 		die("Error when encrypting wallet:", err)
 	}
-	fmt.Printf("Seed is:\n %s\n\n", er.PrimarySeed)
+	fmt.Printf("Recovery seed:\n%s\n\n", er.PrimarySeed)
 	if initPassword {
 		fmt.Printf("Wallet encrypted with given password\n")
 	} else {
-		fmt.Printf("Wallet encrypted with password: %s\n", er.PrimarySeed)
+		fmt.Printf("Wallet encrypted with password:\n%s\n", er.PrimarySeed)
 	}
 }
 
@@ -386,6 +385,7 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
+	fmt.Println("Unlocking the wallet. This may take several minutes...")
 	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 	err = post("/wallet/unlock", qs)
 	if err != nil {
