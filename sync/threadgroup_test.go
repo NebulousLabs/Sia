@@ -1,0 +1,105 @@
+package sync
+
+import (
+	"testing"
+	"time"
+)
+
+// TestThreadGroup tests normal operation of a ThreadGroup.
+func TestThreadGroup(t *testing.T) {
+	var tg ThreadGroup
+	err := tg.Add(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer tg.Done()
+			select {
+			case <-time.After(1 * time.Second):
+			case <-tg.StopChan():
+			}
+		}()
+	}
+	start := time.Now()
+	err = tg.Stop()
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	} else if elapsed > 100*time.Millisecond {
+		t.Fatal("Stop did not interrupt goroutines")
+	}
+}
+
+// TestThreadGroupStop tests the behavior of a ThreadGroup after Stop has been
+// called.
+func TestThreadGroupStop(t *testing.T) {
+	var tg ThreadGroup
+
+	// IsStopped should return false
+	if tg.IsStopped() {
+		t.Error("IsStopped returns true on unstopped ThreadGroup")
+	}
+
+	err := tg.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// IsStopped should return true
+	if !tg.IsStopped() {
+		t.Error("IsStopped returns false on stopped ThreadGroup")
+	}
+
+	// Add and Stop should return errors
+	err = tg.Add(1)
+	if err != ErrStopped {
+		t.Fatal("expected ErrStopped, got", err)
+	}
+	err = tg.Stop()
+	if err != ErrStopped {
+		t.Fatal("expected ErrStopped, got", err)
+	}
+}
+
+// TestThreadGroupOnce tests that a zero-valued ThreadGroup's stopChan is
+// properly initialized.
+func TestThreadGroupOnce(t *testing.T) {
+	var tg ThreadGroup
+	if tg.stopChan != nil {
+		t.Error("expected nil stopChan")
+	}
+
+	// these methods should cause stopChan to be initialized
+	tg.StopChan()
+	if tg.stopChan == nil {
+		t.Error("stopChan should have been initialized by StopChan")
+	}
+
+	tg = ThreadGroup{}
+	tg.IsStopped()
+	if tg.stopChan == nil {
+		t.Error("stopChan should have been initialized by IsStopped")
+	}
+
+	tg = ThreadGroup{}
+	tg.Add(1)
+	if tg.stopChan == nil {
+		t.Error("stopChan should have been initialized by Add")
+	}
+
+	tg = ThreadGroup{}
+	tg.Stop()
+	if tg.stopChan == nil {
+		t.Error("stopChan should have been initialized by Stop")
+	}
+
+	// try to trigger the race detector
+	tg = ThreadGroup{}
+	go tg.IsStopped()
+	go tg.Add(1)
+	err := tg.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
