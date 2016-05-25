@@ -17,6 +17,7 @@ var ErrStopped = errors.New("ThreadGroup already stopped")
 type ThreadGroup struct {
 	stopChan chan struct{}
 	chanOnce sync.Once
+	mu       sync.Mutex
 	wg       sync.WaitGroup
 }
 
@@ -43,6 +44,8 @@ func (tg *ThreadGroup) IsStopped() bool {
 
 // Add adds delta to the ThreadGroup counter.
 func (tg *ThreadGroup) Add(delta int) error {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
 	if tg.IsStopped() {
 		return ErrStopped
 	}
@@ -58,10 +61,13 @@ func (tg *ThreadGroup) Done() {
 // Stop closes the Threadgroup's stopChan and blocks until the counter is
 // zero.
 func (tg *ThreadGroup) Stop() error {
+	tg.mu.Lock()
 	if tg.IsStopped() {
+		tg.mu.Unlock()
 		return ErrStopped
 	}
 	close(tg.stopChan)
+	tg.mu.Unlock()
 	tg.wg.Wait()
 	return nil
 }

@@ -62,6 +62,30 @@ func TestThreadGroupStop(t *testing.T) {
 	}
 }
 
+// TestThreadGroupConcurrentAdd tests that Add can be called concurrently with Stop.
+func TestThreadGroupConcurrentAdd(t *testing.T) {
+	var tg ThreadGroup
+	for i := 0; i < 10; i++ {
+		go func() {
+			err := tg.Add(1)
+			if err != nil {
+				return
+			}
+			defer tg.Done()
+
+			select {
+			case <-time.After(1 * time.Second):
+			case <-tg.StopChan():
+			}
+		}()
+	}
+	time.Sleep(10 * time.Millisecond) // wait for at least one Add
+	err := tg.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestThreadGroupOnce tests that a zero-valued ThreadGroup's stopChan is
 // properly initialized.
 func TestThreadGroupOnce(t *testing.T) {
