@@ -42,14 +42,14 @@ func (tg *ThreadGroup) IsStopped() bool {
 	}
 }
 
-// Add adds delta to the ThreadGroup counter.
-func (tg *ThreadGroup) Add(delta int) error {
+// Add increments the ThreadGroup counter.
+func (tg *ThreadGroup) Add() error {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 	if tg.IsStopped() {
 		return ErrStopped
 	}
-	tg.wg.Add(delta)
+	tg.wg.Add(1)
 	return nil
 }
 

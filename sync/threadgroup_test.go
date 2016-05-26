@@ -9,11 +9,12 @@ import (
 // TestThreadGroup tests normal operation of a ThreadGroup.
 func TestThreadGroup(t *testing.T) {
 	var tg ThreadGroup
-	err := tg.Add(10)
-	if err != nil {
-		t.Fatal(err)
-	}
 	for i := 0; i < 10; i++ {
+		err := tg.Add()
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		go func() {
 			defer tg.Done()
 			select {
@@ -23,7 +24,7 @@ func TestThreadGroup(t *testing.T) {
 		}()
 	}
 	start := time.Now()
-	err = tg.Stop()
+	err := tg.Stop()
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +54,7 @@ func TestThreadGroupStop(t *testing.T) {
 	}
 
 	// Add and Stop should return errors
-	err = tg.Add(1)
+	err = tg.Add()
 	if err != ErrStopped {
 		t.Fatal("expected ErrStopped, got", err)
 	}
@@ -68,7 +69,7 @@ func TestThreadGroupConcurrentAdd(t *testing.T) {
 	var tg ThreadGroup
 	for i := 0; i < 10; i++ {
 		go func() {
-			err := tg.Add(1)
+			err := tg.Add()
 			if err != nil {
 				return
 			}
@@ -108,7 +109,7 @@ func TestThreadGroupOnce(t *testing.T) {
 	}
 
 	tg = new(ThreadGroup)
-	tg.Add(1)
+	tg.Add()
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Add")
 	}
@@ -127,7 +128,7 @@ func TestThreadGroupRace(t *testing.T) {
 	go tg.IsStopped()
 	go tg.StopChan()
 	go func() {
-		if tg.Add(1) == nil {
+		if tg.Add() == nil {
 			tg.Done()
 		}
 	}()
@@ -140,7 +141,7 @@ func TestThreadGroupRace(t *testing.T) {
 func BenchmarkThreadGroup(b *testing.B) {
 	var tg ThreadGroup
 	for i := 0; i < b.N; i++ {
-		tg.Add(1)
+		tg.Add()
 		go tg.Done()
 	}
 	tg.Stop()
