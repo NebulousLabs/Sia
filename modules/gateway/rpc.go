@@ -32,6 +32,11 @@ func handlerName(name string) (id rpcID) {
 // RPC calls an RPC on the given address. RPC cannot be called on an address
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+
 	g.mu.RLock()
 	peer, ok := g.peers[addr]
 	g.mu.RUnlock()
@@ -101,9 +106,29 @@ func (g *Gateway) UnregisterConnectCall(name string) {
 	delete(g.initRPCs, name)
 }
 
-// listenPeer listens for new streams on a peer connection and serves them via
+// threadedListenPeer listens for new streams on a peer connection and serves them via
 // threadedHandleConn.
-func (g *Gateway) listenPeer(p *peer) {
+func (g *Gateway) threadedListenPeer(p *peer) {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
+	// Disconnect from the peer when the stop signal is received.
+	if g.threads.Add() != nil {
+		return
+	}
+	go func() {
+		defer g.threads.Done()
+		<-g.threads.StopChan()
+		g.mu.Lock()
+		delete(g.peers, p.NetAddress)
+		g.mu.Unlock()
+		if err := p.sess.Close(); err != nil {
+			g.log.Printf("WARN: error disconnecting from peer %q: %v", p.NetAddress, err)
+		}
+	}()
+
 	for {
 		conn, err := p.accept()
 		if err != nil {
@@ -112,11 +137,7 @@ func (g *Gateway) listenPeer(p *peer) {
 		}
 
 		// it is the handler's responsibility to close the connection
-		g.closeWG.Add(1)
-		go func() {
-			defer g.closeWG.Done()
-			g.threadedHandleConn(conn)
-		}()
+		go g.threadedHandleConn(conn)
 	}
 	g.Disconnect(p.NetAddress)
 }
@@ -125,6 +146,12 @@ func (g *Gateway) listenPeer(p *peer) {
 // appropriate handler for further processing.
 func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer conn.Close()
+
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	var id rpcID
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
 		return
@@ -157,6 +184,11 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 // object and disconnect. This is why Broadcast takes an interface{} instead of
 // an RPCFunc.
 func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
@@ -171,13 +203,17 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
+				g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed (attempting again in 10 seconds): %v", name, addr, err)
 				// try one more time before giving up
 				select {
 				case <-time.After(10 * time.Second):
-				case <-g.closeChan:
+				case <-g.threads.StopChan():
 					return
 				}
-				g.RPC(addr, name, fn)
+				err := g.RPC(addr, name, fn)
+				if err != nil {
+					g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed twice: %v", name, addr, err)
+				}
 			}
 			wg.Done()
 		}(p.NetAddress)

@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
 var (
@@ -35,10 +36,9 @@ type Gateway struct {
 	// network.
 	nodes map[modules.NetAddress]struct{}
 
-	// closeChan is used to shut down the Gateway's goroutines.
-	closeChan chan struct{}
-	// closeWG is used to wait for all goroutines to exit before returning from Close().
-	closeWG sync.WaitGroup
+	// threads is used to signal the Gateway's goroutines to shut down and to wait
+	// for all goroutines to exit before returning from Close().
+	threads siasync.ThreadGroup
 
 	persistDir string
 
@@ -55,8 +55,11 @@ func (g *Gateway) Address() modules.NetAddress {
 
 // Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
-	var errs []error
+	if err := g.threads.Stop(); err != nil {
+		return err
+	}
 
+	var errs []error
 	// Unregister RPCs. Not strictly necessary for clean shutdown in this specific
 	// case, as the handlers should only contain references to the gateway itself,
 	// but do it anyways as an example for other modules to follow.
@@ -68,24 +71,10 @@ func (g *Gateway) Close() error {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
 	g.mu.RUnlock()
-	// send close signal
-	close(g.closeChan)
 	// clear the port mapping (no effect if UPnP not supported)
 	g.mu.RLock()
 	g.clearPort(g.myAddr.Port())
 	g.mu.RUnlock()
-	// shut down the listener
-	if err := g.listener.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
-	}
-	// Disconnect from peers.
-	for _, p := range g.Peers() {
-		if err := g.Disconnect(p.NetAddress); err != nil {
-			errs = append(errs, fmt.Errorf("Disconnect failed: %v", err))
-		}
-	}
-	// Wait for goroutines to exit.
-	g.closeWG.Wait()
 	// Close the logger. The logger should be the last thing to shut down so that
 	// all other objects have access to logging while closing.
 	if err := g.log.Close(); err != nil {
@@ -108,7 +97,6 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		initRPCs:   make(map[string]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]*peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
-		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
 	}
 
@@ -156,38 +144,30 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	g.closeWG.Add(1)
 	go func() {
-		defer g.closeWG.Done()
+		if err := g.threads.Add(); err != nil {
+			return
+		}
+		defer g.threads.Done()
 		g.forwardPort(port)
 	}()
 
 	// Learn our external IP.
-	g.closeWG.Add(1)
 	go func() {
-		defer g.closeWG.Done()
+		if err := g.threads.Add(); err != nil {
+			return
+		}
+		defer g.threads.Done()
 		g.learnHostname(port)
 	}()
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.
-	g.closeWG.Add(1)
-	go func() {
-		defer g.closeWG.Done()
-		g.threadedPeerManager()
-	}()
-	g.closeWG.Add(1)
-	go func() {
-		defer g.closeWG.Done()
-		g.threadedNodeManager()
-	}()
+	go g.threadedPeerManager()
+	go g.threadedNodeManager()
 
 	// Spawn the primary listener.
-	g.closeWG.Add(1)
-	go func() {
-		defer g.closeWG.Done()
-		g.listen()
-	}()
+	go g.threadedListen()
 
 	return
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 // newTestingGateway returns a gateway read to use in a testing environment.
@@ -18,6 +19,25 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 		t.Fatal(err)
 	}
 	return g
+}
+
+// TestExportedMethodsErrAfterClose tests that exported methods like Close and
+// Connect error with sync.ErrStopped after the gateway has been closed.
+func TestExportedMethodsErrAfterClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	g := newTestingGateway("TestCloseErrsSecondTime", t)
+	if err := g.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Close(); err != sync.ErrStopped {
+		t.Fatalf("expected %q, got %q", sync.ErrStopped, err)
+	}
+	if err := g.Connect("localhost:1234"); err != sync.ErrStopped {
+		t.Fatalf("expected %q, got %q", sync.ErrStopped, err)
+	}
 }
 
 // TestAddress tests that Gateway.Address returns the address of its listener.

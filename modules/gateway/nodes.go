@@ -113,11 +113,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 	}
 	// relay
 	peers := g.Peers()
-	g.closeWG.Add(1)
-	go func() {
-		defer g.closeWG.Done()
-		g.Broadcast("RelayNode", addr, peers)
-	}()
+	go g.Broadcast("RelayNode", addr, peers)
 	return nil
 }
 
@@ -135,10 +131,15 @@ func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 // for more nodes. It also continually pings nodes in order to establish their
 // connectivity. Unresponsive nodes are aggressively removed.
 func (g *Gateway) threadedNodeManager() {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-		case <-g.closeChan:
+		case <-g.threads.StopChan():
 			return
 		}
 
@@ -152,7 +153,11 @@ func (g *Gateway) threadedNodeManager() {
 		}
 
 		if numNodes < minNodeListLen {
-			g.RPC(peer, "ShareNodes", g.requestNodes)
+			err := g.RPC(peer, "ShareNodes", g.requestNodes)
+			if err != nil {
+				g.log.Debugf("WARN: RPC ShareNodes failed on peer %q: %v", peer, err)
+				continue
+			}
 		}
 
 		// find an untested node to check
@@ -180,7 +185,7 @@ func (g *Gateway) threadedNodeManager() {
 		// connectable nodes
 		select {
 		case <-time.After(10 * time.Minute):
-		case <-g.closeChan:
+		case <-g.threads.StopChan():
 			return
 		}
 	}

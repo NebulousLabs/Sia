@@ -72,11 +72,7 @@ func (p *peer) accept() (modules.PeerConn, error) {
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
 	g.peers[p.NetAddress] = p
-	g.closeWG.Add(1)
-	go func() {
-		defer g.closeWG.Done()
-		g.listenPeer(p)
-	}()
+	go g.threadedListenPeer(p)
 }
 
 // randomPeer returns a random peer from the gateway's peer list.
@@ -113,20 +109,33 @@ func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	return "", errNoPeers
 }
 
-// listen handles incoming connection requests. If the connection is accepted,
+// threadedListen handles incoming connection requests. If the connection is accepted,
 // the peer will be added to the Gateway's peer list.
-func (g *Gateway) listen() {
+func (g *Gateway) threadedListen() {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
+	// Shutdown the listener when the stop signal is received.
+	if g.threads.Add() != nil {
+		return
+	}
+	go func() {
+		defer g.threads.Done()
+		<-g.threads.StopChan()
+		if err := g.listener.Close(); err != nil {
+			g.log.Printf("WARN: listener.Close failed: %v", err)
+		}
+	}()
+
 	for {
 		conn, err := g.listener.Accept()
 		if err != nil {
 			return
 		}
 
-		g.closeWG.Add(1)
-		go func() {
-			defer g.closeWG.Done()
-			g.acceptConn(conn)
-		}()
+		go g.threadedAcceptConn(conn)
 
 		// Sleep after each accept. This limits the rate at which the Gateway
 		// will accept new connections. The intent here is to prevent new
@@ -134,14 +143,19 @@ func (g *Gateway) listen() {
 		// chance to request additional nodes.
 		select {
 		case <-time.After(acceptInterval):
-		case <-g.closeChan:
+		case <-g.threads.StopChan():
 			return
 		}
 	}
 }
 
-// acceptConn adds a connecting node as a peer.
-func (g *Gateway) acceptConn(conn net.Conn) {
+// threadedAcceptConn adds a connecting node as a peer.
+func (g *Gateway) threadedAcceptConn(conn net.Conn) {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Printf("INFO: %v wants to connect", addr)
 
@@ -215,6 +229,11 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 // Connect establishes a persistent connection to a peer, and adds it to the
 // Gateway's peer list.
 func (g *Gateway) Connect(addr modules.NetAddress) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+
 	if addr == g.Address() {
 		return errors.New("can't connect to our own address")
 	}
@@ -274,9 +293,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	// call initRPCs
 	g.mu.RLock()
 	for name, fn := range g.initRPCs {
-		g.closeWG.Add(1)
 		go func(name string, fn modules.RPCFunc) {
-			defer g.closeWG.Done()
 			g.RPC(addr, name, fn)
 		}(name, fn)
 	}
@@ -288,16 +305,23 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 // Disconnect terminates a connection to a peer and removes it from the
 // Gateway's peer list. The peer's address remains in the node list.
 func (g *Gateway) Disconnect(addr modules.NetAddress) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+
 	g.mu.RLock()
 	p, exists := g.peers[addr]
 	g.mu.RUnlock()
 	if !exists {
 		return errors.New("not connected to that node")
 	}
-	p.sess.Close()
 	g.mu.Lock()
 	delete(g.peers, addr)
 	g.mu.Unlock()
+	if err := p.sess.Close(); err != nil {
+		return err
+	}
 
 	g.log.Println("INFO: disconnected from peer", addr)
 	return nil
@@ -306,6 +330,11 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 // threadedPeerManager tries to keep the Gateway well-connected. As long as
 // the Gateway is not well-connected, it tries to connect to random nodes.
 func (g *Gateway) threadedPeerManager() {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	for {
 		// If we are well-connected, sleep in increments of five minutes until
 		// we are no longer well-connected.
@@ -321,7 +350,7 @@ func (g *Gateway) threadedPeerManager() {
 		if numOutboundPeers >= modules.WellConnectedThreshold {
 			select {
 			case <-time.After(5 * time.Minute):
-			case <-g.closeChan:
+			case <-g.threads.StopChan():
 				return
 			}
 			continue
@@ -331,9 +360,7 @@ func (g *Gateway) threadedPeerManager() {
 		// spawn a goroutine and sleep for five seconds. This allows us to
 		// continue making connections if the node is unresponsive.
 		if err == nil {
-			g.closeWG.Add(1)
 			go func() {
-				defer g.closeWG.Done()
 				connectErr := g.Connect(addr)
 				if connectErr != nil {
 					g.log.Debugln("WARN: automatic connect failed:", connectErr)
@@ -342,7 +369,7 @@ func (g *Gateway) threadedPeerManager() {
 		}
 		select {
 		case <-time.After(5 * time.Second):
-		case <-g.closeChan:
+		case <-g.threads.StopChan():
 			return
 		}
 	}
