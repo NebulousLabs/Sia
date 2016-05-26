@@ -73,8 +73,8 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
 
 	he.contractor.mu.Lock()
-	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(uploadDelta)
-	he.contractor.storageSpending = he.contractor.storageSpending.Add(storageDelta)
+	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
+	he.contractor.financialMetrics.StorageSpending = he.contractor.financialMetrics.StorageSpending.Add(storageDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
@@ -109,7 +109,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
 
 	he.contractor.mu.Lock()
-	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(uploadDelta)
+	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()

@@ -53,13 +53,14 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint6
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
 	}
+	contractValue := contract.LastRevision.NewValidProofOutputs[0].Value
 
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
+	c.financialMetrics.ContractSpending = c.financialMetrics.ContractSpending.Add(contractValue)
 	c.saveSync()
 	c.mu.Unlock()
 
-	contractValue := contract.LastRevision.NewValidProofOutputs[0].Value
 	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))
 
 	return contract, nil

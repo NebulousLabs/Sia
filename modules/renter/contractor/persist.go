@@ -7,15 +7,12 @@ import (
 
 // contractorPersist defines what Contractor data persists across sessions.
 type contractorPersist struct {
-	Allowance   modules.Allowance
-	BlockHeight types.BlockHeight
-	Contracts   []modules.RenterContract
-	LastChange  modules.ConsensusChangeID
-	RenewHeight types.BlockHeight
-	// metrics
-	DownloadSpending types.Currency
-	StorageSpending  types.Currency
-	UploadSpending   types.Currency
+	Allowance        modules.Allowance
+	BlockHeight      types.BlockHeight
+	Contracts        []modules.RenterContract
+	LastChange       modules.ConsensusChangeID
+	RenewHeight      types.BlockHeight
+	FinancialMetrics modules.RenterFinancialMetrics
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
@@ -25,9 +22,7 @@ func (c *Contractor) persistData() contractorPersist {
 		BlockHeight:      c.blockHeight,
 		LastChange:       c.lastChange,
 		RenewHeight:      c.renewHeight,
-		DownloadSpending: c.downloadSpending,
-		StorageSpending:  c.storageSpending,
-		UploadSpending:   c.uploadSpending,
+		FinancialMetrics: c.financialMetrics,
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
@@ -49,9 +44,7 @@ func (c *Contractor) load() error {
 	}
 	c.lastChange = data.LastChange
 	c.renewHeight = data.RenewHeight
-	c.downloadSpending = data.DownloadSpending
-	c.storageSpending = data.StorageSpending
-	c.uploadSpending = data.UploadSpending
+	c.financialMetrics = data.FinancialMetrics
 	return nil
 }
 

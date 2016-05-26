@@ -41,7 +41,7 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	delta := hd.downloader.DownloadSpending.Sub(oldSpending)
 
 	hd.contractor.mu.Lock()
-	hd.contractor.downloadSpending = hd.contractor.downloadSpending.Add(delta)
+	hd.contractor.financialMetrics.DownloadSpending = hd.contractor.financialMetrics.DownloadSpending.Add(delta)
 	hd.contractor.contracts[contract.ID] = contract
 	hd.contractor.saveSync()
 	hd.contractor.mu.Unlock()
