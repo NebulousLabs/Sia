@@ -36,8 +36,12 @@ type Server struct {
 	wg sync.WaitGroup
 }
 
-// NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
+// NewServer creates a new API server from the provided modules. The API will
+// require authentication using HTTP basic auth if the supplied password is not
+// the empty string. Usernames are ignored for authentication. This type of
+// authentication sends passwords in plaintext and should therefore only be
+// used if the APIaddr is localhost.
+func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
 	l, err := net.Listen("tcp", APIaddr)
 	if err != nil {
 		return nil, err
@@ -58,7 +62,7 @@ func NewServer(APIaddr string, requiredUserAgent string, cs modules.ConsensusSet
 	}
 
 	// Register API handlers
-	srv.initAPI()
+	srv.initAPI(requiredPassword)
 
 	return srv, nil
 }
