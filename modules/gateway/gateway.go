@@ -11,7 +11,6 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
 var (
@@ -44,13 +43,13 @@ type Gateway struct {
 	persistDir string
 
 	log *persist.Logger
-	mu  *siasync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.
 func (g *Gateway) Address() modules.NetAddress {
-	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	return g.myAddr
 }
 
@@ -64,17 +63,17 @@ func (g *Gateway) Close() error {
 	g.UnregisterRPC("ShareNodes")
 	g.UnregisterConnectCall("ShareNodes")
 	// save the latest gateway state
-	id := g.mu.RLock()
+	g.mu.RLock()
 	if err := g.saveSync(); err != nil {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	// send close signal
 	close(g.closeChan)
 	// clear the port mapping (no effect if UPnP not supported)
-	id = g.mu.RLock()
+	g.mu.RLock()
 	g.clearPort(g.myAddr.Port())
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	// shut down the listener
 	if err := g.listener.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
@@ -111,7 +110,6 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		nodes:      make(map[modules.NetAddress]struct{}),
 		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
-		mu:         siasync.New(modules.SafeMutexDelay, 2),
 	}
 
 	// Create the logger.

@@ -177,7 +177,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	// If we are already fully connected, kick out an old peer to make room
 	// for the new one. Importantly, prioritize kicking a peer with the same
 	// IP as the connecting peer. This protects against Sybil attacks.
-	id := g.mu.Lock()
+	g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
 		// first choose a random peer, preferably inbound. If have only
 		// outbound peers, we'll wind up kicking an outbound peer; but
@@ -207,7 +207,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		},
 		sess: muxado.Server(conn),
 	})
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
@@ -222,9 +222,9 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return errors.New("can't connect to invalid address")
 	}
 
-	id := g.mu.RLock()
+	g.mu.RLock()
 	_, exists := g.peers[addr]
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if exists {
 		return errors.New("peer already added")
 	}
@@ -260,7 +260,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 
 	g.log.Println("INFO: connected to new peer", addr)
 
-	id = g.mu.Lock()
+	g.mu.Lock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: addr,
@@ -269,10 +269,10 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		},
 		sess: muxado.Client(conn),
 	})
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 
 	// call initRPCs
-	id = g.mu.RLock()
+	g.mu.RLock()
 	for name, fn := range g.initRPCs {
 		g.closeWG.Add(1)
 		go func(name string, fn modules.RPCFunc) {
@@ -280,7 +280,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 			g.RPC(addr, name, fn)
 		}(name, fn)
 	}
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 
 	return nil
 }
@@ -288,16 +288,16 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 // Disconnect terminates a connection to a peer and removes it from the
 // Gateway's peer list. The peer's address remains in the node list.
 func (g *Gateway) Disconnect(addr modules.NetAddress) error {
-	id := g.mu.RLock()
+	g.mu.RLock()
 	p, exists := g.peers[addr]
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if !exists {
 		return errors.New("not connected to that node")
 	}
 	p.sess.Close()
-	id = g.mu.Lock()
+	g.mu.Lock()
 	delete(g.peers, addr)
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 
 	g.log.Println("INFO: disconnected from peer", addr)
 	return nil
@@ -309,7 +309,7 @@ func (g *Gateway) threadedPeerManager() {
 	for {
 		// If we are well-connected, sleep in increments of five minutes until
 		// we are no longer well-connected.
-		id := g.mu.RLock()
+		g.mu.RLock()
 		numOutboundPeers := 0
 		for _, p := range g.peers {
 			if !p.Inbound {
@@ -317,7 +317,7 @@ func (g *Gateway) threadedPeerManager() {
 			}
 		}
 		addr, err := g.randomNode()
-		g.mu.RUnlock(id)
+		g.mu.RUnlock()
 		if numOutboundPeers >= modules.WellConnectedThreshold {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -350,8 +350,8 @@ func (g *Gateway) threadedPeerManager() {
 
 // Peers returns the addresses currently connected to the Gateway.
 func (g *Gateway) Peers() []modules.Peer {
-	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	var peers []modules.Peer
 	for _, p := range g.peers {
 		peers = append(peers, p.Peer)

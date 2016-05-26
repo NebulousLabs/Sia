@@ -18,8 +18,8 @@ func TestAddNode(t *testing.T) {
 
 	g := newTestingGateway("TestAddNode", t)
 	defer g.Close()
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if err := g.addNode(dummyNode); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
@@ -44,8 +44,8 @@ func TestRemoveNode(t *testing.T) {
 
 	g := newTestingGateway("TestRemoveNode", t)
 	defer g.Close()
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if err := g.addNode(dummyNode); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
@@ -66,22 +66,22 @@ func TestRandomNode(t *testing.T) {
 	defer g.Close()
 
 	// Test with 0 nodes.
-	id := g.mu.RLock()
+	g.mu.RLock()
 	_, err := g.randomNode()
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if err != errNoPeers {
 		t.Fatal("randomNode should fail when the gateway has 0 nodes")
 	}
 
 	// Test with 1 node.
-	id = g.mu.Lock()
+	g.mu.Lock()
 	if err = g.addNode(dummyNode); err != nil {
 		t.Fatal(err)
 	}
-	g.mu.Unlock(id)
-	id = g.mu.RLock()
+	g.mu.Unlock()
+	g.mu.RLock()
 	addr, err := g.randomNode()
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if err != nil {
 		t.Fatal("randomNode failed:", err)
 	} else if addr != dummyNode {
@@ -89,15 +89,15 @@ func TestRandomNode(t *testing.T) {
 	}
 
 	// Test again with 0 nodes.
-	id = g.mu.Lock()
+	g.mu.Lock()
 	err = g.removeNode(dummyNode)
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	id = g.mu.RLock()
+	g.mu.RLock()
 	_, err = g.randomNode()
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if err != errNoPeers {
 		t.Fatalf("randomNode returned wrong error: expected %v, got %v", errNoPeers, err)
 	}
@@ -108,19 +108,19 @@ func TestRandomNode(t *testing.T) {
 		"111.111.111.111:2222": 0,
 		"111.111.111.111:3333": 0,
 	}
-	id = g.mu.Lock()
+	g.mu.Lock()
 	for addr := range nodes {
 		err := g.addNode(addr)
 		if err != nil {
 			t.Error(err)
 		}
 	}
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 
 	for i := 0; i < len(nodes)*10; i++ {
-		id = g.mu.RLock()
+		g.mu.RLock()
 		addr, err := g.randomNode()
-		g.mu.RUnlock(id)
+		g.mu.RUnlock()
 		if err != nil {
 			t.Fatal("randomNode failed:", err)
 		}
@@ -143,9 +143,9 @@ func TestShareNodes(t *testing.T) {
 	defer g2.Close()
 
 	// add a node to g2
-	id := g2.mu.Lock()
+	g2.mu.Lock()
 	err := g2.addNode(dummyNode)
-	g2.mu.Unlock(id)
+	g2.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,20 +158,20 @@ func TestShareNodes(t *testing.T) {
 
 	// g1 should have received the node
 	time.Sleep(100 * time.Millisecond)
-	id = g1.mu.Lock()
+	g1.mu.Lock()
 	err = g1.addNode(dummyNode)
-	g1.mu.Unlock(id)
+	g1.mu.Unlock()
 	if err == nil {
 		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
 	}
 
 	// remove all nodes from both peers
-	id = g1.mu.Lock()
+	g1.mu.Lock()
 	g1.nodes = map[modules.NetAddress]struct{}{}
-	g1.mu.Unlock(id)
-	id = g2.mu.Lock()
+	g1.mu.Unlock()
+	g2.mu.Lock()
 	g2.nodes = map[modules.NetAddress]struct{}{}
-	g2.mu.Unlock(id)
+	g2.mu.Unlock()
 
 	// SharePeers should now return no peers
 	var nodes []modules.NetAddress
@@ -187,9 +187,9 @@ func TestShareNodes(t *testing.T) {
 
 	// sharing should be capped at maxSharedNodes
 	for i := 1; i < maxSharedNodes+11; i++ {
-		id := g2.mu.Lock()
+		g2.mu.Lock()
 		err := g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
-		g2.mu.Unlock(id)
+		g2.mu.Unlock()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -234,8 +234,8 @@ func TestRelayNodes(t *testing.T) {
 
 	// g2 should have received g3's address from g1
 	time.Sleep(200 * time.Millisecond)
-	id := g2.mu.Lock()
-	defer g2.mu.Unlock(id)
+	g2.mu.Lock()
+	defer g2.mu.Unlock()
 	if _, ok := g2.nodes[g3.Address()]; !ok {
 		t.Fatal("node was not relayed:", g2.nodes)
 	}

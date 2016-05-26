@@ -31,8 +31,8 @@ func TestAddPeer(t *testing.T) {
 
 	g := newTestingGateway("TestAddPeer", t)
 	defer g.Close()
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
@@ -51,8 +51,8 @@ func TestRandomInboundPeer(t *testing.T) {
 
 	g := newTestingGateway("TestRandomInboundPeer", t)
 	defer g.Close()
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	_, err := g.randomInboundPeer()
 	if err != errNoPeers {
 		t.Fatal("expected errNoPeers, got", err)
@@ -123,18 +123,18 @@ func TestListen(t *testing.T) {
 	// g should add the peer
 	var ok bool
 	for !ok {
-		id := g.mu.RLock()
+		g.mu.RLock()
 		_, ok = g.peers[addr]
-		g.mu.RUnlock(id)
+		g.mu.RUnlock()
 	}
 
 	muxado.Client(conn).Close()
 
 	// g should remove the peer
 	for ok {
-		id := g.mu.RLock()
+		g.mu.RLock()
 		_, ok = g.peers[addr]
-		g.mu.RUnlock(id)
+		g.mu.RUnlock()
 	}
 
 	// uncompliant connect
@@ -160,9 +160,9 @@ func TestConnect(t *testing.T) {
 	defer bootstrap.Close()
 
 	// give it a node
-	id := bootstrap.mu.Lock()
+	bootstrap.mu.Lock()
 	bootstrap.addNode(dummyNode)
-	bootstrap.mu.Unlock(id)
+	bootstrap.mu.Unlock()
 
 	// create peer who will connect to bootstrap
 	g := newTestingGateway("TestConnect2", t)
@@ -194,11 +194,11 @@ func TestConnect(t *testing.T) {
 	}
 	// g should have the node
 	time.Sleep(100 * time.Millisecond)
-	id = g.mu.RLock()
+	g.mu.RLock()
 	if _, ok := g.nodes[dummyNode]; !ok {
 		t.Fatal("bootstrapper should have received dummyNode:", g.nodes)
 	}
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 }
 
 // TestConnectRejects tests that Gateway.Connect only accepts peers with
@@ -494,14 +494,14 @@ func TestDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
-	id := g.mu.Lock()
+	g.mu.Lock()
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
 		sess: muxado.Client(conn),
 	})
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 	if err := g.Disconnect("foo.com:123"); err != nil {
 		t.Fatal("disconnect failed:", err)
 	}
@@ -520,16 +520,16 @@ func TestPeerManager(t *testing.T) {
 	defer g2.Close()
 
 	// g1's node list should only contain g2
-	id := g1.mu.Lock()
+	g1.mu.Lock()
 	g1.nodes = map[modules.NetAddress]struct{}{}
 	g1.nodes[g2.Address()] = struct{}{}
-	g1.mu.Unlock(id)
+	g1.mu.Unlock()
 
 	// when peerManager wakes up, it should connect to g2.
 	time.Sleep(6 * time.Second)
 
-	id = g1.mu.RLock()
-	defer g1.mu.RUnlock(id)
+	g1.mu.RLock()
+	defer g1.mu.RUnlock()
 	if len(g1.peers) != 1 || g1.peers[g2.Address()] == nil {
 		t.Fatal("gateway did not connect to g2:", g1.peers)
 	}

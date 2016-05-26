@@ -10,10 +10,10 @@ func TestLoad(t *testing.T) {
 	}
 
 	g := newTestingGateway("TestLoad", t)
-	id := g.mu.Lock()
+	g.mu.Lock()
 	g.addNode(dummyNode)
 	g.save()
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 	g.Close()
 
 	g2, err := New("localhost:0", g.persistDir)

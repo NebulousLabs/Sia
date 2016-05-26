@@ -32,9 +32,9 @@ func handlerName(name string) (id rpcID) {
 // RPC calls an RPC on the given address. RPC cannot be called on an address
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	id := g.mu.RLock()
+	g.mu.RLock()
 	peer, ok := g.peers[addr]
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if !ok {
 		return errors.New("can't call RPC on unconnected peer " + string(addr))
 	}
@@ -59,8 +59,8 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 // characters of an identifier should be unique, as the identifier used
 // internally is truncated to 8 bytes.
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.handlers[handlerName(name)]; ok {
 		build.Critical("RPC already registered: " + name)
 	}
@@ -70,8 +70,8 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 // UnregisterRPC unregisters an RPC and removes the corresponding RPCFunc from
 // g.handlers. Future calls to the RPC by peers will fail.
 func (g *Gateway) UnregisterRPC(name string) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.handlers[handlerName(name)]; !ok {
 		build.Critical("RPC not registered: " + name)
 	}
@@ -81,8 +81,8 @@ func (g *Gateway) UnregisterRPC(name string) {
 // RegisterConnectCall registers a name and RPCFunc to be called on a peer
 // upon connecting.
 func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.initRPCs[name]; ok {
 		build.Critical("ConnectCall already registered: " + name)
 	}
@@ -93,8 +93,8 @@ func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
 // corresponding RPCFunc from g.initRPCs. Future connections to peers will not
 // trigger the RPC to be called on them.
 func (g *Gateway) UnregisterConnectCall(name string) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.initRPCs[name]; !ok {
 		build.Critical("ConnectCall not registered: " + name)
 	}
@@ -130,9 +130,9 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		return
 	}
 	// call registered handler for this ID
-	lockid := g.mu.RLock()
+	g.mu.RLock()
 	fn, ok := g.handlers[id]
-	g.mu.RUnlock(lockid)
+	g.mu.RUnlock()
 	if !ok {
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
