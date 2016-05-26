@@ -1047,6 +1047,7 @@ func TestRelayHeader(t *testing.T) {
 	defer cst.Close()
 
 	mg := &mockGatewayCallsRPC{
+		Gateway:   cst.cs.gateway,
 		rpcCalled: make(chan string),
 	}
 	cst.cs.gateway = mg

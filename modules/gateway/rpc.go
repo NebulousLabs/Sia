@@ -61,12 +61,21 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG && build.Release != "testing" {
-		if _, ok := g.handlers[handlerName(name)]; ok {
-			panic("refusing to overwrite RPC " + name)
-		}
+	if _, ok := g.handlers[handlerName(name)]; ok {
+		build.Critical("RPC already registered: " + name)
 	}
 	g.handlers[handlerName(name)] = fn
+}
+
+// UnregisterRPC unregisters an RPC and removes the corresponding RPCFunc from
+// g.handlers. Future calls to the RPC by peers will fail.
+func (g *Gateway) UnregisterRPC(name string) {
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
+	if _, ok := g.handlers[handlerName(name)]; !ok {
+		build.Critical("RPC not registered: " + name)
+	}
+	delete(g.handlers, handlerName(name))
 }
 
 // RegisterConnectCall registers a name and RPCFunc to be called on a peer
@@ -74,12 +83,22 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if build.DEBUG {
-		if _, ok := g.initRPCs[name]; ok {
-			panic("refusing to overwrite RPC " + name)
-		}
+	if _, ok := g.initRPCs[name]; ok {
+		build.Critical("ConnectCall already registered: " + name)
 	}
 	g.initRPCs[name] = fn
+}
+
+// UnregisterConnectCall unregisters an on-connect call and removes the
+// corresponding RPCFunc from g.initRPCs. Future connections to peers will not
+// trigger the RPC to be called on them.
+func (g *Gateway) UnregisterConnectCall(name string) {
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
+	if _, ok := g.initRPCs[name]; !ok {
+		build.Critical("ConnectCall not registered: " + name)
+	}
+	delete(g.initRPCs, name)
 }
 
 // listenPeer listens for new streams on a peer connection and serves them via
