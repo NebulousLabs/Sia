@@ -9,29 +9,13 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-const numTestInputs = 25
-
-var dbVersions = []string{"0.0.0", "7.0.4", "asdf"}
-
 type testInput struct {
 	dbMetadata Metadata
 	dbFilename string
 }
 
-var testInputs = make([]testInput, numTestInputs)
-
-var testBuckets = [][]byte{
-	[]byte("FakeBucket"),
-	[]byte("FakeBucket123"),
-	[]byte("FakeBucket123!@#$"),
-	[]byte("Another Fake Bucket"),
-	[]byte("FakeBucket" + RandomSuffix()),
-	[]byte("_"),
-	[]byte(" asdf"),
-}
-
 // TestOpenDatabase tests calling OpenDatabase on the following types of
-// databases:
+// database:
 // - a database that has not yet been created
 // - an existing empty database
 // - an existing nonempty database
@@ -40,6 +24,26 @@ var testBuckets = [][]byte{
 // - a newly-filled database
 // - a newly-emptied database
 func TestOpenDatabase(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	testVersions := []string{"0.0.0", "7.0.4", "asdf"}
+	numTestVersions := len(testVersions)
+
+	const numTestInputs = 25
+	testInputs := make([]testInput, numTestInputs)
+
+	testBuckets := [][]byte{
+		[]byte("FakeBucket"),
+		[]byte("FakeBucket123"),
+		[]byte("FakeBucket123!@#$"),
+		[]byte("Another Fake Bucket"),
+		[]byte("FakeBucket" + RandomSuffix()),
+		[]byte("_"),
+		[]byte(" asdf"),
+	}
+
 	// Create a folder for the database file. If a folder by that name exists
 	// already, it will be replaced by an empty folder.
 	testdir := build.TempDir(persistDir, "TestOpenNewDatabase")
@@ -48,37 +52,34 @@ func TestOpenDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Generate ten random testInputs for building database files.
-	for i := 0; i < numTestInputs; i++ {
+	// Generate random testInputs for building database files.
+	for i := range testInputs {
 		dbFilename := "testFilename" + RandomSuffix()
 		dbHeader := "testHeader" + RandomSuffix()
-		dbVersion := dbVersions[i%3]
+		dbVersion := testVersions[i%numTestVersions]
 		dbMetadata := Metadata{dbHeader, dbVersion}
 		in := testInput{dbMetadata, dbFilename}
 		testInputs[i] = in
 	}
 
-	// Run the same tests as in TestOpenDatabase for each testInput
+	// Loop through tests for each testInput.
 	for _, in := range testInputs {
 		// Create a new database.
 		db, err := OpenDatabase(in.dbMetadata, in.dbFilename)
 		if err != nil {
-			t.Errorf("calling OpenDatabase on a new database failed for input %v (error below)", in)
-			t.Fatal(err)
+			t.Fatalf("calling OpenDatabase on a new database failed for input %v; error was %v", in, err)
 		}
 
 		// Close the newly-created, empty database.
 		err = db.Close()
 		if err != nil {
-			t.Errorf("closing a newly created database failed for input %v (error below)", in)
-			t.Fatal(err)
+			t.Fatalf("closing a newly created database failed for input %v; error was %v", in, err)
 		}
 
 		// Call OpenDatabase again, this time on the existing empty database.
 		db, err = OpenDatabase(in.dbMetadata, in.dbFilename)
 		if err != nil {
-			t.Errorf("calling OpenDatabase on an existing empty database faile for input %v (error below)", in)
-			t.Fatal(err)
+			t.Fatalf("calling OpenDatabase on an existing empty database failed for input %v; error was %v", in, err)
 		}
 
 		// Create buckets in the database.
@@ -122,8 +123,7 @@ func TestOpenDatabase(t *testing.T) {
 		// Close the newly-filled database.
 		err = db.Close()
 		if err != nil {
-			t.Errorf("closing a newly-filled database failed for input %v (error below)", in)
-			t.Fatal(err)
+			t.Fatalf("closing a newly-filled database failed for input %v; error was %v", in, err)
 		}
 
 		// Call OpenDatabase on the database now that it's been filled.
@@ -137,11 +137,7 @@ func TestOpenDatabase(t *testing.T) {
 			for _, testBucket := range testBuckets {
 				b := tx.Bucket(testBucket)
 				err := b.ForEach(func(k, v []byte) error {
-					err := b.Delete(k)
-					if err != nil {
-						return err
-					}
-					return nil
+					return b.Delete(k)
 				})
 				if err != nil {
 					return err
@@ -153,14 +149,13 @@ func TestOpenDatabase(t *testing.T) {
 		// Close the newly emptied database.
 		err = db.Close()
 		if err != nil {
-			t.Errorf("closing a newly-emptied database failed for input %v (error below)", in)
-			t.Fatal(err)
+			t.Fatalf("closing a newly-emptied database failed for input %v; error was %v", in, err)
 		}
 
 		// Clean up by deleting the testfile.
 		err = os.Remove(in.dbFilename)
 		if err != nil {
-			t.Errorf("removing database file failing for input %v (error below)", in)
+			t.Fatalf("removing database file failing for input %v; error was %v", in, err)
 		}
 	}
 
