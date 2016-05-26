@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -117,13 +118,39 @@ func TestThreadGroupOnce(t *testing.T) {
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Stop")
 	}
+}
 
-	// try to trigger the race detector
-	tg = new(ThreadGroup)
+// TestThreadGroupRace tests that calling ThreadGroup methods concurrently
+// does not trigger the race detector.
+func TestThreadGroupRace(t *testing.T) {
+	var tg ThreadGroup
 	go tg.IsStopped()
-	go tg.Add(1)
+	go tg.StopChan()
+	go func() {
+		if tg.Add(1) == nil {
+			tg.Done()
+		}
+	}()
 	err := tg.Stop()
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func BenchmarkThreadGroup(b *testing.B) {
+	var tg ThreadGroup
+	for i := 0; i < b.N; i++ {
+		tg.Add(1)
+		go tg.Done()
+	}
+	tg.Stop()
+}
+
+func BenchmarkWaitGroup(b *testing.B) {
+	var wg sync.WaitGroup
+	for i := 0; i < b.N; i++ {
+		wg.Add(1)
+		go wg.Done()
+	}
+	wg.Wait()
 }
