@@ -51,6 +51,11 @@ func FormContract(params ContractParams, txnBuilder transactionBuilder, tpool tr
 	payout := storageAllocation.Add(hostPayout).Mul64(10406).Div64(10000) // renter pays for siafund fee
 	renterCost := payout.Sub(hostCollateral)
 
+	// check for negative currency
+	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
+		return modules.RenterContract{}, errors.New("payout smaller than host payout")
+	}
+
 	// create file contract
 	fc := types.FileContract{
 		FileSize:       0,

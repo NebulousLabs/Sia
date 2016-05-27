@@ -36,6 +36,13 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	payout := storageAllocation.Add(hostCollateral.Add(host.ContractPrice)).Mul64(10406).Div64(10000) // renter covers siafund fee
 	renterCost := payout.Sub(hostCollateral)
 
+	// check for negative currency
+	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
+		return modules.RenterContract{}, errors.New("payout smaller than host payout")
+	} else if hostCollateral.Cmp(baseCollateral) < 0 {
+		return modules.RenterContract{}, errors.New("new collateral smaller than old collateral")
+	}
+
 	// create file contract
 	fc := types.FileContract{
 		FileSize:       contract.LastRevision.NewFileSize,
