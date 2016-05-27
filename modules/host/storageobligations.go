@@ -691,9 +691,12 @@ func (h *Host) handleActionItem(so *storageObligation) {
 	// Check whether a storage proof is ready to be provided, and whether it
 	// has been accepted. Check for death.
 	if !so.ProofConfirmed && h.blockHeight >= so.expiration()+resubmissionTimeout {
+		h.log.Debugln("Host is attempting a storage proof for", so.id())
+
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
 		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
+			h.log.Debugln("Host failed to get a storage proof for", so.id(), "before the deadline")
 			err := h.removeStorageObligation(so, obligationFailed)
 			if err != nil {
 				h.log.Println("Error removing storage obligation:", err)
@@ -705,6 +708,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// the segment.
 		segmentIndex, err := h.cs.StorageProofSegment(so.id())
 		if err != nil {
+			h.log.Debugln("Host got an error when fetching a storage proof segment:", err)
 			return
 		}
 		sectorIndex := segmentIndex / (modules.SectorSize / crypto.SegmentSize)
@@ -712,6 +716,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		sectorRoot := so.SectorRoots[sectorIndex]
 		sectorBytes, err := h.ReadSector(sectorRoot)
 		if err != nil {
+			h.log.Debugln(err)
 			return
 		}
 
@@ -742,22 +747,26 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		if so.value().Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the storage proof of the fee is more
 			// than the anticipated revenue.
+			h.log.Debugln("Host not submitting storage proof due to a value that does not sufficiently exceed the fee cost")
 			return
 		}
 		txnSize := uint64(len(encoding.Marshal(sp)) + 300)
 		requiredFee := feeRecommendation.Mul64(txnSize)
 		err = builder.FundSiacoins(requiredFee)
 		if err != nil {
+			h.log.Println("Host error when funding a storage proof transaction fee:", err)
 			return
 		}
 		builder.AddMinerFee(requiredFee)
 		builder.AddStorageProof(sp)
 		storageProofSet, err := builder.Sign(true)
 		if err != nil {
+			h.log.Println("Host error when signing the storage proof transaction:", err)
 			return
 		}
 		err = h.tpool.AcceptTransactionSet(storageProofSet)
 		if err != nil {
+			h.log.Println("Host unable to submit storage proof transaction to transaction pool:", err)
 			return
 		}
 		so.TransactionFeesAdded = so.TransactionFeesAdded.Add(requiredFee)
