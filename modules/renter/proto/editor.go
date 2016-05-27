@@ -218,12 +218,6 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
 	}
-	if !host.StoragePrice.IsZero() {
-		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(host.StoragePrice).Uint64()
-		if errOverflow == nil && bytes < modules.SectorSize {
-			return nil, errors.New("contract has insufficient capacity")
-		}
-	}
 
 	// initiate revision loop
 	conn, err := net.DialTimeout("tcp", string(contract.NetAddress), 15*time.Second)
