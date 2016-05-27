@@ -15,6 +15,7 @@ import (
 	// "github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -246,11 +247,11 @@ func TestHostMultiClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = ht.host.Close()
-	if err != errHostClosed {
+	if err != siasync.ErrStopped {
 		t.Fatal(err)
 	}
 	err = ht.host.Close()
-	if err != errHostClosed {
+	if err != siasync.ErrStopped {
 		t.Fatal(err)
 	}
 }

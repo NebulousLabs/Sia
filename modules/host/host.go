@@ -33,9 +33,6 @@ package host
 // TODO: merge the network interfaces stuff, don't forget to include the
 // 'announced' variable as one of the outputs.
 
-// TODO: check that the host is doing proper clean shudown, especially
-// network.go, a couple of problems with clean shutdown in network.go.
-
 // TODO: 'announced' doesn't tell you if the announcement made it to the
 // blockchain.
 
@@ -80,6 +77,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -182,15 +180,7 @@ type Host struct {
 	mu         sync.RWMutex
 	persistDir string
 	port       string
-
-	// The resource lock is held by threaded functions for the duration of
-	// their operation. Functions should grab the resource lock as a read lock
-	// unless they are planning on manipulating the 'closed' variable.
-	// Readlocks are used so that multiple functions can use resources
-	// simultaneously, but the resources are not closed until all functions
-	// accessing them have returned.
-	closed       bool
-	resourceLock sync.RWMutex
+	tg         siasync.ThreadGroup
 }
 
 // checkUnlockHash will check that the host has an unlock hash. If the host
@@ -245,13 +235,15 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		persistDir: persistDir,
 	}
 
+	// Call stop in the event of a partial startup.
 	var err error
+	defer func() {
+		if err != nil {
+			err = composeErrors(h.tg.Stop(), err)
+		}
+	}()
 
 	// Add the storage manager to the host.
-	//
-	// TODO: instead of hardcoding a storage manager, the storage manager
-	// should probably be chosen by the person that calls 'New', same way that
-	// the wallet, transaction pool, and consensus set are.
 	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
 	if err != nil {
 		return nil, err
@@ -315,24 +307,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 
 // Close shuts down the host, preparing it for garbage collection.
 func (h *Host) Close() (composedError error) {
-	// Close the listener, which means incoming network connections will be
-	// rejected. Due to an implementation shortcoming, the listener must be
-	// closed before the resource lock is acquired.
-	err := h.listener.Close()
+	err := h.tg.Stop()
 	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Grab the resource lock and indicate that the host is closing. Concurrent
-	// functions hold the resource lock until they terminate, meaning that no
-	// threaded function will be running by the time the resource lock is
-	// acquired.
-	h.resourceLock.Lock()
-	closed := h.closed
-	h.closed = true
-	h.resourceLock.Unlock()
-	if closed {
-		return errHostClosed
+		return err
 	}
 
 	// Unsubscribe the host from the consensus set. Call will not terminate
@@ -398,11 +375,11 @@ func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
 func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+	err := h.tg.Add()
+	if err != nil {
+		return err
 	}
+	defer h.tg.Done()
 
 	// The host should not be accepting file contracts if it does not have an
 	// unlock hash.
@@ -430,7 +407,7 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 	h.settings = settings
 	h.revisionNumber++
 
-	err := h.saveSync()
+	err = h.saveSync()
 	if err != nil {
 		return errors.New("internal settings updated, but failed saving to disk: " + err.Error())
 	}

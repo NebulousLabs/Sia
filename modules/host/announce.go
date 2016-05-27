@@ -69,11 +69,11 @@ func (h *Host) announce(addr modules.NetAddress) error {
 func (h *Host) Announce() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+	err := h.tg.Add()
+	if err != nil {
+		return err
 	}
+	defer h.tg.Done()
 
 	// Determine whether to use the settings.NetAddress or autoAddress.
 	if h.settings.NetAddress != "" {
@@ -90,11 +90,11 @@ func (h *Host) Announce() error {
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
-		return errHostClosed
+	err := h.tg.Add()
+	if err != nil {
+		return err
 	}
+	defer h.tg.Done()
 
 	return h.announce(addr)
 }
