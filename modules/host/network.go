@@ -128,13 +128,11 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
 		err = h.managedRPCSettings(conn)
+	case rpcSettingsDeprecated:
+		h.log.Debugln("Received deprecated settings call")
 	default:
 		h.log.Debugf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
-		if id != rpcSettingsDeprecated {
-			// Only mark the call as unrecognized if it is not one of the
-			// legacy calls.
-			atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
-		}
+		atomic.AddUint64(&h.atomicUnrecognizedCalls, 1)
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
