@@ -152,9 +152,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 }
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
-//
-// TODO: Does not seem like this function ever actually lets go of the resource
-// lock.
 func (h *Host) threadedListen() {
 	h.resourceLock.RLock()
 	defer h.resourceLock.RUnlock()

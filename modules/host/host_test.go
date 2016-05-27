@@ -229,6 +229,32 @@ func TestHostInitialization(t *testing.T) {
 	}
 }
 
+// TestHostMultiClose checks that the host returns an error if Close is called
+// multiple times on the host.
+func TestHostMultiClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester("TestHostMultiClose")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != errHostClosed {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != errHostClosed {
+		t.Fatal(err)
+	}
+}
+
 // TestNilValues tries initializing the host with nil values.
 func TestNilValues(t *testing.T) {
 	if testing.Short() {

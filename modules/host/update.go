@@ -103,6 +103,14 @@ func (h *Host) initConsensusSubscription() error {
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.resourceLock.RLock()
+	defer h.resourceLock.RUnlock()
+	if h.closed {
+		// Host resources are not available, ignore this consensus change. The
+		// consensus change will be acquired correctly the next time the host
+		// starts.
+		return
+	}
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.

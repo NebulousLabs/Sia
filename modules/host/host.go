@@ -315,16 +315,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 
 // Close shuts down the host, preparing it for garbage collection.
 func (h *Host) Close() (composedError error) {
-	// Unsubscribe the host from the consensus set. Call will not terminate
-	// until the last consensus update has been sent to the host.
-	// Unsubscription must happen before any resources are released or
-	// terminated because the process consensus change function makes use of
-	// those resources.
-	h.cs.Unsubscribe(h)
-
 	// Close the listener, which means incoming network connections will be
-	// rejected. The listener should be closed before the host resources are
-	// disabled, as incoming connections will want to use the hosts resources.
+	// rejected. Due to an implementation shortcoming, the listener must be
+	// closed before the resource lock is acquired.
 	err := h.listener.Close()
 	if err != nil {
 		composedError = composeErrors(composedError, err)
@@ -335,8 +328,19 @@ func (h *Host) Close() (composedError error) {
 	// threaded function will be running by the time the resource lock is
 	// acquired.
 	h.resourceLock.Lock()
+	closed := h.closed
 	h.closed = true
 	h.resourceLock.Unlock()
+	if closed {
+		return errHostClosed
+	}
+
+	// Unsubscribe the host from the consensus set. Call will not terminate
+	// until the last consensus update has been sent to the host.
+	// Unsubscription must happen before any resources are released or
+	// terminated because the process consensus change function makes use of
+	// those resources.
+	h.cs.Unsubscribe(h)
 
 	err = h.StorageManager.Close()
 	if err != nil {
