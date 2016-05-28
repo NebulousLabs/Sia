@@ -15,6 +15,7 @@ import (
 	// "github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -226,6 +227,32 @@ func TestHostInitialization(t *testing.T) {
 	}
 	if bht.host.blockHeight != 1 {
 		t.Fatal("block height did not increase correctly after first block mined:", bht.host.blockHeight, 1)
+	}
+}
+
+// TestHostMultiClose checks that the host returns an error if Close is called
+// multiple times on the host.
+func TestHostMultiClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	ht, err := newHostTester("TestHostMultiClose")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ht.host.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != siasync.ErrStopped {
+		t.Fatal(err)
+	}
+	err = ht.host.Close()
+	if err != siasync.ErrStopped {
+		t.Fatal(err)
 	}
 }
 

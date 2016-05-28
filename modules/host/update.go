@@ -103,11 +103,16 @@ func (h *Host) initConsensusSubscription() error {
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	err := h.tg.Add()
+	if err != nil {
+		return
+	}
+	defer h.tg.Done()
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.
 	var actionItems []*storageObligation
-	err := h.db.Update(func(tx *bolt.Tx) error {
+	err = h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
 			for _, txn := range block.Transactions {

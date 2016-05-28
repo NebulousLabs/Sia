@@ -17,26 +17,26 @@ var rpcSettingsDeprecated = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', '
 // threadedUpdateHostname periodically runs 'managedLearnHostname', which
 // checks if the host's hostname has changed, and makes an updated host
 // announcement if so.
-//
-// TODO: This thread doesn't actually have clean shutdown, because the sleep is
-// outside of of the resource lock.
 func (h *Host) threadedUpdateHostname() {
 	for {
-		h.resourceLock.RLock()
-		if h.closed {
-			// The host is closed, the goroutine can exit.
-			h.resourceLock.RUnlock()
-			break
+		err := h.tg.Add()
+		if err != nil {
+			return
 		}
 		h.managedLearnHostname()
-		h.resourceLock.RUnlock()
+		h.tg.Done()
 
 		// Wait 30 minutes to check again. If the hostname is changing
 		// regularly (more than once a week), we want the host to be able to be
 		// seen as having 95% uptime. Every minute that the announcement is
 		// pointing to the wrong address is a minute of perceived downtime to
 		// the renters.
-		time.Sleep(time.Minute * 30)
+		select {
+		case <-h.tg.StopChan():
+			return
+		case <-time.After(time.Minute * 30):
+			continue
+		}
 	}
 }
 
@@ -48,6 +48,21 @@ func (h *Host) initNetworking(address string) (err error) {
 	if err != nil {
 		return err
 	}
+	// Automatically close the listener when h.tg.Stop() is called.
+	go func() {
+		err := h.tg.Add()
+		if err != nil {
+			return
+		}
+		defer h.tg.Done()
+		<-h.tg.StopChan()
+		err = h.listener.Close()
+		if err != nil {
+			h.log.Println("Closing the listener failed:", err)
+		}
+	}()
+
+	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
 	if err != nil {
 		return err
@@ -55,26 +70,23 @@ func (h *Host) initNetworking(address string) (err error) {
 	h.mu.Lock()
 	h.port = port
 	if build.Release == "testing" {
+		// Set the autoAddress to localhost for testing builds only.
 		h.autoAddress = modules.NetAddress(net.JoinHostPort("localhost", h.port))
 	}
 	h.mu.Unlock()
 
 	// Non-blocking, perform port forwarding and hostname discovery.
 	go func() {
-		h.resourceLock.RLock()
-		defer h.resourceLock.RUnlock()
-		if h.closed {
+		err := h.tg.Add()
+		if err != nil {
 			return
 		}
+		defer h.tg.Done()
 
-		err := h.managedForwardPort()
+		err = h.managedForwardPort()
 		if err != nil {
 			h.log.Println("ERROR: failed to forward port:", err)
 		}
-
-		// Spin up the hostname checker. The hostname checker should not be
-		// spun up until after the port has been forwarded, because it can
-		// result in announcements being submitted to the blockchain.
 		go h.threadedUpdateHostname()
 	}()
 
@@ -86,15 +98,15 @@ func (h *Host) initNetworking(address string) (err error) {
 // threadedHandleConn handles an incoming connection to the host, typically an
 // RPC.
 func (h *Host) threadedHandleConn(conn net.Conn) {
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
+	err := h.tg.Add()
+	if err != nil {
 		return
 	}
+	defer h.tg.Done()
 
 	// Set an initial duration that is generous, but finite. RPCs can extend
 	// this if desired.
-	err := conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	err = conn.SetDeadline(time.Now().Add(5 * time.Minute))
 	if err != nil {
 		h.log.Println("WARN: could not set deadline on connection:", err)
 		return
@@ -152,15 +164,12 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 }
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
-//
-// TODO: Does not seem like this function ever actually lets go of the resource
-// lock.
 func (h *Host) threadedListen() {
-	h.resourceLock.RLock()
-	defer h.resourceLock.RUnlock()
-	if h.closed {
+	err := h.tg.Add()
+	if err != nil {
 		return
 	}
+	defer h.tg.Done()
 
 	// Receive connections until an error is returned by the listener. When an
 	// error is returned, there will be no more calls to receive.
