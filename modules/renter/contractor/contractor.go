@@ -56,6 +56,9 @@ func (c *Contractor) FinancialMetrics() modules.RenterFinancialMetrics {
 // contracts over a given time period, divided among the number of hosts
 // specified. Note that Contractor can start forming contracts as soon as
 // SetAllowance is called; that is, it may block.
+//
+// NOTE: At this time, transaction fees are not counted towards the allowance.
+// This means the contractor may spend more than allowance.Funds.
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// sanity checks
 	if a.Hosts == 0 {
@@ -68,35 +71,43 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errors.New("renew window must be less than period")
 	}
 
-	err := c.formContracts(a)
-	if err != nil {
-		return err
+	c.mu.RLock()
+	// calculate number of new contracts to form
+	var nContracts int
+	if a.Hosts > uint64(len(c.contracts)) {
+		nContracts = int(a.Hosts) - len(c.contracts)
+	}
+
+	// calculate end height of new contracts
+	endHeight := c.blockHeight + a.Period
+
+	// calculate how much can be spent on new contracts
+	var currentSpent types.Currency
+	for _, contract := range c.contracts {
+		currentSpent = currentSpent.Add(contract.FileContract.ValidProofOutputs[0].Value)
+	}
+	c.mu.RUnlock()
+
+	// only form contracts if we need to and have enough funds to do so
+	if nContracts > 0 {
+		if a.Funds.Cmp(currentSpent) > 0 {
+			funds := a.Funds.Sub(currentSpent)
+			err := c.managedFormContracts(nContracts, funds, endHeight)
+			if err != nil {
+				return err
+			}
+		} else {
+			c.log.Println("WARN: want to form more contracts, but new allowance is too small")
+		}
 	}
 
 	// Set the allowance.
 	c.mu.Lock()
 	c.allowance = a
-	err = c.saveSync()
+	err := c.saveSync()
 	c.mu.Unlock()
 
 	return err
-
-	/*
-		// If this is the first time the allowance has been set, form contracts
-		// immediately.
-		if old.Hosts == 0 {
-			return c.formContracts(a)
-		}
-
-		// Otherwise, if the new allowance is "significantly different" (to be
-		// defined more precisely later), form intermediary contracts.
-		if a.Funds.Cmp(old.Funds) > 0 {
-			// TODO: implement
-			// c.formContracts(diff(a, old))
-		}
-
-		return nil
-	*/
 }
 
 // Contracts returns the contracts formed by the contractor.
