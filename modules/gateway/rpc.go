@@ -198,9 +198,10 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(peers))
 	for _, p := range peers {
+		wg.Add(1)
 		go func(addr modules.NetAddress) {
+			defer wg.Done()
 			err := g.RPC(addr, name, fn)
 			if err != nil {
 				g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed (attempting again in 10 seconds): %v", name, addr, err)
@@ -215,7 +216,6 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 					g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed twice: %v", name, addr, err)
 				}
 			}
-			wg.Done()
 		}(p.NetAddress)
 	}
 	wg.Wait()
