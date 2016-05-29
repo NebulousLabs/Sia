@@ -31,7 +31,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 
 	// calculate price
 	sectorPrice := hd.host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
-	if hd.contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorPrice) < 0 {
+	if hd.contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
 	}
 
@@ -97,7 +97,7 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 		return nil, errors.New("invalid contract")
 	}
 	sectorPrice := host.DownloadBandwidthPrice.Mul64(modules.SectorSize)
-	if contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorPrice) < 0 {
+	if contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return nil, errors.New("contract has insufficient funds to support download")
 	}
 

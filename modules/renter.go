@@ -114,6 +114,12 @@ func (rc *RenterContract) EndHeight() types.BlockHeight {
 	return rc.LastRevision.NewWindowStart
 }
 
+// RenterFunds returns the funds remaining in the contract's Renter payout as
+// of the most recent revision.
+func (rc *RenterContract) RenterFunds() types.Currency {
+	return rc.LastRevision.NewValidProofOutputs[0].Value
+}
+
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {

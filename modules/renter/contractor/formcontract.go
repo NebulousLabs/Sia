@@ -53,7 +53,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint6
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
 	}
-	contractValue := contract.LastRevision.NewValidProofOutputs[0].Value
+	contractValue := contract.RenterFunds()
 
 	c.mu.Lock()
 	c.contracts[contract.ID] = contract
