@@ -55,7 +55,7 @@ func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID 
 
 // EndHeight returns the height at which the host is no longer obligated to
 // store the file.
-func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.FileContract.WindowStart }
+func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.EndHeight() }
 
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
@@ -124,7 +124,7 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
-	if height > contract.FileContract.WindowStart {
+	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
 	}
 	host, ok := c.hdb.Host(contract.NetAddress)

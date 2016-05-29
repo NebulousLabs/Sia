@@ -26,7 +26,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	var expired []types.FileContractID
 	for id, contract := range c.contracts {
 		// TODO: offset this by some sort of confirmation height?
-		if c.blockHeight > contract.LastRevision.NewWindowStart {
+		if c.blockHeight > contract.EndHeight() {
 			expired = append(expired, id)
 		}
 	}

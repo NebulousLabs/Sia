@@ -59,7 +59,7 @@ func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, er
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
-	if height > contract.FileContract.WindowStart {
+	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
 	}
 	host, ok := c.hdb.Host(contract.NetAddress)
