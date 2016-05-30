@@ -98,6 +98,10 @@ func (h *Host) initNetworking(address string) (err error) {
 // threadedHandleConn handles an incoming connection to the host, typically an
 // RPC.
 func (h *Host) threadedHandleConn(conn net.Conn) {
+	// We defer the conn.Close so that the conn is still closed if `Add` returns
+	// an error.
+	defer conn.Close()
+
 	err := h.tg.Add()
 	if err != nil {
 		return
@@ -111,7 +115,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		h.log.Println("WARN: could not set deadline on connection:", err)
 		return
 	}
-	defer conn.Close()
 
 	// Read a specifier indicating which action is being called.
 	var id types.Specifier
