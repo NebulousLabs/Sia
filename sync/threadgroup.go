@@ -78,6 +78,7 @@ func (tg *ThreadGroup) Stop() error {
 	for _, c := range tg.closers {
 		c.Close()
 	}
+	tg.closers = nil
 	tg.mu.Unlock()
 	tg.wg.Wait()
 	return nil
