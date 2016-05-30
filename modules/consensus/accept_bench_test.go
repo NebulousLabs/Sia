@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -23,7 +24,11 @@ func BenchmarkAcceptEmptyBlocks(b *testing.B) {
 	// Create an alternate testing consensus set, which does not
 	// have any subscribers
 	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkEmptyBlocks - 2")
-	cs, err := New(cst.gateway, filepath.Join(testdir, modules.ConsensusDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		b.Fatal(err)
+	}
+	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -91,7 +96,11 @@ func BenchmarkAcceptSmallBlocks(b *testing.B) {
 	// Create an alternate testing consensus set, which does not
 	// have any subscribers
 	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkAcceptSmallBlocks - 2")
-	cs, err := New(cst.gateway, filepath.Join(testdir, modules.ConsensusDir))
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		b.Fatal(err)
+	}
+	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		b.Fatal("Error creating consensus: " + err.Error())
 	}
