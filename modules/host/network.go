@@ -49,14 +49,14 @@ func (h *Host) initNetworking(address string) (err error) {
 		return err
 	}
 	// Automatically close the listener when h.tg.Stop() is called.
+	err = h.tg.Add()
+	if err != nil {
+		return err
+	}
 	go func() {
-		err := h.tg.Add()
-		if err != nil {
-			return
-		}
 		defer h.tg.Done()
 		<-h.tg.StopChan()
-		err = h.listener.Close()
+		err := h.listener.Close()
 		if err != nil {
 			h.log.Println("Closing the listener failed:", err)
 		}
