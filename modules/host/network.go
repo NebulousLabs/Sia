@@ -18,14 +18,14 @@ var rpcSettingsDeprecated = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', '
 // checks if the host's hostname has changed, and makes an updated host
 // announcement if so.
 func (h *Host) threadedUpdateHostname() {
-	for {
-		err := h.tg.Add()
-		if err != nil {
-			return
-		}
-		h.managedLearnHostname()
-		h.tg.Done()
+	err := h.tg.Add()
+	if err != nil {
+		return
+	}
+	defer h.tg.Done()
 
+	for {
+		h.managedLearnHostname()
 		// Wait 30 minutes to check again. If the hostname is changing
 		// regularly (more than once a week), we want the host to be able to be
 		// seen as having 95% uptime. Every minute that the announcement is
