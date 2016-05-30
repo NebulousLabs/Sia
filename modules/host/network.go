@@ -98,9 +98,17 @@ func (h *Host) initNetworking(address string) (err error) {
 // threadedHandleConn handles an incoming connection to the host, typically an
 // RPC.
 func (h *Host) threadedHandleConn(conn net.Conn) {
-	// We defer the conn.Close so that the conn is still closed if `Add` returns
-	// an error.
-	defer conn.Close()
+	// Close the conn on host.Close or when the method terminates, whichever comes
+	// first.
+	connCloseChan := make(chan struct{})
+	defer close(connCloseChan)
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+		case <-connCloseChan:
+		}
+		conn.Close()
+	}()
 
 	err := h.tg.Add()
 	if err != nil {
