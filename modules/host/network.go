@@ -191,7 +191,6 @@ func (h *Host) threadedListen() {
 			return
 		}
 
-		// Grab the resource lock before creating a goroutine.
 		go h.threadedHandleConn(conn)
 	}
 }
