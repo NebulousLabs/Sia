@@ -56,7 +56,7 @@ func maxSectors(a modules.Allowance, hdb hostDB) (uint64, error) {
 
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
-func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
+func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return modules.RenterContract{}, errTooExpensive
@@ -72,7 +72,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint6
 	c.mu.RLock()
 	params := proto.ContractParams{
 		Host:          host,
-		Filesize:      filesize,
+		Filesize:      numSectors * modules.SectorSize,
 		StartHeight:   c.blockHeight,
 		EndHeight:     endHeight,
 		RefundAddress: uc.UnlockHash(),
@@ -131,13 +131,12 @@ func (c *Contractor) managedFormContracts(n int, a modules.Allowance) error {
 	} else if numSectors == 0 {
 		return errInsufficientAllowance
 	}
-	filesize := numSectors * modules.SectorSize
 
 	// Form contracts with each host.
 	var numContracts int
 	var errs []string
 	for _, h := range hosts {
-		_, err := c.managedNewContract(h, filesize, endHeight)
+		_, err := c.managedNewContract(h, numSectors, endHeight)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("\t%v: %v", h.NetAddress, err))
 			continue
