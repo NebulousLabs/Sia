@@ -101,5 +101,9 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 	c.mu.Unlock()
 
-	c.managedRenewContracts()
+	// only attempt renewal if we are synced
+	// (harmless otherwise, since hosts will reject our renewal attempts, but very slow)
+	if c.cs.Synced() {
+		c.managedRenewContracts()
+	}
 }

@@ -18,6 +18,7 @@ func TestProcessConsensusUpdate(t *testing.T) {
 	rc.LastRevision.NewWindowStart = 20
 	rc.FileContract.ValidProofOutputs = []types.SiacoinOutput{{}}
 	c := &Contractor{
+		cs: new(newStub),
 		contracts: map[types.FileContractID]modules.RenterContract{
 			rc.ID: rc,
 		},

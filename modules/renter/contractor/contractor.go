@@ -21,6 +21,7 @@ var (
 // contracts.
 type Contractor struct {
 	// dependencies
+	cs      consensusSet
 	hdb     hostDB
 	log     *persist.Logger
 	persist persister
@@ -152,6 +153,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p persister, l *persist.Logger) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
+		cs:      cs,
 		hdb:     hdb,
 		log:     l,
 		persist: p,
