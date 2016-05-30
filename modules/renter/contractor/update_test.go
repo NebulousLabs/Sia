@@ -14,11 +14,13 @@ import (
 // block height.
 func TestProcessConsensusUpdate(t *testing.T) {
 	// create contractor with a contract ending at height 20
+	var stub newStub
 	var rc modules.RenterContract
 	rc.LastRevision.NewWindowStart = 20
 	rc.FileContract.ValidProofOutputs = []types.SiacoinOutput{{}}
 	c := &Contractor{
-		cs: new(newStub),
+		cs:  stub,
+		hdb: stub,
 		contracts: map[types.FileContractID]modules.RenterContract{
 			rc.ID: rc,
 		},

@@ -78,27 +78,13 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	if a.Hosts > uint64(len(c.contracts)) {
 		nContracts = int(a.Hosts) - len(c.contracts)
 	}
-
-	// calculate end height of new contracts
-	endHeight := c.blockHeight + a.Period
-
-	// calculate how much can be spent on new contracts
-	var currentSpent types.Currency
-	for _, contract := range c.contracts {
-		currentSpent = currentSpent.Add(contract.FileContract.ValidProofOutputs[0].Value)
-	}
 	c.mu.RUnlock()
 
 	// only form contracts if we need to and have enough funds to do so
 	if nContracts > 0 {
-		if a.Funds.Cmp(currentSpent) > 0 {
-			funds := a.Funds.Sub(currentSpent)
-			err := c.managedFormContracts(nContracts, funds, endHeight)
-			if err != nil {
-				return err
-			}
-		} else {
-			c.log.Println("WARN: want to form more contracts, but new allowance is too small")
+		err := c.managedFormContracts(nContracts, a)
+		if err != nil {
+			return err
 		}
 	}
 

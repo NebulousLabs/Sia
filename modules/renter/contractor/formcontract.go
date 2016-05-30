@@ -20,16 +20,38 @@ var (
 	errTooExpensive          = errors.New("host price was too high")
 )
 
-// averageHostPrice returns the average price of hosts.
-func averageHostPrice(hosts []modules.HostDBEntry) types.Currency {
-	if len(hosts) == 0 {
-		return types.ZeroCurrency
+// maxSectors is the estimated maximum number of sectors that the allowance
+// can support.
+func maxSectors(a modules.Allowance, hdb hostDB) (uint64, error) {
+	if a.Hosts == 0 || a.Period == 0 {
+		return 0, errors.New("invalid allowance")
 	}
+
+	// Sample at least 10 hosts.
+	nRandomHosts := int(a.Hosts)
+	if nRandomHosts < 10 {
+		nRandomHosts = 10
+	}
+	hosts := hdb.RandomHosts(nRandomHosts, nil)
+	if len(hosts) < int(a.Hosts) {
+		return 0, errors.New("not enough hosts")
+	}
+
+	// Calculate cost of storing 1 sector per host for the allowance period.
 	var sum types.Currency
 	for _, h := range hosts {
 		sum = sum.Add(h.StoragePrice)
 	}
-	return sum.Div64(uint64(len(hosts)))
+	averagePrice := sum.Div64(uint64(len(hosts)))
+	costPerSector := averagePrice.Mul64(a.Hosts).Mul64(modules.SectorSize).Mul64(uint64(a.Period))
+
+	// Divide total funds by cost per sector.
+	numSectors, err := a.Funds.Div(costPerSector).Uint64()
+	if err != nil {
+		// if there was an overflow, something is definitely wrong
+		return 0, errors.New("allowance can fund suspiciously large number of sectors")
+	}
+	return numSectors, nil
 }
 
 // managedNewContract negotiates an initial file contract with the specified
@@ -80,7 +102,7 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint6
 
 // managedFormContracts forms contracts with n hosts using the allowance
 // parameters.
-func (c *Contractor) managedFormContracts(n int, funds types.Currency, endHeight types.BlockHeight) error {
+func (c *Contractor) managedFormContracts(n int, a modules.Allowance) error {
 	// Sample at least 10 hosts.
 	nRandomHosts := 2 * n
 	if nRandomHosts < 10 {
@@ -101,19 +123,13 @@ func (c *Contractor) managedFormContracts(n int, funds types.Currency, endHeight
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.
 	c.mu.RLock()
-	duration := endHeight - c.blockHeight
+	endHeight := c.blockHeight + a.Period
+	numSectors, err := maxSectors(a, c.hdb)
 	c.mu.RUnlock()
-	costPerSector := averageHostPrice(hosts).Mul64(uint64(n)).Mul64(modules.SectorSize).Mul64(uint64(duration))
-	if funds.Cmp(costPerSector) < 0 {
-		return errInsufficientAllowance
-	}
-
-	// Calculate the filesize of the contracts by using the average host price
-	// and rounding down to the nearest sector.
-	numSectors, err := funds.Div(costPerSector).Uint64()
 	if err != nil {
-		// if there was an overflow, something is definitely wrong
-		return errors.New("allowance resulted in unexpectedly large contract size")
+		return err
+	} else if numSectors == 0 {
+		return errInsufficientAllowance
 	}
 	filesize := numSectors * modules.SectorSize
 
