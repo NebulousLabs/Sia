@@ -85,6 +85,7 @@ bench: clean fmt
 cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
+	@mkdir -p cover/modules/host
 	@for package in $(pkgs); do                                                                                     \
 		go test -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
@@ -93,6 +94,7 @@ cover: clean
 cover-integration: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
+	@mkdir -p cover/modules/host
 	@for package in $(pkgs); do                                                                                     \
 		go test -run=TestIntegration -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
@@ -101,6 +103,7 @@ cover-integration: clean
 cover-unit: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
+	@mkdir -p cover/modules/host
 	@for package in $(pkgs); do                                                                                     \
 		go test -run=TestUnit -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
