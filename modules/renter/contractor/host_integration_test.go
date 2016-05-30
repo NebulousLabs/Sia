@@ -61,7 +61,31 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 	if err != nil {
 		return nil, err
 	}
-	return host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	if err != nil {
+		return nil, err
+	}
+
+	// configure host to accept contracts
+	settings := h.InternalSettings()
+	settings.AcceptingContracts = true
+	err = h.SetInternalSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	// add storage to host
+	storageFolder := filepath.Join(testdir, "storage")
+	err = os.MkdirAll(storageFolder, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = h.AddStorageFolder(storageFolder, 1e6)
+	if err != nil {
+		return nil, err
+	}
+
+	return h, nil
 }
 
 // newTestingContractor is a helper function that creates a ready-to-use
@@ -125,25 +149,6 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 		return nil, nil, nil, err
 	}
 	c, err := newTestingContractor(filepath.Join(testdir, "Contractor"), cs, tp)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// Configure host to accept contracts
-	settings := h.InternalSettings()
-	settings.AcceptingContracts = true
-	err = h.SetInternalSettings(settings)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// add storage to host
-	storageFolder := filepath.Join(build.SiaTestingDir, "contractor", "TestIntegrationReviseContract", "storage")
-	err = os.MkdirAll(storageFolder, 0700)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	err = h.AddStorageFolder(storageFolder, 1e6)
 	if err != nil {
 		return nil, nil, nil, err
 	}

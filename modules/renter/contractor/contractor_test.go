@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -131,27 +132,80 @@ type stubHostDB struct{}
 func (stubHostDB) Host(modules.NetAddress) (h modules.HostDBEntry, ok bool)         { return }
 func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostDBEntry) { return }
 
-// TestSetAllowance tests the SetAllowance method.
-func TestSetAllowance(t *testing.T) {
-	c := &Contractor{
-		// an empty hostDB ensures that calls to formContracts will always fail
-		hdb: stubHostDB{},
+// TestIntegrationSetAllowance tests the SetAllowance method.
+func TestIntegrationSetAllowance(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create testing trio
+	h, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// bad args
-	err := c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 0, Hosts: 3})
+	var a modules.Allowance
+	err = c.SetAllowance(a)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
-	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 0})
+	a.Hosts = 1
+	err = c.SetAllowance(a)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	a.Period = 20
+	err = c.SetAllowance(a)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	a.RenewWindow = 20
+	err = c.SetAllowance(a)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
-	// formContracts should fail (no hosts)
-	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
-	if err == nil {
-		t.Error("expected error, got nil")
+	// reasonable values; should succeed
+	a.Funds = types.SiacoinPrecision.Mul64(100)
+	a.RenewWindow = 10
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 1 {
+		t.Error("expected 1 contract, got", len(c.contracts))
+	}
+
+	// set same allowance; should no-op
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 1 {
+		t.Error("expected 1 contract, got", len(c.contracts))
+	}
+
+	// reannounce host on different IP (easier than creating a new host)
+	addr := "127.0.0.1:" + c.Contracts()[0].NetAddress.Port()
+	err = h.AnnounceAddress(modules.NetAddress(addr))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.AddBlock()
+
+	// wait for hostdb to scan host
+	for i := 0; i < 500 && len(c.hdb.RandomHosts(2, nil)) != 2; i++ {
+		time.Sleep(time.Millisecond)
+	}
+
+	// set allowance with Hosts = 2; should only form one new contract
+	a.Hosts = 2
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Error("expected 2 contracts, got", len(c.contracts))
 	}
 }
 
