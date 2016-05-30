@@ -5,43 +5,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// managedRenewContracts renews any contracts that are up for renewal, using
-// the current allowance.
-func (c *Contractor) managedRenewContracts() {
-	c.mu.RLock()
-	// Renew contracts when they enter the renew window.
-	var renewSet []modules.RenterContract
-	for _, contract := range c.contracts {
-		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
-			renewSet = append(renewSet, contract)
-		}
-	}
-	endHeight := c.blockHeight + c.allowance.Period
-
-	numSectors, err := maxSectors(c.allowance, c.hdb)
-	c.mu.RUnlock()
-	if err != nil {
-		c.log.Println("WARN: could not calculate number of sectors allowance can support:", err)
-		return
-	}
-
-	if len(renewSet) == 0 {
-		// nothing to do
-		return
-	} else if numSectors == 0 {
-		c.log.Printf("WARN: want to renew %v contracts, but allowance is too small", len(renewSet))
-		return
-	}
-
-	filesize := numSectors * modules.SectorSize
-	for _, contract := range renewSet {
-		_, err := c.managedRenew(contract, filesize, endHeight)
-		if err != nil {
-			c.log.Println("WARN: failed to renew contract", contract.ID)
-		}
-	}
-}
-
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change in the blockchain. Updates will always be called in order.
 func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
