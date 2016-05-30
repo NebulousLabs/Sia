@@ -2,6 +2,7 @@ package sync
 
 import (
 	"errors"
+	"io"
 	"sync"
 )
 
@@ -14,11 +15,18 @@ var ErrStopped = errors.New("ThreadGroup already stopped")
 // notifying callers when shutdown occurrs. Another key difference is that a
 // ThreadGroup is only intended be used once; as such, its Add and Stop
 // methods return errors if Stop has already been called.
+//
+// During shutdown, it is common to close resources such as net.Conns and
+// net.Listeners. Typically, this would require spawning a goroutine to wait
+// on the ThreadGroup's StopChan and then close the resource. To make this
+// more convenient, ThreadGroup provides a RegisterCloser method. io.Closers
+// registered in this manner will be automatically closed when Stop is called.
 type ThreadGroup struct {
 	stopChan chan struct{}
 	chanOnce sync.Once
 	mu       sync.Mutex
 	wg       sync.WaitGroup
+	closers  []io.Closer
 }
 
 // StopChan provides read-only access to the ThreadGroup's stopChan. Callers
@@ -58,8 +66,8 @@ func (tg *ThreadGroup) Done() {
 	tg.wg.Done()
 }
 
-// Stop closes the Threadgroup's stopChan and blocks until the counter is
-// zero.
+// Stop closes the ThreadGroup's stopChan, closes members of the closer set,
+// and blocks until the counter is zero.
 func (tg *ThreadGroup) Stop() error {
 	tg.mu.Lock()
 	if tg.IsStopped() {
@@ -67,7 +75,23 @@ func (tg *ThreadGroup) Stop() error {
 		return ErrStopped
 	}
 	close(tg.stopChan)
+	for _, c := range tg.closers {
+		c.Close()
+	}
 	tg.mu.Unlock()
 	tg.wg.Wait()
+	return nil
+}
+
+// RegisterCloser adds an io.Closer to the ThreadGroups closer set. Members of
+// the set will be closed when Stop is called. Note that this means the errors
+// returned by Close are not recoverable.
+func (tg *ThreadGroup) RegisterCloser(c io.Closer) error {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+	if tg.IsStopped() {
+		return ErrStopped
+	}
+	tg.closers = append(tg.closers, c)
 	return nil
 }
