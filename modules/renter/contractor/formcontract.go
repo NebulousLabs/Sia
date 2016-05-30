@@ -20,6 +20,18 @@ var (
 	errTooExpensive          = errors.New("host price was too high")
 )
 
+// averageHostPrice returns the average price of hosts.
+func averageHostPrice(hosts []modules.HostDBEntry) types.Currency {
+	if len(hosts) == 0 {
+		return types.ZeroCurrency
+	}
+	var sum types.Currency
+	for _, h := range hosts {
+		sum = sum.Add(h.StoragePrice)
+	}
+	return sum.Div64(uint64(len(hosts)))
+}
+
 // managedNewContract negotiates an initial file contract with the specified
 // host, saves it, and returns it.
 func (c *Contractor) managedNewContract(host modules.HostDBEntry, filesize uint64, endHeight types.BlockHeight) (modules.RenterContract, error) {
@@ -85,19 +97,13 @@ func (c *Contractor) managedFormContracts(n int, funds types.Currency, endHeight
 	if len(hosts) < n/2 { // TODO: /2 is temporary until more hosts are online
 		return errors.New("not enough hosts")
 	}
-	// Calculate average host price.
-	var sum types.Currency
-	for _, h := range hosts {
-		sum = sum.Add(h.StoragePrice)
-	}
-	avgPrice := sum.Div64(uint64(len(hosts)))
 
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.
 	c.mu.RLock()
 	duration := endHeight - c.blockHeight
 	c.mu.RUnlock()
-	costPerSector := avgPrice.Mul64(uint64(n)).Mul64(modules.SectorSize).Mul64(uint64(duration))
+	costPerSector := averageHostPrice(hosts).Mul64(uint64(n)).Mul64(modules.SectorSize).Mul64(uint64(duration))
 	if funds.Cmp(costPerSector) < 0 {
 		return errInsufficientAllowance
 	}

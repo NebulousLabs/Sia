@@ -11,7 +11,6 @@ import (
 // managedRenew negotiates a new contract for data already stored with a host.
 // It returns the ID of the new contract. This is a blocking call that
 // performs network I/O.
-// TODO: take an allowance and renew with those parameters
 func (c *Contractor) managedRenew(contract modules.RenterContract, filesize uint64, newEndHeight types.BlockHeight) (types.FileContractID, error) {
 	c.mu.RLock()
 	height := c.blockHeight
@@ -52,9 +51,10 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, filesize uint
 		return types.FileContractID{}, err
 	}
 
-	// update host contract
+	// replace old contract with renewed contract
 	c.mu.Lock()
 	c.contracts[newContract.ID] = newContract
+	delete(c.contracts, contract.ID)
 	err = c.saveSync()
 	c.mu.Unlock()
 	if err != nil {
