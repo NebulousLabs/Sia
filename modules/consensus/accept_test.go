@@ -753,7 +753,7 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestFutureTimestampHandling")
+	cst, err := createConsensusSetTester("TestExtremeFutureTimestampHandling")
 	if err != nil {
 		t.Fatal(err)
 	}
