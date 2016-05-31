@@ -117,18 +117,6 @@ func (g *Gateway) threadedListen() {
 	}
 	defer g.threads.Done()
 
-	// Shutdown the listener when the stop signal is received.
-	if g.threads.Add() != nil {
-		return
-	}
-	go func() {
-		defer g.threads.Done()
-		<-g.threads.StopChan()
-		if err := g.listener.Close(); err != nil {
-			g.log.Printf("WARN: listener.Close failed: %v", err)
-		}
-	}()
-
 	for {
 		conn, err := g.listener.Accept()
 		if err != nil {

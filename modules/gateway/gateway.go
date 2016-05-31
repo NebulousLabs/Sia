@@ -133,6 +133,14 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return
 	}
+	// Automatically close the listener when g.threads.Stop() is called.
+	g.threads.OnStop(func() {
+		err := g.listener.Close()
+		if err != nil {
+			g.log.Println("WARN: closing the listener failed:", err)
+		}
+	})
+
 	_, port, portErr := net.SplitHostPort(g.listener.Addr().String())
 	if portErr != nil {
 		return nil, portErr
