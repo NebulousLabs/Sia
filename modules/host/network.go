@@ -18,14 +18,14 @@ var rpcSettingsDeprecated = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', '
 // checks if the host's hostname has changed, and makes an updated host
 // announcement if so.
 func (h *Host) threadedUpdateHostname() {
-	for {
-		err := h.tg.Add()
-		if err != nil {
-			return
-		}
-		h.managedLearnHostname()
-		h.tg.Done()
+	err := h.tg.Add()
+	if err != nil {
+		return
+	}
+	defer h.tg.Done()
 
+	for {
+		h.managedLearnHostname()
 		// Wait 30 minutes to check again. If the hostname is changing
 		// regularly (more than once a week), we want the host to be able to be
 		// seen as having 95% uptime. Every minute that the announcement is
@@ -49,18 +49,12 @@ func (h *Host) initNetworking(address string) (err error) {
 		return err
 	}
 	// Automatically close the listener when h.tg.Stop() is called.
-	go func() {
-		err := h.tg.Add()
+	h.tg.OnStop(func() {
+		err := h.listener.Close()
 		if err != nil {
-			return
+			h.log.Println("WARN: closing the listener failed:", err)
 		}
-		defer h.tg.Done()
-		<-h.tg.StopChan()
-		err = h.listener.Close()
-		if err != nil {
-			h.log.Println("Closing the listener failed:", err)
-		}
-	}()
+	})
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
@@ -98,6 +92,18 @@ func (h *Host) initNetworking(address string) (err error) {
 // threadedHandleConn handles an incoming connection to the host, typically an
 // RPC.
 func (h *Host) threadedHandleConn(conn net.Conn) {
+	// Close the conn on host.Close or when the method terminates, whichever comes
+	// first.
+	connCloseChan := make(chan struct{})
+	defer close(connCloseChan)
+	go func() {
+		select {
+		case <-h.tg.StopChan():
+		case <-connCloseChan:
+		}
+		conn.Close()
+	}()
+
 	err := h.tg.Add()
 	if err != nil {
 		return
@@ -111,7 +117,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		h.log.Println("WARN: could not set deadline on connection:", err)
 		return
 	}
-	defer conn.Close()
 
 	// Read a specifier indicating which action is being called.
 	var id types.Specifier
@@ -180,7 +185,6 @@ func (h *Host) threadedListen() {
 			return
 		}
 
-		// Grab the resource lock before creating a goroutine.
 		go h.threadedHandleConn(conn)
 	}
 }
