@@ -98,13 +98,15 @@ Troubleshooting
 
 If your issue is not addressed above, you can get in touch with us personally:
 
-  slack: http://slackin.siacoin.com (ping taek or nemo)
+  slack: http://slackin.siacoin.com (ping @taek, @nemo, or @jordan)
 
   email:
   
   david@nebulouslabs.com
   
   luke@nebulouslabs.com
+  
+  jordan@nebulouslabs.com
 
 Version Information
 -------------------
