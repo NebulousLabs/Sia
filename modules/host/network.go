@@ -49,18 +49,12 @@ func (h *Host) initNetworking(address string) (err error) {
 		return err
 	}
 	// Automatically close the listener when h.tg.Stop() is called.
-	err = h.tg.Add()
-	if err != nil {
-		return err
-	}
-	go func() {
-		defer h.tg.Done()
-		<-h.tg.StopChan()
+	h.tg.OnStop(func() {
 		err := h.listener.Close()
 		if err != nil {
-			h.log.Println("Closing the listener failed:", err)
+			h.log.Println("WARN: closing the listener failed:", err)
 		}
-	}()
+	})
 
 	// Set the port.
 	_, port, err := net.SplitHostPort(h.listener.Addr().String())
