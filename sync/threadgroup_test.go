@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -53,14 +54,18 @@ func TestThreadGroupStop(t *testing.T) {
 		t.Error("IsStopped returns false on stopped ThreadGroup")
 	}
 
-	// Add and Stop should return errors
+	// Add, Stop, and RegisterCloser should return errors
 	err = tg.Add()
 	if err != ErrStopped {
-		t.Fatal("expected ErrStopped, got", err)
+		t.Error("expected ErrStopped, got", err)
 	}
 	err = tg.Stop()
 	if err != ErrStopped {
-		t.Fatal("expected ErrStopped, got", err)
+		t.Error("expected ErrStopped, got", err)
+	}
+	err = tg.OnStop(nil)
+	if err != ErrStopped {
+		t.Error("expected ErrStopped, got", err)
 	}
 }
 
@@ -118,6 +123,36 @@ func TestThreadGroupOnce(t *testing.T) {
 	tg.Stop()
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Stop")
+	}
+}
+
+// TestThreadGroupOnStop tests that Stop calls functions registered with
+// OnStop.
+func TestThreadGroupOnStop(t *testing.T) {
+	l, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create ThreadGroup and register the closer
+	var tg ThreadGroup
+	err = tg.OnStop(func() { l.Close() })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// send on channel when listener is closed
+	var closed bool
+	tg.Add()
+	go func() {
+		defer tg.Done()
+		_, err := l.Accept()
+		closed = err != nil
+	}()
+
+	tg.Stop()
+	if !closed {
+		t.Fatal("Stop did not close listener")
 	}
 }
 

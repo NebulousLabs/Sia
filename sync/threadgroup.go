@@ -14,11 +14,18 @@ var ErrStopped = errors.New("ThreadGroup already stopped")
 // notifying callers when shutdown occurrs. Another key difference is that a
 // ThreadGroup is only intended be used once; as such, its Add and Stop
 // methods return errors if Stop has already been called.
+//
+// During shutdown, it is common to close resources such as net.Listeners.
+// Typically, this would require spawning a goroutine to wait on the
+// ThreadGroup's StopChan and then close the resource. To make this more
+// convenient, ThreadGroup provides an OnStop method. Functions passed to
+// OnStop will be called automatically when Stop is called.
 type ThreadGroup struct {
 	stopChan chan struct{}
 	chanOnce sync.Once
 	mu       sync.Mutex
 	wg       sync.WaitGroup
+	stopFns  []func()
 }
 
 // StopChan provides read-only access to the ThreadGroup's stopChan. Callers
@@ -58,8 +65,8 @@ func (tg *ThreadGroup) Done() {
 	tg.wg.Done()
 }
 
-// Stop closes the Threadgroup's stopChan and blocks until the counter is
-// zero.
+// Stop closes the ThreadGroup's stopChan, closes members of the closer set,
+// and blocks until the counter is zero.
 func (tg *ThreadGroup) Stop() error {
 	tg.mu.Lock()
 	if tg.IsStopped() {
@@ -67,7 +74,23 @@ func (tg *ThreadGroup) Stop() error {
 		return ErrStopped
 	}
 	close(tg.stopChan)
+	for _, fn := range tg.stopFns {
+		fn()
+	}
+	tg.stopFns = nil
 	tg.mu.Unlock()
 	tg.wg.Wait()
+	return nil
+}
+
+// OnStop adds a function to the ThreadGroup's stopFns set. Members of the set
+// will be closed when Stop is called.
+func (tg *ThreadGroup) OnStop(fn func()) error {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+	if tg.IsStopped() {
+		return ErrStopped
+	}
+	tg.stopFns = append(tg.stopFns, fn)
 	return nil
 }
