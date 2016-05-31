@@ -363,15 +363,20 @@ func (srv *Server) walletTransactionHandler(w http.ResponseWriter, req *http.Req
 
 // walletTransactionsHandler handles API calls to /wallet/transactions.
 func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// Get the start and end blocks.
-	start, err := strconv.Atoi(req.FormValue("startheight"))
-	if err != nil {
-		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+	startheightStr, endheightStr := req.FormValue("startheight"), req.FormValue("endheight")
+	if startheightStr == "" || endheightStr == "" {
+		writeError(w, "startheight and endheight must be provided to a /wallet/transactions call.", http.StatusBadRequest)
 		return
 	}
-	end, err := strconv.Atoi(req.FormValue("endheight"))
+	// Get the start and end blocks.
+	start, err := strconv.Atoi(startheightStr)
 	if err != nil {
-		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		writeError(w, "parsing integer value for parameter `startheight` failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	end, err := strconv.Atoi(endheightStr)
+	if err != nil {
+		writeError(w, "parsing integer value for parameter `endheight` failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	confirmedTxns, err := srv.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
