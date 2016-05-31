@@ -2,7 +2,6 @@ package sync
 
 import (
 	"errors"
-	"io"
 	"sync"
 )
 
@@ -16,17 +15,17 @@ var ErrStopped = errors.New("ThreadGroup already stopped")
 // ThreadGroup is only intended be used once; as such, its Add and Stop
 // methods return errors if Stop has already been called.
 //
-// During shutdown, it is common to close resources such as net.Conns and
-// net.Listeners. Typically, this would require spawning a goroutine to wait
-// on the ThreadGroup's StopChan and then close the resource. To make this
-// more convenient, ThreadGroup provides a RegisterCloser method. io.Closers
-// registered in this manner will be automatically closed when Stop is called.
+// During shutdown, it is common to close resources such as net.Listeners.
+// Typically, this would require spawning a goroutine to wait on the
+// ThreadGroup's StopChan and then close the resource. To make this more
+// convenient, ThreadGroup provides an OnStop method. Functions passed to
+// OnStop will be called automatically when Stop is called.
 type ThreadGroup struct {
 	stopChan chan struct{}
 	chanOnce sync.Once
 	mu       sync.Mutex
 	wg       sync.WaitGroup
-	closers  []io.Closer
+	stopFns  []func()
 }
 
 // StopChan provides read-only access to the ThreadGroup's stopChan. Callers
@@ -75,24 +74,23 @@ func (tg *ThreadGroup) Stop() error {
 		return ErrStopped
 	}
 	close(tg.stopChan)
-	for _, c := range tg.closers {
-		c.Close()
+	for _, fn := range tg.stopFns {
+		fn()
 	}
-	tg.closers = nil
+	tg.stopFns = nil
 	tg.mu.Unlock()
 	tg.wg.Wait()
 	return nil
 }
 
-// RegisterCloser adds an io.Closer to the ThreadGroups closer set. Members of
-// the set will be closed when Stop is called. Note that this means the errors
-// returned by Close are not recoverable.
-func (tg *ThreadGroup) RegisterCloser(c io.Closer) error {
+// OnStop adds a function to the ThreadGroup's stopFns set. Members of the set
+// will be closed when Stop is called.
+func (tg *ThreadGroup) OnStop(fn func()) error {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 	if tg.IsStopped() {
 		return ErrStopped
 	}
-	tg.closers = append(tg.closers, c)
+	tg.stopFns = append(tg.stopFns, fn)
 	return nil
 }

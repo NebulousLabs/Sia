@@ -63,7 +63,7 @@ func TestThreadGroupStop(t *testing.T) {
 	if err != ErrStopped {
 		t.Error("expected ErrStopped, got", err)
 	}
-	err = tg.RegisterCloser(nil)
+	err = tg.OnStop(nil)
 	if err != ErrStopped {
 		t.Error("expected ErrStopped, got", err)
 	}
@@ -126,8 +126,9 @@ func TestThreadGroupOnce(t *testing.T) {
 	}
 }
 
-// TestThreadGroupRegisterCloser tests that Stop calls registered io.Closers.
-func TestThreadGroupRegisterCloser(t *testing.T) {
+// TestThreadGroupOnStop tests that Stop calls functions registered with
+// OnStop.
+func TestThreadGroupOnStop(t *testing.T) {
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +136,7 @@ func TestThreadGroupRegisterCloser(t *testing.T) {
 
 	// create ThreadGroup and register the closer
 	var tg ThreadGroup
-	err = tg.RegisterCloser(l)
+	err = tg.OnStop(func() { l.Close() })
 	if err != nil {
 		t.Fatal(err)
 	}
