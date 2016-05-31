@@ -109,37 +109,45 @@ func (g *Gateway) UnregisterConnectCall(name string) {
 // threadedListenPeer listens for new streams on a peer connection and serves them via
 // threadedHandleConn.
 func (g *Gateway) threadedListenPeer(p *peer) {
-	if g.threads.Add() != nil {
-		return
-	}
-	defer g.threads.Done()
-
-	// Disconnect from the peer when the stop signal is received.
+	// Disconnect from the peer on gateway.Close or when the peer disconnects,
+	// whichever comes first.
+	peerCloseChan := make(chan struct{})
+	defer close(peerCloseChan)
+	// We register the goroutine with the ThreadGroup as it acquires a lock, which
+	// may take some time.
 	if g.threads.Add() != nil {
 		return
 	}
 	go func() {
 		defer g.threads.Done()
-		<-g.threads.StopChan()
+		select {
+		case <-g.threads.StopChan():
+		case <-peerCloseChan:
+		}
+		// Can't call Disconnect because it could return sync.ErrStopped.
 		g.mu.Lock()
 		delete(g.peers, p.NetAddress)
 		g.mu.Unlock()
 		if err := p.sess.Close(); err != nil {
-			g.log.Printf("WARN: error disconnecting from peer %q: %v", p.NetAddress, err)
+			g.log.Debugf("WARN: error disconnecting from peer %q: %v", p.NetAddress, err)
 		}
 	}()
+
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
 
 	for {
 		conn, err := p.accept()
 		if err != nil {
 			g.log.Println("WARN: lost connection to peer", p.NetAddress)
-			break
+			return
 		}
 
 		// it is the handler's responsibility to close the connection
 		go g.threadedHandleConn(conn)
 	}
-	g.Disconnect(p.NetAddress)
 }
 
 // threadedHandleConn reads header data from a connection, then routes it to the
