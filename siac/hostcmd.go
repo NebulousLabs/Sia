@@ -139,8 +139,6 @@ func hostcmd() {
 		storageremaining += folder.CapacityRemaining
 	}
 
-	// convert accepting bool
-	accept := yesNo(is.AcceptingContracts)
 	// convert price from bytes/block to TB/Month
 	price := currencyUnits(is.MinimumStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte))
 	// calculate total revenue
@@ -152,35 +150,48 @@ func hostcmd() {
 		Add(fm.PotentialStorageRevenue).
 		Add(fm.PotentialDownloadBandwidthRevenue).
 		Add(fm.PotentialUploadBandwidthRevenue)
-	fmt.Printf(`Host info:
-	Storage:      %v (%v used)
-	Price:        %v / TB / Month
-	Max Duration: %v Blocks
+	// determine the display method for the net address.
+	netaddr := es.NetAddress
+	if is.NetAddress == "" {
+		netaddr += " (automatically determined)"
+	} else {
+		netaddr += " (manually specified)"
+	}
 
-	Accepting Contracts: %v
-	Anticipated Revenue: %v
-	Locked Collateral:   %v
-	Risked Collateral:   %v
-	Revenue:             %v
-	Lost Revenue:        %v
-	Lost Collateral:     %v
-`, filesizeUnits(int64(totalstorage)), filesizeUnits(int64(totalstorage-storageremaining)),
-		price, is.MaxDuration, accept, currencyUnits(totalPotentialRevenue),
-		currencyUnits(fm.LockedStorageCollateral), currencyUnits(fm.RiskedStorageCollateral),
-		currencyUnits(totalRevenue), currencyUnits(fm.LostRevenue),
-		currencyUnits(fm.LostStorageCollateral))
-
-	// display more info if verbose flag is set
 	if hostVerbose {
 		// describe net address
-		netaddr := es.NetAddress
-		if is.NetAddress == "" {
-			netaddr += " (automatically determined)"
-		} else {
-			netaddr += " (manually specified)"
-		}
-		fmt.Printf(`
-	Net Address: %v
+		fmt.Printf(`Host Internal Settings:
+	acceptingcontracts:   %v
+	maxduration:          %v Weeks
+	maxdownloadbatchsize: %v
+	maxrevisebatchsize:   %v
+	netaddress:           %v
+	windowsize:           %v Weeks
+
+	collateral:       %v / TB / Month
+	collateralbudget: %v 
+	maxcollateral:    %v Per Contract
+
+	minimumcontractprice:         %v
+	minimumdownloadbandwithprice: %v / TB
+	minimumstorageprice:          %v / TB / Month
+	minimumuploadbandwidthprice:  %v / TB
+
+Host Financials:
+	Transaction Fee Compensation: %v
+	Transaction Fee Expenses:     %v
+
+	Storage Revenue:           %v
+	Potential Storage Revenue: %v
+
+	Locked Collateral: %v
+	Risked Collateral: %v
+	Lost Collateral:   %v
+
+	Download Revenue:           %v
+	Potential Download Revenue: %v
+	Upload Revenue :            %v
+	Potential Upload Revenue:   %v
 
 RPC Stats:
 	Error Calls:        %v
@@ -190,8 +201,57 @@ RPC Stats:
 	Revise Calls:       %v
 	Settings Calls:     %v
 	FormContract Calls: %v
-`, netaddr, nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
-			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls, nm.FormContractCalls)
+`,
+			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
+			filesizeUnits(int64(is.MaxDownloadBatchSize)),
+			filesizeUnits(int64(is.MaxReviseBatchSize)), netaddr,
+			periodUnits(is.WindowSize),
+
+			currencyUnits(is.Collateral.Mul(modules.BlockBytesPerMonthTerabyte)),
+			currencyUnits(is.CollateralBudget),
+			currencyUnits(is.MaxCollateral),
+
+			currencyUnits(is.MinimumContractPrice),
+			currencyUnits(is.MinimumDownloadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
+			currencyUnits(is.MinimumStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)),
+			currencyUnits(is.MinimumUploadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
+
+			currencyUnits(fm.ContractCompensation),
+			currencyUnits(fm.TransactionFeeExpenses),
+
+			currencyUnits(fm.StorageRevenue),
+			currencyUnits(fm.PotentialStorageRevenue),
+
+			currencyUnits(fm.LockedStorageCollateral),
+			currencyUnits(fm.RiskedStorageCollateral),
+			currencyUnits(fm.LostStorageCollateral),
+
+			currencyUnits(fm.DownloadBandwidthRevenue),
+			currencyUnits(fm.PotentialDownloadBandwidthRevenue),
+			currencyUnits(fm.UploadBandwidthRevenue),
+			currencyUnits(fm.PotentialUploadBandwidthRevenue),
+
+			nm.ErrorCalls, nm.UnrecognizedCalls, nm.DownloadCalls,
+			nm.RenewCalls, nm.ReviseCalls, nm.SettingsCalls,
+			nm.FormContractCalls)
+	} else {
+		fmt.Printf(`Host info:
+	Storage:      %v (%v used)
+	Price:        %v / TB / Month
+	Max Duration: %v Weeks
+
+	Accepting Contracts: %v
+	Anticipated Revenue: %v
+	Locked Collateral:   %v
+	Revenue:             %v
+`,
+			filesizeUnits(int64(totalstorage)),
+			filesizeUnits(int64(totalstorage-storageremaining)), price,
+			periodUnits(is.MaxDuration),
+
+			yesNo(is.AcceptingContracts), currencyUnits(totalPotentialRevenue),
+			currencyUnits(fm.LockedStorageCollateral),
+			currencyUnits(totalRevenue))
 	}
 
 	fmt.Println("\nStorage Folders:")
