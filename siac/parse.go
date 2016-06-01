@@ -60,6 +60,11 @@ func parseFilesize(strSize string) (string, error) {
 	return "", errUnableToParseSize
 }
 
+// periodUnits turns a period in terms of blocks to a number of weeks.
+func periodUnits(blocks types.BlockHeight) string {
+	return fmt.Sprint(blocks / 1008) // 1008 blocks per week
+}
+
 // parsePeriod converts a number of weeks to a number of blocks.
 func parsePeriod(period string) (string, error) {
 	var weeks float64
@@ -127,4 +132,12 @@ func parseCurrency(amount string) (string, error) {
 	}
 
 	return "", errors.New("amount is missing units; run 'wallet --help' for a list of units")
+}
+
+// yesNo returns "Yes" if b is true, and "No" if b is false.
+func yesNo(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
 }
