@@ -492,12 +492,12 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 
 	for i, tt := range tests {
 		// Create the "remote" peer.
-		remoteCST, err := blankConsensusSetTester(filepath.Join("TestRPCSendBlocks - remote", strconv.Itoa(i)))
+		remoteCST, err := blankConsensusSetTester(filepath.Join("TestIntegrationRPCSendBlocks - remote", strconv.Itoa(i)))
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Create the "local" peer.
-		localCST, err := blankConsensusSetTester(filepath.Join("TestRPCSendBlocks - local", strconv.Itoa(i)))
+		localCST, err := blankConsensusSetTester(filepath.Join("TestIntegrationRPCSendBlocks - local", strconv.Itoa(i)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -572,8 +572,6 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 		}
 
 		// Cleanup.
-		localCST.cs.gateway.Disconnect(remoteCST.cs.gateway.Address())
-		remoteCST.cs.gateway.Disconnect(localCST.cs.gateway.Address())
 		err = localCST.Close()
 		if err != nil {
 			t.Fatal(err)

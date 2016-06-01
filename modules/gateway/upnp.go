@@ -67,9 +67,9 @@ func (g *Gateway) learnHostname(port string) {
 		return
 	}
 
-	id := g.mu.Lock()
+	g.mu.Lock()
 	g.myAddr = addr
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 
 	g.log.Println("INFO: our address is", g.myAddr)
 
