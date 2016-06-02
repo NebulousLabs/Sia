@@ -330,7 +330,7 @@ func TestSetChildTarget(t *testing.T) {
 
 // TestNewChild probes the newChild method of the block node type.
 func TestNewChild(t *testing.T) {
-	cst, err := createConsensusSetTester("TestSetChildTarget")
+	cst, err := createConsensusSetTester("TestNewChild")
 	if err != nil {
 		t.Fatal(err)
 	}
