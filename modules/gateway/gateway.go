@@ -6,12 +6,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"time"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
-	"github.com/NebulousLabs/Sia/sync"
+	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
 var (
@@ -36,58 +36,45 @@ type Gateway struct {
 	// network.
 	nodes map[modules.NetAddress]struct{}
 
-	// closeChan is used to shut down the Gateway's goroutines.
-	closeChan chan struct{}
+	// threads is used to signal the Gateway's goroutines to shut down and to wait
+	// for all goroutines to exit before returning from Close().
+	threads siasync.ThreadGroup
 
 	persistDir string
 
 	log *persist.Logger
-	mu  *sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.
 func (g *Gateway) Address() modules.NetAddress {
-	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	return g.myAddr
 }
 
 // Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
-	var errs []error
+	if err := g.threads.Stop(); err != nil {
+		return err
+	}
 
+	var errs []error
 	// Unregister RPCs. Not strictly necessary for clean shutdown in this specific
 	// case, as the handlers should only contain references to the gateway itself,
 	// but do it anyways as an example for other modules to follow.
 	g.UnregisterRPC("ShareNodes")
 	g.UnregisterConnectCall("ShareNodes")
 	// save the latest gateway state
-	id := g.mu.RLock()
+	g.mu.RLock()
 	if err := g.saveSync(); err != nil {
 		errs = append(errs, fmt.Errorf("save failed: %v", err))
 	}
-	g.mu.RUnlock(id)
-	// send close signal
-	close(g.closeChan)
+	g.mu.RUnlock()
 	// clear the port mapping (no effect if UPnP not supported)
-	id = g.mu.RLock()
+	g.mu.RLock()
 	g.clearPort(g.myAddr.Port())
-	g.mu.RUnlock(id)
-	// shut down the listener
-	if err := g.listener.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
-	}
-	// Disconnect from peers.
-	for _, p := range g.Peers() {
-		if err := g.Disconnect(p.NetAddress); err != nil {
-			errs = append(errs, fmt.Errorf("Disconnect failed: %v", err))
-		}
-	}
-	// Sleep to give time for all goroutines to exit. This is necessary because
-	// some goroutines write to the logger so we must give them time to exit
-	// before closing the logger.
-	// TODO: block until goroutines exit instead of sleeping.
-	time.Sleep(100 * time.Millisecond)
+	g.mu.RUnlock()
 	// Close the logger. The logger should be the last thing to shut down so that
 	// all other objects have access to logging while closing.
 	if err := g.log.Close(); err != nil {
@@ -110,9 +97,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		initRPCs:   make(map[string]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]*peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
-		closeChan:  make(chan struct{}),
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 2),
 	}
 
 	// Create the logger.
@@ -148,6 +133,14 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return
 	}
+	// Automatically close the listener when g.threads.Stop() is called.
+	g.threads.OnStop(func() {
+		err := g.listener.Close()
+		if err != nil {
+			g.log.Println("WARN: closing the listener failed:", err)
+		}
+	})
+
 	_, port, portErr := net.SplitHostPort(g.listener.Addr().String())
 	if portErr != nil {
 		return nil, portErr
@@ -159,10 +152,22 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	go g.forwardPort(port)
+	go func() {
+		if err := g.threads.Add(); err != nil {
+			return
+		}
+		defer g.threads.Done()
+		g.forwardPort(port)
+	}()
 
 	// Learn our external IP.
-	go g.learnHostname(port)
+	go func() {
+		if err := g.threads.Add(); err != nil {
+			return
+		}
+		defer g.threads.Done()
+		g.learnHostname(port)
+	}()
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.
@@ -170,7 +175,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	go g.threadedNodeManager()
 
 	// Spawn the primary listener.
-	go g.listen()
+	go g.threadedListen()
 
 	return
 }

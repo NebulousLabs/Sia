@@ -60,7 +60,7 @@ func TestUnitUnsubscribe(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	cst, err := createConsensusSetTester("TestUnitInvalidConsensusChangeSubscription")
+	cst, err := createConsensusSetTester("TestUnitUnsubscribe")
 	if err != nil {
 		t.Fatal(err)
 	}

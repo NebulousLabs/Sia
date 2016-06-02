@@ -63,7 +63,7 @@ func TestRevertToNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
+	cst, err := createConsensusSetTester("TestRevertToNode")
 	if err != nil {
 		t.Fatal(err)
 	}

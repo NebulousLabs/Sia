@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 // newTestingGateway returns a gateway read to use in a testing environment.
@@ -20,10 +21,33 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	return g
 }
 
+// TestExportedMethodsErrAfterClose tests that exported methods like Close and
+// Connect error with sync.ErrStopped after the gateway has been closed.
+func TestExportedMethodsErrAfterClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	g := newTestingGateway("TestCloseErrsSecondTime", t)
+	if err := g.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Close(); err != sync.ErrStopped {
+		t.Fatalf("expected %q, got %q", sync.ErrStopped, err)
+	}
+	if err := g.Connect("localhost:1234"); err != sync.ErrStopped {
+		t.Fatalf("expected %q, got %q", sync.ErrStopped, err)
+	}
+}
+
 // TestAddress tests that Gateway.Address returns the address of its listener.
 // Also tests that the address is not unspecified and is a loopback address.
 // The address must be a loopback address for testing.
 func TestAddress(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g := newTestingGateway("TestAddress", t)
 	defer g.Close()
 	if g.Address() != g.myAddr {
@@ -43,6 +67,10 @@ func TestAddress(t *testing.T) {
 }
 
 func TestPeers(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRPC2", t)

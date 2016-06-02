@@ -55,7 +55,7 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 // shareNodes is the receiving end of the ShareNodes RPC. It writes up to 10
 // randomly selected nodes to the caller.
 func (g *Gateway) shareNodes(conn modules.PeerConn) error {
-	id := g.mu.RLock()
+	g.mu.RLock()
 	var nodes []modules.NetAddress
 	for node := range g.nodes {
 		if len(nodes) == maxSharedNodes {
@@ -63,7 +63,7 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 		}
 		nodes = append(nodes, node)
 	}
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	return encoding.WriteObject(conn, nodes)
 }
 
@@ -73,7 +73,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength); err != nil {
 		return err
 	}
-	id := g.mu.Lock()
+	g.mu.Lock()
 	for _, node := range nodes {
 		err := g.addNode(node)
 		if err != nil {
@@ -81,7 +81,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 		}
 	}
 	g.save()
-	g.mu.Unlock(id)
+	g.mu.Unlock()
 	return nil
 }
 
@@ -98,8 +98,8 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 	err := func() error {
 		// We wrap this logic in an anonymous function so we can defer Unlock to
 		// avoid managing locks across branching.
-		id := g.mu.Lock()
-		defer g.mu.Unlock(id)
+		g.mu.Lock()
+		defer g.mu.Unlock()
 		if err := g.addNode(addr); err != nil {
 			return err
 		}
@@ -131,30 +131,39 @@ func (g *Gateway) sendAddress(conn modules.PeerConn) error {
 // for more nodes. It also continually pings nodes in order to establish their
 // connectivity. Unresponsive nodes are aggressively removed.
 func (g *Gateway) threadedNodeManager() {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-		case <-g.closeChan:
+		case <-g.threads.StopChan():
 			return
 		}
 
-		id := g.mu.RLock()
+		g.mu.RLock()
 		numNodes := len(g.nodes)
 		peer, err := g.randomPeer()
-		g.mu.RUnlock(id)
+		g.mu.RUnlock()
 		if err != nil {
 			// can't do much until we have peers
 			continue
 		}
 
 		if numNodes < minNodeListLen {
-			g.RPC(peer, "ShareNodes", g.requestNodes)
+			err := g.RPC(peer, "ShareNodes", g.requestNodes)
+			if err != nil {
+				g.log.Debugf("WARN: RPC ShareNodes failed on peer %q: %v", peer, err)
+				continue
+			}
 		}
 
 		// find an untested node to check
-		id = g.mu.RLock()
+		g.mu.RLock()
 		node, err := g.randomNode()
-		g.mu.RUnlock(id)
+		g.mu.RUnlock()
 		if err != nil {
 			continue
 		}
@@ -162,10 +171,10 @@ func (g *Gateway) threadedNodeManager() {
 		// try to connect
 		conn, err := net.DialTimeout("tcp", string(node), dialTimeout)
 		if err != nil {
-			id = g.mu.Lock()
+			g.mu.Lock()
 			g.removeNode(node)
 			g.save()
-			g.mu.Unlock(id)
+			g.mu.Unlock()
 			continue
 		}
 		// if connection succeeds, supply an unacceptable version to ensure
@@ -176,7 +185,7 @@ func (g *Gateway) threadedNodeManager() {
 		// connectable nodes
 		select {
 		case <-time.After(10 * time.Minute):
-		case <-g.closeChan:
+		case <-g.threads.StopChan():
 			return
 		}
 	}

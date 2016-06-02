@@ -12,7 +12,7 @@ func TestTryValidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestValidTransaction")
+	cst, err := createConsensusSetTester("TestTryValidTransactionSet")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestValidTransaction")
+	cst, err := createConsensusSetTester("TestTryInvalidTransactionSet")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestStorageProofSegment(t *testing.T) {
 // is producing outputs that pass an imperfect randomness check (gzip).
 func TestStorageProofSegmentRandomness(t *testing.T) {
 	t.Skip("randomness check takes a long time")
-	cst, err := createConsensusSetTester("TestStorageProofSegment")
+	cst, err := createConsensusSetTester("TestStorageProofSegmentRandomness")
 	if err != nil {
 		t.Fatal(err)
 	}

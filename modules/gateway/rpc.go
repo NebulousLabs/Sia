@@ -32,9 +32,14 @@ func handlerName(name string) (id rpcID) {
 // RPC calls an RPC on the given address. RPC cannot be called on an address
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	id := g.mu.RLock()
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+
+	g.mu.RLock()
 	peer, ok := g.peers[addr]
-	g.mu.RUnlock(id)
+	g.mu.RUnlock()
 	if !ok {
 		return errors.New("can't call RPC on unconnected peer " + string(addr))
 	}
@@ -59,8 +64,8 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 // characters of an identifier should be unique, as the identifier used
 // internally is truncated to 8 bytes.
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.handlers[handlerName(name)]; ok {
 		build.Critical("RPC already registered: " + name)
 	}
@@ -70,8 +75,8 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 // UnregisterRPC unregisters an RPC and removes the corresponding RPCFunc from
 // g.handlers. Future calls to the RPC by peers will fail.
 func (g *Gateway) UnregisterRPC(name string) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.handlers[handlerName(name)]; !ok {
 		build.Critical("RPC not registered: " + name)
 	}
@@ -81,8 +86,8 @@ func (g *Gateway) UnregisterRPC(name string) {
 // RegisterConnectCall registers a name and RPCFunc to be called on a peer
 // upon connecting.
 func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.initRPCs[name]; ok {
 		build.Critical("ConnectCall already registered: " + name)
 	}
@@ -93,42 +98,76 @@ func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
 // corresponding RPCFunc from g.initRPCs. Future connections to peers will not
 // trigger the RPC to be called on them.
 func (g *Gateway) UnregisterConnectCall(name string) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if _, ok := g.initRPCs[name]; !ok {
 		build.Critical("ConnectCall not registered: " + name)
 	}
 	delete(g.initRPCs, name)
 }
 
-// listenPeer listens for new streams on a peer connection and serves them via
+// threadedListenPeer listens for new streams on a peer connection and serves them via
 // threadedHandleConn.
-func (g *Gateway) listenPeer(p *peer) {
+func (g *Gateway) threadedListenPeer(p *peer) {
+	// Disconnect from the peer on gateway.Close or when the peer disconnects,
+	// whichever comes first.
+	peerCloseChan := make(chan struct{})
+	defer close(peerCloseChan)
+	// We register the goroutine with the ThreadGroup as it acquires a lock, which
+	// may take some time.
+	if g.threads.Add() != nil {
+		return
+	}
+	go func() {
+		defer g.threads.Done()
+		select {
+		case <-g.threads.StopChan():
+		case <-peerCloseChan:
+		}
+		// Can't call Disconnect because it could return sync.ErrStopped.
+		g.mu.Lock()
+		delete(g.peers, p.NetAddress)
+		g.mu.Unlock()
+		if err := p.sess.Close(); err != nil {
+			g.log.Debugf("WARN: error disconnecting from peer %q: %v", p.NetAddress, err)
+		}
+	}()
+
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	for {
 		conn, err := p.accept()
 		if err != nil {
 			g.log.Println("WARN: lost connection to peer", p.NetAddress)
-			break
+			return
 		}
 
 		// it is the handler's responsibility to close the connection
 		go g.threadedHandleConn(conn)
 	}
-	g.Disconnect(p.NetAddress)
 }
 
 // threadedHandleConn reads header data from a connection, then routes it to the
 // appropriate handler for further processing.
 func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer conn.Close()
+
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	var id rpcID
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
 		return
 	}
 	// call registered handler for this ID
-	lockid := g.mu.RLock()
+	g.mu.RLock()
 	fn, ok := g.handlers[id]
-	g.mu.RUnlock(lockid)
+	g.mu.RUnlock()
 	if !ok {
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
@@ -153,6 +192,11 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 // object and disconnect. This is why Broadcast takes an interface{} instead of
 // an RPCFunc.
 func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) {
+	if g.threads.Add() != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
@@ -162,16 +206,24 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(peers))
 	for _, p := range peers {
+		wg.Add(1)
 		go func(addr modules.NetAddress) {
+			defer wg.Done()
 			err := g.RPC(addr, name, fn)
 			if err != nil {
+				g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed (attempting again in 10 seconds): %v", name, addr, err)
 				// try one more time before giving up
-				time.Sleep(10 * time.Second)
-				g.RPC(addr, name, fn)
+				select {
+				case <-time.After(10 * time.Second):
+				case <-g.threads.StopChan():
+					return
+				}
+				err := g.RPC(addr, name, fn)
+				if err != nil {
+					g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed twice: %v", name, addr, err)
+				}
 			}
-			wg.Done()
 		}(p.NetAddress)
 	}
 	wg.Wait()

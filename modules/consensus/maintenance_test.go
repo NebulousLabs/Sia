@@ -119,7 +119,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyMissedStorageProof")
+	cst, err := createConsensusSetTester("TestApplyMaturedSiacoinOutputs")
 	if err != nil {
 		t.Fatal(err)
 	}
