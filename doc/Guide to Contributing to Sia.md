@@ -198,6 +198,9 @@ Once you have made the pull request, we will review your code.  We will reject
 code that is unsafe, difficult to read, or otherwise violates the conventions 
 outlined in [docs/Developers.md][developers.md].
 
+Here's a sample code review comment:
+![Screenshot](./codereview.png)
+
 If you want to tweak code for which you've already submitted a pull request,
 push the updated code to your fork with `git push -f <remote> <branch>` and
 summarize the changes you've made in a comment on the pull request page on 
