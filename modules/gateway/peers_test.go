@@ -308,6 +308,7 @@ func TestConnectRejects(t *testing.T) {
 		t.SkipNow()
 	}
 	g := newTestingGateway("TestConnectRejects", t)
+	defer g.Close()
 	// Setup a listener that mocks Gateway.acceptConn, but sends the
 	// version sent over mockVersionChan instead of build.Version.
 	listener, err := net.Listen("tcp", "localhost:0")
@@ -320,16 +321,16 @@ func TestConnectRejects(t *testing.T) {
 			mockVersion := <-mockVersionChan
 			conn, err := listener.Accept()
 			if err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 			// Read remote peer version.
 			var remoteVersion string
 			if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 			// Write our mock version.
 			if err := encoding.WriteObject(conn, mockVersion); err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 		}
 	}()
@@ -486,13 +487,13 @@ func TestAcceptConnRejects(t *testing.T) {
 		{
 			remoteVersion:       "foobar",
 			versionResponseWant: "reject",
-			msg:                 "acceptConn shouldn't accept a remote peer whose version is ascii giberish",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is ascii gibberish",
 		},
 		// Test that acceptConn fails when the remote peer's version is utf8 gibberish.
 		{
 			remoteVersion:       "世界",
 			versionResponseWant: "reject",
-			msg:                 "acceptConn shouldn't accept a remote peer whose version is utf8 giberish",
+			msg:                 "acceptConn shouldn't accept a remote peer whose version is utf8 gibberish",
 		},
 		// Test that acceptConn fails when the remote peer's version is < 0.4.0 (0).
 		{
