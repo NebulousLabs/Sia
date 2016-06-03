@@ -57,11 +57,11 @@ To build Sia on your machine, enter the following on the command line:
 
 ```bash
 # Download Sia and its dependencies
-# Binaries will be installed in $GOROOT/bin
+# Binaries will be installed in $GOPATH/bin
 $ go get -u github.com/NebulousLabs/Sia/...
 
 # Switch to directory containing Sia source code
-$ cd $GOROOT/src/github.com/NebulousLabs/Sia
+$ cd $GOPATH/src/github.com/NebulousLabs/Sia
 
 # You have three Sia builds to choose from.
 # To build the standard release binary:
