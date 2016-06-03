@@ -138,7 +138,7 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.SkipNow()
 	}
 	// create testing trio
-	h, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
+	h, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
 	if err != nil {
 		t.Fatal(err)
 	}
