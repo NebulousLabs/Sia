@@ -202,7 +202,7 @@ Here's a sample code review comment:
 ![Screenshot](assets/codereview.png)
 
 If you want to tweak code for which you've already submitted a pull request,
-push the updated code to your fork with `git push -f <remote> <branch>` and
+push the updated code to your fork with `git push -f <fork remote> <branch>` and
 summarize the changes you've made in a comment on the pull request page on 
 GitHub.
 
@@ -215,6 +215,8 @@ have some cleanup to do:
 $ git pull origin master
 # Delete the branch you made the pull request from.
 $ git branch -d <branch>
+# Delete the remote branch on your fork.
+$ git push <fork remote> :<branch>
 # Update your fork.
 $ git push <fork remote> master
 ```
@@ -226,8 +228,7 @@ $ git push <fork remote> master
 <a name="where-to-start"/>
 ## Where to start
 If you'd like to contribute to Sia but don't have any specific ideas, writing 
-tests is a good way to get your feet wet.  See the [Testing.md doc][test-doc] 
-to get started.
+tests is a good way to get your feet wet.  See [doc/Running and Writing Tests for Sia.md](Running\ and\ Writing\ Tests\ for\ Sia.md) to get started. 
 
 <a name="contact"/>
 ## Contact us
