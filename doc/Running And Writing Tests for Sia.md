@@ -99,6 +99,38 @@ To run tests for just a certain package, run `make test pkgs=./<package>`. To ru
 a certain test function, run `make test pkgs=./<package> run=<function>`. The same
 goes for `make test-long`, `make cover` and `make bench`.
 
+For example, running `test-long` on the package persist produces this output:
+
+```bash
+$ make test-long pkgs=./persist
+rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
+gofmt -s -l -w ./persist
+go install ./persist
+go vet ./persist
+go test -v -race -tags='testing debug' -timeout=300s ./persist -run=Test
+=== RUN   TestOpenDatabase
+--- PASS: TestOpenDatabase (0.42s)
+=== RUN   TestSaveLoad
+--- PASS: TestSaveLoad (0.00s)
+=== RUN   TestSaveLoadFile
+--- PASS: TestSaveLoadFile (0.01s)
+=== RUN   TestSaveLoadFileSync
+--- PASS: TestSaveLoadFileSync (0.00s)
+=== RUN   TestLogger
+--- PASS: TestLogger (0.00s)
+=== RUN   TestLoggerCritical
+--- PASS: TestLoggerCritical (0.00s)
+=== RUN   TestIntegrationRandomSuffix
+--- PASS: TestIntegrationRandomSuffix (0.01s)
+=== RUN   TestAbsolutePathSafeFile
+--- PASS: TestAbsolutePathSafeFile (0.00s)
+=== RUN   TestRelativePathSafeFile
+--- PASS: TestRelativePathSafeFile (0.00s)
+PASS
+ok  	github.com/NebulousLabs/Sia/persist	1.485s
+$
+``` 
+
 <a name="write"/>
 ## Writing new tests for Sia
 When you run `make cover`, you'll notice that many files have pretty low
