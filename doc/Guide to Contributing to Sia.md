@@ -39,11 +39,6 @@ $ echo 'export GOPATH=$HOME/golang' >> $HOME/.profile
 $ echo 'export PATH=$PATH:$GOPATH/bin' >> $HOME/.profile
 ```
 
-Make a base path for your code.  (You'll need [a Github account][signup].)
-```
-$ mkdir -p $GOPATH/src/github.com/<username>
-```
-
 <a name="learn-go"/>
 ### Learn Go
 * To get familiar with the language, start with the official [Tour of Go][tour].
