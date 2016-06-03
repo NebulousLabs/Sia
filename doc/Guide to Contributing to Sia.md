@@ -98,7 +98,7 @@ $ git config --global credential.helper "cache --timeout=[seconds]"
 While logged into your Github account, navigate to the [Sia repository][sia] 
 and click the 'Fork' button in the upper righthand corner.  Your account now 
 has a 'forked' copy of the original repo at 
-`https://GitHub.com/<your GitHub username>/Sia`.
+`https://github.com/<your GitHub username>/Sia`.
 
 When you installed Sia using `go get`, the go tool put the Sia source code in 
 $GOPATH/src/github.com/NebulousLabs/Sia. Change to that directory and set up
@@ -173,8 +173,6 @@ $ git checkout <branch>
 $ git rebase master
 # Before every pull request, you should run `make test-long`
 # to test your code and fix formatting and style problems.
-# You need to be in the main directory if you're not already.
-$ cd $GOPATH/src/NebulousLabs/Sia
 $ make test-long
 # If all goes well, proceed to staging your changed files:
 $ git add <changed files>
@@ -239,19 +237,19 @@ Feel free to ask for help on the #dev channel on [Slack][slack].
 [source]: https://golang.org/doc/install/source
 [tour]: https://tour.golang.org/welcome/1
 [how]: https://golang.org/doc/code.html
-[luke]: https://gist.GitHub.com/lukechampine/6418449
+[luke]: https://gist.github.com/lukechampine/6418449
 [git]: https://git-scm.com/doc
 [cheney]: http://dave.cheney.net/2013/06/09/writing-table-driven-tests-in-go
 [install-go]: https://golang.org/doc/install
-[signup]: https://GitHub.com/join?source=header-home
+[signup]: https://github.com/join?source=header-home
 [effective]: https://golang.org/doc/effective_go.html
-[sia]: https://GitHub.com/NebulousLabs/Sia
+[sia]: https://github.com/NebulousLabs/Sia
 [branch]: http://blog.scottlowe.org/2015/01/27/using-fork-branch-git-workflow/
-[developers.md]: https://GitHub.com/NebulousLabs/Sia/blob/master/doc/Developers.md
+[developers.md]: https://github.com/NebulousLabs/Sia/blob/master/doc/Developers.md
 [gofmt]: https://golang.org/cmd/gofmt/
 [nutshell]: https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell
 [slack]: http://slackin.siacoin.com
 [install-git]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
-[test-doc]: https://GitHub.com/NebulousLabs/Sia/blob/master/doc/Testing.md
+[test-doc]: https://github.com/NebulousLabs/Sia/blob/master/doc/Testing.md
 [stashing]: https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning
 [remote]: https://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes
