@@ -122,10 +122,7 @@ func (c *Contractor) managedFormContracts(n int, a modules.Allowance) error {
 
 	// Check that allowance is sufficient to store at least one sector per
 	// host for the specified duration.
-	c.mu.RLock()
-	endHeight := c.blockHeight + a.Period
 	numSectors, err := maxSectors(a, c.hdb)
-	c.mu.RUnlock()
 	if err != nil {
 		return err
 	} else if numSectors == 0 {
@@ -133,6 +130,9 @@ func (c *Contractor) managedFormContracts(n int, a modules.Allowance) error {
 	}
 
 	// Form contracts with each host.
+	c.mu.RLock()
+	endHeight := c.blockHeight + a.Period
+	c.mu.RUnlock()
 	var numContracts int
 	var errs []string
 	for _, h := range hosts {
