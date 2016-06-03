@@ -205,6 +205,102 @@ func TestConnect(t *testing.T) {
 	g.mu.RUnlock()
 }
 
+// TestUnitAcceptableVersion tests that the acceptableVersion func returns an
+// error for unacceptable versions.
+func TestUnitAcceptableVersion(t *testing.T) {
+	invalidVersions := []string{
+		// ascii gibberish
+		"foobar",
+		"foobar.0",
+		"foobar.9",
+		"0.foobar",
+		"9.foobar",
+		"foobar.0.0",
+		"foobar.9.9",
+		"0.foobar.0",
+		"9.foobar.9",
+		"0.0.foobar",
+		"9.9.foobar",
+		// utf-8 gibberish
+		"世界",
+		"世界.0",
+		"世界.9",
+		"0.世界",
+		"9.世界",
+		"世界.0.0",
+		"世界.9.9",
+		"0.世界.0",
+		"9.世界.9",
+		"0.0.世界",
+		"9.9.世界",
+		// missing numbers
+		".",
+		"..",
+		"...",
+		"0.",
+		".1",
+		"2..",
+		".3.",
+		"..4",
+		"5.6.",
+		".7.8",
+		".9.0.",
+	}
+	for _, v := range invalidVersions {
+		err := acceptableVersion(v)
+		if _, ok := err.(invalidVersionError); err == nil || !ok {
+			t.Errorf("acceptableVersion returned %q for version %q, but expected invalidVersionError", err, v)
+		}
+	}
+	insufficientVersions := []string{
+		// random small versions
+		"0",
+		"00",
+		"0000000000",
+		"0.0",
+		"0000000000.0",
+		"0.0000000000",
+		"0.0.0.0.0.0.0.0",
+		"0.0.9",
+		"0.0.999",
+		"0.0.99999999999",
+		"0.1.2",
+		"0.1.2.3.4.5.6.7.8.9",
+		// pre-hardfork versions
+		"0.3.3",
+		"0.3.9.9.9.9.9.9.9.9.9.9",
+		"0.3.9999999999",
+	}
+	for _, v := range insufficientVersions {
+		err := acceptableVersion(v)
+		if _, ok := err.(insufficientVersionError); err == nil || !ok {
+			t.Errorf("acceptableVersion returned %q for version %q, but expected insufficientVersionError", err, v)
+		}
+	}
+	validVersions := []string{
+		minAcceptableVersion,
+		"0.4.0",
+		"0.6.0",
+		"0.6.1",
+		"0.9",
+		"0.999",
+		"0.9999999999",
+		"1",
+		"1.0",
+		"1.0.0",
+		"9",
+		"9.0",
+		"9.0.0",
+		"9.9.9",
+	}
+	for _, v := range validVersions {
+		err := acceptableVersion(v)
+		if err != nil {
+			t.Errorf("acceptableVersion returned %q for version %q, but expected nil", err, v)
+		}
+	}
+}
+
 // TestConnectRejects tests that Gateway.Connect only accepts peers with
 // sufficient and valid versions.
 func TestConnectRejects(t *testing.T) {

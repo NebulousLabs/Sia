@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -15,8 +16,16 @@ import (
 const (
 	// the gateway will not accept inbound connections above this threshold
 	fullyConnectedThreshold = 128
+
 	// the gateway will ask for more addresses below this threshold
 	minNodeListLen = 100
+
+	// minAcceptableVersion is the version below which the gateway will refuse to
+	// connect to peers and reject connection attempts.
+	//
+	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
+	// pre-hardfork.
+	minAcceptableVersion = "0.4.0"
 )
 
 var (
@@ -158,32 +167,11 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Printf("INFO: %v wants to connect", addr)
 
-	// read version
-	var remoteVersion string
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+	remoteVersion, err := acceptConnVersionHandshake(conn, build.Version)
+	if err != nil {
+		g.log.Debugf("INFO: %v wanted to connect but version handshake failed: %v", addr, err)
+		// TODO: should this be muxado.Server(conn).Close()?
 		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", addr, err)
-		return
-	}
-
-	// Check that version is acceptable.
-	//
-	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
-	// pre-hardfork.
-	//
-	// NOTE: this version must be bumped whenever the gateway or consensus
-	// breaks compatibility.
-	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
-		encoding.WriteObject(conn, "reject")
-		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
-		return
-	}
-
-	// respond with our version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
-		conn.Close()
-		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
 		return
 	}
 
@@ -225,6 +213,61 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
 
+// acceptableVersion returns an error if the version is unacceptable.
+func acceptableVersion(version string) error {
+	if !build.IsVersion(version) {
+		return insufficientVersionError(version)
+	}
+	if build.VersionCmp(version, minAcceptableVersion) < 0 {
+		return insufficientVersionError(version)
+	}
+	return nil
+}
+
+// connectVersionHandshake performs the version handshake and should be called
+// on the side making the connection request. The remote version is only
+// returned if err == nil.
+func connectVersionHandshake(conn net.Conn, version string) (remoteVersion string, err error) {
+	// Send our version.
+	if err := encoding.WriteObject(conn, version); err != nil {
+		return "", fmt.Errorf("failed to write version: %v", err)
+	}
+	// Read remote version.
+	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+		return "", fmt.Errorf("failed to read remote version: %v", err)
+	}
+	// Check that their version is acceptable.
+	if remoteVersion == "reject" {
+		return "", errPeerRejectedConn
+	}
+	if err := acceptableVersion(remoteVersion); err != nil {
+		return "", err
+	}
+	return remoteVersion, nil
+}
+
+// acceptConnVersionHandshake performs the version handshake and should be
+// called on the side accepting a connection request. The remote version is
+// only returned in err == nil.
+func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion string, err error) {
+	// Read remote version.
+	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+		return "", fmt.Errorf("failed to read remote version: %v", err)
+	}
+	// Check that their version is acceptable.
+	if err := acceptableVersion(remoteVersion); err != nil {
+		if err := encoding.WriteObject(conn, "reject"); err != nil {
+			return "", fmt.Errorf("failed to write reject: %v", err)
+		}
+		return "", err
+	}
+	// Send our version.
+	if err := encoding.WriteObject(conn, version); err != nil {
+		return "", fmt.Errorf("failed to write version: %v", err)
+	}
+	return remoteVersion, nil
+}
+
 // Connect establishes a persistent connection to a peer, and adds it to the
 // Gateway's peer list.
 func (g *Gateway) Connect(addr modules.NetAddress) error {
@@ -251,29 +294,11 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-	// send our version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
-		return err
-	}
-	// read version ack
-	var remoteVersion string
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
-		return err
-	}
-	// decide whether to accept this version
-	if remoteVersion == "reject" {
-		return errPeerRejectedConn
-	}
-	// Check that version is acceptable.
-	//
-	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
-	// pre-hardfork.
-	//
-	// NOTE: this version must be bumped whenever the gateway or consensus
-	// breaks compatibility.
-	if build.VersionCmp(remoteVersion, "0.4.0") < 0 {
+	remoteVersion, err := connectVersionHandshake(conn, build.Version)
+	if err != nil {
+		// TODO: should this be muxado.Client(conn).Close()?
 		conn.Close()
-		return insufficientVersionError(remoteVersion)
+		return err
 	}
 
 	g.log.Println("INFO: connected to new peer", addr)
