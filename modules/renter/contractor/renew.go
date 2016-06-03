@@ -73,13 +73,11 @@ func (c *Contractor) managedRenewContracts() {
 
 	numSectors, err := maxSectors(c.allowance, c.hdb)
 	c.mu.RUnlock()
-	if err != nil {
-		c.log.Println("WARN: could not calculate number of sectors allowance can support:", err)
-		return
-	}
-
 	if len(renewSet) == 0 {
 		// nothing to do
+		return
+	} else if err != nil {
+		c.log.Println("WARN: could not calculate number of sectors allowance can support:", err)
 		return
 	} else if numSectors == 0 {
 		c.log.Printf("WARN: want to renew %v contracts, but allowance is too small", len(renewSet))

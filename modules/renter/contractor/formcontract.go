@@ -102,7 +102,11 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 // managedFormContracts forms contracts with n hosts using the allowance
 // parameters.
-func (c *Contractor) managedFormContracts(n int, a modules.Allowance) error {
+func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight types.BlockHeight) error {
+	if n == 0 {
+		return nil
+	}
+
 	// Sample at least 10 hosts.
 	nRandomHosts := 2 * n
 	if nRandomHosts < 10 {
@@ -116,23 +120,10 @@ func (c *Contractor) managedFormContracts(n int, a modules.Allowance) error {
 	}
 	c.mu.RUnlock()
 	hosts := c.hdb.RandomHosts(nRandomHosts, exclude)
-	if len(hosts) < n/2 { // TODO: /2 is temporary until more hosts are online
+	if len(hosts) < n {
 		return errors.New("not enough hosts")
 	}
 
-	// Check that allowance is sufficient to store at least one sector per
-	// host for the specified duration.
-	numSectors, err := maxSectors(a, c.hdb)
-	if err != nil {
-		return err
-	} else if numSectors == 0 {
-		return errInsufficientAllowance
-	}
-
-	// Form contracts with each host.
-	c.mu.RLock()
-	endHeight := c.blockHeight + a.Period
-	c.mu.RUnlock()
 	var numContracts int
 	var errs []string
 	for _, h := range hosts {

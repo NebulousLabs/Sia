@@ -36,6 +36,10 @@ type Contractor struct {
 
 	financialMetrics modules.RenterFinancialMetrics
 
+	// serialize actions that modify contracts, such as SetAllowance and
+	// ProcessConsensusChange
+	contractLock sync.Mutex
+
 	mu sync.RWMutex
 }
 
@@ -72,17 +76,58 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		return errors.New("renew window must be less than period")
 	}
 
-	c.mu.RLock()
-	// calculate number of new contracts to form
-	var nContracts int
-	if a.Hosts > uint64(len(c.contracts)) {
-		nContracts = int(a.Hosts) - len(c.contracts)
+	// check that allowance is sufficient to store at least one sector
+	numSectors, err := maxSectors(a, c.hdb)
+	if err != nil {
+		return err
+	} else if numSectors == 0 {
+		return errInsufficientAllowance
 	}
-	c.mu.RUnlock()
 
-	// only form contracts if we need to and have enough funds to do so
-	if nContracts > 0 {
-		err := c.managedFormContracts(nContracts, a)
+	// prevent ProcessConsensusChange from renewing contracts until we have
+	// finished
+	c.contractLock.Lock()
+	defer c.contractLock.Unlock()
+
+	c.mu.Lock()
+	endHeight := c.blockHeight + a.Period
+
+	// check if allowance has different period or funds; if so, we should
+	// renew existing contracts with the new allowance.
+	// TODO: compare numSectors instead of allowance.Funds?
+	var renewSet []modules.RenterContract
+	if a.Period != c.allowance.Period || a.Funds.Cmp(c.allowance.Funds) != 0 {
+		for _, contract := range c.contracts {
+			renewSet = append(renewSet, contract)
+		}
+		// TODO: dangerous -- figure out a safer approach later
+		c.contracts = map[types.FileContractID]modules.RenterContract{}
+	}
+	c.mu.Unlock()
+
+	// renew existing contracts with new allowance parameters
+	var nRenewed int
+	for _, contract := range renewSet {
+		_, err := c.managedRenew(contract, numSectors, endHeight)
+		if err != nil {
+			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
+		} else if nRenewed++; nRenewed >= int(a.Hosts) {
+			break
+		}
+	}
+
+	// determine number of new contracts to form
+	var remaining int
+	if len(renewSet) != 0 {
+		remaining = int(a.Hosts) - nRenewed
+	} else {
+		c.mu.RLock()
+		remaining = int(a.Hosts) - len(c.contracts)
+		c.mu.RUnlock()
+	}
+
+	if remaining > 0 {
+		err := c.managedFormContracts(remaining, numSectors, endHeight)
 		if err != nil {
 			return err
 		}
@@ -91,7 +136,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// Set the allowance.
 	c.mu.Lock()
 	c.allowance = a
-	err := c.saveSync()
+	err = c.saveSync()
 	c.mu.Unlock()
 
 	return err
@@ -99,8 +144,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 // Contracts returns the contracts formed by the contractor.
 func (c *Contractor) Contracts() (cs []modules.RenterContract) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.contractLock.Lock()
+	defer c.contractLock.Unlock()
 	for _, c := range c.contracts {
 		cs = append(cs, c)
 	}
