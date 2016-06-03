@@ -88,7 +88,7 @@ Run `make cover` to run all tests for each package and generate color-coded
 `cover/<module>.html` in a browser to inspect a module's test coverage. For 
 example, here's part of the html file generated for the persist package: 
 
-![Screenshot](https://raw.githubusercontent.com/mnsl/Sia/812fce20fe982901e16e554de36cd5febbbcd4e0/doc/covertool.png)
+![Screenshot](assets/covertool.png)
 
 Meanwhile, `make bench` will call `gofmt` on all packages, then run all
 benchmarks (functions starting with `Benchmark` in `_test.go` files).
@@ -146,7 +146,7 @@ coverage.  We're working on fixing that, but we could use your help.
     the test function) instead of globally (outside the test function).  [That 
 	holds in general][global], not just for tests.
 * As always, code should adhere to the standards and conventions laid out in
-    [doc/Developers.md][developers]
+    [doc/Developers.md][developers].
 
 <a name="basic"/>
 ### Basic test format
