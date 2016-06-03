@@ -338,6 +338,7 @@ func TestConnectRejects(t *testing.T) {
 	tests := []struct {
 		version             string
 		errWant             error
+		invalidVersion      bool
 		insufficientVersion bool
 		msg                 string
 	}{
@@ -349,15 +350,15 @@ func TestConnectRejects(t *testing.T) {
 		},
 		// Test that Connect fails when the remote peer's version is ascii gibberish.
 		{
-			version:             "foobar",
-			insufficientVersion: true,
-			msg:                 "Connect should fail when the remote peer's version is ascii gibberish",
+			version:        "foobar",
+			invalidVersion: true,
+			msg:            "Connect should fail when the remote peer's version is ascii gibberish",
 		},
 		// Test that Connect fails when the remote peer's version is utf8 gibberish.
 		{
-			version:             "世界",
-			insufficientVersion: true,
-			msg:                 "Connect should fail when the remote peer's version is utf8 gibberish",
+			version:        "世界",
+			invalidVersion: true,
+			msg:            "Connect should fail when the remote peer's version is utf8 gibberish",
 		},
 		// Test that Connect fails when the remote peer's version is < 0.4.0 (0).
 		{
@@ -412,12 +413,18 @@ func TestConnectRejects(t *testing.T) {
 	for _, tt := range tests {
 		mockVersionChan <- tt.version
 		err = g.Connect(modules.NetAddress(listener.Addr().String()))
-		if tt.insufficientVersion {
+		switch {
+		case tt.invalidVersion:
+			// Check that the error is the expected type.
+			if _, ok := err.(invalidVersionError); !ok {
+				t.Fatalf("expected Connect to error with invalidVersionError: %s", tt.msg)
+			}
+		case tt.insufficientVersion:
 			// Check that the error is the expected type.
 			if _, ok := err.(insufficientVersionError); !ok {
 				t.Fatalf("expected Connect to error with insufficientVersionError: %s", tt.msg)
 			}
-		} else {
+		default:
 			// Check that the error is the expected error.
 			if err != tt.errWant {
 				t.Fatalf("expected Connect to error with '%v', but got '%v': %s", tt.errWant, err, tt.msg)

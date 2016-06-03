@@ -67,6 +67,14 @@ func (s insufficientVersionError) Error() string {
 	return "unacceptable version: " + string(s)
 }
 
+// invalidVersionError indicates a peer's version is not a valid version number.
+type invalidVersionError string
+
+// Error implements the error interface for invalidVersionError.
+func (s invalidVersionError) Error() string {
+	return "invalid version: " + string(s)
+}
+
 type peer struct {
 	modules.Peer
 	sess muxado.Session
@@ -216,7 +224,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 // acceptableVersion returns an error if the version is unacceptable.
 func acceptableVersion(version string) error {
 	if !build.IsVersion(version) {
-		return insufficientVersionError(version)
+		return invalidVersionError(version)
 	}
 	if build.VersionCmp(version, minAcceptableVersion) < 0 {
 		return insufficientVersionError(version)
