@@ -283,8 +283,15 @@ func TestErrCheckMetadata(t *testing.T) {
 		{Metadata{"¯|_(ツ)_|¯",""}, Metadata{"¯|_(ツ)_|¯","¯|_(ツ)_|¯"}, ErrBadVersion},
 		{Metadata{",,,,,","2^31"}, Metadata{",,,,","2^31"}, ErrBadHeader},
 		{Metadata{"/","/"}, Metadata{"//","/"}, ErrBadHeader},
+        {Metadata{"%*.*s","%d"}, Metadata{"%*.*s","%	d"}, ErrBadVersion},
 		{Metadata{" ",""}, Metadata{"	",""}, ErrBadHeader},
 		{Metadata{"Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗","Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗"}, Metadata{"Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗","Powerلُلُصّبُلُلصّبُررً ॣ ॣ  ॣ ॣ冗"}, ErrBadVersion},
+		{Metadata{"⒯⒣⒠ ⒬⒰⒤⒞⒦ ⒝⒭⒪⒲⒩ ⒡⒪⒳ ⒥⒰⒨⒫⒮ ⒪⒱⒠⒭ ⒯⒣⒠ ⒧⒜⒵⒴ ⒟⒪⒢","undefined"}, Metadata{"⒯⒣⒠ ⒬⒰⒤⒞⒦ ⒝⒭⒪⒲⒩ ⒡⒪⒳ ⒥⒰⒨⒫⒮ ⒪⒱⒠⒭ ⒯⒣⒠ ⒧⒜⒵⒴ ⒟⒪⒢","␢undefined"}, ErrBadVersion},
+		{Metadata{" ","  "}, Metadata{"  ","  "}, ErrBadHeader},
+		{Metadata{"\xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE"},Metadata{"\xF0\x9F\x98\x8F"," \xF0\x9F\x98\xBE"}, ErrBadVersion},
+		{Metadata{"\xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE"},Metadata{"\xF0\x98\x8F","\xF0\x9F\x98\xBE"}, ErrBadHeader},
+		{Metadata{"'",""}, Metadata{"`",""}, ErrBadHeader},
+		{Metadata{"","-"}, Metadata{"","-␡"}, ErrBadVersion},
 	}
 		
 	for _, in := range testInputs {		
@@ -456,34 +463,75 @@ func TestErrDatabaseNotOpen(t *testing.T) {
 	}
 }
 
-
 // TestErrIntegratedCheckMetadata checks that checkMetadata returns an error
 // within OpenDatabase when OpenDatabase is called on a BoltDatabase that 
 // has already been set up with different metadata.
 func TestErrIntegratedCheckMetadata(t *testing.T) {
-	testDir := build.TempDir(persistDir, "TestErrCheckMetadata")
+	testDir := build.TempDir(persistDir, "TestErrIntegratedCheckMetadata")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dbFilepath := filepath.Join(testDir, "fake_filename")
-	old := Metadata{"Old Header", "Old Version"}
-	new := Metadata{"New Header", "New Version"}
-	testErr := ErrBadHeader
-
-	boltDB, err := OpenDatabase(old, dbFilepath)
-	if err != nil {
-		t.Fatal(err)
+	testInputs := []struct{
+		old		Metadata
+		new		Metadata
+		err		error
+	}{
+		{Metadata{"",""}, Metadata{"asdf",""}, ErrBadHeader},
+		{Metadata{"",""}, Metadata{"","asdf"}, ErrBadVersion},
+		{Metadata{"_",""}, Metadata{"",""}, ErrBadHeader},
+		{Metadata{"","_"}, Metadata{"",""}, ErrBadVersion},
+		{Metadata{"%&*","#@$"}, Metadata{"","#@$"}, ErrBadHeader},
+		{Metadata{"bleep","bloop"}, Metadata{"bloop","bloop"}, ErrBadHeader},
+		{Metadata{"blip","blop"}, Metadata{"blip","blip"}, ErrBadVersion},
+		{Metadata{"a.sdf","0.30.2"}, Metadata{"a.sdf", "0.3.02" }, ErrBadVersion},
+		{Metadata{".asdf","0.30.2"}, Metadata{"asdf.", "0.3.02" }, ErrBadHeader},
+		{Metadata{".","0.0.0"}, Metadata{"..","0.0.0"}, ErrBadHeader},
+		{Metadata{"haggis","."}, Metadata{"haggis",""}, ErrBadVersion},
+		{Metadata{"¯|_(ツ)_|¯",""}, Metadata{"¯|_(ツ)_|¯","¯|_(ツ)_|¯"}, ErrBadVersion},
+		{Metadata{",,,,,","2^31"}, Metadata{",,,,","2^31"}, ErrBadHeader},
+		{Metadata{"/","/"}, Metadata{"//","/"}, ErrBadHeader},
+        {Metadata{"%*.*s","%d"}, Metadata{"%*.*s","%	d"}, ErrBadVersion},
+		{Metadata{" ",""}, Metadata{"	",""}, ErrBadHeader},
+		{Metadata{"Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗","Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗"}, Metadata{"Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗","Powerلُلُصّبُلُلصّبُررً ॣ ॣ  ॣ ॣ冗"}, ErrBadVersion},
+		{Metadata{"⒯⒣⒠ ⒬⒰⒤⒞⒦ ⒝⒭⒪⒲⒩ ⒡⒪⒳ ⒥⒰⒨⒫⒮ ⒪⒱⒠⒭ ⒯⒣⒠ ⒧⒜⒵⒴ ⒟⒪⒢","undefined"}, Metadata{"⒯⒣⒠ ⒬⒰⒤⒞⒦ ⒝⒭⒪⒲⒩ ⒡⒪⒳ ⒥⒰⒨⒫⒮ ⒪⒱⒠⒭ ⒯⒣⒠ ⒧⒜⒵⒴ ⒟⒪⒢","␢undefined"}, ErrBadVersion},
+		{Metadata{" ","  "}, Metadata{"  ","  "}, ErrBadHeader},
+		{Metadata{"\xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE"},Metadata{"\xF0\x9F\x98\x8F"," \xF0\x9F\x98\xBE"}, ErrBadVersion},
+		{Metadata{"\xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE"},Metadata{"\xF0\x98\x8F","\xF0\x9F\x98\xBE"}, ErrBadHeader},
+		{Metadata{"'",""}, Metadata{"`",""}, ErrBadHeader},
+		{Metadata{"","-"}, Metadata{"","-␡"}, ErrBadVersion},
 	}
 
-	err = boltDB.Close()
-	if err != nil {
-		t.Fatal(err)
+	testFilenames := []string{
+		"blip",
+		"blop",
+		"bloop",
 	}
 
-	boltDB, err = OpenDatabase(new, dbFilepath)
-	if err != testErr {
-		t.Error("expected error %v for input %v -> %v, got %v instead", testErr, old, new, err)
+	for _, in := range testInputs {
+		for _, filename := range testFilenames {
+			dbFilepath := filepath.Join(testDir, filename)
+
+			boltDB, err := OpenDatabase(in.old, dbFilepath)
+			if err != nil {
+				t.Errorf("OpenDatabase failed on input %v, filepath %v; error was %v", in, dbFilepath, err)
+			}
+			
+			err = boltDB.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			boltDB, err = OpenDatabase(in.new, dbFilepath)
+			if err != in.err {
+				t.Error("expected error %v for input %v and filename %v; got %v instead", in, filename, err)
+			}
+
+			err = os.Remove(dbFilepath)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }
