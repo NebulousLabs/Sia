@@ -26,8 +26,8 @@ func (srv *Server) gatewayHandler(w http.ResponseWriter, req *http.Request, _ ht
 	writeJSON(w, GatewayInfo{srv.gateway.Address(), peers})
 }
 
-// gatewayAddHandler handles the API call to add a peer to the gateway.
-func (srv *Server) gatewayAddHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+// gatewayConnectHandler handles the API call to add a peer to the gateway.
+func (srv *Server) gatewayConnectHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := srv.gateway.Connect(addr)
 	if err != nil {
@@ -38,8 +38,8 @@ func (srv *Server) gatewayAddHandler(w http.ResponseWriter, req *http.Request, p
 	writeSuccess(w)
 }
 
-// gatewayRemoveHandler handles the API call to remove a peer from the gateway.
-func (srv *Server) gatewayRemoveHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+// gatewayDisconnectHandler handles the API call to remove a peer from the gateway.
+func (srv *Server) gatewayDisconnectHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := srv.gateway.Disconnect(addr)
 	if err != nil {

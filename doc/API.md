@@ -263,11 +263,11 @@ Gateway
 
 Queries:
 
-* /gateway                     [GET]
-* /gateway/add/{netaddress}    [POST]
-* /gateway/remove/{netaddress} [POST]
+* /gateway                         [GET]
+* /gateway/connect/{netaddress}    [POST]
+* /gateway/disconnect/{netaddress} [POST]
 
-#### /gateway
+#### /gateway [GET]
 
 Function: Returns information about the gateway, including the list of peers.
 
@@ -290,22 +290,24 @@ address and the port Sia is listening on.
 'peers' is a list of the network addresses and versions of peers that the
 Gateway is currently connected to.
 
-#### /gateway/add/{netaddress} [POST]
+#### /gateway/connect/{netaddress} [POST]
 
-Function: Adds a peer to the gateway.
+Function: Connects the gateway to a peer. The peer is added to the node list if
+it not already present.
 
 Parameters:
 ```
 netaddress string
 ```
-'netaddress' should be a reachable hostname + port number, typically of the
+'netaddress' should be a reachable ip + port number, typically of the
 form "a.b.c.d:xxxx".
 
 Response: standard
 
-#### /gateway/remove/{netaddress} [POST]
+#### /gateway/disconnect/{netaddress} [POST]
 
-Function: Will remove a peer from the gateway.
+Function: Disconnects the gateway from the peer. The peer remains in the node
+list.
 
 Parameters:
 ```
