@@ -258,10 +258,7 @@ func TestErrTxNotWritable(t *testing.T) {
 		}
 		// Should return an error because updateMetadata is being called from
 		// a read-only transaction.
-		err = db.View(func(tx *bolt.Tx) error {
-			err = boltDB.updateMetadata(tx)
-			return err
-		})
+		err = db.View(boltDB.updateMetadata)
 		if err != bolt.ErrTxNotWritable {
 			t.Errorf("updateMetadata returned wrong error for input %v, filename %v; expected tx not writable, got %v", in.md, dbFilename, err)
 		}
