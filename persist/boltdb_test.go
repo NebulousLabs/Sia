@@ -22,7 +22,6 @@ var (
 		{Metadata{"1sadf23", "12253"}, Metadata{"1sa-df23", "12253"}, ErrBadHeader},
 		{Metadata{"$@#$%^&", "$@#$%^&"}, Metadata{"$@#$%^&", "$@#$%!^&"}, ErrBadVersion},
 		{Metadata{"//", "//"}, Metadata{"////", "//"}, ErrBadHeader},
-		{Metadata{"testHeader" + RandomSuffix(), "0.0.0"}, Metadata{"testHeader" + RandomSuffix(), "0.0.0"}, ErrBadHeader},
 		{Metadata{":]", ":)"}, Metadata{":]", ":("}, ErrBadVersion},
 		{Metadata{"¯|_(ツ)_|¯","_|¯(ツ)¯|_"}, Metadata{"¯|_(ツ)_|¯","_|¯(ツ)_|¯"}, ErrBadVersion},
 		{Metadata{"世界", "怎么办呢"}, Metadata{"世界", "怎么好呢"}, ErrBadVersion},
@@ -31,7 +30,6 @@ var (
         {Metadata{"","_"}, Metadata{"",""}, ErrBadVersion},
         {Metadata{"%&*","#@$"}, Metadata{"","#@$"}, ErrBadHeader},
         {Metadata{"a.sdf","0.30.2"}, Metadata{"a.sdf", "0.3.02" }, ErrBadVersion},
-        {Metadata{",,,,,","2^31"}, Metadata{",,,,","2^31"}, ErrBadHeader},
         {Metadata{"/","/"}, Metadata{"//","/"}, ErrBadHeader},
         {Metadata{"%*.*s","%d"}, Metadata{"%*.*s","%    d"}, ErrBadVersion},
         {Metadata{" ",""}, Metadata{"   ",""}, ErrBadHeader},
@@ -51,10 +49,7 @@ var (
 		"-",
 		"1234sg",
 		"@#$%@#",
-		"test" + RandomSuffix(),
-		":|",
 		"¯|_(ツ)_|¯",
-		"你好好好",
 		"你好好q wgc好",
 		"\xF0\x9F\x99\x8A",
 		"␣",
@@ -81,13 +76,7 @@ func TestOpenDatabase(t *testing.T) {
 	}
 
 	testBuckets := [][]byte{
-		[]byte("FakeBucket"),
-		[]byte("FakeBucket123"),
-		[]byte("FakeBucket123!@#$"),
-		[]byte("Another Fake Bucket"),
-		[]byte("FakeBucket" + RandomSuffix()),
-		[]byte("_"),
-		[]byte(" asdf"),
+		[]byte("Fake Bucket123!@#$"),
 		[]byte("你好好好"),
 		[]byte("¯|_(ツ)_|¯"),
 		[]byte("Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗"),
@@ -95,7 +84,7 @@ func TestOpenDatabase(t *testing.T) {
 		[]byte("(ﾉಥ益ಥ ┻━┻"),
 		[]byte("Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ ̖t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"),
 		[]byte("0xbadidea"),
-		[]byte("nil"),
+		[]byte("␣"),
 		[]byte("你好好好"),
 	}
 
@@ -107,113 +96,112 @@ func TestOpenDatabase(t *testing.T) {
 			t.Fatal(err)
 		}
 
-	for _, in := range testInputs {
-		for _, dbFilename := range testFilenames {
-			dbFilepath := filepath.Join(testDir, dbFilename)
+	for i, in := range testInputs {
+		dbFilename := testFilenames[i%len(testFilenames)]
+		dbFilepath := filepath.Join(testDir, dbFilename)
 
-			// Create a new database.
-			db, err := OpenDatabase(in.md, dbFilepath)
-			if err != nil {
-				t.Fatalf("calling OpenDatabase on a new database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
-			}
+		// Create a new database.
+		db, err := OpenDatabase(in.md, dbFilepath)
+		if err != nil {
+			t.Fatalf("calling OpenDatabase on a new database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+		}
 
-			// Close the newly-created, empty database.
-			err = db.Close()
-			if err != nil {
-				t.Fatalf("closing a newly created database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
-			}
+		// Close the newly-created, empty database.
+		err = db.Close()
+		if err != nil {
+			t.Fatalf("closing a newly created database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+		}
 
-			// Call OpenDatabase again, this time on the existing empty database.
-			db, err = OpenDatabase(in.md, dbFilepath)
-			if err != nil {
-				t.Fatalf("calling OpenDatabase on an existing empty database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
-			}
+		// Call OpenDatabase again, this time on the existing empty database.
+		db, err = OpenDatabase(in.md, dbFilepath)
+		if err != nil {
+			t.Fatalf("calling OpenDatabase on an existing empty database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+		}
 
-			// Create buckets in the database.
-			err = db.Update(func(tx *bolt.Tx) error {
-				for _, testBucket := range testBuckets {
-					_, err := tx.CreateBucketIfNotExists(testBucket)
-					if err != nil {
-						t.Fatalf("db.Update failed on bucket name %v for metadata %v, filename %v; error was", testBucket, in.md, dbFilename,  err)
-						return err
-					}
+		// Create buckets in the database.
+		err = db.Update(func(tx *bolt.Tx) error {
+			for _, testBucket := range testBuckets {
+				_, err := tx.CreateBucketIfNotExists(testBucket)
+				if err != nil {
+					t.Fatalf("db.Update failed on bucket name %v for metadata %v, filename %v; error was", testBucket, in.md, dbFilename,  err)
+					return err
 				}
-				return nil
-			})
-			if err != nil {
 			}
-
-			// Make sure CreateBucketIfNotExists method handles invalid (nil)
-			// bucket name.
-			err = db.Update(func(tx *bolt.Tx) error {
-				_, err := tx.CreateBucketIfNotExists(nil)
-				return err				
-			})
-			if err != bolt.ErrBucketNameRequired {
-				t.Fatalf("the CreateBucketIfNotExists method returned wrong error when fed nil byteslice (metadata was %v, filename was %v); expected %v, got %v", in.md, dbFilename, bolt.ErrBucketNameRequired, err)
-			}
-
-			// Fill each bucket with a random number (0-9, inclusive) of key/value
-			// pairs, where each key is a length-10 random byteslice and each value
-			// is a length-1000 random byteslice.
-			err = db.Update(func(tx *bolt.Tx) error {
-				for _, testBucket := range testBuckets {
-					b := tx.Bucket(testBucket)
-					x := rand.Intn(10)
-					for i := 0; i <= x; i++ {
-						k := make([]byte, 10)
-						rand.Read(k)
-						v := make([]byte, 1e3)
-						rand.Read(v)
-						err := b.Put(k, v)
-						if err != nil {
-							return err
-						}
-					}	
-				}
 			return nil
-			})		
-			if err != nil {
-				t.Fatal(err)
-			}	
+		})
+		if err != nil {
+		}
 
-			// Close the newly-filled database.
-			err = db.Close()
-			if err != nil {
-				t.Fatalf("closing a newly-filled database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
-			}
+		// Make sure CreateBucketIfNotExists method handles invalid (nil)
+		// bucket name.
+		err = db.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucketIfNotExists(nil)
+			return err				
+		})
+		if err != bolt.ErrBucketNameRequired {
+			t.Fatalf("the CreateBucketIfNotExists method returned wrong error when fed nil byteslice (metadata was %v, filename was %v); expected %v, got %v", in.md, dbFilename, bolt.ErrBucketNameRequired, err)
+		}
 
-			// Call OpenDatabase on the database now that it's been filled.
-			db, err = OpenDatabase(in.md, dbFilepath)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// Empty every bucket in the database.
-			err = db.Update(func(tx *bolt.Tx) error {
-				for _, testBucket := range testBuckets {
-					b := tx.Bucket(testBucket)
-					err := b.ForEach(func(k, v []byte) error {
-						return b.Delete(k)
-					})
+		// Fill each bucket with a random number (0-9, inclusive) of key/value
+		// pairs, where each key is a length-10 random byteslice and each value
+		// is a length-1000 random byteslice.
+		err = db.Update(func(tx *bolt.Tx) error {
+			for _, testBucket := range testBuckets {
+				b := tx.Bucket(testBucket)
+				x := rand.Intn(10)
+				for i := 0; i <= x; i++ {
+					k := make([]byte, 10)
+					rand.Read(k)
+					v := make([]byte, 1e3)
+					rand.Read(v)
+					err := b.Put(k, v)
 					if err != nil {
 						return err
 					}
+				}	
+			}
+		return nil
+		})		
+		if err != nil {
+			t.Fatal(err)
+		}	
+
+		// Close the newly-filled database.
+		err = db.Close()
+		if err != nil {
+			t.Fatalf("closing a newly-filled database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+		}
+
+		// Call OpenDatabase on the database now that it's been filled.
+		db, err = OpenDatabase(in.md, dbFilepath)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Empty every bucket in the database.
+		err = db.Update(func(tx *bolt.Tx) error {
+			for _, testBucket := range testBuckets {
+				b := tx.Bucket(testBucket)
+				err := b.ForEach(func(k, v []byte) error {
+					return b.Delete(k)
+				})
+				if err != nil {
+					return err
 				}
-				return nil
-			})
-
-			// Close the newly emptied database.
-			err = db.Close()
-			if err != nil {
-				t.Fatalf("closing a newly-emptied database for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 			}
+			return nil
+		})
 
-			// Clean up by deleting the testfile.
-			err = os.Remove(dbFilepath)
-			if err != nil {
-				t.Fatalf("removing database file failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
-			}
+		// Close the newly emptied database.
+		err = db.Close()
+		if err != nil {
+			t.Fatalf("closing a newly-emptied database for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+		}
+
+		// Clean up by deleting the testfile.
+		err = os.Remove(dbFilepath)
+		if err != nil {
+			t.Fatalf("removing database file failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 		}
 	}
 }
@@ -405,59 +393,58 @@ func TestErrCheckMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, in := range testInputs {		
-		for _, dbFilename := range testFilenames {
-			dbFilepath := filepath.Join(testDir, dbFilename)
+	for i, in := range testInputs {		
+		dbFilename := testFilenames[i%len(testFilenames)]
+		dbFilepath := filepath.Join(testDir, dbFilename)
 
-			db, err := bolt.Open(dbFilepath, 0600, &bolt.Options{Timeout: 3 * time.Second})
+		db, err := bolt.Open(dbFilepath, 0600, &bolt.Options{Timeout: 3 * time.Second})
+		if err != nil {
+			t.Fatal(err)
+		}
+		
+		boltDB := &BoltDatabase{
+			Metadata: 	in.md,
+			DB: 		db,
+		}
+
+		err = db.Update(func(tx *bolt.Tx) error {
+			bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
 			if err != nil {
-				t.Fatal(err)
+				return err
+			}
+
+			err = bucket.Put([]byte("Header"), []byte(in.newMd.Header))
+			if err != nil {
+				return err
 			}
 			
-			boltDB := &BoltDatabase{
-				Metadata: 	in.md,
-				DB: 		db,
-			}
-
-			err = db.Update(func(tx *bolt.Tx) error {
-				bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
-				if err != nil {
-					return err
+			err = bucket.Put([]byte("Version"), []byte(in.newMd.Version))
+			if err != nil {
+				return err
 				}
+			return nil
+		})
 
-				err = bucket.Put([]byte("Header"), []byte(in.newMd.Header))
-				if err != nil {
-					return err
-				}
-				
-				err = bucket.Put([]byte("Version"), []byte(in.newMd.Version))
-				if err != nil {
-					return err
-					}
-				return nil
-			})
+		if err != nil {
+			t.Errorf("Put method failed for input %v, filename %v with error %v", in, dbFilename, err)
+			continue
+		}	
+	
+		// Should return an error because boltDB's metadata 
+		// now differs from its original metadata. 
+		err = (*boltDB).checkMetadata(in.md) 
+		if err != in.err { 
+			t.Errorf("expected %v, got %v for input %v -> %v", in.err, err, in.md, in.newMd)	
+		}
+	
+		err = boltDB.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			if err != nil {
-				t.Errorf("Put method failed for input %v, filename %v with error %v", in, dbFilename, err)
-				continue
-			}	
-		
-			// Should return an error because boltDB's metadata 
-			// now differs from its original metadata. 
-			err = (*boltDB).checkMetadata(in.md) 
-			if err != in.err { 
-				t.Errorf("expected %v, got %v for input %v -> %v", in.err, err, in.md, in.newMd)	
-			}
-		
-			err = boltDB.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			err = os.Remove(dbFilepath)
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = os.Remove(dbFilepath)
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
@@ -477,29 +464,28 @@ func TestErrIntegratedCheckMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, in := range testInputs {
-		for _, dbFilename := range testFilenames {
-			dbFilepath := filepath.Join(testDir, dbFilename)
+	for i, in := range testInputs {
+	dbFilename := testFilenames[i%len(testFilenames)]	
+	dbFilepath := filepath.Join(testDir, dbFilename)
 
-			boltDB, err := OpenDatabase(in.md, dbFilepath)
-			if err != nil {
-				t.Errorf("OpenDatabase failed on input %v, filename %v; error was %v", in, dbFilename, err)
-			}
-			
-			err = boltDB.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
+		boltDB, err := OpenDatabase(in.md, dbFilepath)
+		if err != nil {
+			t.Errorf("OpenDatabase failed on input %v, filename %v; error was %v", in, dbFilename, err)
+		}
+		
+		err = boltDB.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			boltDB, err = OpenDatabase(in.newMd, dbFilepath)
-			if err != in.err {
-				t.Error("expected error %v for input %v and filename %v; got %v instead", in, dbFilename, err)
-			}
+		boltDB, err = OpenDatabase(in.newMd, dbFilepath)
+		if err != in.err {
+			t.Error("expected error %v for input %v and filename %v; got %v instead", in, dbFilename, err)
+		}
 
-			err = os.Remove(dbFilepath)
-			if err != nil {
-				t.Fatal(err)
-			}
+		err = os.Remove(dbFilepath)
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
