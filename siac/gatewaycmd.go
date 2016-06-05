@@ -14,22 +14,36 @@ var (
 	gatewayCmd = &cobra.Command{
 		Use:   "gateway",
 		Short: "Perform gateway actions",
-		Long:  "Add or remove a peer, view the current peer list, or synchronize to the network.",
+		Long:  "View and manage the gateway's connected peers.",
 		Run:   wrap(gatewaycmd),
 	}
 
-	gatewayAddCmd = &cobra.Command{
-		Use:   "add [address]",
-		Short: "Add a peer",
-		Long:  "Add a new peer to the peer list.",
-		Run:   wrap(gatewayaddcmd),
+	gatewayConnectCmd = &cobra.Command{
+		Use:   "connect [address]",
+		Short: "Connect to a peer",
+		Long:  "Connect to a peer and add it to the node list.",
+		Run:   wrap(gatewayconnectcmd),
 	}
 
-	gatewayRemoveCmd = &cobra.Command{
-		Use:   "remove [address]",
-		Short: "Remove a peer",
-		Long:  "Remove a peer from the peer list.",
-		Run:   wrap(gatewayremovecmd),
+	// COMPATv0.6.0
+	gatewayDeprecatedAddCmd = &cobra.Command{
+		Use:        "add [address]",
+		Deprecated: "use `siac gateway connect` instead.",
+		Run:        wrap(gatewayconnectcmd),
+	}
+
+	gatewayDisconnectCmd = &cobra.Command{
+		Use:   "disconnect [address]",
+		Short: "Disconnect from a peer",
+		Long:  "Disconnect from a peer. Does not remove the peer from the node list.",
+		Run:   wrap(gatewaydisconnectcmd),
+	}
+
+	// COMPATv0.6.0
+	gatewayDeprecatedRemoveCmd = &cobra.Command{
+		Use:        "remove [address]",
+		Deprecated: "use `siac gateway disconnect` instead.",
+		Run:        wrap(gatewaydisconnectcmd),
 	}
 
 	gatewayAddressCmd = &cobra.Command{
@@ -47,9 +61,9 @@ var (
 	}
 )
 
-// gatewayaddcmd is the handler for the command `siac gateway add [address]`.
+// gatewayconnectcmd is the handler for the command `siac gateway add [address]`.
 // Adds a new peer to the peer list.
-func gatewayaddcmd(addr string) {
+func gatewayconnectcmd(addr string) {
 	err := post("/gateway/add/"+addr, "")
 	if err != nil {
 		die("Could not add peer:", err)
@@ -57,9 +71,9 @@ func gatewayaddcmd(addr string) {
 	fmt.Println("Added", addr, "to peer list.")
 }
 
-// gatewayremovecmd is the handler for the command `siac gateway remove [address]`.
+// gatewaydisconnectcmd is the handler for the command `siac gateway remove [address]`.
 // Removes a peer from the peer list.
-func gatewayremovecmd(addr string) {
+func gatewaydisconnectcmd(addr string) {
 	err := post("/gateway/remove/"+addr, "")
 	if err != nil {
 		die("Could not remove peer:", err)
