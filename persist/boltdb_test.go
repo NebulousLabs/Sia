@@ -1,5 +1,3 @@
-// Borrowed weird strings from https://github.com/minimaxir/big-list-of-naughty-strings
-
 package persist
 
 import (
@@ -12,7 +10,11 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/bolt"
 )
-
+ 
+// testInputs and testFilenames are global variables because most tests require
+// a variety of metadata and filename inputs (although only TestCheckMetadata 
+// and TestIntegratedCheckMetadata use testInput.newMd and testInput.err). 
+// Weird strings are from https://github.com/minimaxir/big-ltist-of-naughty-strings
 var (
     testInputs = []struct{
         md		Metadata
@@ -42,7 +44,6 @@ var (
 		{Metadata{"\n\n","Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ ̖t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"}, Metadata{"\n\n","Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"}, ErrBadVersion},
     }
 
-
     testFilenames = []string{
 		" ",
 		"_",
@@ -60,6 +61,7 @@ var (
 		"%s",
     }
 )
+
 
 // TestOpenDatabase tests calling OpenDatabase on the following types of
 // database:
@@ -123,7 +125,7 @@ func TestOpenDatabase(t *testing.T) {
 			for _, testBucket := range testBuckets {
 				_, err := tx.CreateBucketIfNotExists(testBucket)
 				if err != nil {
-					t.Fatalf("db.Update failed on bucket name %v for metadata %v, filename %v; error was", testBucket, in.md, dbFilename,  err)
+					t.Fatalf("db.Update failed on bucket name %v for metadata %v, filename %v; error was %v", testBucket, in.md, dbFilename, err)
 					return err
 				}
 			}
@@ -221,8 +223,8 @@ func TestErrPermissionOpenDatabase(t *testing.T) {
 		dbFilename = "Fake Filename"
 	)
 
-	// Create a folder for the database file. If a folder by that
-	// name exists already, it will be replaced by an empty folder.
+	// Create a folder for the database file. If a folder by that name exists 
+	// already, it will be replaced by an empty folder.
 	testDir := build.TempDir(persistDir, "TestErrPermissionOpenDatabase")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
@@ -256,8 +258,8 @@ func TestErrPermissionOpenDatabase(t *testing.T) {
 }
 
 
-// TestErrTxNotWritable checks that updateMetadata returns an error
-// when called from a read-only transaction.
+// TestErrTxNotWritable checks that updateMetadata returns an error when called 
+// from a read-only transaction.
 func TestErrTxNotWritable(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -299,8 +301,9 @@ func TestErrTxNotWritable(t *testing.T) {
 	}
 }
 
-// TestErrDatabaseNotOpen tests that checkMetadata returns an error
-// when called on a BoltDatabase that is closed.
+
+// TestErrDatabaseNotOpen tests that checkMetadata returns an error when called 
+// on a BoltDatabase that is closed.
 func TestErrDatabaseNotOpen(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -342,8 +345,9 @@ func TestErrDatabaseNotOpen(t *testing.T) {
 	}
 }
 
-// TestErrCheckMetadata tests that checkMetadata returns an error
-// when called on a BoltDatabase whose metadata has been changed.
+
+// TestErrCheckMetadata tests that checkMetadata returns an error when called 
+// on a BoltDatabase whose metadata has been changed.
 func TestErrCheckMetadata(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -413,8 +417,8 @@ func TestErrCheckMetadata(t *testing.T) {
 
 
 // TestErrIntegratedCheckMetadata checks that checkMetadata returns an error
-// within OpenDatabase when OpenDatabase is called on a BoltDatabase that 
-// has already been set up with different metadata.
+// within OpenDatabase when OpenDatabase is called on a BoltDatabase that has 
+// already been set up with different metadata.
 func TestErrIntegratedCheckMetadata(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -427,8 +431,8 @@ func TestErrIntegratedCheckMetadata(t *testing.T) {
 	}
 
 	for i, in := range testInputs {
-	dbFilename := testFilenames[i%len(testFilenames)]	
-	dbFilepath := filepath.Join(testDir, dbFilename)
+		dbFilename := testFilenames[i%len(testFilenames)]	
+		dbFilepath := filepath.Join(testDir, dbFilename)
 
 		boltDB, err := OpenDatabase(in.md, dbFilepath)
 		if err != nil {
@@ -442,7 +446,7 @@ func TestErrIntegratedCheckMetadata(t *testing.T) {
 
 		boltDB, err = OpenDatabase(in.newMd, dbFilepath)
 		if err != in.err {
-			t.Error("expected error %v for input %v and filename %v; got %v instead", in, dbFilename, err)
+			t.Errorf("expected error %v for input %v and filename %v; got %v instead", in.err, in, dbFilename, err)
 		}
 
 		err = os.Remove(dbFilepath)
