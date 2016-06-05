@@ -269,47 +269,9 @@ func TestErrTxNotWritable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testInputs := []struct{
-		md			Metadata
-		filename	string
-	}{
-		{Metadata{"", ""}, " "},
-		{Metadata{"", ""}, "_"},
-		{Metadata{"_", "_"}, "_"},
-		{Metadata{"asdf", "asdf"}, "asdf"},
-		{Metadata{"1sadf23", "12253"}, "123kjhgfd"},
-		{Metadata{"$@#$%^&", "$@#$%^&"}, "$@#$%^&"},
-		{Metadata{"//", "//"}, "_"},
-		{Metadata{"testHeader" + RandomSuffix(), "0.0.0"}, "testFilename" + RandomSuffix()},
-		{Metadata{"testHeader	" + RandomSuffix(), "7.0.4"}, "testFilename" + RandomSuffix()},
-		{Metadata{"testHeader?" + RandomSuffix(), "asdf"}, "testFilename" + RandomSuffix()},
-		{Metadata{"testHeader...." + RandomSuffix(), ""}, "testFilename" + RandomSuffix()},
-		{Metadata{"testHeader/asdf" + RandomSuffix(), "_"}, "testFilename" + RandomSuffix()},
-		{Metadata{":]", ":)"}, ":|"},
-		{Metadata{"¯|_(ツ)_|¯","_|¯(ツ)¯|_"}, "¯|_(ツ)_|¯"},
-		{Metadata{"世界", "怎么办呢"}, "你好好好"},
-		{Metadata{"		","		"}," "},
-		{Metadata{"你好		好 好", "好a好3好你"}, "你好好q wgc好"},
-		{Metadata{"apparently \xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE"}, "\xF0\x9F\x99\x8A"},
-		{Metadata{"\xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE	emoji"}, "\xF0\x9F\x99\x8A"},
-		{Metadata{"\xF0\x9F\x98\x8F","\xF0\x9F\x98\xBE"}, "are okay?\xF0\x9F\x99\x8A"},
-		{Metadata{"nil","undefined"}, "A:"},		
-		{Metadata{"⒯⒣⒠ ⒬⒰⒤⒞⒦ ⒝⒭⒪⒲⒩ ⒡⒪⒳ ⒥⒰⒨⒫⒮ ⒪⒱⒠⒭ ⒯⒣⒠ ⒧⒜⒵⒴ ⒟⒪⒢","undefined"}, "PRN"},		
-		{Metadata{"\n","Ṱ̺̺̕o͞ ̷i̲̬͇̪͙n̝̗͕v̟̜̘̦͟o̶̙̰̠kè͚̮̺̪̹̱̤ ̖t̝͕̳̣̻̪͞h̼͓̲̦̳̘̲e͇̣̰̦̬͎ ̢̼̻̱̘h͚͎͙̜̣̲ͅi̦̲̣̰̤v̻͍e̺̭̳̪̰-m̢iͅn̖̺̞̲̯̰d̵̼̟͙̩̼̘̳ ̞̥̱̳̭r̛̗̘e͙p͠r̼̞̻̭̗e̺̠̣͟s̘͇̳͍̝͉e͉̥̯̞̲͚̬͜ǹ̬͎͎̟̖͇̤t͍̬̤͓̼̭͘ͅi̪̱n͠g̴͉ ͏͉ͅc̬̟h͡a̫̻̯͘o̫̟̖͍̙̝͉s̗̦̲.̨̹͈̣"}, "CON"},		
-		{Metadata{"𝕋𝕙𝕖 𝕢𝕦𝕚𝕔𝕜 𝕓𝕣𝕠𝕨𝕟 𝕗𝕠𝕩 𝕛𝕦𝕞𝕡𝕤 𝕠𝕧𝕖𝕣 𝕥𝕙𝕖 𝕝𝕒𝕫𝕪 𝕕𝕠𝕘","test"}, "␣"},		
-		{Metadata{"⁰⁴⁵₀₁₂","⅛⅜⅝⅞"}, " "},		
-		{Metadata{"הָיְתָהtestالصفحات التّحول",  "مُنَاقَشَةُ سُبُلِ اِسْتِخْدَامِ اللُّغَةِ فِي النُّظُمِ الْقَائِمَةِ وَفِيم يَخُصَّ التَّطْبِيقَاتُ الْحاسُوبِيَّةُ،"},"$HOME"},		
-		{Metadata{"<foo val=“bar” />","(ﾉಥ益ಥ ┻━┻"}, "$HOME"},		
-		{Metadata{"!@#$%^&*()`~","<>?:\"{}|_+/"}, ",.;'[]-="},		
-		{Metadata{"true","false"}, "A:"},		
-		{Metadata{"Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗","Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗"}, "Powerلُلُصّبُلُلصّبُررً ॣ ॣh ॣ ॣ冗"},		
-		{Metadata{"%*.*s","%d"}, "%s"},		
-
-	}
-
-	for _, in := range testInputs {
-
-		dbFilepath := filepath.Join(testDir, in.filename)
+	for i, in := range testInputs {
+		dbFilename := testFilenames[i%len(testFilenames)]
+		dbFilepath := filepath.Join(testDir, dbFilename)
 
 		db, err := bolt.Open(dbFilepath, 0600, &bolt.Options{Timeout: 3 * time.Second})
 		if err != nil {
@@ -325,7 +287,7 @@ func TestErrTxNotWritable(t *testing.T) {
 		// Should return an error since tx is a read-only transaction.
 		err = boltDB.updateMetadata(tx)
 		if err != bolt.ErrTxNotWritable {
-			t.Errorf("expected tx not writable, got %v", err)
+			t.Errorf("updateMetadata returned wrong error for input %v, filename %v; expected tx not writable, got %v", in.md, dbFilename, err)
 		}
 
 		tx.Commit()
