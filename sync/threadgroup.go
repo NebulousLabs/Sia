@@ -74,8 +74,8 @@ func (tg *ThreadGroup) Stop() error {
 		return ErrStopped
 	}
 	close(tg.stopChan)
-	for _, fn := range tg.stopFns {
-		fn()
+	for i := len(tg.stopFns) - 1; i >= 0; i-- {
+		tg.stopFns[i]()
 	}
 	tg.stopFns = nil
 	tg.mu.Unlock()
@@ -84,7 +84,7 @@ func (tg *ThreadGroup) Stop() error {
 }
 
 // OnStop adds a function to the ThreadGroup's stopFns set. Members of the set
-// will be closed when Stop is called.
+// will be called when Stop is called, in reverse order.
 func (tg *ThreadGroup) OnStop(fn func()) error {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
