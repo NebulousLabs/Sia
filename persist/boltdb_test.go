@@ -43,7 +43,6 @@ var (
 		{Metadata{"<foo val=“bar” />", "(ﾉಥ益ಥ ┻━┻"}, Metadata{"<foo val=“bar” />", "(ﾉ\nಥ益ಥ ┻━┻"}, ErrBadVersion},
 		{Metadata{"\n\n", "Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ ̖t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"}, Metadata{"\n\n", "Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"}, ErrBadVersion},
 	}
-
 	testFilenames = []string{
 		" ",
 		"_",
@@ -75,7 +74,6 @@ func TestOpenDatabase(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	testBuckets := [][]byte{
 		[]byte("Fake Bucket123!@#$"),
 		[]byte("你好好好"),
@@ -88,7 +86,6 @@ func TestOpenDatabase(t *testing.T) {
 		[]byte("␣"),
 		[]byte("你好好好"),
 	}
-
 	// Create a folder for the database file. If a folder by that name exists
 	// already, it will be replaced by an empty folder.
 	testDir := build.TempDir(persistDir, "TestOpenNewDatabase")
@@ -96,29 +93,24 @@ func TestOpenDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	for i, in := range testInputs {
 		dbFilename := testFilenames[i%len(testFilenames)]
 		dbFilepath := filepath.Join(testDir, dbFilename)
-
 		// Create a new database.
 		db, err := OpenDatabase(in.md, dbFilepath)
 		if err != nil {
 			t.Fatalf("calling OpenDatabase on a new database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 		}
-
 		// Close the newly-created, empty database.
 		err = db.Close()
 		if err != nil {
 			t.Fatalf("closing a newly created database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 		}
-
 		// Call OpenDatabase again, this time on the existing empty database.
 		db, err = OpenDatabase(in.md, dbFilepath)
 		if err != nil {
 			t.Fatalf("calling OpenDatabase on an existing empty database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 		}
-
 		// Create buckets in the database.
 		err = db.Update(func(tx *bolt.Tx) error {
 			for _, testBucket := range testBuckets {
@@ -130,24 +122,17 @@ func TestOpenDatabase(t *testing.T) {
 			}
 			return nil
 		})
-
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		// Make sure CreateBucketIfNotExists method handles invalid (nil)
 		// bucket name.
 		err = db.Update(func(tx *bolt.Tx) error {
 			_, err := tx.CreateBucketIfNotExists(nil)
 			return err
 		})
-
-		//
 		if err != bolt.ErrBucketNameRequired {
-			t.Errorf("the CreateBucketIfNotExists method returned wrong error when fed nil byteslice (metadata was %v, filename was %v); expected %v, got %v", in.md, dbFilename, bolt.ErrBucketNameRequired, err)
-			continue
 		}
-
 		// Fill each bucket with a random number (0-9, inclusive) of key/value
 		// pairs, where each key is a length-10 random byteslice and each value
 		// is a length-1000 random byteslice.
@@ -169,23 +154,19 @@ func TestOpenDatabase(t *testing.T) {
 			}
 			return nil
 		})
-
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		// Close the newly-filled database.
 		err = db.Close()
 		if err != nil {
 			t.Fatalf("closing a newly-filled database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 		}
-
 		// Call OpenDatabase on the database now that it's been filled.
 		db, err = OpenDatabase(in.md, dbFilepath)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		// Empty every bucket in the database.
 		err = db.Update(func(tx *bolt.Tx) error {
 			for _, testBucket := range testBuckets {
@@ -199,14 +180,11 @@ func TestOpenDatabase(t *testing.T) {
 			}
 			return nil
 		})
-
-		// Close the newly emptied database.
+		// Close and delete the newly emptied database.
 		err = db.Close()
 		if err != nil {
 			t.Fatalf("closing a newly-emptied database for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 		}
-
-		// Clean up by deleting the testfile.
 		err = os.Remove(dbFilepath)
 		if err != nil {
 			t.Fatalf("removing database file failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
@@ -221,15 +199,11 @@ func TestErrPermissionOpenDatabase(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	const (
 		dbHeader   = "Fake Header"
 		dbVersion  = "0.0.0"
 		dbFilename = "Fake Filename"
 	)
-
-	// Create a folder for the database file. If a folder by that name exists
-	// already, it will be replaced by an empty folder.
 	testDir := build.TempDir(persistDir, "TestErrPermissionOpenDatabase")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
@@ -247,14 +221,12 @@ func TestErrPermissionOpenDatabase(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		// OpenDatabase should return a permissions error because the database
 		// mode is less than 0600.
 		_, err = OpenDatabase(Metadata{dbHeader, dbVersion}, dbFilepath)
 		if !os.IsPermission(err) {
 			t.Errorf("OpenDatabase failed to return expected error when called on a database with the wrong permissions (%o instead of >= 0600);\n wanted:\topen %v: permission denied\n got:\t\t%v", mode, dbFilepath, err)
 		}
-
 		err = os.Remove(dbFilepath)
 		if err != nil {
 			t.Error(err)
@@ -268,41 +240,35 @@ func TestErrTxNotWritable(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	testDir := build.TempDir(persistDir, "TestErrTxNotWritable")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	for i, in := range testInputs {
 		dbFilename := testFilenames[i%len(testFilenames)]
 		dbFilepath := filepath.Join(testDir, dbFilename)
-
 		db, err := bolt.Open(dbFilepath, 0600, &bolt.Options{Timeout: 3 * time.Second})
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		boltDB := &BoltDatabase{
 			Metadata: in.md,
 			DB:       db,
 		}
-
+		// Should return an error because updateMetadata is being called from
+		// a read-only transaction.
 		err = db.View(func(tx *bolt.Tx) error {
 			err = boltDB.updateMetadata(tx)
 			return err
 		})
-
 		if err != bolt.ErrTxNotWritable {
 			t.Errorf("updateMetadata returned wrong error for input %v, filename %v; expected tx not writable, got %v", in.md, dbFilename, err)
 		}
-
 		err = boltDB.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		err = os.Remove(dbFilepath)
 		if err != nil {
 			t.Fatal(err)
@@ -316,37 +282,30 @@ func TestErrDatabaseNotOpen(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	testDir := build.TempDir(persistDir, "TestErrDatabaseNotOpen")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	dbFilepath := filepath.Join(testDir, "fake_filename")
 	md := Metadata{"Fake Header", "Fake Version"}
-
 	db, err := bolt.Open(dbFilepath, 0600, &bolt.Options{Timeout: 3 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	boltDB := &BoltDatabase{
 		Metadata: md,
 		DB:       db,
 	}
-
 	err = boltDB.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Should return an error since boltDB is closed.
 	err = boltDB.checkMetadata(md)
 	if err != bolt.ErrDatabaseNotOpen {
 		t.Errorf("expected database not open, got %v", err)
 	}
-
 	err = os.Remove(dbFilepath)
 	if err != nil {
 		t.Error(err)
@@ -359,62 +318,51 @@ func TestErrCheckMetadata(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	testDir := build.TempDir(persistDir, "TestErrCheckMetadata")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	for i, in := range testInputs {
 		dbFilename := testFilenames[i%len(testFilenames)]
 		dbFilepath := filepath.Join(testDir, dbFilename)
-
 		db, err := bolt.Open(dbFilepath, 0600, &bolt.Options{Timeout: 3 * time.Second})
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		boltDB := &BoltDatabase{
 			Metadata: in.md,
 			DB:       db,
 		}
-
 		err = db.Update(func(tx *bolt.Tx) error {
 			bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
 			if err != nil {
 				return err
 			}
-
 			err = bucket.Put([]byte("Header"), []byte(in.newMd.Header))
 			if err != nil {
 				return err
 			}
-
 			err = bucket.Put([]byte("Version"), []byte(in.newMd.Version))
 			if err != nil {
 				return err
 			}
 			return nil
 		})
-
 		if err != nil {
 			t.Errorf("Put method failed for input %v, filename %v with error %v", in, dbFilename, err)
 			continue
 		}
-
-		// Should return an error because boltDB's metadata
-		// now differs from its original metadata.
+		// Should return an error because boltDB's metadata now differs from
+		// its original metadata.
 		err = (*boltDB).checkMetadata(in.md)
 		if err != in.err {
 			t.Errorf("expected %v, got %v for input %v -> %v", in.err, err, in.md, in.newMd)
 		}
-
 		err = boltDB.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		err = os.Remove(dbFilepath)
 		if err != nil {
 			t.Fatal(err)
@@ -429,32 +377,27 @@ func TestErrIntegratedCheckMetadata(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	testDir := build.TempDir(persistDir, "TestErrIntegratedCheckMetadata")
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	for i, in := range testInputs {
 		dbFilename := testFilenames[i%len(testFilenames)]
 		dbFilepath := filepath.Join(testDir, dbFilename)
-
 		boltDB, err := OpenDatabase(in.md, dbFilepath)
 		if err != nil {
 			t.Errorf("OpenDatabase failed on input %v, filename %v; error was %v", in, dbFilename, err)
 		}
-
 		err = boltDB.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
-
+		// Should return an error because boltDB was set up with metadata in.md, not in.newMd
 		boltDB, err = OpenDatabase(in.newMd, dbFilepath)
 		if err != in.err {
 			t.Errorf("expected error %v for input %v and filename %v; got %v instead", in.err, in, dbFilename, err)
 		}
-
 		err = os.Remove(dbFilepath)
 		if err != nil {
 			t.Fatal(err)
