@@ -127,10 +127,11 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	// Check that the host is reporting a profit.
 	var hg HostGET
 	st.getAPI("/host", &hg)
-	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 {
-		t.Fatal("host is not reporting storage revenue")
-	}
-	if hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
-		t.Fatal("host is not reporting bandwidth revenue")
+	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 ||
+		hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
+		t.Error("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
+		t.Error("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
+		t.Error("Full Financial Metrics:", hg.FinancialMetrics)
+		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
 	}
 }
