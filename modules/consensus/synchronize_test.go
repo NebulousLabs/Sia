@@ -1197,13 +1197,12 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 
 // TestIntegrationRelaySynchronize tests that blocks are relayed as they are
 // accepted and that peers stay synchronized. This test is header/block
-// broadcast agnostic.  When build.Version <= 0.5.1 block relaying will be
+// broadcast agnostic. When build.Version <= 0.5.1 block relaying will be
 // tested. When build.Version > 0.5.1 header relaying will be tested.
 func TestIntegrationRelaySynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	cst1, err := blankConsensusSetTester("TestRelaySynchronize1")
 	if err != nil {
 		t.Fatal(err)
@@ -1248,6 +1247,9 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// cst2, and then to cst3.
 	b, err := cst1.miner.AddBlock()
 	if err != nil {
+		t.Error(b.ID())
+		t.Error(cst1.cs.CurrentBlock().ID())
+		t.Error(cst2.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
 
@@ -1261,7 +1263,6 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if cst2.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("Block propagation has failed")
 	}
-
 	// Spin until the block has propagated to cst3.
 	for i := 0; i < 100; i++ {
 		time.Sleep(50 * time.Millisecond)
@@ -1276,9 +1277,12 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// Mine a block on cst2.
 	b, err = cst2.miner.AddBlock()
 	if err != nil {
+		t.Error(b.ID())
+		t.Error(cst2.cs.CurrentBlock().ID())
+		t.Error(cst3.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
-	// Spin until the block has propagated.
+	// Spin until the block has propagated to cst1.
 	for i := 0; i < 100; i++ {
 		time.Sleep(50 * time.Millisecond)
 		if cst1.cs.CurrentBlock().ID() == b.ID() {
@@ -1288,6 +1292,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if cst1.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("block propagation has failed")
 	}
+	// Spin until the block has propagated to cst3.
 	for i := 0; i < 100; i++ {
 		time.Sleep(50 * time.Millisecond)
 		if cst3.cs.CurrentBlock().ID() == b.ID() {
@@ -1301,9 +1306,12 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// Mine a block on cst3.
 	b, err = cst3.miner.AddBlock()
 	if err != nil {
+		t.Error(b.ID())
+		t.Error(cst1.cs.CurrentBlock().ID())
+		t.Error(cst3.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
-	// Spin until the block has propagated.
+	// Spin until the block has propagated to cst1.
 	for i := 0; i < 100; i++ {
 		time.Sleep(50 * time.Millisecond)
 		if cst1.cs.CurrentBlock().ID() == b.ID() {
@@ -1313,6 +1321,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if cst1.cs.CurrentBlock().ID() != b.ID() {
 		t.Fatal("block propagation has failed")
 	}
+	// Spin until the block has propagated to cst2.
 	for i := 0; i < 100; i++ {
 		time.Sleep(50 * time.Millisecond)
 		if cst2.cs.CurrentBlock().ID() == b.ID() {
