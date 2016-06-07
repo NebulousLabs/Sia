@@ -173,7 +173,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	defer g.threads.Done()
 
 	addr := modules.NetAddress(conn.RemoteAddr().String())
-	g.log.Printf("INFO: %v wants to connect", addr)
+	g.log.Debugf("INFO: %v wants to connect", addr)
 
 	remoteVersion, err := acceptConnVersionHandshake(conn, build.Version)
 	if err != nil {
@@ -218,7 +218,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	})
 	g.mu.Unlock()
 
-	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
+	g.log.Debugf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
 
 // acceptableVersion returns an error if the version is unacceptable.
@@ -309,7 +309,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return err
 	}
 
-	g.log.Println("INFO: connected to new peer", addr)
+	g.log.Debugln("INFO: connected to new peer", addr)
 
 	g.mu.Lock()
 	g.addPeer(&peer{
@@ -339,7 +339,10 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 			}
 			defer g.threads.Done()
 
-			g.RPC(addr, name, fn)
+			err := g.RPC(addr, name, fn)
+			if err != nil {
+				g.log.Debugf("INFO: RPC %q on peer %q failed: %v", name, addr, err)
+			}
 		}(name, fn)
 	}
 	g.mu.RUnlock()
