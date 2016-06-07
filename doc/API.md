@@ -27,6 +27,17 @@ Example GET curl call:  `curl -A "Sia-Agent" /wallet/transactions?startheight=1&
 
 Example POST curl call: `curl -A "Sia-Agent" --data "amount=123&destination=abcd" /wallet/siacoins
 
+Table of contents:
+- [Daemon](#daemon)
+- [Consensus](#consensus)
+- [Explorer](#explorer)
+- [Gateway](#gateway)
+- [Host](#host)
+- [Miner](#miner)
+- [Renter](#renter)
+- [Transaction Pool](#transaction-pool)
+- [Wallet](#wallet)
+
 Daemon
 ------
 
