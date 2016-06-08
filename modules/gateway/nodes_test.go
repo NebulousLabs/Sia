@@ -179,7 +179,7 @@ func TestShareNodes(t *testing.T) {
 	// SharePeers should now return no peers
 	var nodes []modules.NetAddress
 	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +198,7 @@ func TestShareNodes(t *testing.T) {
 		}
 	}
 	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength)
 	})
 	if err != nil {
 		t.Fatal(err)

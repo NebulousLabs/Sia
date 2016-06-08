@@ -12,7 +12,6 @@ import (
 
 const (
 	maxSharedNodes = 10
-	maxAddrLength  = 100 // TODO: max NetAddress length is 254 for the hostname (including the trailing dot, 253 without) + 1 for the : + 5 for the port.
 	minPeers       = 3
 )
 
@@ -77,7 +76,7 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 // requestNodes is the calling end of the ShareNodes RPC.
 func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	var nodes []modules.NetAddress
-	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength); err != nil {
 		return err
 	}
 	g.mu.Lock()
