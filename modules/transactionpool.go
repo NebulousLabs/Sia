@@ -29,8 +29,8 @@ var (
 	ErrLargeTransaction = errors.New("transaction is too large for this transaction pool")
 
 	// ErrLargeTransactionSet is the error that gets returned if a transaction
-	// set set given to the transaction pool is larger than the limit placed
-	// by the IsStandard rules of the transaction pool.
+	// set given to the transaction pool is larger than the limit placed by the
+	// IsStandard rules of the transaction pool.
 	ErrLargeTransactionSet = errors.New("transaction set is too large for this transaction pool")
 
 	// ErrInvalidArbPrefix is the error that gets returned if a transaction is

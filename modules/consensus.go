@@ -78,7 +78,7 @@ type (
 
 		// RevertedBlocks is the list of blocks that were reverted by the change.
 		// The reverted blocks were always all reverted before the applied blocks
-		// were applied. The reverted blocks are presented in the order that they
+		// were applied. The revered blocks are presented in the order that they
 		// were reverted.
 		RevertedBlocks []types.Block
 
