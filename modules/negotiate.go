@@ -23,7 +23,7 @@ const (
 	StopResponse = "stop"
 
 	// NegotiateDownloadTime defines the amount of time that the renter and
-	// host have to negotitate a download request batch. The time is set high
+	// host have to negotiate a download request batch. The time is set high
 	// enough that two nodes behind Tor have a reasonable chance of completing
 	// the negotiation.
 	NegotiateDownloadTime = 600 * time.Second
@@ -209,7 +209,7 @@ type (
 	// build its database.
 	HostExternalSettings struct {
 		// MaxBatchSize indicates the maximum size in bytes that a batch is
-		// allowed to be. A batch is an array of revision actions, each
+		// allowed to be. A batch is an array of revision actions; each
 		// revision action can have a different number of bytes, depending on
 		// the action, so the number of revision actions allowed depends on the
 		// sizes of each.
@@ -266,7 +266,7 @@ type (
 	}
 
 	// A RevisionAction is a description of an edit to be performed on a file
-	// contract. Three types are allowed, 'ActionDelecte', 'ActionInsert', and
+	// contract. Three types are allowed, 'ActionDelete', 'ActionInsert', and
 	// 'ActionModify'. ActionDelete just takes a sector index, indicating which
 	// sector is going to be deleted. ActionInsert takes a sector index, and a
 	// full sector of data, indicating that a sector at the index should be

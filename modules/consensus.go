@@ -28,7 +28,7 @@ var (
 
 	// ConsensusChangeRecent is a special consensus change id that tells the
 	// consensus set to provide the most recent consensus change, instead of
-	// starting from a specific value (which many not be known to the caller).
+	// starting from a specific value (which may not be known to the caller).
 	ConsensusChangeRecent = ConsensusChangeID{1}
 
 	// ErrBlockKnown is an error indicating that a block is already in the
@@ -42,7 +42,7 @@ var (
 	// ErrInvalidConsensusChangeID indicates that ConsensusSetPersistSubscribe
 	// was called with a consensus change id that is not recognized. Most
 	// commonly, this means that the consensus set was deleted or replaced and
-	// now the module attempting the subscription has desynchonized. This error
+	// now the module attempting the subscription has desynchronized. This error
 	// should be handled by the module, and not reported to the user.
 	ErrInvalidConsensusChangeID = errors.New("consensus subscription has invalid id - files are inconsistent")
 
@@ -78,7 +78,7 @@ type (
 
 		// RevertedBlocks is the list of blocks that were reverted by the change.
 		// The reverted blocks were always all reverted before the applied blocks
-		// were applied. The revered blocks are presented in the order that they
+		// were applied. The reverted blocks are presented in the order that they
 		// were reverted.
 		RevertedBlocks []types.Block
 
@@ -180,7 +180,7 @@ type (
 		// run any required closing routines.
 		Close() error
 
-		// ConsensusSetSubscribe adds a subscriber to the list of subscribers,
+		// ConsensusSetSubscribe adds a subscriber to the list of subscribers
 		// and gives them every consensus change that has occurred since the
 		// change with the provided id. There are a few special cases,
 		// described by the ConsensusChangeX variables in this package.

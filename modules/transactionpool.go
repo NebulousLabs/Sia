@@ -21,7 +21,7 @@ const (
 var (
 	// ErrDuplicateTransactionSet is the error that gets returned if a
 	// duplicate transaction set is given to the transaction pool.
-	ErrDuplicateTransactionSet = errors.New("transaction set contains only duplicate transaction")
+	ErrDuplicateTransactionSet = errors.New("transaction set contains only duplicate transactions")
 
 	// ErrLargeTransaction is the error that gets returned if a transaction
 	// provided to the transaction pool is larger than what is allowed by the
@@ -29,8 +29,8 @@ var (
 	ErrLargeTransaction = errors.New("transaction is too large for this transaction pool")
 
 	// ErrLargeTransactionSet is the error that gets returned if a transaction
-	// set is given to the transaction pool if the transaction is larger than
-	// limit placed by the IsStandard rules of the transaction pool.
+	// set set given to the transaction pool is larger than the limit placed
+	// by the IsStandard rules of the transaction pool.
 	ErrLargeTransactionSet = errors.New("transaction set is too large for this transaction pool")
 
 	// ErrInvalidArbPrefix is the error that gets returned if a transaction is

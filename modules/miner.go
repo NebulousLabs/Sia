@@ -53,14 +53,14 @@ type TestMiner interface {
 	AddBlock() (types.Block, error)
 
 	// BlockForWork returns a block that is ready for nonce grinding. All
-	// blocks returned by BlockForWork have a unique merkle root, meaning that
+	// blocks returned by BlockForWork have a unique Merkle root, meaning that
 	// each can safely start from nonce 0.
 	BlockForWork() (types.Block, types.Target, error)
 
 	// FindBlock will have the miner make 1 attempt to find a solved block that
 	// builds on the current consensus set. It will give up after a few
 	// seconds, returning the block and a bool indicating whether the block is
-	// sovled.
+	// solved.
 	FindBlock() (types.Block, error)
 
 	// SolveBlock will have the miner make 1 attempt to solve the input block,
