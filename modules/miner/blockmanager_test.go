@@ -14,7 +14,7 @@ import (
 func solveHeader(header types.BlockHeader, target types.Target) types.BlockHeader {
 	// Solve the header.
 	for {
-		// Incrememnt the nonce first to guarantee that a new header is formed
+		// Increment the nonce first to guarantee that a new header is formed
 		// - this helps check for pointer errors.
 		header.Nonce[0]++
 		id := crypto.HashObject(header)
@@ -44,7 +44,7 @@ func TestIntegrationHeaderForWork(t *testing.T) {
 	solvedHeader := solveHeader(header, target)
 	// Sanity check - header and solvedHeader should be different. (within the
 	// testing file, 'header' should always have a nonce of '0' and
-	// solvedHeader should never have a nonce of '0'.
+	// solvedHeader should never have a nonce of '0'.)
 	if header.Nonce == solvedHeader.Nonce {
 		t.Fatal("nonce memory is not independent")
 	}
@@ -63,7 +63,7 @@ func TestIntegrationHeaderForWorkUpdates(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	mt, err := createMinerTester("TestIntegreationHeaderForWorkUpdates")
+	mt, err := createMinerTester("TestIntegrationHeaderForWorkUpdates")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestIntegrationHeaderForWorkUpdates(t *testing.T) {
 	}
 }
 
-// TestIntegrationManyHeaders checks that requesting a full set of headers a
+// TestIntegrationManyHeaders checks that requesting a full set of headers in a
 // row results in all unique headers, and that all of them can be reassembled
 // into valid blocks.
 func TestIntegrationManyHeaders(t *testing.T) {
