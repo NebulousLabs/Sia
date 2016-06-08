@@ -241,6 +241,10 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	if err != nil && err != errNodeExists {
 		return fmt.Errorf("error adding node %q: %v", remoteAddr, err)
 	}
+	err = g.save()
+	if err != nil {
+		return fmt.Errorf("error saving node list: %v", err)
+	}
 
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
@@ -388,6 +392,10 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 	if err != nil && err != errNodeExists {
 		return err
 	}
+	err = g.save()
+	if err != nil {
+		return fmt.Errorf("error saving node list: %v", err)
+	}
 
 	g.addPeer(&peer{
 		Peer: modules.Peer{
@@ -416,6 +424,10 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 	err = g.addNode(remoteAddr)
 	if err != nil && err != errNodeExists {
 		return err
+	}
+	err = g.save()
+	if err != nil {
+		return fmt.Errorf("error saving node list: %v", err)
 	}
 
 	g.addPeer(&peer{

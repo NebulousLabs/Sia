@@ -25,46 +25,55 @@ func TestGatewayStatus(t *testing.T) {
 	}
 }
 
-// TestGatewayPeerAdd checks that /gateway/add is adding a peer to the
+// TestGatewayPeerConnect checks that /gateway/connect is adding a peer to the
 // gateway's peerlist.
-func TestGatewayPeerAdd(t *testing.T) {
+func TestGatewayPeerConnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestGatewayPeerConnect")
+	st, err := createServerTester("TestGatewayPeerConnect1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	peer, err := gateway.New("localhost:0", build.TempDir("api", "TestGatewayPeerConnect", "gateway"))
+	peer, err := gateway.New("localhost:0", build.TempDir("api", "TestGatewayPeerConnect2", "gateway"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
+	err = st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var info GatewayInfo
-	st.getAPI("/gateway", &info)
+	err = st.getAPI("/gateway", &info)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(info.Peers) != 1 || info.Peers[0].NetAddress != peer.Address() {
 		t.Fatal("/gateway/connect did not connect to peer", peer.Address())
 	}
 }
 
-// TestGatewayPeerRemove checks that gateway/remove removes the correct peer
-// from the gateway's peerlist.
-func TestGatewayPeerRemove(t *testing.T) {
+// TestGatewayPeerDisconnect checks that /gateway/disconnect removes the
+// correct peer from the gateway's peerlist.
+func TestGatewayPeerDisconnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestGatewayPeerDisconnect")
+	st, err := createServerTester("TestGatewayPeerDisconnect1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	peer, err := gateway.New("localhost:0", build.TempDir("api", "TestGatewayPeerDisconnect", "gateway"))
+	peer, err := gateway.New("localhost:0", build.TempDir("api", "TestGatewayPeerDisconnect2", "gateway"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
+	err = st.stdPostAPI("/gateway/connect/"+string(peer.Address()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var info GatewayInfo
 	st.getAPI("/gateway", &info)
@@ -72,8 +81,14 @@ func TestGatewayPeerRemove(t *testing.T) {
 		t.Fatal("/gateway/connect did not connect to peer", peer.Address())
 	}
 
-	st.stdPostAPI("/gateway/disconnect/"+string(peer.Address()), nil)
-	st.getAPI("/gateway", &info)
+	err = st.stdPostAPI("/gateway/disconnect/"+string(peer.Address()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.getAPI("/gateway", &info)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(info.Peers) != 0 {
 		t.Fatal("/gateway/disconnect did not disconnect from peer", peer.Address())
 	}
