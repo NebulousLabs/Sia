@@ -107,6 +107,36 @@ func TestListen(t *testing.T) {
 	// a simple 'conn.Close' would not obey the muxado disconnect protocol
 	muxado.Client(conn).Close()
 
+	// compliant connect with invalid port
+	conn, err = net.Dial("tcp", string(g.Address()))
+	if err != nil {
+		t.Fatal("dial failed:", err)
+	}
+	addr = modules.NetAddress(conn.LocalAddr().String())
+	ack, err = connectVersionHandshake(conn, build.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ack != build.Version {
+		t.Fatal("gateway should have given ack")
+	}
+	err = connectPortHandshake(conn, "0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		g.mu.RLock()
+		_, ok := g.peers[addr]
+		g.mu.RUnlock()
+		if ok {
+			t.Fatal("gateway should not have added a peer with an invalid port")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// a simple 'conn.Close' would not obey the muxado disconnect protocol
+	muxado.Client(conn).Close()
+
 	// compliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
 	if err != nil {
@@ -119,6 +149,10 @@ func TestListen(t *testing.T) {
 	}
 	if ack != build.Version {
 		t.Fatal("gateway should have given ack")
+	}
+	err = connectPortHandshake(conn, addr.Port())
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// g should add the peer
