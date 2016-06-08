@@ -178,7 +178,6 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	remoteVersion, err := acceptConnVersionHandshake(conn, build.Version)
 	if err != nil {
 		g.log.Debugf("INFO: %v wanted to connect but version handshake failed: %v", addr, err)
-		// TODO: should this be muxado.Server(conn).Close()?
 		conn.Close()
 		return
 	}
@@ -256,7 +255,7 @@ func connectVersionHandshake(conn net.Conn, version string) (remoteVersion strin
 
 // acceptConnVersionHandshake performs the version handshake and should be
 // called on the side accepting a connection request. The remote version is
-// only returned in err == nil.
+// only returned if err == nil.
 func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion string, err error) {
 	// Read remote version.
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
@@ -304,7 +303,6 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	remoteVersion, err := connectVersionHandshake(conn, build.Version)
 	if err != nil {
-		// TODO: should this be muxado.Client(conn).Close()?
 		conn.Close()
 		return err
 	}
