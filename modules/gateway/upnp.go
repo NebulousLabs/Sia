@@ -77,9 +77,6 @@ func (g *Gateway) threadedLearnHostname() {
 	g.mu.Unlock()
 
 	g.log.Println("INFO: our address is", g.myAddr)
-
-	// now that we know our address, we can start advertising it
-	g.RegisterConnectCall("RelayNode", g.sendAddress)
 }
 
 // threadedForwardPort adds a port mapping to the router.

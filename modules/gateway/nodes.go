@@ -92,47 +92,6 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	return nil
 }
 
-// relayNode is the recipient end of the RelayNode RPC. It reads a node, adds
-// it to the Gateway's node list, and relays it to each of the Gateway's
-// peers. If the node is already in the node list, it is not relayed.
-func (g *Gateway) relayNode(conn modules.PeerConn) error {
-	// read address
-	var addr modules.NetAddress
-	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
-		return err
-	}
-	// add node
-	err := func() error {
-		// We wrap this logic in an anonymous function so we can defer Unlock to
-		// avoid managing locks across branching.
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		if err := g.addNode(addr); err != nil {
-			return err
-		}
-		if err := g.save(); err != nil {
-			return err
-		}
-		return nil
-	}()
-	if err != nil && err != errNodeExists {
-		return err
-	}
-	// relay
-	peers := g.Peers()
-	go g.Broadcast("RelayNode", addr, peers)
-	return nil
-}
-
-// sendAddress is the calling end of the RelayNode RPC.
-func (g *Gateway) sendAddress(conn modules.PeerConn) error {
-	// don't send if we aren't connectible
-	if g.Address().IsValid() != nil {
-		return errors.New("can't send address without knowing external IP")
-	}
-	return encoding.WriteObject(conn, g.Address())
-}
-
 // threadedNodeManager tries to keep the Gateway's node list healthy. As long
 // as the Gateway has fewer than minNodeListSize nodes, it asks a random peer
 // for more nodes. It also continually pings nodes in order to establish their

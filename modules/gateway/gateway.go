@@ -109,7 +109,6 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 
 	// Register RPCs.
 	g.RegisterRPC("ShareNodes", g.shareNodes)
-	g.RegisterRPC("RelayNode", g.relayNode)
 	g.RegisterConnectCall("ShareNodes", g.requestNodes)
 
 	// Load the old node list. If it doesn't exist, no problem, but if it does,
