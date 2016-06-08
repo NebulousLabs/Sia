@@ -347,7 +347,7 @@ func connectVersionHandshake(conn net.Conn, version string) (remoteVersion strin
 		return "", fmt.Errorf("failed to write version: %v", err)
 	}
 	// Read remote version.
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 		return "", fmt.Errorf("failed to read remote version: %v", err)
 	}
 	// Check that their version is acceptable.
@@ -365,7 +365,7 @@ func connectVersionHandshake(conn net.Conn, version string) (remoteVersion strin
 // only returned if err == nil.
 func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion string, err error) {
 	// Read remote version.
-	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &remoteVersion, build.MaxEncodedVersionLength); err != nil {
 		return "", fmt.Errorf("failed to read remote version: %v", err)
 	}
 	// Check that their version is acceptable.
