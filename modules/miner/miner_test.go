@@ -128,6 +128,9 @@ func TestIntegrationMiner(t *testing.T) {
 // TestIntegrationNilMinerDependencies tests that the miner properly handles
 // nil inputs for its dependencies.
 func TestIntegrationNilMinerDependencies(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	mt, err := createMinerTester("TestIntegrationNilMinerDependencies")
 	if err != nil {
 		t.Fatal(err)
@@ -153,6 +156,9 @@ func TestIntegrationNilMinerDependencies(t *testing.T) {
 // TestIntegrationBlocksMined checks that the BlocksMined function correctly
 // indicates the number of real blocks and stale blocks that have been mined.
 func TestIntegrationBlocksMined(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	mt, err := createMinerTester("TestIntegrationBlocksMined")
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +232,7 @@ func TestIntegrationBlocksMined(t *testing.T) {
 }
 
 // TestIntegrationAutoRescan triggers a rescan during a call to New and
-// verifies that the rescanning happens correctly. The rerscan is triggered by
+// verifies that the rescanning happens correctly. The rescan is triggered by
 // a call to New, instead of getting called directly.
 func TestIntegrationAutoRescan(t *testing.T) {
 	if testing.Short() {
