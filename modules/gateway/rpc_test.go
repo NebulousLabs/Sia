@@ -508,14 +508,16 @@ func TestCallingRPCFromRPC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Call the "FOO" RPC on g1. We don't know g1's address as g2 sees it, so we
-	// get it from the first address in g2's peer list.
-	var addr modules.NetAddress
-	for _, p := range g2.Peers() {
-		addr = p.NetAddress
-		break
+	// Wait for g2 to accept the connection
+	for {
+		if len(g2.Peers()) > 0 {
+			break
+		}
 	}
-	err = g2.RPC(addr, "FOO", func(conn modules.PeerConn) error { return nil })
+
+	err = g2.RPC(g1.Address(), "FOO", func(conn modules.PeerConn) error {
+		return nil
+	})
 
 	select {
 	case err = <-errChan:
