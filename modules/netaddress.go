@@ -39,7 +39,7 @@ func (na NetAddress) Port() string {
 	return port
 }
 
-// isLoopback returns true for ip addresses that are on the same machine.
+// isLoopback returns true for IP addresses that are on the same machine.
 func (na NetAddress) isLoopback() bool {
 	host, _, err := net.SplitHostPort(string(na))
 	if err != nil {

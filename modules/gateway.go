@@ -13,7 +13,7 @@ const (
 	WellConnectedThreshold = 8
 )
 
-// TODO: Move this and it's functionality into the gateway package.
+// TODO: Move this and its functionality into the gateway package.
 var (
 	// BootstrapPeers is a list of peers that can be used to find other peers -
 	// when a client first connects to the network, the only options for

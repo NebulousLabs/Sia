@@ -111,7 +111,7 @@ type (
 	//
 	// Transaction builders are not thread safe.
 	TransactionBuilder interface {
-		// FundSiacoins will add a siacoin input of exaclty 'amount' to the
+		// FundSiacoins will add a siacoin input of exactly 'amount' to the
 		// transaction. A parent transaction may be needed to achieve an input
 		// with the correct value. The siacoin input will not be signed until
 		// 'Sign' is called on the transaction builder. The expectation is that
@@ -120,14 +120,14 @@ type (
 		// transaction failed.
 		FundSiacoins(amount types.Currency) error
 
-		// FundSiafunds will add a siafund input of exaclty 'amount' to the
+		// FundSiafunds will add a siafund input of exactly 'amount' to the
 		// transaction. A parent transaction may be needed to achieve an input
 		// with the correct value. The siafund input will not be signed until
 		// 'Sign' is called on the transaction builder. Any siacoins that are
 		// released by spending the siafund outputs will be sent to another
 		// address owned by the wallet. The expectation is that the transaction
 		// will be completed and broadcast within a few hours. Longer risks
-		// double-spends, because the wallet will assume the transcation
+		// double-spends, because the wallet will assume the transaction
 		// failed.
 		FundSiafunds(amount types.Currency) error
 
@@ -207,7 +207,7 @@ type (
 		// builder. Items are returned by index.
 		ViewAdded() (newParents, siacoinInputs, siafundInputs, transactionSignatures []int)
 
-		// Drop indicates that a transaction is no longer useful, will not be
+		// Drop indicates that a transaction is no longer useful and will not be
 		// broadcast, and that all of the outputs can be reclaimed. 'Drop'
 		// should only be used before signatures are added.
 		Drop()
@@ -221,7 +221,7 @@ type (
 		// exists prior to this point). If the key is blank, then the hash of
 		// the seed that is generated will be used as the key.
 		//
-		// Encrypt can only be called once throughout the life of the wallet,
+		// Encrypt can only be called once throughout the life of the wallet
 		// and will return an error on subsequent calls (even after restarting
 		// the wallet). To reset the wallet, the wallet files must be moved to
 		// a different directory or deleted.
@@ -289,7 +289,7 @@ type (
 
 		// LoadSeed will recreate a wallet file using the recovery phrase.
 		// LoadSeed only needs to be called if the original seed file or
-		// encryption password was lost. The master key is used encrypt the
+		// encryption password was lost. The master key is used to encrypt the
 		// recovery seed before saving it to disk.
 		LoadSeed(crypto.TwofishKey, Seed) error
 
@@ -301,19 +301,19 @@ type (
 
 	// Wallet stores and manages siacoins and siafunds. The wallet file is
 	// encrypted using a user-specified password. Common addresses are all
-	// dervied from a single address seed.
+	// derived from a single address seed.
 	Wallet interface {
 		EncryptionManager
 		KeyManager
 
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
-		// refund transacitons.
+		// refund transactions.
 		ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
 		// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 		// Outgoing funds and incoming funds are reported separately. Refund
-		// outputs are included, meaning that a sending a single coin to
+		// outputs are included, meaning that sending a single coin to
 		// someone could result in 'outgoing: 12, incoming: 11'. Siafunds are
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)

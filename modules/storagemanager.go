@@ -24,7 +24,7 @@ type (
 		// errors when operations are being performed. A large number of
 		// FailedWrites can indicate that more space has been allocated on a
 		// drive than is physically available. A high number of failures can
-		// also indicaate disk trouble.
+		// also indicate disk trouble.
 		FailedReads      uint64 `json:"failedreads"`
 		FailedWrites     uint64 `json:"failedwrites"`
 		SuccessfulReads  uint64 `json:"successfulreads"`

@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	// BytesPerTerabyte is conversion rate between bytes and terabytes.
+	// BytesPerTerabyte is the conversion rate between bytes and terabytes.
 	BytesPerTerabyte = types.NewCurrency64(1e12)
 
 	// BlockBytesPerMonthTerabyte is the conversion rate between block-bytes and month-TB.
@@ -23,7 +23,7 @@ type (
 	// statistics should provide a clear picture of where the host's money is
 	// currently being used. The front end can consolidate stats where desired.
 	// Potential revenue refers to revenue that is available in a file
-	// contract, but the file contract window has not yet closed.
+	// contract for which the file contract window has not yet closed.
 	HostFinancialMetrics struct {
 		// Every time a renter forms a contract with a host, a contract fee is
 		// paid by the renter. These stats track the total contract fees.
