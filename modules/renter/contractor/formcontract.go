@@ -87,14 +87,8 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 		txnBuilder.Drop()
 		return modules.RenterContract{}, err
 	}
+
 	contractValue := contract.RenterFunds()
-
-	c.mu.Lock()
-	c.contracts[contract.ID] = contract
-	c.financialMetrics.ContractSpending = c.financialMetrics.ContractSpending.Add(contractValue)
-	c.saveSync()
-	c.mu.Unlock()
-
 	c.log.Printf("Formed contract with %v for %v SC", host.NetAddress, contractValue.Div(types.SiacoinPrecision))
 
 	return contract, nil
@@ -102,9 +96,9 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 
 // managedFormContracts forms contracts with n hosts using the allowance
 // parameters.
-func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight types.BlockHeight) error {
-	if n == 0 {
-		return nil
+func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight types.BlockHeight) ([]modules.RenterContract, error) {
+	if n <= 0 {
+		return nil, nil
 	}
 
 	// Sample at least 10 hosts.
@@ -121,18 +115,19 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	c.mu.RUnlock()
 	hosts := c.hdb.RandomHosts(nRandomHosts, exclude)
 	if len(hosts) < n {
-		return errors.New("not enough hosts")
+		return nil, errors.New("not enough hosts")
 	}
 
-	var numContracts int
+	var contracts []modules.RenterContract
 	var errs []string
 	for _, h := range hosts {
-		_, err := c.managedNewContract(h, numSectors, endHeight)
+		contract, err := c.managedNewContract(h, numSectors, endHeight)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("\t%v: %v", h.NetAddress, err))
 			continue
 		}
-		if numContracts++; numContracts >= n {
+		contracts = append(contracts, contract)
+		if len(contracts) >= n {
 			break
 		}
 	}
@@ -141,11 +136,11 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	// TODO: is there a better way to handle failure here? Should we prefer an
 	// all-or-nothing approach? We can't pick new hosts to negotiate with
 	// because they'll probably be more expensive than we can afford.
-	if numContracts == 0 {
-		return errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
-	} else if numContracts < n {
-		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v):\n%v", n, numContracts, strings.Join(errs, "\n"))
+	if len(contracts) == 0 {
+		return nil, errors.New("could not form any contracts:\n" + strings.Join(errs, "\n"))
+	} else if len(contracts) < n {
+		c.log.Printf("WARN: failed to form desired number of contracts (wanted %v, got %v):\n%v", n, len(contracts), strings.Join(errs, "\n"))
 	}
 
-	return nil
+	return contracts, nil
 }

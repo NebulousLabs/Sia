@@ -522,14 +522,13 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew the contract
-	contract = c.contracts[contract.ID]
-	newID, err := c.managedRenew(contract, modules.SectorSize*10, c.blockHeight+200)
+	oldContract := c.contracts[contract.ID]
+	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check renewed contract
-	contract = c.contracts[newID]
 	if contract.FileContract.FileMerkleRoot != root {
 		t.Fatal(contract.FileContract.FileMerkleRoot)
 	} else if contract.FileContract.FileSize != modules.SectorSize {

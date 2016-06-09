@@ -182,12 +182,12 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(c.contracts) != 1 {
-		t.Error("expected 1 contract, got", len(c.contracts))
+		t.Fatal("expected 1 contract, got", len(c.contracts))
 	}
 
 	// reannounce host on different IP (easier than creating a new host)
-	addr := "127.0.0.1:" + c.Contracts()[0].NetAddress.Port()
-	err = h.AnnounceAddress(modules.NetAddress(addr))
+	addr := modules.NetAddress("127.0.0.1:" + c.Contracts()[0].NetAddress.Port())
+	err = h.AnnounceAddress(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,54 @@ func TestIntegrationSetAllowance(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(c.contracts) != 2 {
-		t.Error("expected 2 contracts, got", len(c.contracts))
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	}
+
+	// set allowance with Funds*2; should trigger renewal of both contracts
+	a.Funds = a.Funds.Mul64(2)
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	}
+
+	// delete one of the contracts and set allowance with Funds*2; should
+	// trigger 1 renewal and 1 new contract
+	c.mu.Lock()
+	for id, contract := range c.contracts {
+		if contract.NetAddress == addr {
+			delete(c.contracts, id)
+			break
+		}
+	}
+	c.mu.Unlock()
+	a.Funds = a.Funds.Mul64(2)
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	}
+
+	// make one of the contracts un-renewable and set allowance with Funds*2; should
+	// trigger 1 renewal failure and 2 new contracts
+	c.mu.Lock()
+	for id, contract := range c.contracts {
+		contract.NetAddress = "foo"
+		c.contracts[id] = contract
+		break
+	}
+	c.mu.Unlock()
+	a.Funds = a.Funds.Mul64(2)
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
 	}
 }
 
