@@ -350,6 +350,18 @@ disconnects the gateway from a peer. The peer remains in the node list.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
+Host
+----
+
+Queries:
+
+* /host                         [GET]
+* /host                         [POST]
+* /host/announce                [POST]
+* /host/delete/{filecontractid} [POST]
+
+[Full Description][api/Host.md]
+
 Miner
 -----
 
@@ -1267,3 +1279,5 @@ encryptionpassword string
 frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
+
+[api/Host.md]https://github.com/NebulousLabs/Sia/blob/master/doc/api/Host.md
