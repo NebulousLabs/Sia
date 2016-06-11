@@ -83,10 +83,10 @@ func (h *Host) establishDefaults() error {
 		CollateralBudget: defaultCollateralBudget,
 		MaxCollateral:    defaultMaxCollateral,
 
-		MinimumStoragePrice:           defaultStoragePrice,
-		MinimumContractPrice:          defaultContractPrice,
-		MinimumDownloadBandwidthPrice: defaultDownloadBandwidthPrice,
-		MinimumUploadBandwidthPrice:   defaultUploadBandwidthPrice,
+		MinStoragePrice:           defaultStoragePrice,
+		MinContractPrice:          defaultContractPrice,
+		MinDownloadBandwidthPrice: defaultDownloadBandwidthPrice,
+		MinUploadBandwidthPrice:   defaultUploadBandwidthPrice,
 	}
 
 	// Generate signing key, for revising contracts.

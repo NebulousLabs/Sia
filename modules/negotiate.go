@@ -215,8 +215,8 @@ type (
 		// sizes of each.
 		AcceptingContracts   bool              `json:"acceptingcontracts"`
 		MaxDownloadBatchSize uint64            `json:"maxdownloadbatchsize"`
-		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
 		MaxDuration          types.BlockHeight `json:"maxduration"`
+		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
 		NetAddress           NetAddress        `json:"netaddress"`
 		RemainingStorage     uint64            `json:"remainingstorage"`
 		SectorSize           uint64            `json:"sectorsize"`

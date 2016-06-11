@@ -324,34 +324,16 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if settings.MaxCollateral.Cmp(defaultMaxCollateral) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.DownloadLimitGrowth != 0 {
+	if settings.MinContractPrice.Cmp(defaultContractPrice) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.DownloadLimitCap != 0 {
+	if settings.MinDownloadBandwidthPrice.Cmp(defaultDownloadBandwidthPrice) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.DownloadSpeedLimit != 0 {
+	if settings.MinStoragePrice.Cmp(defaultStoragePrice) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}
-	if settings.UploadLimitGrowth != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
-	if settings.UploadLimitCap != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
-	if settings.UploadSpeedLimit != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
-	if settings.MinimumContractPrice.Cmp(defaultContractPrice) != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
-	if settings.MinimumDownloadBandwidthPrice.Cmp(defaultDownloadBandwidthPrice) != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
-	if settings.MinimumStoragePrice.Cmp(defaultStoragePrice) != 0 {
-		t.Error("settings retrieval did not return default value")
-	}
-	if settings.MinimumUploadBandwidthPrice.Cmp(defaultUploadBandwidthPrice) != 0 {
+	if settings.MinUploadBandwidthPrice.Cmp(defaultUploadBandwidthPrice) != 0 {
 		t.Error("settings retrieval did not return default value")
 	}
 

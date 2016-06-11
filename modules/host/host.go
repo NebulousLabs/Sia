@@ -55,6 +55,9 @@ package host
 // sectors to the storage manager - in some places right now WindowStart is
 // being used but really it's WindowEnd that should be in use.
 
+// TODO: The host needs some way to blacklist file contracts that are being
+// abusive by repeatedly getting free download batches.
+
 // TODO: clean up all of the magic numbers in the host.
 
 // TODO: revamp the finances for the storage obligations.

@@ -136,7 +136,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 		// Verify that the correct amount of money has been moved from the
 		// renter's contract funds to the host's contract funds.
-		expectedTransfer := settings.MinimumDownloadBandwidthPrice.Mul64(totalSize)
+		expectedTransfer := settings.MinDownloadBandwidthPrice.Mul64(totalSize)
 		err = verifyPaymentRevision(existingRevision, paymentRevision, blockHeight, expectedTransfer)
 		if err != nil {
 			return err

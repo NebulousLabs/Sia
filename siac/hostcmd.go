@@ -36,10 +36,10 @@ maxcollateral                    currency
 maxdownloadbatchsize             int
 maxduration                      int
 maxrevisebatchsize               int
-minimumcontractprice             currency
-minimumdownloadbandwidthprice    currency/TB
-minimumstorageprice              currency/TB/month
-minimumuploadbandwidthprice      currency/TB
+mincontractprice                 currency
+mindownloadbandwidthprice        currency/TB
+minstorageprice                  currency/TB/month
+minuploadbandwidthprice          currency/TB
 netaddress                       string
 windowsize                       int
 
@@ -140,7 +140,7 @@ func hostcmd() {
 	}
 
 	// convert price from bytes/block to TB/Month
-	price := currencyUnits(is.MinimumStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte))
+	price := currencyUnits(is.MinStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte))
 	// calculate total revenue
 	totalRevenue := fm.ContractCompensation.
 		Add(fm.StorageRevenue).
@@ -172,10 +172,10 @@ func hostcmd() {
 	collateralbudget: %v 
 	maxcollateral:    %v Per Contract
 
-	minimumcontractprice:         %v
-	minimumdownloadbandwithprice: %v / TB
-	minimumstorageprice:          %v / TB / Month
-	minimumuploadbandwidthprice:  %v / TB
+	mincontractprice:         %v
+	mindownloadbandwithprice: %v / TB
+	minstorageprice:          %v / TB / Month
+	minuploadbandwidthprice:  %v / TB
 
 Host Financials:
 	Transaction Fee Compensation: %v
@@ -211,10 +211,10 @@ RPC Stats:
 			currencyUnits(is.CollateralBudget),
 			currencyUnits(is.MaxCollateral),
 
-			currencyUnits(is.MinimumContractPrice),
-			currencyUnits(is.MinimumDownloadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
-			currencyUnits(is.MinimumStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)),
-			currencyUnits(is.MinimumUploadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
+			currencyUnits(is.MinContractPrice),
+			currencyUnits(is.MinDownloadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
+			currencyUnits(is.MinStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)),
+			currencyUnits(is.MinUploadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
 
 			currencyUnits(fm.ContractCompensation),
 			currencyUnits(fm.TransactionFeeExpenses),
@@ -276,7 +276,7 @@ RPC Stats:
 func hostconfigcmd(param, value string) {
 	switch param {
 	// currency (convert to hastings)
-	case "collateralbudget", "maxcollateral", "minimumcontractprice":
+	case "collateralbudget", "maxcollateral", "mincontractprice":
 		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
@@ -284,7 +284,7 @@ func hostconfigcmd(param, value string) {
 		value = hastings
 
 	// currency/TB (convert to hastings/byte)
-	case "collateral", "minimumdownloadbandwidthprice", "minimumuploadbandwidthprice":
+	case "collateral", "mindownloadbandwidthprice", "minuploadbandwidthprice":
 		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
@@ -294,7 +294,7 @@ func hostconfigcmd(param, value string) {
 		value = c.String()
 
 	// currency/TB/month (convert to hastings/byte/block)
-	case "minimumstorageprice":
+	case "minstorageprice":
 		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)

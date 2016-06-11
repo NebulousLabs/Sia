@@ -122,9 +122,9 @@ func (srv *Server) initAPI(password string) {
 	// Host API Calls
 	if srv.host != nil {
 		// Calls directly pertaining to the host.
-		router.GET("/host", srv.hostHandlerGET)                                           // Get a bunch of information about the host.
-		router.POST("/host", requirePassword(srv.hostHandlerPOST, password))              // Set HostInternalSettings.
-		router.POST("/host/announce", requirePassword(srv.hostAnnounceHandler, password)) // Announce the host, optionally on a specific address.
+		router.GET("/host", srv.hostHandlerGET)                                           // Get the host status.
+		router.POST("/host", requirePassword(srv.hostHandlerPOST, password))              // Change the settings of the host.
+		router.POST("/host/announce", requirePassword(srv.hostAnnounceHandler, password)) // Announce the host to the network.
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/storage", srv.storageHandler)
