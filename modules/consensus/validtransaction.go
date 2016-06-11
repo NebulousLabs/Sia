@@ -114,16 +114,41 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 		}
 		leaves := crypto.CalculateLeaves(fc.FileSize)
 		segmentLen := uint64(crypto.SegmentSize)
+
+		// If this segment chosen is the final segment, it should only be as
+		// long as necessary to complete the filesize.
 		if segmentIndex == leaves-1 {
 			segmentLen = fc.FileSize % crypto.SegmentSize
 		}
+		if segmentLen == 0 {
+			segmentLen = uint64(crypto.SegmentSize)
+		}
 
-		// COMPATv0.4.0
+		// HARDFORK 21,000
 		//
-		// Fixing the padding situation resulted in a hardfork. The below code
-		// will stop the hardfork from triggering before block 21,000.
+		// Originally, the code used the entire segment to verify the
+		// correctness of the storage proof. This made the code incompatible
+		// with data sizes that did not fill an entire segment.
+		//
+		// This was patched with a hardfork in block 21,000. The new code made
+		// it possible to perform successful storage proofs on the final
+		// segment of a file if the final segment was not crypto.SegmentSize
+		// bytes.
+		//
+		// Unfortunately, a new bug was introduced where storage proofs on the
+		// final segment would fail if the final segment was selected and was
+		// crypto.SegmentSize bytes, because the segmentLen would be set to 0
+		// instead of crypto.SegmentSize, due to an error with the modulus
+		// math. This new error has been fixed with the block 100,000 hardfork.
 		if (build.Release == "standard" && blockHeight(tx) < 21e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
+		}
+		// HARDFORK 100,000
+		if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) >= 10) {
+			segmentLen = uint64(crypto.SegmentSize)
+			if segmentIndex == leaves-1 {
+				segmentLen = fc.FileSize % crypto.SegmentSize
+			}
 		}
 
 		verified := crypto.VerifySegment(
