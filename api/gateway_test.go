@@ -7,6 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
+// TestGatewayStatus checks that the /gateway/status call is returning a corect
+// peerlist.
 func TestGatewayStatus(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -23,7 +25,9 @@ func TestGatewayStatus(t *testing.T) {
 	}
 }
 
-func TestGatewayPeerConnect(t *testing.T) {
+// TestGatewayPeerAdd checks that /gateway/add is adding a peer to the
+// gateway's peerlist.
+func TestGatewayPeerAdd(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -45,7 +49,9 @@ func TestGatewayPeerConnect(t *testing.T) {
 	}
 }
 
-func TestGatewayPeerDisconnect(t *testing.T) {
+// TestGatewayPeerRemove checks that gateway/remove removes the correct peer
+// from the gateway's peerlist.
+func TestGatewayPeerRemove(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
