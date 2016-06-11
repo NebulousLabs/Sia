@@ -71,12 +71,51 @@ struct {
 		windowsize types.BlockHeight (uint64)
 
 		// The maximum amount of money that the host will put up as collateral
-		// per byte per block of storage that is contracted by the renter.
+		// for storage that is contracted by the renter.
+		//
+		// The unit is hastings per byte per block.
 		collateral types.Currency (string)
 
 		// The maximum amount of collateral that the host will put into a
 		// single file contract.
+		//
+		// The unit is hastings.
 		maxcollateral types.Currency (string)
+
+		// The price that a renter has to pay to create a contract with the
+		// host. The payment is intended to cover transaction fees
+		// for the file contract revision and the storage proof that the host
+		// will be submitting to the blockchain.
+		//
+		// The unit is hastings per contract.
+		contractprice types.Currency (string)
+
+		// The price that a renter has to pay when downloading data from the
+		// host.
+		//
+		// The unit is hastings per byte.
+		downloadbandwidthprice types.Currency (string)
+
+		// The price that a renter has to pay to store files with the host.
+		//
+		// The unit is hastings per byte per block.
+		storageprice types.Currency (string)
+
+		// The price that a renter has to pay when uploading data to the host.
+		//
+		// The unit is hastings per byte.
+		uploadbandwidthprice types.Currency (string)
+
+		// The revision number indicates to the renter what iteration of
+		// settings the host is currently at. Settings are generally signed.
+		// If the renter has multiple conflicting copies of settings from the
+		// host, the renter can expect the one with the higher revision number
+		// to be more recent.
+		revisionnumber uint64
+
+		// The version of external settings being used. This field helps
+		// coordinate updates while preserving compatibility with older nodes.
+		version string
 	}
 
 	// The financial status of the host.
@@ -85,12 +124,16 @@ struct {
 		// file contracts. The host is required to submit a file contract
 		// revision and a storage proof for every file contract that gets created,
 		// and the renter pays for the miner fees on these objects.
+		//
+		// The unit is hastings.
 		contractcompensation types.Currency (string)
 
 		// The amount of money that renters have given to the host to pay for
 		// file contracts which have not been confirmed yet. The potential
 		// compensation becomes compensation after the storage proof is
 		// submitted.
+		//
+		// The unit is hastings.
 		potentialcontractcompensation types.Currency (string)
 
 		// The amount of storage collateral which the host has tied up in file
@@ -99,19 +142,27 @@ struct {
 		// even if the host does not submit a storage proof - the collateral is
 		// not at risk, it is merely set aside so that it can be put at risk
 		// later.
+		//
+		// The unit is hastings.
 		lockedstoragecollateral types.Currency (string)
 
 		// The amount of revenue, including storage revenue and bandwidth
 		// revenue, that has been lost due to failed file contracts and
 		// failed storage proofs.
+		//
+		// The unit is hastings.
 		lostrevenue types.Currency (string)
 
 		// The amount of collateral that was put up to protect data which has
 		// been lost due to failed file contracts and missed storage proofs.
+		//
+		// The unit is hastings.
 		loststoragecollateral types.Currency (string)
 
 		// The amount of revenue that the host stands to earn if all storage
 		// proofs are submitted corectly and in time.
+		//
+		// The unit is hastings.
 		potentialstoragerevenue types.Currency (string)
 
 		// The amount of money that the host has risked on file contracts. If
@@ -119,36 +170,49 @@ struct {
 		// this many coins. In the event of a missed storage proof, locked
 		// storage collateral gets returned, but risked storage collateral
 		// does not get returned.
+		//
+		// The unit is hastings.
 		riskedstoragecollateral types.Currency (string)
 
 		// The amount of money that the host has earned from storing data. This
 		// money has been locked down by successful storage proofs.
+		//
+		// The unit is hastings.
 		storagerevenue types.Currency (string)
 
 		// The amount of money that the host has spent on transaction fees when
 		// submitting host announcements, file contract revisions, and storage
 		// proofs.
+		//
+		// The unit is hastings.
 		transactionfeeexpenses types.Currency (string)
 
 		// The amount of money that the host has made from renters downloading
 		// their files. This money has been locked in by successsful storage
 		// proofs.
+		//
+		// The unit is hastings.
 		downloadbandwidthrevenue types.Currency (string)
 
 		// The amount of money that the host stands to make from renters that
 		// downloaded their files. The host will only realize this revenue if
 		// the host successfully submits storage proofs for the related file
 		// contracts.
+		//
+		// The unit is hastings.
 		potentialdownloadbandwidthrevenue types.Currency (string)
 
 		// The amount of money that the host stands to make from renters that
 		// uploaded files. The host will only realize this revenue if the host
 		// successfully submits storage proofs for the related file contracts.
+		//
+		// The unit is hastings.
 		potentialuploadbandwidthrevenue types.Currency (string)
 
 		// The amount of money that the host has made from renters uploading
 		// their files. This money has been locked in by successful storage
 		// proofs.
+		uploadbandwidthrevenue types.Currency (string)
 	}
 
 	// The settings of the host. Most interactions between the user and the
@@ -192,14 +256,20 @@ struct {
 
 		// The maximum amount of money that the host will put up as collateral
 		// per byte per block of storage that is contracted by the renter.
+		//
+		// The unit is hastings per byte per block.
 		collateral types.Currency (string)
 
 		// The total amount of money that the host will allocate to collateral
 		// across all file contracts.
+		//
+		// The unit is hastings.
 		collateralbudget types.Currency (string)
 
 		// The maximum amount of collateral that the host will put into a
 		// single file contract.
+		//
+		// The unit is hastings.
 		maxcollateral types.Currency (string)
 
 		// The minimum price that the host will demand from a renter when
@@ -209,31 +279,31 @@ struct {
 		// minimum because the host may automatically adjust the price upwards
 		// in times of high demand.
 		//
-		// The price is in hastings..
+		// The unit is hastings.
 		mincontractprice types.Currency (string)
 
 		// The minimum price that the host will demand from a renter when the
 		// renter is downloading data. If the host is saturated, the host may
 		// increase the price from the minimum.
 		//
-		// The price is in hastings per byte.
+		// The unit is hastings per byte.
 		mindownloadbandwidthprice types.Currency (string)
 
 		// The minimum price that the host will demand when storing data for
 		// extended periods of time. If the host is low on space, the price of
 		// storage may be set higher than the minimum.
 		//
-		// The price is in hastings per byte per block.
+		// The unit is hastings per byte per block.
 		minstorageprice types.Currency (string)
 
 		// The minimum price that the host will demand from a renter when the
 		// renter is uploading data. If the host is saturated, the host may
 		// increase the price from the minimum.
 		//
-		// The price is in hastings per byte.
+		// The unit is hastings per byte.
 		minuploadbandwidthprice types.Currency (string)
 	}
-	
+
 	// Information about the network, specifically various ways in which
 	// renters have contacted the host.
 	networkmetrics {
@@ -317,14 +387,20 @@ windowsize types.BlockHeight (uint64) // Optional
 
 // The maximum amount of money that the host will put up as collateral
 // per byte per block of storage that is contracted by the renter.
+//
+// The unit is hastings per byte per block.
 collateral types.Currency (string) // Optional
 
 // The total amount of money that the host will allocate to collateral
 // across all file contracts.
+//
+// The unit is hastings.
 collateralbudget types.Currency (string) // Optional
 
 // The maximum amount of collateral that the host will put into a
 // single file contract.
+//
+// The unit is hastings.
 maxcollateral types.Currency (string) // Optional
 
 // The minimum price that the host will demand from a renter when
@@ -334,28 +410,28 @@ maxcollateral types.Currency (string) // Optional
 // minimum because the host may automatically adjust the price upwards
 // in times of high demand.
 //
-// The price is in hastings..
+// The unit is hastings..
 mincontractprice types.Currency (string) // Optional
 
 // The minimum price that the host will demand from a renter when the
 // renter is downloading data. If the host is saturated, the host may
 // increase the price from the minimum.
 //
-// The price is in hastings per byte.
+// The unit is hastings per byte.
 mindownloadbandwidthprice types.Currency (string) // Optional
 
 // The minimum price that the host will demand when storing data for
 // extended periods of time. If the host is low on space, the price of
 // storage may be set higher than the minimum.
 //
-// The price is in hastings per byte per block.
+// The unit is hastings per byte per block.
 minstorageprice types.Currency (string) // Optional
 
 // The minimum price that the host will demand from a renter when the
 // renter is uploading data. If the host is saturated, the host may
 // increase the price from the minimum.
 //
-// The price is in hastings per byte.
+// The unit is hastings per byte.
 minuploadbandwidthprice types.Currency (string) // Optional
 ```
 

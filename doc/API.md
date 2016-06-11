@@ -360,7 +360,128 @@ Queries:
 * /host/announce                [POST]
 * /host/delete/{filecontractid} [POST]
 
-[Full Description][api/Host.md]
+[Full Description](api/Host.md)
+
+#### /host [GET]
+
+Function: Fetches status information about the host.
+
+Parameters: none
+
+Response:
+```go
+struct {
+	externalsettings {
+		acceptingcontracts   bool
+		maxdownloadbatchsize uint64
+		maxduration          types.BlockHeight (uint64)
+		maxrevisebatchsize   uint64
+		netaddress           modules.NetAddress (string)
+		remainingstorage     uint64
+		sectorsize           uint64
+		totalstorage         uint64
+		unlockhash           types.UnlockHash (string)
+		windowsize           types.BlockHeight (uint64)
+
+		collateral    types.Currency (string)
+		maxcollateral types.Currency (string)
+
+		contractprice          types.Currency (string)
+		downloadbandwidthprice types.Currency (string)
+		storageprice           types.Currency (string)
+		uploadbandwidthprice   types.Currency (string)
+
+		revisionnumber uint64
+		version        string
+	}
+
+	financialmetrics {
+		contractcompensation          types.Currency (string)
+		potentialcontractcompensation types.Currency (string)
+
+		lockedstoragecollateral types.Currency (string)
+		lostrevenue             types.Currency (string)
+		loststoragecollateral   types.Currency (string)
+		potentialstoragerevenue types.Currency (string)
+		riskedstoragecollateral types.Currency (string)
+		storagerevenue          types.Currency (string)
+		transactionfeeexpenses  types.Currency (string)
+
+		downloadbandwidthrevenue          types.Currency (string)
+		potentialdownloadbandwidthrevenue types.Currency (string)
+		potentialuploadbandwidthrevenue   types.Currency (string)
+		uploadbandwidthrevenue            types.Currency (string)
+	}
+
+	internalsettings {
+		acceptingcontracts   bool
+		maxdownloadbatchsize uint64
+		maxduration          types.BlockHeight (uint64)
+		maxrevisebatchsize   uint64
+		netaddress           modules.NetAddress (string)
+		windowsize           types.BlockHeight (uint64)
+
+		collateral       types.Currency (string)
+		collateralbudget types.Currency (string)
+		maxcollateral    types.Currency (string)
+
+		mincontractprice          types.Currency (string)
+		mindownloadbandwidthprice types.Currency (string)
+		minstorageprice           types.Currency (string)
+		minuploadbandwidthprice   types.Currency (string)
+	}
+
+	// Information about the network, specifically various ways in which
+	// renters have contacted the host.
+	networkmetrics {
+		downloadcalls     uint64
+		errorcalls        uint64
+		formcontractcalls uint64
+		renewcalls        uint64
+		revisecalls       uint64
+		settingscalls     uint64
+		unrecognizedcalls uint64
+	}
+}
+```
+
+#### /host [POST]
+
+Function: Configures hosting parameters. All parameters are optional;
+unspecified parameters will be left unchanged.
+
+Parameters:
+```
+acceptingcontracts   bool                        // Optional
+maxdownloadbatchsize uint64                      // Optional
+maxduration          types.BlockHeight (uint64)  // Optional
+maxrevisebatchsize   uint64                      // Optional
+netaddress           modules.NetAddress (string) // Optional
+windowsize           types.BlockHeight (uint64)  // Optional
+
+collateral       types.Currency (string) // Optional
+collateralbudget types.Currency (string) // Optional
+maxcollateral    types.Currency (string) // Optional
+
+mincontractprice          types.Currency (string) // Optional
+mindownloadbandwidthprice types.Currency (string) // Optional
+minstorageprice           types.Currency (string) // Optional
+minuploadbandwidthprice   types.Currency (string) // Optional
+```
+
+Response: standard
+
+#### /host/announce [POST]
+
+Function: The host will announce itself to the network as a source of storage.
+Generally only needs to be called once.
+
+Parameters:
+```
+netaddress string // Optional
+```
+
+Response: standard
 
 Miner
 -----
@@ -1279,5 +1400,3 @@ encryptionpassword string
 frequently, the encryption password is the same as the primary wallet seed.
 
 Response: standard
-
-[api/Host.md]https://github.com/NebulousLabs/Sia/blob/master/doc/api/Host.md
