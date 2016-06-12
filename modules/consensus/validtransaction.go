@@ -144,7 +144,7 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
 		// HARDFORK 100,000
-		if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) >= 10) {
+		if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 			if segmentIndex == leaves-1 {
 				segmentLen = fc.FileSize % crypto.SegmentSize
@@ -158,8 +158,21 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 			segmentIndex,
 			fc.FileMerkleRoot,
 		)
-		if !verified {
+		if !verified && fc.FileSize > 0 {
 			return errInvalidStorageProof
+		}
+
+		// HARDFORK 100,000
+		//
+		// Originally, it was impossible to provide a storage proof for data of
+		// length zero. A hardfork was added triggering at block 100,000 to
+		// enable an optimization where hosts could submit empty storage proofs
+		// for files of size 0, saving space on the blockchain in conditions
+		// where the renter is content.
+		if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
+			if !verified {
+				return errInvalidStorageProof
+			}
 		}
 	}
 
