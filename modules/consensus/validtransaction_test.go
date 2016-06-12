@@ -3,6 +3,7 @@ package consensus
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -69,6 +70,248 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	}
 	if len(cc.SiacoinOutputDiffs) != 0 {
 		t.Error("consensus change was not empty despite an error being returned")
+	}
+}
+
+// TestStorageProofBoundaries creates file contracts and submits storage proofs
+// for them, probing segment boundaries (first segment, last segment,
+// incomplete segment, etc.).
+func TestStorageProofBoundaries(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestStorageProofBoundaries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Mine enough blocks to put us beyond the testing hardfork.
+	for i := 0; i < 10; i++ {
+		_, err = cst.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Try storage proofs on data between 0 bytes and 128 bytes (0 segments and
+	// 1 segment). Perform the operation five times because we can't control
+	// which segment gets selected - it is randomly decided by the block.
+	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
+	for i := 0; i < 3; i++ {
+		randData, err := crypto.RandBytes(140)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a file contract for all sizes of the data between 0 and 2
+		// segments and put them in the transaction pool.
+		var fcids []types.FileContractID
+		for _, k := range segmentRange {
+			// Create the data and the file contract around it.
+			truncatedData := randData[:k]
+			fc := types.FileContract{
+				FileSize:           uint64(k),
+				FileMerkleRoot:     crypto.MerkleRoot(truncatedData),
+				WindowStart:        cst.cs.dbBlockHeight() + 2,
+				WindowEnd:          cst.cs.dbBlockHeight() + 4,
+				Payout:             types.NewCurrency64(500), // Too small to be subject to siafund fee.
+				ValidProofOutputs:  []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+				MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+			}
+
+			// Create a transaction around the file contract and add it to the
+			// transaction pool.
+			b := cst.wallet.StartTransaction()
+			err = b.FundSiacoins(types.NewCurrency64(500))
+			if err != nil {
+				t.Fatal(err)
+			}
+			b.AddFileContract(fc)
+			txnSet, err := b.Sign(true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cst.tpool.AcceptTransactionSet(txnSet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Store the file contract id for later when building the storage
+			// proof.
+			fcids = append(fcids, txnSet[len(txnSet)-1].FileContractID(0))
+		}
+
+		// Mine blocks to get the file contracts into the blockchain and
+		// confirming.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Create storage proofs for the file contracts and submit the proofs
+		// to the blockchain.
+		for j, k := range segmentRange {
+			// Build the storage proof.
+			truncatedData := randData[:k]
+			proofIndex, err := cst.cs.StorageProofSegment(fcids[j])
+			if err != nil {
+				t.Fatal(err)
+			}
+			base, hashSet := crypto.MerkleProof(truncatedData, proofIndex)
+			sp := types.StorageProof{
+				ParentID: fcids[j],
+				HashSet:  hashSet,
+			}
+			copy(sp.Segment[:], base)
+
+			if k > 0 {
+				// Try submitting an empty storage proof, to make sure that the
+				// hardfork code didn't accidentally allow empty storage proofs
+				// in situations other than file sizes with 0 bytes.
+				badSP := types.StorageProof{ParentID: fcids[j]}
+				badTxn := types.Transaction{
+					StorageProofs: []types.StorageProof{badSP},
+				}
+				err = cst.tpool.AcceptTransactionSet([]types.Transaction{badTxn})
+				if err == nil {
+					t.Fatal("bad storage proof got accepted into the transaction pool")
+				}
+			}
+
+			// Submit the storage proof to the blockchain in a transaction.
+			txn := types.Transaction{
+				StorageProofs: []types.StorageProof{sp},
+			}
+			err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
+			if err != nil {
+				t.Fatal(err, "-", j, k)
+			}
+		}
+
+		// Mine blocks to get the storage proofs on the blockchain.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// TestEmptyStorageProof creates file contracts and submits storage proofs for
+// them, probing segment boundaries (first segment, last segment, incomplete
+// segment, etc.).
+func TestEmptyStorageProof(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestStorageProofBoundaries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Mine enough blocks to put us beyond the testing hardfork.
+	for i := 0; i < 10; i++ {
+		_, err = cst.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Try storage proofs on data between 0 bytes and 128 bytes (0 segments and
+	// 1 segment). Perform the operation five times because we can't control
+	// which segment gets selected - it is randomly decided by the block.
+	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
+	for i := 0; i < 3; i++ {
+		randData, err := crypto.RandBytes(140)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a file contract for all sizes of the data between 0 and 2
+		// segments and put them in the transaction pool.
+		var fcids []types.FileContractID
+		for _, k := range segmentRange {
+			// Create the data and the file contract around it.
+			truncatedData := randData[:k]
+			fc := types.FileContract{
+				FileSize:           uint64(k),
+				FileMerkleRoot:     crypto.MerkleRoot(truncatedData),
+				WindowStart:        cst.cs.dbBlockHeight() + 2,
+				WindowEnd:          cst.cs.dbBlockHeight() + 4,
+				Payout:             types.NewCurrency64(500), // Too small to be subject to siafund fee.
+				ValidProofOutputs:  []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+				MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+			}
+
+			// Create a transaction around the file contract and add it to the
+			// transaction pool.
+			b := cst.wallet.StartTransaction()
+			err = b.FundSiacoins(types.NewCurrency64(500))
+			if err != nil {
+				t.Fatal(err)
+			}
+			b.AddFileContract(fc)
+			txnSet, err := b.Sign(true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cst.tpool.AcceptTransactionSet(txnSet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Store the file contract id for later when building the storage
+			// proof.
+			fcids = append(fcids, txnSet[len(txnSet)-1].FileContractID(0))
+		}
+
+		// Mine blocks to get the file contracts into the blockchain and
+		// confirming.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Create storage proofs for the file contracts and submit the proofs
+		// to the blockchain.
+		for j, k := range segmentRange {
+			// Build the storage proof.
+			truncatedData := randData[:k]
+			proofIndex, err := cst.cs.StorageProofSegment(fcids[j])
+			if err != nil {
+				t.Fatal(err)
+			}
+			base, hashSet := crypto.MerkleProof(truncatedData, proofIndex)
+			sp := types.StorageProof{
+				ParentID: fcids[j],
+				HashSet:  hashSet,
+			}
+			copy(sp.Segment[:], base)
+
+			// Submit the storage proof to the blockchain in a transaction.
+			txn := types.Transaction{
+				StorageProofs: []types.StorageProof{sp},
+			}
+			err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
+			if err != nil {
+				t.Fatal(err, "-", j, k)
+			}
+		}
+
+		// Mine blocks to get the storage proofs on the blockchain.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }
 
