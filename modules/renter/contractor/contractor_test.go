@@ -146,23 +146,23 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	// bad args
 	var a modules.Allowance
 	err = c.SetAllowance(a)
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err != errAllowanceNoHosts {
+		t.Errorf("expected %q, got %q", errAllowanceNoHosts, err)
 	}
 	a.Hosts = 1
 	err = c.SetAllowance(a)
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err != errAllowanceZeroPeriod {
+		t.Errorf("expected %q, got %q", errAllowanceZeroPeriod, err)
 	}
 	a.Period = 20
 	err = c.SetAllowance(a)
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err != errAllowanceZeroWindow {
+		t.Errorf("expected %q, got %q", errAllowanceZeroWindow, err)
 	}
 	a.RenewWindow = 20
 	err = c.SetAllowance(a)
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err != errAllowanceWindowSize {
+		t.Errorf("expected %q, got %q", errAllowanceWindowSize, err)
 	}
 
 	// reasonable values; should succeed

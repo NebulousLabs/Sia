@@ -8,6 +8,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	errAllowanceNoHosts    = errors.New("hosts must be non-zero")
+	errAllowanceZeroPeriod = errors.New("period must be non-zero")
+	errAllowanceZeroWindow = errors.New("renew window must be non-zero")
+	errAllowanceWindowSize = errors.New("renew window must be less than period")
+)
+
 // contractEndHeight returns the height at which the Contractor's contracts
 // end. If there are no contracts, it returns zero.
 func (c *Contractor) contractEndHeight() types.BlockHeight {
@@ -46,13 +53,13 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// sanity checks
 	if a.Hosts == 0 {
-		return errors.New("hosts must be non-zero")
+		return errAllowanceNoHosts
 	} else if a.Period == 0 {
-		return errors.New("period must be non-zero")
+		return errAllowanceZeroPeriod
 	} else if a.RenewWindow == 0 {
-		return errors.New("renew window must be non-zero")
+		return errAllowanceZeroWindow
 	} else if a.RenewWindow >= a.Period {
-		return errors.New("renew window must be less than period")
+		return errAllowanceWindowSize
 	}
 
 	// check that allowance is sufficient to store at least one sector
