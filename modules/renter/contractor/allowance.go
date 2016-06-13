@@ -101,7 +101,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// should not change either
 	endHeight := c.blockHeight + a.Period
 	if a.Period == c.allowance.Period && len(c.contracts) > 0 {
-		endHeight = c.contractEndHeight()
+		// COMPAT v0.6.0 - old hosts require end height increase by at least 1
+		endHeight = c.contractEndHeight() + 1
 	}
 	c.mu.RUnlock()
 
