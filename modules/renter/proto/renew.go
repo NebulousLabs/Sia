@@ -18,6 +18,10 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
 
+	if endHeight+host.WindowSize < contract.LastRevision.NewWindowEnd {
+		return modules.RenterContract{}, errors.New("contract cannot be renewed to a lower height")
+	}
+
 	// calculate cost to renter and cost to host
 	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
