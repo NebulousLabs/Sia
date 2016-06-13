@@ -3,9 +3,29 @@ package contractor
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// contractEndHeight returns the height at which the Contractor's contracts
+// end. If there are no contracts, it returns zero.
+func (c *Contractor) contractEndHeight() types.BlockHeight {
+	var endHeight types.BlockHeight
+	for _, contract := range c.contracts {
+		endHeight = contract.EndHeight()
+		break
+	}
+	// sanity check: all contracts should have same EndHeight
+	if build.DEBUG {
+		for _, contract := range c.contracts {
+			if contract.EndHeight() != endHeight {
+				build.Critical("all contracts should have EndHeight", endHeight, "-- got", contract.EndHeight())
+			}
+		}
+	}
+	return endHeight
+}
 
 // SetAllowance sets the amount of money the Contractor is allowed to spend on
 // contracts over a given time period, divided among the number of hosts
@@ -63,11 +83,8 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	// calculate new endHeight; if the period has not changed, the endHeight
 	// should not change either
 	endHeight := c.blockHeight + a.Period
-	if a.Period == c.allowance.Period {
-		for _, contract := range c.contracts {
-			endHeight = contract.EndHeight()
-			break
-		}
+	if a.Period == c.allowance.Period && len(c.contracts) > 0 {
+		endHeight = c.contractEndHeight()
 	}
 	c.mu.RUnlock()
 
@@ -130,9 +147,8 @@ func (c *Contractor) managedFormAllowanceContracts(n int, numSectors uint64, a m
 	// should be a full period.
 	c.mu.RLock()
 	endHeight := c.blockHeight + a.Period
-	for _, contract := range c.contracts {
-		endHeight = contract.EndHeight()
-		break
+	if len(c.contracts) > 0 {
+		endHeight = c.contractEndHeight()
 	}
 	c.mu.RUnlock()
 
