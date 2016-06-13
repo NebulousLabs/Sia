@@ -54,22 +54,23 @@ func TestIntegrationAutoRenew(t *testing.T) {
 		t.SkipNow()
 	}
 	// create testing trio
-	h, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
+	_, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// get the host's entry from the db
-	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
-	if !ok {
-		t.Fatal("no entry for host in db")
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+50)
+	a := modules.Allowance{
+		Funds:       types.SiacoinPrecision.Mul64(100), // 100 SC
+		Hosts:       1,
+		Period:      50,
+		RenewWindow: 10,
+	}
+	err = c.SetAllowance(a)
 	if err != nil {
 		t.Fatal(err)
 	}
+	contract := c.Contracts()[0]
 
 	// revise the contract
 	editor, err := c.Editor(contract)
@@ -90,15 +91,13 @@ func TestIntegrationAutoRenew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// set allowance (manually) so that Contractor will auto-renew
-	c.mu.Lock()
-	c.allowance = modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(100), // 100 SC
-		Hosts:       1,
-		Period:      50,
-		RenewWindow: 10,
+	// set allowance to a lower period; Contractor will auto-renew when
+	// current contract expires
+	a.Period--
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
 	}
-	c.mu.Unlock()
 
 	// mine until we enter the renew window
 	renewHeight := contract.EndHeight() - c.allowance.RenewWindow

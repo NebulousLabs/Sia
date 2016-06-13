@@ -188,7 +188,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 64000, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 64000, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +321,7 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func TestIntegrationModify(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,7 +497,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}

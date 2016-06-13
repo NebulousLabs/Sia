@@ -72,12 +72,22 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 
 	c.mu.RLock()
 	shouldRenew := a.Period != c.allowance.Period || a.Funds.Cmp(c.allowance.Funds) != 0
+	shouldWait := c.blockHeight+a.Period < c.contractEndHeight()
 	remaining := int(a.Hosts) - len(c.contracts)
 	c.mu.RUnlock()
 
-	// if no contracts need renewing, run special-case logic instead
 	if !shouldRenew {
+		// If no contracts need renewing, just form new contracts.
 		return c.managedFormAllowanceContracts(remaining, numSectors, a)
+	} else if shouldWait {
+		// If the new period would result in an earlier endHeight, we can't
+		// renew; instead, set the allowance without modifying any contracts.
+		// They will be renewed with the new allowance when they expire.
+		c.mu.Lock()
+		c.allowance = a
+		err = c.saveSync()
+		c.mu.Unlock()
+		return err
 	}
 
 	c.mu.RLock()
