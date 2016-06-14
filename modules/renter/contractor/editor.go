@@ -55,7 +55,7 @@ func (he *hostEditor) ContractID() types.FileContractID { return he.contract.ID 
 
 // EndHeight returns the height at which the host is no longer obligated to
 // store the file.
-func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.FileContract.WindowStart }
+func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.EndHeight() }
 
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
@@ -73,8 +73,8 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	storageDelta := he.editor.StorageSpending.Sub(oldStorageSpending)
 
 	he.contractor.mu.Lock()
-	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(uploadDelta)
-	he.contractor.storageSpending = he.contractor.storageSpending.Add(storageDelta)
+	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
+	he.contractor.financialMetrics.StorageSpending = he.contractor.financialMetrics.StorageSpending.Add(storageDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
@@ -109,7 +109,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	uploadDelta := he.editor.UploadSpending.Sub(oldUploadSpending)
 
 	he.contractor.mu.Lock()
-	he.contractor.uploadSpending = he.contractor.uploadSpending.Add(uploadDelta)
+	he.contractor.financialMetrics.UploadSpending = he.contractor.financialMetrics.UploadSpending.Add(uploadDelta)
 	he.contractor.contracts[contract.ID] = contract
 	he.contractor.saveSync()
 	he.contractor.mu.Unlock()
@@ -124,7 +124,7 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
-	if height > contract.FileContract.WindowStart {
+	if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
 	}
 	host, ok := c.hdb.Host(contract.NetAddress)

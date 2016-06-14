@@ -61,7 +61,31 @@ func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.Transact
 	if err != nil {
 		return nil, err
 	}
-	return host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	if err != nil {
+		return nil, err
+	}
+
+	// configure host to accept contracts
+	settings := h.InternalSettings()
+	settings.AcceptingContracts = true
+	err = h.SetInternalSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	// add storage to host
+	storageFolder := filepath.Join(testdir, "storage")
+	err = os.MkdirAll(storageFolder, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = h.AddStorageFolder(storageFolder, 1e6)
+	if err != nil {
+		return nil, err
+	}
+
+	return h, nil
 }
 
 // newTestingContractor is a helper function that creates a ready-to-use
@@ -129,25 +153,6 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 		return nil, nil, nil, err
 	}
 
-	// Configure host to accept contracts
-	settings := h.InternalSettings()
-	settings.AcceptingContracts = true
-	err = h.SetInternalSettings(settings)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// add storage to host
-	storageFolder := filepath.Join(build.SiaTestingDir, "contractor", "TestIntegrationReviseContract", "storage")
-	err = os.MkdirAll(storageFolder, 0700)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	err = h.AddStorageFolder(storageFolder, 1e6)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	// announce the host
 	err = h.Announce()
 	if err != nil {
@@ -183,7 +188,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 64000, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +217,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, 64000, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +260,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +321,7 @@ func TestIntegrationDelete(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,7 +379,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +434,7 @@ func TestIntegrationModify(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +497,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// form a contract with the host
-	contract, err := c.managedNewContract(hostEntry, modules.SectorSize*10, c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,14 +522,13 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// renew the contract
-	contract = c.contracts[contract.ID]
-	newID, err := c.managedRenew(contract, modules.SectorSize*10, c.blockHeight+200)
+	oldContract := c.contracts[contract.ID]
+	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+200)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// check renewed contract
-	contract = c.contracts[newID]
 	if contract.FileContract.FileMerkleRoot != root {
 		t.Fatal(contract.FileContract.FileMerkleRoot)
 	} else if contract.FileContract.FileSize != modules.SectorSize {

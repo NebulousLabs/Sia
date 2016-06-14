@@ -9,8 +9,6 @@ import (
 // is a change in the blockchain. Updates will always be called in order.
 func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	for _, block := range cc.RevertedBlocks {
 		if block.ID() != types.GenesisID {
 			c.blockHeight--
@@ -26,7 +24,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	var expired []types.FileContractID
 	for id, contract := range c.contracts {
 		// TODO: offset this by some sort of confirmation height?
-		if c.blockHeight > contract.LastRevision.NewWindowStart {
+		if c.blockHeight > contract.EndHeight() {
 			expired = append(expired, id)
 		}
 	}
@@ -35,18 +33,16 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		c.log.Debugln("INFO: deleted expired contract", id)
 	}
 
-	// renew contracts
-	// TODO: re-enable this functionality
-	// if c.blockHeight+c.allowance.RenewWindow >= c.renewHeight {
-	// 	c.renewHeight += c.allowance.Period
-	// 	go c.threadedRenewContracts(c.allowance, c.renewHeight)
-	// 	// reset the spentPeriod metric
-	// 	c.spentPeriod = types.ZeroCurrency
-	// }
-
 	c.lastChange = cc.ID
 	err := c.save()
 	if err != nil {
 		c.log.Println(err)
+	}
+	c.mu.Unlock()
+
+	// only attempt renewal if we are synced
+	// (harmless otherwise, since hosts will reject our renewal attempts, but very slow)
+	if c.cs.Synced() {
+		c.managedRenewContracts()
 	}
 }

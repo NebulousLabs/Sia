@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -20,6 +21,7 @@ type newStub struct{}
 func (newStub) ConsensusSetSubscribe(modules.ConsensusSetSubscriber, modules.ConsensusChangeID) error {
 	return nil
 }
+func (newStub) Synced() bool { return true }
 
 // wallet stubs
 func (newStub) NextAddress() (uc types.UnlockConditions, err error) { return }
@@ -130,27 +132,127 @@ type stubHostDB struct{}
 func (stubHostDB) Host(modules.NetAddress) (h modules.HostDBEntry, ok bool)         { return }
 func (stubHostDB) RandomHosts(int, []modules.NetAddress) (hs []modules.HostDBEntry) { return }
 
-// TestSetAllowance tests the SetAllowance method.
-func TestSetAllowance(t *testing.T) {
-	c := &Contractor{
-		// an empty hostDB ensures that calls to formContracts will always fail
-		hdb: stubHostDB{},
+// TestIntegrationSetAllowance tests the SetAllowance method.
+func TestIntegrationSetAllowance(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create testing trio
+	h, c, m, err := newTestingTrio("TestIntegrationSetAllowance")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// bad args
-	err := c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 0, Hosts: 3})
-	if err == nil {
-		t.Error("expected error, got nil")
+	var a modules.Allowance
+	err = c.SetAllowance(a)
+	if err != errAllowanceNoHosts {
+		t.Errorf("expected %q, got %q", errAllowanceNoHosts, err)
 	}
-	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 0})
-	if err == nil {
-		t.Error("expected error, got nil")
+	a.Hosts = 1
+	err = c.SetAllowance(a)
+	if err != errAllowanceZeroPeriod {
+		t.Errorf("expected %q, got %q", errAllowanceZeroPeriod, err)
+	}
+	a.Period = 20
+	err = c.SetAllowance(a)
+	if err != errAllowanceZeroWindow {
+		t.Errorf("expected %q, got %q", errAllowanceZeroWindow, err)
+	}
+	a.RenewWindow = 20
+	err = c.SetAllowance(a)
+	if err != errAllowanceWindowSize {
+		t.Errorf("expected %q, got %q", errAllowanceWindowSize, err)
 	}
 
-	// formContracts should fail (no hosts)
-	err = c.SetAllowance(modules.Allowance{Funds: types.NewCurrency64(1), Period: 2, Hosts: 3})
-	if err == nil {
-		t.Error("expected error, got nil")
+	// reasonable values; should succeed
+	a.Funds = types.SiacoinPrecision.Mul64(100)
+	a.RenewWindow = 10
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 1 {
+		t.Error("expected 1 contract, got", len(c.contracts))
+	}
+
+	// set same allowance; should no-op
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 1 {
+		t.Fatal("expected 1 contract, got", len(c.contracts))
+	}
+
+	// reannounce host on different IP (easier than creating a new host)
+	addr := modules.NetAddress("127.0.0.1:" + c.Contracts()[0].NetAddress.Port())
+	err = h.AnnounceAddress(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.AddBlock()
+
+	// wait for hostdb to scan host
+	for i := 0; i < 500 && len(c.hdb.RandomHosts(2, nil)) != 2; i++ {
+		time.Sleep(time.Millisecond)
+	}
+
+	// set allowance with Hosts = 2; should only form one new contract
+	a.Hosts = 2
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	}
+
+	// set allowance with Funds*2; should trigger renewal of both contracts
+	a.Funds = a.Funds.Mul64(2)
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	}
+
+	// delete one of the contracts and set allowance with Funds*2; should
+	// trigger 1 renewal and 1 new contract
+	c.mu.Lock()
+	for id, contract := range c.contracts {
+		if contract.NetAddress == addr {
+			delete(c.contracts, id)
+			break
+		}
+	}
+	c.mu.Unlock()
+	a.Funds = a.Funds.Mul64(2)
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
+	}
+
+	// make one of the contracts un-renewable and set allowance with Funds*2; should
+	// trigger 1 renewal failure and 2 new contracts
+	c.mu.Lock()
+	for id, contract := range c.contracts {
+		contract.NetAddress = "foo"
+		c.contracts[id] = contract
+		break
+	}
+	c.mu.Unlock()
+	a.Funds = a.Funds.Mul64(2)
+	err = c.SetAllowance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.contracts) != 2 {
+		t.Fatal("expected 2 contracts, got", len(c.contracts))
 	}
 }
 

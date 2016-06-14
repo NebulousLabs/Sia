@@ -95,7 +95,7 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	sectorStoragePrice := he.host.StoragePrice.Mul(blockBytes)
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(modules.SectorSize)
 	sectorPrice := sectorStoragePrice.Add(sectorBandwidthPrice)
-	if he.contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorPrice) < 0 {
+	if he.contract.RenterFunds().Cmp(sectorPrice) < 0 {
 		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient funds to support upload")
 	}
 	sectorCollateral := he.host.Collateral.Mul(blockBytes)
@@ -171,7 +171,7 @@ func (he *Editor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []
 
 	// calculate price
 	sectorBandwidthPrice := he.host.UploadBandwidthPrice.Mul64(uint64(len(newData)))
-	if he.contract.LastRevision.NewValidProofOutputs[0].Value.Cmp(sectorBandwidthPrice) < 0 {
+	if he.contract.RenterFunds().Cmp(sectorBandwidthPrice) < 0 {
 		return modules.RenterContract{}, errors.New("contract has insufficient funds to support modification")
 	}
 
@@ -217,12 +217,6 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	// check that contract has enough value to support an upload
 	if len(contract.LastRevision.NewValidProofOutputs) != 2 {
 		return nil, errors.New("invalid contract")
-	}
-	if !host.StoragePrice.IsZero() {
-		bytes, errOverflow := contract.LastRevision.NewValidProofOutputs[0].Value.Div(host.StoragePrice).Uint64()
-		if errOverflow == nil && bytes < modules.SectorSize {
-			return nil, errors.New("contract has insufficient capacity")
-		}
 	}
 
 	// initiate revision loop

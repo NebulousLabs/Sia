@@ -21,6 +21,7 @@ var (
 // contracts.
 type Contractor struct {
 	// dependencies
+	cs      consensusSet
 	hdb     hostDB
 	log     *persist.Logger
 	persist persister
@@ -33,10 +34,7 @@ type Contractor struct {
 	lastChange  modules.ConsensusChangeID
 	renewHeight types.BlockHeight // height at which to renew contracts
 
-	// metrics
-	downloadSpending types.Currency
-	storageSpending  types.Currency
-	uploadSpending   types.Currency
+	financialMetrics modules.RenterFinancialMetrics
 
 	mu sync.RWMutex
 }
@@ -52,64 +50,7 @@ func (c *Contractor) Allowance() modules.Allowance {
 func (c *Contractor) FinancialMetrics() modules.RenterFinancialMetrics {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	// calculate contract spending
-	var contractSpending types.Currency
-	for _, contract := range c.contracts {
-		contractSpending = contractSpending.Add(contract.FileContract.Payout)
-	}
-	return modules.RenterFinancialMetrics{
-		ContractSpending: contractSpending,
-		DownloadSpending: c.downloadSpending,
-		StorageSpending:  c.storageSpending,
-		UploadSpending:   c.uploadSpending,
-	}
-}
-
-// SetAllowance sets the amount of money the Contractor is allowed to spend on
-// contracts over a given time period, divided among the number of hosts
-// specified. Note that Contractor can start forming contracts as soon as
-// SetAllowance is called; that is, it may block.
-func (c *Contractor) SetAllowance(a modules.Allowance) error {
-	// sanity checks
-	if a.Hosts == 0 {
-		return errors.New("hosts must be non-zero")
-	} else if a.Period == 0 {
-		return errors.New("period must be non-zero")
-	} else if a.RenewWindow == 0 {
-		return errors.New("renew window must be non-zero")
-	} else if a.RenewWindow >= a.Period {
-		return errors.New("renew window must be less than period")
-	}
-
-	err := c.formContracts(a)
-	if err != nil {
-		return err
-	}
-
-	// Set the allowance.
-	c.mu.Lock()
-	c.allowance = a
-	err = c.saveSync()
-	c.mu.Unlock()
-
-	return err
-
-	/*
-		// If this is the first time the allowance has been set, form contracts
-		// immediately.
-		if old.Hosts == 0 {
-			return c.formContracts(a)
-		}
-
-		// Otherwise, if the new allowance is "significantly different" (to be
-		// defined more precisely later), form intermediary contracts.
-		if a.Funds.Cmp(old.Funds) > 0 {
-			// TODO: implement
-			// c.formContracts(diff(a, old))
-		}
-
-		return nil
-	*/
+	return c.financialMetrics
 }
 
 // Contracts returns the contracts formed by the contractor.
@@ -154,6 +95,7 @@ func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, 
 func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p persister, l *persist.Logger) (*Contractor, error) {
 	// Create the Contractor object.
 	c := &Contractor{
+		cs:      cs,
 		hdb:     hdb,
 		log:     l,
 		persist: p,

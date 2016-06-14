@@ -241,7 +241,7 @@ func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []type
 	}
 	// The WindowEnd for the new file contract must be further in the future
 	// than the WindowEnd for the existing file contract.
-	if fc.WindowEnd <= so.proofDeadline() {
+	if fc.WindowEnd < so.proofDeadline() {
 		return errRenewDoesNotExtend
 	}
 

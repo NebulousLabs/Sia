@@ -18,6 +18,10 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
 
+	if endHeight+host.WindowSize < contract.LastRevision.NewWindowEnd {
+		return modules.RenterContract{}, errors.New("contract cannot be renewed to a lower height")
+	}
+
 	// calculate cost to renter and cost to host
 	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
@@ -35,6 +39,13 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 
 	payout := storageAllocation.Add(hostCollateral.Add(host.ContractPrice)).Mul64(10406).Div64(10000) // renter covers siafund fee
 	renterCost := payout.Sub(hostCollateral)
+
+	// check for negative currency
+	if types.PostTax(startHeight, payout).Cmp(hostPayout) < 0 {
+		return modules.RenterContract{}, errors.New("payout smaller than host payout")
+	} else if hostCollateral.Cmp(baseCollateral) < 0 {
+		return modules.RenterContract{}, errors.New("new collateral smaller than old collateral")
+	}
 
 	// create file contract
 	fc := types.FileContract{

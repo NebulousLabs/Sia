@@ -9,34 +9,27 @@ import (
 )
 
 // managedRenew negotiates a new contract for data already stored with a host.
-// It returns the ID of the new contract. This is a blocking call that
+// It returns the new contract. This is a blocking call that
 // performs network I/O.
-// TODO: take an allowance and renew with those parameters
-func (c *Contractor) managedRenew(contract modules.RenterContract, filesize uint64, newEndHeight types.BlockHeight) (types.FileContractID, error) {
-	c.mu.RLock()
-	height := c.blockHeight
-	c.mu.RUnlock()
-	if newEndHeight < height {
-		return types.FileContractID{}, errors.New("cannot renew below current height")
-	}
+func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors uint64, newEndHeight types.BlockHeight) (modules.RenterContract, error) {
 	host, ok := c.hdb.Host(contract.NetAddress)
 	if !ok {
-		return types.FileContractID{}, errors.New("no record of that host")
+		return modules.RenterContract{}, errors.New("no record of that host")
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
-		return types.FileContractID{}, errTooExpensive
+		return modules.RenterContract{}, errTooExpensive
 	}
 
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()
 	if err != nil {
-		return types.FileContractID{}, err
+		return modules.RenterContract{}, err
 	}
 
 	// create contract params
 	c.mu.RLock()
 	params := proto.ContractParams{
 		Host:          host,
-		Filesize:      filesize,
+		Filesize:      numSectors * modules.SectorSize,
 		StartHeight:   c.blockHeight,
 		EndHeight:     newEndHeight,
 		RefundAddress: uc.UnlockHash(),
@@ -49,63 +42,69 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, filesize uint
 	newContract, err := proto.Renew(contract, params, txnBuilder, c.tpool)
 	if err != nil {
 		txnBuilder.Drop() // return unused outputs to wallet
-		return types.FileContractID{}, err
+		return modules.RenterContract{}, err
 	}
 
-	// update host contract
+	return newContract, nil
+}
+
+// managedRenewContracts renews any contracts that are up for renewal, using
+// the current allowance.
+func (c *Contractor) managedRenewContracts() {
+	c.mu.RLock()
+	// Renew contracts when they enter the renew window.
+	var renewSet []modules.RenterContract
+	for _, contract := range c.contracts {
+		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
+			renewSet = append(renewSet, contract)
+		}
+	}
+	endHeight := c.blockHeight + c.allowance.Period
+
+	numSectors, err := maxSectors(c.allowance, c.hdb)
+	c.mu.RUnlock()
+	if len(renewSet) == 0 {
+		// nothing to do
+		return
+	} else if err != nil {
+		c.log.Println("WARN: could not calculate number of sectors allowance can support:", err)
+		return
+	} else if numSectors == 0 {
+		c.log.Printf("WARN: want to renew %v contracts, but allowance is too small", len(renewSet))
+		return
+	}
+
+	// map old ID to new contract, for easy replacement later
+	newContracts := make(map[types.FileContractID]modules.RenterContract)
+	for _, contract := range renewSet {
+		newContract, err := c.managedRenew(contract, numSectors, endHeight)
+		if err != nil {
+			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
+		} else {
+			newContracts[contract.ID] = newContract
+		}
+	}
+
+	// if we did not renew enough contracts, form new ones
+	if remaining := len(newContracts) - len(renewSet); remaining > 0 {
+		formed, err := c.managedFormContracts(remaining, numSectors, endHeight)
+		if err != nil {
+			c.log.Println("WARN: failed to form new contracts during auto-renew:", err)
+		}
+		for _, contract := range formed {
+			newContracts[contract.ID] = contract
+		}
+	}
+
+	// replace old contracts with renewed ones
 	c.mu.Lock()
-	c.contracts[newContract.ID] = newContract
+	for id, contract := range newContracts {
+		delete(c.contracts, id)
+		c.contracts[contract.ID] = contract
+	}
 	err = c.saveSync()
 	c.mu.Unlock()
 	if err != nil {
 		c.log.Println("WARN: failed to save the contractor:", err)
 	}
-
-	return newContract.ID, nil
-}
-
-// threadedRenewContracts renews the Contractor's contracts according to the
-// specified allowance and at the specified height.
-func (c *Contractor) threadedRenewContracts(allowance modules.Allowance, newHeight types.BlockHeight) {
-	// calculate filesize using new allowance
-	contracts := c.Contracts()
-	var sum types.Currency
-	var numHosts uint64
-	for _, contract := range contracts {
-		if h, ok := c.hdb.Host(contract.NetAddress); ok {
-			sum = sum.Add(h.StoragePrice)
-			numHosts++
-		}
-	}
-	if numHosts == 0 || numHosts < allowance.Hosts {
-		// ??? get more
-		return
-	}
-	avgPrice := sum.Div64(numHosts)
-
-	costPerSector := avgPrice.Mul64(allowance.Hosts).Mul64(modules.SectorSize).Mul64(uint64(allowance.Period))
-
-	if allowance.Funds.Cmp(costPerSector) < 0 {
-		// errors.New("insufficient funds")
-	}
-
-	// Calculate the filesize of the contracts by using the average host price
-	// and rounding down to the nearest sector.
-	numSectors, err := allowance.Funds.Div(costPerSector).Uint64()
-	if err != nil {
-		// errors.New("allowance resulted in unexpectedly large contract size")
-	}
-	filesize := numSectors * modules.SectorSize
-
-	for _, contract := range contracts {
-		if contract.FileContract.WindowStart < newHeight {
-			_, err := c.managedRenew(contract, filesize, newHeight)
-			if err != nil {
-				c.log.Println("WARN: failed to renew contract", contract.ID, ":", err)
-			}
-		}
-	}
-
-	// TODO: reset renewHeight if too many rewewals failed.
-	// TODO: form more contracts if numRenewed < allowance.Hosts
 }
