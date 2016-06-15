@@ -124,12 +124,15 @@ func MerkleProof(b []byte, proofIndex uint64) (base []byte, hashSet []Hash) {
 
 	// Get the proof and convert it to a base + hash set.
 	_, proof, _, _ := t.Prove()
-	if len(proof) > 0 {
-		base = proof[0]
-		hashSet = make([]Hash, len(proof)-1)
-		for i, p := range proof[1:] {
-			copy(hashSet[i][:], p)
-		}
+	if len(proof) == 0 {
+		// There's no proof, because there's no data. Return blank values.
+		return nil, nil
+	}
+
+	base = proof[0]
+	hashSet = make([]Hash, len(proof)-1)
+	for i, p := range proof[1:] {
+		copy(hashSet[i][:], p)
 	}
 	return base, hashSet
 }

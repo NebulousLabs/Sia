@@ -279,7 +279,6 @@ func TestBuriedBadFork(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	cst, err := createConsensusSetTester("TestBuriedBadFork")
 	if err != nil {
 		t.Fatal(err)

@@ -417,6 +417,9 @@ func TestStorageProofSegment(t *testing.T) {
 // TestStorageProofSegmentRandomness checks that the storageProofSegment method
 // is producing outputs that pass an imperfect randomness check (gzip).
 func TestStorageProofSegmentRandomness(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := createConsensusSetTester("TestStorageProofSegmentRandomness")
 	if err != nil {
 		t.Fatal(err)
