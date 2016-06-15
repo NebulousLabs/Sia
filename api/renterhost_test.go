@@ -96,7 +96,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10 {
-		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0])
+		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
 	}
 
 	// Try downloading the second file.
