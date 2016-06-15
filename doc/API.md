@@ -287,62 +287,66 @@ provided hash.
 Gateway
 -------
 
-Queries:
+| Route | HTTP verb |
+| ----- | --------- |
+| [/gateway](#gateway-get) | GET |
+| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post) | POST |
+| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST |
 
-* /gateway                         [GET]
-* /gateway/connect/{netaddress}    [POST]
-* /gateway/disconnect/{netaddress} [POST]
+For examples and detailed descriptions of request and response parameters,
+refer to [Gateway.md](/doc/api/Gateway.md).
 
 #### /gateway [GET]
 
-Function: Returns information about the gateway, including the list of peers.
+`/gateway [GET]` returns information about the gateway, including the list of
+connected peers.
 
-Parameters: none
-
-Response:
-```
-struct {
-	netaddress string
-	peers      []struct {
-                netaddress string
-                version    string
-                inbound    bool
-        }
+###### JSON Response [(with comments)](/doc/api/Gateway.md#json-response)
+```javascript
+{
+    "netaddress": String,
+    "peers":      []{
+        "netaddress": String,
+        "version":    String,
+        "inbound":    Boolean
+    }
 }
 ```
-'netaddress' is the network address of the Gateway, including its external IP
-address and the port Sia is listening on.
 
-'peers' is a list of the network addresses and versions of peers that the
-Gateway is currently connected to.
+###### [Example](/doc/api/Gateway.md#gateway-info-example)
 
 #### /gateway/connect/{netaddress} [POST]
 
-Function: Connects the gateway to a peer. The peer is added to the node list if
-it not already present.
+`/gateway/connect/{netaddress} [POST]` connects the gateway to a peer. The peer
+is added to the node list if it is not already present. The node list is the
+list of all nodes the gateway knows about, but is not necessarily connected to.
 
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters)
 ```
-netaddress string
+{netaddress}
 ```
-'netaddress' should be a reachable ip + port number, typically of the
-form "a.b.c.d:xxxx".
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+###### [Example](/doc/api/Gateway.md#connect-example)
 
 #### /gateway/disconnect/{netaddress} [POST]
 
-Function: Disconnects the gateway from the peer. The peer remains in the node
-list.
+`/gateway/disconnect/{netaddress} [POST]` disconnects the gateway from a peer.
+The peer remains in the node list.
 
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters-1)
 ```
-netaddress string
+{netaddress}
 ```
-'netaddress' should be a reachable hostname + port number, typically of the
-form "a.b.c.d:xxxx".
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+###### [Example](/doc/api/Gateway.md#disconnect-example)
 
 Host
 ----
