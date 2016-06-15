@@ -173,6 +173,9 @@ func (cst *consensusSetTester) Close() error {
 
 // TestNilInputs tries to create new consensus set modules using nil inputs.
 func TestNilInputs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")
 	_, err := New(nil, testdir)
 	if err != errNilGateway {
@@ -182,6 +185,9 @@ func TestNilInputs(t *testing.T) {
 
 // TestClosing tries to close a consenuss set.
 func TestDatabaseClosing(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	testdir := build.TempDir(modules.ConsensusDir, "TestClosing")
 
 	// Create the gateway.

@@ -731,6 +731,9 @@ func (mockPeerConnFailingWriter) Write([]byte) (int, error) {
 // TestSendBlk probes the ConsensusSet.rpcSendBlk method and tests that it
 // correctly receives block ids and writes out the corresponding blocks.
 func TestSendBlk(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := blankConsensusSetTester("TestSendBlk")
 	if err != nil {
 		t.Fatal(err)
@@ -818,6 +821,9 @@ func TestSendBlk(t *testing.T) {
 // receives a block. Also tests that the block is correctly (not) accepted into
 // the consensus set.
 func TestThreadedReceiveBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := blankConsensusSetTester("TestThreadedReceiveBlock")
 	if err != nil {
 		t.Fatal(err)
@@ -1038,6 +1044,9 @@ func (g *mockGatewayCallsRPC) RPC(addr modules.NetAddress, name string, fn modul
 // to valid headers with known parents, or requests the block history to orphan
 // headers.
 func TestRelayHeader(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := blankConsensusSetTester("TestRelayHeader")
 	if err != nil {
 		t.Fatal(err)

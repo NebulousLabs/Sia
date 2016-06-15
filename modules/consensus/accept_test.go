@@ -489,9 +489,9 @@ func TestUnitValidateHeader(t *testing.T) {
 // TestIntegrationDoSBlockHandling checks that saved bad blocks are correctly
 // ignored.
 func TestIntegrationDoSBlockHandling(t *testing.T) {
-	// TestIntegrationDoSBlockHandling catches a wide array of simple errors,
-	// and therefore is included in the short tests despite being somewhat
-	// computationally expensive.
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := createConsensusSetTester("TestIntegrationDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -973,6 +973,9 @@ func (g *mockGatewayDoesBroadcast) Broadcast(name string, obj interface{}, peers
 // TestAcceptBlockBroadcasts tests that AcceptBlock broadcasts valid blocks and
 // that managedAcceptBlock does not.
 func TestAcceptBlockBroadcasts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := blankConsensusSetTester("TestAcceptBlockBroadcasts")
 	if err != nil {
 		t.Fatal(err)
