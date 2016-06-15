@@ -36,8 +36,8 @@ const (
 
 // Reliability is a measure of a host's uptime.
 var (
-	MaxReliability     = types.NewCurrency64(225) // Given the scanning defaults, about 3 weeks of survival.
-	DefaultReliability = types.NewCurrency64(75)  // Given the scanning defaults, about 1 week of survival.
+	MaxReliability     = types.NewCurrency64(500) // Given the scanning defaults, about 6 weeks of survival.
+	DefaultReliability = types.NewCurrency64(150) // Given the scanning defaults, about 2 week of survival.
 	UnreachablePenalty = types.NewCurrency64(1)
 )
 
