@@ -73,15 +73,15 @@ func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
 }
 
 // ActiveHosts returns the hosts that can be randomly selected out of the
-// hostdb.
+// hostdb, sorted by preference.
 func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostDBEntry) {
 	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
+	numHosts := len(hdb.activeHosts)
+	hdb.mu.RUnlock()
 
-	for _, node := range hdb.activeHosts {
-		activeHosts = append(activeHosts, node.hostEntry.HostDBEntry)
-	}
-	return
+	// Get the hosts using RandomHosts so that they are in sorted order.
+	sortedHosts := hdb.RandomHosts(numHosts, nil)
+	return sortedHosts
 }
 
 // AllHosts returns all of the hosts known to the hostdb, including the

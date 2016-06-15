@@ -126,8 +126,8 @@ type Renter interface {
 	// Allowance returns the current allowance.
 	Allowance() Allowance
 
-	// ActiveHosts returns the list of hosts that are actively being selected
-	// from.
+	// ActiveHosts provides the list of hosts that the renter is selecting,
+	// sorted by preference.
 	ActiveHosts() []HostDBEntry
 
 	// AllHosts returns the full list of hosts known to the renter.
@@ -162,7 +162,7 @@ type Renter interface {
 	// renter.
 	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
-	// Rename changes the path of a file.
+	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
 
 	// SetAllowance sets the amount of money the Renter is allowed to spend on
