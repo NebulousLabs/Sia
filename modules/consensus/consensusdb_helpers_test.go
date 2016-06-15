@@ -88,6 +88,24 @@ func (cs *ConsensusSet) dbGetSiacoinOutput(id types.SiacoinOutputID) (sco types.
 	return sco, err
 }
 
+// getArbSiacoinOutput is a convenience function fetching a single random
+// siacoin output from the database.
+func (cs *ConsensusSet) getArbSiacoinOutput() (scoid types.SiacoinOutputID, sco types.SiacoinOutput, err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		cursor := tx.Bucket(SiacoinOutputs).Cursor()
+		scoidBytes, scoBytes := cursor.First()
+		copy(scoid[:], scoidBytes)
+		return encoding.Unmarshal(scoBytes, &sco)
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	if err != nil {
+		return types.SiacoinOutputID{}, types.SiacoinOutput{}, err
+	}
+	return scoid, sco, nil
+}
+
 // dbGetFileContract is a convenience function allowing getFileContract to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.FileContract, err error) {
@@ -99,6 +117,18 @@ func (cs *ConsensusSet) dbGetFileContract(id types.FileContractID) (fc types.Fil
 		panic(dbErr)
 	}
 	return fc, err
+}
+
+// dbAddFileContract is a convenience function allowing addFileContract to be
+// called without a bolt.Tx.
+func (cs *ConsensusSet) dbAddFileContract(id types.FileContractID, fc types.FileContract) {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+		addFileContract(tx, id, fc)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
 }
 
 // dbGetSiafundOutput is a convenience function allowing getSiafundOutput to be
@@ -165,4 +195,17 @@ func (cs *ConsensusSet) dbGetDSCO(height types.BlockHeight, id types.SiacoinOutp
 		panic(dbErr)
 	}
 	return dsco, err
+}
+
+// dbStorageProofSegment is a convenience function allowing
+// 'storageProofSegment' to be called during testing without a tx.
+func (cs *ConsensusSet) dbStorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		index, err = storageProofSegment(tx, fcid)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return index, err
 }

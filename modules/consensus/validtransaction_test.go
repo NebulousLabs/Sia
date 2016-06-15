@@ -1,10 +1,15 @@
 package consensus
 
 import (
+	"bytes"
+	"compress/gzip"
+	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // TestTryValidTransactionSet submits a valid transaction set to the
@@ -315,7 +320,6 @@ func TestEmptyStorageProof(t *testing.T) {
 	}
 }
 
-/*
 // TestValidSiacoins probes the validSiacoins method of the consensus set.
 func TestValidSiacoins(t *testing.T) {
 	if testing.Short() {
@@ -325,30 +329,42 @@ func TestValidSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Create a transaction pointing to a nonexistent siacoin output.
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
-	err = cst.cs.validSiacoins(txn)
-	if err != ErrMissingSiacoinOutput {
-		t.Error(err)
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		err := validSiacoins(tx, txn)
+		if err != errMissingSiacoinOutput {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create a transaction with invalid unlock conditions.
-	var scoid types.SiacoinOutputID
-	cst.cs.db.forEachSiacoinOutputs(func(mapScoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		scoid = mapScoid
-	})
+	scoid, _, err := cst.cs.getArbSiacoinOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
 	txn = types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID: scoid,
 		}},
 	}
-	err = cst.cs.validSiacoins(txn)
-	if err != ErrWrongUnlockConditions {
-		t.Error(err)
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		err := validSiacoins(tx, txn)
+		if err != errWrongUnlockConditions {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create a txn with more outputs than inputs.
@@ -357,9 +373,15 @@ func TestValidSiacoins(t *testing.T) {
 			Value: types.NewCurrency64(1),
 		}},
 	}
-	err = cst.cs.validSiacoins(txn)
-	if err != ErrSiacoinInputOutputMismatch {
-		t.Error(err)
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		err := validSiacoins(tx, txn)
+		if err != errSiacoinInputOutputMismatch {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -373,20 +395,21 @@ func TestStorageProofSegment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Submit a file contract that is unrecognized.
-	_, err = cst.cs.storageProofSegment(types.FileContractID{})
-	if err != ErrUnrecognizedFileContractID {
+	_, err = cst.cs.dbStorageProofSegment(types.FileContractID{})
+	if err != errUnrecognizedFileContractID {
 		t.Error(err)
 	}
 
 	// Try to get the segment of an unfinished file contract.
-	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
+	cst.cs.dbAddFileContract(types.FileContractID{}, types.FileContract{
+		Payout:      types.NewCurrency64(1),
 		WindowStart: 100000,
 	})
-	_, err = cst.cs.storageProofSegment(types.FileContractID{})
-	if err != ErrUnfinishedFileContract {
+	_, err = cst.cs.dbStorageProofSegment(types.FileContractID{})
+	if err != errUnfinishedFileContract {
 		t.Error(err)
 	}
 }
@@ -394,25 +417,28 @@ func TestStorageProofSegment(t *testing.T) {
 // TestStorageProofSegmentRandomness checks that the storageProofSegment method
 // is producing outputs that pass an imperfect randomness check (gzip).
 func TestStorageProofSegmentRandomness(t *testing.T) {
-	t.Skip("randomness check takes a long time")
 	cst, err := createConsensusSetTester("TestStorageProofSegmentRandomness")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Add a file contract to the consensus set that can be used to probe the
 	// storage segment.
 	var outputs []byte
-	for i := 0; i < 32*256; i++ {
+	for i := 0; i < 20e3; i++ {
 		var fcid types.FileContractID
 		rand.Read(fcid[:])
 		fc := types.FileContract{
-			WindowStart: 2,
+			Payout:      types.NewCurrency64(1),
 			FileSize:    256 * 64,
+			WindowStart: 2,
 		}
-		cst.cs.db.addFileContracts(fcid, fc)
-		index, err := cst.cs.storageProofSegment(fcid)
+		cst.cs.dbAddFileContract(fcid, fc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		index, err := cst.cs.dbStorageProofSegment(fcid)
 		if err != nil {
 			t.Error(err)
 		}
@@ -432,6 +458,7 @@ func TestStorageProofSegmentRandomness(t *testing.T) {
 	}
 }
 
+/*
 // TestValidStorageProofs probes the validStorageProofs method of the consensus
 // set.
 func TestValidStorageProofs(t *testing.T) {
