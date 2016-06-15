@@ -62,6 +62,18 @@ func (cs *ConsensusSet) dbGetPath(bh types.BlockHeight) (id types.BlockID, err e
 	return id, err
 }
 
+// dbPushPath is a convenience function allowing pushPath to be called without a
+// bolt.Tx.
+func (cs *ConsensusSet) dbPushPath(bid types.BlockID) {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+		pushPath(tx, bid)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+}
+
 // dbGetBlockMap is a convenience function allowing getBlockMap to be called
 // without a bolt.Tx.
 func (cs *ConsensusSet) dbGetBlockMap(id types.BlockID) (pb *processedBlock, err error) {

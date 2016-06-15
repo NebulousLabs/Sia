@@ -27,7 +27,7 @@ func TestSynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	cst1, err := createConsensusSetTester("TestSynchronize1")
 	if err != nil {
 		t.Fatal(err)
@@ -59,15 +59,14 @@ func TestSynchronize(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst2.
+	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst1.
 	// NOTE: we have to disconnect prior to this, otherwise cst2 will relay
 	// blocks to cst1.
 	err = cst1.gateway.Disconnect(cst2.gateway.Address())
 	if err != nil {
 		t.Fatal(err)
 	}
-	// TODO: more than 30 causes a race condition!
-	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+20 {
+	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+50 {
 		b, _ := cst2.miner.FindBlock()
 		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
@@ -85,86 +84,22 @@ func TestSynchronize(t *testing.T) {
 		time.Sleep(250 * time.Millisecond)
 	}
 
-	/*
-		// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
-		// reject the bad block.
-		lockID := cst2.cs.mu.Lock()
-		cst2.cs.db.pushPath(cst2.cs.db.getPath(0))
-		cst2.cs.mu.Unlock(lockID)
-		if cst1.cs.db.pathHeight() == cst2.cs.db.pathHeight() {
-			t.Fatal("cst1 did not reject bad block")
-		}
-	*/
-}
-
-func TestResynchronize(t *testing.T) {
-	t.Skip("takes way too long")
-
-	cst1, err := createConsensusSetTester("TestResynchronize1")
+	// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
+	// reject the bad block.
+	cst2.cs.mu.Lock()
+	id, err := cst2.cs.dbGetPath(0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst1.Close()
-	cst2, err := createConsensusSetTester("TestResynchronize2")
-	if err != nil {
-		t.Fatal(err)
+	cst2.cs.dbPushPath(id)
+	cst2.cs.mu.Unlock()
+
+	// Sleep for a few seconds to allow the network call between the two time
+	// to occur.
+	time.Sleep(2 * time.Second)
+	if cst1.cs.dbBlockHeight() == cst2.cs.dbBlockHeight() {
+		t.Fatal("cst1 did not reject bad block")
 	}
-	defer cst2.Close()
-
-	// TODO: without this extra block, sync fails. Why?
-	b, _ := cst2.miner.FindBlock()
-	err = cst2.cs.AcceptBlock(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// connect and disconnect, so that cst1 and cst2 are synchronized
-	err = cst1.gateway.Connect(cst2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst1.gateway.Disconnect(cst2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
-		t.Fatal("Consensus Sets did not synchronize")
-	}
-
-	// mine a block on cst2, but hide it from cst1 during reconnect
-	/*
-		b, _ = cst2.miner.FindBlock()
-		err = cst2.cs.AcceptBlock(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		lockID := cst2.cs.mu.Lock()
-		id := cst2.cs.currentBlockID()
-		err = cst2.cs.db.popPath()
-		if err != nil {
-			t.Fatal(err)
-		}
-		cst2.cs.mu.Unlock(lockID)
-
-		err = cst1.gateway.Connect(cst2.gateway.Address())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// add id back to cst2's current path
-		lockID = cst2.cs.mu.Lock()
-		err = cst2.cs.db.pushPath(id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cst2.cs.mu.Unlock(lockID)
-
-		// cst1 should not have the block
-		if cst1.cs.dbBlockHeight() == cst2.cs.dbBlockHeight() {
-			t.Fatal("Consensus Sets should not have the same height")
-		}
-	*/
 }
 
 // TestBlockHistory tests that blockHistory returns the expected sequence of
