@@ -27,7 +27,22 @@ Example GET curl call:  `curl -A "Sia-Agent" /wallet/transactions?startheight=1&
 
 Example POST curl call: `curl -A "Sia-Agent" --data "amount=123&destination=abcd" /wallet/siacoins
 
-Table of contents:
+Standard responses
+------------------
+
+#### Success
+
+The standard response indicating the request was successfully processed is HTTP
+status code 204.
+
+#### Error
+
+The standard error response indicating the request failed for any reason, is a
+4xx or 5xx HTTP status code with the error message as plain text.
+
+Table of contents
+-----------------
+
 - [Daemon](#daemon)
 - [Consensus](#consensus)
 - [Explorer](#explorer)
