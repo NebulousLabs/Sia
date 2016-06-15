@@ -119,3 +119,92 @@ func TestRenterConflicts(t *testing.T) {
 		t.Fatal("expecting conflict error, got nil")
 	}
 }
+
+// TestRenterHostsActiveHandler checks the behavior of the call to
+// /renter/hosts/active.
+func TestRenterHostsActiveHandler(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestRenterHostsActiveHandler")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Try the call with with numhosts unset, and set to -1, 0, and 1.
+	var ah ActiveHosts
+	err = st.getAPI("/renter/hosts/active", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 0 {
+		t.Fatal(len(ah.Hosts))
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=-1", &ah)
+	if err == nil {
+		t.Fatal("expecting an error, got:", err)
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=0", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 0 {
+		t.Fatal(len(ah.Hosts))
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=1", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 0 {
+		t.Fatal(len(ah.Hosts))
+	}
+
+	// announce the host and start accepting contracts
+	err = st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.acceptContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.setHostStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try the call with with numhosts unset, and set to -1, 0, 1, and 2.
+	err = st.getAPI("/renter/hosts/active", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatal(len(ah.Hosts))
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=-1", &ah)
+	if err == nil {
+		t.Fatal("expecting an error, got:", err)
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=0", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 0 {
+		t.Fatal(len(ah.Hosts))
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=1", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatal(len(ah.Hosts))
+	}
+	err = st.getAPI("/renter/hosts/active?numhosts=2", &ah)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatal(len(ah.Hosts))
+	}
+}
