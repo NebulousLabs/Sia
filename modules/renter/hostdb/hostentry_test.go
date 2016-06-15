@@ -53,9 +53,8 @@ func TestActiveHosts(t *testing.T) {
 	// with one host
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
-	hdb.activeHosts = map[modules.NetAddress]*hostNode{
-		h1.NetAddress: {hostEntry: h1},
-	}
+	h1.Weight = types.NewCurrency64(1)
+	hdb.insertNode(h1)
 	if hosts := hdb.ActiveHosts(); len(hosts) != 1 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 1, len(hosts))
 	} else if hosts[0].NetAddress != h1.NetAddress {
@@ -65,10 +64,8 @@ func TestActiveHosts(t *testing.T) {
 	// with multiple hosts
 	h2 := new(hostEntry)
 	h2.NetAddress = "bar"
-	hdb.activeHosts = map[modules.NetAddress]*hostNode{
-		h1.NetAddress: {hostEntry: h1},
-		h2.NetAddress: {hostEntry: h2},
-	}
+	h2.Weight = types.NewCurrency64(1)
+	hdb.insertNode(h2)
 	if hosts := hdb.ActiveHosts(); len(hosts) != 2 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 2, len(hosts))
 	} else if hosts[0].NetAddress != h1.NetAddress && hosts[1].NetAddress != h1.NetAddress {

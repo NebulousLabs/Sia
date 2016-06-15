@@ -242,8 +242,28 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 // renterHostsActiveHandler handes the API call asking for the list of active
 // hosts.
 func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var numHosts uint64
+	hosts := srv.renter.ActiveHosts()
+
+	if req.FormValue("numhosts") == "" {
+		// Default value for 'numhosts' is all of them.
+		numHosts = uint64(len(hosts))
+	} else {
+		// Parse the value for 'numhosts'.
+		_, err := fmt.Sscan(req.FormValue("numhosts"), &numHosts)
+		if err != nil {
+			writeError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Catch any boundary errors.
+		if numHosts > uint64(len(hosts)) {
+			numHosts = uint64(len(hosts))
+		}
+	}
+
 	writeJSON(w, ActiveHosts{
-		Hosts: srv.renter.ActiveHosts(),
+		Hosts: hosts[:numHosts],
 	})
 }
 

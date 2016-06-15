@@ -16,7 +16,8 @@ type hostDB interface {
 	// from.
 	ActiveHosts() []modules.HostDBEntry
 
-	// AllHosts returns the full list of hosts known to the hostdb.
+	// AllHosts returns the full list of hosts known to the hostdb, sorted in
+	// order of preference.
 	AllHosts() []modules.HostDBEntry
 
 	// AveragePrice returns the average price of a host.

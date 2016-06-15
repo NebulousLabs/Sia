@@ -819,9 +819,15 @@ Response: standard.
 
 #### /renter/hosts/active [GET]
 
-Function: Lists all of the active hosts known to the renter.
+Function: Lists all of the active hosts known to the renter, sorted by
+preference.
 
-Parameters: none
+Parameters:
+```
+numhosts uint64 // Optional
+```
+'numhosts' is the maximum number of hosts that should be returned by the active
+hosts call.
 
 Response:
 ```
