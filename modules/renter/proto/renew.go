@@ -18,10 +18,6 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 	host, filesize, startHeight, endHeight, refundAddress := params.Host, params.Filesize, params.StartHeight, params.EndHeight, params.RefundAddress
 	ourSK := contract.SecretKey
 
-	if endHeight+host.WindowSize < contract.LastRevision.NewWindowEnd {
-		return modules.RenterContract{}, errors.New("contract cannot be renewed to a lower height")
-	}
-
 	// calculate cost to renter and cost to host
 	storageAllocation := host.StoragePrice.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
 	hostCollateral := host.Collateral.Mul64(filesize).Mul64(uint64(endHeight - startHeight))
@@ -31,12 +27,16 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		hostCollateral = host.MaxCollateral
 	}
 
-	timeExtension := uint64((endHeight + host.WindowSize) - contract.LastRevision.NewWindowEnd)
-	basePrice := host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
-	baseCollateral := host.Collateral.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension) // same but collateral
+	// Calculate additional basePrice and baseCollateral. If the contract
+	// height did not increase, basePrice and baseCollateral are zero.
+	var basePrice, baseCollateral types.Currency
+	if endHeight+host.WindowSize > contract.LastRevision.NewWindowEnd {
+		timeExtension := uint64((endHeight + host.WindowSize) - contract.LastRevision.NewWindowEnd)
+		basePrice = host.StoragePrice.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension)    // cost of data already covered by contract, i.e. lastrevision.Filesize
+		baseCollateral = host.Collateral.Mul64(contract.LastRevision.NewFileSize).Mul64(timeExtension) // same but collateral
+	}
 
 	hostPayout := hostCollateral.Add(host.ContractPrice).Add(basePrice)
-
 	payout := storageAllocation.Add(hostCollateral.Add(host.ContractPrice)).Mul64(10406).Div64(10000) // renter covers siafund fee
 	renterCost := payout.Sub(hostCollateral)
 

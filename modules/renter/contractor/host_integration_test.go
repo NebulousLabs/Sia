@@ -555,4 +555,14 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// renew to a lower height
+	oldContract = c.contracts[contract.ID]
+	contract, err = c.managedRenew(oldContract, modules.SectorSize*10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contract.FileContract.WindowStart != c.blockHeight+100 {
+		t.Fatal(contract.FileContract.WindowStart)
+	}
 }
