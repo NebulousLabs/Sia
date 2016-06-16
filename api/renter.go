@@ -121,8 +121,15 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
 func (srv *Server) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	// if srv.renter.Contracts() is nil, marshal a 0-length slice instead.
+	// this prevents the API from returning `contracts: null` when there are zero contracts,
+	// and instead returns an empty array `contracts: []`.
+	contracts := srv.renter.Contracts()
+	if contracts == nil {
+		contracts = []modules.RenterContract{}
+	}
 	writeJSON(w, RenterContracts{
-		Contracts: srv.renter.Contracts(),
+		Contracts: contracts,
 	})
 }
 
