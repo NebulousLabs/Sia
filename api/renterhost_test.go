@@ -129,9 +129,9 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	st.getAPI("/host", &hg)
 	if hg.FinancialMetrics.StorageRevenue.Cmp(types.ZeroCurrency) <= 0 ||
 		hg.FinancialMetrics.DownloadBandwidthRevenue.Cmp(types.ZeroCurrency) <= 0 {
-		t.Error("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
-		t.Error("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
-		t.Error("Full Financial Metrics:", hg.FinancialMetrics)
+		t.Log("Storage Revenue:", hg.FinancialMetrics.StorageRevenue)
+		t.Log("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
+		t.Log("Full Financial Metrics:", hg.FinancialMetrics)
 		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
 	}
 }

@@ -1247,9 +1247,9 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// cst2, and then to cst3.
 	b, err := cst1.miner.AddBlock()
 	if err != nil {
-		t.Error(b.ID())
-		t.Error(cst1.cs.CurrentBlock().ID())
-		t.Error(cst2.cs.CurrentBlock().ID())
+		t.Log(b.ID())
+		t.Log(cst1.cs.CurrentBlock().ID())
+		t.Log(cst2.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
 
@@ -1277,9 +1277,9 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// Mine a block on cst2.
 	b, err = cst2.miner.AddBlock()
 	if err != nil {
-		t.Error(b.ID())
-		t.Error(cst2.cs.CurrentBlock().ID())
-		t.Error(cst3.cs.CurrentBlock().ID())
+		t.Log(b.ID())
+		t.Log(cst2.cs.CurrentBlock().ID())
+		t.Log(cst3.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
 	// Spin until the block has propagated to cst1.
@@ -1306,9 +1306,9 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// Mine a block on cst3.
 	b, err = cst3.miner.AddBlock()
 	if err != nil {
-		t.Error(b.ID())
-		t.Error(cst1.cs.CurrentBlock().ID())
-		t.Error(cst3.cs.CurrentBlock().ID())
+		t.Log(b.ID())
+		t.Log(cst1.cs.CurrentBlock().ID())
+		t.Log(cst3.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
 	// Spin until the block has propagated to cst1.
