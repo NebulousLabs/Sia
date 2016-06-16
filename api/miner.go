@@ -49,7 +49,7 @@ func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request, _ 
 func (srv *Server) minerHeaderHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	bhfw, target, err := srv.miner.HeaderForWork()
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	w.Write(encoding.MarshalAll(target, bhfw))
@@ -61,12 +61,12 @@ func (srv *Server) minerHeaderHandlerPOST(w http.ResponseWriter, req *http.Reque
 	var bh types.BlockHeader
 	err := encoding.NewDecoder(req.Body).Decode(&bh)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = srv.miner.SubmitHeader(bh)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)

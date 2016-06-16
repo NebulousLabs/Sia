@@ -31,7 +31,7 @@ func (srv *Server) gatewayConnectHandler(w http.ResponseWriter, req *http.Reques
 	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := srv.gateway.Connect(addr)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (srv *Server) gatewayDisconnectHandler(w http.ResponseWriter, req *http.Req
 	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := srv.gateway.Disconnect(addr)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 

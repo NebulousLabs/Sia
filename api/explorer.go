@@ -202,14 +202,14 @@ func (srv *Server) explorerBlocksHandler(w http.ResponseWriter, req *http.Reques
 	var height types.BlockHeight
 	_, err := fmt.Sscan(ps.ByName("height"), &height)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	// Fetch and return the explorer block.
 	block, exists := srv.cs.BlockAtHeight(height)
 	if !exists {
-		writeError(w, "no block found at input height in call to /explorer/block", http.StatusBadRequest)
+		writeError(w, APIError{"no block found at input height in call to /explorer/block"}, http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, ExplorerBlockGET{
@@ -251,7 +251,7 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	// not they have a checksum.
 	hash, err := scanAddress(ps.ByName("hash"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, APIError{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -320,7 +320,7 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	// TODO: lookups on the zero hash are too expensive to allow. Need a
 	// better way to handle this case.
 	if hash == (types.UnlockHash{}) {
-		writeError(w, "can't lookup the empty unlock hash", http.StatusBadRequest)
+		writeError(w, APIError{"can't lookup the empty unlock hash"}, http.StatusBadRequest)
 		return
 	}
 
@@ -344,7 +344,7 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	}
 
 	// Hash not found, return an error.
-	writeError(w, "unrecognized hash used as input to /explorer/hash", http.StatusBadRequest)
+	writeError(w, APIError{"unrecognized hash used as input to /explorer/hash"}, http.StatusBadRequest)
 }
 
 // explorerHandler handles API calls to /explorer

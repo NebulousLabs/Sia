@@ -8,6 +8,26 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+// APIError is a type that is encoded as JSON and returned in an API response
+// in the event of an error. Only the Message field is required. More fields
+// may be added to this struct in the future for better error reporting.
+type APIError struct {
+	// Message describes the error in English. Typically it is set to
+	// `err.Error()`. This field is required.
+	Message string `json:"message"`
+
+	// TODO: add a Param field with the (omitempty option in the json tag)
+	// to indicate that the error was caused by an invalid, missing, or
+	// incorrect parameter. This is not trivial as the API does not
+	// currently do parameter validation itself. For example, the
+	// /gateway/connect endpoint relies on the gateway.Connect method to
+	// validate the netaddress. However, this prevents the API from knowing
+	// whether an error returned by gateway.Connect is because of a
+	// connection error or an invalid netaddress parameter. Validating
+	// parameters in the API is not sufficient, as a parameter's value may
+	// be valid or invalid depending on the current state of a module.
+}
+
 // HttpGET is a utility function for making http get requests to sia with a
 // whitelisted user-agent. A non-2xx response does not return an error.
 func HttpGET(url string) (resp *http.Response, err error) {
@@ -63,7 +83,7 @@ func HttpPOSTAuthenticated(url string, data string, password string) (resp *http
 func requireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !strings.Contains(req.UserAgent(), ua) {
-			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusBadRequest)
+			writeError(w, APIError{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
 		h.ServeHTTP(w, req)
@@ -82,7 +102,7 @@ func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		_, pass, ok := req.BasicAuth()
 		if !ok || pass != password {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
-			writeError(w, "API authentication failed.", http.StatusUnauthorized)
+			writeError(w, APIError{"API authentication failed."}, http.StatusUnauthorized)
 			return
 		}
 		h(w, req, ps)
@@ -205,8 +225,12 @@ func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Requ
 }
 
 // writeError an error to the API caller.
-func writeError(w http.ResponseWriter, msg string, err int) {
-	http.Error(w, msg, err)
+func writeError(w http.ResponseWriter, err APIError, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+	if json.NewEncoder(w).Encode(err) != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an
