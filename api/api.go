@@ -207,8 +207,10 @@ func writeError(w http.ResponseWriter, msg string, err int) {
 }
 
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an
-// error is written instead.
+// error is written instead. The Content-Type of the response header is set
+// accordingly.
 func writeJSON(w http.ResponseWriter, obj interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if json.NewEncoder(w).Encode(obj) != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
