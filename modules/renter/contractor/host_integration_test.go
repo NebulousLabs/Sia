@@ -176,6 +176,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	h, c, _, err := newTestingTrio("TestIntegrationFormContract")
 	if err != nil {
 		t.Fatal(err)
@@ -204,6 +205,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationReviseContract")
 	if err != nil {
@@ -247,6 +249,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationUploadDownload")
 	if err != nil {
@@ -308,6 +311,7 @@ func TestIntegrationDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationDelete")
 	if err != nil {
@@ -366,6 +370,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationInsertDelete")
 	if err != nil {
@@ -421,6 +426,7 @@ func TestIntegrationModify(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationModify")
 	if err != nil {
@@ -484,6 +490,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	h, c, _, err := newTestingTrio("TestIntegrationRenew")
 	if err != nil {
