@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -45,6 +46,12 @@ type serverTester struct {
 // assembleServerTester creates a bunch of modules and assembles them into a
 // server tester, without creating any directories or mining any blocks.
 func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester, error) {
+	// assembleServerTester should not get called during short tests, as it
+	// takes a long time to run.
+	if testing.Short() {
+		panic("assembleServerTester called during short tests")
+	}
+
 	// Create the modules.
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
@@ -124,6 +131,12 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 // them into a server tester that requires authentication with the given
 // requiredPassword. No directories are created and no blocks are mined.
 func assembleAuthenticatedServerTester(requiredPassword string, key crypto.TwofishKey, testdir string) (*serverTester, error) {
+	// assembleAuthenticatedServerTester should not get called during short
+	// tests, as it takes a long time to run.
+	if testing.Short() {
+		panic("assembleServerTester called during short tests")
+	}
+
 	// Create the modules.
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
@@ -203,6 +216,12 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 // explorer module without creating any directories. The user agent requirement
 // is disabled.
 func assembleExplorerServerTester(testdir string) (*serverTester, error) {
+	// assembleExplorerServerTester should not get called during short tests,
+	// as it takes a long time to run.
+	if testing.Short() {
+		panic("assembleServerTester called during short tests")
+	}
+
 	// Create the modules.
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
@@ -245,6 +264,12 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 // createServerTester creates a server tester object that is ready for testing,
 // including money in the wallet and all modules initialized.
 func createServerTester(name string) (*serverTester, error) {
+	// createServerTester is expensive, and therefore should not be called
+	// during short tests.
+	if testing.Short() {
+		panic("createServerTester called during short tests")
+	}
+
 	// Create the testing directory.
 	testdir := build.TempDir("api", name)
 
@@ -272,6 +297,12 @@ func createServerTester(name string) (*serverTester, error) {
 // object that is ready for testing, including money in the wallet and all
 // modules initalized.
 func createAuthenticatedServerTester(name string, password string) (*serverTester, error) {
+	// createAuthenticatedServerTester should not get called during short
+	// tests, as it takes a long time to run.
+	if testing.Short() {
+		panic("assembleServerTester called during short tests")
+	}
+
 	// Create the testing directory.
 	testdir := build.TempDir("authenticated-api", name)
 

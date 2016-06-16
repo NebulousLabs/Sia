@@ -7,6 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+// TestVersion checks that /daemon/version is responding with the correct
+// version.
 func TestVersion(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -25,6 +27,9 @@ func TestVersion(t *testing.T) {
 
 // TestStop tests the /daemon/stop handler.
 func TestStop(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st, err := createServerTester("TestStop")
 	if err != nil {
 		t.Fatal(err)
