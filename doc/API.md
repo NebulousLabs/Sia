@@ -27,6 +27,42 @@ Example GET curl call:  `curl -A "Sia-Agent" /wallet/transactions?startheight=1&
 
 Example POST curl call: `curl -A "Sia-Agent" --data "amount=123&destination=abcd" /wallet/siacoins
 
+Standard responses
+------------------
+
+#### Success
+
+The standard response indicating the request was successfully processed is HTTP
+status code 204.
+
+#### Error
+
+The standard error response indicating the request failed for any reason, is a
+4xx or 5xx HTTP status code with an error JSON object describing the error.
+```javascript
+{
+    "error": {
+        "message": String
+
+        // The error object may have additional fields depending on the
+        // specific error.
+    }
+}
+```
+
+Table of contents
+-----------------
+
+- [Daemon](#daemon)
+- [Consensus](#consensus)
+- [Explorer](#explorer)
+- [Gateway](#gateway)
+- [Host](#host)
+- [Miner](#miner)
+- [Renter](#renter)
+- [Transaction Pool](#transaction-pool)
+- [Wallet](#wallet)
+
 Daemon
 ------
 
@@ -261,60 +297,58 @@ provided hash.
 Gateway
 -------
 
-Queries:
+| Route                                                                 | HTTP verb |
+| --------------------------------------------------------------------- | --------- |
+| [/gateway](#gateway-get)                                              | GET       |
+| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post)       | POST      |
+| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST      |
 
-* /gateway                     [GET]
-* /gateway/add/{netaddress}    [POST]
-* /gateway/remove/{netaddress} [POST]
+For examples and detailed descriptions of request and response parameters,
+refer to [Gateway.md](/doc/api/Gateway.md).
 
-#### /gateway
+#### /gateway [GET] [(example)](/doc/api/Gateway.md#gateway-info-example)
 
-Function: Returns information about the gateway, including the list of peers.
+returns information about the gateway, including the list of connected peers.
 
-Parameters: none
-
-Response:
-```
-struct {
-	netaddress string
-	peers      []struct {
-                netaddress string
-                version    string
-                inbound    bool
-        }
+###### JSON Response [(with comments)](/doc/api/Gateway.md#json-response)
+```javascript
+{
+    "netaddress": String,
+    "peers":      []{
+        "netaddress": String,
+        "version":    String,
+        "inbound":    Boolean
+    }
 }
 ```
-'netaddress' is the network address of the Gateway, including its external IP
-address and the port Sia is listening on.
 
-'peers' is a list of the network addresses and versions of peers that the
-Gateway is currently connected to.
+#### /gateway/connect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#connect-example)
 
-#### /gateway/add/{netaddress} [POST]
+connects the gateway to a peer. The peer is added to the node list if it is not
+already present. The node list is the list of all nodes the gateway knows
+about, but is not necessarily connected to.
 
-Function: Adds a peer to the gateway.
-
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters)
 ```
-netaddress string
+{netaddress}
 ```
-'netaddress' should be a reachable hostname + port number, typically of the
-form "a.b.c.d:xxxx".
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
-#### /gateway/remove/{netaddress} [POST]
+#### /gateway/disconnect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#disconnect-example)
 
-Function: Will remove a peer from the gateway.
+disconnects the gateway from a peer. The peer remains in the node list.
 
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters-1)
 ```
-netaddress string
+{netaddress}
 ```
-'netaddress' should be a reachable hostname + port number, typically of the
-form "a.b.c.d:xxxx".
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 Host
 ----

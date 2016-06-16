@@ -181,14 +181,16 @@ your saved list.
 if you have multiple downloads happening simultaneously.
 
 #### Gateway tasks
-* `siac gateway add [address:port]` manually adds a peer to your list
-of connected clients
+* `siac gateway` prints info about the gateway, including its address and how
+many peers it's connected to.
 
-* `siac gateway remove [address:port]` manually removes a peer from
-your list of connected peers
+* `siac gateway list` prints a list of all currently connected peers.
 
-* `siac gateway status` prints a list of all the peers you are
-connected to
+* `siac gateway connect [address:port]` manually connects to a peer and adds it
+to the gateway's node list.
+
+* `siac gateway disconnect [address:port]` manually disconnects from a peer, but
+leaves it in the gateway's node list.
 
 #### Miner tasks
 * `siac miner status` returns information about the miner. It is only

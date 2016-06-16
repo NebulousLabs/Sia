@@ -238,7 +238,7 @@ func main() {
 	renterFilesListCmd.Flags().BoolVarP(&renterListVerbose, "verbose", "v", false, "Show additional file info such as redundancy")
 
 	root.AddCommand(gatewayCmd)
-	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayAddressCmd, gatewayListCmd)
+	gatewayCmd.AddCommand(gatewayConnectCmd, gatewayDisconnectCmd, gatewayAddressCmd, gatewayListCmd)
 
 	root.AddCommand(consensusCmd)
 
