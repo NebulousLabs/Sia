@@ -219,8 +219,9 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 	}
 }
 
-// writeSuccess writes the success json object ({"Success":true}) to the
-// ResponseWriter
+// writeSuccess writes the HTTP header with status 204 No Content to the
+// ResponseWriter. writeSuccess should only be used to indicate that the
+// requested action succeeded AND there is no data to return.
 func writeSuccess(w http.ResponseWriter) {
-	writeJSON(w, struct{ Success bool }{true})
+	w.WriteHeader(http.StatusNoContent)
 }
