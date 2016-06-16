@@ -243,11 +243,12 @@ func renterdownloadscmd() {
 
 // renterallowancecmd displays the current allowance.
 func renterallowancecmd() {
-	var allowance modules.Allowance
-	err := getAPI("/renter/allowance", &allowance)
+	var rg api.RenterGET
+	err := getAPI("/renter", &rg)
 	if err != nil {
 		die("Could not get allowance:", err)
 	}
+	allowance := rg.Settings.Allowance
 
 	// convert to SC
 	fmt.Printf(`Allowance:
@@ -266,7 +267,7 @@ func rentersetallowancecmd(amount, period string) {
 	if err != nil {
 		die("Could not parse period")
 	}
-	err = post("/renter/allowance", fmt.Sprintf("funds=%s&period=%s", hastings, blocks))
+	err = post("/renter", fmt.Sprintf("funds=%s&period=%s", hastings, blocks))
 	if err != nil {
 		die("Could not set allowance:", err)
 	}

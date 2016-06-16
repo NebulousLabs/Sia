@@ -48,7 +48,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "10000000000000000000000000000") // 10k SC
 	allowanceValues.Set("period", "5")
-	err = st.stdPostAPI("/renter/allowance", allowanceValues)
+	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
 	}

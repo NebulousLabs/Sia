@@ -132,11 +132,17 @@ func (r *Renter) ActiveHosts() []modules.HostDBEntry { return r.hostDB.ActiveHos
 func (r *Renter) AllHosts() []modules.HostDBEntry    { return r.hostDB.AllHosts() }
 
 // contractor passthroughs
-func (r *Renter) Allowance() modules.Allowance           { return r.hostContractor.Allowance() }
-func (r *Renter) Contracts() []modules.RenterContract    { return r.hostContractor.Contracts() }
-func (r *Renter) SetAllowance(a modules.Allowance) error { return r.hostContractor.SetAllowance(a) }
+func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
 func (r *Renter) FinancialMetrics() modules.RenterFinancialMetrics {
 	return r.hostContractor.FinancialMetrics()
+}
+func (r *Renter) Settings() modules.RenterSettings {
+	return modules.RenterSettings{
+		Allowance: r.hostContractor.Allowance(),
+	}
+}
+func (r *Renter) SetSettings(s modules.RenterSettings) error {
+	return r.hostContractor.SetAllowance(s.Allowance)
 }
 
 // enforce that Renter satisfies the modules.Renter interface

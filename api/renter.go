@@ -31,6 +31,7 @@ var (
 type (
 	// RenterGET contains various renter metrics.
 	RenterGET struct {
+		Settings         modules.RenterSettings         `json:"settings"`
 		FinancialMetrics modules.RenterFinancialMetrics `json:"financialmetrics"`
 	}
 
@@ -65,20 +66,16 @@ type (
 	}
 )
 
-// renterHandler handles the API call to /renter.
-func (srv *Server) renterHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// renterHandlerGET handles the API call to /renter.
+func (srv *Server) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterGET{
+		Settings:         srv.renter.Settings(),
 		FinancialMetrics: srv.renter.FinancialMetrics(),
 	})
 }
 
-// renterAllowanceHandlerGET handles the API call to get the allowance.
-func (srv *Server) renterAllowanceHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, srv.renter.Allowance())
-}
-
-// renterAllowanceHandlerPOST handles the API call to set the allowance.
-func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// renterHandlerPOST handles the API call to set the Renter's settings.
+func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// scan values
 	funds, ok := scanAmount(req.FormValue("funds"))
 	if !ok {
@@ -104,13 +101,15 @@ func (srv *Server) renterAllowanceHandlerPOST(w http.ResponseWriter, req *http.R
 	// 	return
 	// }
 
-	err = srv.renter.SetAllowance(modules.Allowance{
-		Funds:  funds,
-		Period: period,
+	err = srv.renter.SetSettings(modules.RenterSettings{
+		Allowance: modules.Allowance{
+			Funds:  funds,
+			Period: period,
 
-		// TODO: let user specify these
-		Hosts:       recommendedHosts,
-		RenewWindow: period / 2,
+			// TODO: let user specify these
+			Hosts:       recommendedHosts,
+			RenewWindow: period / 2,
+		},
 	})
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
