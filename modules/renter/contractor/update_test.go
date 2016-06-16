@@ -53,6 +53,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// create testing trio
 	_, c, m, err := newTestingTrio("TestIntegrationAutoRenew")
 	if err != nil {
