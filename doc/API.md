@@ -287,19 +287,18 @@ provided hash.
 Gateway
 -------
 
-| Route | HTTP verb |
-| ----- | --------- |
-| [/gateway](#gateway-get) | GET |
-| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post) | POST |
-| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST |
+| Route                                                                 | HTTP verb |
+| --------------------------------------------------------------------- | --------- |
+| [/gateway](#gateway-get)                                              | GET       |
+| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post)       | POST      |
+| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Gateway.md](/doc/api/Gateway.md).
 
-#### /gateway [GET]
+#### /gateway [GET] [(example)](/doc/api/Gateway.md#gateway-info-example)
 
-`/gateway [GET]` returns information about the gateway, including the list of
-connected peers.
+returns information about the gateway, including the list of connected peers.
 
 ###### JSON Response [(with comments)](/doc/api/Gateway.md#json-response)
 ```javascript
@@ -313,13 +312,11 @@ connected peers.
 }
 ```
 
-###### [Example](/doc/api/Gateway.md#gateway-info-example)
+#### /gateway/connect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#connect-example)
 
-#### /gateway/connect/{netaddress} [POST]
-
-`/gateway/connect/{netaddress} [POST]` connects the gateway to a peer. The peer
-is added to the node list if it is not already present. The node list is the
-list of all nodes the gateway knows about, but is not necessarily connected to.
+connects the gateway to a peer. The peer is added to the node list if it is not
+already present. The node list is the list of all nodes the gateway knows
+about, but is not necessarily connected to.
 
 ###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters)
 ```
@@ -330,12 +327,9 @@ list of all nodes the gateway knows about, but is not necessarily connected to.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-###### [Example](/doc/api/Gateway.md#connect-example)
+#### /gateway/disconnect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#disconnect-example)
 
-#### /gateway/disconnect/{netaddress} [POST]
-
-`/gateway/disconnect/{netaddress} [POST]` disconnects the gateway from a peer.
-The peer remains in the node list.
+disconnects the gateway from a peer. The peer remains in the node list.
 
 ###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters-1)
 ```
@@ -345,8 +339,6 @@ The peer remains in the node list.
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
-
-###### [Example](/doc/api/Gateway.md#disconnect-example)
 
 Host
 ----

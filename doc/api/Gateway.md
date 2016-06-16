@@ -22,25 +22,15 @@ peers on its own.
 Index
 -----
 
-| Route | HTTP verb |
-| ----- | --------- |
-| [/gateway](#gateway-get) | GET |
-| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post) | POST |
-| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST |
+| Route                                                                 | HTTP verb | Examples                                                |
+| --------------------------------------------------------------------- | --------- | ------------------------------------------------------- |
+| [/gateway](#gateway-get)                                              | GET       | [Gateway info](#gateway-info)                           |
+| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post)       | POST      | [Connecting to a peer](#connecting-to-a-peer)           |
+| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST      | [Disconnecting from a peer](#disconnecting-from-a-peer) |
 
-Examples
---------
+#### /gateway [GET] [(example)](#gateway-info-example)
 
-* [gateway info](#gateway-info-example)
-* [connecting to a peer](#connect-example)
-* [disconnecting from a peer](#disconnect-example)
-
--------------------------------------------------------------------------------
-
-#### /gateway [GET]
-
-`/gateway [GET]` returns information about the gateway, including the list of
-connected peers.
+returns information about the gateway, including the list of connected peers.
 
 ###### JSON Response
 ```javascript
@@ -68,13 +58,11 @@ connected peers.
 }
 ```
 
-###### [Example](#gateway-info-example)
+#### /gateway/connect/{netaddress} [POST] [(example)](#connect-example)
 
-#### /gateway/connect/{netaddress} [POST]
-
-`/gateway/connect/{netaddress} [POST]` connects the gateway to a peer. The peer
-is added to the node list if it is not already present. The node list is the
-list of all nodes the gateway knows about, but is not necessarily connected to.
+connects the gateway to a peer. The peer is added to the node list if it is not
+already present. The node list is the list of all nodes the gateway knows
+about, but is not necessarily connected to.
 
 ###### Path Parameters
 ```
@@ -91,13 +79,11 @@ list of all nodes the gateway knows about, but is not necessarily connected to.
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
-###### [Example](#connect-example)
+#### /gateway/disconnect/{netaddress} [POST] [(example)](#disconnect-example)
 
-#### /gateway/disconnect/{netaddress} [POST]
-
-`/gateway/disconnect/{netaddress} [POST]` disconnects the gateway from a peer.
-The peer remains in the node list. Disconnecting from a peer does not prevent
-the gateway from automatically connecting to the peer in the future.
+disconnects the gateway from a peer. The peer remains in the node list.
+Disconnecting from a peer does not prevent the gateway from automatically
+connecting to the peer in the future.
 
 ###### Path Parameters
 ```
@@ -114,18 +100,22 @@ the gateway from automatically connecting to the peer in the future.
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
-###### [Example](#disconnect-example)
+Examples
+--------
 
-#### gateway info example
+#### Gateway info
 
-Request:
+###### Request
 ```
 /gateway
 ```
 
-Expected Response Code: 200
+###### Expected Response Code
+```
+200 OK
+```
 
-Example JSON Response:
+###### Example JSON Response
 ```json
 {
     "netaddress":"333.333.333.333:9981",
@@ -144,20 +134,26 @@ Example JSON Response:
 }
 ```
 
-#### connect example
+#### Connecting to a peer
 
-Request:
+###### Request
 ```
 /gateway/connect/123.456.789.0:123
 ```
 
-Expected Response Code: 204
+###### Expected Response Code
+```
+204 No Content
+```
 
-#### disconnect example
+#### Disconnecting from a peer
 
-Request:
+###### Request
 ```
 /gateway/disconnect/123.456.789.0:123
 ```
 
-Expected Response Code: 204
+###### Expected Response Code
+```
+204 No Content
+```
