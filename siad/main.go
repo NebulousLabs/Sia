@@ -147,27 +147,16 @@ func main() {
 	})
 
 	// Set default values, which have the lowest priority.
-	root.Flags().StringVarP(&globalConfig.Siad.RequiredUserAgent, "agent", "A", "Sia-Agent", "required substring for the user agent")
-	root.Flags().StringVarP(&globalConfig.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
-	root.Flags().StringVarP(&globalConfig.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
-	root.Flags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
+	root.Flags().StringVarP(&globalConfig.Siad.RequiredUserAgent, "agent", "", "Sia-Agent", "required substring for the user agent")
+	root.Flags().StringVarP(&globalConfig.Siad.HostAddr, "host-addr", "", ":9982", "which port the host listens on")
+	root.Flags().StringVarP(&globalConfig.Siad.ProfileDir, "profile-directory", "", "profiles", "location of the profiling directory")
+	root.Flags().StringVarP(&globalConfig.Siad.APIaddr, "api-addr", "", "localhost:9980", "which host:port the API server listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
-	root.Flags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
-	root.Flags().BoolVarP(&globalConfig.Siad.Profile, "profile", "p", false, "enable profiling")
-	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
+	root.Flags().BoolVarP(&globalConfig.Siad.NoBootstrap, "no-bootstrap", "", false, "disable bootstrapping on this run")
+	root.Flags().BoolVarP(&globalConfig.Siad.Profile, "profile", "", false, "enable profiling")
+	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "", ":9981", "which port the gateway listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules, see 'siad modules' for more info")
 	root.Flags().BoolVarP(&globalConfig.Siad.AuthenticateAPI, "authenticate-api", "", false, "enable API password protection")
-
-	// Deprecate shorthand flags that aren't commonly used.
-	// COMPATv0.5.2
-	// TODO: remove shorthands for these flags by supplying a blank shorthand in flag construction above.
-	root.Flags().MarkShorthandDeprecated("agent", "please use --agent instead")
-	root.Flags().MarkShorthandDeprecated("host-addr", "please use --host-addr instead")
-	root.Flags().MarkShorthandDeprecated("profile-directory", "please use --profile-directory instead")
-	root.Flags().MarkShorthandDeprecated("api-addr", "please use --api-addr instead")
-	root.Flags().MarkShorthandDeprecated("no-bootstrap", "please use --no-bootstrap instead")
-	root.Flags().MarkShorthandDeprecated("profile", "please use --profile instead")
-	root.Flags().MarkShorthandDeprecated("rpc-addr", "please use --rpc-addr instead")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

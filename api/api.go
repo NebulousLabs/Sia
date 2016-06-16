@@ -117,9 +117,6 @@ func (srv *Server) initAPI(password string) {
 		router.GET("/gateway", srv.gatewayHandler)
 		router.POST("/gateway/connect/:netaddress", requirePassword(srv.gatewayConnectHandler, password))
 		router.POST("/gateway/disconnect/:netaddress", requirePassword(srv.gatewayDisconnectHandler, password))
-		// COMPATv0.6.0
-		router.POST("/gateway/add/:netaddress", requirePassword(srv.gatewayConnectHandler, password))
-		router.POST("/gateway/remove/:netaddress", requirePassword(srv.gatewayDisconnectHandler, password))
 	}
 
 	// Host API Calls

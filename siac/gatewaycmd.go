@@ -25,25 +25,11 @@ var (
 		Run:   wrap(gatewayconnectcmd),
 	}
 
-	// COMPATv0.6.0
-	gatewayDeprecatedAddCmd = &cobra.Command{
-		Use:        "add [address]",
-		Deprecated: "use `siac gateway connect` instead.",
-		Run:        wrap(gatewayconnectcmd),
-	}
-
 	gatewayDisconnectCmd = &cobra.Command{
 		Use:   "disconnect [address]",
 		Short: "Disconnect from a peer",
 		Long:  "Disconnect from a peer. Does not remove the peer from the node list.",
 		Run:   wrap(gatewaydisconnectcmd),
-	}
-
-	// COMPATv0.6.0
-	gatewayDeprecatedRemoveCmd = &cobra.Command{
-		Use:        "remove [address]",
-		Deprecated: "use `siac gateway disconnect` instead.",
-		Run:        wrap(gatewaydisconnectcmd),
 	}
 
 	gatewayAddressCmd = &cobra.Command{

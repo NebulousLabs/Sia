@@ -242,10 +242,6 @@ func main() {
 
 	root.AddCommand(consensusCmd)
 
-	// COMPATv0.6.0
-	gatewayCmd.AddCommand(gatewayDeprecatedAddCmd)
-	gatewayCmd.AddCommand(gatewayDeprecatedRemoveCmd)
-
 	// parse flags
 	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
 
