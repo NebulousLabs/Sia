@@ -20,6 +20,9 @@ var (
 // renewBaseCollateral returns the base collateral on the storage in the file
 // contract, using the host's external settings and the starting file contract.
 func renewBaseCollateral(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
+	if fc.WindowEnd <= so.proofDeadline() {
+		return types.NewCurrency64(0)
+	}
 	timeExtension := fc.WindowEnd - so.proofDeadline()
 	return settings.Collateral.Mul64(fc.FileSize).Mul64(uint64(timeExtension))
 }
@@ -27,6 +30,9 @@ func renewBaseCollateral(so *storageObligation, settings modules.HostExternalSet
 // renewBasePrice returns the base cost of the storage in the file contract,
 // using the host external settings and the starting file contract.
 func renewBasePrice(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
+	if fc.WindowEnd <= so.proofDeadline() {
+		return types.NewCurrency64(0)
+	}
 	timeExtension := fc.WindowEnd - so.proofDeadline()
 	return settings.StoragePrice.Mul64(fc.FileSize).Mul64(uint64(timeExtension))
 }
@@ -239,11 +245,6 @@ func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []type
 	if fc.WindowEnd < fc.WindowStart+externalSettings.WindowSize {
 		return errWindowSizeTooSmall
 	}
-	// The WindowEnd for the new file contract must be further in the future
-	// than the WindowEnd for the existing file contract.
-	if fc.WindowEnd < so.proofDeadline() {
-		return errRenewDoesNotExtend
-	}
 
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
 	// outputs should have 3 (renter + host + void)
@@ -268,9 +269,9 @@ func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []type
 	if lockedStorageCollateral.Add(expectedCollateral).Cmp(internalSettings.CollateralBudget) > 0 {
 		return errCollateralBudgetExceeded
 	}
-	// Check that the missed proof outputs contains enough money, and that the
-	// void contains enough money. Before calculating the expected value, check
-	// that the subtraction won't cause a negative currency.
+	// Check that the missed proof outputs contain enough money, and that the
+	// void output contains enough money. Before calculating the expected
+	// value, check that the subtraction won't cause a negative currency.
 	basePrice := renewBasePrice(so, externalSettings, fc)
 	baseCollateral := renewBaseCollateral(so, externalSettings, fc)
 	if fc.ValidProofOutputs[1].Value.Cmp(basePrice.Add(baseCollateral)) < 0 {
