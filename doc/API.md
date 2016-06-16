@@ -38,7 +38,17 @@ status code 204.
 #### Error
 
 The standard error response indicating the request failed for any reason, is a
-4xx or 5xx HTTP status code with the error message as plain text.
+4xx or 5xx HTTP status code with an error JSON object describing the error.
+```javascript
+{
+    "error": {
+        "message": String
+
+        // The error object may have additional fields depending on the
+        // specific error.
+    }
+}
+```
 
 Table of contents
 -----------------
