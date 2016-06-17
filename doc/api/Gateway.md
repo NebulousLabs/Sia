@@ -22,13 +22,13 @@ peers on its own.
 Index
 -----
 
-| Route                                                                 | HTTP verb | Examples                                                |
-| --------------------------------------------------------------------- | --------- | ------------------------------------------------------- |
-| [/gateway](#gateway-get)                                              | GET       | [Gateway info](#gateway-info)                           |
-| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post)       | POST      | [Connecting to a peer](#connecting-to-a-peer)           |
-| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST      | [Disconnecting from a peer](#disconnecting-from-a-peer) |
+| Route                                                                         | HTTP verb | Examples                                                |
+| ----------------------------------------------------------------------------- | --------- | ------------------------------------------------------- |
+| [/gateway](#gateway-get-example)                                              | GET       | [Gateway info](#gateway-info)                           |
+| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post-example)       | POST      | [Connecting to a peer](#connecting-to-a-peer)           |
+| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post-example) | POST      | [Disconnecting from a peer](#disconnecting-from-a-peer) |
 
-#### /gateway [GET] [(example)](#gateway-info-example)
+#### /gateway [GET] [(example)](#gateway-info)
 
 returns information about the gateway, including the list of connected peers.
 
@@ -58,7 +58,7 @@ returns information about the gateway, including the list of connected peers.
 }
 ```
 
-#### /gateway/connect/{netaddress} [POST] [(example)](#connect-example)
+#### /gateway/connect/{netaddress} [POST] [(example)](#connecting-to-a-peer)
 
 connects the gateway to a peer. The peer is added to the node list if it is not
 already present. The node list is the list of all nodes the gateway knows
@@ -79,7 +79,7 @@ about, but is not necessarily connected to.
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
-#### /gateway/disconnect/{netaddress} [POST] [(example)](#disconnect-example)
+#### /gateway/disconnect/{netaddress} [POST] [(example)](#disconnecting-from-a-peer)
 
 disconnects the gateway from a peer. The peer remains in the node list.
 Disconnecting from a peer does not prevent the gateway from automatically
