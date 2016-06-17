@@ -35,7 +35,7 @@ type (
 		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
 		LostRevenue             types.Currency `json:"lostrevenue"`
 		LostStorageCollateral   types.Currency `json:"loststoragecollateral"`
-		PotentialStorageRevenue types.Currency `json:"potentialstoragerevenue"`
+		PotentialStorageRevenue types.Currency `json:"potentialestoragerevenue"`
 		RiskedStorageCollateral types.Currency `json:"riskedstoragecollateral"`
 		StorageRevenue          types.Currency `json:"storagerevenue"`
 		TransactionFeeExpenses  types.Currency `json:"transactionfeeexpenses"`
