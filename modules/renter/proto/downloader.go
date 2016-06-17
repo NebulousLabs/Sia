@@ -18,6 +18,8 @@ type Downloader struct {
 	contract modules.RenterContract // updated after each revision
 	conn     net.Conn
 
+	SaveFn revisionSaver
+
 	// metrics
 	DownloadSpending types.Currency
 }
@@ -35,6 +37,17 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 		return modules.RenterContract{}, nil, errors.New("contract has insufficient funds to support download")
 	}
 
+	// create the download revision
+	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
+
+	// if a SaveFn was provided, call it before doing any further I/O, because
+	// that's when we're most likely to experience failure
+	if hd.SaveFn != nil {
+		if err := hd.SaveFn(rev); err != nil {
+			return modules.RenterContract{}, nil, errors.New("failed to save unsigned revision: " + err.Error())
+		}
+	}
+
 	// initiate download by confirming host settings
 	if err := startDownload(hd.conn, hd.host); err != nil {
 		return modules.RenterContract{}, nil, err
@@ -50,8 +63,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 		return modules.RenterContract{}, nil, err
 	}
 
-	// create and send revision to host for approval
-	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
+	// send the revision to the host for approval
 	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
 	if err != nil {
 		return modules.RenterContract{}, nil, err
@@ -115,7 +127,7 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 	}
 	if err := verifyRecentRevision(conn, contract); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
-		return nil, errors.New("revision exchange failed: " + err.Error())
+		return nil, err
 	}
 
 	// the host is now ready to accept revisions

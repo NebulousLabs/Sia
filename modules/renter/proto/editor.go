@@ -41,6 +41,8 @@ type Editor struct {
 	height   types.BlockHeight
 	contract modules.RenterContract // updated after each revision
 
+	SaveFn revisionSaver
+
 	// metrics
 	StorageSpending types.Currency
 	UploadSpending  types.Currency
@@ -60,6 +62,14 @@ func (he *Editor) Close() error {
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
 func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) error {
+	// if a SaveFn was provided, call it before doing any further I/O, because
+	// that's when we're most likely to experience failure
+	if he.SaveFn != nil {
+		if err := he.SaveFn(rev); err != nil {
+			return errors.New("failed to save unsigned revision: " + err.Error())
+		}
+	}
+
 	// initiate revision
 	if err := startRevision(he.conn, he.host); err != nil {
 		return err
@@ -234,7 +244,7 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	}
 	if err := verifyRecentRevision(conn, contract); err != nil {
 		conn.Close() // TODO: close gracefully if host has entered revision loop
-		return nil, errors.New("revision exchange failed: " + err.Error())
+		return nil, err
 	}
 
 	// the host is now ready to accept revisions
