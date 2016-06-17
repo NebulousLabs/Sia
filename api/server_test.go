@@ -117,7 +117,7 @@ func TestAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusOK {
+	if decodeErrorResponse(resp) != nil {
 		t.Fatal("authenticated API call failed with the correct password")
 	}
 	// POST
@@ -125,7 +125,7 @@ func TestAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusOK {
+	if decodeErrorResponse(resp) != nil {
 		t.Fatal("authenticated API call failed with the correct password")
 	}
 }

@@ -337,6 +337,21 @@ func createExplorerServerTester(name string) (*serverTester, error) {
 	return st, nil
 }
 
+// decodeErrorResponse returns an error if the response's status code is
+// non-2xx. If an error message or APIError is included in the response, it is
+// decoded and returned as the error.
+func decodeErrorResponse(resp *http.Response) error {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		respErr, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		// TODO: unmarshal respErr to an APIError type if applicable.
+		return errors.New(string(respErr))
+	}
+	return nil
+}
+
 // reloadedServerTester creates a server tester where all of the persistent
 // data has been copied to a new folder and all of the modules re-initialized
 // on the new folder. This gives an opportunity to see how modules will behave
@@ -433,13 +448,14 @@ func (st *serverTester) getAPI(call string, obj interface{}) error {
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	err = decodeErrorResponse(resp)
+	if err != nil {
+		return err
+	}
+
+	// Return early because there is no content to decode.
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
 	}
 
 	// Decode the response into 'obj'.
@@ -458,13 +474,14 @@ func (st *serverTester) postAPI(call string, values url.Values, obj interface{})
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	err = decodeErrorResponse(resp)
+	if err != nil {
+		return err
+	}
+
+	// Return early because there is no content to decode.
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
 	}
 
 	// Decode the response into 'obj'.
@@ -482,16 +499,7 @@ func (st *serverTester) stdGetAPI(call string) error {
 		return err
 	}
 	defer resp.Body.Close()
-
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
-	}
-	return nil
+	return decodeErrorResponse(resp)
 }
 
 // stdGetAPIUA makes an API call with a custom user agent.
@@ -506,16 +514,7 @@ func (st *serverTester) stdGetAPIUA(call string, userAgent string) error {
 		return err
 	}
 	defer resp.Body.Close()
-
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
-	}
-	return nil
+	return decodeErrorResponse(resp)
 }
 
 // stdPostAPI makes an API call and discards the response.
@@ -525,14 +524,5 @@ func (st *serverTester) stdPostAPI(call string, values url.Values) error {
 		return err
 	}
 	defer resp.Body.Close()
-
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
-	}
-	return nil
+	return decodeErrorResponse(resp)
 }
