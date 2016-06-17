@@ -98,9 +98,16 @@ func storageProofSegment(tx *bolt.Tx, fcid types.FileContractID) (uint64, error)
 	return index, nil
 }
 
-// validStorageProofs checks that the storage proofs are valid in the context
-// of the consensus set.
-func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
+// validStorageProofsPre100e3 runs the code that was running before height
+// 100e3, which contains a hardforking bug, fixed at block 100e3.
+//
+// HARDFORK 100,000
+//
+// Originally, it was impossible to provide a storage proof for data of length
+// zero. A hardfork was added triggering at block 100,000 to enable an
+// optimization where hosts could submit empty storage proofs for files of size
+// 0, saving space on the blockchain in conditions where the renter is content.
+func validStorageProofs100e3(tx *bolt.Tx, t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
 		// Check that the storage proof itself is valid.
 		segmentIndex, err := storageProofSegment(tx, sp.ParentID)
@@ -118,10 +125,22 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 			segmentLen = fc.FileSize % crypto.SegmentSize
 		}
 
-		// COMPATv0.4.0
+		// HARDFORK 21,000
 		//
-		// Fixing the padding situation resulted in a hardfork. The below code
-		// will stop the hardfork from triggering before block 21,000.
+		// Originally, the code used the entire segment to verify the
+		// correctness of the storage proof. This made the code incompatible
+		// with data sizes that did not fill an entire segment.
+		//
+		// This was patched with a hardfork in block 21,000. The new code made
+		// it possible to perform successful storage proofs on the final
+		// segment of a file if the final segment was not crypto.SegmentSize
+		// bytes.
+		//
+		// Unfortunately, a new bug was introduced where storage proofs on the
+		// final segment would fail if the final segment was selected and was
+		// crypto.SegmentSize bytes, because the segmentLen would be set to 0
+		// instead of crypto.SegmentSize, due to an error with the modulus
+		// math. This new error has been fixed with the block 100,000 hardfork.
 		if (build.Release == "standard" && blockHeight(tx) < 21e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
 			segmentLen = uint64(crypto.SegmentSize)
 		}
@@ -134,6 +153,51 @@ func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
 			fc.FileMerkleRoot,
 		)
 		if !verified {
+			return errInvalidStorageProof
+		}
+	}
+
+	return nil
+}
+
+// validStorageProofs checks that the storage proofs are valid in the context
+// of the consensus set.
+func validStorageProofs(tx *bolt.Tx, t types.Transaction) error {
+	if (build.Release == "standard" && blockHeight(tx) < 100e3) || (build.Release == "testing" && blockHeight(tx) < 10) {
+		return validStorageProofs100e3(tx, t)
+	}
+
+	for _, sp := range t.StorageProofs {
+		// Check that the storage proof itself is valid.
+		segmentIndex, err := storageProofSegment(tx, sp.ParentID)
+		if err != nil {
+			return err
+		}
+
+		fc, err := getFileContract(tx, sp.ParentID)
+		if err != nil {
+			return err
+		}
+		leaves := crypto.CalculateLeaves(fc.FileSize)
+		segmentLen := uint64(crypto.SegmentSize)
+
+		// If this segment chosen is the final segment, it should only be as
+		// long as necessary to complete the filesize.
+		if segmentIndex == leaves-1 {
+			segmentLen = fc.FileSize % crypto.SegmentSize
+		}
+		if segmentLen == 0 {
+			segmentLen = uint64(crypto.SegmentSize)
+		}
+
+		verified := crypto.VerifySegment(
+			sp.Segment[:segmentLen],
+			sp.HashSet,
+			leaves,
+			segmentIndex,
+			fc.FileMerkleRoot,
+		)
+		if !verified && fc.FileSize > 0 {
 			return errInvalidStorageProof
 		}
 	}

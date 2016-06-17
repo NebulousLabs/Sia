@@ -163,6 +163,7 @@ func TestIntegrationSimpleReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	rs := createReorgSets("TestIntegrationSimpleReorg")
 	defer rs.Close()
 
@@ -180,6 +181,7 @@ func TestIntegrationSiacoinReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	rs := createReorgSets("TestIntegrationSiacoinReorg")
 	defer rs.Close()
 
@@ -197,6 +199,7 @@ func TestIntegrationValidStorageProofReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	rs := createReorgSets("TestIntegrationValidStorageProofReorg")
 	defer rs.Close()
 
@@ -215,6 +218,7 @@ func TestIntegrationMissedStorageProofReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	rs := createReorgSets("TestIntegrationMissedStorageProofReorg")
 	defer rs.Close()
 
@@ -233,6 +237,7 @@ func TestIntegrationFileContractRevisionReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	rs := createReorgSets("TestIntegrationFileContractRevisionReorg")
 	defer rs.Close()
 
@@ -251,6 +256,7 @@ func TestIntegrationComplexReorg(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	rs := createReorgSets("TestIntegrationComplexReorg")
 	defer rs.Close()
 
@@ -279,7 +285,7 @@ func TestBuriedBadFork(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestBuriedBadFork")
 	if err != nil {
 		t.Fatal(err)

@@ -1,9 +1,13 @@
 package consensus
 
 import (
+	"crypto/rand"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // TestTryValidTransactionSet submits a valid transaction set to the
@@ -12,6 +16,7 @@ func TestTryValidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestTryValidTransactionSet")
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +48,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestTryInvalidTransactionSet")
 	if err != nil {
 		t.Fatal(err)
@@ -72,40 +78,296 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	}
 }
 
-/*
+// TestStorageProofBoundaries creates file contracts and submits storage proofs
+// for them, probing segment boundaries (first segment, last segment,
+// incomplete segment, etc.).
+func TestStorageProofBoundaries(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	cst, err := createConsensusSetTester("TestStorageProofBoundaries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Mine enough blocks to put us beyond the testing hardfork.
+	for i := 0; i < 10; i++ {
+		_, err = cst.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Try storage proofs on data between 0 bytes and 128 bytes (0 segments and
+	// 1 segment). Perform the operation five times because we can't control
+	// which segment gets selected - it is randomly decided by the block.
+	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
+	for i := 0; i < 3; i++ {
+		randData, err := crypto.RandBytes(140)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a file contract for all sizes of the data between 0 and 2
+		// segments and put them in the transaction pool.
+		var fcids []types.FileContractID
+		for _, k := range segmentRange {
+			// Create the data and the file contract around it.
+			truncatedData := randData[:k]
+			fc := types.FileContract{
+				FileSize:           uint64(k),
+				FileMerkleRoot:     crypto.MerkleRoot(truncatedData),
+				WindowStart:        cst.cs.dbBlockHeight() + 2,
+				WindowEnd:          cst.cs.dbBlockHeight() + 4,
+				Payout:             types.NewCurrency64(500), // Too small to be subject to siafund fee.
+				ValidProofOutputs:  []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+				MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+			}
+
+			// Create a transaction around the file contract and add it to the
+			// transaction pool.
+			b := cst.wallet.StartTransaction()
+			err = b.FundSiacoins(types.NewCurrency64(500))
+			if err != nil {
+				t.Fatal(err)
+			}
+			b.AddFileContract(fc)
+			txnSet, err := b.Sign(true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cst.tpool.AcceptTransactionSet(txnSet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Store the file contract id for later when building the storage
+			// proof.
+			fcids = append(fcids, txnSet[len(txnSet)-1].FileContractID(0))
+		}
+
+		// Mine blocks to get the file contracts into the blockchain and
+		// confirming.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Create storage proofs for the file contracts and submit the proofs
+		// to the blockchain.
+		for j, k := range segmentRange {
+			// Build the storage proof.
+			truncatedData := randData[:k]
+			proofIndex, err := cst.cs.StorageProofSegment(fcids[j])
+			if err != nil {
+				t.Fatal(err)
+			}
+			base, hashSet := crypto.MerkleProof(truncatedData, proofIndex)
+			sp := types.StorageProof{
+				ParentID: fcids[j],
+				HashSet:  hashSet,
+			}
+			copy(sp.Segment[:], base)
+
+			if k > 0 {
+				// Try submitting an empty storage proof, to make sure that the
+				// hardfork code didn't accidentally allow empty storage proofs
+				// in situations other than file sizes with 0 bytes.
+				badSP := types.StorageProof{ParentID: fcids[j]}
+				badTxn := types.Transaction{
+					StorageProofs: []types.StorageProof{badSP},
+				}
+				err = cst.tpool.AcceptTransactionSet([]types.Transaction{badTxn})
+				if err == nil {
+					t.Fatal("bad storage proof got accepted into the transaction pool")
+				}
+			}
+
+			// Submit the storage proof to the blockchain in a transaction.
+			txn := types.Transaction{
+				StorageProofs: []types.StorageProof{sp},
+			}
+			err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
+			if err != nil {
+				t.Fatal(err, "-", j, k)
+			}
+		}
+
+		// Mine blocks to get the storage proofs on the blockchain.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// TestEmptyStorageProof creates file contracts and submits storage proofs for
+// them, probing segment boundaries (first segment, last segment, incomplete
+// segment, etc.).
+func TestEmptyStorageProof(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	cst, err := createConsensusSetTester("TestEmptyStorageProof")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Mine enough blocks to put us beyond the testing hardfork.
+	for i := 0; i < 10; i++ {
+		_, err = cst.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Try storage proofs on data between 0 bytes and 128 bytes (0 segments and
+	// 1 segment). Perform the operation five times because we can't control
+	// which segment gets selected - it is randomly decided by the block.
+	segmentRange := []int{0, 1, 2, 3, 4, 5, 15, 25, 30, 32, 62, 63, 64, 65, 66, 70, 81, 89, 90, 126, 127, 128, 129}
+	for i := 0; i < 3; i++ {
+		randData, err := crypto.RandBytes(140)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a file contract for all sizes of the data between 0 and 2
+		// segments and put them in the transaction pool.
+		var fcids []types.FileContractID
+		for _, k := range segmentRange {
+			// Create the data and the file contract around it.
+			truncatedData := randData[:k]
+			fc := types.FileContract{
+				FileSize:           uint64(k),
+				FileMerkleRoot:     crypto.MerkleRoot(truncatedData),
+				WindowStart:        cst.cs.dbBlockHeight() + 2,
+				WindowEnd:          cst.cs.dbBlockHeight() + 4,
+				Payout:             types.NewCurrency64(500), // Too small to be subject to siafund fee.
+				ValidProofOutputs:  []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+				MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(500)}},
+			}
+
+			// Create a transaction around the file contract and add it to the
+			// transaction pool.
+			b := cst.wallet.StartTransaction()
+			err = b.FundSiacoins(types.NewCurrency64(500))
+			if err != nil {
+				t.Fatal(err)
+			}
+			b.AddFileContract(fc)
+			txnSet, err := b.Sign(true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cst.tpool.AcceptTransactionSet(txnSet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Store the file contract id for later when building the storage
+			// proof.
+			fcids = append(fcids, txnSet[len(txnSet)-1].FileContractID(0))
+		}
+
+		// Mine blocks to get the file contracts into the blockchain and
+		// confirming.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Create storage proofs for the file contracts and submit the proofs
+		// to the blockchain.
+		for j, k := range segmentRange {
+			// Build the storage proof.
+			truncatedData := randData[:k]
+			proofIndex, err := cst.cs.StorageProofSegment(fcids[j])
+			if err != nil {
+				t.Fatal(err)
+			}
+			base, hashSet := crypto.MerkleProof(truncatedData, proofIndex)
+			sp := types.StorageProof{
+				ParentID: fcids[j],
+				HashSet:  hashSet,
+			}
+			copy(sp.Segment[:], base)
+
+			// Submit the storage proof to the blockchain in a transaction.
+			txn := types.Transaction{
+				StorageProofs: []types.StorageProof{sp},
+			}
+			err = cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
+			if err != nil {
+				t.Fatal(err, "-", j, k)
+			}
+		}
+
+		// Mine blocks to get the storage proofs on the blockchain.
+		for j := 0; j < 2; j++ {
+			_, err = cst.miner.AddBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 // TestValidSiacoins probes the validSiacoins method of the consensus set.
 func TestValidSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestValidSiacoins")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Create a transaction pointing to a nonexistent siacoin output.
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
-	err = cst.cs.validSiacoins(txn)
-	if err != ErrMissingSiacoinOutput {
-		t.Error(err)
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		err := validSiacoins(tx, txn)
+		if err != errMissingSiacoinOutput {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create a transaction with invalid unlock conditions.
-	var scoid types.SiacoinOutputID
-	cst.cs.db.forEachSiacoinOutputs(func(mapScoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		scoid = mapScoid
-	})
+	scoid, _, err := cst.cs.getArbSiacoinOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
 	txn = types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID: scoid,
 		}},
 	}
-	err = cst.cs.validSiacoins(txn)
-	if err != ErrWrongUnlockConditions {
-		t.Error(err)
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		err := validSiacoins(tx, txn)
+		if err != errWrongUnlockConditions {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create a txn with more outputs than inputs.
@@ -114,9 +376,15 @@ func TestValidSiacoins(t *testing.T) {
 			Value: types.NewCurrency64(1),
 		}},
 	}
-	err = cst.cs.validSiacoins(txn)
-	if err != ErrSiacoinInputOutputMismatch {
-		t.Error(err)
+	err = cst.cs.db.View(func(tx *bolt.Tx) error {
+		err := validSiacoins(tx, txn)
+		if err != errSiacoinInputOutputMismatch {
+			t.Fatal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -126,66 +394,27 @@ func TestStorageProofSegment(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestStorageProofSegment")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Submit a file contract that is unrecognized.
-	_, err = cst.cs.storageProofSegment(types.FileContractID{})
-	if err != ErrUnrecognizedFileContractID {
+	_, err = cst.cs.dbStorageProofSegment(types.FileContractID{})
+	if err != errUnrecognizedFileContractID {
 		t.Error(err)
 	}
 
 	// Try to get the segment of an unfinished file contract.
-	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
+	cst.cs.dbAddFileContract(types.FileContractID{}, types.FileContract{
+		Payout:      types.NewCurrency64(1),
 		WindowStart: 100000,
 	})
-	_, err = cst.cs.storageProofSegment(types.FileContractID{})
-	if err != ErrUnfinishedFileContract {
+	_, err = cst.cs.dbStorageProofSegment(types.FileContractID{})
+	if err != errUnfinishedFileContract {
 		t.Error(err)
-	}
-}
-
-// TestStorageProofSegmentRandomness checks that the storageProofSegment method
-// is producing outputs that pass an imperfect randomness check (gzip).
-func TestStorageProofSegmentRandomness(t *testing.T) {
-	t.Skip("randomness check takes a long time")
-	cst, err := createConsensusSetTester("TestStorageProofSegmentRandomness")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.closeCst()
-
-	// Add a file contract to the consensus set that can be used to probe the
-	// storage segment.
-	var outputs []byte
-	for i := 0; i < 32*256; i++ {
-		var fcid types.FileContractID
-		rand.Read(fcid[:])
-		fc := types.FileContract{
-			WindowStart: 2,
-			FileSize:    256 * 64,
-		}
-		cst.cs.db.addFileContracts(fcid, fc)
-		index, err := cst.cs.storageProofSegment(fcid)
-		if err != nil {
-			t.Error(err)
-		}
-		outputs = append(outputs, byte(index))
-	}
-
-	// Perform entropy testing on 'outputs' to verify randomness.
-	var b bytes.Buffer
-	zip := gzip.NewWriter(&b)
-	_, err = zip.Write(outputs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	zip.Close()
-	if b.Len() < len(outputs) {
-		t.Error("supposedly high entropy random segments have been compressed!")
 	}
 }
 
@@ -195,11 +424,12 @@ func TestValidStorageProofs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestValidStorageProofs")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// COMPATv0.4.0
 	//
@@ -220,29 +450,22 @@ func TestValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buffer := bytes.NewReader(simFile)
-	root, err := crypto.ReaderMerkleRoot(buffer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := crypto.MerkleRoot(simFile)
 	fc := types.FileContract{
 		FileSize:       64 * 1024,
 		FileMerkleRoot: root,
+		Payout:         types.NewCurrency64(1),
 		WindowStart:    2,
 		WindowEnd:      1200,
 	}
-	cst.cs.db.addFileContracts(fcid, fc)
-	buffer.Seek(0, 0)
+	cst.cs.dbAddFileContract(fcid, fc)
 
 	// Create a transaction with a storage proof.
-	proofIndex, err := cst.cs.storageProofSegment(fcid)
+	proofIndex, err := cst.cs.dbStorageProofSegment(fcid)
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, proofSet, err := crypto.BuildReaderProof(buffer, proofIndex)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, proofSet := crypto.MerkleProof(simFile, proofIndex)
 	txn := types.Transaction{
 		StorageProofs: []types.StorageProof{{
 			ParentID: fcid,
@@ -250,7 +473,7 @@ func TestValidStorageProofs(t *testing.T) {
 		}},
 	}
 	copy(txn.StorageProofs[0].Segment[:], base)
-	err = cst.cs.validStorageProofs(txn)
+	err = cst.cs.dbValidStorageProofs(txn)
 	if err != nil {
 		t.Error(err)
 	}
@@ -264,15 +487,15 @@ func TestValidStorageProofs(t *testing.T) {
 		}},
 	}
 	copy(txn.StorageProofs[0].Segment[:], base)
-	err = cst.cs.validStorageProofs(txn)
-	if err != ErrInvalidStorageProof {
+	err = cst.cs.dbValidStorageProofs(txn)
+	if err != errInvalidStorageProof {
 		t.Error(err)
 	}
 
 	// Try to validate a proof for a file contract that doesn't exist.
 	txn.StorageProofs[0].ParentID = types.FileContractID{}
-	err = cst.cs.validStorageProofs(txn)
-	if err != ErrUnrecognizedFileContractID {
+	err = cst.cs.dbValidStorageProofs(txn)
+	if err != errUnrecognizedFileContractID {
 		t.Error(err)
 	}
 
@@ -282,24 +505,20 @@ func TestValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buffer = bytes.NewReader(file)
-	root, err = crypto.ReaderMerkleRoot(buffer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root = crypto.MerkleRoot(file)
 	fc = types.FileContract{
 		FileSize:       100,
 		FileMerkleRoot: root,
+		Payout:         types.NewCurrency64(1),
 		WindowStart:    2,
 		WindowEnd:      1200,
 	}
-	buffer.Seek(0, 0)
 
 	// Find a proofIndex that has the value '1'.
 	for {
 		fcid[0]++
-		cst.cs.db.addFileContracts(fcid, fc)
-		proofIndex, err = cst.cs.storageProofSegment(fcid)
+		cst.cs.dbAddFileContract(fcid, fc)
+		proofIndex, err = cst.cs.dbStorageProofSegment(fcid)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -307,10 +526,7 @@ func TestValidStorageProofs(t *testing.T) {
 			break
 		}
 	}
-	base, proofSet, err = crypto.BuildReaderProof(buffer, proofIndex)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, proofSet = crypto.MerkleProof(file, proofIndex)
 	txn = types.Transaction{
 		StorageProofs: []types.StorageProof{{
 			ParentID: fcid,
@@ -318,13 +534,13 @@ func TestValidStorageProofs(t *testing.T) {
 		}},
 	}
 	copy(txn.StorageProofs[0].Segment[:], base)
-	err = cst.cs.validStorageProofs(txn)
+	err = cst.cs.dbValidStorageProofs(txn)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// COMPATv0.4.0
+// HARDFORK 21,000
 //
 // TestPreForkValidStorageProofs checks that storage proofs which are invalid
 // before the hardfork (but valid afterwards) are still rejected before the
@@ -333,11 +549,12 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestPreForkValidStorageProofs")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Try a proof set where there is padding on the last segment in the file.
 	file := make([]byte, 100)
@@ -345,26 +562,22 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buffer := bytes.NewReader(file)
-	root, err := crypto.ReaderMerkleRoot(buffer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := crypto.MerkleRoot(file)
 	fc := types.FileContract{
 		FileSize:       100,
 		FileMerkleRoot: root,
+		Payout:         types.NewCurrency64(1),
 		WindowStart:    2,
 		WindowEnd:      1200,
 	}
-	buffer.Seek(0, 0)
 
 	// Find a proofIndex that has the value '1'.
 	var fcid types.FileContractID
 	var proofIndex uint64
 	for {
 		fcid[0]++
-		cst.cs.db.addFileContracts(fcid, fc)
-		proofIndex, err = cst.cs.storageProofSegment(fcid)
+		cst.cs.dbAddFileContract(fcid, fc)
+		proofIndex, err = cst.cs.dbStorageProofSegment(fcid)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -372,10 +585,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 			break
 		}
 	}
-	base, proofSet, err := crypto.BuildReaderProof(buffer, proofIndex)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, proofSet := crypto.MerkleProof(file, proofIndex)
 	txn := types.Transaction{
 		StorageProofs: []types.StorageProof{{
 			ParentID: fcid,
@@ -383,8 +593,9 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 		}},
 	}
 	copy(txn.StorageProofs[0].Segment[:], base)
-	err = cst.cs.validStorageProofs(txn)
-	if err != ErrInvalidStorageProof {
+	err = cst.cs.dbValidStorageProofs(txn)
+	if err != errInvalidStorageProof {
+		t.Log(cst.cs.dbBlockHeight())
 		t.Fatal(err)
 	}
 }
@@ -395,11 +606,12 @@ func TestValidFileContractRevisions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestValidFileContractRevisions")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cst.closeCst()
+	defer cst.Close()
 
 	// Grab an address + unlock conditions for the transaction.
 	unlockConditions, err := cst.wallet.NextAddress()
@@ -412,20 +624,17 @@ func TestValidFileContractRevisions(t *testing.T) {
 	fcid[0] = 12
 	simFile := make([]byte, 64*1024)
 	rand.Read(simFile)
-	buffer := bytes.NewReader(simFile)
-	root, err := crypto.ReaderMerkleRoot(buffer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := crypto.MerkleRoot(simFile)
 	fc := types.FileContract{
 		FileSize:       64 * 1024,
 		FileMerkleRoot: root,
 		WindowStart:    102,
 		WindowEnd:      1200,
+		Payout:         types.NewCurrency64(1),
 		UnlockHash:     unlockConditions.UnlockHash(),
 		RevisionNumber: 1,
 	}
-	cst.cs.db.addFileContracts(fcid, fc)
+	cst.cs.dbAddFileContract(fcid, fc)
 
 	// Try a working file contract revision.
 	txn := types.Transaction{
@@ -437,7 +646,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 			},
 		},
 	}
-	err = cst.cs.validFileContractRevisions(txn)
+	err = cst.cs.dbValidFileContractRevisions(txn)
 	if err != nil {
 		t.Error(err)
 	}
@@ -452,8 +661,8 @@ func TestValidFileContractRevisions(t *testing.T) {
 			},
 		},
 	}
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrLowRevisionNumber {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errLowRevisionNumber {
 		t.Error(err)
 	}
 	txn = types.Transaction{
@@ -465,38 +674,41 @@ func TestValidFileContractRevisions(t *testing.T) {
 			},
 		},
 	}
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrLowRevisionNumber {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errLowRevisionNumber {
 		t.Error(err)
 	}
 
 	// Submit a file contract revision pointing to an invalid parent.
 	txn.FileContractRevisions[0].ParentID[0]--
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrUnrecognizedFileContractID {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errNilItem {
 		t.Error(err)
 	}
 	txn.FileContractRevisions[0].ParentID[0]++
 
 	// Submit a file contract revision for a file contract whose window has
 	// already opened.
-	fc = cst.cs.db.getFileContracts(fcid)
+	fc, err = cst.cs.dbGetFileContract(fcid)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fc.WindowStart = 0
-	cst.cs.db.rmFileContracts(fcid)
-	cst.cs.db.addFileContracts(fcid, fc)
+	cst.cs.dbRemoveFileContract(fcid)
+	cst.cs.dbAddFileContract(fcid, fc)
 	txn.FileContractRevisions[0].NewRevisionNumber = 3
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrLateRevision {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errLateRevision {
 		t.Error(err)
 	}
 
 	// Submit a file contract revision with incorrect unlock conditions.
 	fc.WindowStart = 100
-	cst.cs.db.rmFileContracts(fcid)
-	cst.cs.db.addFileContracts(fcid, fc)
+	cst.cs.dbRemoveFileContract(fcid)
+	cst.cs.dbAddFileContract(fcid, fc)
 	txn.FileContractRevisions[0].UnlockConditions.Timelock++
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrWrongUnlockConditions {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errWrongUnlockConditions {
 		t.Error(err)
 	}
 	txn.FileContractRevisions[0].UnlockConditions.Timelock--
@@ -508,25 +720,26 @@ func TestValidFileContractRevisions(t *testing.T) {
 	txn.FileContractRevisions[0].NewMissedProofOutputs = []types.SiacoinOutput{{
 		Value: types.NewCurrency64(1),
 	}}
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrAlteredRevisionPayouts {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errAlteredRevisionPayouts {
 		t.Error(err)
 	}
 	txn.FileContractRevisions[0].NewValidProofOutputs = nil
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrAlteredRevisionPayouts {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errAlteredRevisionPayouts {
 		t.Error(err)
 	}
 	txn.FileContractRevisions[0].NewValidProofOutputs = []types.SiacoinOutput{{
 		Value: types.NewCurrency64(1),
 	}}
 	txn.FileContractRevisions[0].NewMissedProofOutputs = nil
-	err = cst.cs.validFileContractRevisions(txn)
-	if err != ErrAlteredRevisionPayouts {
+	err = cst.cs.dbValidFileContractRevisions(txn)
+	if err != errAlteredRevisionPayouts {
 		t.Error(err)
 	}
 }
 
+/*
 // TestValidSiafunds probes the validSiafunds mthod of the consensus set.
 func TestValidSiafunds(t *testing.T) {
 	if testing.Short() {
