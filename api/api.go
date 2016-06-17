@@ -145,9 +145,8 @@ func (srv *Server) initAPI(password string) {
 
 	// Renter API Calls
 	if srv.renter != nil {
-		router.GET("/renter", srv.renterHandler)
-		router.GET("/renter/allowance", srv.renterAllowanceHandlerGET)
-		router.POST("/renter/allowance", requirePassword(srv.renterAllowanceHandlerPOST, password))
+		router.GET("/renter", srv.renterHandlerGET)
+		router.POST("/renter", requirePassword(srv.renterHandlerPOST, password))
 		router.GET("/renter/contracts", srv.renterContractsHandler)
 		router.GET("/renter/downloads", srv.renterDownloadsHandler)
 		router.GET("/renter/files", srv.renterFilesHandler)

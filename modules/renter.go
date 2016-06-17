@@ -74,6 +74,11 @@ type Allowance struct {
 	RenewWindow types.BlockHeight `json:"renewwindow"`
 }
 
+// RenterSettings control the behavior of the Renter.
+type RenterSettings struct {
+	Allowance Allowance `json:"allowance"`
+}
+
 // RenterFinancialMetrics contains metrics about how much the Renter has
 // spent on storage, uploads, and downloads.
 type RenterFinancialMetrics struct {
@@ -123,9 +128,6 @@ func (rc *RenterContract) RenterFunds() types.Currency {
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
-	// Allowance returns the current allowance.
-	Allowance() Allowance
-
 	// ActiveHosts provides the list of hosts that the renter is selecting,
 	// sorted by preference.
 	ActiveHosts() []HostDBEntry
@@ -165,11 +167,11 @@ type Renter interface {
 	// RenameFile changes the path of a file.
 	RenameFile(path, newPath string) error
 
-	// SetAllowance sets the amount of money the Renter is allowed to spend on
-	// contracts over a given time period, divided among the number of hosts
-	// specified. Note that Renter can start forming contracts as soon as
-	// SetAllowance is called; that is, it may block.
-	SetAllowance(Allowance) error
+	// Settings returns the Renter's current settings.
+	Settings() RenterSettings
+
+	// SetSettings sets the Renter's settings.
+	SetSettings(RenterSettings) error
 
 	// ShareFiles creates a '.sia' file that can be shared with others.
 	ShareFiles(paths []string, shareDest string) error
