@@ -35,7 +35,7 @@ type (
 		LockedStorageCollateral types.Currency `json:"lockedstoragecollateral"`
 		LostRevenue             types.Currency `json:"lostrevenue"`
 		LostStorageCollateral   types.Currency `json:"loststoragecollateral"`
-		PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
+		PotentialStorageRevenue types.Currency `json:"potentialestoragerevenue"`
 		RiskedStorageCollateral types.Currency `json:"riskedstoragecollateral"`
 		StorageRevenue          types.Currency `json:"storagerevenue"`
 		TransactionFeeExpenses  types.Currency `json:"transactionfeeexpenses"`
@@ -50,8 +50,8 @@ type (
 	// HostInternalSettings contains a list of settings that can be changed.
 	HostInternalSettings struct {
 		AcceptingContracts   bool              `json:"acceptingcontracts"`
-		MaxDuration          types.BlockHeight `json:"maxduration"`
 		MaxDownloadBatchSize uint64            `json:"maxdownloadbatchsize"`
+		MaxDuration          types.BlockHeight `json:"maxduration"`
 		MaxReviseBatchSize   uint64            `json:"maxrevisebatchsize"`
 		NetAddress           NetAddress        `json:"netaddress"`
 		WindowSize           types.BlockHeight `json:"windowsize"`
@@ -60,25 +60,15 @@ type (
 		CollateralBudget types.Currency `json:"collateralbudget"`
 		MaxCollateral    types.Currency `json:"maxcollateral"`
 
-		DownloadLimitGrowth uint64 `json:"downloadlimitgrowth"` // Bytes per second that get added to the limit for how much download bandwidth the host is allowed to use.
-		DownloadLimitCap    uint64 `json:"downloadlimitcap"`    // The maximum size of the limit for how much download bandwidth the host is allowed to use.
-		DownloadSpeedLimit  uint64 `json:"downloadspeedlimit"`  // The maximum download speed for all combined host connections.
-		UploadLimitGrowth   uint64 `json:"uploadlimitgrowth"`   // Bytes per second that get added to the limit for how much upload bandwidth the host is allowed to use.
-		UploadLimitCap      uint64 `json:"uploadlimitcap"`      // The maximum size of the limit for how much upload bandwidth the host is allowed to use.
-		UploadSpeedLimit    uint64 `json:"uploadspeedlimit"`    // The maximum upload speed for all combined host connections.
-
-		MinimumContractPrice          types.Currency `json:"contractprice"`
-		MinimumDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
-		MinimumStoragePrice           types.Currency `json:"storageprice"`
-		MinimumUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
+		MinContractPrice          types.Currency `json:"mincontractprice"`
+		MinDownloadBandwidthPrice types.Currency `json:"mindownloadbandwidthprice"`
+		MinStoragePrice           types.Currency `json:"minstorageprice"`
+		MinUploadBandwidthPrice   types.Currency `json:"minuploadbandwidthprice"`
 	}
 
 	// HostNetworkMetrics reports the quantity of each type of RPC call that
 	// has been made to the host.
 	HostNetworkMetrics struct {
-		DownloadBandwidthConsumed uint64 `json:"downloadbandwidthconsumed"`
-		UploadBandwidthConsumed   uint64 `json:"uploadbandwidthconsumed"`
-
 		DownloadCalls     uint64 `json:"downloadcalls"`
 		ErrorCalls        uint64 `json:"errorcalls"`
 		FormContractCalls uint64 `json:"formcontractcalls"`
@@ -98,12 +88,15 @@ type (
 		// AnnounceAddress submits an announcement using the given address.
 		AnnounceAddress(NetAddress) error
 
+		// ExternalSettings returns the settings of the host as seen by an
+		// untrusted node querying the host for settings.
 		ExternalSettings() HostExternalSettings
 
 		// FinancialMetrics returns the financial statistics of the host.
 		FinancialMetrics() HostFinancialMetrics
 
-		// InternalSettings returns the host's internal settings.
+		// InternalSettings returns the host's internal settings, including
+		// potentially private or sensitive information.
 		InternalSettings() HostInternalSettings
 
 		// NetworkMetrics returns information on the types of RPC calls that

@@ -80,17 +80,10 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 		"collateralbudget": &settings.CollateralBudget,
 		"maxcollateral":    &settings.MaxCollateral,
 
-		"downloadlimitgrowth": &settings.DownloadLimitGrowth,
-		"downloadlimitcap":    &settings.DownloadLimitCap,
-		"downloadspeedlimit":  &settings.DownloadSpeedLimit,
-		"uploadlimitgrowth":   &settings.UploadLimitGrowth,
-		"uploadlimitcap":      &settings.UploadLimitCap,
-		"uploadspeedlimit":    &settings.UploadSpeedLimit,
-
-		"minimumcontractprice":          &settings.MinimumContractPrice,
-		"minimumdownloadbandwidthprice": &settings.MinimumDownloadBandwidthPrice,
-		"minimumstorageprice":           &settings.MinimumStoragePrice,
-		"minimumuploadbandwidthprice":   &settings.MinimumUploadBandwidthPrice,
+		"mincontractprice":          &settings.MinContractPrice,
+		"mindownloadbandwidthprice": &settings.MinDownloadBandwidthPrice,
+		"minstorageprice":           &settings.MinStoragePrice,
+		"minuploadbandwidthprice":   &settings.MinUploadBandwidthPrice,
 	}
 
 	// Iterate through the query string and replace any fields that have been

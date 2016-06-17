@@ -85,7 +85,7 @@ var (
 // expected to add to the file contract based on the payout of the file
 // contract and based on the host settings.
 func contractCollateral(settings modules.HostInternalSettings, fc types.FileContract) types.Currency {
-	return fc.ValidProofOutputs[1].Value.Sub(settings.MinimumContractPrice)
+	return fc.ValidProofOutputs[1].Value.Sub(settings.MinContractPrice)
 }
 
 // managedAddCollateral adds the host's collateral to the file contract
@@ -177,7 +177,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	fullTxn, _ := builder.View()
 	hostPortion := contractCollateral(h.settings, fc)
 	so := &storageObligation{
-		ContractCost:     h.settings.MinimumContractPrice,
+		ContractCost:     h.settings.MinContractPrice,
 		LockedCollateral: hostPortion,
 
 		OriginTransactionSet:   fullTxnSet,
@@ -404,7 +404,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	// Check that there's enough payout for the host to cover at least the
 	// contract price. This will prevent negative currency panics when working
 	// with the collateral.
-	if fc.ValidProofOutputs[1].Value.Cmp(settings.MinimumContractPrice) < 0 {
+	if fc.ValidProofOutputs[1].Value.Cmp(settings.MinContractPrice) < 0 {
 		return errLowHostPayout
 	}
 	// Check that the collateral does not exceed the maximum amount of

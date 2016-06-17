@@ -360,6 +360,8 @@ Queries:
 * /host/announce                [POST]
 * /host/delete/{filecontractid} [POST]
 
+[Full Description](api/Host.md)
+
 #### /host [GET]
 
 Function: Fetches status information about the host.
@@ -367,87 +369,81 @@ Function: Fetches status information about the host.
 Parameters: none
 
 Response:
-```
+```go
 struct {
-	collateral   types.Currency     (string)
-	maxduration  types.BlockHeight  (uint64)
-	minduration  types.BlockHeight  (uint64)
-	netaddress   modules.NetAddress (string)
-	price        types.Currency     (string)
-	totalstorage int64
-	unlockhash   types.UnlockHash  (string)
-	windowsize   types.BlockHeight (uint64)
+	externalsettings {
+		acceptingcontracts   bool
+		maxdownloadbatchsize uint64
+		maxduration          types.BlockHeight (uint64)
+		maxrevisebatchsize   uint64
+		netaddress           modules.NetAddress (string)
+		remainingstorage     uint64
+		sectorsize           uint64
+		totalstorage         uint64
+		unlockhash           types.UnlockHash (string)
+		windowsize           types.BlockHeight (uint64)
 
-	acceptingcontracts bool
-	anticipatedrevenue types.Currency (string)
-	numcontracts       uint64
-	revenue            types.Currency (string)
-	storageremaining   int64
+		collateral    types.Currency (string)
+		maxcollateral types.Currency (string)
 
-	rpcdownloadcalls     uint64
-	rpcerrorcalls        uint64
-	rpcrenewcalls        uint64
-	rpcrevisecalls       uint64
-	rpcsettingscalls     uint64
-	rpcunrecognizedcalls uint64
-	rpcuploadcalls       uint64
+		contractprice          types.Currency (string)
+		downloadbandwidthprice types.Currency (string)
+		storageprice           types.Currency (string)
+		uploadbandwidthprice   types.Currency (string)
+
+		revisionnumber uint64
+		version        string
+	}
+
+	financialmetrics {
+		contractcompensation          types.Currency (string)
+		potentialcontractcompensation types.Currency (string)
+
+		lockedstoragecollateral types.Currency (string)
+		lostrevenue             types.Currency (string)
+		loststoragecollateral   types.Currency (string)
+		potentialstoragerevenue types.Currency (string)
+		riskedstoragecollateral types.Currency (string)
+		storagerevenue          types.Currency (string)
+		transactionfeeexpenses  types.Currency (string)
+
+		downloadbandwidthrevenue          types.Currency (string)
+		potentialdownloadbandwidthrevenue types.Currency (string)
+		potentialuploadbandwidthrevenue   types.Currency (string)
+		uploadbandwidthrevenue            types.Currency (string)
+	}
+
+	internalsettings {
+		acceptingcontracts   bool
+		maxdownloadbatchsize uint64
+		maxduration          types.BlockHeight (uint64)
+		maxrevisebatchsize   uint64
+		netaddress           modules.NetAddress (string)
+		windowsize           types.BlockHeight (uint64)
+
+		collateral       types.Currency (string)
+		collateralbudget types.Currency (string)
+		maxcollateral    types.Currency (string)
+
+		mincontractprice          types.Currency (string)
+		mindownloadbandwidthprice types.Currency (string)
+		minstorageprice           types.Currency (string)
+		minuploadbandwidthprice   types.Currency (string)
+	}
+
+	// Information about the network, specifically various ways in which
+	// renters have contacted the host.
+	networkmetrics {
+		downloadcalls     uint64
+		errorcalls        uint64
+		formcontractcalls uint64
+		renewcalls        uint64
+		revisecalls       uint64
+		settingscalls     uint64
+		unrecognizedcalls uint64
+	}
 }
 ```
-'collateral' is the number of hastings per byte per block that are put up as
-collateral when making file contracts.
-
-'maxduration' is the maximum allowed duration of a file contract.
-
-'minduration' is the minimum allowed duration of a file contract.
-
-'netaddress' is the network address of the host.
-
-'price' is the number of hastings per byte per block that the host is charging
-when making file contracts.
-
-'totalstorage' is the total amount of storage that has been allocated to the
-host.
-
-'unlockhash' is the address that hosting revenues will be sent to.
-
-'windowsize' is the minimum required window that must be given to the host to
-prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
-downtime, 40 blocks is recommended as an absolute minimum. The current network
-default is 288 blocks. The current software will break entirely below 20
-blocks, though in theory something as low as 6 blocks could be safe.
-
-'acceptingcontracts' indicates whether the host is accepting new file
-contracts, file contract revisions, and file contract renewals. A host that is
-not accepting these calls will still accept download requests, and will still
-submit storage proofs to the network.
-
-'anticipatedrevenue' is the value of the contracts that have been created but
-not fulfilled.
-
-'numcontracts' is the number of active contracts that the host is engaged in.
-
-'revenue' is the total number of Hastings earned from hosting.
-
-'storageremaining' is 'totalstorage' minus the number of bytes currently being
-stored.
-
-'rpcdownloadcalls' is the number of RPCs to the host that requested a download.
-
-'rpcerrorcalls' is the number of RPCs to the host that returned errors.
-
-'rpcrenewcalls' is the number of RPCs to the host that requested a file
-contract renewal.
-
-'rpcrevisecalls' is the number of RPCs to the host that requested a file
-contract revision.
-
-'rpcsettingscalls' is the number of RPCs to the host that requested the host's
-settings.
-
-'rpcunrecognizedcalls' is the number of RPCs to the host that used unrecognized
-identifiers.
-
-'rpcuploadcalls' is the number of RPCs to the host that tried to upload a file.
 
 #### /host [POST]
 
@@ -456,31 +452,22 @@ unspecified parameters will be left unchanged.
 
 Parameters:
 ```
-collateral   int
-maxduration  int
-minduration  int
-price        int
-totalstorage int
-windowsize   int
+acceptingcontracts   bool                        // Optional
+maxdownloadbatchsize uint64                      // Optional
+maxduration          types.BlockHeight (uint64)  // Optional
+maxrevisebatchsize   uint64                      // Optional
+netaddress           modules.NetAddress (string) // Optional
+windowsize           types.BlockHeight (uint64)  // Optional
+
+collateral       types.Currency (string) // Optional
+collateralbudget types.Currency (string) // Optional
+maxcollateral    types.Currency (string) // Optional
+
+mincontractprice          types.Currency (string) // Optional
+mindownloadbandwidthprice types.Currency (string) // Optional
+minstorageprice           types.Currency (string) // Optional
+minuploadbandwidthprice   types.Currency (string) // Optional
 ```
-'collateral' is the number of hastings per byte per block that are put up as
-collateral when making file contracts.
-
-'maxduration' is the maximum allowed duration of a file contract.
-
-'minduration' is the minimum allowed duration of a file contract.
-
-'price' is the number of hastings per byte per block that the host is charging
-when making file contracts.
-
-'totalstorage' is the total amount of storage that has been allocated to the
-host.
-
-'windowsize' is the minimum required window that must be given to the host to
-prove storage of a file. Due to potential spam attacks, bloat, DDOS, and host
-downtime, 40 blocks is recommended as an absolute minimum. The current network
-default is 288 blocks. The current software will break entirely below 20
-blocks, though in theory something as low as 6 blocks could be safe.
 
 Response: standard
 
@@ -491,28 +478,8 @@ Generally only needs to be called once.
 
 Parameters:
 ```
-netaddress string
+netaddress string // Optional
 ```
-'netaddress' is an optional parameter that specifies the address to be
-announced. Supplying this parameters will also override standard connectivity
-checks.
-
-Response: standard
-
-#### /host/delete/{filecontractid} [POST]
-
-Function: Delete a file contract from the host. This will cause the host to
-lose the future revenue, and also any collateral that the host had placed on
-the file. Typically, this is only used in emergency situations where capacity
-must be freed up, or in situations where legal pressure requires a host to
-delete a contract.
-
-Parameters:
-```
-filecontractid types.UnlockHash (string)
-```
-
-'filecontractid' is the ID of the file contract that is being deleted.
 
 Response: standard
 
