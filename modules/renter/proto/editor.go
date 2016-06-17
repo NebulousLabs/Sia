@@ -49,6 +49,7 @@ type Editor struct {
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
 func (he *Editor) Close() error {
+	extendDeadline(he.conn, modules.NegotiateSettingsTime)
 	// don't care about these errors
 	_, _ = verifySettings(he.conn, he.host)
 	_ = modules.WriteNegotiationStop(he.conn)
@@ -228,9 +229,11 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
+		conn.Close()
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	if err := verifyRecentRevision(conn, contract); err != nil {
+		conn.Close() // TODO: close gracefully if host has entered revision loop
 		return nil, errors.New("revision exchange failed: " + err.Error())
 	}
 

@@ -110,9 +110,11 @@ func NewDownloader(host modules.HostDBEntry, contract modules.RenterContract) (*
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCDownload); err != nil {
+		conn.Close()
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	if err := verifyRecentRevision(conn, contract); err != nil {
+		conn.Close() // TODO: close gracefully if host has entered revision loop
 		return nil, errors.New("revision exchange failed: " + err.Error())
 	}
 
