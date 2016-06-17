@@ -50,7 +50,7 @@ var (
 // gatewayconnectcmd is the handler for the command `siac gateway add [address]`.
 // Adds a new peer to the peer list.
 func gatewayconnectcmd(addr string) {
-	err := post("/gateway/add/"+addr, "")
+	err := post("/gateway/connect/"+addr, "")
 	if err != nil {
 		die("Could not add peer:", err)
 	}
@@ -60,7 +60,7 @@ func gatewayconnectcmd(addr string) {
 // gatewaydisconnectcmd is the handler for the command `siac gateway remove [address]`.
 // Removes a peer from the peer list.
 func gatewaydisconnectcmd(addr string) {
-	err := post("/gateway/remove/"+addr, "")
+	err := post("/gateway/disconnect/"+addr, "")
 	if err != nil {
 		die("Could not remove peer:", err)
 	}
