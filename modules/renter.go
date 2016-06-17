@@ -98,7 +98,7 @@ type RenterFinancialMetrics struct {
 // aggregates the host's external settings with its public key.
 type HostDBEntry struct {
 	HostExternalSettings
-	PublicKey types.SiaPublicKey
+	PublicKey types.SiaPublicKey `json:"publickey"`
 }
 
 // A RenterContract contains all the metadata necessary to revise or renew a
