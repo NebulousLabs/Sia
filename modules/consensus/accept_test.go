@@ -492,6 +492,7 @@ func TestIntegrationDoSBlockHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestIntegrationDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -536,6 +537,7 @@ func TestBlockKnownHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestBlockKnownHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -599,6 +601,7 @@ func TestOrphanHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestOrphanHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -624,6 +627,7 @@ func TestMissedTarget(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestMissedTarget")
 	if err != nil {
 		t.Fatal(err)
@@ -653,6 +657,7 @@ func TestMinerPayoutHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestMinerPayoutHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -680,6 +685,7 @@ func TestEarlyTimestampHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestEarlyTimestampHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -709,6 +715,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestFutureTimestampHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -753,6 +760,7 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestExtremeFutureTimestampHandling")
 	if err != nil {
 		t.Fatal(err)
@@ -778,6 +786,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestBuriedBadTransaction")
 	if err != nil {
 		t.Fatal(err)
@@ -828,6 +837,7 @@ func TestInconsistentCheck(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestInconsistentCheck")
 	if err != nil {
 		t.Fatal(err)
@@ -858,6 +868,7 @@ func TestTaxHardfork(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestTaxHardfork")
 	if err != nil {
 		t.Fatal(err)
@@ -976,6 +987,7 @@ func TestAcceptBlockBroadcasts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := blankConsensusSetTester("TestAcceptBlockBroadcasts")
 	if err != nil {
 		t.Fatal(err)

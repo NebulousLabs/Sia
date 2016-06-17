@@ -23,6 +23,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create 8 remote peers.
 	remoteCSTs := make([]*consensusSetTester, 8)
@@ -284,6 +285,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Set minIBDWaitTime to 1s for just this test because no blocks are
 	// transferred between peers so the wait time can be very short.

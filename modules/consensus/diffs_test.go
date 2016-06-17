@@ -15,6 +15,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiffBadMaturity")
 	if err != nil {
 		t.Fatal(err)

@@ -12,6 +12,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
 	if err != nil {
 		t.Fatal(err)
@@ -63,6 +64,7 @@ func TestRevertToNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestRevertToNode")
 	if err != nil {
 		t.Fatal(err)

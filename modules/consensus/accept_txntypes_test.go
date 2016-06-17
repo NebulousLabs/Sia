@@ -89,6 +89,7 @@ func TestIntegrationSimpleBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestIntegrationSimpleBlock")
 	if err != nil {
 		t.Fatal(err)
@@ -146,6 +147,7 @@ func TestIntegrationSpendSiacoinsBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
 	if err != nil {
 		t.Fatal(err)
@@ -288,6 +290,7 @@ func TestIntegrationValidStorageProofBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestIntegrationValidStorageProofBlocks")
 	if err != nil {
 		t.Fatal(err)
@@ -392,6 +395,7 @@ func TestIntegrationMissedStorageProofBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestIntegrationMissedStorageProofBlocks")
 	if err != nil {
 		t.Fatal(err)
@@ -553,6 +557,7 @@ func TestIntegrationFileContractRevision(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestIntegrationFileContractRevision")
 	if err != nil {
 		t.Fatal(err)
@@ -646,6 +651,7 @@ func (cst *consensusSetTester) TestIntegrationSpendSiafunds(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestIntegtrationSpendSiafunds")
 	if err != nil {
 		t.Fatal(err)

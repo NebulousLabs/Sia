@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"bytes"
-	"compress/gzip"
 	"crypto/rand"
 	"testing"
 
@@ -18,6 +16,7 @@ func TestTryValidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestTryValidTransactionSet")
 	if err != nil {
 		t.Fatal(err)
@@ -49,6 +48,7 @@ func TestTryInvalidTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestTryInvalidTransactionSet")
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +85,7 @@ func TestStorageProofBoundaries(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestStorageProofBoundaries")
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +214,8 @@ func TestEmptyStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestStorageProofBoundaries")
+	t.Parallel()
+	cst, err := createConsensusSetTester("TestEmptyStorageProof")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,6 +327,7 @@ func TestValidSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestValidSiacoins")
 	if err != nil {
 		t.Fatal(err)
@@ -391,6 +394,7 @@ func TestStorageProofSegment(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestStorageProofSegment")
 	if err != nil {
 		t.Fatal(err)
@@ -414,59 +418,13 @@ func TestStorageProofSegment(t *testing.T) {
 	}
 }
 
-// TestStorageProofSegmentRandomness checks that the storageProofSegment method
-// is producing outputs that pass an imperfect randomness check (gzip).
-func TestStorageProofSegmentRandomness(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	cst, err := createConsensusSetTester("TestStorageProofSegmentRandomness")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cst.Close()
-
-	// Add a file contract to the consensus set that can be used to probe the
-	// storage segment.
-	var outputs []byte
-	for i := 0; i < 20e3; i++ {
-		var fcid types.FileContractID
-		rand.Read(fcid[:])
-		fc := types.FileContract{
-			Payout:      types.NewCurrency64(1),
-			FileSize:    256 * 64,
-			WindowStart: 2,
-		}
-		cst.cs.dbAddFileContract(fcid, fc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		index, err := cst.cs.dbStorageProofSegment(fcid)
-		if err != nil {
-			t.Error(err)
-		}
-		outputs = append(outputs, byte(index))
-	}
-
-	// Perform entropy testing on 'outputs' to verify randomness.
-	var b bytes.Buffer
-	zip := gzip.NewWriter(&b)
-	_, err = zip.Write(outputs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	zip.Close()
-	if b.Len() < len(outputs) {
-		t.Error("supposedly high entropy random segments have been compressed!")
-	}
-}
-
 // TestValidStorageProofs probes the validStorageProofs method of the consensus
 // set.
 func TestValidStorageProofs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestValidStorageProofs")
 	if err != nil {
 		t.Fatal(err)
@@ -591,6 +549,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestPreForkValidStorageProofs")
 	if err != nil {
 		t.Fatal(err)
@@ -647,6 +606,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestValidFileContractRevisions")
 	if err != nil {
 		t.Fatal(err)

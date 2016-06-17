@@ -14,6 +14,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Get a blank consensus set tester so that the mocked subscriber can join
 	// immediately after genesis.
 	cst, err := blankConsensusSetTester("TestIntegrationChangeLog")

@@ -38,8 +38,9 @@ func (ms *mockSubscriber) copySub() (cms mockSubscriber) {
 // using an unrecognized id.
 func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestUnitInvalidConsensusChangeSubscription")
 	if err != nil {
 		t.Fatal(err)
@@ -58,8 +59,9 @@ func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
 // subscriber if the Unsubscribe call is made.
 func TestUnitUnsubscribe(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestUnitUnsubscribe")
 	if err != nil {
 		t.Fatal(err)

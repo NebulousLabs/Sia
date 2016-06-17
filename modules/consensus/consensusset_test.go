@@ -176,6 +176,7 @@ func TestNilInputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")
 	_, err := New(nil, testdir)
 	if err != errNilGateway {
@@ -188,6 +189,7 @@ func TestDatabaseClosing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	testdir := build.TempDir(modules.ConsensusDir, "TestClosing")
 
 	// Create the gateway.

@@ -108,6 +108,7 @@ func TestBlockHistory(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	cst, err := createConsensusSetTester("TestBlockHistory")
 	if err != nil {
@@ -197,6 +198,7 @@ func TestSendBlocksBroadcastsOnce(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Setup consensus sets.
 	cst1, err := blankConsensusSetTester("TestSendBlocksBroadcastsOnce1")
@@ -313,6 +315,7 @@ func TestIntegrationRPCSendBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	type sendBlocksTest struct {
 		commonBlocksToMine types.BlockHeight
@@ -525,6 +528,7 @@ func TestRPCSendBlockSendsOnlyNecessaryBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create the "remote" peer.
 	cst, err := blankConsensusSetTester("TestRPCSendBlockSendsOnlyNecessaryBlocks - remote")
@@ -669,6 +673,7 @@ func TestSendBlk(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := blankConsensusSetTester("TestSendBlk")
 	if err != nil {
 		t.Fatal(err)
@@ -759,6 +764,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := blankConsensusSetTester("TestThreadedReceiveBlock")
 	if err != nil {
 		t.Fatal(err)
@@ -879,6 +885,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst1, err := blankConsensusSetTester("TestIntegrationSendBlkRPC1")
 	if err != nil {
 		t.Fatal(err)
@@ -982,6 +989,7 @@ func TestRelayHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := blankConsensusSetTester("TestRelayHeader")
 	if err != nil {
 		t.Fatal(err)
@@ -1087,6 +1095,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	// Setup consensus sets.
 	cst1, err := blankConsensusSetTester("TestIntegrationBroadcastRelayHeader1")
 	if err != nil {
@@ -1147,6 +1156,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst1, err := blankConsensusSetTester("TestRelaySynchronize1")
 	if err != nil {
 		t.Fatal(err)
@@ -1337,6 +1347,7 @@ func TestThreadedReceiveBlocksStalls(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	cst, err := blankConsensusSetTester("TestThreadedReceiveBlocksStalls")
 	if err != nil {
@@ -1454,6 +1465,7 @@ func TestIntegrationSendBlocksStalls(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	cstLocal, err := blankConsensusSetTester("TestThreadedReceiveBlocksTimesout - local")
 	if err != nil {

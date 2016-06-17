@@ -20,6 +20,7 @@ func TestIntegrationMinimumValidChildTimestamp(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a custom consnesus set to control the blocks.
 	testdir := build.TempDir(modules.ConsensusDir, "TestIntegrationMinimumValidChildTimestamp")

@@ -15,6 +15,7 @@ func TestSaveLoad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cst, err := createConsensusSetTester("TestSaveLoad")
 	if err != nil {
 		t.Fatal(err)
