@@ -143,6 +143,18 @@ func (cs *ConsensusSet) dbAddFileContract(id types.FileContractID, fc types.File
 	}
 }
 
+// dbRemoveFileContract is a convenience function allowing removeFileContract
+// to be called without a bolt.Tx.
+func (cs *ConsensusSet) dbRemoveFileContract(id types.FileContractID) {
+	dbErr := cs.db.Update(func(tx *bolt.Tx) error {
+		removeFileContract(tx, id)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+}
+
 // dbGetSiafundOutput is a convenience function allowing getSiafundOutput to be
 // called without a bolt.Tx.
 func (cs *ConsensusSet) dbGetSiafundOutput(id types.SiafundOutputID) (sfo types.SiafundOutput, err error) {
@@ -220,4 +232,30 @@ func (cs *ConsensusSet) dbStorageProofSegment(fcid types.FileContractID) (index 
 		panic(dbErr)
 	}
 	return index, err
+}
+
+// dbValidStorageProofs is a convenience function allowing 'validStorageProofs'
+// to be called during testing without a tx.
+func (cs *ConsensusSet) dbValidStorageProofs(t types.Transaction) (err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		err = validStorageProofs(tx, t)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return err
+}
+
+// dbValidFileContractRevisions is a convenience function allowing
+// 'validFileContractRevisions' to be called during testing without a tx.
+func (cs *ConsensusSet) dbValidFileContractRevisions(t types.Transaction) (err error) {
+	dbErr := cs.db.View(func(tx *bolt.Tx) error {
+		err = validFileContractRevisions(tx, t)
+		return nil
+	})
+	if dbErr != nil {
+		panic(dbErr)
+	}
+	return err
 }
