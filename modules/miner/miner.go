@@ -235,6 +235,11 @@ func (m *Miner) checkAddress() error {
 // BlocksMined returns the number of good blocks and stale blocks that have
 // been mined by the miner.
 func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
+	if err := m.tg.Add(); err != nil {
+		build.Critical(err)
+	}
+	defer m.tg.Done()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

@@ -13,7 +13,7 @@ type mockSubscriber struct {
 }
 
 // ReceiveUpdatedUnconfirmedTransactions receives transactinos from the
-// transaction pool and stores them in the order they were received. 
+// transaction pool and stores them in the order they were received.
 // This method allows *mockSubscriber to satisfy the
 // modules.TransactionPoolSubscriber interface.
 func (ms *mockSubscriber) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, _ modules.ConsensusChange) {
@@ -28,7 +28,7 @@ func TestSubscription(t *testing.T) {
 		t.Skip()
 	}
 
-	tpt, err  := createTpoolTester("TestUnsubscribe")
+	tpt, err := createTpoolTester("TestUnsubscribe")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,11 +63,10 @@ func TestSubscription(t *testing.T) {
 	if len(ms.txns) != numTxns {
 		t.Errorf("mock subscriber should've received %v transactions; received %v instead", numTxns, len(ms.txns))
 	}
-	
+
 	numSubscribers := len(tpt.tpool.subscribers)
 	tpt.tpool.Unsubscribe(&ms)
 	if len(tpt.tpool.subscribers) != numSubscribers-1 {
 		t.Error("transaction pool failed to unsubscribe mock subscriber")
 	}
 }
-

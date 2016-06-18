@@ -69,6 +69,11 @@ func (m *Miner) newSourceBlock() {
 // it is typically safe to assume that headers will be remembered for
 // min(10 minutes, 10e3 requests).
 func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target, error) {
+	if err := m.tg.Add(); err != nil {
+		return types.BlockHeader{}, types.Target{}, err
+	}
+	defer m.tg.Done()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -158,6 +163,11 @@ func (m *Miner) managedSubmitBlock(b types.Block) error {
 
 // SubmitHeader accepts a block header.
 func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
+	if err := m.tg.Add(); err != nil {
+		return err
+	}
+	defer m.tg.Done()
+
 	// Because a call to managedSubmitBlock is required at the end of this
 	// function, the first part needs to be wrapped in an anonymous function
 	// for lock safety.
