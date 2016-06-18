@@ -27,8 +27,15 @@ func (m *Miner) threadedMine() {
 	// occurring.
 	cycleStart := time.Now()
 	for {
-		// Kill the thread if mining has been turned off.
 		m.mu.Lock()
+		// Kill the thread if the miner's threadgroup is stopped.
+		if m.tg.IsStopped() {
+			m.miningOn = false
+			m.mining = false
+			m.mu.Unlock()
+			return
+		}
+		// Kill the thread if mining has been turned off.
 		if !m.miningOn {
 			m.mining = false
 			m.mu.Unlock()

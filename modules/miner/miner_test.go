@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -207,7 +208,7 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	}
 	goodBlocks, staleBlocks := mt.miner.BlocksMined()
 	if goodBlocks != 1 {
-		t.Error("expexting 1 good block")
+		t.Error("expecting 1 good block")
 	}
 	if staleBlocks != 1 {
 		t.Error("expecting 1 stale block, got", staleBlocks)
@@ -316,5 +317,31 @@ func TestIntegrationStartupRescan(t *testing.T) {
 	}
 	if mt.miner.persist.Target != oldTarget {
 		t.Error("rescan failed, ended up at the wrong target")
+	}
+}
+
+func TestMinerCloseDeadlock(t *testing.T) {
+	mt, err := createMinerTester("TestMinerCloseDeadlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// StartCPUMining calls `go threadedMine()`, which needs to access the miner
+	// before Close() does in the next goroutine, otherwise m.tg.Add() fails
+	// at the top of threadedMine() and threadedMine() exits (silently!).
+	// I haven't seen this behavior since sticking Close() inside a goroutine,
+	// but I'm not sure that's comfort enough.
+	mt.miner.StartCPUMining()
+
+	closed := make(chan struct{})
+	go func() {
+		if err := mt.miner.Close(); err != nil {
+			t.Fatal(err)
+		}
+		closed <- struct{}{}
+	}()
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("mt.miner.Close never completed")
 	}
 }
