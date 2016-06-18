@@ -326,6 +326,11 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.mu.RLock()
 	for name, fn := range g.initRPCs {
 		go func(name string, fn modules.RPCFunc) {
+			if g.threads.Add() != nil {
+				return
+			}
+			defer g.threads.Done()
+
 			g.RPC(addr, name, fn)
 		}(name, fn)
 	}
@@ -393,6 +398,11 @@ func (g *Gateway) threadedPeerManager() {
 		// continue making connections if the node is unresponsive.
 		if err == nil {
 			go func() {
+				if g.threads.Add() != nil {
+					return
+				}
+				defer g.threads.Done()
+
 				connectErr := g.Connect(addr)
 				if connectErr != nil {
 					g.log.Debugln("WARN: automatic connect failed:", connectErr)
