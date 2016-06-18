@@ -19,6 +19,7 @@ func TestHostPersistCompat100(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	ht, err := newHostTester("TestHostPersistCompat100")
 	if err != nil {
 		t.Fatal(err)
@@ -27,7 +28,7 @@ func TestHostPersistCompat100(t *testing.T) {
 	// Close the host and then swap out the persist file for the one that is
 	// being used for testing.
 	ht.host.Close()
-	err = build.CopyFile("persist_compat_1.0.0.json", filepath.Join(ht.host.persistDir, settingsFile))
+	err = build.CopyFile(filepath.Join("testdata", "persist_compat_1.0.0.json"), filepath.Join(ht.host.persistDir, settingsFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,19 +44,19 @@ func TestHostPersistCompat100(t *testing.T) {
 	if errCalls == 0 {
 		t.Error("error calls incorrectly loaded after compatibility loading")
 	}
-	if h.financialMetrics.PotentialStorageRevenue.Cmp(types.ZeroCurrency) == 0 {
+	if h.financialMetrics.PotentialStorageRevenue.IsZero() {
 		t.Error("potential storage revenue not loaded correctly")
 	}
-	if h.settings.MinContractPrice.Cmp(types.ZeroCurrency) == 0 {
+	if h.settings.MinContractPrice.IsZero() {
 		t.Error("min contract price not loaded correctly")
 	}
-	if h.settings.MinDownloadBandwidthPrice.Cmp(types.ZeroCurrency) == 0 {
+	if h.settings.MinDownloadBandwidthPrice.IsZero() {
 		t.Error("min download bandwidth price not loaded correctly")
 	}
-	if h.settings.MinStoragePrice.Cmp(types.ZeroCurrency) == 0 {
+	if h.settings.MinStoragePrice.IsZero() {
 		t.Error("min storage price not loaded correctly")
 	}
-	if h.settings.MinUploadBandwidthPrice.Cmp(types.ZeroCurrency) == 0 {
+	if h.settings.MinUploadBandwidthPrice.IsZero() {
 		t.Error("min upload bandwidth price not loaded correctly")
 	}
 	if h.revisionNumber == 0 {

@@ -173,9 +173,30 @@ func (h *Host) load() error {
 
 	// COMPAT v1.0.0
 	//
-	// A spelling error in pre-1.0 versions means that, if this is the first
-	// time running after an upgrade, the misspelled field needs to be
-	// transfered over.
+	// Load compatibility fields which may have data leftover. This call should
+	// only be relevant the first time the user loads the host after upgrading
+	// from v0.6.0 to v1.0.0.
+	err = h.loadCompat(p)
+	if err != nil {
+		return err
+	}
+
+	err = h.initConsensusSubscription()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// loadCompat loads fields that have changed names or otherwise broken
+// compatibility with previous versions, enabling users to upgrade without
+// unexpected loss of data.
+//
+// COMPAT v1.0.0
+//
+// A spelling error in pre-1.0 versions means that, if this is the first time
+// running after an upgrade, the misspelled field needs to be transfered over.
+func (h *Host) loadCompat(p *persistence) error {
 	var compatPersistence struct {
 		FinancialMetrics struct {
 			PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
@@ -187,31 +208,26 @@ func (h *Host) load() error {
 			MinUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
 		}
 	}
-	err = h.dependencies.loadFile(persistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
+	err := h.dependencies.loadFile(persistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
 	if err != nil {
 		return err
 	}
 	// Load the compat values, but only if the compat values are non-zero and
 	// the real values are zero.
-	if compatPersistence.FinancialMetrics.PotentialStorageRevenue.Cmp(types.ZeroCurrency) > 0 && p.FinancialMetrics.PotentialStorageRevenue.Cmp(types.ZeroCurrency) == 0 {
+	if !compatPersistence.FinancialMetrics.PotentialStorageRevenue.IsZero() && p.FinancialMetrics.PotentialStorageRevenue.IsZero() {
 		h.financialMetrics.PotentialStorageRevenue = compatPersistence.FinancialMetrics.PotentialStorageRevenue
 	}
-	if compatPersistence.Settings.MinContractPrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinContractPrice.Cmp(types.ZeroCurrency) == 0 {
+	if !compatPersistence.Settings.MinContractPrice.IsZero() && p.Settings.MinContractPrice.IsZero() {
 		h.settings.MinContractPrice = compatPersistence.Settings.MinContractPrice
 	}
-	if compatPersistence.Settings.MinDownloadBandwidthPrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinDownloadBandwidthPrice.Cmp(types.ZeroCurrency) == 0 {
+	if !compatPersistence.Settings.MinDownloadBandwidthPrice.IsZero() && p.Settings.MinDownloadBandwidthPrice.IsZero() {
 		h.settings.MinDownloadBandwidthPrice = compatPersistence.Settings.MinDownloadBandwidthPrice
 	}
-	if compatPersistence.Settings.MinStoragePrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinStoragePrice.Cmp(types.ZeroCurrency) == 0 {
+	if !compatPersistence.Settings.MinStoragePrice.IsZero() && p.Settings.MinStoragePrice.IsZero() {
 		h.settings.MinStoragePrice = compatPersistence.Settings.MinStoragePrice
 	}
-	if compatPersistence.Settings.MinUploadBandwidthPrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinUploadBandwidthPrice.Cmp(types.ZeroCurrency) == 0 {
+	if !compatPersistence.Settings.MinUploadBandwidthPrice.IsZero() && p.Settings.MinUploadBandwidthPrice.IsZero() {
 		h.settings.MinUploadBandwidthPrice = compatPersistence.Settings.MinUploadBandwidthPrice
-	}
-
-	err = h.initConsensusSubscription()
-	if err != nil {
-		return err
 	}
 	return nil
 }
