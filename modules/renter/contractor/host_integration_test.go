@@ -637,33 +637,32 @@ func TestResync(t *testing.T) {
 	}
 	contract = c.contracts[contract.ID]
 
-	// create a new contractor, mimicking the state of a contractor whose
-	// negotiation had been interrupted
-	c2, err := newTestingContractor(build.TempDir("contractor", "TestResync", "Contractor2"), c.cs.(modules.ConsensusSet), c.tpool.(modules.TransactionPool))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	// corrupt contract and delete its cachedRevision
 	badContract := contract
 	badContract.LastRevision.NewRevisionNumber--
 	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
+
+	c.mu.Lock()
+	delete(c.cachedRevisions, contract.ID)
+	c.mu.Unlock()
+
 	// Editor and Downloader should fail with the bad contract
-	_, err = c2.Editor(badContract)
+	_, err = c.Editor(badContract)
 	if !proto.IsRevisionMismatch(err) {
-		t.Fatal(err)
+		t.Fatal("expected revision mismatch, got", err)
 	}
-	_, err = c2.Downloader(badContract)
+	_, err = c.Downloader(badContract)
 	if !proto.IsRevisionMismatch(err) {
-		t.Fatal(err)
+		t.Fatal("expected revision mismatch, got", err)
 	}
 
 	// add cachedRevision
-	c2.mu.Lock()
-	c2.cachedRevisions[contract.ID] = contract.LastRevision
-	c2.mu.Unlock()
+	c.mu.Lock()
+	c.cachedRevisions[contract.ID] = contract.LastRevision
+	c.mu.Unlock()
 
 	// Editor and Downloader should now succeed after loading the cachedRevision
-	editor, err = c2.Editor(badContract)
+	editor, err = c.Editor(badContract)
 	if err != nil {
 		t.Fatal(err)
 	}
