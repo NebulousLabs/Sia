@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -104,6 +105,9 @@ type Miner struct {
 	mu         sync.RWMutex
 	persist    persistence
 	persistDir string
+	// tg signals the Miner's goroutines to shut down and blocks until all
+	// goroutines have exited before returning from Close().
+	tg siasync.ThreadGroup
 }
 
 // startupRescan will rescan the blockchain in the event that the miner
@@ -194,6 +198,10 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 // Close terminates all ongoing processes involving the miner, enabling garbage
 // collection.
 func (m *Miner) Close() error {
+	if err := m.tg.Stop(); err != nil {
+		return err
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
