@@ -206,6 +206,7 @@ func (m *Miner) Close() error {
 	defer m.mu.Unlock()
 
 	m.cs.Unsubscribe(m)
+	m.tpool.Unsubscribe(m)
 
 	var errs []error
 	if err := m.saveSync(); err != nil {
