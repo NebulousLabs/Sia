@@ -224,7 +224,7 @@ func TestIntegrationBlocksMined(t *testing.T) {
 	}
 	goodBlocks, staleBlocks = rebootMiner.BlocksMined()
 	if goodBlocks != 1 {
-		t.Error("expexting 1 good block")
+		t.Error("expecting 1 good block")
 	}
 	if staleBlocks != 1 {
 		t.Error("expecting 1 stale block, got", staleBlocks)
