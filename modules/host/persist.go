@@ -16,28 +16,28 @@ import (
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
 	// RPC Metrics.
-	DownloadCalls       uint64
-	ErroredCalls        uint64
-	FormContractCalls   uint64
-	RenewCalls          uint64
-	ReviseCalls         uint64
-	RecentRevisionCalls uint64
-	SettingsCalls       uint64
-	UnrecognizedCalls   uint64
+	DownloadCalls       uint64 `json:"downloadcalls"`
+	ErroredCalls        uint64 `json:"erroredcalls"`
+	FormContractCalls   uint64 `json:"formcontractcalls"`
+	RenewCalls          uint64 `json:"renewcalls"`
+	ReviseCalls         uint64 `json:"revisecalls"`
+	RecentRevisionCalls uint64 `json:"recentrevisioncalls"`
+	SettingsCalls       uint64 `json:"settingscalls"`
+	UnrecognizedCalls   uint64 `json:"unrecognizedcalls"`
 
 	// Consensus Tracking.
-	BlockHeight  types.BlockHeight
-	RecentChange modules.ConsensusChangeID
+	BlockHeight  types.BlockHeight         `json:"blockheight"`
+	RecentChange modules.ConsensusChangeID `json:"recentchange"`
 
 	// Host Identity.
-	Announced        bool
-	AutoAddress      modules.NetAddress
-	FinancialMetrics modules.HostFinancialMetrics
-	PublicKey        types.SiaPublicKey
-	RevisionNumber   uint64
-	SecretKey        crypto.SecretKey
-	Settings         modules.HostInternalSettings
-	UnlockHash       types.UnlockHash
+	Announced        bool                         `json:"announced"`
+	AutoAddress      modules.NetAddress           `json:"autoaddress"`
+	FinancialMetrics modules.HostFinancialMetrics `json:"financialmetrics"`
+	PublicKey        types.SiaPublicKey           `json:"publickey"`
+	RevisionNumber   uint64                       `json:"revisionnumber"`
+	SecretKey        crypto.SecretKey             `json:"secretkey"`
+	Settings         modules.HostInternalSettings `json:"settings"`
+	UnlockHash       types.UnlockHash             `json:"unlockhash"`
 }
 
 // persistData returns the data in the Host that will be saved to disk.
@@ -170,6 +170,44 @@ func (h *Host) load() error {
 		h.settings.NetAddress = ""
 	}
 	h.unlockHash = p.UnlockHash
+
+	// COMPAT v1.0.0
+	//
+	// A spelling error in pre-1.0 versions means that, if this is the first
+	// time running after an upgrade, the misspelled field needs to be
+	// transfered over.
+	var compatPersistence struct {
+		FinancialMetrics struct {
+			PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
+		}
+		Settings struct {
+			MinContractPrice          types.Currency `json:"contractprice"`
+			MinDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
+			MinStoragePrice           types.Currency `json:"storageprice"`
+			MinUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
+		}
+	}
+	err = h.dependencies.loadFile(persistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
+	if err != nil {
+		return err
+	}
+	// Load the compat values, but only if the compat values are non-zero and
+	// the real values are zero.
+	if compatPersistence.FinancialMetrics.PotentialStorageRevenue.Cmp(types.ZeroCurrency) > 0 && p.FinancialMetrics.PotentialStorageRevenue.Cmp(types.ZeroCurrency) == 0 {
+		h.financialMetrics.PotentialStorageRevenue = compatPersistence.FinancialMetrics.PotentialStorageRevenue
+	}
+	if compatPersistence.Settings.MinContractPrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinContractPrice.Cmp(types.ZeroCurrency) == 0 {
+		h.settings.MinContractPrice = compatPersistence.Settings.MinContractPrice
+	}
+	if compatPersistence.Settings.MinDownloadBandwidthPrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinDownloadBandwidthPrice.Cmp(types.ZeroCurrency) == 0 {
+		h.settings.MinDownloadBandwidthPrice = compatPersistence.Settings.MinDownloadBandwidthPrice
+	}
+	if compatPersistence.Settings.MinStoragePrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinStoragePrice.Cmp(types.ZeroCurrency) == 0 {
+		h.settings.MinStoragePrice = compatPersistence.Settings.MinStoragePrice
+	}
+	if compatPersistence.Settings.MinUploadBandwidthPrice.Cmp(types.ZeroCurrency) > 0 && p.Settings.MinUploadBandwidthPrice.Cmp(types.ZeroCurrency) == 0 {
+		h.settings.MinUploadBandwidthPrice = compatPersistence.Settings.MinUploadBandwidthPrice
+	}
 
 	err = h.initConsensusSubscription()
 	if err != nil {
