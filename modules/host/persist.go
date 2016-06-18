@@ -16,28 +16,28 @@ import (
 // persistence is the data that is kept when the host is restarted.
 type persistence struct {
 	// RPC Metrics.
-	DownloadCalls       uint64
-	ErroredCalls        uint64
-	FormContractCalls   uint64
-	RenewCalls          uint64
-	ReviseCalls         uint64
-	RecentRevisionCalls uint64
-	SettingsCalls       uint64
-	UnrecognizedCalls   uint64
+	DownloadCalls       uint64 `json:"downloadcalls"`
+	ErroredCalls        uint64 `json:"erroredcalls"`
+	FormContractCalls   uint64 `json:"formcontractcalls"`
+	RenewCalls          uint64 `json:"renewcalls"`
+	ReviseCalls         uint64 `json:"revisecalls"`
+	RecentRevisionCalls uint64 `json:"recentrevisioncalls"`
+	SettingsCalls       uint64 `json:"settingscalls"`
+	UnrecognizedCalls   uint64 `json:"unrecognizedcalls"`
 
 	// Consensus Tracking.
-	BlockHeight  types.BlockHeight
-	RecentChange modules.ConsensusChangeID
+	BlockHeight  types.BlockHeight         `json:"blockheight"`
+	RecentChange modules.ConsensusChangeID `json:"recentchange"`
 
 	// Host Identity.
-	Announced        bool
-	AutoAddress      modules.NetAddress
-	FinancialMetrics modules.HostFinancialMetrics
-	PublicKey        types.SiaPublicKey
-	RevisionNumber   uint64
-	SecretKey        crypto.SecretKey
-	Settings         modules.HostInternalSettings
-	UnlockHash       types.UnlockHash
+	Announced        bool                         `json:"announced"`
+	AutoAddress      modules.NetAddress           `json:"autoaddress"`
+	FinancialMetrics modules.HostFinancialMetrics `json:"financialmetrics"`
+	PublicKey        types.SiaPublicKey           `json:"publickey"`
+	RevisionNumber   uint64                       `json:"revisionnumber"`
+	SecretKey        crypto.SecretKey             `json:"secretkey"`
+	Settings         modules.HostInternalSettings `json:"settings"`
+	UnlockHash       types.UnlockHash             `json:"unlockhash"`
 }
 
 // persistData returns the data in the Host that will be saved to disk.
@@ -171,9 +171,63 @@ func (h *Host) load() error {
 	}
 	h.unlockHash = p.UnlockHash
 
+	// COMPAT v1.0.0
+	//
+	// Load compatibility fields which may have data leftover. This call should
+	// only be relevant the first time the user loads the host after upgrading
+	// from v0.6.0 to v1.0.0.
+	err = h.loadCompat(p)
+	if err != nil {
+		return err
+	}
+
 	err = h.initConsensusSubscription()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// loadCompat loads fields that have changed names or otherwise broken
+// compatibility with previous versions, enabling users to upgrade without
+// unexpected loss of data.
+//
+// COMPAT v1.0.0
+//
+// A spelling error in pre-1.0 versions means that, if this is the first time
+// running after an upgrade, the misspelled field needs to be transfered over.
+func (h *Host) loadCompat(p *persistence) error {
+	var compatPersistence struct {
+		FinancialMetrics struct {
+			PotentialStorageRevenue types.Currency `json:"potentialerevenue"`
+		}
+		Settings struct {
+			MinContractPrice          types.Currency `json:"contractprice"`
+			MinDownloadBandwidthPrice types.Currency `json:"minimumdownloadbandwidthprice"`
+			MinStoragePrice           types.Currency `json:"storageprice"`
+			MinUploadBandwidthPrice   types.Currency `json:"minimumuploadbandwidthprice"`
+		}
+	}
+	err := h.dependencies.loadFile(persistMetadata, &compatPersistence, filepath.Join(h.persistDir, settingsFile))
+	if err != nil {
+		return err
+	}
+	// Load the compat values, but only if the compat values are non-zero and
+	// the real values are zero.
+	if !compatPersistence.FinancialMetrics.PotentialStorageRevenue.IsZero() && p.FinancialMetrics.PotentialStorageRevenue.IsZero() {
+		h.financialMetrics.PotentialStorageRevenue = compatPersistence.FinancialMetrics.PotentialStorageRevenue
+	}
+	if !compatPersistence.Settings.MinContractPrice.IsZero() && p.Settings.MinContractPrice.IsZero() {
+		h.settings.MinContractPrice = compatPersistence.Settings.MinContractPrice
+	}
+	if !compatPersistence.Settings.MinDownloadBandwidthPrice.IsZero() && p.Settings.MinDownloadBandwidthPrice.IsZero() {
+		h.settings.MinDownloadBandwidthPrice = compatPersistence.Settings.MinDownloadBandwidthPrice
+	}
+	if !compatPersistence.Settings.MinStoragePrice.IsZero() && p.Settings.MinStoragePrice.IsZero() {
+		h.settings.MinStoragePrice = compatPersistence.Settings.MinStoragePrice
+	}
+	if !compatPersistence.Settings.MinUploadBandwidthPrice.IsZero() && p.Settings.MinUploadBandwidthPrice.IsZero() {
+		h.settings.MinUploadBandwidthPrice = compatPersistence.Settings.MinUploadBandwidthPrice
 	}
 	return nil
 }
