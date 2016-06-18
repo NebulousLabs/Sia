@@ -72,9 +72,25 @@ func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, er
 
 	// create downloader
 	d, err := proto.NewDownloader(host, contract)
+	if proto.IsRevisionMismatch(err) {
+		// try again with the cached revision
+		c.mu.RLock()
+		cachedRev, ok := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !ok {
+			// nothing we can do; return original error
+			return nil, err
+		}
+		c.log.Printf("host has different revision for %v; retrying with cached revision", contract.ID)
+		contract.LastRevision = cachedRev
+		d, err = proto.NewDownloader(host, contract)
+	}
 	if err != nil {
 		return nil, err
 	}
+	// supply a SaveFn that saves the revision to the contractor's persist
+	// (the existing revision will be overwritten when SaveFn is called)
+	d.SaveFn = c.saveRevision(contract.ID)
 
 	return &hostDownloader{
 		downloader: d,
