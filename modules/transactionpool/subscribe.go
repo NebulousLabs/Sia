@@ -42,3 +42,20 @@ func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.Transacti
 	}
 	subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
 }
+
+// Unsubscribe removes a subscriber from the transaction pool. If the
+// subscriber is not in tp.subscribers, Unsubscribe does nothing. If the
+// subscriber occurs more than once in tp.subscribers, only the earliest
+// occurrence is removed (unsubscription fails).
+func (tp *TransactionPool) Unsubscribe(subscriber modules.TransactionPoolSubscriber) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	// Search for and remove subscriber from list of subscribers.
+	for i := range tp.subscribers {
+		if tp.subscribers[i] == subscriber {
+			tp.subscribers = append(tp.subscribers[0:i], tp.subscribers[i+1:]...)
+			break
+		}
+	}
+}

@@ -2,11 +2,18 @@ package miner
 
 import (
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // threadedMine starts a gothread that does CPU mining. threadedMine is the
 // only function that should be setting the mining flag to true.
 func (m *Miner) threadedMine() {
+	if err := m.tg.Add(); err != nil {
+		return
+	}
+	defer m.tg.Done()
+
 	// There should not be another thread mining, and mining should be enabled.
 	m.mu.Lock()
 	if m.mining || !m.miningOn {
@@ -20,8 +27,15 @@ func (m *Miner) threadedMine() {
 	// occurring.
 	cycleStart := time.Now()
 	for {
-		// Kill the thread if mining has been turned off.
 		m.mu.Lock()
+		// Kill the thread if the miner's threadgroup is stopped.
+		if m.tg.IsStopped() {
+			m.miningOn = false
+			m.mining = false
+			m.mu.Unlock()
+			return
+		}
+		// Kill the thread if mining has been turned off.
 		if !m.miningOn {
 			m.mining = false
 			m.mu.Unlock()
@@ -54,6 +68,11 @@ func (m *Miner) threadedMine() {
 
 // CPUHashrate returns an estimated cpu hashrate.
 func (m *Miner) CPUHashrate() int {
+	if err := m.tg.Add(); err != nil {
+		build.Critical(err)
+	}
+	defer m.tg.Done()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return int(m.hashRate)
@@ -61,6 +80,11 @@ func (m *Miner) CPUHashrate() int {
 
 // CPUMining indicates whether the cpu miner is running.
 func (m *Miner) CPUMining() bool {
+	if err := m.tg.Add(); err != nil {
+		build.Critical(err)
+	}
+	defer m.tg.Done()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.miningOn
@@ -69,6 +93,11 @@ func (m *Miner) CPUMining() bool {
 // StartCPUMining will start a single threaded cpu miner. If the miner is
 // already running, nothing will happen.
 func (m *Miner) StartCPUMining() {
+	if err := m.tg.Add(); err != nil {
+		build.Critical(err)
+	}
+	defer m.tg.Done()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.miningOn = true
@@ -78,6 +107,11 @@ func (m *Miner) StartCPUMining() {
 // StopCPUMining will stop the cpu miner. If the cpu miner is already stopped,
 // nothing will happen.
 func (m *Miner) StopCPUMining() {
+	if err := m.tg.Add(); err != nil {
+		build.Critical(err)
+	}
+	defer m.tg.Done()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.hashRate = 0

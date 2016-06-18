@@ -73,7 +73,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !mg.CPUMining {
-		t.Error("cpu is not reporting through the api that it is mining.")
+		t.Error("cpu is not reporting through the api that it is mining")
 	}
 
 	// Stop the cpu miner and wait for the stop call to go through.
@@ -83,7 +83,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	if st.server.miner.CPUMining() {
-		t.Error("cpu miner is reporting that it is not on")
+		t.Error("cpu miner is reporting that it is on after being stopped")
 	}
 
 	// Check the numbers through the status api call.
@@ -92,7 +92,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	if mg.CPUMining {
-		t.Error("cpu is not reporting through the api that it is mining.")
+		t.Error("cpu is not reporting through the api that it is mining")
 	}
 }
 

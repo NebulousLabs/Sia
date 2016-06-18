@@ -95,6 +95,10 @@ type TransactionPool interface {
 	// Subscribers will receive all consensus set changes as well as
 	// transaction pool changes, and should not subscribe to both.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
+
+	// Unsubscribe removes a subscriber from the transaction pool.
+	// This is necessary for clean shutdown of the miner.
+	Unsubscribe(TransactionPoolSubscriber)
 }
 
 // ConsensusConflict implements the error interface, and indicates that a
