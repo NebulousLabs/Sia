@@ -137,9 +137,25 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
+	if proto.IsRevisionMismatch(err) {
+		// try again with the cached revision
+		c.mu.RLock()
+		cachedRev, ok := c.cachedRevisions[contract.ID]
+		c.mu.RUnlock()
+		if !ok {
+			// nothing we can do; return original error
+			return nil, err
+		}
+		c.log.Printf("host has different revision for %v; retrying with cached revision", contract.ID)
+		contract.LastRevision = cachedRev
+		e, err = proto.NewEditor(host, contract, height)
+	}
 	if err != nil {
 		return nil, err
 	}
+	// supply a SaveFn that saves the revision to the contractor's persist
+	// (the existing revision will be overwritten when SaveFn is called)
+	e.SaveFn = c.saveRevision(contract.ID)
 
 	return &hostEditor{
 		editor:     e,

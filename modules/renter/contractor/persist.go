@@ -9,6 +9,7 @@ import (
 type contractorPersist struct {
 	Allowance        modules.Allowance
 	BlockHeight      types.BlockHeight
+	CachedRevisions  []types.FileContractRevision
 	Contracts        []modules.RenterContract
 	LastChange       modules.ConsensusChangeID
 	RenewHeight      types.BlockHeight
@@ -23,6 +24,9 @@ func (c *Contractor) persistData() contractorPersist {
 		LastChange:       c.lastChange,
 		RenewHeight:      c.renewHeight,
 		FinancialMetrics: c.financialMetrics,
+	}
+	for _, rev := range c.cachedRevisions {
+		data.CachedRevisions = append(data.CachedRevisions, rev)
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
@@ -39,6 +43,9 @@ func (c *Contractor) load() error {
 	}
 	c.allowance = data.Allowance
 	c.blockHeight = data.BlockHeight
+	for _, rev := range data.CachedRevisions {
+		c.cachedRevisions[rev.ParentID] = rev
+	}
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
 	}
@@ -56,4 +63,15 @@ func (c *Contractor) save() error {
 // saveSync saves the Contractor persistence data to disk and then syncs to disk.
 func (c *Contractor) saveSync() error {
 	return c.persist.saveSync(c.persistData())
+}
+
+// saveRevision returns a function that saves a revision. It is used by the
+// Editor and Downloader types to prevent desynchronizing with their host.
+func (c *Contractor) saveRevision(id types.FileContractID) func(types.FileContractRevision) error {
+	return func(rev types.FileContractRevision) error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.cachedRevisions[id] = rev
+		return c.saveSync()
+	}
 }

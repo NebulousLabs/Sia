@@ -2,7 +2,6 @@ package proto
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"time"
 
@@ -71,7 +70,7 @@ func verifySettings(conn net.Conn, host modules.HostDBEntry) (modules.HostDBEntr
 }
 
 // verifyRecentRevision confirms that the host and contractor agree upon the current
-// state of the contract being revisde.
+// state of the contract being revised.
 func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error {
 	// send contract ID
 	if err := encoding.WriteObject(conn, contract.ID); err != nil {
@@ -102,12 +101,12 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error 
 	if err := encoding.ReadObject(conn, &hostSignatures, 2048); err != nil {
 		return errors.New("couldn't read host signatures: " + err.Error())
 	}
-	// check that revision number matches; if it does, do a more thorough
-	// check by comparing unlock hashes.
-	if lastRevision.NewRevisionNumber != contract.LastRevision.NewRevisionNumber {
-		return fmt.Errorf("our revision number (%v) does not match the host's (%v)", contract.LastRevision.NewRevisionNumber, lastRevision.NewRevisionNumber)
-	} else if lastRevision.UnlockConditions.UnlockHash() != contract.LastRevision.UnlockConditions.UnlockHash() {
+	// Check that the unlock hashes match; if they do not, something is
+	// seriously wrong. Otherwise, check that the revision numbers match.
+	if lastRevision.UnlockConditions.UnlockHash() != contract.LastRevision.UnlockConditions.UnlockHash() {
 		return errors.New("unlock conditions do not match")
+	} else if lastRevision.NewRevisionNumber != contract.LastRevision.NewRevisionNumber {
+		return &recentRevisionError{contract.LastRevision.NewRevisionNumber, lastRevision.NewRevisionNumber}
 	}
 	// NOTE: we can fake the blockheight here because it doesn't affect
 	// verification; it just needs to be above the fork height and below the

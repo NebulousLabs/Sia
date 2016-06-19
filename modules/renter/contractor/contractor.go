@@ -28,11 +28,12 @@ type Contractor struct {
 	tpool   transactionPool
 	wallet  wallet
 
-	allowance   modules.Allowance
-	blockHeight types.BlockHeight
-	contracts   map[types.FileContractID]modules.RenterContract
-	lastChange  modules.ConsensusChangeID
-	renewHeight types.BlockHeight // height at which to renew contracts
+	allowance       modules.Allowance
+	blockHeight     types.BlockHeight
+	cachedRevisions map[types.FileContractID]types.FileContractRevision
+	contracts       map[types.FileContractID]modules.RenterContract
+	lastChange      modules.ConsensusChangeID
+	renewHeight     types.BlockHeight // height at which to renew contracts
 
 	financialMetrics modules.RenterFinancialMetrics
 
@@ -102,7 +103,8 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		tpool:   tp,
 		wallet:  w,
 
-		contracts: make(map[types.FileContractID]modules.RenterContract),
+		cachedRevisions: make(map[types.FileContractID]types.FileContractRevision),
+		contracts:       make(map[types.FileContractID]modules.RenterContract),
 	}
 
 	// Load the prior persistence structures.

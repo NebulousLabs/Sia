@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	modWallet "github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -572,4 +573,104 @@ func TestIntegrationRenew(t *testing.T) {
 	if contract.FileContract.WindowStart != c.blockHeight+100 {
 		t.Fatal(contract.FileContract.WindowStart)
 	}
+}
+
+// TestResync tests that the contractor can resync with a host after being
+// interrupted during contract revision.
+func TestResync(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestResync")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// revise the contract
+	editor, err := c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// download the data
+	contract = c.contracts[contract.ID]
+	downloader, err := c.Downloader(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrieved, err := downloader.Sector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, retrieved) {
+		t.Fatal("downloaded data does not match original")
+	}
+	err = downloader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract = c.contracts[contract.ID]
+
+	// corrupt contract and delete its cachedRevision
+	badContract := contract
+	badContract.LastRevision.NewRevisionNumber--
+	badContract.LastRevisionTxn.TransactionSignatures = nil // delete signatures
+
+	c.mu.Lock()
+	delete(c.cachedRevisions, contract.ID)
+	c.mu.Unlock()
+
+	// Editor and Downloader should fail with the bad contract
+	_, err = c.Editor(badContract)
+	if !proto.IsRevisionMismatch(err) {
+		t.Fatal("expected revision mismatch, got", err)
+	}
+	_, err = c.Downloader(badContract)
+	if !proto.IsRevisionMismatch(err) {
+		t.Fatal("expected revision mismatch, got", err)
+	}
+
+	// add cachedRevision
+	c.mu.Lock()
+	c.cachedRevisions[contract.ID] = contract.LastRevision
+	c.mu.Unlock()
+
+	// Editor and Downloader should now succeed after loading the cachedRevision
+	editor, err = c.Editor(badContract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	editor.Close()
+
+	downloader, err = c.Downloader(badContract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloader.Close()
 }

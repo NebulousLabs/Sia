@@ -1,6 +1,8 @@
 package proto
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -34,4 +36,25 @@ type ContractParams struct {
 	EndHeight     types.BlockHeight
 	RefundAddress types.UnlockHash
 	// TODO: add optional keypair
+}
+
+// A revisionSaver is called just before we send our revision signature to the host; this
+// allows the revision to be reloaded later if we desync from the host.
+type revisionSaver func(types.FileContractRevision) error
+
+// A recentRevisionError occurs if the host reports a different revision
+// number than expected.
+type recentRevisionError struct {
+	ours, theirs uint64
+}
+
+func (e *recentRevisionError) Error() string {
+	return fmt.Sprintf("our revision number (%v) does not match the host's (%v)", e.ours, e.theirs)
+}
+
+// IsRevisionMismatch returns true if err was caused by the host reporting a
+// different revision number than expected.
+func IsRevisionMismatch(err error) bool {
+	_, ok := err.(*recentRevisionError)
+	return ok
 }

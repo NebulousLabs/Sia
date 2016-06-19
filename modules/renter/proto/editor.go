@@ -41,6 +41,8 @@ type Editor struct {
 	height   types.BlockHeight
 	contract modules.RenterContract // updated after each revision
 
+	SaveFn revisionSaver
+
 	// metrics
 	StorageSpending types.Currency
 	UploadSpending  types.Currency
@@ -49,6 +51,7 @@ type Editor struct {
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
 func (he *Editor) Close() error {
+	extendDeadline(he.conn, modules.NegotiateSettingsTime)
 	// don't care about these errors
 	_, _ = verifySettings(he.conn, he.host)
 	_ = modules.WriteNegotiationStop(he.conn)
@@ -59,6 +62,14 @@ func (he *Editor) Close() error {
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
 func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) error {
+	// if a SaveFn was provided, call it before doing any further I/O, because
+	// that's when we're most likely to experience failure
+	if he.SaveFn != nil {
+		if err := he.SaveFn(rev); err != nil {
+			return errors.New("failed to save unsigned revision: " + err.Error())
+		}
+	}
+
 	// initiate revision
 	if err := startRevision(he.conn, he.host); err != nil {
 		return err
@@ -228,10 +239,12 @@ func NewEditor(host modules.HostDBEntry, contract modules.RenterContract, curren
 	extendDeadline(conn, modules.NegotiateRecentRevisionTime)
 	defer extendDeadline(conn, time.Hour)
 	if err := encoding.WriteObject(conn, modules.RPCReviseContract); err != nil {
+		conn.Close()
 		return nil, errors.New("couldn't initiate RPC: " + err.Error())
 	}
 	if err := verifyRecentRevision(conn, contract); err != nil {
-		return nil, errors.New("revision exchange failed: " + err.Error())
+		conn.Close() // TODO: close gracefully if host has entered revision loop
+		return nil, err
 	}
 
 	// the host is now ready to accept revisions
