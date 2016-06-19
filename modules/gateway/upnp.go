@@ -66,7 +66,9 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
+	g.mu.RLock()
 	addr := modules.NetAddress(net.JoinHostPort(host, g.port))
+	g.mu.RUnlock()
 	if err := addr.IsValid(); err != nil {
 		g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
 		return
@@ -76,11 +78,11 @@ func (g *Gateway) threadedLearnHostname() {
 	g.myAddr = addr
 	g.mu.Unlock()
 
-	g.log.Println("INFO: our address is", g.myAddr)
+	g.log.Println("INFO: our address is", addr)
 }
 
 // threadedForwardPort adds a port mapping to the router.
-func (g *Gateway) threadedForwardPort() {
+func (g *Gateway) threadedForwardPort(port string) {
 	if err := g.threads.Add(); err != nil {
 		return
 	}
@@ -92,18 +94,18 @@ func (g *Gateway) threadedForwardPort() {
 
 	d, err := upnp.Discover()
 	if err != nil {
-		g.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found", g.port)
+		g.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found", port)
 		return
 	}
 
-	portInt, _ := strconv.Atoi(g.port)
+	portInt, _ := strconv.Atoi(port)
 	err = d.Forward(uint16(portInt), "Sia RPC")
 	if err != nil {
-		g.log.Printf("WARN: could not automatically forward port %s: %v", g.port, err)
+		g.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
 		return
 	}
 
-	g.log.Println("INFO: successfully forwarded port", g.port)
+	g.log.Println("INFO: successfully forwarded port", port)
 }
 
 // clearPort removes a port mapping from the router.

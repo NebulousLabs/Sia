@@ -411,9 +411,12 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 // managedConnectNewPeer connects to peers >= v1.0.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
+	g.mu.RLock()
+	port := g.port
+	g.mu.RUnlock()
 	// Send our dialable address to the peer so they can dial us back should we
 	// disconnect.
-	err := connectPortHandshake(conn, g.port)
+	err := connectPortHandshake(conn, port)
 	if err != nil {
 		return err
 	}

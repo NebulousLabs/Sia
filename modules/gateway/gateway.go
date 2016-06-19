@@ -152,7 +152,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	go g.threadedForwardPort()
+	go g.threadedForwardPort(g.port)
 	// Learn our external IP.
 	go g.threadedLearnHostname()
 
