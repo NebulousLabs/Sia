@@ -181,9 +181,12 @@ func TestStorageProofBoundaries(t *testing.T) {
 				badTxn := types.Transaction{
 					StorageProofs: []types.StorageProof{badSP},
 				}
+				if sp.Segment == badSP.Segment {
+					continue
+				}
 				err = cst.tpool.AcceptTransactionSet([]types.Transaction{badTxn})
 				if err == nil {
-					t.Fatal("bad storage proof got accepted into the transaction pool")
+					t.Fatal("An empty storage proof got into the transaction pool with non-empty data")
 				}
 			}
 
