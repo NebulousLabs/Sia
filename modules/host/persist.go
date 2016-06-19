@@ -171,6 +171,16 @@ func (h *Host) load() error {
 	}
 	h.unlockHash = p.UnlockHash
 
+	// Get the number of storage obligations by looking at the storage
+	// obligation database.
+	err = h.db.View(func(tx *bolt.Tx) error {
+		h.financialMetrics.ContractCount = uint64(tx.Bucket(bucketStorageObligations).Stats().KeyN)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
 	// COMPAT v1.0.0
 	//
 	// Load compatibility fields which may have data leftover. This call should
