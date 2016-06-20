@@ -178,6 +178,7 @@ func hostcmd() {
 	minuploadbandwidthprice:  %v / TB
 
 Host Financials:
+	Contract Count:               %v
 	Transaction Fee Compensation: %v
 	Transaction Fee Expenses:     %v
 
@@ -216,7 +217,7 @@ RPC Stats:
 			currencyUnits(is.MinStoragePrice.Mul(modules.BlockBytesPerMonthTerabyte)),
 			currencyUnits(is.MinUploadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
 
-			currencyUnits(fm.ContractCompensation),
+			fm.ContractCount, currencyUnits(fm.ContractCompensation),
 			currencyUnits(fm.TransactionFeeExpenses),
 
 			currencyUnits(fm.StorageRevenue),

@@ -372,6 +372,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 
 	// Update the host financial metrics with regards to this storage
 	// obligation.
+	h.financialMetrics.ContractCount++
 	h.financialMetrics.PotentialContractCompensation = h.financialMetrics.PotentialContractCompensation.Add(so.ContractCost)
 	h.financialMetrics.LockedStorageCollateral = h.financialMetrics.LockedStorageCollateral.Add(so.LockedCollateral)
 	h.financialMetrics.PotentialStorageRevenue = h.financialMetrics.PotentialStorageRevenue.Add(so.PotentialStorageRevenue)
@@ -537,6 +538,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	if sos == obligationConfused {
 		h.log.Critical("storage obligation confused!")
 	}
+	h.financialMetrics.ContractCount--
 	if sos == obligationRejected {
 		// Remove the obligation statistics as potential risk and income.
 		h.log.Printf("Rejecting storage obligation expiring at block %v, current height is %v. Potential revenue is %v.\n", so.expiration(), h.blockHeight, h.financialMetrics.PotentialContractCompensation.Add(h.financialMetrics.PotentialStorageRevenue).Add(h.financialMetrics.PotentialDownloadBandwidthRevenue).Add(h.financialMetrics.PotentialUploadBandwidthRevenue))
