@@ -60,6 +60,7 @@ func TestThreadedProbeHosts(t *testing.T) {
 	}
 	h := new(hostEntry)
 	h.NetAddress = "foo"
+	h.AcceptingContracts = true
 	h.PublicKey = types.SiaPublicKey{
 		Algorithm: types.SignatureEd25519,
 		Key:       pk[:],
@@ -112,7 +113,8 @@ func TestThreadedProbeHosts(t *testing.T) {
 			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
 			// write host settings
 			crypto.WriteSignedObject(ourConn, modules.HostExternalSettings{
-				NetAddress: "probed",
+				AcceptingContracts: true,
+				NetAddress:         "probed",
 			}, sk)
 			ourConn.Close()
 		}()

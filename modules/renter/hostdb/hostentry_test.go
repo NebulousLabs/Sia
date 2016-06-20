@@ -54,6 +54,7 @@ func TestActiveHosts(t *testing.T) {
 	h1 := new(hostEntry)
 	h1.NetAddress = "foo"
 	h1.Weight = types.NewCurrency64(1)
+	h1.AcceptingContracts = true
 	hdb.insertNode(h1)
 	if hosts := hdb.ActiveHosts(); len(hosts) != 1 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 1, len(hosts))
@@ -65,6 +66,7 @@ func TestActiveHosts(t *testing.T) {
 	h2 := new(hostEntry)
 	h2.NetAddress = "bar"
 	h2.Weight = types.NewCurrency64(1)
+	h2.AcceptingContracts = true
 	hdb.insertNode(h2)
 	if hosts := hdb.ActiveHosts(); len(hosts) != 2 {
 		t.Errorf("wrong number of hosts: expected %v, got %v", 2, len(hosts))
@@ -90,6 +92,7 @@ func TestAveragePrice(t *testing.T) {
 	h1.NetAddress = "foo"
 	h1.ContractPrice = types.NewCurrency64(100)
 	h1.Weight = baseWeight
+	h1.AcceptingContracts = true
 	hdb.insertNode(h1)
 	if avg := hdb.AveragePrice(); avg.Cmp(h1.ContractPrice) != 0 {
 		t.Error("average of one host should be that host's price:", avg)
@@ -100,6 +103,7 @@ func TestAveragePrice(t *testing.T) {
 	h2.NetAddress = "bar"
 	h2.ContractPrice = types.NewCurrency64(300)
 	h2.Weight = baseWeight
+	h2.AcceptingContracts = true
 	hdb.insertNode(h2)
 	if len(hdb.activeHosts) != 2 {
 		t.Error("host was not added:", hdb.activeHosts)
