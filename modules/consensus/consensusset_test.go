@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -169,6 +170,35 @@ func (cst *consensusSetTester) Close() error {
 		panic(err)
 	}
 	return nil
+}
+
+// TestClose tests that Close returns an err after it has been closed once.
+func TestClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	testdir := build.TempDir(modules.ConsensusDir, "TestClose")
+	g, err := gateway.New("localhost:0", build.TempDir(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	cs, err := New(g, build.TempDir(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cs.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cs.Close()
+	if err != sync.ErrStopped {
+		t.Fatalf("expected Close to err with sync.ErrStopped after it's already been closed, but it erred with: %v", err)
+	}
 }
 
 // TestNilInputs tries to create new consensus set modules using nil inputs.
