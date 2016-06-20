@@ -40,7 +40,6 @@ func (g *Gateway) removeNode(addr modules.NetAddress) error {
 		return errors.New("no record of that node")
 	}
 	delete(g.nodes, addr)
-	g.log.Println("INFO: removed node", addr)
 	return nil
 }
 
@@ -140,6 +139,7 @@ func (g *Gateway) threadedNodeManager() {
 			g.removeNode(node)
 			g.save()
 			g.mu.Unlock()
+			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
 			continue
 		}
 		// if connection succeeds, supply an unacceptable version to ensure
