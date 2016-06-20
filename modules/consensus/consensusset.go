@@ -152,6 +152,15 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 
+		// Unregister RPCs on Close.
+		cs.tg.OnStop(func() {
+			cs.gateway.UnregisterRPC("SendBlocks")
+			cs.gateway.UnregisterRPC("RelayBlock") // COMPATv0.5.1
+			cs.gateway.UnregisterRPC("RelayHeader")
+			cs.gateway.UnregisterRPC("SendBlk")
+			cs.gateway.UnregisterConnectCall("SendBlocks")
+		})
+
 		// Mark that we are synced with the network.
 		cs.mu.Lock()
 		cs.synced = true
@@ -201,14 +210,6 @@ func (cs *ConsensusSet) Close() error {
 
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-
-	if cs.synced {
-		cs.gateway.UnregisterRPC("SendBlocks")
-		cs.gateway.UnregisterRPC("RelayBlock") // COMPATv0.5.1
-		cs.gateway.UnregisterRPC("RelayHeader")
-		cs.gateway.UnregisterRPC("SendBlk")
-		cs.gateway.UnregisterConnectCall("SendBlocks")
-	}
 
 	var errs []error
 	if err := cs.db.Close(); err != nil {
