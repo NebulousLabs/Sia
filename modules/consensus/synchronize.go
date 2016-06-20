@@ -129,6 +129,11 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 
 // threadedReceiveBlocks is the calling end of the SendBlocks RPC.
 func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
+	if err := cs.tg.Add(); err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
@@ -237,6 +242,11 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
+	if err := cs.tg.Add(); err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
@@ -335,6 +345,11 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 // rpcRelayBlock is an RPC that accepts a block from a peer.
 // COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
+	if err := cs.tg.Add(); err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
@@ -368,6 +383,11 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 
 // rpcRelayHeader is an RPC that accepts a block header from a peer.
 func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
+	if err := cs.tg.Add(); err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Decode the block header from the connection.
 	var h types.BlockHeader
 	err := encoding.ReadObject(conn, &h, types.BlockHeaderSize)
@@ -417,6 +437,11 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 
 // rpcSendBlk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
+	if err := cs.tg.Add(); err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Decode the block id from the conneciton.
 	var id types.BlockID
 	err := encoding.ReadObject(conn, &id, crypto.HashSize)
