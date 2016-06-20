@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -80,6 +81,7 @@ type ConsensusSet struct {
 	db         *persist.BoltDatabase
 	log        *persist.Logger
 	mu         demotemutex.DemoteMutex
+	tg         sync.ThreadGroup
 	persistDir string
 }
 
@@ -131,6 +133,11 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	}
 
 	go func() {
+		if cs.tg.Add() != nil {
+			return
+		}
+		defer cs.tg.Done()
+
 		// Sync with the network. Don't sync if we are testing because typically we
 		// don't have any mock peers to synchronize with in testing.
 		// TODO: figure out a better way to conditionally do IBD. Otherwise this block will never be tested.
@@ -188,6 +195,10 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
+	if err := cs.tg.Stop(); err != nil {
+		return err
+	}
+
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
