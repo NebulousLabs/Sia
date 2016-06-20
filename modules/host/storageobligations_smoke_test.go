@@ -94,6 +94,12 @@ func TestBlankStorageObligation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The number of contracts reported by the host should be zero.
+	fm := ht.host.FinancialMetrics()
+	if fm.ContractCount != 0 {
+		t.Error("host does not start with 0 contracts:", fm.ContractCount)
+	}
+
 	// Start by adding a storage obligation to the host. To emulate conditions
 	// of a renter creating the first contract, the storage obligation has no
 	// data, but does have money.
@@ -117,6 +123,10 @@ func TestBlankStorageObligation(t *testing.T) {
 	// confirmed on the blockchain.
 	if so.OriginConfirmed {
 		t.Fatal("storage obligation should not yet be marked as confirmed, confirmation is on the way")
+	}
+	fm = ht.host.FinancialMetrics()
+	if fm.ContractCount != 1 {
+		t.Error("host should have 1 contract:", fm.ContractCount)
 	}
 
 	// Mine a block to confirm the transaction containing the storage
@@ -160,6 +170,10 @@ func TestBlankStorageObligation(t *testing.T) {
 	})
 	if err != errNoStorageObligation {
 		t.Fatal(err)
+	}
+	fm = ht.host.FinancialMetrics()
+	if fm.ContractCount != 0 {
+		t.Error("host should have 0 contracts, the contracts were all completed:", fm.ContractCount)
 	}
 }
 

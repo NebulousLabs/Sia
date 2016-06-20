@@ -27,6 +27,7 @@ type (
 	HostFinancialMetrics struct {
 		// Every time a renter forms a contract with a host, a contract fee is
 		// paid by the renter. These stats track the total contract fees.
+		ContractCount                 uint64         `json:"contractcount"`
 		ContractCompensation          types.Currency `json:"contractcompensation"`
 		PotentialContractCompensation types.Currency `json:"potentialcontractcompensation"`
 

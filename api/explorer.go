@@ -43,7 +43,7 @@ type (
 		StorageProofOutputs                      [][]types.SiacoinOutput   `json:"storageproofoutputs"`                      // outer array is per-payout
 		SiafundInputOutputs                      []types.SiafundOutput     `json:"siafundinputoutputs"`                      // the outputs being spent
 		SiafundOutputIDs                         []types.SiafundOutputID   `json:"siafundoutputids"`
-		SiaClaimOutputIDs                        []types.SiacoinOutputID   `json:"siafundclaimoutputids"`
+		SiafundClaimOutputIDs                    []types.SiacoinOutputID   `json:"siafundclaimoutputids"`
 	}
 
 	// ExplorerGET is the object returned as a response to a GET request to
@@ -164,7 +164,7 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 	}
 
 	for _, sfi := range txn.SiafundInputs {
-		et.SiaClaimOutputIDs = append(et.SiaClaimOutputIDs, sfi.ParentID.SiaClaimOutputID())
+		et.SiafundClaimOutputIDs = append(et.SiafundClaimOutputIDs, sfi.ParentID.SiaClaimOutputID())
 	}
 	return et
 }
