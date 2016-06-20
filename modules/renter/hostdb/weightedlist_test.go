@@ -100,6 +100,7 @@ func TestWeightedList(t *testing.T) {
 
 	// Create a bunch of host entries of equal weight.
 	var dbe modules.HostDBEntry
+	dbe.AcceptingContracts = true
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
 		dbe.NetAddress = fakeAddr(uint8(i))
@@ -177,6 +178,7 @@ func TestVariedWeights(t *testing.T) {
 	// per weight added to the tree, the total number of selections necessary
 	// will be tallied up as hosts are created.
 	var dbe modules.HostDBEntry
+	dbe.AcceptingContracts = true
 	hostCount := 5
 	expectedPerWeight := int(10e3)
 	selections := 0
@@ -285,6 +287,7 @@ func TestRandomHosts(t *testing.T) {
 	// Insert 3 hosts to be selected.
 	var dbe modules.HostDBEntry
 	dbe.NetAddress = fakeAddr(1)
+	dbe.AcceptingContracts = true
 	entry1 := hostEntry{
 		HostDBEntry: dbe,
 		Weight:      types.NewCurrency64(1),
@@ -364,4 +367,21 @@ func TestRandomHosts(t *testing.T) {
 		t.Error("doubled up")
 	}
 
+	// entry4 should not every be returned by RandomHosts because it is not
+	// accepting contracts.
+	dbe.NetAddress = fakeAddr(4)
+	dbe.AcceptingContracts = false
+	entry4 := hostEntry{
+		HostDBEntry: dbe,
+		Weight:      types.NewCurrency64(4),
+	}
+	hdb.insertNode(&entry4)
+	// Grab 4 random hosts. 3 should be returned.
+	randHosts = hdb.RandomHosts(4, nil)
+	if len(randHosts) != 3 {
+		t.Error("didn't get 3 hosts")
+	}
+	if randHosts[0].NetAddress == randHosts[1].NetAddress || randHosts[0].NetAddress == randHosts[2].NetAddress || randHosts[1].NetAddress == randHosts[2].NetAddress {
+		t.Error("doubled up")
+	}
 }
