@@ -43,6 +43,9 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// only attempt renewal if we are synced
 	// (harmless otherwise, since hosts will reject our renewal attempts, but very slow)
 	if c.cs.Synced() {
-		c.managedRenewContracts()
+		err := c.managedRenewContracts()
+		if err != nil {
+			c.log.Debugln("WARN: failed to renew contracts:", err)
+		}
 	}
 }
