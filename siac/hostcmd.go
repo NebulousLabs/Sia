@@ -117,14 +117,31 @@ sector may impact host revenue.`,
 // Prints info about the host and its storage folders.
 func hostcmd() {
 	hg := new(api.HostGET)
-	err := getAPI("/host", &hg)
+	err := getAPI("/host", hg)
 	if err != nil {
 		die("Could not fetch host settings:", err)
 	}
 	sg := new(api.StorageGET)
-	err = getAPI("/storage", &sg)
+	err = getAPI("/storage", sg)
 	if err != nil {
 		die("Could not fetch storage info:", err)
+	}
+
+	// Determine the competitive price string.
+	ah := new(api.ActiveHosts)
+	var competitivePrice string
+	err = getAPI("/renter/hosts/active?numhosts=24", ah)
+	if err != nil || len(ah.Hosts) == 0 {
+		competitivePrice = "Unavailable"
+	} else {
+		var sum types.Currency
+		for _, host := range ah.Hosts {
+			sum = sum.Add(host.StoragePrice)
+		}
+
+		// Divide by the number of hosts to get the average price, and then
+		// trim 5% to present what would be a competitive edge.
+		competitivePrice = currencyUnits(sum.Div64(uint64(len(ah.Hosts))).MulFloat(0.95).Mul(modules.BlockBytesPerMonthTerabyte))
 	}
 
 	es := hg.ExternalSettings
@@ -160,7 +177,10 @@ func hostcmd() {
 
 	if hostVerbose {
 		// describe net address
-		fmt.Printf(`Host Internal Settings:
+		fmt.Printf(`General Info:
+	Estimated Comptetitive Price: %v
+
+Host Internal Settings:
 	acceptingcontracts:   %v
 	maxduration:          %v Weeks
 	maxdownloadbatchsize: %v
@@ -203,6 +223,8 @@ RPC Stats:
 	Settings Calls:     %v
 	FormContract Calls: %v
 `,
+			competitivePrice,
+
 			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
 			filesizeUnits(int64(is.MaxDownloadBatchSize)),
 			filesizeUnits(int64(is.MaxReviseBatchSize)), netaddr,
@@ -237,6 +259,8 @@ RPC Stats:
 			nm.FormContractCalls)
 	} else {
 		fmt.Printf(`Host info:
+	Estimated Comptetitive Price: %v
+
 	Storage:      %v (%v used)
 	Price:        %v / TB / Month
 	Max Duration: %v Weeks
@@ -246,6 +270,8 @@ RPC Stats:
 	Locked Collateral:   %v
 	Revenue:             %v
 `,
+			competitivePrice,
+
 			filesizeUnits(int64(totalstorage)),
 			filesizeUnits(int64(totalstorage-storageremaining)), price,
 			periodUnits(is.MaxDuration),
