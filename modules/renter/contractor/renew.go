@@ -80,20 +80,9 @@ func (c *Contractor) managedRenewContracts() error {
 	for _, contract := range renewSet {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
-			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
+			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)
 		} else {
 			newContracts[contract.ID] = newContract
-		}
-	}
-
-	// if we did not renew enough contracts, form new ones
-	if remaining := len(newContracts) - len(renewSet); remaining > 0 {
-		formed, err := c.managedFormContracts(remaining, numSectors, endHeight)
-		if err != nil {
-			c.log.Println("WARN: failed to form new contracts during auto-renew:", err)
-		}
-		for _, contract := range formed {
-			newContracts[contract.ID] = contract
 		}
 	}
 
