@@ -41,9 +41,13 @@ type (
 	}
 
 	// A PeerConn is the connection type used when communicating with peers during
-	// an RPC. For now it is identical to a net.Conn.
+	// an RPC. It is identical to a net.Conn with the additional RPCAddr method.
+	// This method acts as an identifier for peers and is the address that the
+	// peer can be dialed on. It is also the address that should be used when
+	// calling an RPC on the peer.
 	PeerConn interface {
 		net.Conn
+		RPCAddr() NetAddress
 	}
 
 	// RPCFunc is the type signature of functions that handle RPCs. It is used for

@@ -23,7 +23,7 @@ func TestAddNode(t *testing.T) {
 	if err := g.addNode(dummyNode); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
-	if err := g.addNode(dummyNode); err == nil {
+	if err := g.addNode(dummyNode); err != errNodeExists {
 		t.Error("addNode added duplicate node")
 	}
 	if err := g.addNode("foo"); err == nil {
@@ -34,6 +34,9 @@ func TestAddNode(t *testing.T) {
 	}
 	if err := g.addNode("[::]:9981"); err == nil {
 		t.Error("addNode added unspecified address")
+	}
+	if err := g.addNode(g.myAddr); err != errOurAddress {
+		t.Error("addNode added our own address")
 	}
 }
 
@@ -176,7 +179,7 @@ func TestShareNodes(t *testing.T) {
 	// SharePeers should now return no peers
 	var nodes []modules.NetAddress
 	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +198,7 @@ func TestShareNodes(t *testing.T) {
 		}
 	}
 	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -205,20 +208,19 @@ func TestShareNodes(t *testing.T) {
 	}
 }
 
-func TestRelayNodes(t *testing.T) {
+// TestNodesAreSharedOnConnect tests that nodes that a gateway has never seen
+// before are added to the node list when connecting to another gateway that
+// has seen said nodes.
+func TestNodesAreSharedOnConnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	g1 := newTestingGateway("TestRelayNodes1", t)
+	g1 := newTestingGateway("TestNodesAreSharedOnConnect1", t)
 	defer g1.Close()
-	g2 := newTestingGateway("TestRelayNodes2", t)
+	g2 := newTestingGateway("TestNodesAreSharedOnConnect2", t)
 	defer g2.Close()
-	g3 := newTestingGateway("TestRelayNodes3", t)
+	g3 := newTestingGateway("TestNodesAreSharedOnConnect3", t)
 	defer g3.Close()
-
-	// normally the Gateway will only register this RPC if has discovered its
-	// IP through external means.
-	g3.RegisterConnectCall("RelayNode", g3.sendAddress)
 
 	// connect g2 to g1
 	err := g2.Connect(g1.Address())
@@ -232,11 +234,11 @@ func TestRelayNodes(t *testing.T) {
 		t.Fatal("couldn't connect:", err)
 	}
 
-	// g2 should have received g3's address from g1
+	// g3 should have received g2's address from g1
 	time.Sleep(200 * time.Millisecond)
-	g2.mu.Lock()
-	defer g2.mu.Unlock()
-	if _, ok := g2.nodes[g3.Address()]; !ok {
-		t.Fatal("node was not relayed:", g2.nodes)
+	g3.mu.Lock()
+	defer g3.mu.Unlock()
+	if _, ok := g3.nodes[g2.Address()]; !ok {
+		t.Fatal("node was not relayed:", g3.nodes)
 	}
 }

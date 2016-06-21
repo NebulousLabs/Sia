@@ -12,18 +12,24 @@ import (
 
 const (
 	maxSharedNodes = 10
-	maxAddrLength  = 100
 	minPeers       = 3
+)
+
+var (
+	errNodeExists = errors.New("node already added")
+	errOurAddress = errors.New("can't add our own address")
 )
 
 // addNode adds an address to the set of nodes on the network.
 func (g *Gateway) addNode(addr modules.NetAddress) error {
-	if _, exists := g.nodes[addr]; exists {
-		return errors.New("node already added")
-	} else if net.ParseIP(addr.Host()) == nil {
-		return errors.New("address is not routable: " + string(addr))
+	if addr == g.myAddr {
+		return errOurAddress
+	} else if _, exists := g.nodes[addr]; exists {
+		return errNodeExists
 	} else if addr.IsValid() != nil {
 		return errors.New("address is not valid: " + string(addr))
+	} else if net.ParseIP(addr.Host()) == nil {
+		return errors.New("address must be an IP address: " + string(addr))
 	}
 	g.nodes[addr] = struct{}{}
 	return nil
@@ -34,7 +40,6 @@ func (g *Gateway) removeNode(addr modules.NetAddress) error {
 		return errors.New("no record of that node")
 	}
 	delete(g.nodes, addr)
-	g.log.Println("INFO: removed node", addr)
 	return nil
 }
 
@@ -70,60 +75,19 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 // requestNodes is the calling end of the ShareNodes RPC.
 func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	var nodes []modules.NetAddress
-	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength); err != nil {
+	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength); err != nil {
 		return err
 	}
 	g.mu.Lock()
 	for _, node := range nodes {
 		err := g.addNode(node)
-		if err != nil {
-			g.log.Printf("WARN: peer '%v' send the invalid addr '%v'", conn.RemoteAddr(), node)
+		if err != nil && err != errNodeExists && err != errOurAddress {
+			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RPCAddr(), node)
 		}
 	}
 	g.save()
 	g.mu.Unlock()
 	return nil
-}
-
-// relayNode is the recipient end of the RelayNode RPC. It reads a node, adds
-// it to the Gateway's node list, and relays it to each of the Gateway's
-// peers. If the node is already in the node list, it is not relayed.
-func (g *Gateway) relayNode(conn modules.PeerConn) error {
-	// read address
-	var addr modules.NetAddress
-	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
-		return err
-	}
-	// add node
-	err := func() error {
-		// We wrap this logic in an anonymous function so we can defer Unlock to
-		// avoid managing locks across branching.
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		if err := g.addNode(addr); err != nil {
-			return err
-		}
-		if err := g.save(); err != nil {
-			return err
-		}
-		return nil
-	}()
-	if err != nil {
-		return err
-	}
-	// relay
-	peers := g.Peers()
-	go g.Broadcast("RelayNode", addr, peers)
-	return nil
-}
-
-// sendAddress is the calling end of the RelayNode RPC.
-func (g *Gateway) sendAddress(conn modules.PeerConn) error {
-	// don't send if we aren't connectible
-	if g.Address().IsValid() != nil {
-		return errors.New("can't send address without knowing external IP")
-	}
-	return encoding.WriteObject(conn, g.Address())
 }
 
 // threadedNodeManager tries to keep the Gateway's node list healthy. As long
@@ -175,6 +139,7 @@ func (g *Gateway) threadedNodeManager() {
 			g.removeNode(node)
 			g.save()
 			g.mu.Unlock()
+			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
 			continue
 		}
 		// if connection succeeds, supply an unacceptable version to ensure
