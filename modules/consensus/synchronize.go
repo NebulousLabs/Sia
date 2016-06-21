@@ -236,12 +236,12 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 	return nil
 }
 
-// rpcSendBlocks is the receiving end of the SendBlocks RPC. It returns a
-// sequential set of blocks based on the 32 input block IDs. The most recent
+// threadedRPCSendBlocks is the receiving end of the SendBlocks RPC. It returns
+// a sequential set of blocks based on the 32 input block IDs. The most recent
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
-func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
+func (cs *ConsensusSet) threadedRPCSendBlocks(conn modules.PeerConn) error {
 	if err := cs.tg.Add(); err != nil {
 		return err
 	}
@@ -342,9 +342,9 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// rpcRelayBlock is an RPC that accepts a block from a peer.
+// threadedRPCRelayBlock is an RPC that accepts a block from a peer.
 // COMPATv0.5.1
-func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
+func (cs *ConsensusSet) threadedRPCRelayBlock(conn modules.PeerConn) error {
 	if err := cs.tg.Add(); err != nil {
 		return err
 	}
@@ -381,8 +381,8 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	return nil
 }
 
-// rpcRelayHeader is an RPC that accepts a block header from a peer.
-func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
+// threadedRPCRelayHeader is an RPC that accepts a block header from a peer.
+func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	if err := cs.tg.Add(); err != nil {
 		return err
 	}
@@ -435,8 +435,9 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	return nil
 }
 
-// rpcSendBlk is an RPC that sends the requested block to the requesting peer.
-func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
+// threadedRPCSendBlk is an RPC that sends the requested block to the
+// requesting peer.
+func (cs *ConsensusSet) threadedRPCSendBlk(conn modules.PeerConn) error {
 	if err := cs.tg.Add(); err != nil {
 		return err
 	}

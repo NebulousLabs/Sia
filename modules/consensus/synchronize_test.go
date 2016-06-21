@@ -662,8 +662,8 @@ func (mockPeerConnFailingWriter) Write([]byte) (int, error) {
 	return 0, errFailingWriter
 }
 
-// TestSendBlk probes the ConsensusSet.rpcSendBlk method and tests that it
-// correctly receives block ids and writes out the corresponding blocks.
+// TestSendBlk probes the ConsensusSet.threadedRPCSendBlk method and tests that
+// it correctly receives block ids and writes out the corresponding blocks.
 func TestSendBlk(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -690,7 +690,7 @@ func TestSendBlk(t *testing.T) {
 			conn:    mockPeerConnFailingReader{PeerConn: p1},
 			fn:      func() { fnErr <- nil },
 			errWant: errFailingReader,
-			msg:     "expected rpcSendBlk to error with a failing reader conn",
+			msg:     "expected threadedRPCSendBlk to error with a failing reader conn",
 		},
 		// Test with a block id not found in the blockmap.
 		{
@@ -700,7 +700,7 @@ func TestSendBlk(t *testing.T) {
 				fnErr <- encoding.WriteObject(p2, types.BlockID{})
 			},
 			errWant: errNilItem,
-			msg:     "expected rpcSendBlk to error with a nonexistent block id",
+			msg:     "expected threadedRPCSendBlk to error with a nonexistent block id",
 		},
 		// Test with a failing writer.
 		{
@@ -710,7 +710,7 @@ func TestSendBlk(t *testing.T) {
 				fnErr <- encoding.WriteObject(p2, types.GenesisID)
 			},
 			errWant: errFailingWriter,
-			msg:     "expected rpcSendBlk to error with a failing writer conn",
+			msg:     "expected threadedRPCSendBlk to error with a failing writer conn",
 		},
 		// Test with a valid conn and valid block.
 		{
@@ -728,18 +728,18 @@ func TestSendBlk(t *testing.T) {
 				}
 				// Verify the block is the expected block.
 				if block.ID() != types.GenesisID {
-					fnErr <- fmt.Errorf("rpcSendBlk wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisID, block.ID())
+					fnErr <- fmt.Errorf("threadedRPCSendBlk wrote a different block to conn than the block requested. requested block id: %v, received block id: %v", types.GenesisID, block.ID())
 				}
 
 				fnErr <- nil
 			},
 			errWant: nil,
-			msg:     "expected rpcSendBlk to succeed with a valid conn and valid block",
+			msg:     "expected threadedRPCSendBlk to succeed with a valid conn and valid block",
 		},
 	}
 	for _, tt := range tests {
 		go tt.fn()
-		err := cst.cs.rpcSendBlk(tt.conn)
+		err := cst.cs.threadedRPCSendBlk(tt.conn)
 		if err != tt.errWant {
 			t.Errorf("%s: expected to fail with `%v', got: `%v'", tt.msg, tt.errWant, err)
 		}
@@ -974,9 +974,9 @@ func (g *mockGatewayCallsRPC) RPC(addr modules.NetAddress, name string, fn modul
 	return nil
 }
 
-// TestRelayHeader tests that rpcRelayHeader requests the corresponding blocks
-// to valid headers with known parents, or requests the block history to orphan
-// headers.
+// TestRelayHeader tests that threadedRPCRelayHeader requests the corresponding
+// blocks to valid headers with known parents, or requests the block history to
+// orphan headers.
 func TestRelayHeader(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -995,13 +995,13 @@ func TestRelayHeader(t *testing.T) {
 
 	p1, p2 := net.Pipe()
 
-	// Valid block that rpcRelayHeader should accept.
+	// Valid block that threadedRPCRelayHeader should accept.
 	validBlock, err := cst.miner.FindBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// A block in the near future that rpcRelayHeader return an error for, but
+	// A block in the near future that threadedRPCRelayHeader return an error for, but
 	// still request the corresponding block.
 	block, target, err := cst.miner.BlockForWork()
 	if err != nil {
@@ -1017,35 +1017,35 @@ func TestRelayHeader(t *testing.T) {
 		rpcWant string
 		rpcMSG  string
 	}{
-		// Test that rpcRelayHeader rejects known blocks.
+		// Test that threadedRPCRelayHeader rejects known blocks.
 		{
 			header:  types.GenesisBlock.Header(),
 			errWant: modules.ErrBlockKnown,
-			errMSG:  "rpcRelayHeader should reject headers to known blocks",
+			errMSG:  "threadedRPCRelayHeader should reject headers to known blocks",
 		},
-		// Test that rpcRelayHeader requests the parent blocks of orphan headers.
+		// Test that threadedRPCRelayHeader requests the parent blocks of orphan headers.
 		{
 			header:  types.BlockHeader{},
 			errWant: nil,
-			errMSG:  "rpcRelayHeader should not return an error for orphan headers",
+			errMSG:  "threadedRPCRelayHeader should not return an error for orphan headers",
 			rpcWant: "SendBlocks",
-			rpcMSG:  "rpcRelayHeader should request blocks when the relayed header is an orphan",
+			rpcMSG:  "threadedRPCRelayHeader should request blocks when the relayed header is an orphan",
 		},
-		// Test that rpcRelayHeader accepts a valid header that extends the longest chain.
+		// Test that threadedRPCRelayHeader accepts a valid header that extends the longest chain.
 		{
 			header:  validBlock.Header(),
 			errWant: nil,
-			errMSG:  "rpcRelayHeader should accept a valid header",
+			errMSG:  "threadedRPCRelayHeader should accept a valid header",
 			rpcWant: "SendBlk",
-			rpcMSG:  "rpcRelayHeader should request the block of a valid header",
+			rpcMSG:  "threadedRPCRelayHeader should request the block of a valid header",
 		},
-		// Test that rpcRelayHeader requests a future, but otherwise valid block.
+		// Test that threadedRPCRelayHeader requests a future, but otherwise valid block.
 		{
 			header:  futureBlock.Header(),
 			errWant: nil,
-			errMSG:  "rpcRelayHeader should not return an error for a future header",
+			errMSG:  "threadedRPCRelayHeader should not return an error for a future header",
 			rpcWant: "SendBlk",
-			rpcMSG:  "rpcRelayHeader should request the corresponding block to a future, but otherwise valid header",
+			rpcMSG:  "threadedRPCRelayHeader should request the corresponding block to a future, but otherwise valid header",
 		},
 	}
 	errChan := make(chan error)
@@ -1053,7 +1053,7 @@ func TestRelayHeader(t *testing.T) {
 		go func() {
 			errChan <- encoding.WriteObject(p1, tt.header)
 		}()
-		err = cst.cs.rpcRelayHeader(p2)
+		err = cst.cs.threadedRPCRelayHeader(p2)
 		if err != tt.errWant {
 			t.Errorf("%s: expected '%v', got '%v'", tt.errMSG, tt.errWant, err)
 		}

@@ -146,10 +146,10 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		}
 
 		// Register RPCs
-		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
-		gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock) // COMPATv0.5.1
-		gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
-		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
+		gateway.RegisterRPC("SendBlocks", cs.threadedRPCSendBlocks)
+		gateway.RegisterRPC("RelayBlock", cs.threadedRPCRelayBlock) // COMPATv0.5.1
+		gateway.RegisterRPC("RelayHeader", cs.threadedRPCRelayHeader)
+		gateway.RegisterRPC("SendBlk", cs.threadedRPCSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 
 		// Unregister RPCs on Close.
