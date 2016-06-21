@@ -23,7 +23,6 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Create 8 remote peers.
 	remoteCSTs := make([]*consensusSetTester, 8)
