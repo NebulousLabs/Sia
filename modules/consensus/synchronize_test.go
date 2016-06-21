@@ -54,9 +54,9 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// blockchains should now match
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		if cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(250 * time.Millisecond)
 		}
 	}
 	if cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
@@ -70,7 +70,7 @@ func TestSynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+50 {
+	for cst2.cs.dbBlockHeight() < cst1.cs.dbBlockHeight()+3+MaxCatchUpBlocks {
 		b, _ := cst2.miner.FindBlock()
 		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
@@ -84,7 +84,7 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// block heights should now match
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		if cst1.cs.dbBlockHeight() != cst2.cs.dbBlockHeight() {
 			time.Sleep(250 * time.Millisecond)
 		}
@@ -105,7 +105,7 @@ func TestSynchronize(t *testing.T) {
 
 	// Sleep for a few seconds to allow the network call between the two time
 	// to occur.
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	if cst1.cs.dbBlockHeight() == cst2.cs.dbBlockHeight() {
 		t.Fatal("cst1 did not reject bad block")
 	}
