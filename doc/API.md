@@ -297,16 +297,16 @@ provided hash.
 Gateway
 -------
 
-| Route                                                                 | HTTP verb |
-| --------------------------------------------------------------------- | --------- |
-| [/gateway](#gateway-get)                                              | GET       |
-| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post)       | POST      |
-| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post) | POST      |
+| Route                                                                         | HTTP verb |
+| ----------------------------------------------------------------------------- | --------- |
+| [/gateway](#gateway-get-example)                                              | GET       |
+| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post-example)       | POST      |
+| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post-example) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Gateway.md](/doc/api/Gateway.md).
 
-#### /gateway [GET] [(example)](/doc/api/Gateway.md#gateway-info-example)
+#### /gateway [GET] [(example)](/doc/api/Gateway.md#gateway-info)
 
 returns information about the gateway, including the list of connected peers.
 
@@ -322,7 +322,7 @@ returns information about the gateway, including the list of connected peers.
 }
 ```
 
-#### /gateway/connect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#connect-example)
+#### /gateway/connect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
 
 connects the gateway to a peer. The peer is added to the node list if it is not
 already present. The node list is the list of all nodes the gateway knows
@@ -337,7 +337,7 @@ about, but is not necessarily connected to.
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /gateway/disconnect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#disconnect-example)
+#### /gateway/disconnect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
 
 disconnects the gateway from a peer. The peer remains in the node list.
 
