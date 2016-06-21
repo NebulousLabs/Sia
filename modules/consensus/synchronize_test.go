@@ -54,8 +54,13 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// blockchains should now match
-	for cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < 20; i++ {
+		if cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	if cst1.cs.dbCurrentBlockID() != cst2.cs.dbCurrentBlockID() {
+		t.Fatal("Synchronize failed")
 	}
 
 	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst1.
@@ -79,8 +84,13 @@ func TestSynchronize(t *testing.T) {
 	}
 
 	// block heights should now match
-	for cst1.cs.dbBlockHeight() != cst2.cs.dbBlockHeight() {
-		time.Sleep(250 * time.Millisecond)
+	for i := 0; i < 20; i++ {
+		if cst1.cs.dbBlockHeight() != cst2.cs.dbBlockHeight() {
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+	if cst1.cs.dbBlockHeight() != cst2.cs.dbBlockHeight() {
+		t.Fatal("synchronize failed")
 	}
 
 	// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
