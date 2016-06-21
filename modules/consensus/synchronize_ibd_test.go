@@ -397,7 +397,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		gatewayTimesouts[i] = tmpG
 		err = cs.gateway.Connect(gatewayTimesouts[i].Address())
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("connecting to timesout peer %v failed: %v", i, err)
 		}
 	}
 	go func() {
@@ -429,7 +429,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		gatewayNoTimeouts[i] = tmpG
 		err = cs.gateway.Connect(gatewayNoTimeouts[i].Address())
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("connecting to no time out peer %v failed: %v", i, err)
 		}
 	}
 	go func() {

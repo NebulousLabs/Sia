@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -80,6 +81,7 @@ type ConsensusSet struct {
 	db         *persist.BoltDatabase
 	log        *persist.Logger
 	mu         demotemutex.DemoteMutex
+	tg         sync.ThreadGroup
 	persistDir string
 }
 
@@ -131,6 +133,11 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	}
 
 	go func() {
+		if cs.tg.Add() != nil {
+			return
+		}
+		defer cs.tg.Done()
+
 		// Sync with the network. Don't sync if we are testing because typically we
 		// don't have any mock peers to synchronize with in testing.
 		// TODO: figure out a better way to conditionally do IBD. Otherwise this block will never be tested.
@@ -139,11 +146,20 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		}
 
 		// Register RPCs
-		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
-		gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock) // COMPATv0.5.1
-		gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
-		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
+		gateway.RegisterRPC("SendBlocks", cs.threadedRPCSendBlocks)
+		gateway.RegisterRPC("RelayBlock", cs.threadedRPCRelayBlock) // COMPATv0.5.1
+		gateway.RegisterRPC("RelayHeader", cs.threadedRPCRelayHeader)
+		gateway.RegisterRPC("SendBlk", cs.threadedRPCSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+
+		// Unregister RPCs on Close.
+		cs.tg.OnStop(func() {
+			cs.gateway.UnregisterRPC("SendBlocks")
+			cs.gateway.UnregisterRPC("RelayBlock") // COMPATv0.5.1
+			cs.gateway.UnregisterRPC("RelayHeader")
+			cs.gateway.UnregisterRPC("SendBlk")
+			cs.gateway.UnregisterConnectCall("SendBlocks")
+		})
 
 		// Mark that we are synced with the network.
 		cs.mu.Lock()
@@ -188,16 +204,12 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
+	if err := cs.tg.Stop(); err != nil {
+		return err
+	}
+
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-
-	if cs.synced {
-		cs.gateway.UnregisterRPC("SendBlocks")
-		cs.gateway.UnregisterRPC("RelayBlock") // COMPATv0.5.1
-		cs.gateway.UnregisterRPC("RelayHeader")
-		cs.gateway.UnregisterRPC("SendBlk")
-		cs.gateway.UnregisterConnectCall("SendBlocks")
-	}
 
 	var errs []error
 	if err := cs.db.Close(); err != nil {

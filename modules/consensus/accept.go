@@ -236,6 +236,11 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			// a new block to the cache.
 			if err == errFutureTimestamp {
 				go func() {
+					if cs.tg.Add() != nil {
+						return
+					}
+					defer cs.tg.Done()
+
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
 					err := cs.AcceptBlock(b)
 					if err != nil {
