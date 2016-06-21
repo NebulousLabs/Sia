@@ -9,7 +9,7 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed sicoin
+// TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed siacoin
 // output that has a bad maturity height and triggers a panic.
 func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 	if testing.Short() {
@@ -20,6 +20,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.Close()
 
 	// Trigger an inconsistency check.
 	defer func() {
@@ -55,6 +56,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.Close()
 	pb := cst.cs.dbCurrentProcessedBlock()
 	_ = cst.cs.db.Update(func(tx *bolt.Tx) error {
 		commitDiffSet(tx, pb, modules.DiffRevert) // pull the block node out of the consensus set.
@@ -168,6 +170,7 @@ func TestCommitSiacoinOutputDiff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.Close()
 
 	// Commit a siacoin output diff.
 	initialScosLen := cst.cs.db.lenSiacoinOutputs()

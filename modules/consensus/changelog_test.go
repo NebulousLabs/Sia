@@ -21,6 +21,7 @@ func TestIntegrationChangeLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.Close()
 
 	// Add a mocked subscriber and check that it receives the correct number of
 	// blocks.
@@ -53,6 +54,6 @@ func TestIntegrationChangeLog(t *testing.T) {
 		t.Error("subscribers have inconsistent update chains")
 	}
 	if len(ms.updates) != len(behindSubscriber.updates) {
-		t.Error("subscribers have inconsisitent update chains")
+		t.Error("subscribers have inconsistent update chains")
 	}
 }
