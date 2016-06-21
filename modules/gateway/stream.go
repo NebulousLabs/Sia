@@ -34,9 +34,9 @@ func newMuxadoV1Client(conn net.Conn) muxadoAdaptor {
 }
 
 func newMuxadoV2Server(conn net.Conn) muxadov2.Session {
-	return muxadov2.Server(conn, nil)
+	return muxadov2.Server(conn, &muxadov2.Config{})
 }
 
 func newMuxadoV2Client(conn net.Conn) muxadov2.Session {
-	return muxadov2.Client(conn, nil)
+	return muxadov2.Client(conn, &muxadov2.Config{})
 }
