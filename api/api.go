@@ -151,10 +151,12 @@ func (srv *Server) initAPI(password string) {
 		router.GET("/renter/downloads", srv.renterDownloadsHandler)
 		router.GET("/renter/files", srv.renterFilesHandler)
 
-		router.POST("/renter/load", requirePassword(srv.renterLoadHandler, password))
-		router.POST("/renter/loadascii", requirePassword(srv.renterLoadAsciiHandler, password))
-		router.GET("/renter/share", requirePassword(srv.renterShareHandler, password))
-		router.GET("/renter/shareascii", requirePassword(srv.renterShareAsciiHandler, password))
+		// TODO: re-enable these routes once the new .sia format has been
+		// standardized and implemented.
+		// router.POST("/renter/load", requirePassword(srv.renterLoadHandler, password))
+		// router.POST("/renter/loadascii", requirePassword(srv.renterLoadAsciiHandler, password))
+		// router.GET("/renter/share", requirePassword(srv.renterShareHandler, password))
+		// router.GET("/renter/shareascii", requirePassword(srv.renterShareAsciiHandler, password))
 
 		router.POST("/renter/delete/*siapath", requirePassword(srv.renterDeleteHandler, password))
 		router.GET("/renter/download/*siapath", requirePassword(srv.renterDownloadHandler, password))
