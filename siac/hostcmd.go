@@ -25,25 +25,27 @@ var (
 		Use:   "config [setting] [value]",
 		Short: "Modify host settings",
 		Long: `Modify host settings.
+
 Available settings:
+     acceptingcontracts:       boolean
+     maxduration:              blocks
+     maxdownloadbatchsize:     int
+     maxrevisebatchsize:       int
+     netaddress:               string
+     windowsize:               blocks
 
-Parameter                        Unit
+     collateral:               currency
+     collateralbudget:         currency
+     maxcollateral:            currency
 
-acceptingcontracts               boolean
-collateral                       currency/TB
-collateralbudget                 currency
-maxcollateral                    currency
-maxdownloadbatchsize             int
-maxduration                      int
-maxrevisebatchsize               int
-mincontractprice                 currency
-mindownloadbandwidthprice        currency/TB
-minstorageprice                  currency/TB/month
-minuploadbandwidthprice          currency/TB
-netaddress                       string
-windowsize                       int
+     mincontractprice:         currency
+     mindownloadbandwithprice: currency / TB
+     minstorageprice:          currency / TB / Month
+     minuploadbandwidthprice:  currency / TB
 
 Currency units can be specified, e.g. 10SC; run 'siac help wallet' for details.
+
+Blocks are approximately 10 minutes each.
 
 For a description of each parameter, see doc/API.md.
 

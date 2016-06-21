@@ -17,6 +17,7 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.Close()
 	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Backtrack from the current node to the blockchain.
@@ -69,6 +70,7 @@ func TestRevertToNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.Close()
 	pb := cst.cs.dbCurrentProcessedBlock()
 
 	// Revert to a grandparent and verify the returned array is correct.

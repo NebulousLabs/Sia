@@ -58,6 +58,9 @@ func TestAddress(t *testing.T) {
 	}
 	host := modules.NetAddress(g.listener.Addr().String()).Host()
 	ip := net.ParseIP(host)
+	if ip == nil {
+		t.Fatal("address is not an IP address")
+	}
 	if ip.IsUnspecified() {
 		t.Fatal("expected a non-unspecified address")
 	}

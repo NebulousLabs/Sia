@@ -107,6 +107,36 @@ func TestListen(t *testing.T) {
 	// a simple 'conn.Close' would not obey the muxado disconnect protocol
 	muxado.Client(conn).Close()
 
+	// compliant connect with invalid port
+	conn, err = net.Dial("tcp", string(g.Address()))
+	if err != nil {
+		t.Fatal("dial failed:", err)
+	}
+	addr = modules.NetAddress(conn.LocalAddr().String())
+	ack, err = connectVersionHandshake(conn, build.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ack != build.Version {
+		t.Fatal("gateway should have given ack")
+	}
+	err = connectPortHandshake(conn, "0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		g.mu.RLock()
+		_, ok := g.peers[addr]
+		g.mu.RUnlock()
+		if ok {
+			t.Fatal("gateway should not have added a peer with an invalid port")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// a simple 'conn.Close' would not obey the muxado disconnect protocol
+	muxado.Client(conn).Close()
+
 	// compliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
 	if err != nil {
@@ -119,6 +149,10 @@ func TestListen(t *testing.T) {
 	}
 	if ack != build.Version {
 		t.Fatal("gateway should have given ack")
+	}
+	err = connectPortHandshake(conn, addr.Port())
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// g should add the peer
@@ -298,6 +332,58 @@ func TestUnitAcceptableVersion(t *testing.T) {
 		err := acceptableVersion(v)
 		if err != nil {
 			t.Errorf("acceptableVersion returned %q for version %q, but expected nil", err, v)
+		}
+	}
+}
+
+// TestConnectRejectsInvalidAddrs tests that Connect only connects to valid IP
+// addresses.
+func TestConnectRejectsInvalidAddrs(t *testing.T) {
+	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
+	defer g.Close()
+
+	g2 := newTestingGateway("TestConnectRejectsInvalidAddrs2", t)
+	defer g2.Close()
+
+	_, g2Port, err := net.SplitHostPort(string(g2.Address()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		addr    modules.NetAddress
+		wantErr bool
+		msg     string
+	}{
+		{
+			addr:    "127.0.0.1:123",
+			wantErr: true,
+			msg:     "Connect should reject unreachable addresses",
+		},
+		{
+			addr:    "111.111.111.111:0",
+			wantErr: true,
+			msg:     "Connect should reject invalid NetAddresses",
+		},
+		{
+			addr:    modules.NetAddress(net.JoinHostPort("localhost", g2Port)),
+			wantErr: true,
+			msg:     "Connect should reject non-IP addresses",
+		},
+		{
+			addr: g2.Address(),
+			msg:  "Connect failed to connect to another gateway",
+		},
+		{
+			addr:    g2.Address(),
+			wantErr: true,
+			msg:     "Connect should reject an address it's already connected to",
+		},
+	}
+	for _, tt := range tests {
+		err := g.Connect(tt.addr)
+		if tt.wantErr != (err != nil) {
+			t.Errorf("%v, wantErr: %v, err: %v", tt.msg, tt.wantErr, err)
 		}
 	}
 }

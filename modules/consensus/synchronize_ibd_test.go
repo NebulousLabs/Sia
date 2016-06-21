@@ -23,7 +23,6 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Create 8 remote peers.
 	remoteCSTs := make([]*consensusSetTester, 8)
@@ -48,7 +47,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		}
 	}
 	// Give the OnConnectRPCs time to finish.
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Test IBD when all peers have only the genesis block.
 	doneChan := make(chan struct{})
@@ -73,7 +72,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		}
 		for _, cst := range remoteCSTs {
 			err = cst.cs.managedAcceptBlock(b)
-			if err != nil {
+			if err != nil && err != modules.ErrBlockKnown {
 				t.Fatal(err)
 			}
 		}
@@ -99,7 +98,7 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		}
 		for _, cst := range remoteCSTs {
 			err = cst.cs.managedAcceptBlock(b)
-			if err != nil {
+			if err != nil && err != modules.ErrBlockKnown {
 				t.Fatal(err)
 			}
 		}
@@ -135,7 +134,8 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		}
 		for _, cst := range remoteCSTs {
 			err = cst.cs.managedAcceptBlock(b)
-			if err != nil {
+			if err != nil && err != modules.ErrBlockKnown {
+				t.Log(i)
 				t.Fatal(err)
 			}
 		}
@@ -171,7 +171,8 @@ func TestSimpleInitialBlockchainDownload(t *testing.T) {
 		}
 		for _, cst := range remoteCSTs {
 			err = cst.cs.managedAcceptBlock(b)
-			if err != nil {
+			if err != nil && err != modules.ErrBlockKnown {
+				t.Log(i)
 				t.Fatal(err)
 			}
 		}
