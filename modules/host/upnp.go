@@ -74,17 +74,25 @@ func (h *Host) managedLearnHostname() {
 		// annoucement was successful.
 		return
 	}
-	err = h.announce(autoAddress)
-	if err != nil {
-		// Set h.announced to false, as the address has changed yet the
-		// renewed annoucement has failed.
-		h.announced = false
-		h.log.Debugln(err)
-	}
+
 	h.autoAddress = autoAddress
 	err = h.save()
 	if err != nil {
 		h.log.Println(err)
+	}
+
+	// Announce the host, but only if the host is either accepting contracts or
+	// has a storage obligation. If the host is not accepting contracts and has
+	// no open contracts, there is no reason to notify anyone that the host's
+	// address has changed.
+	if h.settings.AcceptingContracts || h.financialMetrics.ContractCount > 0 {
+		err = h.announce(autoAddress)
+		if err != nil {
+			// Set h.announced to false, as the address has changed yet the
+			// renewed annoucement has failed.
+			h.announced = false
+			h.log.Debugln("unable to announce address after upnp-detected address change:", err)
+		}
 	}
 }
 
