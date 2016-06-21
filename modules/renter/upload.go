@@ -63,8 +63,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		up.ErasureCode, _ = NewRSCode(defaultDataPieces, defaultParityPieces)
 	}
 
-	// Check that we have contracts to upload to.
-	if len(r.hostContractor.Contracts()) < up.ErasureCode.NumPieces() && build.Release != "testing" {
+	// Check that we have contracts to upload to. We need at least (data +
+	// parity/2) contracts; since NumPieces = data + parity, we arrive at the
+	// expression below.
+	if len(r.hostContractor.Contracts()) < (up.ErasureCode.NumPieces()+up.ErasureCode.MinPieces())/2 && build.Release != "testing" {
 		return errInsufficientContracts
 	}
 

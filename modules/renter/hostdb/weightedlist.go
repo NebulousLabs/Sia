@@ -183,13 +183,18 @@ func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modu
 	for len(hosts) < n && !hdb.isEmpty() {
 		randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
 		if err != nil {
+			build.Critical("rand.Int is returning an error:", err)
 			break
 		}
 		node, err := hdb.hostTree.nodeAtWeight(types.NewCurrency(randWeight))
 		if err != nil {
+			build.Critical("nodeAtWeight is returning and error:", err)
 			break
 		}
-		hosts = append(hosts, node.hostEntry.HostDBEntry)
+		// Only return the host if they are accepting contracts.
+		if node.hostEntry.HostDBEntry.AcceptingContracts {
+			hosts = append(hosts, node.hostEntry.HostDBEntry)
+		}
 
 		node.removeNode()
 		delete(hdb.activeHosts, node.hostEntry.NetAddress)

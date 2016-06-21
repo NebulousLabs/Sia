@@ -38,10 +38,15 @@ func myExternalIP() (string, error) {
 	return string(buf[:n-1]), nil
 }
 
-// learnHostname discovers the external IP of the Gateway. Once the IP has
-// been discovered, it registers the ShareNodes RPC to be called on new
+// threadedLearnHostname discovers the external IP of the Gateway. Once the IP
+// has been discovered, it registers the ShareNodes RPC to be called on new
 // connections, advertising the IP to other nodes.
-func (g *Gateway) learnHostname(port string) {
+func (g *Gateway) threadedLearnHostname() {
+	if err := g.threads.Add(); err != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	if build.Release == "testing" {
 		return
 	}
@@ -61,7 +66,9 @@ func (g *Gateway) learnHostname(port string) {
 		return
 	}
 
-	addr := modules.NetAddress(net.JoinHostPort(host, port))
+	g.mu.RLock()
+	addr := modules.NetAddress(net.JoinHostPort(host, g.port))
+	g.mu.RUnlock()
 	if err := addr.IsValid(); err != nil {
 		g.log.Printf("WARN: discovered hostname %q is invalid: %v", addr, err)
 		return
@@ -71,14 +78,16 @@ func (g *Gateway) learnHostname(port string) {
 	g.myAddr = addr
 	g.mu.Unlock()
 
-	g.log.Println("INFO: our address is", g.myAddr)
-
-	// now that we know our address, we can start advertising it
-	g.RegisterConnectCall("RelayNode", g.sendAddress)
+	g.log.Println("INFO: our address is", addr)
 }
 
-// forwardPort adds a port mapping to the router.
-func (g *Gateway) forwardPort(port string) {
+// threadedForwardPort adds a port mapping to the router.
+func (g *Gateway) threadedForwardPort(port string) {
+	if err := g.threads.Add(); err != nil {
+		return
+	}
+	defer g.threads.Done()
+
 	if build.Release == "testing" {
 		return
 	}

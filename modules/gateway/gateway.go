@@ -23,6 +23,7 @@ var (
 type Gateway struct {
 	listener net.Listener
 	myAddr   modules.NetAddress
+	port     string
 
 	// handlers are the RPCs that the Gateway can handle.
 	handlers map[rpcID]modules.RPCFunc
@@ -108,7 +109,6 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 
 	// Register RPCs.
 	g.RegisterRPC("ShareNodes", g.shareNodes)
-	g.RegisterRPC("RelayNode", g.relayNode)
 	g.RegisterConnectCall("ShareNodes", g.requestNodes)
 
 	// Load the old node list. If it doesn't exist, no problem, but if it does,
@@ -121,7 +121,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if build.Release == "standard" {
 		for _, addr := range modules.BootstrapPeers {
 			err := g.addNode(addr)
-			if err != nil {
+			if err != nil && err != errNodeExists {
 				g.log.Printf("WARN: failed to add the bootstrap node '%v': %v", addr, err)
 			}
 		}
@@ -141,9 +141,9 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		}
 	})
 
-	_, port, portErr := net.SplitHostPort(g.listener.Addr().String())
-	if portErr != nil {
-		return nil, portErr
+	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
+	if err != nil {
+		return nil, err
 	}
 	if build.Release == "testing" {
 		g.myAddr = modules.NetAddress(g.listener.Addr().String())
@@ -152,22 +152,9 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	g.log.Println("INFO: gateway created, started logging")
 
 	// Forward the RPC port, if possible.
-	go func() {
-		if err := g.threads.Add(); err != nil {
-			return
-		}
-		defer g.threads.Done()
-		g.forwardPort(port)
-	}()
-
+	go g.threadedForwardPort(g.port)
 	// Learn our external IP.
-	go func() {
-		if err := g.threads.Add(); err != nil {
-			return
-		}
-		defer g.threads.Done()
-		g.learnHostname(port)
-	}()
+	go g.threadedLearnHostname()
 
 	// Spawn the peer and node managers. These will attempt to keep the peer
 	// and node lists healthy.

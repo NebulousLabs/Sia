@@ -40,9 +40,28 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 	c.mu.Unlock()
 
-	// only attempt renewal if we are synced
+	// only attempt contract formation/renewal if we are synced
 	// (harmless otherwise, since hosts will reject our renewal attempts, but very slow)
 	if c.cs.Synced() {
-		c.managedRenewContracts()
+		// renew any contracts that have entered the renew window
+		err := c.managedRenewContracts()
+		if err != nil {
+			c.log.Debugln("WARN: failed to renew contracts:", err)
+		}
+
+		// if we don't have enough contracts, form new ones
+		c.mu.RLock()
+		a := c.allowance
+		remaining := int(a.Hosts) - len(c.contracts)
+		numSectors, err := maxSectors(a, c.hdb)
+		c.mu.RUnlock()
+		if err != nil {
+			c.log.Debugln("ERROR: couldn't calculate numSectors:", err)
+			return
+		}
+		err = c.managedFormAllowanceContracts(remaining, numSectors, a)
+		if err != nil {
+			c.log.Debugln("WARN: failed to form contracts:", err)
+		}
 	}
 }

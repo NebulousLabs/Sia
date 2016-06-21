@@ -387,9 +387,17 @@ func (st *serverTester) setHostStorage() error {
 // announceHost announces the host, mines a block, and waits for the
 // announcement to register.
 func (st *serverTester) announceHost() error {
+	// Set the host to be accepting contracts.
+	acceptingContractsValues := url.Values{}
+	acceptingContractsValues.Set("acceptingcontracts", "true")
+	err := st.stdPostAPI("/host", acceptingContractsValues)
+	if err != nil {
+		return err
+	}
+
 	announceValues := url.Values{}
 	announceValues.Set("address", string(st.host.ExternalSettings().NetAddress))
-	err := st.stdPostAPI("/host/announce", announceValues)
+	err = st.stdPostAPI("/host/announce", announceValues)
 	if err != nil {
 		return err
 	}
