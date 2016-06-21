@@ -50,7 +50,7 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 
 // managedRenewContracts renews any contracts that are up for renewal, using
 // the current allowance.
-func (c *Contractor) managedRenewContracts() {
+func (c *Contractor) managedRenewContracts() error {
 	c.mu.RLock()
 	// Renew contracts when they enter the renew window.
 	var renewSet []modules.RenterContract
@@ -59,19 +59,20 @@ func (c *Contractor) managedRenewContracts() {
 			renewSet = append(renewSet, contract)
 		}
 	}
-	endHeight := c.blockHeight + c.allowance.Period
-
-	numSectors, err := maxSectors(c.allowance, c.hdb)
 	c.mu.RUnlock()
 	if len(renewSet) == 0 {
 		// nothing to do
-		return
-	} else if err != nil {
-		c.log.Println("WARN: could not calculate number of sectors allowance can support:", err)
-		return
+		return nil
+	}
+
+	c.mu.RLock()
+	endHeight := c.blockHeight + c.allowance.Period
+	numSectors, err := maxSectors(c.allowance, c.hdb)
+	c.mu.RUnlock()
+	if err != nil {
+		return err
 	} else if numSectors == 0 {
-		c.log.Printf("WARN: want to renew %v contracts, but allowance is too small", len(renewSet))
-		return
+		return errors.New("allowance is too small")
 	}
 
 	// map old ID to new contract, for easy replacement later
@@ -79,20 +80,9 @@ func (c *Contractor) managedRenewContracts() {
 	for _, contract := range renewSet {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
-			c.log.Printf("WARN: failed to renew contract with %v; a new contract will be formed in its place", contract.NetAddress)
+			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)
 		} else {
 			newContracts[contract.ID] = newContract
-		}
-	}
-
-	// if we did not renew enough contracts, form new ones
-	if remaining := len(newContracts) - len(renewSet); remaining > 0 {
-		formed, err := c.managedFormContracts(remaining, numSectors, endHeight)
-		if err != nil {
-			c.log.Println("WARN: failed to form new contracts during auto-renew:", err)
-		}
-		for _, contract := range formed {
-			newContracts[contract.ID] = contract
 		}
 	}
 
@@ -104,7 +94,5 @@ func (c *Contractor) managedRenewContracts() {
 	}
 	err = c.saveSync()
 	c.mu.Unlock()
-	if err != nil {
-		c.log.Println("WARN: failed to save the contractor:", err)
-	}
+	return err
 }
