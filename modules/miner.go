@@ -45,7 +45,7 @@ type CPUMiner interface {
 	StopCPUMining()
 }
 
-// TestMiner provides direct acesss to block fetching, solving, and
+// TestMiner provides direct access to block fetching, solving, and
 // manipulation. The primary use of this interface is integration testing.
 type TestMiner interface {
 	// AddBlock is an extension of FindBlock - AddBlock will submit the block
@@ -56,6 +56,9 @@ type TestMiner interface {
 	// blocks returned by BlockForWork have a unique Merkle root, meaning that
 	// each can safely start from nonce 0.
 	BlockForWork() (types.Block, types.Target, error)
+
+	// Close is necessary for clean shutdown during testing.
+	Close() error
 
 	// FindBlock will have the miner make 1 attempt to find a solved block that
 	// builds on the current consensus set. It will give up after a few
