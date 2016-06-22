@@ -199,6 +199,21 @@ func newHostTester(name string) (*hostTester, error) {
 	return ht, nil
 }
 
+// Close safely closes the hostTester. It panics if err != nil because there
+// isn't a good way to errcheck when deferring a close.
+func (ht *hostTester) Close() error {
+	errs := []error{
+		ht.cs.Close(),
+		ht.gateway.Close(),
+		ht.tpool.Close(),
+		ht.miner.Close(),
+	}
+	if err := build.JoinErrors(errs, "; "); err != nil {
+		panic(err)
+	}
+	return nil
+}
+
 // TestHostInitialization checks that the host initializes to sensible default
 // values.
 func TestHostInitialization(t *testing.T) {
