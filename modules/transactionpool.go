@@ -2,7 +2,6 @@ package modules
 
 import (
 	"errors"
-	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
