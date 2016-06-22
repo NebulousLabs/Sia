@@ -16,6 +16,7 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Check that the transaction pool is empty.
 	if len(tpt.tpool.transactionSets) != 0 {
@@ -66,6 +67,7 @@ func TestIntegrationConflictingTransactionSets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Fund a partial transaction.
 	fund := types.NewCurrency64(30e6)
@@ -123,6 +125,7 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Fill the transaction pool to the fee limit.
 	for i := 0; i < TransactionPoolSizeForFee/10e3; i++ {
@@ -165,6 +168,7 @@ func TestIntegrationTransactionSuperset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Fund a partial transaction.
 	fund := types.NewCurrency64(30e6)
@@ -223,6 +227,7 @@ func TestIntegrationTransactionSubset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Fund a partial transaction.
 	fund := types.NewCurrency64(30e6)
@@ -269,6 +274,7 @@ func TestIntegrationTransactionChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Fund a partial transaction.
 	fund := types.NewCurrency64(30e6)
@@ -314,6 +320,7 @@ func TestIntegrationNilAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	err = tpt.tpool.AcceptTransactionSet(nil)
 	if err == nil {
@@ -337,6 +344,7 @@ func TestAcceptFCAndConflictingRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Create and fund a valid file contract.
 	builder := tpt.wallet.StartTransaction()
@@ -392,6 +400,7 @@ func TestPartialConfirmation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Create and fund a valid file contract.
 	builder := tpt.wallet.StartTransaction()
@@ -468,6 +477,7 @@ func TestPartialConfirmationWeave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 
 	// Step 1: create an output to the empty address in a tx.
 	// Step 2: create a second output to the empty address in another tx.

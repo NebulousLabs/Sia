@@ -19,6 +19,7 @@ func TestArbDataOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpt.Close()
 	txn := types.Transaction{
 		ArbitraryData: [][]byte{
 			append(modules.PrefixNonSia[:], []byte("arb-data")...),

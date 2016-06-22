@@ -15,13 +15,15 @@ import (
 // TestRescan triggers a rescan in the transaction pool, verifying that the
 // rescan code does not cause deadlocks or crashes.
 func TestRescan(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	tpt, err := createTpoolTester("TestRescan")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testing.Short() {
-		t.SkipNow()
-	}
+	defer tpt.Close()
 
 	// Create a valid transaction set using the wallet.
 	txns, err := tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{})

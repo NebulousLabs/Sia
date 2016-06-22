@@ -105,7 +105,7 @@ func (tpt *tpoolTester) Close() error {
 	if err := build.JoinErrors(errs, "; "); err != nil {
 		panic(err)
 	}
-	return nil	
+	return nil
 }
 
 // TestIntegrationNewNilInputs tries to trigger a panic with nil inputs.
