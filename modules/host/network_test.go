@@ -18,6 +18,7 @@ func TestRPCMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Upload a test file to get some metrics to increment.
 	_, err = ht.uploadFile("TestRPCMetrics - 1", renewDisabled)

@@ -18,6 +18,7 @@ func TestEarlySaving(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Store a few of the important fields.
 	var oldSK crypto.SecretKey
@@ -58,6 +59,7 @@ func TestIntegrationValuePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Change one of the features of the host persistence and save.
 	ht.host.fileCounter += 1500

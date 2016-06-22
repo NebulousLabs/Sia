@@ -93,6 +93,7 @@ func TestBlankStorageObligation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// The number of contracts reported by the host should be zero.
 	fm := ht.host.FinancialMetrics()
@@ -189,6 +190,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Start by adding a storage obligation to the host. To emulate conditions
 	// of a renter creating the first contract, the storage obligation has no
@@ -353,6 +355,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Start by adding a storage obligation to the host. To emulate conditions
 	// of a renter creating the first contract, the storage obligation has no
@@ -589,6 +592,7 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Start by adding a storage obligation to the host. To emulate conditions
 	// of a renter creating the first contract, the storage obligation has no

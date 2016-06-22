@@ -124,6 +124,7 @@ func TestHostFailedLoadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 	err = ht.host.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -155,6 +156,7 @@ func TestHostFailedListen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 	err = ht.host.Close()
 	if err != nil {
 		t.Fatal(err)
