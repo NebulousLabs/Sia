@@ -199,6 +199,21 @@ func newHostTester(name string) (*hostTester, error) {
 	return ht, nil
 }
 
+// Close safely closes the hostTester. It panics if err != nil because there
+// isn't a good way to errcheck when deferring a close.
+func (ht *hostTester) Close() error {
+	errs := []error{
+		ht.cs.Close(),
+		ht.gateway.Close(),
+		ht.tpool.Close(),
+		ht.miner.Close(),
+	}
+	if err := build.JoinErrors(errs, "; "); err != nil {
+		panic(err)
+	}
+	return nil
+}
+
 // TestHostInitialization checks that the host initializes to sensible default
 // values.
 func TestHostInitialization(t *testing.T) {
@@ -211,6 +226,7 @@ func TestHostInitialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer bht.Close()
 	if bht.host.blockHeight != 0 {
 		t.Error("host initialized to the wrong block height")
 	}
@@ -241,6 +257,7 @@ func TestHostMultiClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	err = ht.host.Close()
 	if err != nil {
@@ -266,6 +283,7 @@ func TestNilValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	hostDir := filepath.Join(ht.persistDir, modules.HostDir)
 	_, err = New(nil, ht.tpool, ht.wallet, "localhost:0", hostDir)
@@ -294,6 +312,7 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Check the default settings get returned at first call.
 	settings := ht.host.InternalSettings()
@@ -392,6 +411,7 @@ func TestSetAndGetSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Check the default settings get returned at first call.
 	settings := ht.host.Settings()
@@ -469,6 +489,7 @@ func TestPersistentSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Submit updated settings.
 	settings := ht.host.Settings()

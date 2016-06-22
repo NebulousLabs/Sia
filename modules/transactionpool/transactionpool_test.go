@@ -67,7 +67,7 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 		return nil, err
 	}
 
-	// Assebmle all of the objects in to a tpoolTester
+	// Assemble all of the objects into a tpoolTester
 	tpt := &tpoolTester{
 		cs:        cs,
 		gateway:   g,
@@ -89,6 +89,23 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 	}
 
 	return tpt, nil
+}
+
+// Close safely closes the tpoolTester, calling a panic in the event of an
+// error since there isn't a good way to errcheck when deferring a Close.
+func (tpt *tpoolTester) Close() error {
+	errs := []error{
+		tpt.cs.Close(),
+		tpt.gateway.Close(),
+		tpt.tpool.Close(),
+		tpt.miner.Close(),
+		// TODO: implement modules.Wallet.Close()
+		// tpt.wallet.Close()
+	}
+	if err := build.JoinErrors(errs, "; "); err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 // TestIntegrationNewNilInputs tries to trigger a panic with nil inputs.

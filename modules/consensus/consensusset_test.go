@@ -160,12 +160,12 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 // to errcheck when deferring a close, a panic is called in the event of an
 // error.
 func (cst *consensusSetTester) Close() error {
-	err := cst.cs.Close()
-	if err != nil {
-		panic(err)
+	errs := []error{
+		cst.cs.Close(),
+		cst.gateway.Close(),
+		cst.miner.Close(),
 	}
-	err = cst.gateway.Close()
-	if err != nil {
+	if err := build.JoinErrors(errs, "; "); err != nil {
 		panic(err)
 	}
 	return nil

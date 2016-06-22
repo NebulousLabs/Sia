@@ -67,6 +67,9 @@ type TransactionPool interface {
 	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
+	// Close is necessary for clean shutdown (e.g. during testing).
+	Close() error
+
 	// FeeEstimation returns an estimation for how high the transaction fee
 	// needs to be per byte. The minimum recommended targets getting accepted
 	// in ~3 blocks, and the maximum recommended targets getting accepted

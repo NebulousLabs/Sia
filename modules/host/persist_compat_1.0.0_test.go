@@ -24,6 +24,7 @@ func TestHostPersistCompat100(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ht.Close()
 
 	// Close the host and then swap out the persist file for the one that is
 	// being used for testing.
