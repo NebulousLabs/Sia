@@ -2,6 +2,7 @@ package modules
 
 import (
 	"errors"
+	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
@@ -66,6 +67,9 @@ type TransactionPool interface {
 	// AcceptTransactionSet accepts a set of potentially interdependent
 	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
+
+	// Close is necessary for clean shutdown (e.g. during testing).
+	Close() error
 
 	// FeeEstimation returns an estimation for how high the transaction fee
 	// needs to be per byte. The minimum recommended targets getting accepted
