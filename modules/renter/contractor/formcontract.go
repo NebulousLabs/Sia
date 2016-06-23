@@ -12,9 +12,11 @@ import (
 
 var (
 	// the contractor will not form contracts above this price
-	maxStoragePrice = types.SiacoinPrecision.Mul64(500e3).Mul(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
+	maxStoragePrice = types.SiacoinPrecision.Mul64(500e3).Div(modules.BlockBytesPerMonthTerabyte) // 500k SC / TB / Month
 	// the contractor will not download data above this price (3x the maximum monthly storage price)
 	maxDownloadPrice = maxStoragePrice.Mul64(3 * 4320)
+	// the contractor will cap host's MaxCollateral setting to this value
+	maxCollateral = types.SiacoinPrecision.Mul64(1e3) // 1k SC
 
 	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
 	errTooExpensive          = errors.New("host price was too high")
@@ -60,6 +62,10 @@ func (c *Contractor) managedNewContract(host modules.HostDBEntry, numSectors uin
 	// reject hosts that are too expensive
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return modules.RenterContract{}, errTooExpensive
+	}
+	// cap host.MaxCollateral
+	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
+		host.MaxCollateral = maxCollateral
 	}
 
 	// get an address to use for negotiation

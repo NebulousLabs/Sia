@@ -18,6 +18,10 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return modules.RenterContract{}, errTooExpensive
 	}
+	// cap host.MaxCollateral
+	if host.MaxCollateral.Cmp(maxCollateral) > 0 {
+		host.MaxCollateral = maxCollateral
+	}
 
 	// get an address to use for negotiation
 	uc, err := c.wallet.NextAddress()

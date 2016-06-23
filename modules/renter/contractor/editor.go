@@ -9,6 +9,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// the contractor will cap host's MaxCollateral setting to this value
+var maxUploadCollateral = types.SiacoinPrecision.Mul64(1e3).Div(modules.BlockBytesPerMonthTerabyte) // 1k SC / TB / Month
+
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.
 // Editors are the means by which the renter uploads data to hosts.
@@ -133,6 +136,10 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	}
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return nil, errTooExpensive
+	}
+	// cap host.Collateral
+	if host.Collateral.Cmp(maxUploadCollateral) > 0 {
+		host.Collateral = maxUploadCollateral
 	}
 
 	// create editor
