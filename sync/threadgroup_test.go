@@ -54,16 +54,12 @@ func TestThreadGroupStop(t *testing.T) {
 		t.Error("IsStopped returns false on stopped ThreadGroup")
 	}
 
-	// Add, Stop, and RegisterCloser should return errors
+	// Add and Stop should return errors
 	err = tg.Add()
 	if err != ErrStopped {
 		t.Error("expected ErrStopped, got", err)
 	}
 	err = tg.Stop()
-	if err != ErrStopped {
-		t.Error("expected ErrStopped, got", err)
-	}
-	err = tg.OnStop(nil)
 	if err != ErrStopped {
 		t.Error("expected ErrStopped, got", err)
 	}
@@ -136,10 +132,7 @@ func TestThreadGroupOnStop(t *testing.T) {
 
 	// create ThreadGroup and register the closer
 	var tg ThreadGroup
-	err = tg.OnStop(func() { l.Close() })
-	if err != nil {
-		t.Fatal(err)
-	}
+	tg.OnStop(func() { l.Close() })
 
 	// send on channel when listener is closed
 	var closed bool
@@ -170,6 +163,29 @@ func TestThreadGroupRace(t *testing.T) {
 	err := tg.Stop()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestThreadGroupClosedOnStop(t *testing.T) {
+	var tg ThreadGroup
+	var closed bool
+	tg.OnStop(func() { closed = true })
+	if closed {
+		t.Fatal("close function should not have been called yet")
+	}
+	if err := tg.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if !closed {
+		t.Fatal("close function should have been called")
+	}
+
+	// Stop has already been called, so the close function should be called
+	// immediately
+	closed = false
+	tg.OnStop(func() { closed = true })
+	if !closed {
+		t.Fatal("close function should have been called immediately")
 	}
 }
 
