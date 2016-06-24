@@ -50,8 +50,8 @@ func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
-		delete(hdb.activeHosts, addr)
 		node.removeNode()
+		delete(hdb.activeHosts, addr)
 	}
 
 	// Remove the node from all hosts.

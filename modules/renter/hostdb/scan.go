@@ -67,8 +67,8 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// database.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
-		delete(hdb.activeHosts, entry.NetAddress)
 		node.removeNode()
+		delete(hdb.activeHosts, entry.NetAddress)
 	}
 
 	// If the reliability has fallen to 0, remove the host from the
@@ -142,7 +142,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 
 			// If 'maxActiveHosts' has not been reached, add the host to the
 			// activeHosts tree.
-			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; !exists && len(hdb.activeHosts) < maxActiveHosts {
+			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; exists || len(hdb.activeHosts) < maxActiveHosts {
 				hdb.insertNode(hostEntry)
 			}
 			hdb.save()

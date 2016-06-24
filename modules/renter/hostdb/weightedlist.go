@@ -105,7 +105,7 @@ func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *
 		hn.right = createNode(hn, entry)
 		nodesAdded = 1
 		newNode = hn.right
-	} else if hn.left.count < hn.right.count {
+	} else if hn.left.count <= hn.right.count {
 		nodesAdded, newNode = hn.left.recursiveInsert(entry)
 	} else {
 		nodesAdded, newNode = hn.right.recursiveInsert(entry)
@@ -113,6 +113,18 @@ func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *
 
 	hn.count += nodesAdded
 	return
+}
+
+// remove takes a node and removes it from the tree by climbing through the
+// list of parents. remove does not delete nodes.
+func (hn *hostNode) removeNode() {
+	hn.weight = hn.weight.Sub(hn.hostEntry.Weight)
+	hn.taken = false
+	current := hn.parent
+	for current != nil {
+		current.weight = current.weight.Sub(hn.hostEntry.Weight)
+		current = current.parent
+	}
 }
 
 // insertNode inserts a host entry into the host tree, removing
@@ -132,18 +144,6 @@ func (hdb *HostDB) insertNode(entry *hostEntry) {
 	} else {
 		_, hostNode := hdb.hostTree.recursiveInsert(entry)
 		hdb.activeHosts[entry.NetAddress] = hostNode
-	}
-}
-
-// remove takes a node and removes it from the tree by climbing through the
-// list of parents. remove does not delete nodes.
-func (hn *hostNode) removeNode() {
-	hn.weight = hn.weight.Sub(hn.hostEntry.Weight)
-	hn.taken = false
-	current := hn.parent
-	for current != nil {
-		current.weight = current.weight.Sub(hn.hostEntry.Weight)
-		current = current.parent
 	}
 }
 
@@ -196,9 +196,9 @@ func (hdb *HostDB) RandomHosts(n int, ignore []modules.NetAddress) (hosts []modu
 			hosts = append(hosts, node.hostEntry.HostDBEntry)
 		}
 
+		removedEntries = append(removedEntries, node.hostEntry)
 		node.removeNode()
 		delete(hdb.activeHosts, node.hostEntry.NetAddress)
-		removedEntries = append(removedEntries, node.hostEntry)
 	}
 
 	// Add back all of the entries that got removed.

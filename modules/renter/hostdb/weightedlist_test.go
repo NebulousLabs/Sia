@@ -92,11 +92,7 @@ func TestWeightedList(t *testing.T) {
 	}
 
 	// Create a hostdb and 3 equal entries to insert.
-	hdb := &HostDB{
-		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
-		scanPool:    make(chan *hostEntry, scanPoolSize),
-	}
+	hdb := bareHostDB()
 
 	// Create a bunch of host entries of equal weight.
 	var dbe modules.HostDBEntry
