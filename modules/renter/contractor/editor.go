@@ -3,11 +3,15 @@ package contractor
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// the contractor will cap host's MaxCollateral setting to this value
+var maxUploadCollateral = types.SiacoinPrecision.Mul64(1e3).Div(modules.BlockBytesPerMonthTerabyte) // 1k SC / TB / Month
 
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.
@@ -134,6 +138,12 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return nil, errTooExpensive
 	}
+	// cap host.Collateral on new hosts
+	if build.VersionCmp(host.Version, "0.6.0") > 0 {
+		if host.Collateral.Cmp(maxUploadCollateral) > 0 {
+			host.Collateral = maxUploadCollateral
+		}
+	}
 
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
@@ -159,6 +169,7 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 
 	return &hostEditor{
 		editor:     e,
+		contract:   contract,
 		contractor: c,
 	}, nil
 }

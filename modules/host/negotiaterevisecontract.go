@@ -368,12 +368,8 @@ func verifyRevision(so *storageObligation, revision types.FileContractRevision, 
 		return errReviseBadRenterMissedOutput
 	}
 	// The new collateral comes out of the host's missed outputs.
-	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) > 0 {
+	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) < 0 {
 		return errReviseBadCollateralDeduction
-	}
-	// The new collateral and new revenue goes into the host's void outputs.
-	if oldFCR.NewMissedProofOutputs[2].Value.Add(newRevenue).Add(newCollateral).Cmp(revision.NewMissedProofOutputs[2].Value) < 0 {
-		return errReviseBadVoidOutput
 	}
 
 	// The Merkle root is checked last because it is the most expensive check.
