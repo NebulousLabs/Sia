@@ -36,6 +36,9 @@ Target: %v
 	} else {
 		estimatedHeight := estimatedHeightAt(time.Now())
 		estimatedProgress := float64(cg.Height) / float64(estimatedHeight) * 100
+		if estimatedProgress > 99 {
+			estimatedProgress = 99
+		}
 		fmt.Printf(`Synced: %v
 Height: %v
 Progress (estimated): %.f%%
