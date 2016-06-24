@@ -3,6 +3,7 @@ package contractor
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
@@ -137,9 +138,11 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return nil, errTooExpensive
 	}
-	// cap host.Collateral
-	if host.Collateral.Cmp(maxUploadCollateral) > 0 {
-		host.Collateral = maxUploadCollateral
+	// cap host.Collateral on new hosts
+	if build.VersionCmp(host.Version, "0.6.0") > 0 {
+		if host.Collateral.Cmp(maxUploadCollateral) > 0 {
+			host.Collateral = maxUploadCollateral
+		}
 	}
 
 	// create editor
