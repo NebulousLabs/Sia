@@ -42,10 +42,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return errors.New("nicknames cannot begin with /")
 	}
 
-	if !r.wallet.Unlocked() {
-		return errors.New("wallet must be unlocked before uploading")
-	}
-
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
 	_, exists := r.files[up.SiaPath]

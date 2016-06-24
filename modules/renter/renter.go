@@ -70,8 +70,7 @@ type trackedFile struct {
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
 	// modules
-	cs     modules.ConsensusSet
-	wallet modules.Wallet
+	cs modules.ConsensusSet
 
 	// resources
 	hostDB         hostDB
@@ -102,7 +101,6 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 
 	r := &Renter{
 		cs:             cs,
-		wallet:         wallet,
 		hostDB:         hdb,
 		hostContractor: hc,
 

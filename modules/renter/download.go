@@ -189,10 +189,6 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
-	if !r.wallet.Unlocked() {
-		return errors.New("wallet must be unlocked before downloading")
-	}
-
 	// Copy the file's metadata
 	// TODO: this is ugly because we only have the Contracts method for
 	// looking up contracts.

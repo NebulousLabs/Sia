@@ -218,10 +218,6 @@ func (r *Renter) threadedRepairLoop() {
 	for {
 		time.Sleep(5 * time.Second)
 
-		if !r.wallet.Unlocked() {
-			continue
-		}
-
 		if len(r.hostContractor.Contracts()) == 0 {
 			// nothing to revise
 			continue
