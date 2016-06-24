@@ -74,7 +74,7 @@ func TestUploadDownload(t *testing.T) {
 	hc := &uploadDownloadContractor{
 		sectors: make(map[crypto.Hash][]byte),
 	}
-	rt, err := newContractorTester("TestUploadDownload", hc)
+	rt, err := newContractorTester("TestUploadDownload", nil, hc)
 	if err != nil {
 		t.Fatal(err)
 	}

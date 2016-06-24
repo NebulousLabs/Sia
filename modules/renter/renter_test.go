@@ -100,7 +100,7 @@ func newRenterTester(name string) (*renterTester, error) {
 
 // newContractorTester creates a renterTester, but with the supplied
 // hostContractor.
-func newContractorTester(name string, hc hostContractor) (*renterTester, error) {
+func newContractorTester(name string, hdb hostDB, hc hostContractor) (*renterTester, error) {
 	// Create the modules.
 	testdir := build.TempDir("renter", name)
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
@@ -131,11 +131,10 @@ func newContractorTester(name string, hc hostContractor) (*renterTester, error) 
 	if err != nil {
 		return nil, err
 	}
-	r, err := New(cs, w, tp, filepath.Join(testdir, modules.RenterDir))
+	r, err := newRenter(cs, tp, hdb, hc, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		return nil, err
 	}
-	r.hostContractor = hc
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err

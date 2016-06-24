@@ -70,8 +70,7 @@ type trackedFile struct {
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
 	// modules
-	cs     modules.ConsensusSet
-	wallet modules.Wallet
+	cs modules.ConsensusSet
 
 	// resources
 	hostDB         hostDB
@@ -100,9 +99,12 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 		return nil, err
 	}
 
+	return newRenter(cs, tpool, hdb, hc, persistDir)
+}
+
+func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
 	r := &Renter{
 		cs:             cs,
-		wallet:         wallet,
 		hostDB:         hdb,
 		hostContractor: hc,
 
@@ -112,8 +114,7 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
-	err = r.initPersist()
-	if err != nil {
+	if err := r.initPersist(); err != nil {
 		return nil, err
 	}
 
