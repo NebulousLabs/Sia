@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 )
@@ -50,6 +51,7 @@ func (p *hostPool) remove(addr modules.NetAddress) {
 			return
 		}
 	}
+	build.Critical("could not remove host from pool: no record of host", addr)
 }
 
 // uniqueHosts will return up to 'n' unique hosts that are not in 'exclude'.
