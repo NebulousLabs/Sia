@@ -84,13 +84,15 @@ func (tg *ThreadGroup) Stop() error {
 }
 
 // OnStop adds a function to the ThreadGroup's stopFns set. Members of the set
-// will be called when Stop is called, in reverse order.
-func (tg *ThreadGroup) OnStop(fn func()) error {
+// will be called when Stop is called, in reverse order. If the ThreadGroup is
+// already stopped, the function will be called immediately.
+func (tg *ThreadGroup) OnStop(fn func()) {
 	tg.mu.Lock()
-	defer tg.mu.Unlock()
 	if tg.IsStopped() {
-		return ErrStopped
+		tg.mu.Unlock()
+		fn()
+	} else {
+		tg.stopFns = append(tg.stopFns, fn)
+		tg.mu.Unlock()
 	}
-	tg.stopFns = append(tg.stopFns, fn)
-	return nil
 }
