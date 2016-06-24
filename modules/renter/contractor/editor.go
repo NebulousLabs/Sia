@@ -166,6 +166,7 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 
 	return &hostEditor{
 		editor:     e,
+		contract:   contract,
 		contractor: c,
 	}, nil
 }
