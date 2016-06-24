@@ -166,6 +166,29 @@ func TestThreadGroupRace(t *testing.T) {
 	}
 }
 
+func TestThreadGroupClosedOnStop(t *testing.T) {
+	var tg ThreadGroup
+	var closed bool
+	tg.OnStop(func() { closed = true })
+	if closed {
+		t.Fatal("close function should not have been called yet")
+	}
+	if err := tg.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if !closed {
+		t.Fatal("close function should have been called")
+	}
+
+	// Stop has already been called, so the close function should be called
+	// immediately
+	closed = false
+	tg.OnStop(func() { closed = true })
+	if !closed {
+		t.Fatal("close function should have been called immediately")
+	}
+}
+
 func BenchmarkThreadGroup(b *testing.B) {
 	var tg ThreadGroup
 	for i := 0; i < b.N; i++ {
