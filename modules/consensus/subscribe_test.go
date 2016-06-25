@@ -33,15 +33,15 @@ func (ms *mockSubscriber) copySub() (cms mockSubscriber) {
 	return cms
 }
 
-// TestUnitInvalidConsensusChangeSubscription checks that the consensus set
-// returns modules.ErrInvalidConsensusChangeID in the event of a subscriber
-// using an unrecognized id.
-func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
+// TestInvalidConsensusChangeSubscription checks that the consensus set returns
+// modules.ErrInvalidConsensusChangeID in the event of a subscriber using an
+// unrecognized id.
+func TestInvalidConsensusChangeSubscription(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestUnitInvalidConsensusChangeSubscription")
+	cst, err := createConsensusSetTester("TestInvalidConsensusChangeSubscription")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,16 +53,65 @@ func TestUnitInvalidConsensusChangeSubscription(t *testing.T) {
 	if err != modules.ErrInvalidConsensusChangeID {
 		t.Error("consensus set returning the wrong error during an invalid subscription:", err)
 	}
+
+	cst.cs.mu.Lock()
+	for i := range cst.cs.subscribers {
+		if cst.cs.subscribers[i] == &ms {
+			t.Fatal("subscriber was not removed from subscriber list after an erroneus subscription")
+		}
+	}
+	cst.cs.mu.Unlock()
 }
 
-// TestUnitUnsubscribe checks that the consensus set correctly unsubscribes a
-// subscriber if the Unsubscribe call is made.
-func TestUnitUnsubscribe(t *testing.T) {
+// TestInvalidToValidSubscription is a regression test. Previously, the
+// consensus set would not unsubscribe a module if it returned an error during
+// subscription. When the module resubscribed, the module would be
+// double-subscribed to the consensus set.
+func TestInvalidToValidSubscription(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	cst, err := createConsensusSetTester("TestUnitUnsubscribe")
+	cst, err := createConsensusSetTester("TestInvalidToValidSubscription")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.Close()
+
+	// Start by performing a bad subscribe.
+	ms := newMockSubscriber()
+	badCCID := modules.ConsensusChangeID{255, 255, 255}
+	err = cst.cs.ConsensusSetSubscribe(&ms, badCCID)
+	if err != modules.ErrInvalidConsensusChangeID {
+		t.Error("consensus set returning the wrong error during an invalid subscription:", err)
+	}
+
+	// Perform a correct subscribe.
+	err = cst.cs.ConsensusSetSubscribe(&ms, modules.ConsensusChangeBeginning)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block and check that the mock subscriber only got a single
+	// consensus change.
+	numPrevUpdates := len(ms.updates)
+	_, err = cst.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ms.updates) != numPrevUpdates+1 {
+		t.Error("subscriber received two consensus changes for a single block")
+	}
+}
+
+// TestUnsubscribe checks that the consensus set correctly unsubscribes a
+// subscriber if the Unsubscribe call is made.
+func TestUnsubscribe(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	cst, err := createConsensusSetTester("TestUnsubscribe")
 	if err != nil {
 		t.Fatal(err)
 	}
