@@ -72,6 +72,8 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
+
+	cc.Synced = cs.synced
 	return cc, nil
 }
 

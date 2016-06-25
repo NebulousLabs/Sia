@@ -110,6 +110,10 @@ type (
 		// SiafundPoolDiffs are the siafund pool diffs that were applied to the
 		// consensus set in the recent change.
 		SiafundPoolDiffs []SiafundPoolDiff
+
+		// Synced indicates whether or not the ConsensusSet is synced with its
+		// peers.
+		Synced bool
 	}
 
 	// A SiacoinOutputDiff indicates the addition or removal of a SiacoinOutput in
