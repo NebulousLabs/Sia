@@ -72,6 +72,8 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
+
+	cc.Synced = cs.synced
 	return cc, nil
 }
 
@@ -160,13 +162,14 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 // sent to the modules starting with the genesis block.
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
 	cs.mu.Lock()
+	defer cs.mu.Unlock()
 	cs.subscribers = append(cs.subscribers, subscriber)
-	cs.mu.Demote()
-	defer cs.mu.DemotedUnlock()
 
 	// Get the input module caught up to the currenct consnesus set.
 	err := cs.initializeSubscribe(subscriber, start)
 	if err != nil {
+		// Remove the subscriber from the set of subscribers.
+		cs.subscribers = cs.subscribers[:len(cs.subscribers)-1]
 		return err
 	}
 	// Only add the module as a subscriber if there was no error.
