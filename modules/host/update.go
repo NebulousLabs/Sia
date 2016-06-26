@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -269,10 +270,16 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			bso := tx.Bucket(bucketStorageObligations)
 			for _, soid := range obligationIDs {
 				soBytes := bso.Get(soid[:])
+				if soBytes == nil {
+					// Obligation may have been cleared out by a previous
+					// action item.
+					continue
+				}
 				var so storageObligation
 				err := json.Unmarshal(soBytes, &so)
 				if err != nil {
-					return err
+					build.Critical("json unmarshalling failed for storage obligation")
+					continue
 				}
 				_, exists := knownActionItems[soid]
 				if !exists {
