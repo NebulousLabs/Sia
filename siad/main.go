@@ -26,9 +26,9 @@ const (
 // compatible with gcfg.
 type Config struct {
 	Siad struct {
-		APIaddr  string
-		RPCaddr  string
-		HostAddr string
+		APIaddr      string
+		RPCaddr      string
+		HostAddr     string
 		AllowAPIBind bool
 
 		Modules           string

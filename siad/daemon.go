@@ -57,9 +57,11 @@ func processModules(modules string) (string, error) {
 func processConfig(config Config) (Config, error) {
 	var err error
 	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
-	apiaddr := modules.NetAddress(config.Siad.APIaddr)
-	if apiaddr.Host() != "" && !apiaddr.IsLoopback() && !config.Siad.AllowAPIBind {
-		return Config{}, errors.New("you must pass --disable-security to bind Siad to a non-localhost address")
+	if !config.Siad.AllowAPIBind {
+		addr := modules.NetAddress(config.Siad.APIaddr)
+		if !addr.IsLoopback() && addr.Host() != "" {
+			return Config{}, errors.New("you must pass --disable-security to bind Siad to a non-localhost address")
+		}
 	}
 	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
 	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
