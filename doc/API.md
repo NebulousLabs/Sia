@@ -581,8 +581,8 @@ Queries:
 * /renter/download/{siapath} [GET]
 * /renter/rename/{siapath}   [POST]
 * /renter/upload/{siapath}   [POST]
-* /renter/hosts/active       [GET]
-* /renter/hosts/all          [GET]
+* /hostdb/active             [GET]
+* /hostdb/all                [GET]
 
 #### /renter/allowance [GET]
 
@@ -817,7 +817,7 @@ source   string
 
 Response: standard.
 
-#### /renter/hosts/active [GET]
+#### /hostdb/active [GET]
 
 Function: Lists all of the active hosts known to the renter, sorted by
 preference.
@@ -844,9 +844,9 @@ struct {
 	}
 }
 ```
-See /renter/hosts/all for a description of each field.
+See /hostdb/all for a description of each field.
 
-#### /renter/hosts/all [GET]
+#### /hostdb/all [GET]
 
 Function: Lists all of the hosts known to the renter.
 
