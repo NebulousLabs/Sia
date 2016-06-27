@@ -163,8 +163,9 @@ func (srv *Server) initAPI(password string) {
 		router.POST("/renter/rename/*siapath", requirePassword(srv.renterRenameHandler, password))
 		router.POST("/renter/upload/*siapath", requirePassword(srv.renterUploadHandler, password))
 
-		router.GET("/renter/hosts/active", srv.renterHostsActiveHandler)
-		router.GET("/renter/hosts/all", srv.renterHostsAllHandler)
+		// HostDB endpoints.
+		router.GET("/hostdb/active", srv.renterHostsActiveHandler)
+		router.GET("/hostdb/all", srv.renterHostsAllHandler)
 	}
 
 	// TransactionPool API Calls

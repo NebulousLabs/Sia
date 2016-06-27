@@ -132,7 +132,7 @@ func hostcmd() {
 	// Determine the competitive price string.
 	ah := new(api.ActiveHosts)
 	var competitivePrice string
-	err = getAPI("/renter/hosts/active?numhosts=24", ah)
+	err = getAPI("/hostdb/active?numhosts=24", ah)
 	if err != nil || len(ah.Hosts) == 0 {
 		competitivePrice = "Unavailable"
 	} else {

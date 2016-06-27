@@ -408,13 +408,13 @@ func (st *serverTester) announceHost() error {
 	}
 	// wait for announcement
 	var hosts ActiveHosts
-	err = st.getAPI("/renter/hosts/active", &hosts)
+	err = st.getAPI("/hostdb/active", &hosts)
 	if err != nil {
 		return err
 	}
 	for i := 0; i < 20 && len(hosts.Hosts) == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
-		err = st.getAPI("/renter/hosts/active", &hosts)
+		err = st.getAPI("/hostdb/active", &hosts)
 		if err != nil {
 			return err
 		}
