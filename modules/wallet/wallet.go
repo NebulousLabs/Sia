@@ -13,6 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -77,9 +78,9 @@ type Wallet struct {
 	spentOutputs   map[types.OutputID]types.BlockHeight
 
 	// The following fields are kept to track transaction history.
-	// walletTransactions are stored in chronological order, and have a map for
+	// processedTransactions are stored in chronological order, and have a map for
 	// constant time random access. The set of full transactions is kept as
-	// well, ordering can be determined by the walletTransactions slice.
+	// well, ordering can be determined by the processedTransactions slice.
 	//
 	// The unconfirmed transactions are kept the same way, except without the
 	// random access. It is assumed that the list of unconfirmed transactions
@@ -100,6 +101,9 @@ type Wallet struct {
 	persistDir string
 	log        *persist.Logger
 	mu         sync.RWMutex
+	// The wallet's ThreadGroup tells tracked functions to shut down and
+	// blocks until they have all exited before returning from Close.
+	tg siasync.ThreadGroup
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -142,8 +146,14 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 // Close terminates all ongoing processes involving the wallet, enabling
 // garbage collection.
 func (w *Wallet) Close() error {
+	if err := w.tg.Stop(); err != nil {
+		return err
+	}
 	var errs []error
 	// Lock the wallet outside of mu.Lock because Lock uses its own mu.Lock.
+	// Once the wallet is locked it cannot be unlocked except using the
+	// unexported unlock method (w.Unlock returns an error if the wallet's
+	// ThreadGroup is stopped).
 	if w.Unlocked() {
 		if err := w.Lock(); err != nil {
 			errs = append(errs, err)

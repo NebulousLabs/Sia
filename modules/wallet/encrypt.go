@@ -232,6 +232,16 @@ func (w *Wallet) Lock() error {
 // Unlock will decrypt the wallet seed and load all of the addresses into
 // memory.
 func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
+	// By having the wallet's ThreadGroup track the Unlock method, we ensure
+	// that Unlock will never unlock the wallet once the ThreadGroup has been
+	// stopped. Without this precaution, the wallet's Close method would be
+	// unsafe because it would theoretically be possible for another function
+	// to Unlock the wallet in the short interval after Close calls w.Lock
+	// and before Close calls w.mu.Lock.
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
 	w.log.Println("INFO: Unlocking wallet.")
 
 	// Initialize all of the keys in the wallet under a lock. While holding the
