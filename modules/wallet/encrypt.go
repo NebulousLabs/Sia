@@ -83,7 +83,7 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, erro
 	return seed, nil
 }
 
-// unlock loads all of the encrypted file structures into wallet memory. Even
+// managedUnlock loads all of the encrypted file structures into wallet memory. Even
 // after loading, the structures are kept encrypted, but some data such as
 // addresses are decrypted so that the wallet knows what to track.
 func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
@@ -200,6 +200,10 @@ func (w *Wallet) Encrypted() bool {
 // reset the wallet, the wallet files must be moved to a different directory or
 // deleted.
 func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
+	if err := w.tg.Add(); err != nil {
+		return modules.Seed{}, err
+	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.initEncryption(masterKey)

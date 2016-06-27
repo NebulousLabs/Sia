@@ -177,6 +177,10 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 
 // LoadSiagKeys loads a set of siag-generated keys into the wallet.
 func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	err := w.checkMasterKey(masterKey)
@@ -189,6 +193,10 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 // Load033xWallet loads a v0.3.3.x wallet as an unseeded key, such that the
 // funds become spendable to the current wallet.
 func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	err := w.checkMasterKey(masterKey)

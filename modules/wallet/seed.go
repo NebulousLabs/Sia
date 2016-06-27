@@ -251,6 +251,10 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 // NextAddress returns an unlock hash that is ready to receive siacoins or
 // siafunds. The address is generated using the primary address seed.
 func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
+	if err := w.tg.Add(); err != nil {
+		return types.UnlockConditions{}, err
+	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.nextPrimarySeedAddress()
@@ -261,6 +265,10 @@ func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 // key. An error will be returned if the seed has already been integrated with
 // the wallet.
 func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	err := w.checkMasterKey(masterKey)

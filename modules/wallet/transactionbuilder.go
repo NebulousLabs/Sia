@@ -82,7 +82,7 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 	return newSigIndices, nil
 }
 
-// FundSiacoins will add a siacoin input of exaclty 'amount' to the
+// FundSiacoins will add a siacoin input of exactly 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siacoin input will not be signed until 'Sign' is called
 // on the transaction builder.
