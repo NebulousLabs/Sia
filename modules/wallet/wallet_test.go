@@ -132,8 +132,14 @@ func createBlankWalletTester(name string) (*walletTester, error) {
 
 // closeWt closes all of the modules in the wallet tester.
 func (wt *walletTester) closeWt() {
-	err := wt.gateway.Close()
-	if err != nil {
+	errs := []error{
+		wt.gateway.Close(),
+		wt.cs.Close(),
+		wt.tpool.Close(),
+		wt.miner.Close(),
+		wt.wallet.Close(),
+	}
+	if err := build.JoinErrors(errs, "; "); err != nil {
 		panic(err)
 	}
 }
@@ -189,5 +195,33 @@ func TestAllAddresses(t *testing.T) {
 		if addrs[i][0] != byte(i) {
 			t.Error("address sorting failed:", i, addrs[i][0])
 		}
+	}
+}
+
+// TestCloseWallet tries to close the wallet.
+func TestCloseWallet(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	testdir := build.TempDir(modules.WalletDir, "TestCloseWallet")
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wdir := filepath.Join(testdir, modules.WalletDir)
+	w, err := New(cs, tp, wdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
 	}
 }

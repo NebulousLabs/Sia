@@ -114,18 +114,6 @@ func (srv *Server) Close() error {
 	srv.wg.Wait()
 
 	// Safely close each module.
-	// TODO: close transaction pool
-
-	// wallet has special closing mechanics
-	if srv.wallet != nil {
-		// TODO: close wallet and lock the wallet in the wallet's Close method.
-		if srv.wallet.Unlocked() {
-			if err := srv.wallet.Lock(); err != nil {
-				errs = append(errs, fmt.Errorf("wallet.Lock failed: %v", err))
-			}
-		}
-	}
-
 	mods := []struct {
 		name string
 		c    io.Closer
@@ -134,6 +122,8 @@ func (srv *Server) Close() error {
 		{"renter", srv.renter},
 		{"explorer", srv.explorer},
 		{"miner", srv.miner},
+		{"wallet", srv.wallet},
+		{"tpool", srv.tpool},
 		{"consensus", srv.cs},
 		{"gateway", srv.gateway},
 	}

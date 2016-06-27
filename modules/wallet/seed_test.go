@@ -22,6 +22,7 @@ func TestPrimarySeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 
 	// Create a seed and unlock the wallet.
 	seed, err := wt.wallet.Encrypt(crypto.TwofishKey{})
@@ -91,6 +92,7 @@ func TestLoadSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer wt.closeWt()
 	seed, _, err := wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)

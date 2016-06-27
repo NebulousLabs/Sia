@@ -134,6 +134,10 @@ func (w *Wallet) createBackup(backupFilepath string) error {
 
 // CreateBackup creates a backup file at the desired filepath.
 func (w *Wallet) CreateBackup(backupFilepath string) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.createBackup(backupFilepath)
@@ -143,6 +147,11 @@ func (w *Wallet) CreateBackup(backupFilepath string) error {
 // LoadBackup loads a backup file from the provided filepath. The backup file
 // primary seed is loaded as an auxiliary seed.
 func (w *Wallet) LoadBackup(masterKey, backupMasterKey crypto.TwofishKey, backupFilepath string) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
+
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 

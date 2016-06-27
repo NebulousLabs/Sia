@@ -306,6 +306,9 @@ type (
 		EncryptionManager
 		KeyManager
 
+		// Close permits clean shutdown during testing and serving.
+		Close() error
+
 		// ConfirmedBalance returns the confirmed balance of the wallet, minus
 		// any outgoing transactions. ConfirmedBalance will include unconfirmed
 		// refund transactions.
