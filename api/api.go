@@ -169,7 +169,8 @@ func (srv *Server) initAPI(password string) {
 
 	// TransactionPool API Calls
 	if srv.tpool != nil {
-		router.GET("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+		// TODO: re-enable this route once the transaction pool API has been finalized
+		//router.GET("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls

@@ -60,7 +60,6 @@ Table of contents
 - [Host](#host)
 - [Miner](#miner)
 - [Renter](#renter)
-- [Transaction Pool](#transaction-pool)
 - [Wallet](#wallet)
 
 Daemon
@@ -885,28 +884,6 @@ the host.
 hastings/byte/block.
 
 'unlockhash' is the coin address of the host.
-
-Transaction Pool
-----------------
-
-Queries:
-
-* /transactionpool/transactions [GET]
-
-#### /transactionpool/transactions [GET]
-
-Function: Returns all of the transactions in the transaction pool.
-
-Parameters: none
-
-Response:
-```
-struct {
-	transactions []types.Transaction
-}
-```
-Please see types/transactions.go for a more detailed explanation of
-what a transaction looks like. There are many fields.
 
 
 Wallet
