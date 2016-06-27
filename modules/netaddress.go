@@ -59,6 +59,10 @@ func (na NetAddress) isLoopback() bool {
 	}
 	return false
 }
+// exported form of isLoopback
+func (na NetAddress) IsLoopback() bool {
+	return na.isLoopback()
+}
 
 // IsValid returns an error if the NetAddress is invalid. A valid NetAddress
 // is of the form "host:port", such that "host" is either a valid IPv4/IPv6
