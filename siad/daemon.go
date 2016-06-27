@@ -60,7 +60,7 @@ func processConfig(config Config) (Config, error) {
 	if !config.Siad.AllowAPIBind {
 		addr := modules.NetAddress(config.Siad.APIaddr)
 		if !addr.IsLoopback() && addr.Host() != "" {
-			return Config{}, errors.New("you must pass --disable-security to bind Siad to a non-localhost address")
+			return Config{}, errors.New("you must pass --disable-api-security to bind Siad to a non-localhost address")
 		}
 	}
 	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
