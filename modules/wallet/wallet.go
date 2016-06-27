@@ -5,9 +5,11 @@ package wallet
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -135,6 +137,29 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 	return w, nil
+}
+
+// Close terminates all ongoing processes involving the wallet, enabling
+// garbage collection.
+func (w *Wallet) Close() error {
+	var errs []error
+	// Lock the wallet outside of mu.Lock because Lock uses its own mu.Lock.
+	if w.Unlocked() {
+		if err := w.Lock(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.cs.Unsubscribe(w)
+	w.tpool.Unsubscribe(w)
+
+	if err := w.log.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
+	}
+	return build.JoinErrors(errs, "; ")
 }
 
 // AllAddresses returns all addresses that the wallet is able to spend from,
