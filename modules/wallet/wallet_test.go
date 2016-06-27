@@ -197,3 +197,31 @@ func TestAllAddresses(t *testing.T) {
 		}
 	}
 }
+
+// TestCloseWallet tries to close the wallet.
+func TestCloseWallet(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	testdir := build.TempDir(modules.WalletDir, "TestCloseWallet")
+	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g, filepath.Join(testdir, modules.TransactionPoolDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wdir := filepath.Join(testdir, modules.WalletDir)
+	w, err := New(cs, tp, wdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
