@@ -132,8 +132,14 @@ func createBlankWalletTester(name string) (*walletTester, error) {
 
 // closeWt closes all of the modules in the wallet tester.
 func (wt *walletTester) closeWt() {
-	err := wt.gateway.Close()
-	if err != nil {
+	errs := []error{
+		wt.gateway.Close(),
+		wt.cs.Close(),
+		wt.tpool.Close(),
+		wt.miner.Close(),
+		wt.wallet.Close(),
+	}
+	if err := build.JoinErrors(errs, "; "); err != nil {
 		panic(err)
 	}
 }
