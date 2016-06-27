@@ -35,14 +35,14 @@ const (
 
 // decodeErrorResponse returns an error if the response's status code is
 // non-2xx. If the status code is non-2xx and the response body is an encoded
-// APIError and human readable error message is returned.
+// Error and human readable error message is returned.
 func decodeErrorResponse(resp *http.Response) error {
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		respErr, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}
-		var apiErr api.APIError
+		var apiErr api.Error
 		err = json.Unmarshal(respErr, apiErr)
 		if err != nil {
 			return err

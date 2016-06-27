@@ -8,10 +8,10 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// APIError is a type that is encoded as JSON and returned in an API response
-// in the event of an error. Only the Message field is required. More fields
-// may be added to this struct in the future for better error reporting.
-type APIError struct {
+// Error is a type that is encoded as JSON and returned in an API response in
+// the event of an error. Only the Message field is required. More fields may
+// be added to this struct in the future for better error reporting.
+type Error struct {
 	// Message describes the error in English. Typically it is set to
 	// `err.Error()`. This field is required.
 	Message string `json:"message"`
@@ -28,9 +28,9 @@ type APIError struct {
 	// be valid or invalid depending on the current state of a module.
 }
 
-// Error implements the error interface for APIError. It returns only the
+// Error implements the error interface for the Error type. It returns only the
 // Message field.
-func (err APIError) Error() string {
+func (err Error) Error() string {
 	return err.Message
 }
 
@@ -89,7 +89,7 @@ func HttpPOSTAuthenticated(url string, data string, password string) (resp *http
 func requireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !strings.Contains(req.UserAgent(), ua) {
-			writeError(w, APIError{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
+			writeError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
 		h.ServeHTTP(w, req)
@@ -108,7 +108,7 @@ func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		_, pass, ok := req.BasicAuth()
 		if !ok || pass != password {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
-			writeError(w, APIError{"API authentication failed."}, http.StatusUnauthorized)
+			writeError(w, Error{"API authentication failed."}, http.StatusUnauthorized)
 			return
 		}
 		h(w, req, ps)
@@ -231,7 +231,7 @@ func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Requ
 }
 
 // writeError an error to the API caller.
-func writeError(w http.ResponseWriter, err APIError, code int) {
+func writeError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	if json.NewEncoder(w).Encode(err) != nil {

@@ -338,7 +338,7 @@ func createExplorerServerTester(name string) (*serverTester, error) {
 }
 
 // decodeErrorResponse returns an error if the response's status code is
-// non-2xx. If an error message or APIError is included in the response, it is
+// non-2xx. If an error message or Error is included in the response, it is
 // decoded and returned as the error.
 func decodeErrorResponse(resp *http.Response) error {
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -346,7 +346,7 @@ func decodeErrorResponse(resp *http.Response) error {
 		if err != nil {
 			return err
 		}
-		var apiErr APIError
+		var apiErr Error
 		err = json.Unmarshal(respErr, &apiErr)
 		if err != nil {
 			return err
