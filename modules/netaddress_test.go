@@ -171,8 +171,8 @@ func TestIsLoopback(t *testing.T) {
 		{"[::1]", false},
 	}
 	for _, test := range testSet {
-		if test.query.isLoopback() != test.desiredResponse {
-			t.Error("test failed:", test, test.query.isLoopback())
+		if test.query.IsLoopback() != test.desiredResponse {
+			t.Error("test failed:", test, test.query.IsLoopback())
 		}
 	}
 }
