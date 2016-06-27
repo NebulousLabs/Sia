@@ -267,7 +267,7 @@ func TestIntegrationWalletTransactionGETid(t *testing.T) {
 	// A call to /wallet/transactions without startheight and endheight parameters
 	// should return a descriptive error message.
 	err = st.getAPI("/wallet/transactions", &wtg)
-	if err == nil || err.Error() != "startheight and endheight must be provided to a /wallet/transactions call.\n" {
+	if err == nil || err.Error() != "startheight and endheight must be provided to a /wallet/transactions call." {
 		t.Error("expecting /wallet/transactions call with empty parameters to error")
 	}
 

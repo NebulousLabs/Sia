@@ -28,6 +28,12 @@ type APIError struct {
 	// be valid or invalid depending on the current state of a module.
 }
 
+// Error implements the error interface for APIError. It returns only the
+// Message field.
+func (err APIError) Error() string {
+	return err.Message
+}
+
 // HttpGET is a utility function for making http get requests to sia with a
 // whitelisted user-agent. A non-2xx response does not return an error.
 func HttpGET(url string) (resp *http.Response, err error) {

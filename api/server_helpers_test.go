@@ -346,8 +346,12 @@ func decodeErrorResponse(resp *http.Response) error {
 		if err != nil {
 			return err
 		}
-		// TODO: unmarshal respErr to an APIError type if applicable.
-		return errors.New(string(respErr))
+		var apiErr APIError
+		err = json.Unmarshal(respErr, &apiErr)
+		if err != nil {
+			return err
+		}
+		return apiErr
 	}
 	return nil
 }
