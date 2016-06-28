@@ -35,9 +35,18 @@ type (
 		FinancialMetrics modules.RenterFinancialMetrics `json:"financialmetrics"`
 	}
 
+	// RenterContract represents a contract formed by the renter.
+	RenterContract struct {
+		FileContract types.FileContract         `json:"filecontract"`
+		ID           types.FileContractID       `json:"id"`
+		LastRevision types.FileContractRevision `json:"lastrevision"`
+		NetAddress   modules.NetAddress         `json:"netaddress"`
+		Size         uint64                     `json:"size"`
+	}
+
 	// RenterContracts contains the renter's contracts.
 	RenterContracts struct {
-		Contracts []modules.RenterContract `json:"contracts"`
+		Contracts []RenterContract `json:"contracts"`
 	}
 
 	// DownloadQueue contains the renter's download queue.
@@ -120,12 +129,15 @@ func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
 func (srv *Server) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	// if srv.renter.Contracts() is nil, marshal a 0-length slice instead.
-	// this prevents the API from returning `contracts: null` when there are zero contracts,
-	// and instead returns an empty array `contracts: []`.
-	contracts := srv.renter.Contracts()
-	if contracts == nil {
-		contracts = []modules.RenterContract{}
+	contracts := []RenterContract{}
+	for _, c := range srv.renter.Contracts() {
+		contracts = append(contracts, RenterContract{
+			FileContract: c.FileContract,
+			ID:           c.ID,
+			LastRevision: c.LastRevision,
+			NetAddress:   c.NetAddress,
+			Size:         modules.SectorSize * uint64(len(c.MerkleRoots)),
+		})
 	}
 	writeJSON(w, RenterContracts{
 		Contracts: contracts,

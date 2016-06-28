@@ -276,7 +276,7 @@ func rentersetallowancecmd(amount, period string) {
 
 // byHeight sorts contracts by their expiration, high to low. If two contracts
 // expire at the same height, they are sorted by their host's address.
-type byHeight []modules.RenterContract
+type byHeight []api.RenterContract
 
 func (s byHeight) Len() int      { return len(s) }
 func (s byHeight) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
@@ -305,9 +305,12 @@ func rentercontractscmd() {
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Host\tValue\tData\tEnd Height\tID")
 	for _, c := range rc.Contracts {
-		value := currencyUnits(c.LastRevision.NewValidProofOutputs[0].Value)
-		data := filesizeUnits(int64(modules.SectorSize) * int64(len(c.MerkleRoots)))
-		fmt.Fprintf(w, "%v\t%8s\t%v\t%v\t%v\n", c.NetAddress, value, data, c.LastRevision.NewWindowStart, c.ID)
+		fmt.Fprintf(w, "%v\t%8s\t%v\t%v\t%v\n",
+			c.NetAddress,
+			currencyUnits(c.LastRevision.NewValidProofOutputs[0].Value),
+			filesizeUnits(int64(c.Size)),
+			c.LastRevision.NewWindowStart,
+			c.ID)
 	}
 	w.Flush()
 }
