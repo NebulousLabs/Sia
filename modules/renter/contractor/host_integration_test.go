@@ -546,6 +546,10 @@ func TestIntegrationRenew(t *testing.T) {
 	} else if contract.FileContract.WindowStart != c.blockHeight+200 {
 		t.Fatal(contract.FileContract.WindowStart)
 	}
+	// check that Merkle roots are intact
+	if len(contract.MerkleRoots) != len(oldContract.MerkleRoots) {
+		t.Fatal(len(contract.MerkleRoots), len(oldContract.MerkleRoots))
+	}
 
 	// download the renewed contract
 	downloader, err := c.Downloader(contract)
@@ -572,6 +576,10 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 	if contract.FileContract.WindowStart != c.blockHeight+100 {
 		t.Fatal(contract.FileContract.WindowStart)
+	}
+	// check that Merkle roots are intact
+	if len(contract.MerkleRoots) != len(oldContract.MerkleRoots) {
+		t.Fatal(len(contract.MerkleRoots), len(oldContract.MerkleRoots))
 	}
 }
 
