@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -33,23 +32,22 @@ const (
 	exitCodeUsage   = 64 // EX_USAGE in sysexits.h
 )
 
-// decodeErrorResponse returns an error if the response's status code is
-// non-2xx. If the status code is non-2xx and the response body is an encoded
-// Error and human readable error message is returned.
-func decodeErrorResponse(resp *http.Response) error {
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		var apiErr api.Error
-		err = json.Unmarshal(respErr, apiErr)
-		if err != nil {
-			return err
-		}
-		return apiErr
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// decodeError returns the api.Error from a API response. This method should
+// only be called if the response's status code is non-2xx. The error returned
+// may not be of type api.Error in the event of an error unmarshalling the
+// JSON.
+func decodeError(resp *http.Response) error {
+	var apiErr api.Error
+	err := json.NewDecoder(resp.Body).Decode(&apiErr)
+	if err != nil {
+		return err
 	}
-	return nil
+	return apiErr
 }
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -80,9 +78,9 @@ func apiGet(call string) (*http.Response, error) {
 		resp.Body.Close()
 		return nil, errors.New("API call not recognized: " + call)
 	}
-	if err := decodeErrorResponse(resp); err != nil {
+	if non2xx(resp.StatusCode) {
 		resp.Body.Close()
-		return nil, err
+		return nil, decodeError(resp)
 	}
 	return resp, nil
 }
@@ -147,9 +145,9 @@ func apiPost(call, vals string) (*http.Response, error) {
 		resp.Body.Close()
 		return nil, errors.New("API call not recognized: " + call)
 	}
-	if err := decodeErrorResponse(resp); err != nil {
+	if non2xx(resp.StatusCode) {
 		resp.Body.Close()
-		return nil, err
+		return nil, decodeError(resp)
 	}
 	return resp, nil
 }

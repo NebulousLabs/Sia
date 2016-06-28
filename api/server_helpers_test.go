@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -337,23 +336,22 @@ func createExplorerServerTester(name string) (*serverTester, error) {
 	return st, nil
 }
 
-// decodeErrorResponse returns an error if the response's status code is
-// non-2xx. If an error message or Error is included in the response, it is
-// decoded and returned as the error.
-func decodeErrorResponse(resp *http.Response) error {
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		var apiErr Error
-		err = json.Unmarshal(respErr, &apiErr)
-		if err != nil {
-			return err
-		}
-		return apiErr
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// decodeError returns the api.Error from a API response. This method should
+// only be called if the response's status code is non-2xx. The error returned
+// may not be of type api.Error in the event of an error unmarshalling the
+// JSON.
+func decodeError(resp *http.Response) error {
+	var apiErr Error
+	err := json.NewDecoder(resp.Body).Decode(&apiErr)
+	if err != nil {
+		return err
 	}
-	return nil
+	return apiErr
 }
 
 // reloadedServerTester creates a server tester where all of the persistent
@@ -452,9 +450,8 @@ func (st *serverTester) getAPI(call string, obj interface{}) error {
 	}
 	defer resp.Body.Close()
 
-	err = decodeErrorResponse(resp)
-	if err != nil {
-		return err
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
 	}
 
 	// Return early because there is no content to decode.
@@ -478,9 +475,8 @@ func (st *serverTester) postAPI(call string, values url.Values, obj interface{})
 	}
 	defer resp.Body.Close()
 
-	err = decodeErrorResponse(resp)
-	if err != nil {
-		return err
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
 	}
 
 	// Return early because there is no content to decode.
@@ -503,7 +499,11 @@ func (st *serverTester) stdGetAPI(call string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	return decodeErrorResponse(resp)
+
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
+	}
+	return nil
 }
 
 // stdGetAPIUA makes an API call with a custom user agent.
@@ -518,7 +518,11 @@ func (st *serverTester) stdGetAPIUA(call string, userAgent string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	return decodeErrorResponse(resp)
+
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
+	}
+	return nil
 }
 
 // stdPostAPI makes an API call and discards the response.
@@ -528,5 +532,9 @@ func (st *serverTester) stdPostAPI(call string, values url.Values) error {
 		return err
 	}
 	defer resp.Body.Close()
-	return decodeErrorResponse(resp)
+
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
+	}
+	return nil
 }
