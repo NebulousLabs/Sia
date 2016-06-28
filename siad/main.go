@@ -26,9 +26,10 @@ const (
 // compatible with gcfg.
 type Config struct {
 	Siad struct {
-		APIaddr  string
-		RPCaddr  string
-		HostAddr string
+		APIaddr      string
+		RPCaddr      string
+		HostAddr     string
+		AllowAPIBind bool
 
 		Modules           string
 		NoBootstrap       bool
@@ -157,6 +158,7 @@ func main() {
 	root.Flags().StringVarP(&globalConfig.Siad.RPCaddr, "rpc-addr", "", ":9981", "which port the gateway listens on")
 	root.Flags().StringVarP(&globalConfig.Siad.Modules, "modules", "M", "cghmrtw", "enabled modules, see 'siad modules' for more info")
 	root.Flags().BoolVarP(&globalConfig.Siad.AuthenticateAPI, "authenticate-api", "", false, "enable API password protection")
+	root.Flags().BoolVarP(&globalConfig.Siad.AllowAPIBind, "disable-api-security", "", false, "allow siad to listen on a non-localhost address (DANGEROUS)")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

@@ -45,8 +45,8 @@ func (na NetAddress) Port() string {
 	return port
 }
 
-// isLoopback returns true for IP addresses that are on the same machine.
-func (na NetAddress) isLoopback() bool {
+// IsLoopback returns true for IP addresses that are on the same machine.
+func (na NetAddress) IsLoopback() bool {
 	host, _, err := net.SplitHostPort(string(na))
 	if err != nil {
 		return false
@@ -81,7 +81,7 @@ func (na NetAddress) IsValid() error {
 
 	// This check must come after the valid port check so that a host such as
 	// "localhost:badport" will fail.
-	if na.isLoopback() {
+	if na.IsLoopback() {
 		if build.Release == "testing" {
 			return nil
 		}
