@@ -241,6 +241,9 @@ func main() {
 
 	root.AddCommand(stopCmd)
 
+	root.AddCommand(updateCmd)
+	updateCmd.AddCommand(updateCheckCmd)
+
 	root.AddCommand(hostCmd)
 	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostFolderCmd, hostSectorCmd)
 	hostFolderCmd.AddCommand(hostFolderAddCmd, hostFolderRemoveCmd, hostFolderResizeCmd)

@@ -124,6 +124,8 @@ func (srv *Server) initAPI(password string) {
 	// Daemon API Calls
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
+	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
+	router.POST("/daemon/update", srv.daemonUpdateHandlerPOST)
 	router.GET("/daemon/stop", requirePassword(srv.daemonStopHandler, password))
 
 	// Consensus API Calls
