@@ -53,8 +53,8 @@ type DaemonVersion struct {
 // UpdateInfo indicates whether an update is available, and to what
 // version.
 type UpdateInfo struct {
-	Available bool
-	Version   string
+	Available bool   `json:"available"`
+	Version   string `json:"version"`
 }
 
 // githubRelease represents of the JSON returned by the GitHub release API
