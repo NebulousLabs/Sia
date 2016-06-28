@@ -149,8 +149,9 @@ func updateToRelease(release githubRelease) error {
 	if err != nil {
 		return err
 	}
-	// release is small enough to store in memory
-	content, err := ioutil.ReadAll(resp.Body)
+	// release should be small enough to store in memory (<10 MiB); use
+	// LimitReader to ensure we don't download more than 32 MiB
+	content, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1<<25))
 	resp.Body.Close()
 	if err != nil {
 		return err
