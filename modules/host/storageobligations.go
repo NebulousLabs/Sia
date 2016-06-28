@@ -42,10 +42,10 @@ import (
 )
 
 const (
-	obligationConfused  storageObligationStatus = iota // Indicatees that an unitialized value was used.
-	obligationRejected                                 // Indicates that the obligation never got started, no revenue gained or lost.
-	obligationSucceeded                                // Indicates that the obligation was completed, revenues were gained.
-	obligationFailed                                   // Indicates that the obligation failed, revenues and collateral were lost.
+	obligationUnresolved storageObligationStatus = iota // Indicatees that an unitialized value was used.
+	obligationRejected                                  // Indicates that the obligation never got started, no revenue gained or lost.
+	obligationSucceeded                                 // Indicates that the obligation was completed, revenues were gained.
+	obligationFailed                                    // Indicates that the obligation failed, revenues and collateral were lost.
 )
 
 var (
@@ -107,7 +107,7 @@ var (
 	errNoStorageObligation = errors.New("storage obligation not found in database")
 )
 
-type storageObligationStatus int
+type storageObligationStatus uint64
 
 // storageObligation contains all of the metadata related to a file contract
 // and the storage contained by the file contract.
@@ -139,6 +139,7 @@ type storageObligation struct {
 	OriginConfirmed   bool
 	RevisionConfirmed bool
 	ProofConfirmed    bool
+	ObligationStatus  storageObligationStatus
 }
 
 // getStorageObligation fetches a storage obligation from the database tx.
@@ -535,8 +536,8 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	}
 
 	// Update the host revenue metrics based on the status of the obligation.
-	if sos == obligationConfused {
-		h.log.Critical("storage obligation confused!")
+	if sos == obligationUnresolved {
+		h.log.Critical("storage obligation 'unresolved' during call to removeStorageObligation")
 	}
 	h.financialMetrics.ContractCount--
 	if sos == obligationRejected {
@@ -581,10 +582,14 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 		h.financialMetrics.LostRevenue = h.financialMetrics.LostRevenue.Add(so.ContractCost).Add(so.PotentialStorageRevenue).Add(so.PotentialDownloadRevenue).Add(so.PotentialUploadRevenue)
 	}
 
-	// Delete the storage obligation from the database.
+	// Update the storage obligation to be finalized but still in-database. The
+	// obligation status is updated so that the user can see how the obligation
+	// ended up, and the sector roots are removed because they are large
+	// objects with little purpose once storage proofs are no longer needed.
+	so.ObligationStatus = sos
+	so.SectorRoots = nil
 	return h.db.Update(func(tx *bolt.Tx) error {
-		soid := so.id()
-		return tx.Bucket(bucketStorageObligations).Delete(soid[:])
+		return putStorageObligation(tx, *so)
 	})
 }
 

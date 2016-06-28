@@ -169,7 +169,7 @@ func TestBlankStorageObligation(t *testing.T) {
 		}
 		return nil
 	})
-	if err != errNoStorageObligation {
+	if err != nil {
 		t.Fatal(err)
 	}
 	fm = ht.host.FinancialMetrics()
@@ -318,7 +318,7 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	}
 
 	// Mine blocks until the storage proof has enough confirmations that the
-	// host will delete the file entirely.
+	// host will finalize the obligation.
 	for i := 0; i <= int(defaultWindowSize); i++ {
 		_, err := ht.miner.AddBlock()
 		if err != nil {
@@ -330,9 +330,15 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if so.SectorRoots != nil {
+			t.Error("sector roots were not cleared when the host finalized the obligation")
+		}
+		if so.ObligationStatus != obligationSucceeded {
+			t.Error("obligation is not being reported as successful:", so.ObligationStatus)
+		}
 		return nil
 	})
-	if err != errNoStorageObligation {
+	if err != nil {
 		t.Fatal(err)
 	}
 	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost) != 0 {
@@ -571,9 +577,15 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if so.SectorRoots != nil {
+			t.Error("sector roots were not cleared out when the storage proof was finalized")
+		}
+		if so.ObligationStatus != obligationSucceeded {
+			t.Error("storage obligation was not reported as a success")
+		}
 		return nil
 	})
-	if err != errNoStorageObligation {
+	if err != nil {
 		t.Fatal(err)
 	}
 	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost.Add(sectorCost2)) != 0 {
@@ -706,12 +718,15 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if so.SectorRoots != nil {
+			t.Error("sector roots were not cleared out when the storage proof was finalized")
+		}
+		if so.ObligationStatus != obligationSucceeded {
+			t.Error("storage obligation was not reported as a success")
+		}
 		return nil
 	})
-	if err != errNoStorageObligation {
-		t.Error(so.OriginConfirmed)
-		t.Error(so.RevisionConfirmed)
-		t.Error(so.ProofConfirmed)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if ht.host.financialMetrics.StorageRevenue.Cmp(sectorCost) != 0 {
