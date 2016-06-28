@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"reflect"
-	"strings"
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
@@ -34,8 +32,26 @@ const (
 	exitCodeUsage   = 64 // EX_USAGE in sysexits.h
 )
 
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// decodeError returns the api.Error from a API response. This method should
+// only be called if the response's status code is non-2xx. The error returned
+// may not be of type api.Error in the event of an error unmarshalling the
+// JSON.
+func decodeError(resp *http.Response) error {
+	var apiErr api.Error
+	err := json.NewDecoder(resp.Body).Decode(&apiErr)
+	if err != nil {
+		return err
+	}
+	return apiErr
+}
+
 // apiGet wraps a GET request with a status code check, such that if the GET does
-// not return 200, the error will be read and returned. The response body is
+// not return 2xx, the error will be read and returned. The response body is
 // not closed.
 func apiGet(call string) (*http.Response, error) {
 	if host, port, _ := net.SplitHostPort(addr); host == "" {
@@ -60,22 +76,28 @@ func apiGet(call string) (*http.Response, error) {
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		resp.Body.Close()
-		err = errors.New("API call not recognized: " + call)
-	} else if resp.StatusCode != http.StatusOK {
-		errResp, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		err = errors.New(strings.TrimSpace(string(errResp)))
+		return nil, errors.New("API call not recognized: " + call)
 	}
-	return resp, err
+	if non2xx(resp.StatusCode) {
+		resp.Body.Close()
+		return nil, decodeError(resp)
+	}
+	return resp, nil
 }
 
-// getAPI makes a GET API call and decodes the response.
+// getAPI makes a GET API call and decodes the response. An error is returned
+// if the response status is not 2xx.
 func getAPI(call string, obj interface{}) error {
 	resp, err := apiGet(call)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		return errors.New("expecting a response, but API returned status code 204 No Content")
+	}
+
 	err = json.NewDecoder(resp.Body).Decode(obj)
 	if err != nil {
 		return err
@@ -83,7 +105,8 @@ func getAPI(call string, obj interface{}) error {
 	return nil
 }
 
-// get makes an API call and discards the response.
+// get makes an API call and discards the response. An error is returned if the
+// response status is not 2xx.
 func get(call string) error {
 	resp, err := apiGet(call)
 	if err != nil {
@@ -94,7 +117,7 @@ func get(call string) error {
 }
 
 // apiPost wraps a POST request with a status code check, such that if the POST
-// does not return 200, the error will be read and returned. The response body
+// does not return 2xx, the error will be read and returned. The response body
 // is not closed.
 func apiPost(call, vals string) (*http.Response, error) {
 	if host, port, _ := net.SplitHostPort(addr); host == "" {
@@ -120,22 +143,28 @@ func apiPost(call, vals string) (*http.Response, error) {
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		resp.Body.Close()
-		err = errors.New("API call not recognized: " + call)
-	} else if resp.StatusCode != http.StatusOK {
-		errResp, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		err = errors.New(strings.TrimSpace(string(errResp)))
+		return nil, errors.New("API call not recognized: " + call)
 	}
-	return resp, err
+	if non2xx(resp.StatusCode) {
+		resp.Body.Close()
+		return nil, decodeError(resp)
+	}
+	return resp, nil
 }
 
-// postResp makes a POST API call and decodes the response.
+// postResp makes a POST API call and decodes the response. An error is
+// returned if the response status is not 2xx.
 func postResp(call, vals string, obj interface{}) error {
 	resp, err := apiPost(call, vals)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		return errors.New("expecting a response, but API returned status code 204 No Content")
+	}
+
 	err = json.NewDecoder(resp.Body).Decode(obj)
 	if err != nil {
 		return err
@@ -143,6 +172,8 @@ func postResp(call, vals string, obj interface{}) error {
 	return nil
 }
 
+// post makes an API call and discards the response. An error is returned if
+// the response status is not 2xx.
 func post(call, vals string) error {
 	resp, err := apiPost(call, vals)
 	if err != nil {

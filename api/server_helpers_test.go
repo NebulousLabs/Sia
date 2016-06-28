@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -337,6 +336,24 @@ func createExplorerServerTester(name string) (*serverTester, error) {
 	return st, nil
 }
 
+// non2xx returns true for non-success HTTP status codes.
+func non2xx(code int) bool {
+	return code < 200 || code > 299
+}
+
+// decodeError returns the api.Error from a API response. This method should
+// only be called if the response's status code is non-2xx. The error returned
+// may not be of type api.Error in the event of an error unmarshalling the
+// JSON.
+func decodeError(resp *http.Response) error {
+	var apiErr Error
+	err := json.NewDecoder(resp.Body).Decode(&apiErr)
+	if err != nil {
+		return err
+	}
+	return apiErr
+}
+
 // reloadedServerTester creates a server tester where all of the persistent
 // data has been copied to a new folder and all of the modules re-initialized
 // on the new folder. This gives an opportunity to see how modules will behave
@@ -433,13 +450,13 @@ func (st *serverTester) getAPI(call string, obj interface{}) error {
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
+	}
+
+	// Return early because there is no content to decode.
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
 	}
 
 	// Decode the response into 'obj'.
@@ -458,13 +475,13 @@ func (st *serverTester) postAPI(call string, values url.Values, obj interface{})
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
+	}
+
+	// Return early because there is no content to decode.
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
 	}
 
 	// Decode the response into 'obj'.
@@ -483,13 +500,8 @@ func (st *serverTester) stdGetAPI(call string) error {
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
 	}
 	return nil
 }
@@ -507,13 +519,8 @@ func (st *serverTester) stdGetAPIUA(call string, userAgent string) error {
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
 	}
 	return nil
 }
@@ -526,13 +533,8 @@ func (st *serverTester) stdPostAPI(call string, values url.Values) error {
 	}
 	defer resp.Body.Close()
 
-	// Check for a call error.
-	if resp.StatusCode != http.StatusOK {
-		respErr, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		return errors.New(string(respErr))
+	if non2xx(resp.StatusCode) {
+		return decodeError(resp)
 	}
 	return nil
 }

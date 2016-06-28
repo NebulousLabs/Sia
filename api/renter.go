@@ -79,25 +79,25 @@ func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _
 	// scan values
 	funds, ok := scanAmount(req.FormValue("funds"))
 	if !ok {
-		writeError(w, "Couldn't parse funds", http.StatusBadRequest)
+		writeError(w, Error{"Couldn't parse funds"}, http.StatusBadRequest)
 		return
 	}
 	// var hosts uint64
 	// _, err := fmt.Sscan(req.FormValue("hosts"), &hosts)
 	// if err != nil {
-	// 	writeError(w, "Couldn't parse hosts: "+err.Error(), http.StatusBadRequest)
+	// 	writeError(w, Error{"Couldn't parse hosts: "+err.Error()}, http.StatusBadRequest)
 	// 	return
 	// }
 	var period types.BlockHeight
 	_, err := fmt.Sscan(req.FormValue("period"), &period)
 	if err != nil {
-		writeError(w, "Couldn't parse period: "+err.Error(), http.StatusBadRequest)
+		writeError(w, Error{"Couldn't parse period: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	// var renewWindow types.BlockHeight
 	// _, err = fmt.Sscan(req.FormValue("renewwindow"), &renewWindow)
 	// if err != nil {
-	// 	writeError(w, "Couldn't parse renewwindow: "+err.Error(), http.StatusBadRequest)
+	// 	writeError(w, Error{"Couldn't parse renewwindow: "+err.Error()}, http.StatusBadRequest)
 	// 	return
 	// }
 
@@ -112,7 +112,7 @@ func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _
 		},
 	})
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -143,7 +143,7 @@ func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request
 func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	files, err := srv.renter.LoadSharedFiles(req.FormValue("source"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _
 func (srv *Server) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	files, err := srv.renter.LoadSharedFilesAscii(req.FormValue("asciisia"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (srv *Server) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Reque
 func (srv *Server) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	err := srv.renter.RenameFile(strings.TrimPrefix(ps.ByName("siapath"), "/"), req.FormValue("newsiapath"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -186,7 +186,7 @@ func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request, 
 func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	err := srv.renter.DeleteFile(strings.TrimPrefix(ps.ByName("siapath"), "/"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request,
 func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	err := srv.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), req.FormValue("destination"))
 	if err != nil {
-		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
+		writeError(w, Error{"Download failed: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 
@@ -209,7 +209,7 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	err := srv.renter.ShareFiles(strings.Split(req.FormValue("siapaths"), ","), req.FormValue("destination"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -221,7 +221,7 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	ascii, err := srv.renter.ShareFilesAscii(strings.Split(req.FormValue("siapaths"), ","))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, RenterShareASCII{
@@ -238,7 +238,7 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 		ErasureCode: nil,
 	})
 	if err != nil {
-		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
+		writeError(w, Error{"Upload failed: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 
@@ -258,7 +258,7 @@ func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Req
 		// Parse the value for 'numhosts'.
 		_, err := fmt.Sscan(req.FormValue("numhosts"), &numHosts)
 		if err != nil {
-			writeError(w, err.Error(), http.StatusBadRequest)
+			writeError(w, Error{err.Error()}, http.StatusBadRequest)
 			return
 		}
 

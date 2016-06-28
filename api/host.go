@@ -92,14 +92,14 @@ func (srv *Server) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ h
 		if req.FormValue(qs) != "" { // skip empty values
 			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
 			if err != nil {
-				writeError(w, "Malformed "+qs, http.StatusBadRequest)
+				writeError(w, Error{"Malformed " + qs}, http.StatusBadRequest)
 				return
 			}
 		}
 	}
 	err := srv.host.SetInternalSettings(settings)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -115,7 +115,7 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 		err = srv.host.Announce()
 	}
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -137,12 +137,12 @@ func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Req
 	var folderSize uint64
 	_, err := fmt.Sscan(req.FormValue("size"), &folderSize)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = srv.host.AddStorageFolder(folderPath, folderSize)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -154,19 +154,19 @@ func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.
 	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	var newSize uint64
 	_, err = fmt.Sscan(req.FormValue("newsize"), &newSize)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = srv.host.ResizeStorageFolder(folderIndex, newSize)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -179,14 +179,14 @@ func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.
 	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	force := req.FormValue("force") == "true"
 	err = srv.host.RemoveStorageFolder(folderIndex, force)
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -197,12 +197,12 @@ func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.
 func (srv *Server) storageSectorsDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	sectorRoot, err := scanAddress(ps.ByName("merkleroot"))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = srv.host.DeleteSector(crypto.Hash(sectorRoot))
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)

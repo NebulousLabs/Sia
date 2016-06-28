@@ -41,12 +41,9 @@ The standard error response indicating the request failed for any reason, is a
 4xx or 5xx HTTP status code with an error JSON object describing the error.
 ```javascript
 {
-    "error": {
-        "message": String
+    "message": String
 
-        // The error object may have additional fields depending on the
-        // specific error.
-    }
+    // There may be additional fields depending on the specific error.
 }
 ```
 
