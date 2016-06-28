@@ -32,7 +32,7 @@ type (
 	// to /host/storage - a bunch of information about the status of storage
 	// management on the host.
 	StorageGET struct {
-		Folders []modules.StorageFolderMetadata `json:"folders"`
+		FolderMetadata []modules.StorageFolderMetadata `json:"foldermetadata"`
 	}
 )
 
@@ -126,7 +126,7 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 func (srv *Server) storageHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folders := srv.host.StorageFolders()
 	sg := StorageGET{
-		Folders: folders,
+		FolderMetadata: folders,
 	}
 	writeJSON(w, sg)
 }

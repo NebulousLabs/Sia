@@ -494,11 +494,11 @@ Parameters: none
 Response:
 ```javascript
 {
-  "folders": [
+  "foldermetadata": [
     {
-      "path": "/home/foo/bar",
-      "capacity": 50000000000, // bytes
-      "capacityremaining": 100000, // bytes
+      "path":              "/home/foo/bar",
+      "capacity":          50000000000,     // bytes
+      "capacityremaining": 100000,          // bytes
 
       "failedreads": 0,
       "failedwrites": 1,
@@ -531,7 +531,7 @@ will be stopped.
 
 Parameters:
 ```
-path // Required
+path  // Required
 force // bool, Optional, default is false
 ```
 
@@ -549,7 +549,7 @@ be stopped.
 
 Parameters:
 ```
-path // Required
+path    // Required
 newsize // bytes, Required
 ```
 
@@ -596,19 +596,19 @@ numhosts // Optional
 {
   "hosts": [
     {
-      "acceptingcontracts": true,
+      "acceptingcontracts":   true,
       "maxdownloadbatchsize": 17825792, // bytes
-      "maxduration": 25920, // blocks
-      "maxrevisebatchsize": 17825792, // bytes
-      "netaddress": "123.456.789.0:9982",
-      "remainingstorage": 35000000000, // bytes
-      "sectorsize": 4194304, // bytes
-      "totalstorage": 35000000000, // bytes
-      "unlockhash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
-      "windowsize": 144, // blocks
+      "maxduration":          25920,    // blocks
+      "maxrevisebatchsize":   17825792, // bytes
+      "netaddress":           "123.456.789.2:9982",
+      "remainingstorage":     35000000000, // bytes
+      "sectorsize":           4194304,     // bytes
+      "totalstorage":         35000000000, // bytes
+      "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "windowsize":           144, // blocks
       "publickey": {
         "algorithm": "ed25519",
-        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+        "key":        "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
     }
   ]
@@ -625,19 +625,19 @@ any particular order, and the order may change in subsequent calls.
 {
   "hosts": [
     {
-      "acceptingcontracts": true,
+      "acceptingcontracts":   true,
       "maxdownloadbatchsize": 17825792, // bytes
-      "maxduration": 25920, // blocks
-      "maxrevisebatchsize": 17825792, // bytes
-      "netaddress": "123.456.789.0:9982",
-      "remainingstorage": 35000000000, // bytes
-      "sectorsize": 4194304, // bytes
-      "totalstorage": 35000000000, // bytes
-      "unlockhash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
-      "windowsize": 144, // blocks
+      "maxduration":          25920,    // blocks
+      "maxrevisebatchsize":   17825792, // bytes
+      "netaddress":           "123.456.789.0:9982",
+      "remainingstorage":     35000000000, // bytes
+      "sectorsize":           4194304,     // bytes
+      "totalstorage":         35000000000, // bytes
+      "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "windowsize":           144, // blocks
       "publickey": {
         "algorithm": "ed25519",
-        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+        "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
     }
   ]

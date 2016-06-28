@@ -153,7 +153,7 @@ func hostcmd() {
 
 	// calculate total storage available and remaining
 	var totalstorage, storageremaining uint64
-	for _, folder := range sg.StorageFolderMetadata {
+	for _, folder := range sg.FolderMetadata {
 		totalstorage += folder.Capacity
 		storageremaining += folder.CapacityRemaining
 	}
@@ -286,13 +286,13 @@ RPC Stats:
 	fmt.Println("\nStorage Folders:")
 
 	// display storage folder info
-	if len(sg.StorageFolderMetadata) == 0 {
+	if len(sg.FolderMetadata) == 0 {
 		fmt.Println("No storage folders configured")
 		return
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 	fmt.Fprintf(w, "\tUsed\tCapacity\t%% Used\tPath\n")
-	for _, folder := range sg.StorageFolderMetadata {
+	for _, folder := range sg.FolderMetadata {
 		curSize := int64(folder.Capacity - folder.CapacityRemaining)
 		pctUsed := 100 * (float64(curSize) / float64(folder.Capacity))
 		fmt.Fprintf(w, "\t%s\t%s\t%.2f\t%s\n", filesizeUnits(curSize), filesizeUnits(int64(folder.Capacity)), pctUsed, folder.Path)
