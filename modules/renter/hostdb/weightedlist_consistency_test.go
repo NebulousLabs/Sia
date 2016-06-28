@@ -1,11 +1,13 @@
 package hostdb
 
-/*
 import (
+	"crypto/rand"
 	"errors"
-	"fmt"
+	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // repeatCheckHelper recursively goes through nodes in the host map and adds
@@ -52,31 +54,74 @@ func repeatCheck(hn *hostNode) error {
 	pkMap := make(map[string]struct{})
 	err := hn.repeatCheckHelper(ipMap, pkMap)
 	if err != nil {
-		hn.String()
 		return err
 	}
 	return nil
 }
 
-// Print recursively prints out the structure of a host tree.
-func (hn *hostNode) Print() {
-	if hn == nil {
-		fmt.Println("EMPTY TREE")
-		return
+// uniformTreeVerification checks that everything makes sense in the tree given
+// the number of entries that the tree is supposed to have and also given that
+// every entropy has the same weight.
+func uniformTreeVerification(hdb *HostDB, numEntries int) error {
+	// Check that the weight of the hostTree is what is expected.
+	expectedWeight := hdb.hostTree.hostEntry.Weight.Mul64(uint64(numEntries))
+	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
+		return errors.New("expected weight is incorrect")
 	}
-	fmt.Println("Node Head:", hn.hostEntry.NetAddress, hn.count)
 
-	if hn.left != nil {
-		fmt.Println("Node Left")
-		hn.left.Print()
-	} else {
-		fmt.Println("No Left")
+	// Check that the length of activeHosts and the count of hostTree are
+	// consistent.
+	if len(hdb.activeHosts) != numEntries {
+		return errors.New("unexpected number of active hosts")
 	}
-	if hn.right != nil {
-		fmt.Println("Node Right")
-		hn.right.Print()
-	} else {
-		fmt.Println("No Right")
+
+	// Select many random hosts and do naive statistical analysis on the
+	// results.
+	if !testing.Short() {
+		// Pull a bunch of random hosts and count how many times we pull each
+		// host.
+		selectionMap := make(map[modules.NetAddress]int)
+		expected := 100
+		for i := 0; i < expected*numEntries; i++ {
+			entries := hdb.RandomHosts(1, nil)
+			if len(entries) == 0 {
+				return errors.New("no hosts")
+			}
+			selectionMap[entries[0].NetAddress]++
+		}
+
+		// See if each host was selected enough times.
+		errorBound := 64 // Pretty large, but will still detect if something is seriously wrong.
+		for _, count := range selectionMap {
+			if count < expected-errorBound || count > expected+errorBound {
+				return errors.New("error bound was breached")
+			}
+		}
 	}
+
+	// Try removing an re-adding all hosts.
+	var removedEntries []*hostEntry
+	for {
+		if hdb.hostTree.weight.IsZero() {
+			break
+		}
+		randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
+		if err != nil {
+			break
+		}
+		node, err := hdb.hostTree.nodeAtWeight(types.NewCurrency(randWeight))
+		if err != nil {
+			break
+		}
+		node.removeNode()
+		delete(hdb.activeHosts, node.hostEntry.NetAddress)
+
+		// remove the entry from the hostdb so it won't be selected as a
+		// repeat.
+		removedEntries = append(removedEntries, node.hostEntry)
+	}
+	for _, entry := range removedEntries {
+		hdb.insertNode(entry)
+	}
+	return nil
 }
-*/

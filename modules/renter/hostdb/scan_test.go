@@ -50,6 +50,9 @@ func (dial probeDialer) DialTimeout(addr modules.NetAddress, timeout time.Durati
 
 // TestThreadedProbeHosts tests the threadedProbeHosts method.
 func TestThreadedProbeHosts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdb := bareHostDB()
 	hdb.persist = &memPersist{}
 
@@ -123,6 +126,105 @@ func TestThreadedProbeHosts(t *testing.T) {
 	runProbe(h)
 	if len(hdb.ActiveHosts()) != 1 {
 		t.Error("host was not added")
+	}
+}
+
+// TestThreadedProbeHostsCorruption tests the threadedProbeHosts method,
+// specifically checking for corruption of the hostdb if the weight of a host
+// changes after a scan.
+func TestThreadedProbeHostsCorruption(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	hdb := bareHostDB()
+	hdb.persist = &memPersist{}
+
+	// create a host to send to threadedProbeHosts
+	sk, pk, err := crypto.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := new(hostEntry)
+	h.NetAddress = "foo"
+	h.AcceptingContracts = true
+	h.PublicKey = types.SiaPublicKey{
+		Algorithm: types.SignatureEd25519,
+		Key:       pk[:],
+	}
+	h.Reliability = baseWeight // enough to withstand a few failures
+
+	// define a helper function for running threadedProbeHosts. We send the
+	// hostEntry, close the channel, and then call threadedProbeHosts.
+	// threadedProbeHosts will receive the host, loop once, and return after
+	// seeing the channel has closed.
+	//
+	// NOTE: since threadedProbeHosts decrements hdb.threadGroup, we Add(100)
+	// to prevent it from going negative. This is acceptable because we don't
+	// call hdb.Close in this test.
+	hdb.threadGroup.Add(100)
+	runProbe := func(h *hostEntry) {
+		hdb.scanPool <- h
+		close(hdb.scanPool)
+		hdb.threadedProbeHosts()
+		// reset hdb.scanPool
+		hdb.scanPool = make(chan *hostEntry, 1)
+	}
+
+	// Add a normal host.
+	hdb.dialer = probeDialer(func(modules.NetAddress, time.Duration) (net.Conn, error) {
+		// create an in-memory conn and spawn a goroutine to handle our half
+		ourConn, theirConn := net.Pipe()
+		go func() {
+			// read the RPC
+			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
+			// write host settings
+			crypto.WriteSignedObject(ourConn, modules.HostExternalSettings{
+				AcceptingContracts: true,
+				StoragePrice:       types.NewCurrency64(15e6),
+				NetAddress:         "probed",
+			}, sk)
+			ourConn.Close()
+		}()
+		return theirConn, nil
+	})
+	runProbe(h)
+	if len(hdb.ActiveHosts()) != 1 {
+		t.Error("host was not added")
+	}
+
+	// Add the host again, this time changing the storage price, which will
+	// change the weight of the host, which at one point would cause a
+	// corruption of the host tree.
+	hdb.dialer = probeDialer(func(modules.NetAddress, time.Duration) (net.Conn, error) {
+		// create an in-memory conn and spawn a goroutine to handle our half
+		ourConn, theirConn := net.Pipe()
+		go func() {
+			// read the RPC
+			encoding.ReadObject(ourConn, new(types.Specifier), types.SpecifierLen)
+			// write host settings
+			crypto.WriteSignedObject(ourConn, modules.HostExternalSettings{
+				AcceptingContracts: true,
+				StoragePrice:       types.NewCurrency64(15e3), // Lower than the previous, to cause a higher weight.
+				NetAddress:         "probed",
+			}, sk)
+			ourConn.Close()
+		}()
+		return theirConn, nil
+	})
+	runProbe(h)
+	if len(hdb.ActiveHosts()) != 1 {
+		t.Error("host was not added")
+	}
+
+	// Check that the host tree has not been corrupted.
+	err = repeatCheck(hdb.hostTree)
+	if err != nil {
+		t.Error(err)
+	}
+	err = uniformTreeVerification(hdb, 1)
+	if err != nil {
+		t.Error(err)
 	}
 }
 

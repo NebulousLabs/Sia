@@ -78,6 +78,56 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	}
 }
 
+// managedUpdateEntry updates an entry in the hostdb after a scan has taken
+// place.
+func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.HostExternalSettings, netErr error) {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+
+	// Regardless of whether the host responded, add it to allHosts.
+	priorHost, exists := hdb.allHosts[entry.NetAddress]
+	if !exists {
+		hdb.allHosts[entry.NetAddress] = entry
+	}
+
+	// If the scan was unsuccessful, decrement the host's reliability.
+	if netErr != nil {
+		if exists && bytes.Equal(priorHost.PublicKey.Key, entry.PublicKey.Key) {
+			// Only decrement the reliability if the public key in the
+			// hostdb matches the public key in the host announcement -
+			// the failure may just be a failed signature, indicating
+			// the wrong public key.
+			hdb.decrementReliability(entry.NetAddress, UnreachablePenalty)
+		}
+		return
+	}
+
+	// The host entry should be updated to reflect the new weight. The safety
+	// properties of the tree require that the weight does not change while the
+	// node is in the tree, so the node must be removed before the settings and
+	// weight are changed.
+	existingNode, exists := hdb.activeHosts[entry.NetAddress]
+	if exists {
+		existingNode.removeNode()
+		delete(hdb.activeHosts, entry.NetAddress)
+	}
+
+	// Update the host settings, reliability, and weight. The old NetAddress
+	// must be preserved.
+	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
+	entry.HostExternalSettings = newSettings
+	entry.Reliability = MaxReliability
+	entry.Weight = calculateHostWeight(*entry)
+	entry.Online = true
+
+	// If 'maxActiveHosts' has not been reached, add the host to the
+	// activeHosts tree.
+	if _, exists := hdb.activeHosts[entry.NetAddress]; exists || len(hdb.activeHosts) < maxActiveHosts {
+		hdb.insertNode(entry)
+	}
+	hdb.save()
+}
+
 // threadedProbeHosts tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
@@ -108,45 +158,8 @@ func (hdb *HostDB) threadedProbeHosts() {
 			hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey, "succeeded")
 		}
 
-		// Now that network communication is done, lock the hostdb to modify the
-		// host entry.
-		func() {
-			hdb.mu.Lock()
-			defer hdb.mu.Unlock()
-
-			// Regardless of whether the host responded, add it to allHosts.
-			priorHost, exists := hdb.allHosts[hostEntry.NetAddress]
-			if !exists {
-				hdb.allHosts[hostEntry.NetAddress] = hostEntry
-			}
-
-			// If the scan was unsuccessful, decrement the host's reliability.
-			if err != nil {
-				if exists && bytes.Equal(priorHost.PublicKey.Key, hostEntry.PublicKey.Key) {
-					// Only decrement the reliability if the public key in the
-					// hostdb matches the public key in the host announcement -
-					// the failure may just be a failed signature, indicating
-					// the wrong public key.
-					hdb.decrementReliability(hostEntry.NetAddress, UnreachablePenalty)
-				}
-				return
-			}
-
-			// Update the host settings, reliability, and weight. The old NetAddress
-			// must be preserved.
-			settings.NetAddress = hostEntry.HostExternalSettings.NetAddress
-			hostEntry.HostExternalSettings = settings
-			hostEntry.Reliability = MaxReliability
-			hostEntry.Weight = calculateHostWeight(*hostEntry)
-			hostEntry.Online = true
-
-			// If 'maxActiveHosts' has not been reached, add the host to the
-			// activeHosts tree.
-			if _, exists := hdb.activeHosts[hostEntry.NetAddress]; exists || len(hdb.activeHosts) < maxActiveHosts {
-				hdb.insertNode(hostEntry)
-			}
-			hdb.save()
-		}()
+		// Update the host tree to have a new entry.
+		hdb.managedUpdateEntry(hostEntry, settings, err)
 	}
 }
 
