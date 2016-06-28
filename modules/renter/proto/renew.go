@@ -252,6 +252,7 @@ func Renew(contract modules.RenterContract, params ContractParams, txnBuilder tr
 		ID:              fcid,
 		LastRevision:    initRevision,
 		LastRevisionTxn: revisionTxn,
+		MerkleRoots:     contract.MerkleRoots,
 		NetAddress:      host.NetAddress,
 		SecretKey:       ourSK,
 	}, nil
