@@ -494,7 +494,7 @@ Parameters: none
 Response:
 ```javascript
 {
-  "foldermetadata": [
+  "folders": [
     {
       "path":              "/home/foo/bar",
       "capacity":          50000000000,     // bytes
