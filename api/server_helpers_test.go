@@ -398,7 +398,7 @@ func (st *serverTester) setHostStorage() error {
 	values := url.Values{}
 	values.Set("path", st.dir)
 	values.Set("size", "1048576")
-	return st.stdPostAPI("/storage/folders/add", values)
+	return st.stdPostAPI("/host/storage/folders/add", values)
 }
 
 // announceHost announces the host, mines a block, and waits for the

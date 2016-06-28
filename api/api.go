@@ -155,11 +155,11 @@ func (srv *Server) initAPI(password string) {
 		router.POST("/host/announce", requirePassword(srv.hostAnnounceHandler, password)) // Announce the host to the network.
 
 		// Calls pertaining to the storage manager that the host uses.
-		router.GET("/storage", srv.storageHandler)
-		router.POST("/storage/folders/add", requirePassword(srv.storageFoldersAddHandler, password))
-		router.POST("/storage/folders/remove", requirePassword(srv.storageFoldersRemoveHandler, password))
-		router.POST("/storage/folders/resize", requirePassword(srv.storageFoldersResizeHandler, password))
-		router.POST("/storage/sectors/delete/:merkleroot", requirePassword(srv.storageSectorsDeleteHandler, password))
+		router.GET("/host/storage", srv.storageHandler)
+		router.POST("/host/storage/folders/add", requirePassword(srv.storageFoldersAddHandler, password))
+		router.POST("/host/storage/folders/remove", requirePassword(srv.storageFoldersRemoveHandler, password))
+		router.POST("/host/storage/folders/resize", requirePassword(srv.storageFoldersResizeHandler, password))
+		router.POST("/host/storage/sectors/delete/:merkleroot", requirePassword(srv.storageSectorsDeleteHandler, password))
 	}
 
 	// Miner API Calls

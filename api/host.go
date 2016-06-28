@@ -29,7 +29,7 @@ type (
 	}
 
 	// StorageGET contains the information that is returned after a GET request
-	// to /storage - a bunch of information about the status of storage
+	// to /host/storage - a bunch of information about the status of storage
 	// management on the host.
 	StorageGET struct {
 		StorageFolderMetadata []modules.StorageFolderMetadata
