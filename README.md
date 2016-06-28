@@ -94,7 +94,7 @@ Troubleshooting
 
   There is a 144-block confirmation delay before you will receive siacoins from
   mined blocks. If you still have not received the block reward after 144
-  blocks, it means your block did not made it into the blockchain.
+  blocks, it means your block did not make it into the blockchain.
 
 If your issue is not addressed above, you can get in touch with us personally:
 
