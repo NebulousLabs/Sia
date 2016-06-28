@@ -79,8 +79,9 @@ func apiGet(call string) (*http.Response, error) {
 		return nil, errors.New("API call not recognized: " + call)
 	}
 	if non2xx(resp.StatusCode) {
+		err := decodeError(resp)
 		resp.Body.Close()
-		return nil, decodeError(resp)
+		return nil, err
 	}
 	return resp, nil
 }
@@ -146,8 +147,9 @@ func apiPost(call, vals string) (*http.Response, error) {
 		return nil, errors.New("API call not recognized: " + call)
 	}
 	if non2xx(resp.StatusCode) {
+		err := decodeError(resp)
 		resp.Body.Close()
-		return nil, decodeError(resp)
+		return nil, err
 	}
 	return resp, nil
 }
