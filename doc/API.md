@@ -1,9 +1,7 @@
 Siad API
 ========
 
-The siad API is currently under construction. Under semantic versioning, the
-minor version will be incremented whenever API-breaking changes are introduced.
-Once siad hits v1.0.0, the major version will be incremented instead.
+Sia uses semantic versioning and is backwards compatible to version v1.0.0.
 
 All API calls return JSON objects. If there is an error, the error is returned
 in plaintext with an appropriate HTTP error code. The standard response is {
