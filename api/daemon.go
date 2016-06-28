@@ -99,7 +99,12 @@ bwIDAQAB
 
 // fetchLatestRelease returns metadata about the most recent GitHub release.
 func fetchLatestRelease() (githubRelease, error) {
-	resp, err := http.Get("https://api.github.com/repos/NebulousLabs/Sia/releases/latest")
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/NebulousLabs/Sia/releases/latest", nil)
+	if err != nil {
+		return githubRelease{}, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	resp, err := new(http.Client).Do(req)
 	if err != nil {
 		return githubRelease{}, err
 	}
