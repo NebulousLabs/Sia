@@ -1,15 +1,12 @@
 Siad API
 ========
 
-The siad API is currently under construction. Under semantic versioning, the
-minor version will be incremented whenever API-breaking changes are introduced.
-Once siad hits v1.0.0, the major version will be incremented instead.
+Sia uses semantic versioning and is backwards compatible to version v1.0.0.
 
-All API calls return JSON objects. If there is an error, the error is returned
-in plaintext with an appropriate HTTP error code. The standard response is {
-"Success": true }. In this document, the API responses are defined as Go
-structs. The structs will be encoded to JSON before being sent; they are used
-here to provide type information.
+API calls return either JSON or no content. Success is indicated by 2xx HTTP
+status codes, while errors are indicated by 4xx and 5xx HTTP status codes. If
+an endpoint does not specify its expected status code refer to
+[#standard-responses](#standard-responses).
 
 There may be functional API calls which are not documented. These are not
 guaranteed to be supported beyond the current release, and should not be used
@@ -18,14 +15,19 @@ in production.
 Notes:
 - Requests must set their User-Agent string to contain the substring "Sia-Agent".
 - By default, siad listens on "localhost:9980". This can be changed using the
-  '--api-addr' flag when running siad.
-- The types.Currency object is an arbitrary-precision unsigned integer. In JSON,
-  it is represented as a base-10 string. You must use a "bignum" library to handle
-  these values, or you risk losing precision.
+  `--api-addr` flag when running siad.
+- **Do not bind or expose the API to a non-loopback address unless you are
+  aware of the possible dangers.**
 
-Example GET curl call:  `curl -A "Sia-Agent" /wallet/transactions?startheight=1&endheight=250`
+Example GET curl call: 
+```
+curl -A "Sia-Agent" "localhost:9980/wallet/transactions?startheight=1&endheight=250"
+```
 
-Example POST curl call: `curl -A "Sia-Agent" --data "amount=123&destination=abcd" /wallet/siacoins
+Example POST curl call:
+```
+curl -A "Sia-Agent" --data "amount=123&destination=abcd" "localhost:9980/wallet/siacoins"
+```
 
 Standard responses
 ------------------
@@ -33,7 +35,9 @@ Standard responses
 #### Success
 
 The standard response indicating the request was successfully processed is HTTP
-status code 204.
+status code `204 No Content`. If the request was successfully processed and the
+server responded with JSON the HTTP status code is `200 OK`. Specific endpoints
+may specify other 2xx status codes on success.
 
 #### Error
 
@@ -46,6 +50,15 @@ The standard error response indicating the request failed for any reason, is a
     // There may be additional fields depending on the specific error.
 }
 ```
+
+Authentication
+--------------
+
+API authentication can be enabled with the `--authenticate-api` siad flag.
+Authentication is HTTP Basic Authentication as described in
+[RFC 2617](https://tools.ietf.org/html/rfc2617). The flag does not enforce
+authentication on all API endpoints. Only endpoints that expose sensitive
+information or modify state require authentication.
 
 Table of contents
 -----------------
