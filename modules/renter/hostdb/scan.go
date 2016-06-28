@@ -132,6 +132,16 @@ func (hdb *HostDB) threadedProbeHosts() {
 				return
 			}
 
+			// The hostEntry should be updated to reflect the new weight. The
+			// safety properties of the tree require that the weight does not
+			// change while the node is in the tree, so the node must be
+			// removed before the settings and weight are changed.
+			existingNode, exists := hdb.activeHosts[hostEntry.NetAddress]
+			if exists {
+				existingNode.removeNode()
+				delete(hdb.activeHosts, hostEntry.NetAddress)
+			}
+
 			// Update the host settings, reliability, and weight. The old NetAddress
 			// must be preserved.
 			settings.NetAddress = hostEntry.HostExternalSettings.NetAddress
