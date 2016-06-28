@@ -127,12 +127,6 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// Sanity check - sector should have modules.SectorSize bytes.
-	if uint64(len(sectorData)) != modules.SectorSize {
-		sm.log.Critical("incorrectly sized sector passed to AddSector in the storage manager")
-		return errors.New("incorrectly sized sector passed to AddSector in the storage manager")
-	}
-
 	// Check that there is enough room for the sector in at least one storage
 	// folder - check will also guarantee that there is at least one storage folder.
 	enoughRoom := false
@@ -140,9 +134,6 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 		if sf.SizeRemaining >= modules.SectorSize {
 			enoughRoom = true
 		}
-	}
-	if !enoughRoom {
-		return errInsufficientStorageForSector
 	}
 
 	// Determine which storage folder is going to receive the new sector.
@@ -177,6 +168,19 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 				return err
 			}
 			return bsu.Put(sm.sectorID(sectorRoot[:]), usageBytes)
+		}
+
+		// Given that this is a physical sector and not a virtual sector, there
+		// needs to be enough room in the storage folder to accept the sector.
+		if !enoughRoom {
+			return errInsufficientStorageForSector
+		}
+		// Sanity check - sector should have modules.SectorSize bytes. This
+		// sanity check is only important if the sector is not a virtual
+		// sector.
+		if uint64(len(sectorData)) != modules.SectorSize {
+			sm.log.Critical("incorrectly sized sector passed to AddSector in the storage manager")
+			return errors.New("incorrectly sized sector passed to AddSector in the storage manager")
 		}
 
 		// Try adding the sector to disk. In the event of a failure, the host

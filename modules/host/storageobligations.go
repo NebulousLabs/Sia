@@ -347,7 +347,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		// re-added with a new expriation height. If there is an error at any
 		// point, all of the sectors should be removed.
 		for i, root := range so.SectorRoots {
-			err := h.AddSector(root, so.expiration(), make([]byte, modules.SectorSize))
+			err := h.AddSector(root, so.expiration(), nil)
 			if err != nil {
 				// Remove all of the sectors that got added and return an error.
 				for j := 0; j < i; j++ {
