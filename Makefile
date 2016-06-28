@@ -65,8 +65,8 @@ release-std:
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long
-	goxc -arch="386 amd64 arm" -bc="darwin linux windows" -d=release \
-	     -pv=v1.0.0 -br=rc -include=LICENSE,README.md,doc/API.md   \
+	goxc -arch="amd64 arm" -bc="darwin linux windows" -d=release \
+	     -pv=v1.0.0 -br=rc -include=LICENSE,README.md,doc/API.md \
 	     -tasks-=archive,rmbin,deb,deb-dev,deb-source,go-test -n=Sia
 
 # clean removes all directories that get automatically created during
