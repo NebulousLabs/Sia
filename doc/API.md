@@ -365,10 +365,15 @@ Host
 
 Queries:
 
-* /host                         [GET]
-* /host                         [POST]
-* /host/announce                [POST]
-* /host/delete/{filecontractid} [POST]
+* /host                                     [GET]
+* /host                                     [POST]
+* /host/announce                            [POST]
+* /host/delete/{filecontractid}             [POST]
+* /host/storage                             [GET]
+* /host/storage/folders/add                 [POST]
+* /host/storage/folders/remove              [POST]
+* /host/storage/folders/resize              [POST]
+* /host/storage/sectors/delete/{merkleroot} [POST]
 
 [Full Description](api/Host.md)
 
@@ -493,6 +498,92 @@ netaddress string // Optional
 
 Response: standard
 
+#### /host/storage [GET]
+
+Function: Get a list of folders tracked by the host's storage manager.
+
+Parameters: none
+
+Response:
+```javascript
+{
+  "folders": [
+    {
+      "path":              "/home/foo/bar",
+      "capacity":          50000000000,     // bytes
+      "capacityremaining": 100000,          // bytes
+
+      "failedreads": 0,
+      "failedwrites": 1,
+      "successfulreads": 2,
+      "successfulwrites": 3
+    }
+  ]
+}
+```
+
+#### /host/storage/folders/add [POST]
+
+Function: Add a storage folder to the manager. The manager may not check that
+there is enough space available on-disk to support as much storage as requested
+
+Parameters:
+```
+path // Required
+size // bytes, Required
+```
+
+Response: standard
+
+#### /host/storage/folders/remove [POST]
+
+Function: Remove a storage folder from the manager. All storage on the folder
+will be moved to other storage folders, meaning that no data will be lost. If
+the manager is unable to save data, an error will be returned and the operation
+will be stopped.
+
+Parameters:
+```
+path  // Required
+force // bool, Optional, default is false
+```
+
+Response: standard
+
+#### /host/storage/folders/resize [POST]
+
+Function: Grow or shrink a storage folder in the manager. The manager may not
+check that there is enough space on-disk to support growing the storage folder,
+but should gracefully handle running out of space unexpectedly. When shrinking
+a storage folder, any data in the folder that needs to be moved will be placed
+into other storage folders, meaning that no data will be lost. If the manager
+is unable to migrate the data, an error will be returned and the operation will
+be stopped.
+
+Parameters:
+```
+path    // Required
+newsize // bytes, Required
+```
+
+Response: standard
+
+#### /host/storage/sectors/delete/{merkleroot} [POST]
+
+Function: Deletes a sector, meaning that the manager will be unable to upload
+that sector and be unable to provide a storage proof on that sector.
+DeleteSector is for removing the data entirely, and will remove instances of
+the sector appearing at all heights. The primary purpose of DeleteSector is to
+comply with legal requests to remove data.
+
+Path Parameters
+```
+{merkleroot} // Required
+```
+
+Response: standard
+
+
 Host DB
 -------
 
@@ -518,19 +609,19 @@ numhosts // Optional
 {
   "hosts": [
     {
-      "acceptingcontracts": true,
+      "acceptingcontracts":   true,
       "maxdownloadbatchsize": 17825792, // bytes
-      "maxduration": 25920, // blocks
-      "maxrevisebatchsize": 17825792, // bytes
-      "netaddress": "123.456.789.0:9982",
-      "remainingstorage": 35000000000, // bytes
-      "sectorsize": 4194304, // bytes
-      "totalstorage": 35000000000, // bytes
-      "unlockhash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
-      "windowsize": 144, // blocks
+      "maxduration":          25920,    // blocks
+      "maxrevisebatchsize":   17825792, // bytes
+      "netaddress":           "123.456.789.2:9982",
+      "remainingstorage":     35000000000, // bytes
+      "sectorsize":           4194304,     // bytes
+      "totalstorage":         35000000000, // bytes
+      "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "windowsize":           144, // blocks
       "publickey": {
         "algorithm": "ed25519",
-        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+        "key":        "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
     }
   ]
@@ -547,19 +638,19 @@ any particular order, and the order may change in subsequent calls.
 {
   "hosts": [
     {
-      "acceptingcontracts": true,
+      "acceptingcontracts":   true,
       "maxdownloadbatchsize": 17825792, // bytes
-      "maxduration": 25920, // blocks
-      "maxrevisebatchsize": 17825792, // bytes
-      "netaddress": "123.456.789.0:9982",
-      "remainingstorage": 35000000000, // bytes
-      "sectorsize": 4194304, // bytes
-      "totalstorage": 35000000000, // bytes
-      "unlockhash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
-      "windowsize": 144, // blocks
+      "maxduration":          25920,    // blocks
+      "maxrevisebatchsize":   17825792, // bytes
+      "netaddress":           "123.456.789.0:9982",
+      "remainingstorage":     35000000000, // bytes
+      "sectorsize":           4194304,     // bytes
+      "totalstorage":         35000000000, // bytes
+      "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "windowsize":           144, // blocks
       "publickey": {
         "algorithm": "ed25519",
-        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+        "key":       "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
       }
     }
   ]

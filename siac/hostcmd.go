@@ -124,7 +124,7 @@ func hostcmd() {
 		die("Could not fetch host settings:", err)
 	}
 	sg := new(api.StorageGET)
-	err = getAPI("/storage", sg)
+	err = getAPI("/host/storage", sg)
 	if err != nil {
 		die("Could not fetch storage info:", err)
 	}
@@ -153,7 +153,7 @@ func hostcmd() {
 
 	// calculate total storage available and remaining
 	var totalstorage, storageremaining uint64
-	for _, folder := range sg.StorageFolderMetadata {
+	for _, folder := range sg.Folders {
 		totalstorage += folder.Capacity
 		storageremaining += folder.CapacityRemaining
 	}
@@ -286,13 +286,13 @@ RPC Stats:
 	fmt.Println("\nStorage Folders:")
 
 	// display storage folder info
-	if len(sg.StorageFolderMetadata) == 0 {
+	if len(sg.Folders) == 0 {
 		fmt.Println("No storage folders configured")
 		return
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 	fmt.Fprintf(w, "\tUsed\tCapacity\t%% Used\tPath\n")
-	for _, folder := range sg.StorageFolderMetadata {
+	for _, folder := range sg.Folders {
 		curSize := int64(folder.Capacity - folder.CapacityRemaining)
 		pctUsed := 100 * (float64(curSize) / float64(folder.Capacity))
 		fmt.Fprintf(w, "\t%s\t%s\t%.2f\t%s\n", filesizeUnits(curSize), filesizeUnits(int64(folder.Capacity)), pctUsed, folder.Path)
@@ -384,7 +384,7 @@ func hostfolderaddcmd(path, size string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
-	err = post("/storage/folders/add", fmt.Sprintf("path=%s&size=%s", abs(path), size))
+	err = post("/host/storage/folders/add", fmt.Sprintf("path=%s&size=%s", abs(path), size))
 	if err != nil {
 		die("Could not add folder:", err)
 	}
@@ -393,7 +393,7 @@ func hostfolderaddcmd(path, size string) {
 
 // hostfolderremovecmd removes a folder from the host.
 func hostfolderremovecmd(path string) {
-	err := post("/storage/folders/remove", "path="+abs(path))
+	err := post("/host/storage/folders/remove", "path="+abs(path))
 	if err != nil {
 		die("Could not remove folder:", err)
 	}
@@ -406,7 +406,7 @@ func hostfolderresizecmd(path, newsize string) {
 	if err != nil {
 		die("Could not parse size:", err)
 	}
-	err = post("/storage/folders/resize", fmt.Sprintf("path=%s&newsize=%s", abs(path), newsize))
+	err = post("/host/storage/folders/resize", fmt.Sprintf("path=%s&newsize=%s", abs(path), newsize))
 	if err != nil {
 		die("Could not resize folder:", err)
 	}
@@ -415,7 +415,7 @@ func hostfolderresizecmd(path, newsize string) {
 
 // hostsectordeletecmd deletes a sector from the host.
 func hostsectordeletecmd(root string) {
-	err := post("/storage/sectors/delete/"+root, "")
+	err := post("/host/storage/sectors/delete/"+root, "")
 	if err != nil {
 		die("Could not delete sector:", err)
 	}

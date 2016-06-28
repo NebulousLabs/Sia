@@ -29,10 +29,10 @@ type (
 	}
 
 	// StorageGET contains the information that is returned after a GET request
-	// to /storage - a bunch of information about the status of storage
+	// to /host/storage - a bunch of information about the status of storage
 	// management on the host.
 	StorageGET struct {
-		StorageFolderMetadata []modules.StorageFolderMetadata
+		Folders []modules.StorageFolderMetadata `json:"folders"`
 	}
 )
 
@@ -124,11 +124,9 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request,
 // storageHandler returns a bunch of information about storage management on
 // the host.
 func (srv *Server) storageHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	sfs := srv.host.StorageFolders()
-	sg := StorageGET{
-		StorageFolderMetadata: sfs,
-	}
-	writeJSON(w, sg)
+	writeJSON(w, StorageGET{
+		Folders: srv.host.StorageFolders(),
+	})
 }
 
 // storageFoldersAddHandler adds a storage folder to the storage manager.
@@ -151,6 +149,11 @@ func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Req
 // storageFoldersResizeHandler resizes a storage folder in the storage manager.
 func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folderPath := req.FormValue("path")
+	if folderPath == "" {
+		writeError(w, Error{"path parameter is required"}, http.StatusBadRequest)
+		return
+	}
+
 	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
@@ -176,6 +179,11 @@ func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.
 // manager.
 func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folderPath := req.FormValue("path")
+	if folderPath == "" {
+		writeError(w, Error{"path parameter is required"}, http.StatusBadRequest)
+		return
+	}
+
 	storageFolders := srv.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
