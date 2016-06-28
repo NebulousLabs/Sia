@@ -55,6 +55,7 @@ Table of contents
 - [Explorer](#explorer)
 - [Gateway](#gateway)
 - [Host](#host)
+- [Host DB](#host-db)
 - [Miner](#miner)
 - [Renter](#renter)
 - [Wallet](#wallet)
@@ -479,6 +480,79 @@ netaddress string // Optional
 
 Response: standard
 
+Host DB
+-------
+
+| Request                                     | HTTP Verb |
+| ------------------------------------------- | --------- |
+| [/hostdb/active](#hostdbactive-get-example) | GET       |
+| [/hostdb/all](#hostdball-get-example)       | GET       |
+
+For examples and detailed descriptions of request and response parameters,
+refer to [HostDB.md](/doc/api/HostDB.md).
+
+#### /hostdb/active [GET] [(example)](/doc/api/HostDB.md#active-hosts)
+
+lists all of the active hosts known to the renter, sorted by preference.
+
+###### Query String Parameters [(with comments)](/doc/api/HostDB.md#query-string-parameters)
+```
+numhosts // Optional
+```
+
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response)
+```javascript
+{
+  "hosts": [
+    {
+      "acceptingcontracts": true,
+      "maxdownloadbatchsize": 17825792, // bytes
+      "maxduration": 25920, // blocks
+      "maxrevisebatchsize": 17825792, // bytes
+      "netaddress": "123.456.789.0:9982",
+      "remainingstorage": 35000000000, // bytes
+      "sectorsize": 4194304, // bytes
+      "totalstorage": 35000000000, // bytes
+      "unlockhash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "windowsize": 144, // blocks
+      "publickey": {
+        "algorithm": "ed25519",
+        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+      }
+    }
+  ]
+}
+```
+
+#### /hostdb/all [GET] [(example)](/doc/api/HostDB.md#all-hosts)
+
+lists all of the hosts known to the renter. Hosts are not guaranteed to be in
+any particular order, and the order may change in subsequent calls.
+
+###### JSON Response [(with comments)](/doc/api/HostDB.md#json-response-1)
+```javascript
+{
+  "hosts": [
+    {
+      "acceptingcontracts": true,
+      "maxdownloadbatchsize": 17825792, // bytes
+      "maxduration": 25920, // blocks
+      "maxrevisebatchsize": 17825792, // bytes
+      "netaddress": "123.456.789.0:9982",
+      "remainingstorage": 35000000000, // bytes
+      "sectorsize": 4194304, // bytes
+      "totalstorage": 35000000000, // bytes
+      "unlockhash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "windowsize": 144, // blocks
+      "publickey": {
+        "algorithm": "ed25519",
+        "key": "RW50cm9weSBpc24ndCB3aGF0IGl0IHVzZWQgdG8gYmU="
+      }
+    }
+  ]
+}
+```
+
 Miner
 -----
 
@@ -578,8 +652,6 @@ Queries:
 * /renter/download/{siapath} [GET]
 * /renter/rename/{siapath}   [POST]
 * /renter/upload/{siapath}   [POST]
-* /hostdb/active             [GET]
-* /hostdb/all                [GET]
 
 #### /renter/allowance [GET]
 
@@ -813,74 +885,6 @@ source   string
 'source' is the location on disk of the file being uploaded.
 
 Response: standard.
-
-#### /hostdb/active [GET]
-
-Function: Lists all of the active hosts known to the renter, sorted by
-preference.
-
-Parameters:
-```
-numhosts uint64 // Optional
-```
-'numhosts' is the maximum number of hosts that should be returned by the active
-hosts call.
-
-Response:
-```
-struct {
-	hosts []struct {
-		netaddress   string
-		totalstorage int64
-		minduration  types.BlockHeight (uint64)
-		maxduration  types.BlockHeight (uint64)
-		windowsize   types.BlockHeight (uint64)
-		price        types.Currency    (string)
-		collateral   types.Currency    (string)
-		unlockhash   types.UnlockHash  (string)
-	}
-}
-```
-See /hostdb/all for a description of each field.
-
-#### /hostdb/all [GET]
-
-Function: Lists all of the hosts known to the renter.
-
-Parameters: none
-
-Response:
-```
-struct {
-	hosts []struct {
-		netaddress   string
-		totalstorage int64
-		minduration  types.BlockHeight (uint64)
-		maxduration  types.BlockHeight (uint64)
-		windowsize   types.BlockHeight (uint64)
-		price        types.Currency    (string)
-		collateral   types.Currency    (string)
-		unlockhash   types.UnlockHash  (string)
-	}
-}
-```
-'netaddress' is the network address of the host.
-
-'totalstorage' is the amount of storage advertised by the host.
-
-'minduration' is the minimum acceptable contract duration required by the host.
-
-'maxduration' is the maximum acceptable contract duration required by the host.
-
-'windowsize' is the minimum acceptable storage proof window size required by
-the host.
-
-'price' is the cost of storing data with the host, in hastings/byte/block.
-
-'collateral' is the collateral supplied by the host when storing data, in
-hastings/byte/block.
-
-'unlockhash' is the coin address of the host.
 
 
 Wallet
