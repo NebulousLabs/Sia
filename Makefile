@@ -63,9 +63,9 @@ release-std:
 	go install $(pkgs)
 
 # xc builds and packages release binaries for all systems by using goxc.
-# Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
+# Cross Compile - makes binaries for windows, linux, and mac, 64 bit only.
 xc: dependencies test test-long
-	goxc -arch="amd64 arm" -bc="darwin linux windows" -d=release \
+	goxc -arch="amd64" -bc="darwin linux windows" -d=release \
 	     -pv=v1.0.0 -br=rc -include=LICENSE,README.md,doc/API.md \
 	     -tasks-=archive,rmbin,deb,deb-dev,deb-source,go-test -n=Sia
 
