@@ -124,7 +124,7 @@ func (h *Host) managedAddCollateral(settings modules.HostInternalSettings, txnSe
 // collateral, and then try submitting the file contract to the transaction
 // pool. If there is no error, the completed transaction set will be returned
 // to the caller.
-func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, renterPK crypto.PublicKey, renterSignatures []types.TransactionSignature, renterRevisionSignature types.TransactionSignature) ([]types.TransactionSignature, types.TransactionSignature, error) {
+func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, renterPK crypto.PublicKey, renterSignatures []types.TransactionSignature, renterRevisionSignature types.TransactionSignature, initialSectorRoots []crypto.Hash, hostCollateral, hostInitialRevenue, hostInitialRisk types.Currency) ([]types.TransactionSignature, types.TransactionSignature, error) {
 	for _, sig := range renterSignatures {
 		builder.AddTransactionSignature(sig)
 	}
@@ -165,7 +165,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		NewUnlockHash:         fc.UnlockHash,
 	}
 	// createRevisionSignature will also perform validation on the result,
-	// returning an error if the renter.
+	// returning an error if the renter provided an incorrect signature.
 	revisionTransaction, err := createRevisionSignature(noOpRevision, renterRevisionSignature, hostSK, blockHeight)
 	if err != nil {
 		return nil, types.TransactionSignature{}, err
@@ -175,10 +175,13 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	fullTxn, _ := builder.View()
-	hostPortion := contractCollateral(h.settings, fc)
 	so := &storageObligation{
-		ContractCost:     h.settings.MinContractPrice,
-		LockedCollateral: hostPortion,
+		SectorRoots: initialSectorRoots,
+
+		ContractCost:            h.settings.MinContractPrice,
+		LockedCollateral:        hostCollateral,
+		PotentialStorageRevenue: hostInitialRevenue,
+		RiskedCollateral:        hostInitialRisk,
 
 		OriginTransactionSet:   fullTxnSet,
 		RevisionTransactionSet: []types.Transaction{revisionTransaction},
@@ -320,7 +323,10 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	//
 	// During finalization, the siganture for the revision is also checked, and
 	// signatures for the revision transaction are created.
-	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature)
+	h.mu.RLock()
+	hostCollateral := contractCollateral(h.settings, txnSet[len(txnSet)-1].FileContracts[0])
+	h.mu.RUnlock()
+	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, nil, hostCollateral, types.ZeroCurrency, types.ZeroCurrency)
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
