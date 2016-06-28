@@ -47,6 +47,15 @@ The standard error response indicating the request failed for any reason, is a
 }
 ```
 
+Authentication
+--------------
+
+API authentication can be enabled with the `--authenticate-api` siad flag.
+Authentication is HTTP Basic Authentication as described in
+[RFC 2617](https://tools.ietf.org/html/rfc2617). The flag does not enforce
+authentication on all API endpoints. Only endpoints that expose sensitive
+information or modify state require authentication.
+
 Table of contents
 -----------------
 
