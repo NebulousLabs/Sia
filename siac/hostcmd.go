@@ -180,7 +180,7 @@ func hostcmd() {
 	if hostVerbose {
 		// describe net address
 		fmt.Printf(`General Info:
-	Estimated Comptetitive Price: %v
+	Estimated Competitive Price: %v
 
 Host Internal Settings:
 	acceptingcontracts:   %v
@@ -261,7 +261,7 @@ RPC Stats:
 			nm.FormContractCalls)
 	} else {
 		fmt.Printf(`Host info:
-	Estimated Comptetitive Price: %v
+	Estimated Competitive Price: %v
 
 	Storage:      %v (%v used)
 	Price:        %v / TB / Month
