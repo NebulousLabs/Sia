@@ -281,7 +281,7 @@ type byHeight []api.RenterContract
 func (s byHeight) Len() int      { return len(s) }
 func (s byHeight) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s byHeight) Less(i, j int) bool {
-	hi, hj := s[i].LastRevision.NewWindowStart, s[j].LastRevision.NewWindowStart
+	hi, hj := s[i].EndHeight, s[j].EndHeight
 	if hi == hj {
 		return s[i].NetAddress < s[j].NetAddress
 	}
@@ -307,9 +307,9 @@ func rentercontractscmd() {
 	for _, c := range rc.Contracts {
 		fmt.Fprintf(w, "%v\t%8s\t%v\t%v\t%v\n",
 			c.NetAddress,
-			currencyUnits(c.LastRevision.NewValidProofOutputs[0].Value),
+			currencyUnits(c.RenterFunds),
 			filesizeUnits(int64(c.Size)),
-			c.LastRevision.NewWindowStart,
+			c.EndHeight,
 			c.ID)
 	}
 	w.Flush()
