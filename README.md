@@ -21,10 +21,9 @@ retrieving data, Sia is poised to be a highly competitive cloud storage
 platform. More information about the technology can be found on our website and
 in the 'doc' folder of the repo.
 
-Sia is currently in beta. The currency was launched on June 7th, 2015, but the
-storage platform itself remains in beta. Sia is ready for use with small sums
-of money and non-critical files, but until the network has a more proven track
-record, we advise against using it as a sole means of storing important data.
+Sia is ready for use with small sums of money and non-critical files, but until
+the network has a more proven track record, we advise against using it as a
+sole means of storing important data.
 
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon," that runs the Sia protocol, and siac is a client that is
@@ -116,9 +115,9 @@ Version Information
   the current development roadmap. In other words, developers should feel
   confident leveraging the siad API in their own applications. When new
   functionality is added, it will be added in a backwards-compatible manner.
-  For example, new routes may be added, and new parameters may be added to
-  existing routes or responses. But none of the routes present in v1.0.0 will
-  be removed, nor will any of their parameters or response fields be removed.
+  New routes may be added, and new parameters may be added to existing routes
+  or responses, but none of the routes present in v1.0.0 will be removed, nor
+  will any of their parameters or response fields be removed.
 
 - siad now supports API authentication, enabled by the `--authenticate-api`
   flag.
@@ -162,46 +161,4 @@ v0.5.0 (minor release)
 - Support for folder structure
 - Smarter host
 
-October 2015:
-
-v0.4.8 (patch)
-- Restored compatibility with v0.4.6
-
-v0.4.7 (patch)
-- Dropped support for v0.3.3.x
-
-v0.4.6 (patch)
-- Removed over-aggressive consistency check
-
-v0.4.5 (patch)
-- Fixed last prominent bug in block database
-- Closed some dangling resource handles
-
-v0.4.4 (patch)
-- Uploading is much more reliable
-- Price estimations are more accurate
-- Bumped filesize limit to 20 GB
-
-v0.4.3 (patch)
-- Block database is now faster and more stable
-- Wallet no longer freezes when unlocked during IBD
-- Optimized block encoding/decoding
-
-September 2015:
-
-v0.4.2 (patch)
-- HostDB is now smarter
-- Tweaked renter contract creation
-
-v0.4.1 (patch)
-- Added support for loading v0.3.3.x wallets
-- Better pruning of dead nodes
-- Improve database consistency
-
-August 2015:
-
-v0.4.0: Second stable currency release.
-- Wallets are encrypted and generated from seed phrases
-- Files are erasure-coded and transferred in parallel
-- The blockchain is now fully on-disk
-- Added UPnP support
+For older release notes, consult the git history of this file.
