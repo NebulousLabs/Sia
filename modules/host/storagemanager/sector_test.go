@@ -62,6 +62,11 @@ func TestBadSectorAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer smt.Close()
+	// Add a storage folder to receive a sector.
+	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	defer func() {
 		r := recover()

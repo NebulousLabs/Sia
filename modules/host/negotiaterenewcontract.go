@@ -189,7 +189,13 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// completed file contract.
 	//
 	// During finalization the signatures sent by the renter are all checked.
-	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature)
+	h.mu.RLock()
+	fc := txnSet[len(txnSet)-1].FileContracts[0]
+	renewCollateral := renewContractCollateral(so, settings, fc)
+	renewRevenue := renewBasePrice(so, settings, fc)
+	renewRisk := renewBaseCollateral(so, settings, fc)
+	h.mu.RUnlock()
+	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}

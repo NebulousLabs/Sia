@@ -581,6 +581,25 @@ func TestIntegrationRenew(t *testing.T) {
 	if len(contract.MerkleRoots) != len(oldContract.MerkleRoots) {
 		t.Fatal(len(contract.MerkleRoots), len(oldContract.MerkleRoots))
 	}
+
+	// revise the contract
+	editor, err = c.Editor(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err = crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// insert the sector
+	_, err = editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestResync tests that the contractor can resync with a host after being
