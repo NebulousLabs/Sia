@@ -255,12 +255,13 @@ func (sm *StorageManager) ReadSector(sectorRoot crypto.Hash) (sectorBytes []byte
 
 		sectorPath := filepath.Join(sm.persistDir, hex.EncodeToString(su.StorageFolder), string(sectorKey))
 		sectorBytes, err = ioutil.ReadFile(sectorPath)
+		sf := sm.storageFolder(su.StorageFolder)
 		if err != nil {
 			// Mark the read failure in the sector.
-			sf := sm.storageFolder(su.StorageFolder)
 			sf.FailedReads++
 			return err
 		}
+		sf.SuccessfulReads++
 		return nil
 	})
 	return
