@@ -1,10 +1,13 @@
 package host
 
 import (
+	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/NebulousLabs/go-upnp"
@@ -23,13 +26,19 @@ func myExternalIP() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	buf := make([]byte, 64)
-	n, err := resp.Body.Read(buf)
-	if err != nil && err != io.EOF {
+	if resp.StatusCode != http.StatusOK {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		return "", errors.New(string(errResp))
+	}
+	buf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 64))
+	if err != nil {
 		return "", err
 	}
+	if len(buf) == 0 {
+		return "", errors.New("myexternalip.com returned a 0 length IP address")
+	}
 	// trim newline
-	return string(buf[:n-1]), nil
+	return strings.TrimSpace(string(buf)), nil
 }
 
 // managedLearnHostname discovers the external IP of the Host. If the host's
