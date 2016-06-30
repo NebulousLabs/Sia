@@ -111,6 +111,9 @@ var (
 	// errStorageFolderNotFolder is returned if a storage folder gets added
 	// that is not a folder.
 	errStorageFolderNotFolder = errors.New("must use to an existing folder")
+
+	// errRelativePath is returned if a path must be absolute.
+	errRelativePath = errors.New("storage folder paths must be absolute")
 )
 
 // storageFolder tracks a folder that is being used to store sectors. There is
@@ -400,6 +403,10 @@ func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
 	}
 	if size < minimumStorageFolderSize {
 		return errSmallStorageFolder
+	}
+	// Check that the path is an absolute path.
+	if !filepath.IsAbs(path) {
+		return errRelativePath
 	}
 	// Check that the folder being linked to is not already in use.
 	for _, sf := range sm.storageFolders {
