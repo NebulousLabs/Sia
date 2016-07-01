@@ -199,12 +199,9 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		return nil, types.TransactionSignature{}, lockErr
 	}
 	if err != nil {
-		// AcceptingContracts is set to false in the event of an error, because
-		// it means that the host is having some type of disk error. Under
-		// normal circumstances, adding a storage obligation should not cause
-		// problems unexpectedly.
+		// TODO: in the event of serious disk error, consider setting
+		// AcceptingContracts to false.
 		h.log.Println(err)
-		h.settings.AcceptingContracts = false
 		builder.Drop()
 		return nil, types.TransactionSignature{}, err
 	}
