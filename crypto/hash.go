@@ -67,6 +67,21 @@ func (hs HashSlice) Len() int           { return len(hs) }
 func (hs HashSlice) Less(i, j int) bool { return bytes.Compare(hs[i][:], hs[j][:]) < 0 }
 func (hs HashSlice) Swap(i, j int)      { hs[i], hs[j] = hs[j], hs[i] }
 
+// LoadString takes a string, parses the hash value of the string, and sets the
+// value of the hash equal to the hash value of the string.
+func (h *Hash) LoadString(s string) error {
+	// *2 because there are 2 hex characters per byte.
+	if len(s) != HashSize*2 {
+		return ErrHashWrongLen
+	}
+	hBytes, err := hex.DecodeString(s)
+	if err != nil {
+		return errors.New("could not unmarshal crypto.Hash: " + err.Error())
+	}
+	copy(h[:], hBytes)
+	return nil
+}
+
 // MarshalJSON marshales a hash as a hex string.
 func (h Hash) MarshalJSON() ([]byte, error) {
 	return json.Marshal(h.String())

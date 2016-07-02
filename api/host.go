@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
@@ -203,12 +202,12 @@ func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.
 // storageSectorsDeleteHandler handles the call to delete a sector from the
 // storage manager.
 func (srv *Server) storageSectorsDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	sectorRoot, err := scanAddress(ps.ByName("merkleroot"))
+	sectorRoot, err := scanHash(ps.ByName("merkleroot"))
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	err = srv.host.DeleteSector(crypto.Hash(sectorRoot))
+	err = srv.host.DeleteSector(sectorRoot)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
