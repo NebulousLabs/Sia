@@ -45,7 +45,7 @@ func (hdb *HostDB) load() error {
 		hdb.allHosts[data.AllHosts[i].NetAddress] = &data.AllHosts[i]
 	}
 	for i := range data.ActiveHosts {
-		hdb.insertNode(&data.ActiveHosts[i])
+		hdb.insertNode(hdb.allHosts[data.ActiveHosts[i].NetAddress])
 	}
 	hdb.lastChange = data.LastChange
 	return nil
