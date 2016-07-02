@@ -735,22 +735,17 @@ func TestFutureTimestampHandling(t *testing.T) {
 		t.Fatalf("expected %v, got %v", errFutureTimestamp, err)
 	}
 
-	// Check that after waiting until the block is no longer too far in the
-	// future, the block gets added to the consensus set.
-	time.Sleep(time.Second * 3) // 3 seconds, as the block was originally 2 seconds too far into the future.
-	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
-	if err == errNilItem {
-		t.Errorf("future block was not added to the consensus set after waiting the appropriate amount of time")
-	}
-	time.Sleep(time.Second * 3)
-	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
-	if err == errNilItem {
-		t.Errorf("Future block not added to consensus set.\nCurrent Timestamp %v\nFutureThreshold: %v\nBlock Timestamp %v\n", types.CurrentTimestamp(), types.FutureThreshold, block.Timestamp)
+	// Poll the consensus set until the future block appears.
+	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second * 3)
 		_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
-		if err == errNilItem {
-			t.Error("waiting double long did not help.")
+		if err == nil {
+			break
 		}
+	}
+	_, err = cst.cs.dbGetBlockMap(solvedBlock.ID())
+	if err != nil {
+		t.Errorf("Future block not added to consensus set.\nCurrent Timestamp %v\nFutureThreshold: %v\nBlock Timestamp %v\n", types.CurrentTimestamp(), types.FutureThreshold, block.Timestamp)
 	}
 }
 
