@@ -112,3 +112,54 @@ func TestUnitProcessConfig(t *testing.T) {
 		t.Error("processModules didn't error on invalid module:", invalidModule)
 	}
 }
+
+// TestVerifyAPISecurity checks that the verifyAPISecurity function is
+// correctly banning the use of a non-loopback address without the
+// --disable-security flag, and that the --disable-security flag cannot be used
+// without an api password.
+func TestVerifyAPISecurity(t *testing.T) {
+	// Check that the loopback address is accepted when security is enabled.
+	var securityOnLoopback Config
+	securityOnLoopback.Siad.APIaddr = "127.0.0.1:9980"
+	err := verifyAPISecurity(securityOnLoopback)
+	if err != nil {
+		t.Error("loopback + securityOn was rejected")
+	}
+
+	// Check that the blank address is accepted when security is enabled.
+	var securityOnBlank Config
+	securityOnBlank.Siad.APIaddr = ":9980"
+	err = verifyAPISecurity(securityOnBlank)
+	if err != nil {
+		t.Error("blank + securityOn was rejected")
+	}
+
+	// Check that a public hostname is rejected when security is enabled.
+	var securityOnPublic Config
+	securityOnPublic.Siad.APIaddr = "sia.tech:9980"
+	err = verifyAPISecurity(securityOnPublic)
+	if err == nil {
+		t.Error("public + securityOn was accepted")
+	}
+
+	// Check that a public hostname is rejected when security is disabled and
+	// there is no api password.
+	var securityOffPublic Config
+	securityOffPublic.Siad.APIaddr = "sia.tech:9980"
+	securityOffPublic.Siad.AllowAPIBind = true
+	err = verifyAPISecurity(securityOffPublic)
+	if err == nil {
+		t.Error("public + securityOff was accepted without authentication")
+	}
+
+	// Check that a public hostname is accepted when security is disabled and
+	// there is an api password.
+	var securityOffPublicAuthenticated Config
+	securityOffPublicAuthenticated.Siad.APIaddr = "sia.tech:9980"
+	securityOffPublicAuthenticated.Siad.AllowAPIBind = true
+	securityOffPublicAuthenticated.Siad.AuthenticateAPI = true
+	err = verifyAPISecurity(securityOffPublicAuthenticated)
+	if err != nil {
+		t.Error("public + securityOff with authentication was rejected:", err)
+	}
+}
