@@ -601,6 +601,12 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 // handleActionItem will look at a storage obligation and determine which
 // action is necessary for the storage obligation to succeed.
 func (h *Host) handleActionItem(so *storageObligation) {
+	// Check whether the storage obligation has already been completed.
+	if so.ObligationStatus != obligationUnresolved {
+		// Storage obligation has already been completed, skip action item.
+		return
+	}
+
 	// Check whether the file contract has been seen. If not, resubmit and
 	// queue another action item. Check for death. (signature should have a
 	// kill height)
