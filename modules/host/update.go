@@ -80,6 +80,7 @@ func (h *Host) initRescan() error {
 		err3 := h.queueActionItem(so.expiration()+resubmissionTimeout, soid)
 		err = composeErrors(err0, err1, err2, err3)
 		if err != nil {
+			h.log.Println("dropping storage obligation during rescan, id", so.id())
 			return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 		}
 	}
