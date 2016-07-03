@@ -1196,7 +1196,7 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 
 	// Spin until the connection calls have completed.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 		if len(cst1.gateway.Peers()) >= 1 && len(cst3.gateway.Peers()) >= 1 {
 			break
 		}
@@ -1207,9 +1207,9 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 
 	// Mine a block on cst1, expecting the block to propagate from cst1 to
 	// cst2, and then to cst3.
-	b, err := cst1.miner.AddBlock()
+	b1, err := cst1.miner.AddBlock()
 	if err != nil {
-		t.Log(b.ID())
+		t.Log(b1.ID())
 		t.Log(cst1.cs.CurrentBlock().ID())
 		t.Log(cst2.cs.CurrentBlock().ID())
 		t.Fatal(err)
@@ -1217,80 +1217,84 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 
 	// Spin until the block has propagated to cst2.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
-		if cst2.cs.CurrentBlock().ID() == b.ID() {
+		time.Sleep(150 * time.Millisecond)
+		if cst2.cs.CurrentBlock().ID() == b1.ID() {
 			break
 		}
 	}
-	if cst2.cs.CurrentBlock().ID() != b.ID() {
+	if cst2.cs.CurrentBlock().ID() != b1.ID() {
 		t.Fatal("Block propagation has failed")
 	}
 	// Spin until the block has propagated to cst3.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
-		if cst3.cs.CurrentBlock().ID() == b.ID() {
+		time.Sleep(150 * time.Millisecond)
+		if cst3.cs.CurrentBlock().ID() == b1.ID() {
 			break
 		}
 	}
-	if cst3.cs.CurrentBlock().ID() != b.ID() {
+	if cst3.cs.CurrentBlock().ID() != b1.ID() {
 		t.Fatal("Block propagation has failed")
 	}
 
 	// Mine a block on cst2.
-	b, err = cst2.miner.AddBlock()
+	b2, err := cst2.miner.AddBlock()
 	if err != nil {
-		t.Log(b.ID())
+		t.Log(b1.ID())
+		t.Log(b2.ID())
 		t.Log(cst2.cs.CurrentBlock().ID())
 		t.Log(cst3.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
 	// Spin until the block has propagated to cst1.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
-		if cst1.cs.CurrentBlock().ID() == b.ID() {
+		time.Sleep(150 * time.Millisecond)
+		if cst1.cs.CurrentBlock().ID() == b2.ID() {
 			break
 		}
 	}
-	if cst1.cs.CurrentBlock().ID() != b.ID() {
+	if cst1.cs.CurrentBlock().ID() != b2.ID() {
 		t.Fatal("block propagation has failed")
 	}
 	// Spin until the block has propagated to cst3.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
-		if cst3.cs.CurrentBlock().ID() == b.ID() {
+		time.Sleep(150 * time.Millisecond)
+		if cst3.cs.CurrentBlock().ID() == b2.ID() {
 			break
 		}
 	}
-	if cst3.cs.CurrentBlock().ID() != b.ID() {
+	if cst3.cs.CurrentBlock().ID() != b2.ID() {
 		t.Fatal("block propagation has failed")
 	}
 
 	// Mine a block on cst3.
-	b, err = cst3.miner.AddBlock()
+	b3, err := cst3.miner.AddBlock()
 	if err != nil {
-		t.Log(b.ID())
+		t.Log(b1.ID())
+		t.Log(b2.ID())
+		t.Log(b3.ID())
 		t.Log(cst1.cs.CurrentBlock().ID())
+		t.Log(cst2.cs.CurrentBlock().ID())
 		t.Log(cst3.cs.CurrentBlock().ID())
 		t.Fatal(err)
 	}
 	// Spin until the block has propagated to cst1.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
-		if cst1.cs.CurrentBlock().ID() == b.ID() {
+		time.Sleep(150 * time.Millisecond)
+		if cst1.cs.CurrentBlock().ID() == b3.ID() {
 			break
 		}
 	}
-	if cst1.cs.CurrentBlock().ID() != b.ID() {
+	if cst1.cs.CurrentBlock().ID() != b3.ID() {
 		t.Fatal("block propagation has failed")
 	}
 	// Spin until the block has propagated to cst2.
 	for i := 0; i < 100; i++ {
-		time.Sleep(50 * time.Millisecond)
-		if cst2.cs.CurrentBlock().ID() == b.ID() {
+		time.Sleep(150 * time.Millisecond)
+		if cst2.cs.CurrentBlock().ID() == b3.ID() {
 			break
 		}
 	}
-	if cst2.cs.CurrentBlock().ID() != b.ID() {
+	if cst2.cs.CurrentBlock().ID() != b3.ID() {
 		t.Fatal("block propagation has failed")
 	}
 

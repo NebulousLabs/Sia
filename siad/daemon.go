@@ -3,13 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -25,6 +25,27 @@ import (
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
 )
+
+// verifyAPISecurity checks that the security values are consistent with a
+// sane, secure system.
+func verifyAPISecurity(config Config) error {
+	// Make sure that only the loopback address is allowed unless the
+	// --disable-api-security flag has been used.
+	if !config.Siad.AllowAPIBind {
+		addr := modules.NetAddress(config.Siad.APIaddr)
+		if !addr.IsLoopback() && addr.Host() != "" {
+			return errors.New("you must pass --disable-api-security to bind Siad to a non-localhost address")
+		}
+		return nil
+	}
+
+	// If the --disable-api-security flag is used, enforce that
+	// --authenticate-api must also be used.
+	if config.Siad.AllowAPIBind && !config.Siad.AuthenticateAPI {
+		return errors.New("cannot use --disable-api-security without setting an api password")
+	}
+	return nil
+}
 
 // processNetAddr adds a ':' to a bare integer, so that it is a proper port
 // number.
@@ -55,17 +76,13 @@ func processModules(modules string) (string, error) {
 // processConfig checks the configuration values and performs cleanup on
 // incorrect-but-allowed values.
 func processConfig(config Config) (Config, error) {
-	var err error
+	var err1 error
 	config.Siad.APIaddr = processNetAddr(config.Siad.APIaddr)
-	if !config.Siad.AllowAPIBind {
-		addr := modules.NetAddress(config.Siad.APIaddr)
-		if !addr.IsLoopback() && addr.Host() != "" {
-			return Config{}, errors.New("you must pass --disable-api-security to bind Siad to a non-localhost address")
-		}
-	}
 	config.Siad.RPCaddr = processNetAddr(config.Siad.RPCaddr)
 	config.Siad.HostAddr = processNetAddr(config.Siad.HostAddr)
-	config.Siad.Modules, err = processModules(config.Siad.Modules)
+	config.Siad.Modules, err1 = processModules(config.Siad.Modules)
+	err2 := verifyAPISecurity(config)
+	err := build.JoinErrors([]error{err1, err2}, ", and ")
 	if err != nil {
 		return Config{}, err
 	}
@@ -75,22 +92,20 @@ func processConfig(config Config) (Config, error) {
 // startDaemonCmd uses the config parameters to start siad.
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
-	var password string
 	if config.Siad.AuthenticateAPI {
-		password, err = speakeasy.Ask("Enter API password: ")
+		config.APIPassword, err = speakeasy.Ask("Enter API password: ")
 		if err != nil {
 			return err
 		}
-		if password == "" {
+		if config.APIPassword == "" {
 			return errors.New("password cannot be blank")
 		}
-		passwordConfirm, err := speakeasy.Ask("Confirm API password: ")
-		if err != nil {
-			return err
-		}
-		if password != passwordConfirm {
-			return errors.New("passwords don't match")
-		}
+	}
+
+	// Process the config variables after they are parsed by cobra.
+	config, err = processConfig(config)
+	if err != nil {
+		return err
 	}
 
 	// Print a startup message.
@@ -174,7 +189,7 @@ func startDaemon(config Config) (err error) {
 	srv, err := api.NewServer(
 		config.Siad.APIaddr,
 		config.Siad.RequiredUserAgent,
-		password,
+		config.APIPassword,
 		cs,
 		e,
 		g,
@@ -219,16 +234,8 @@ func startDaemonCmd(cmd *cobra.Command, _ []string) {
 		go profile.StartContinuousProfile(globalConfig.Siad.ProfileDir)
 	}
 
-	// Process the config variables after they are parsed by cobra.
-	config, err := processConfig(globalConfig)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		cmd.Usage()
-		os.Exit(exitCodeUsage)
-	}
-
 	// Start siad. startDaemon will only return when it is shutting down.
-	err = startDaemon(config)
+	err := startDaemon(globalConfig)
 	if err != nil {
 		die(err)
 	}

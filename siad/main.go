@@ -25,6 +25,12 @@ const (
 // The Config struct contains all configurable variables for siad. It is
 // compatible with gcfg.
 type Config struct {
+	// The APIPassword is input by the user after the daemon starts up, if the
+	// --authenticate-api flag is set.
+	APIPassword string
+
+	// The Siad variables are referenced directly by cobra, and are set
+	// according to the flags.
 	Siad struct {
 		APIaddr      string
 		RPCaddr      string
