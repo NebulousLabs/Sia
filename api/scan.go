@@ -3,6 +3,7 @@ package api
 import (
 	"math/big"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -24,4 +25,13 @@ func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
 		return types.UnlockHash{}, err
 	}
 	return addr, nil
+}
+
+// scanHash scans a crypto.Hash from a string.
+func scanHash(s string) (h crypto.Hash, err error) {
+	err = h.LoadString(s)
+	if err != nil {
+		return crypto.Hash{}, err
+	}
+	return h, nil
 }

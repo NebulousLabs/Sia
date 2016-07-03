@@ -56,7 +56,7 @@ func (uh UnlockHash) String() string {
 // fails the checksum.
 func (uh *UnlockHash) LoadString(strUH string) error {
 	// Check the length of strUH.
-	if len(strUH) != crypto.HashSize*2+UnlockHashChecksumSize*2 && len(strUH) != crypto.HashSize*2 {
+	if len(strUH) != crypto.HashSize*2+UnlockHashChecksumSize*2 {
 		return ErrUnlockHashWrongLen
 	}
 
@@ -67,21 +67,18 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 	if err != nil {
 		return err
 	}
-	// Decode the checksum, if provided.
-	if len(strUH) == crypto.HashSize*2+UnlockHashChecksumSize*2 {
-		_, err = fmt.Sscanf(strUH[crypto.HashSize*2:], "%x", &checksum)
-		if err != nil {
-			return err
-		}
 
-		// Verify the checksum - leave uh as-is unless the checksum is valid.
-		expectedChecksum := crypto.HashBytes(byteUnlockHash)
-		if !bytes.Equal(expectedChecksum[:UnlockHashChecksumSize], checksum) {
-			return ErrInvalidUnlockHashChecksum
-		}
+	// Decode and verify the checksum.
+	_, err = fmt.Sscanf(strUH[crypto.HashSize*2:], "%x", &checksum)
+	if err != nil {
+		return err
 	}
-	copy(uh[:], byteUnlockHash[:])
+	expectedChecksum := crypto.HashBytes(byteUnlockHash)
+	if !bytes.Equal(expectedChecksum[:UnlockHashChecksumSize], checksum) {
+		return ErrInvalidUnlockHashChecksum
+	}
 
+	copy(uh[:], byteUnlockHash[:])
 	return nil
 }
 

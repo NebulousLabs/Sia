@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -246,12 +247,22 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 
 // explorerHashHandler handles GET requests to /explorer/hash/:hash.
 func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	// The hash is scanned as an address, because an address can be typecast to
-	// all other necessary types, and will correctly decode hashes whether or
-	// not they have a checksum.
-	hash, err := scanAddress(ps.ByName("hash"))
+	// Scan the hash as a hash. If that fails, try scanning the hash as an
+	// address.
+	hash, err := scanHash(ps.ByName("hash"))
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		addr, err := scanAddress(ps.ByName("hash"))
+		if err != nil {
+			writeError(w, Error{err.Error()}, http.StatusBadRequest)
+			return
+		}
+		hash = crypto.Hash(addr)
+	}
+
+	// TODO: lookups on the zero hash are too expensive to allow. Need a
+	// better way to handle this case.
+	if hash == (crypto.Hash{}) {
+		writeError(w, Error{"can't lookup the empty unlock hash"}, http.StatusBadRequest)
 		return
 	}
 
@@ -314,13 +325,6 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 			Blocks:       blocks,
 			Transactions: txns,
 		})
-		return
-	}
-
-	// TODO: lookups on the zero hash are too expensive to allow. Need a
-	// better way to handle this case.
-	if hash == (types.UnlockHash{}) {
-		writeError(w, Error{"can't lookup the empty unlock hash"}, http.StatusBadRequest)
 		return
 	}
 

@@ -159,3 +159,40 @@ func TestHashMarshalling(t *testing.T) {
 		t.Error("encoded and decoded hash do not match!")
 	}
 }
+
+// TestHashLoadString checks that the LoadString method of the hash function is
+// working properly.
+func TestHashLoadString(t *testing.T) {
+	h1 := Hash{}
+	h2 := HashObject("tame")
+	h1e := h1.String()
+	h2e := h2.String()
+
+	var h1d, h2d Hash
+	err := h1d.LoadString(h1e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = h2d.LoadString(h2e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h1d != h1 {
+		t.Error("decoding h1 failed")
+	}
+	if h2d != h2 {
+		t.Error("decoding h2 failed")
+	}
+
+	// Try some bogus strings.
+	h1e = h1e + "a"
+	err = h1.LoadString(h1e)
+	if err == nil {
+		t.Fatal("expecting error when decoding hash of too large length")
+	}
+	h1e = h1e[:60]
+	err = h1.LoadString(h1e)
+	if err == nil {
+		t.Fatal("expecting error when decoding hash of too small length")
+	}
+}
