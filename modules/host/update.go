@@ -81,7 +81,7 @@ func (h *Host) initRescan() error {
 		err = composeErrors(err0, err1, err2, err3)
 		if err != nil {
 			h.log.Println("dropping storage obligation during rescan, id", so.id())
-			return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
+			return composeErrors(err, h.removeStorageObligation(so, obligationRejected, "error during rescan: "+err.Error()))
 		}
 	}
 	return nil
