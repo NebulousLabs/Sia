@@ -229,7 +229,7 @@ func (srv *Server) initAPI(password string) {
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
 func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	http.Error(w, "404 - Refer to API.md", http.StatusNotFound)
+	writeError(w, Error{"404 - Refer to API.md"}, http.StatusNotFound)
 }
 
 // writeError an error to the API caller.
