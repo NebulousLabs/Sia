@@ -77,13 +77,13 @@ func TestActiveHosts(t *testing.T) {
 	}
 }
 
-// TestAveragePrice tests the AveragePrice method, which also depends on the
+// TestAverageContractPrice tests the AverageContractPrice method, which also depends on the
 // randomHosts method.
-func TestAveragePrice(t *testing.T) {
+func TestAverageContractPrice(t *testing.T) {
 	hdb := bareHostDB()
 
 	// empty
-	if avg := hdb.AveragePrice(); !avg.IsZero() {
+	if avg := hdb.AverageContractPrice(); !avg.IsZero() {
 		t.Error("average of empty hostdb should be zero:", avg)
 	}
 
@@ -94,7 +94,7 @@ func TestAveragePrice(t *testing.T) {
 	h1.Weight = baseWeight
 	h1.AcceptingContracts = true
 	hdb.insertNode(h1)
-	if avg := hdb.AveragePrice(); avg.Cmp(h1.ContractPrice) != 0 {
+	if avg := hdb.AverageContractPrice(); avg.Cmp(h1.ContractPrice) != 0 {
 		t.Error("average of one host should be that host's price:", avg)
 	}
 
@@ -108,7 +108,7 @@ func TestAveragePrice(t *testing.T) {
 	if len(hdb.activeHosts) != 2 {
 		t.Error("host was not added:", hdb.activeHosts)
 	}
-	if avg := hdb.AveragePrice(); avg.Cmp(types.NewCurrency64(200)) != 0 {
+	if avg := hdb.AverageContractPrice(); avg.Cmp(types.NewCurrency64(200)) != 0 {
 		t.Error("average of two hosts should be their sum/2:", avg)
 	}
 }

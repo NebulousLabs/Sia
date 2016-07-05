@@ -20,8 +20,8 @@ type hostDB interface {
 	// order of preference.
 	AllHosts() []modules.HostDBEntry
 
-	// AveragePrice returns the average price of a host.
-	AveragePrice() types.Currency
+	// AverageContractPrice returns the average contract price of a host.
+	AverageContractPrice() types.Currency
 
 	// Close closes the hostdb.
 	Close() error

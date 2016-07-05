@@ -96,8 +96,8 @@ func (hdb *HostDB) AllHosts() (allHosts []modules.HostDBEntry) {
 	return
 }
 
-// AveragePrice returns the average price of a host.
-func (hdb *HostDB) AveragePrice() types.Currency {
+// AverageContractPrice returns the average price of a host.
+func (hdb *HostDB) AverageContractPrice() types.Currency {
 	// maybe a more sophisticated way of doing this
 	var totalPrice types.Currency
 	sampleSize := 18

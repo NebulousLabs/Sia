@@ -166,11 +166,11 @@ func newContractorTester(name string, hdb hostDB, hc hostContractor) (*renterTes
 // of the hostDB's methods on every mock.
 type stubHostDB struct{}
 
-func (stubHostDB) ActiveHosts() []modules.HostDBEntry { return nil }
-func (stubHostDB) AllHosts() []modules.HostDBEntry    { return nil }
-func (stubHostDB) AveragePrice() types.Currency       { return types.Currency{} }
-func (stubHostDB) Close() error                       { return nil }
-func (stubHostDB) IsOffline(modules.NetAddress) bool  { return true }
+func (stubHostDB) ActiveHosts() []modules.HostDBEntry   { return nil }
+func (stubHostDB) AllHosts() []modules.HostDBEntry      { return nil }
+func (stubHostDB) AverageContractPrice() types.Currency { return types.Currency{} }
+func (stubHostDB) Close() error                         { return nil }
+func (stubHostDB) IsOffline(modules.NetAddress) bool    { return true }
 
 // stubContractor is the minimal implementation of the hostContractor
 // interface.
