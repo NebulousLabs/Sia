@@ -229,7 +229,7 @@ func (srv *Server) initAPI(password string) {
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
 func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	http.Error(w, "404 - Refer to API.md", http.StatusNotFound)
+	writeError(w, Error{"404 - Refer to API.md"}, http.StatusNotFound)
 }
 
 // writeError an error to the API caller.
@@ -237,7 +237,7 @@ func writeError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	if json.NewEncoder(w).Encode(err) != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
 	}
 }
 
