@@ -237,7 +237,7 @@ func writeError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	if json.NewEncoder(w).Encode(err) != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
 	}
 }
 
