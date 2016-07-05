@@ -195,6 +195,9 @@ func (srv *Server) walletInitHandler(w http.ResponseWriter, req *http.Request, _
 func (srv *Server) walletSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Get the seed using the ditionary + phrase
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	if dictID == "" {
+		dictID = "english"
+	}
 	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
 	if err != nil {
 		writeError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
