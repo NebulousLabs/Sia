@@ -110,7 +110,7 @@ var (
 
 	// errStorageFolderNotFolder is returned if a storage folder gets added
 	// that is not a folder.
-	errStorageFolderNotFolder = errors.New("must use to an existing folder")
+	errStorageFolderNotFolder = errors.New("must use an existing folder")
 
 	// errRelativePath is returned if a path must be absolute.
 	errRelativePath = errors.New("storage folder paths must be absolute")
