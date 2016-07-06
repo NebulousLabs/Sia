@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -367,11 +366,11 @@ func renterfileslistcmd() {
 			availableStr := yesNo(file.Available)
 			renewingStr := yesNo(file.Renewing)
 			redundancyStr := fmt.Sprintf("%.2f", file.Redundancy)
-			if math.IsNaN(file.Redundancy) {
+			if file.Redundancy == -1 {
 				redundancyStr = "-"
 			}
 			uploadProgressStr := fmt.Sprintf("%.2f%%", file.UploadProgress)
-			if math.IsNaN(file.UploadProgress) {
+			if file.UploadProgress == -1 {
 				uploadProgressStr = "-"
 			}
 			fmt.Fprintf(w, "\t%s\t%8s\t%10s\t%s", availableStr, uploadProgressStr, redundancyStr, renewingStr)
