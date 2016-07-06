@@ -70,7 +70,7 @@ func gatewaydisconnectcmd(addr string) {
 // gatewayaddresscmd is the handler for the command `siac gateway address`.
 // Prints the gateway's network address.
 func gatewayaddresscmd() {
-	var info api.GatewayInfo
+	var info api.GatewayGET
 	err := getAPI("/gateway", &info)
 	if err != nil {
 		die("Could not get gateway address:", err)
@@ -81,7 +81,7 @@ func gatewayaddresscmd() {
 // gatewaycmd is the handler for the command `siac gateway`.
 // Prints the gateway's network address and number of peers.
 func gatewaycmd() {
-	var info api.GatewayInfo
+	var info api.GatewayGET
 	err := getAPI("/gateway", &info)
 	if err != nil {
 		die("Could not get gateway address:", err)
@@ -93,7 +93,7 @@ func gatewaycmd() {
 // gatewaylistcmd is the handler for the command `siac gateway list`.
 // Prints a list of all peers.
 func gatewaylistcmd() {
-	var info api.GatewayInfo
+	var info api.GatewayGET
 	err := getAPI("/gateway", &info)
 	if err != nil {
 		die("Could not get peer list:", err)

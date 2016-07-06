@@ -18,7 +18,7 @@ func TestGatewayStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.server.Close()
-	var info GatewayInfo
+	var info GatewayGET
 	st.getAPI("/gateway", &info)
 	if len(info.Peers) != 0 {
 		t.Fatal("/gateway gave bad peer list:", info.Peers)
@@ -45,7 +45,7 @@ func TestGatewayPeerConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var info GatewayInfo
+	var info GatewayGET
 	err = st.getAPI("/gateway", &info)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestGatewayPeerDisconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var info GatewayInfo
+	var info GatewayGET
 	st.getAPI("/gateway", &info)
 	if len(info.Peers) != 1 || info.Peers[0].NetAddress != peer.Address() {
 		t.Fatal("/gateway/connect did not connect to peer", peer.Address())
