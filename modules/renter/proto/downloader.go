@@ -65,7 +65,13 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 
 	// send the revision to the host for approval
 	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
-	if err != nil {
+	if err == modules.ErrStopResponse {
+		// if host gracefully closed, close our connection as well; this will
+		// cause the next operation will fail. We also need to set SaveFn to
+		// nil to prevent saving a revision that the host can't see.
+		he.conn.Close()
+		he.SaveFn = nil
+	} else if err != nil {
 		return modules.RenterContract{}, nil, err
 	}
 

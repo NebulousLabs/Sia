@@ -144,8 +144,11 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
 	}
 	// read the host's acceptance and transaction signature
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return types.Transaction{}, errors.New("host did not accept transaction signature: " + err.Error())
+	// NOTE: if the host sends ErrStopResponse, we should continue processing
+	// the revision, but return the error anyway.
+	responseErr := modules.ReadNegotiationAcceptance(conn)
+	if responseErr != nil && responseErr != modules.ErrStopResponse {
+		return types.Transaction{}, errors.New("host did not accept transaction signature: " + responseErr.Error())
 	}
 	var hostSig types.TransactionSignature
 	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
@@ -161,7 +164,9 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	if err := signedTxn.StandaloneValid(verificationHeight); err != nil {
 		return types.Transaction{}, err
 	}
-	return signedTxn, nil
+
+	// if the host sent ErrStopResponse, return it
+	return signedTxn, responseErr
 }
 
 // newRevision creates a copy of current with its revision number incremented,

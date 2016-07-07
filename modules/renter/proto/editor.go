@@ -82,7 +82,13 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 
 	// send revision to host and exchange signatures
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
-	if err != nil {
+	if err == modules.ErrStopResponse {
+		// if host gracefully closed, close our connection as well; this will
+		// cause the next operation will fail. We also need to set SaveFn to
+		// nil to prevent saving a revision that the host can't see.
+		he.conn.Close()
+		he.SaveFn = nil
+	} else if err != nil {
 		return err
 	}
 
