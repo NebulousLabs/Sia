@@ -37,21 +37,11 @@ func TestThreadGroup(t *testing.T) {
 // TestThreadGroupStop tests the behavior of a ThreadGroup after Stop has been
 // called.
 func TestThreadGroupStop(t *testing.T) {
+	// Create a thread group and stop it.
 	var tg ThreadGroup
-
-	// IsStopped should return false
-	if tg.IsStopped() {
-		t.Error("IsStopped returns true on unstopped ThreadGroup")
-	}
-
 	err := tg.Stop()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// IsStopped should return true
-	if !tg.IsStopped() {
-		t.Error("IsStopped returns false on stopped ThreadGroup")
 	}
 
 	// Add and Stop should return errors
@@ -104,12 +94,6 @@ func TestThreadGroupOnce(t *testing.T) {
 	}
 
 	tg = new(ThreadGroup)
-	tg.IsStopped()
-	if tg.stopChan == nil {
-		t.Error("stopChan should have been initialized by IsStopped")
-	}
-
-	tg = new(ThreadGroup)
 	tg.Add()
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Add")
@@ -122,9 +106,9 @@ func TestThreadGroupOnce(t *testing.T) {
 	}
 }
 
-// TestThreadGroupOnStop tests that Stop calls functions registered with
-// OnStop.
-func TestThreadGroupOnStop(t *testing.T) {
+// TestThreadGroupBeforeStop tests that Stop calls functions registered with
+// BeforeStop.
+func TestThreadGroupBeforeStop(t *testing.T) {
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +116,7 @@ func TestThreadGroupOnStop(t *testing.T) {
 
 	// create ThreadGroup and register the closer
 	var tg ThreadGroup
-	tg.OnStop(func() { l.Close() })
+	tg.BeforeStop(func() { l.Close() })
 
 	// send on channel when listener is closed
 	var closed bool
@@ -153,7 +137,6 @@ func TestThreadGroupOnStop(t *testing.T) {
 // does not trigger the race detector.
 func TestThreadGroupRace(t *testing.T) {
 	var tg ThreadGroup
-	go tg.IsStopped()
 	go tg.StopChan()
 	go func() {
 		if tg.Add() == nil {
@@ -166,10 +149,12 @@ func TestThreadGroupRace(t *testing.T) {
 	}
 }
 
-func TestThreadGroupClosedOnStop(t *testing.T) {
+// TestThreadedGroupCloseAfterStop checks that an AfterStop function is
+// correctly called after the thread is stopped.
+func TestThreadGroupClosedAfterStop(t *testing.T) {
 	var tg ThreadGroup
 	var closed bool
-	tg.OnStop(func() { closed = true })
+	tg.AfterStop(func() { closed = true })
 	if closed {
 		t.Fatal("close function should not have been called yet")
 	}
@@ -183,12 +168,14 @@ func TestThreadGroupClosedOnStop(t *testing.T) {
 	// Stop has already been called, so the close function should be called
 	// immediately
 	closed = false
-	tg.OnStop(func() { closed = true })
+	tg.AfterStop(func() { closed = true })
 	if !closed {
 		t.Fatal("close function should have been called immediately")
 	}
 }
 
+// BenchmarkThreadGroup times how long it takes to add a ton of threads and
+// trigger goroutines that call Done.
 func BenchmarkThreadGroup(b *testing.B) {
 	var tg ThreadGroup
 	for i := 0; i < b.N; i++ {
@@ -198,6 +185,8 @@ func BenchmarkThreadGroup(b *testing.B) {
 	tg.Stop()
 }
 
+// BenchmarkWaitGroup times how long it takes to add a ton of threads to a wait
+// group and trigger goroutines that call Done.
 func BenchmarkWaitGroup(b *testing.B) {
 	var wg sync.WaitGroup
 	for i := 0; i < b.N; i++ {

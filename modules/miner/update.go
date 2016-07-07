@@ -43,8 +43,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Sanity check - if the most recent block in the miner is the same as the
 	// most recent block in the consensus set, then the height of the consensus
 	// set and the height of the miner should be the same.
-	lastID := cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
-	if lastID == m.cs.CurrentBlock().ID() {
+	if cc.Synced {
 		if m.persist.Height != m.cs.Height() {
 			m.log.Critical("Miner has a height mismatch: expecting ", m.cs.Height(), " but got ", m.persist.Height, ". Recent update had ", len(cc.RevertedBlocks), " reverted blocks, and ", len(cc.AppliedBlocks), " applied blocks.")
 			m.persist.Height = m.cs.Height()
@@ -53,7 +52,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Update the unsolved block.
 	var exists1, exists2 bool
-	m.persist.UnsolvedBlock.ParentID = lastID
+	m.persist.UnsolvedBlock.ParentID = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 	m.persist.Target, exists1 = m.cs.ChildTarget(m.persist.UnsolvedBlock.ParentID)
 	m.persist.UnsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.persist.UnsolvedBlock.ParentID)
 	if !exists1 {

@@ -140,10 +140,10 @@ func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 // threadedListen handles incoming connection requests. If the connection is accepted,
 // the peer will be added to the Gateway's peer list.
 func (g *Gateway) threadedListen() {
-	if g.threads.Add() != nil {
+	if g.threads.AddPermanent() != nil {
 		return
 	}
-	defer g.threads.Done()
+	defer g.threads.DonePermanent()
 
 	for {
 		conn, err := g.listener.Accept()

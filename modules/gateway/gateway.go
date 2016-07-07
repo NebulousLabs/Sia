@@ -134,7 +134,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		return
 	}
 	// Automatically close the listener when g.threads.Stop() is called.
-	g.threads.OnStop(func() {
+	g.threads.BeforeStop(func() {
 		err := g.listener.Close()
 		if err != nil {
 			g.log.Println("WARN: closing the listener failed:", err)

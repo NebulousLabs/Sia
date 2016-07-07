@@ -49,7 +49,7 @@ func (h *Host) initNetworking(address string) (err error) {
 		return err
 	}
 	// Automatically close the listener when h.tg.Stop() is called.
-	h.tg.OnStop(func() {
+	h.tg.BeforeStop(func() {
 		err := h.listener.Close()
 		if err != nil {
 			h.log.Println("WARN: closing the listener failed:", err)
@@ -170,11 +170,11 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
 func (h *Host) threadedListen() {
-	err := h.tg.Add()
+	err := h.tg.AddPermanent()
 	if err != nil {
 		return
 	}
-	defer h.tg.Done()
+	defer h.tg.DonePermanent()
 
 	// Receive connections until an error is returned by the listener. When an
 	// error is returned, there will be no more calls to receive.
