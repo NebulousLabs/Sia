@@ -130,12 +130,18 @@ func (tg *ThreadGroup) Resume() error {
 // Stop closes the ThreadGroup's stopChan, closes members of the closer set,
 // and blocks until the counter is zero.
 func (tg *ThreadGroup) Stop() error {
+	// Establish that Stop has been called.
 	tg.mu.Lock()
 	if tg.isStopped() {
 		tg.mu.Unlock()
 		return ErrStopped
 	}
 	close(tg.stopChan)
+
+	// Release the lock - future calls to 'Add' should be rejected because the
+	// group has stopped.
+	tg.mu.Unlock()
+
 	for i := len(tg.beforeStopFns) - 1; i >= 0; i-- {
 		tg.beforeStopFns[i]()
 	}
@@ -149,7 +155,6 @@ func (tg *ThreadGroup) Stop() error {
 		tg.stopFns[i]()
 	}
 	tg.stopFns = nil
-	tg.mu.Unlock()
 	return nil
 }
 
