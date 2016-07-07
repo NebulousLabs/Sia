@@ -211,6 +211,9 @@ func (cs *ConsensusSet) Close() error {
 
 // CurrentBlock returns the latest block in the heaviest known blockchain.
 func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
 	_ = cs.db.View(func(tx *bolt.Tx) error {
 		pb := currentProcessedBlock(tx)
 		block = pb.Block

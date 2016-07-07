@@ -186,7 +186,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		OriginTransactionSet:   fullTxnSet,
 		RevisionTransactionSet: []types.Transaction{revisionTransaction},
 	}
-	lockErr := h.lockStorageObligation(so)
+	lockErr := h.tryLockStorageObligation(so.id())
 	if lockErr != nil {
 		return nil, types.TransactionSignature{}, lockErr
 	}
@@ -194,10 +194,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// pool, and will only do so if there was not some error in creating the
 	// storage obligation.
 	err = h.addStorageObligation(so)
-	lockErr = h.unlockStorageObligation(so)
-	if lockErr != nil {
-		return nil, types.TransactionSignature{}, lockErr
-	}
+	h.unlockStorageObligation(so.id())
 	if err != nil {
 		// TODO: in the event of serious disk error, consider setting
 		// AcceptingContracts to false.

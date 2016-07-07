@@ -260,6 +260,28 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	return st, nil
 }
 
+// blankServerTester creates a server tester object that is ready for testing,
+// without any money in the wallet.
+func blankServerTester(name string) (*serverTester, error) {
+	// createServerTester is expensive, and therefore should not be called
+	// during short tests.
+	if testing.Short() {
+		panic("createServerTester called during short tests")
+	}
+
+	// Create the server tester with key.
+	testdir := build.TempDir("api", name)
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return nil, err
+	}
+	st, err := assembleServerTester(key, testdir)
+	if err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
 // createServerTester creates a server tester object that is ready for testing,
 // including money in the wallet and all modules initialized.
 func createServerTester(name string) (*serverTester, error) {

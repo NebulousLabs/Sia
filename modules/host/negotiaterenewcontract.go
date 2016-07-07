@@ -84,18 +84,15 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 
 	// Lock the storage obligation for the remainder of the connection.
 	h.mu.Lock()
-	err = h.lockStorageObligation(so)
+	err = h.tryLockStorageObligation(so.id())
 	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	defer func() {
 		h.mu.Lock()
-		err = h.unlockStorageObligation(so)
+		h.unlockStorageObligation(so.id())
 		h.mu.Unlock()
-		if err != nil {
-			h.log.Critical(err)
-		}
 	}()
 
 	// Perform the host settings exchange with the renter.

@@ -18,11 +18,11 @@ var rpcSettingsDeprecated = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', '
 // checks if the host's hostname has changed, and makes an updated host
 // announcement if so.
 func (h *Host) threadedUpdateHostname() {
-	err := h.tg.Add()
+	err := h.tg.AddPermanent()
 	if err != nil {
 		return
 	}
-	defer h.tg.Done()
+	defer h.tg.DonePermanent()
 
 	for {
 		h.managedLearnHostname()

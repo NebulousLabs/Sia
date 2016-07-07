@@ -3,6 +3,9 @@
 // internet bandwidth into profit for the user.
 package host
 
+// TODO: Review the pointer control on the host, particularly with respect to
+// the storage obligations being flung around in storageobligations.go.
+
 // TODO: Test the safety of the builder, it should be okay to have multiple
 // builders open for up to 600 seconds, which means multiple blocks could be
 // received in that time period. Should also check what happens if a prent gets
@@ -11,6 +14,12 @@ package host
 // TODO: Would be nice to have some sort of error transport to the user, so
 // that the user is notified in ways other than logs via the host that there
 // are issues such as disk, etc.
+
+// TODO: Double check that any network connection has a finite deadline -
+// handling action items properly requires that the locks held on the
+// obligations eventually be released. There's also some more advanced
+// implementation that needs to happen with the storage obligation locks to
+// make sure that someone who wants a lock is able to get it eventually.
 
 // TODO: automated_settings.go, a file which can be responsible for
 // automatically regulating things like bandwidth price, storage price,
@@ -163,18 +172,10 @@ type Host struct {
 	settings         modules.HostInternalSettings
 	unlockHash       types.UnlockHash // A wallet address that can receive coins.
 
-	// Storage Obligation Management - different from file management in that
-	// the storage obligation management is the new way of handling storage
-	// obligations. Is a replacement for the contract obligation logic, but the
-	// old logic is being kept for compatibility purposes.
-	//
-	// Storage is broken up into sectors. The sectors are distributed across a
-	// set of storage folders using a strategy that tries to create even
-	// distributions, but not aggressively. Uneven distributions could be
-	// manufactured by an attacker given sufficient knowledge about the disk
-	// layout (knowledge which should be unavailable), but a limited amount of
-	// damage can be done even with this attack.
-	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
+	// A map of storage obligations that are currently being modified. Locks on
+	// storage obligations can be long-running, and each storage obligation can
+	// be locked separately.
+	lockedStorageObligations map[types.FileContractID]*siasync.TryMutex
 
 	// Utilities.
 	db         *persist.BoltDatabase
@@ -233,7 +234,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		wallet:       wallet,
 		dependencies: dependencies,
 
-		lockedStorageObligations: make(map[types.FileContractID]struct{}),
+		lockedStorageObligations: make(map[types.FileContractID]*siasync.TryMutex),
 
 		persistDir: persistDir,
 	}

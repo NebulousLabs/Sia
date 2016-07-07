@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -113,7 +112,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.
-	var actionItems []*storageObligation
+	var actionItems []types.FileContractID
 	err = h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
@@ -268,23 +267,10 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			for i := 0; i < len(existingItems); i += crypto.HashSize {
 				copy(obligationIDs[i/crypto.HashSize][:], existingItems[i:i+crypto.HashSize])
 			}
-			bso := tx.Bucket(bucketStorageObligations)
 			for _, soid := range obligationIDs {
-				soBytes := bso.Get(soid[:])
-				if soBytes == nil {
-					// Obligation may have been cleared out by a previous
-					// action item.
-					continue
-				}
-				var so storageObligation
-				err := json.Unmarshal(soBytes, &so)
-				if err != nil {
-					build.Critical("json unmarshalling failed for storage obligation")
-					continue
-				}
 				_, exists := knownActionItems[soid]
 				if !exists {
-					actionItems = append(actionItems, &so)
+					actionItems = append(actionItems, soid)
 					knownActionItems[soid] = struct{}{}
 				}
 			}
@@ -297,7 +283,12 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Handle the list of action items.
 	for _, ai := range actionItems {
-		h.handleActionItem(ai)
+		// Add the action item to the wait group outside of the threaded call.
+		err = h.tg.Add()
+		if err != nil {
+			h.log.Critical("unable to use waitgroup while submitting an action item")
+		}
+		go h.threadedHandleActionItem(ai)
 	}
 
 	// Update the host's recent change pointer to point to the most recent
