@@ -73,7 +73,10 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 		}
 	}
 
-	cc.Synced = cs.synced
+	currentBlock := currentBlockID(tx)
+	if cs.synced && ce.AppliedBlocks[len(ce.AppliedBlocks)-1] == currentBlock {
+		cc.Synced = true
+	}
 	return cc, nil
 }
 
