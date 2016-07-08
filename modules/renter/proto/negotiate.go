@@ -116,7 +116,7 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error 
 
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
-func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
+func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, saveFn revisionSaver) (types.Transaction, error) {
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
@@ -139,13 +139,27 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
 	}
 
+	// Before we continue, save the revision. Unexpected termination (e.g.
+	// power failure) during the signature transfer leaves in an ambiguous
+	// state: the host may or may not have received the signature, and thus
+	// may report either revision as being the most recent. To mitigate this,
+	// we save the old revision as a fallback.
+	if saveFn != nil {
+		if err := saveFn(rev); err != nil {
+			return types.Transaction{}, errors.New("failed to save revision: " + err.Error())
+		}
+	}
+
 	// send the new transaction signature
 	if err := encoding.WriteObject(conn, signedTxn.TransactionSignatures[0]); err != nil {
 		return types.Transaction{}, errors.New("couldn't send transaction signature: " + err.Error())
 	}
 	// read the host's acceptance and transaction signature
-	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
-		return types.Transaction{}, errors.New("host did not accept transaction signature: " + err.Error())
+	// NOTE: if the host sends ErrStopResponse, we should continue processing
+	// the revision, but return the error anyway.
+	responseErr := modules.ReadNegotiationAcceptance(conn)
+	if responseErr != nil && responseErr != modules.ErrStopResponse {
+		return types.Transaction{}, errors.New("host did not accept transaction signature: " + responseErr.Error())
 	}
 	var hostSig types.TransactionSignature
 	if err := encoding.ReadObject(conn, &hostSig, 16e3); err != nil {
@@ -161,7 +175,9 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	if err := signedTxn.StandaloneValid(verificationHeight); err != nil {
 		return types.Transaction{}, err
 	}
-	return signedTxn, nil
+
+	// if the host sent ErrStopResponse, return it
+	return signedTxn, responseErr
 }
 
 // newRevision creates a copy of current with its revision number incremented,

@@ -62,14 +62,6 @@ func (he *Editor) Close() error {
 // host for approval. If negotiation is successful, it updates the underlying
 // Contract.
 func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev types.FileContractRevision, newRoots []crypto.Hash) error {
-	// if a SaveFn was provided, call it before doing any further I/O, because
-	// that's when we're most likely to experience failure
-	if he.SaveFn != nil {
-		if err := he.SaveFn(rev); err != nil {
-			return errors.New("failed to save unsigned revision: " + err.Error())
-		}
-	}
-
 	// initiate revision
 	if err := startRevision(he.conn, he.host); err != nil {
 		return err
@@ -81,8 +73,12 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 	}
 
 	// send revision to host and exchange signatures
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
-	if err != nil {
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, he.SaveFn)
+	if err == modules.ErrStopResponse {
+		// if host gracefully closed, close our connection as well; this will
+		// cause the next operation to fail
+		he.conn.Close()
+	} else if err != nil {
 		return err
 	}
 

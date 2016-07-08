@@ -40,14 +40,6 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	// create the download revision
 	rev := newDownloadRevision(hd.contract.LastRevision, sectorPrice)
 
-	// if a SaveFn was provided, call it before doing any further I/O, because
-	// that's when we're most likely to experience failure
-	if hd.SaveFn != nil {
-		if err := hd.SaveFn(rev); err != nil {
-			return modules.RenterContract{}, nil, errors.New("failed to save unsigned revision: " + err.Error())
-		}
-	}
-
 	// initiate download by confirming host settings
 	if err := startDownload(hd.conn, hd.host); err != nil {
 		return modules.RenterContract{}, nil, err
@@ -64,8 +56,13 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	}
 
 	// send the revision to the host for approval
-	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
-	if err != nil {
+	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey, hd.SaveFn)
+	if err == modules.ErrStopResponse {
+		// if host gracefully closed, close our connection as well; this will
+		// cause the next download to fail. However, we must delay closing
+		// until we've finished downloading the sector.
+		defer hd.conn.Close()
+	} else if err != nil {
 		return modules.RenterContract{}, nil, err
 	}
 
