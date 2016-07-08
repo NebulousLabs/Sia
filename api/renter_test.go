@@ -136,7 +136,7 @@ func TestRenterHostsActiveHandler(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	// Try the call with with numhosts unset, and set to -1, 0, and 1.
+	// Try the call with numhosts unset, and set to -1, 0, and 1.
 	var ah ActiveHosts
 	err = st.getAPI("/hostdb/active", &ah)
 	if err != nil {
@@ -210,5 +210,39 @@ func TestRenterHostsActiveHandler(t *testing.T) {
 	}
 	if len(ah.Hosts) != 1 {
 		t.Fatal(len(ah.Hosts))
+	}
+}
+
+// TestRenterHostsAllHandler checks that announcing a host adds it to the list
+// of all hosts.
+func TestRenterHostsAllHandler(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestRenterHostsAllHandler1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Try the call before any hosts have been declared.
+	// Note that ah is of type ActiveHosts even though it may include inactive
+	// hosts. This is nonintuitive; I'd rather make a new AllHosts type instead.
+	var ah ActiveHosts
+	if err = st.getAPI("/hostdb/all", &ah); err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 0 {
+		t.Fatalf("expected 0 hosts, got %v", len(ah.Hosts))
+	}
+	// Announce the host and try the call again.
+	if err = st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.getAPI("/hostdb/all", &ah); err != nil {
+		t.Fatal(err)
+	}
+	if len(ah.Hosts) != 1 {
+		t.Fatalf("expected 1 host, got %v", len(ah.Hosts))
 	}
 }
