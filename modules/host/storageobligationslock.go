@@ -1,8 +1,18 @@
 package host
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// errObligationLocked is returned if the file contract being requested is
+	// currently locked. The lock can be in place if there is a storage proof
+	// being submitted, if there is another renter altering the contract, or if
+	// there have been network connections with have not resolved yet.
+	errObligationLocked = errors.New("the requested file contract is currently locked")
 )
 
 // lockStorageObligation puts a storage obligation under lock in the host.
@@ -22,7 +32,7 @@ func (h *Host) lockStorageObligation(soid types.FileContractID) {
 func (h *Host) tryLockStorageObligation(soid types.FileContractID) error {
 	tl, exists := h.lockedStorageObligations[soid]
 	if exists {
-		return tl.TryLock()
+		return errObligationLocked
 	}
 	tl = new(sync.TryMutex)
 	tl.Lock()

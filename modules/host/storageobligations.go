@@ -89,10 +89,6 @@ var (
 	// inputs.
 	errInsaneStorageObligationRevisionData = errors.New("revision to storage obligation has insane data")
 
-	// errObligationLocked is returned when a storage obligation is being put
-	// under lock, but is already locked.
-	errObligationLocked = errors.New("storage obligation is locked, and is unavailable for editing")
-
 	// errObligationUnlocked is returned when a storage obligation is being
 	// removed from lock, but is already unlocked.
 	errObligationUnlocked = errors.New("storage obligation is unlocked, and should not be getting unlocked")

@@ -6,6 +6,14 @@ package host
 // TODO: Review the pointer control on the host, particularly with respect to
 // the storage obligations being flung around in storageobligations.go.
 
+// TODO: New method of handling action items makes storage obligations
+// unavailable for short periods of time, which may cause noticeable (probably
+// not though) downtime as seen from the renter. Solutions may include just
+// blocking access to the renter while consensus itmes are happening.
+
+// TODO: what happens if the renter submits the revision early, before the
+// final revision. Will the host mark the contract as complete?
+
 // TODO: Test the safety of the builder, it should be okay to have multiple
 // builders open for up to 600 seconds, which means multiple blocks could be
 // received in that time period. Should also check what happens if a prent gets
