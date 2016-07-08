@@ -76,7 +76,7 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, he.SaveFn)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
-		// cause the next operation will fail
+		// cause the next operation to fail
 		he.conn.Close()
 	} else if err != nil {
 		return err

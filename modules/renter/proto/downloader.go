@@ -59,8 +59,9 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey, hd.SaveFn)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
-		// cause the next operation will fail
-		hd.conn.Close()
+		// cause the next download to fail. However, we must delay closing
+		// until we've finished downloading the sector.
+		defer hd.conn.Close()
 	} else if err != nil {
 		return modules.RenterContract{}, nil, err
 	}
