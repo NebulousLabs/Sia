@@ -112,8 +112,9 @@ func TestRenterConflicts(t *testing.T) {
 
 	// Upload using the same nickname.
 	err = st.stdPostAPI("/renter/upload/foo/bar.sia/test", uploadValues)
-	if err == renter.ErrPathOverload {
-		t.Fatalf("expected %v, got %v", renter.ErrPathOverload, err)
+	expectedErr := Error{"Upload failed: " + renter.ErrPathOverload.Error()}
+	if err != expectedErr {
+		t.Fatalf("expected %v, got %v", Error{"Upload failed: " + renter.ErrPathOverload.Error()}, err)
 	}
 
 	// Upload using nickname that conflicts with folder.
