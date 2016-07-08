@@ -73,6 +73,11 @@ type (
 	ActiveHosts struct {
 		Hosts []modules.HostDBEntry `json:"hosts"`
 	}
+
+	// AllHosts lists all hosts that the renter is aware of.
+	AllHosts struct {
+		Hosts []modules.HostDBEntry `json:"hosts"`
+	}
 )
 
 // renterHandlerGET handles the API call to /renter.
@@ -193,7 +198,7 @@ func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request, 
 	})
 }
 
-// renterDeleteHander handles the API call to delete a file entry from the
+// renterDeleteHandler handles the API call to delete a file entry from the
 // renter.
 func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	err := srv.renter.DeleteFile(strings.TrimPrefix(ps.ByName("siapath"), "/"))
@@ -257,7 +262,7 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 	writeSuccess(w)
 }
 
-// renterHostsActiveHandler handes the API call asking for the list of active
+// renterHostsActiveHandler handles the API call asking for the list of active
 // hosts.
 func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var numHosts uint64
@@ -285,9 +290,9 @@ func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Req
 	})
 }
 
-// renterHostsAllHandler handes the API call asking for the list of all hosts.
+// renterHostsAllHandler handles the API call asking for the list of all hosts.
 func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, ActiveHosts{
+	writeJSON(w, AllHosts{
 		Hosts: srv.renter.AllHosts(),
 	})
 }

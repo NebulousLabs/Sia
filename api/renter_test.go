@@ -226,9 +226,7 @@ func TestRenterHostsAllHandler(t *testing.T) {
 	defer st.server.Close()
 
 	// Try the call before any hosts have been declared.
-	// Note that ah is of type ActiveHosts even though it may include inactive
-	// hosts. This is nonintuitive; I'd rather make a new AllHosts type instead.
-	var ah ActiveHosts
+	var ah AllHosts
 	if err = st.getAPI("/hostdb/all", &ah); err != nil {
 		t.Fatal(err)
 	}
