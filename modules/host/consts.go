@@ -142,6 +142,22 @@ var (
 		panic("unrecognized release constant in host - maximumLockedStorageObligations")
 	}()
 
+	// obligationLockTimeout defines how long a thread will wait to get a lock
+	// on a storage obligation before timing out and reporting an error to the
+	// renter.
+	obligationLockTimeout = func() time.Duration {
+		if build.Release == "dev" {
+			return time.Second * 20
+		}
+		if build.Release == "standard" {
+			return time.Second * 60
+		}
+		if build.Release == "testing" {
+			return time.Second * 1
+		}
+		panic("unrecognized release constant in host - obligationLockTimeout")
+	}()
+
 	// revisionSubmissionBuffer describes the number of blocks ahead of time
 	// that the host will submit a file contract revision. The host will not
 	// accept any more revisions once inside the submission buffer.
