@@ -3,6 +3,7 @@ package sync
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestTryMutexBasicMutex verifies that Lock and Unlock work the same as a
@@ -91,4 +92,67 @@ func TestTryMutexConncurrentTries(t *testing.T) {
 	if data != 250 {
 		t.Error("Locking did not safely protect the data")
 	}
+}
+
+// TestTryMutexTimed checks that a timed lock will correctly time out if it
+// cannot grab a lock.
+func TestTryMutexTimed(t *testing.T) {
+	var tm TryMutex
+	tm.Lock()
+
+	startTime := time.Now()
+	if tm.TryLockTimed(time.Millisecond * 500) {
+		t.Error("was able to grab a locked lock")
+	}
+
+	if time.Now().Sub(startTime) < time.Millisecond*500 {
+		t.Error("lock did not wait the correct amount of time before timing out")
+	}
+	if time.Now().Sub(startTime) > time.Millisecond*750 {
+		t.Error("lock waited too long before timing out")
+	}
+
+	tm.Unlock()
+	if !tm.TryLockTimed(time.Millisecond * 1) {
+		t.Error("Unable to get an unlocked lock")
+	}
+	tm.Unlock()
+}
+
+// TestTryMutexTimedConcurrent checks that a timed lock will correctly time out
+// if it cannot grab a lock.
+func TestTryMutexTimedConcurrent(t *testing.T) {
+	var tm TryMutex
+
+	// Engage a lock and launch a gothread to wait for a lock, fail, and then
+	// call unlock.
+	tm.Lock()
+	go func() {
+		startTime := time.Now()
+		if tm.TryLockTimed(time.Millisecond * 500) {
+			t.Error("was able to grab a locked lock")
+		}
+
+		if time.Now().Sub(startTime) < time.Millisecond*500 {
+			t.Error("lock did not wait the correct amount of time before timing out")
+		}
+		if time.Now().Sub(startTime) > time.Millisecond*750 {
+			t.Error("lock waited too long before timing out")
+		}
+
+		tm.Unlock()
+	}()
+
+	// Try to get a lock, but don't wait long enough.
+	if tm.TryLockTimed(time.Millisecond * 250) {
+		// Lock shoud time out because the gothread responsible for releasing
+		// the lock will be idle for 500 milliseconds.
+		t.Error("Lock should have timed out")
+	}
+	if !tm.TryLockTimed(time.Millisecond * 750) {
+		// Lock should be successful - the above thread should finish in under
+		// 750 milliseconds.
+		t.Error("Lock should have been successful")
+	}
+	tm.Unlock()
 }
