@@ -27,21 +27,21 @@ var (
 		Long: `Modify host settings.
 
 Available settings:
-     acceptingcontracts:       boolean
-     maxduration:              blocks
-     maxdownloadbatchsize:     int
-     maxrevisebatchsize:       int
-     netaddress:               string
-     windowsize:               blocks
+     acceptingcontracts:   boolean
+     maxduration:          blocks
+     maxdownloadbatchsize: int
+     maxrevisebatchsize:   int
+     netaddress:           string
+     windowsize:           blocks
 
-     collateral:               currency
-     collateralbudget:         currency
-     maxcollateral:            currency
+     collateral:       currency
+     collateralbudget: currency
+     maxcollateral:    currency
 
-     mincontractprice:         currency
-     mindownloadbandwithprice: currency / TB
-     minstorageprice:          currency / TB / Month
-     minuploadbandwidthprice:  currency / TB
+     mincontractprice:          currency
+     mindownloadbandwidthprice: currency / TB
+     minstorageprice:           currency / TB / Month
+     minuploadbandwidthprice:   currency / TB
 
 Currency units can be specified, e.g. 10SC; run 'siac help wallet' for details.
 
@@ -194,10 +194,10 @@ Host Internal Settings:
 	collateralbudget: %v 
 	maxcollateral:    %v Per Contract
 
-	mincontractprice:         %v
-	mindownloadbandwithprice: %v / TB
-	minstorageprice:          %v / TB / Month
-	minuploadbandwidthprice:  %v / TB
+	mincontractprice:          %v
+	mindownloadbandwidthprice: %v / TB
+	minstorageprice:           %v / TB / Month
+	minuploadbandwidthprice:   %v / TB
 
 Host Financials:
 	Contract Count:               %v
