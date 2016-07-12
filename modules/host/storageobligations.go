@@ -600,17 +600,16 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
 		h.mu.Unlock()
 	}()
 
-	h.mu.RLock()
-	blockHeight := h.blockHeight
-	h.mu.RUnlock()
-
 	// Convert the storage obligation id into a storage obligation.
 	var err error
 	var so storageObligation
+	h.mu.RLock()
+	blockHeight := h.blockHeight
 	err = h.db.View(func(tx *bolt.Tx) error {
 		so, err = getStorageObligation(tx, soid)
 		return err
 	})
+	h.mu.RUnlock()
 	if err != nil {
 		h.log.Println("Could not get storage obligation:", err)
 		return

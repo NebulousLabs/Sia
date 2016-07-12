@@ -89,6 +89,7 @@ package host
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"path/filepath"
 	"sync"
@@ -255,60 +256,69 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		}
 	}()
 
-	// Add the storage manager to the host.
-	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the perist directory if it does not yet exist.
 	err = dependencies.mkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize the logger. Logging should be initialized ASAP, because the
-	// rest of the initialization makes use of the logger.
+	// Initialize the logger, and set up the stop call that will close the
+	// logger.
 	h.log, err = dependencies.newLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
+	h.tg.AfterStop(func() {
+		err = h.log.Close()
+		if err != nil {
+			// State of the logger is uncertain, a Println will have to
+			// suffice.
+			fmt.Println("Error when closing the logger:", err)
+		}
+	})
 
-	// Open the database containing the host's storage obligation metadata.
-	h.db, err = dependencies.openDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	// Add the storage manager to the host, and set up the stop call that will
+	// close the storage manager.
+	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
 	if err != nil {
-		// An error will be returned if the database has the wrong version, but
-		// as of writing there was only one version of the database and all
-		// other databases would be incompatible.
-		_ = h.log.Close()
+		h.log.Println("Could not open the storage manager:", err)
 		return nil, err
 	}
+	h.tg.AfterStop(func() {
+		err = h.StorageManager.Close()
+		if err != nil {
+			h.log.Println("Could not close storage manager:", err)
+		}
+	})
+
 	// After opening the database, it must be initialized. Most commonly,
 	// nothing happens. But for new databases, a set of buckets must be
 	// created. Initialization is also a good time to run sanity checks.
 	err = h.initDB()
 	if err != nil {
-		_ = h.log.Close()
-		_ = h.db.Close()
+		h.log.Println("Could not initalize database:", err)
 		return nil, err
 	}
 
-	// Load the prior persistence structures.
+	// Load the prior persistence structures, and configure the host to save
+	// before shutting down.
 	err = h.load()
 	if err != nil {
-		_ = h.log.Close()
-		_ = h.db.Close()
 		return nil, err
 	}
+	h.tg.AfterStop(func() {
+		err = h.saveSync()
+		if err != nil {
+			h.log.Println("Could not save host upon shutdown:", err)
+		}
+	})
 
-	// Get the host established on the network.
+	// Initialize the networking.
 	err = h.initNetworking(listenerAddress)
 	if err != nil {
-		_ = h.log.Close()
-		_ = h.db.Close()
+		h.log.Println("Could not initialize host networking:", err)
 		return nil, err
 	}
-
 	return h, nil
 }
 
@@ -317,39 +327,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
 }
 
-// Close shuts down the host, preparing it for garbage collection.
-func (h *Host) Close() (composedError error) {
-	err := h.tg.Stop()
-	if err != nil {
-		return err
-	}
-
-	err = h.StorageManager.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Close the bolt database.
-	err = h.db.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Save the latest host state.
-	h.mu.Lock()
-	err = h.saveSync()
-	h.mu.Unlock()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Close the logger. The logger should be the last thing to shut down so
-	// that all other objects have access to logging while closing.
-	err = h.log.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-	return composedError
+// Close shuts down the host.
+func (h *Host) Close() error {
+	return h.tg.Stop()
 }
 
 // ExternalSettings returns the hosts external settings. These values cannot be

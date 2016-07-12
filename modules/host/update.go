@@ -69,11 +69,9 @@ func (h *Host) initRescan() error {
 	if err != nil {
 		return err
 	}
-	h.mu.Lock()
 	h.tg.OnStop(func() {
 		h.cs.Unsubscribe(h)
 	})
-	h.mu.Unlock()
 
 	// Re-queue all of the action items for the storage obligations.
 	for _, so := range allObligations {
@@ -104,11 +102,9 @@ func (h *Host) initConsensusSubscription() error {
 	if err != nil {
 		return err
 	}
-	h.mu.Lock()
 	h.tg.OnStop(func() {
 		h.cs.Unsubscribe(h)
 	})
-	h.mu.Unlock()
 	return nil
 }
 
@@ -294,7 +290,7 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// Add the action item to the wait group outside of the threaded call.
 		err = h.tg.Add()
 		if err != nil {
-			h.log.Critical("unable to use waitgroup while submitting an action item")
+			break
 		}
 		go h.threadedHandleActionItem(ai)
 	}

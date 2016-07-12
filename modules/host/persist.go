@@ -105,12 +105,24 @@ func (h *Host) establishDefaults() error {
 	if err != nil {
 		return err
 	}
-	return h.save()
+	return nil
 }
 
 // initDB will check that the database has been initialized and if not, will
 // initialize the database.
-func (h *Host) initDB() error {
+func (h *Host) initDB() (err error) {
+	// Open the host's database and set up the stop function to close it.
+	h.db, err = h.dependencies.openDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	if err != nil {
+		return err
+	}
+	h.tg.AfterStop(func() {
+		err = h.db.Close()
+		if err != nil {
+			h.log.Println("Could not close the database:", err)
+		}
+	})
+
 	return h.db.Update(func(tx *bolt.Tx) error {
 		// The storage obligation bucket does not exist, which means the
 		// database needs to be initialized. Create the database buckets.
