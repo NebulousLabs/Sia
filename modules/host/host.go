@@ -342,13 +342,6 @@ func (h *Host) Close() (composedError error) {
 		composedError = composeErrors(composedError, err)
 	}
 
-	// Clear the port that was forwarded at startup. The port handling must
-	// happen before the logger is closed, as it leaves a logging message.
-	err = h.managedClearPort()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
 	// Save the latest host state.
 	h.mu.Lock()
 	err = h.saveSync()

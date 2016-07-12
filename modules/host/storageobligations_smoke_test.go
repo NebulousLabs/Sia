@@ -282,13 +282,9 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Pause the host - pause will block until the host has submitted the
+	// Flush the host - flush will block until the host has submitted the
 	// storage proof to the transaction pool.
-	err = ht.host.tg.Pause()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ht.host.tg.Resume()
+	err = ht.host.tg.Flush()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,13 +528,9 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Pause the host - pause will block until the host has submitted the
+	// Flush the host - flush will block until the host has submitted the
 	// storage proof to the transaction pool.
-	err = ht.host.tg.Pause()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ht.host.tg.Resume()
+	err = ht.host.tg.Flush()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -678,13 +670,9 @@ func TestAutoRevisionSubmission(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Pause the host - pause will block until the host has submitted the
+	// Flush the host - flush will block until the host has submitted the
 	// storage proof to the transaction pool.
-	err = ht.host.tg.Pause()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ht.host.tg.Resume()
+	err = ht.host.tg.Flush()
 	if err != nil {
 		t.Fatal(err)
 	}

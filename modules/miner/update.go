@@ -8,11 +8,6 @@ import (
 
 // ProcessConsensusDigest will update the miner's most recent block.
 func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
-	if err := m.tg.Add(); err != nil {
-		return
-	}
-	defer m.tg.Done()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -75,11 +70,6 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
 // set of transactions with the input transactions.
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
-	if err := m.tg.Add(); err != nil {
-		return
-	}
-	defer m.tg.Done()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

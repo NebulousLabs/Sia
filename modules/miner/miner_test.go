@@ -333,6 +333,7 @@ func TestMinerCloseDeadlock(t *testing.T) {
 	// I haven't seen this behavior since sticking Close() inside a goroutine,
 	// but I'm not sure that's comfort enough.
 	mt.miner.StartCPUMining()
+	time.Sleep(time.Millisecond * 250)
 
 	closed := make(chan struct{})
 	go func() {

@@ -31,6 +31,7 @@ func TestHostFailedMkdirAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	err = ht.host.Close()
 	if err != nil {
 		t.Fatal(err)
