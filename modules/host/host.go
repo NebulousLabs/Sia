@@ -73,6 +73,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
@@ -319,7 +320,7 @@ func (h *Host) ExternalSettings() modules.HostExternalSettings {
 	defer h.mu.RUnlock()
 	err := h.tg.Add()
 	if err != nil {
-		return err
+		build.Critical("Call to ExternalSettings after close")
 	}
 	defer h.tg.Done()
 	return h.externalSettings()
@@ -332,7 +333,7 @@ func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
 	defer h.mu.RUnlock()
 	err := h.tg.Add()
 	if err != nil {
-		return err
+		build.Critical("Call to FinancialMetrics after close")
 	}
 	defer h.tg.Done()
 	return h.financialMetrics
@@ -387,7 +388,7 @@ func (h *Host) InternalSettings() modules.HostInternalSettings {
 	defer h.mu.RUnlock()
 	err := h.tg.Add()
 	if err != nil {
-		return err
+		build.Critical("call to InternalSettings after close")
 	}
 	defer h.tg.Done()
 	return h.settings

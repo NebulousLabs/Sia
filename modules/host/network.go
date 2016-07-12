@@ -206,8 +206,6 @@ func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return modules.HostNetworkMetrics{
-		// TODO: Up/Down bandwidth
-
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
 		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),
