@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -172,8 +173,6 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	}
 
 	// Create and add the storage obligation for this file contract.
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	fullTxn, _ := builder.View()
 	so := &storageObligation{
 		SectorRoots: initialSectorRoots,
@@ -186,20 +185,52 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		OriginTransactionSet:   fullTxnSet,
 		RevisionTransactionSet: []types.Transaction{revisionTransaction},
 	}
+
+	// Get a lock on the storage obligation.
+	h.mu.Lock()
 	lockErr := h.tryLockStorageObligation(so.id())
+	h.mu.Unlock()
 	if lockErr != nil {
 		return nil, types.TransactionSignature{}, lockErr
 	}
+
 	// addStorageObligation will submit the transaction to the transaction
 	// pool, and will only do so if there was not some error in creating the
-	// storage obligation.
-	err = h.addStorageObligation(so)
-	h.unlockStorageObligation(so.id())
+	// storage obligation. If the transaction pool returns a consensus
+	// conflict, wait 30 seconds and try again.
+	err = func() error {
+		// Unlock the storage obligation when finished.
+		defer h.unlockStorageObligation(so.id())
+
+		// Try adding the storage obligation. If there's an error, wait a few
+		// seconds and try again. Eventually time out. It should be noted that
+		// the storage obligation locking is both crappy and incomplete, and
+		// that I'm not sure how this timeout plays with the overall host
+		// timeouts.
+		//
+		// The storage obligation locks should occur at the highest level, not
+		// just when the actual modification is happening.
+		i := 0
+		for {
+			h.mu.Lock()
+			err = h.addStorageObligation(so)
+			h.mu.Unlock()
+			if err == nil {
+				return nil
+			}
+			if err != nil && i > 4 {
+				h.log.Println(err)
+				builder.Drop()
+				return err
+			}
+
+			i++
+			if build.Release == "standard" {
+				time.Sleep(time.Second * 15)
+			}
+		}
+	}()
 	if err != nil {
-		// TODO: in the event of serious disk error, consider setting
-		// AcceptingContracts to false.
-		h.log.Println(err)
-		builder.Drop()
 		return nil, types.TransactionSignature{}, err
 	}
 
