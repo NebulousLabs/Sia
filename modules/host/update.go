@@ -69,6 +69,11 @@ func (h *Host) initRescan() error {
 	if err != nil {
 		return err
 	}
+	h.mu.Lock()
+	h.tg.OnStop(func() {
+		h.cs.Unsubscribe(h)
+	})
+	h.mu.Unlock()
 
 	// Re-queue all of the action items for the storage obligations.
 	for _, so := range allObligations {
@@ -96,7 +101,15 @@ func (h *Host) initConsensusSubscription() error {
 		// structure.
 		return h.initRescan()
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	h.mu.Lock()
+	h.tg.OnStop(func() {
+		h.cs.Unsubscribe(h)
+	})
+	h.mu.Unlock()
+	return nil
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
@@ -104,16 +117,11 @@ func (h *Host) initConsensusSubscription() error {
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	err := h.tg.Add()
-	if err != nil {
-		return
-	}
-	defer h.tg.Done()
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.
 	var actionItems []types.FileContractID
-	err = h.db.Update(func(tx *bolt.Tx) error {
+	err := h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
 			for _, txn := range block.Transactions {

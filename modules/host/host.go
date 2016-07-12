@@ -324,13 +324,6 @@ func (h *Host) Close() (composedError error) {
 		return err
 	}
 
-	// Unsubscribe the host from the consensus set. Call will not terminate
-	// until the last consensus update has been sent to the host.
-	// Unsubscription must happen before any resources are released or
-	// terminated because the process consensus change function makes use of
-	// those resources.
-	h.cs.Unsubscribe(h)
-
 	err = h.StorageManager.Close()
 	if err != nil {
 		composedError = composeErrors(composedError, err)
