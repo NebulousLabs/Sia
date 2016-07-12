@@ -2,13 +2,23 @@ package sync
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
-// TestThreadGroup tests normal operation of a ThreadGroup.
-func TestThreadGroup(t *testing.T) {
+// TestThreadGroupStopEarly tests that a thread group can correctly interrupt
+// an ongoing process.
+func TestThreadGroupStopEarly(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
 	var tg ThreadGroup
 	for i := 0; i < 10; i++ {
 		err := tg.Add()
@@ -34,17 +44,126 @@ func TestThreadGroup(t *testing.T) {
 	}
 }
 
+// TestThreadGroupWait tests that a thread group will correctly wait for
+// existing processes to halt.
+func TestThreadGroupWait(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	var tg ThreadGroup
+	for i := 0; i < 10; i++ {
+		err := tg.Add()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		go func() {
+			defer tg.Done()
+			time.Sleep(time.Second)
+		}()
+	}
+	start := time.Now()
+	err := tg.Stop()
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	} else if elapsed < time.Second {
+		t.Fatal("Stop did not wait for goroutines")
+	}
+}
+
 // TestThreadGroupStop tests the behavior of a ThreadGroup after Stop has been
 // called.
 func TestThreadGroupStop(t *testing.T) {
 	// Create a thread group and stop it.
 	var tg ThreadGroup
-	err := tg.Stop()
+	// Create an array to track the order of execution for OnStop and AfterStop
+	// calls.
+	var stopCalls []int
+
+	// isStopped should return false
+	if tg.isStopped() {
+		t.Error("isStopped returns true on unstopped ThreadGroup")
+	}
+	// The cannel provided by StopChan should be open.
+	select {
+	case <-tg.StopChan():
+		t.Error("stop chan appears to be closed")
+	default:
+	}
+
+	// OnStop and AfterStop should queue their functions, but not call them.
+	// 'Add' and 'Done' are setup around the OnStop functions, to make sure
+	// that the OnStop functions are called before waiting for all calls to
+	// 'Done' to come through.
+	//
+	// Note: the practice of calling Add outside of OnStop and Done inside of
+	// OnStop is a bad one - any call to tg.Flush() will cause a deadlock
+	// because the stop functions will not be called but tg.Flush will be
+	// waiting for the thread group counter to reach zero.
+	err := tg.Add()
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = tg.Add()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tg.OnStop(func() {
+		tg.Done()
+		stopCalls = append(stopCalls, 1)
+	})
+	tg.OnStop(func() {
+		tg.Done()
+		stopCalls = append(stopCalls, 2)
+	})
+	tg.AfterStop(func() {
+		stopCalls = append(stopCalls, 10)
+	})
+	tg.AfterStop(func() {
+		stopCalls = append(stopCalls, 20)
+	})
+	// None of the stop calls should have been called yet.
+	if len(stopCalls) != 0 {
+		t.Fatal("Stop calls were called too early")
+	}
 
-	// Add and Stop should return errors
+	// Stop the thread group.
+	err = tg.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// isStopped should return true.
+	if !tg.isStopped() {
+		t.Error("isStopped returns false on stopped ThreadGroup")
+	}
+	// The cannel provided by StopChan should be closed.
+	select {
+	case <-tg.StopChan():
+	default:
+		t.Error("stop chan appears to be closed")
+	}
+	// The OnStop calls should have been called first, in reverse order, and
+	// the AfterStop calls should have been called second, in reverse order.
+	if len(stopCalls) != 4 {
+		t.Fatal("Stop did not call the stopping functions correctly")
+	}
+	if stopCalls[0] != 2 {
+		t.Error("Stop called the stopping functions in the wrong order")
+	}
+	if stopCalls[1] != 1 {
+		t.Error("Stop called the stopping functions in the wrong order")
+	}
+	if stopCalls[2] != 20 {
+		t.Error("Stop called the stopping functions in the wrong order")
+	}
+	if stopCalls[3] != 10 {
+		t.Error("Stop called the stopping functions in the wrong order")
+	}
+
+	// Add and Stop should return errors.
 	err = tg.Add()
 	if err != ErrStopped {
 		t.Error("expected ErrStopped, got", err)
@@ -52,6 +171,23 @@ func TestThreadGroupStop(t *testing.T) {
 	err = tg.Stop()
 	if err != ErrStopped {
 		t.Error("expected ErrStopped, got", err)
+	}
+
+	// OnStop and AfterStop should call their functions immediately now that
+	// the thread group has stopped.
+	onStopCalled := false
+	tg.OnStop(func() {
+		onStopCalled = true
+	})
+	if !onStopCalled {
+		t.Error("OnStop function not called immediately despite the thread group being closed already.")
+	}
+	afterStopCalled := false
+	tg.AfterStop(func() {
+		afterStopCalled = true
+	})
+	if !afterStopCalled {
+		t.Error("AfterStop function not called immediately despite the thread group being closed already.")
 	}
 }
 
@@ -94,6 +230,12 @@ func TestThreadGroupOnce(t *testing.T) {
 	}
 
 	tg = new(ThreadGroup)
+	tg.isStopped()
+	if tg.stopChan == nil {
+		t.Error("stopChan should have been initialized by isStopped")
+	}
+
+	tg = new(ThreadGroup)
 	tg.Add()
 	if tg.stopChan == nil {
 		t.Error("stopChan should have been initialized by Add")
@@ -106,9 +248,9 @@ func TestThreadGroupOnce(t *testing.T) {
 	}
 }
 
-// TestThreadGroupBeforeStop tests that Stop calls functions registered with
-// BeforeStop.
-func TestThreadGroupBeforeStop(t *testing.T) {
+// TestThreadGroupOnStop tests that Stop calls functions registered with
+// OnStop.
+func TestThreadGroupOnStop(t *testing.T) {
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +258,7 @@ func TestThreadGroupBeforeStop(t *testing.T) {
 
 	// create ThreadGroup and register the closer
 	var tg ThreadGroup
-	tg.BeforeStop(func() { l.Close() })
+	tg.OnStop(func() { l.Close() })
 
 	// send on channel when listener is closed
 	var closed bool
@@ -149,7 +291,7 @@ func TestThreadGroupRace(t *testing.T) {
 	}
 }
 
-// TestThreadedGroupCloseAfterStop checks that an AfterStop function is
+// TestThreadGroupCloseAfterStop checks that an AfterStop function is
 // correctly called after the thread is stopped.
 func TestThreadGroupClosedAfterStop(t *testing.T) {
 	var tg ThreadGroup
@@ -171,6 +313,106 @@ func TestThreadGroupClosedAfterStop(t *testing.T) {
 	tg.AfterStop(func() { closed = true })
 	if !closed {
 		t.Fatal("close function should have been called immediately")
+	}
+}
+
+// TestThreadGroupSiaExample tries to use a thread group as it might be
+// expected to be used by a module of Sia.
+func TestThreadGroupSiaExample(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	testDir := build.TempDir("sync", "TestThreadGroupSiaExample")
+	err := os.MkdirAll(testDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tg ThreadGroup
+
+	// Open an example file. The file is expected to be used throughout the
+	// lifetime of the module, and should not be closed until 'AfterStop' is
+	// called.
+	fileClosed := false
+	file, err := os.Create(filepath.Join(testDir, "exampleFile.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tg.AfterStop(func() {
+		fileClosed = true
+		err := file.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	// Open a listener. The listener and handler thread should be closed before
+	// the file is closed.
+	listenerCleanedUp := false
+	listener, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Open a thread to accept calls from the listener.
+	handlerFinishedChan := make(chan struct{})
+	go func() {
+		for {
+			_, err := listener.Accept()
+			if err != nil {
+				break
+			}
+		}
+		handlerFinishedChan <- struct{}{}
+	}()
+	tg.OnStop(func() {
+		err := listener.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-handlerFinishedChan
+
+		if fileClosed {
+			t.Error("file should be open while the listener is shutting down")
+		}
+		listenerCleanedUp = true
+	})
+
+	// Create a thread that does some stuff which takes time, and then closes.
+	// Use Flush to clear out the process without closing the resources.
+	threadFinished := false
+	err = tg.Add()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(time.Second)
+		threadFinished = true
+		tg.Done()
+	}()
+	tg.Flush()
+	if !threadFinished {
+		t.Error("call to Flush should have allowed the working thread to finish")
+	}
+	if listenerCleanedUp || fileClosed {
+		t.Error("call to Flush resulted in permanent resources being closed")
+	}
+
+	// Create a thread that does some stuff which takes time, and then closes.
+	// Use Stop to wait for the threead to finish and then check that all
+	// resources have closed.
+	threadFinished2 := false
+	err = tg.Add()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(time.Second)
+		threadFinished2 = true
+		tg.Done()
+	}()
+	tg.Stop()
+	if !threadFinished || !listenerCleanedUp || !fileClosed {
+		t.Error("stop did not block until all running resources had closed")
 	}
 }
 
