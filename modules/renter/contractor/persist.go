@@ -1,6 +1,7 @@
 package contractor
 
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -9,7 +10,7 @@ import (
 type contractorPersist struct {
 	Allowance        modules.Allowance
 	BlockHeight      types.BlockHeight
-	CachedRevisions  []types.FileContractRevision
+	CachedRevisions  []cachedRevision
 	Contracts        []modules.RenterContract
 	LastChange       modules.ConsensusChangeID
 	RenewHeight      types.BlockHeight
@@ -44,7 +45,7 @@ func (c *Contractor) load() error {
 	c.allowance = data.Allowance
 	c.blockHeight = data.BlockHeight
 	for _, rev := range data.CachedRevisions {
-		c.cachedRevisions[rev.ParentID] = rev
+		c.cachedRevisions[rev.revision.ParentID] = rev
 	}
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
@@ -67,11 +68,11 @@ func (c *Contractor) saveSync() error {
 
 // saveRevision returns a function that saves a revision. It is used by the
 // Editor and Downloader types to prevent desynchronizing with their host.
-func (c *Contractor) saveRevision(id types.FileContractID) func(types.FileContractRevision) error {
-	return func(rev types.FileContractRevision) error {
+func (c *Contractor) saveRevision(id types.FileContractID) func(types.FileContractRevision, []crypto.Hash) error {
+	return func(rev types.FileContractRevision, newRoots []crypto.Hash) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		c.cachedRevisions[id] = rev
+		c.cachedRevisions[id] = cachedRevision{rev, newRoots}
 		return c.saveSync()
 	}
 }

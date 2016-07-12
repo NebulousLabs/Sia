@@ -43,7 +43,7 @@ var (
 	// errReviseBadFileMerkleRoot is returned if the renter sends a file
 	// contract revision with a Merkle root that does not match the changes
 	// presented by the revision request.
-	errReviseBadFileMerkleRoot = errors.New("proposed file contract revision has an incorrect Merkle merkle root")
+	errReviseBadFileMerkleRoot = errors.New("proposed file contract revision has an incorrect Merkle root")
 
 	// errReviseBadHostValidOutput is returned if a proposed file contract
 	// revision does not correctly add value to the host's valid proof outputs.

@@ -67,13 +67,24 @@ func (he *Editor) runRevisionIteration(actions []modules.RevisionAction, rev typ
 		return err
 	}
 
+	// Before we continue, save the revision. Unexpected termination (e.g.
+	// power failure) during the signature transfer leaves in an ambiguous
+	// state: the host may or may not have received the signature, and thus
+	// may report either revision as being the most recent. To mitigate this,
+	// we save the old revision as a fallback.
+	if he.SaveFn != nil {
+		if err := he.SaveFn(rev, newRoots); err != nil {
+			return err
+		}
+	}
+
 	// send actions
 	if err := encoding.WriteObject(he.conn, actions); err != nil {
 		return err
 	}
 
 	// send revision to host and exchange signatures
-	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey, he.SaveFn)
+	signedTxn, err := negotiateRevision(he.conn, rev, he.contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next operation to fail

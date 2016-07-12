@@ -45,6 +45,17 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 		return modules.RenterContract{}, nil, err
 	}
 
+	// Before we continue, save the revision. Unexpected termination (e.g.
+	// power failure) during the signature transfer leaves in an ambiguous
+	// state: the host may or may not have received the signature, and thus
+	// may report either revision as being the most recent. To mitigate this,
+	// we save the old revision as a fallback.
+	if hd.SaveFn != nil {
+		if err := hd.SaveFn(rev, hd.contract.MerkleRoots); err != nil {
+			return modules.RenterContract{}, nil, err
+		}
+	}
+
 	// send download action
 	err := encoding.WriteObject(hd.conn, []modules.DownloadAction{{
 		MerkleRoot: root,
@@ -56,7 +67,7 @@ func (hd *Downloader) Sector(root crypto.Hash) (modules.RenterContract, []byte, 
 	}
 
 	// send the revision to the host for approval
-	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey, hd.SaveFn)
+	signedTxn, err := negotiateRevision(hd.conn, rev, hd.contract.SecretKey)
 	if err == modules.ErrStopResponse {
 		// if host gracefully closed, close our connection as well; this will
 		// cause the next download to fail. However, we must delay closing

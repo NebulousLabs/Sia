@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -118,6 +119,10 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 		newContracts[newContract.ID] = newContract
 		if len(newContracts) >= int(a.Hosts) {
 			break
+		}
+		if build.Release != "testing" {
+			// sleep for 1 minute to alleviate potential block propagation issues
+			time.Sleep(60 * time.Second)
 		}
 	}
 

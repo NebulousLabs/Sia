@@ -3,6 +3,7 @@ package proto
 import (
 	"fmt"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -39,8 +40,8 @@ type ContractParams struct {
 }
 
 // A revisionSaver is called just before we send our revision signature to the host; this
-// allows the revision to be reloaded later if we desync from the host.
-type revisionSaver func(types.FileContractRevision) error
+// allows the revision and Merkle roots to be reloaded later if we desync from the host.
+type revisionSaver func(types.FileContractRevision, []crypto.Hash) error
 
 // A recentRevisionError occurs if the host reports a different revision
 // number than expected.

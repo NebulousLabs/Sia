@@ -150,14 +150,15 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
-		cachedRev, ok := c.cachedRevisions[contract.ID]
+		cached, ok := c.cachedRevisions[contract.ID]
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
 			return nil, err
 		}
-		c.log.Printf("host has different revision for %v; retrying with cached revision", contract.ID)
-		contract.LastRevision = cachedRev
+		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		contract.LastRevision = cached.revision
+		contract.MerkleRoots = cached.merkleRoots
 		e, err = proto.NewEditor(host, contract, height)
 	}
 	if err != nil {

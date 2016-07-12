@@ -2,7 +2,9 @@ package contractor
 
 import (
 	"errors"
+	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
@@ -87,6 +89,10 @@ func (c *Contractor) managedRenewContracts() error {
 			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)
 		} else {
 			newContracts[contract.ID] = newContract
+		}
+		if build.Release != "testing" {
+			// sleep for 1 minute to alleviate potential block propagation issues
+			time.Sleep(60 * time.Second)
 		}
 	}
 

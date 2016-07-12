@@ -116,7 +116,7 @@ func verifyRecentRevision(conn net.Conn, contract modules.RenterContract) error 
 
 // negotiateRevision sends a revision and actions to the host for approval,
 // completing one iteration of the revision loop.
-func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey, saveFn revisionSaver) (types.Transaction, error) {
+func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey crypto.SecretKey) (types.Transaction, error) {
 	// create transaction containing the revision
 	signedTxn := types.Transaction{
 		FileContractRevisions: []types.FileContractRevision{rev},
@@ -137,17 +137,6 @@ func negotiateRevision(conn net.Conn, rev types.FileContractRevision, secretKey 
 	// read acceptance
 	if err := modules.ReadNegotiationAcceptance(conn); err != nil {
 		return types.Transaction{}, errors.New("host did not accept revision: " + err.Error())
-	}
-
-	// Before we continue, save the revision. Unexpected termination (e.g.
-	// power failure) during the signature transfer leaves in an ambiguous
-	// state: the host may or may not have received the signature, and thus
-	// may report either revision as being the most recent. To mitigate this,
-	// we save the old revision as a fallback.
-	if saveFn != nil {
-		if err := saveFn(rev); err != nil {
-			return types.Transaction{}, errors.New("failed to save revision: " + err.Error())
-		}
 	}
 
 	// send the new transaction signature
