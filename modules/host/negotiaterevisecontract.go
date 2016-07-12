@@ -297,9 +297,6 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 		h.mu.Lock()
 		h.unlockStorageObligation(so.id())
 		h.mu.Unlock()
-		if err != nil {
-			h.log.Critical(err)
-		}
 	}()
 
 	// Begin the revision loop. The host will process revisions until a

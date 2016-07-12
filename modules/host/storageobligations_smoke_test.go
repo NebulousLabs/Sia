@@ -194,9 +194,6 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host.lockStorageObligation(so.id())
-	if err != nil {
-		t.Fatal(err)
-	}
 	err = ht.host.addStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
@@ -449,7 +446,7 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	// this should never happen, we want to check that the transaction pool is
 	// correctly handling multiple file contract revisions being submitted in
 	// the same block cycle. This test will additionally tell us whether or not
-	// the host can correctly handle buildling storage proofs for files with
+	// the host can correctly handle building storage proofs for files with
 	// multiple sectors.
 	sectorRoot2, sectorData2, err := randSector()
 	if err != nil {
@@ -482,9 +479,6 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 		}},
 	}}
 	ht.host.lockStorageObligation(so.id())
-	if err != nil {
-		t.Fatal(err)
-	}
 	err = ht.host.modifyStorageObligation(so, nil, []crypto.Hash{sectorRoot2}, [][]byte{sectorData2})
 	if err != nil {
 		t.Fatal(err)

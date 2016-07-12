@@ -266,7 +266,7 @@ func blankServerTester(name string) (*serverTester, error) {
 	// createServerTester is expensive, and therefore should not be called
 	// during short tests.
 	if testing.Short() {
-		panic("createServerTester called during short tests")
+		panic("blankServerTester called during short tests")
 	}
 
 	// Create the server tester with key.

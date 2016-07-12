@@ -159,7 +159,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Connectivity check - all nodes should by synchronized to the leader's
+	// Connectivity check - all nodes should be synchronized to the leader's
 	// chain, which should have been the longest.
 	allTesters := []*serverTester{stLeader, stHost1, stHost2, stHost3, stHost4, stRenter1, stRenter2}
 	chainTip, err := synchronizationCheck(allTesters)
@@ -170,8 +170,8 @@ func TestHostPoorConnectivity(t *testing.T) {
 	// Mine a block from each node, to give the node money in the wallet that
 	// is recognized by the shared chain.
 	for i := range allTesters {
-		// Wait until the current tester has 'leadBlockID' as its current
-		// block, to make sure the network is buildling a community chain
+		// Wait until the current tester has 'chainTip' as its current
+		// block, to make sure the network is building a community chain
 		// instead of creating orphans.
 		var cg ConsensusGET
 		success := false
