@@ -69,7 +69,7 @@ func TestAddress(t *testing.T) {
 	}
 }
 
-// TestPeers checks that two gateways are able to connect to eachother.
+// TestPeers checks that two gateways are able to connect to each other.
 func TestPeers(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

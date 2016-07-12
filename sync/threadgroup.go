@@ -58,7 +58,7 @@ func (tg *ThreadGroup) Add() error {
 // immediately.
 //
 // The primary use of AfterStop is to allow code that opens and closes
-// resources to be positioned next to eachother. The purpose is similar to
+// resources to be positioned next to each other. The purpose is similar to
 // `defer`, except for resources that outlive the function which creates them.
 func (tg *ThreadGroup) AfterStop(fn func()) {
 	tg.mu.Lock()
