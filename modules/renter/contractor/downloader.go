@@ -75,14 +75,14 @@ func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, er
 	if proto.IsRevisionMismatch(err) {
 		// try again with the cached revision
 		c.mu.RLock()
-		cachedRev, ok := c.cachedRevisions[contract.ID]
+		cached, ok := c.cachedRevisions[contract.ID]
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
 			return nil, err
 		}
-		c.log.Printf("host has different revision for %v; retrying with cached revision", contract.ID)
-		contract.LastRevision = cachedRev
+		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
+		contract.LastRevision = cached.revision
 		d, err = proto.NewDownloader(host, contract)
 	}
 	if err != nil {

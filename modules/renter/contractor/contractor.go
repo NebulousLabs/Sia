@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -16,6 +17,15 @@ var (
 	errNilWallet = errors.New("cannot create contractor with nil wallet")
 	errNilTpool  = errors.New("cannot create contractor with nil transaction pool")
 )
+
+// A cachedRevision contains changes that would be applied to a RenterContract
+// if a contract revision succeeded. The contractor must cache these changes
+// as a safeguard against desynchronizing with the host.
+// TODO: save a diff of the Merkle roots instead of all of them.
+type cachedRevision struct {
+	revision    types.FileContractRevision
+	merkleRoots []crypto.Hash
+}
 
 // A Contractor negotiates, revises, renews, and provides access to file
 // contracts.
@@ -30,7 +40,7 @@ type Contractor struct {
 
 	allowance       modules.Allowance
 	blockHeight     types.BlockHeight
-	cachedRevisions map[types.FileContractID]types.FileContractRevision
+	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract
 	lastChange      modules.ConsensusChangeID
 	renewHeight     types.BlockHeight // height at which to renew contracts
@@ -103,7 +113,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		tpool:   tp,
 		wallet:  w,
 
-		cachedRevisions: make(map[types.FileContractID]types.FileContractRevision),
+		cachedRevisions: make(map[types.FileContractID]cachedRevision),
 		contracts:       make(map[types.FileContractID]modules.RenterContract),
 	}
 

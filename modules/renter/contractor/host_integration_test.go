@@ -684,8 +684,9 @@ func TestResync(t *testing.T) {
 	}
 
 	// add cachedRevision
+	cachedRev := cachedRevision{contract.LastRevision, contract.MerkleRoots}
 	c.mu.Lock()
-	c.cachedRevisions[contract.ID] = contract.LastRevision
+	c.cachedRevisions[contract.ID] = cachedRev
 	c.mu.Unlock()
 
 	// Editor and Downloader should now succeed after loading the cachedRevision
@@ -700,4 +701,39 @@ func TestResync(t *testing.T) {
 		t.Fatal(err)
 	}
 	downloader.Close()
+
+	// corrupt contract and delete its cachedRevision
+	badContract = contract
+	badContract.LastRevision.NewRevisionNumber--
+	badContract.MerkleRoots = nil // delete Merkle roots
+
+	c.mu.Lock()
+	delete(c.cachedRevisions, contract.ID)
+	c.mu.Unlock()
+
+	// Editor and Downloader should fail with the bad contract
+	_, err = c.Editor(badContract)
+	if !proto.IsRevisionMismatch(err) {
+		t.Fatal("expected revision mismatch, got", err)
+	}
+	_, err = c.Downloader(badContract)
+	if !proto.IsRevisionMismatch(err) {
+		t.Fatal("expected revision mismatch, got", err)
+	}
+
+	// add cachedRevision
+	c.mu.Lock()
+	c.cachedRevisions[contract.ID] = cachedRev
+	c.mu.Unlock()
+
+	// should be able to upload after loading the cachedRevision
+	editor, err = c.Editor(badContract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = editor.Upload(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	editor.Close()
 }
