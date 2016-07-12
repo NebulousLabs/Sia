@@ -6,43 +6,22 @@ package host
 // TODO: Review the pointer control on the host, particularly with respect to
 // the storage obligations being flung around in storageobligations.go.
 
-// TODO: New method of handling action items makes storage obligations
-// unavailable for short periods of time, which may cause noticeable (probably
-// not though) downtime as seen from the renter. Solutions may include just
-// blocking access to the renter while consensus itmes are happening.
-
 // TODO: what happens if the renter submits the revision early, before the
 // final revision. Will the host mark the contract as complete?
+
+// TODO: Host and renter are reporting errors where the renter is not adding
+// enough fees to the file contract.
 
 // TODO: Test the safety of the builder, it should be okay to have multiple
 // builders open for up to 600 seconds, which means multiple blocks could be
 // received in that time period. Should also check what happens if a prent gets
 // confirmed on the blockchain before the builder is finished.
 
-// TODO: Would be nice to have some sort of error transport to the user, so
-// that the user is notified in ways other than logs via the host that there
-// are issues such as disk, etc.
-
 // TODO: Double check that any network connection has a finite deadline -
 // handling action items properly requires that the locks held on the
 // obligations eventually be released. There's also some more advanced
 // implementation that needs to happen with the storage obligation locks to
 // make sure that someone who wants a lock is able to get it eventually.
-
-// TODO: automated_settings.go, a file which can be responsible for
-// automatically regulating things like bandwidth price, storage price,
-// contract price, etc. One of the features in consideration is that the host
-// would start to steeply increase the contract price as it begins to run low
-// on collateral. The host would also inform the user that there doesn't seem
-// to be enough money to handle all of the file contracts, so that the user
-// could make a judgement call on whether to get more.
-
-// TODO: The host needs to somehow keep an awareness of its bandwidth limits,
-// and needs to reject calls if there is not enough bandwidth available.
-
-// TODO: The synchronization on the port forwarding is not perfect. Sometimes a
-// port will be cleared before it was set (if things happen fast enough),
-// because the port forwarding call is asynchronous.
 
 // TODO: Add contract compensation from form contract to the storage obligation
 // financial metrics, and to the host's tracking.
@@ -338,6 +317,11 @@ func (h *Host) Close() error {
 func (h *Host) ExternalSettings() modules.HostExternalSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	err := h.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer h.tg.Done()
 	return h.externalSettings()
 }
 
@@ -346,6 +330,11 @@ func (h *Host) ExternalSettings() modules.HostExternalSettings {
 func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	err := h.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer h.tg.Done()
 	return h.financialMetrics
 }
 
@@ -396,5 +385,10 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 func (h *Host) InternalSettings() modules.HostInternalSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	err := h.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer h.tg.Done()
 	return h.settings
 }

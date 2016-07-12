@@ -73,7 +73,6 @@ func (h *Host) initNetworking(address string) (err error) {
 		if err != nil {
 			h.log.Println("ERROR: failed to forward port:", err)
 		}
-
 		// Clear the port that was forwarded at startup.
 		h.tg.OnStop(func() {
 			err := h.managedClearPort()

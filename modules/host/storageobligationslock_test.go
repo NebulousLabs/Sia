@@ -15,6 +15,10 @@ func TestObligationLocks(t *testing.T) {
 	}
 	t.Parallel()
 	ht, err := blankHostTester("TestObligationLocks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ht.Close()
 
 	// Simple lock and unlock.
 	ob1 := types.FileContractID{1}
