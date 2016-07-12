@@ -140,6 +140,7 @@ type storageObligation struct {
 	RevisionConfirmed bool
 	ProofConfirmed    bool
 	ObligationStatus  storageObligationStatus
+	StatusMessage     string
 }
 
 // getStorageObligation fetches a storage obligation from the database tx.
@@ -402,7 +403,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	err = composeErrors(err0, err1, err2, err3)
 	if err != nil {
 		h.log.Println("Error with transaction set, redacting obligation, id", so.id())
-		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
+		return composeErrors(err, h.removeStorageObligation(so, obligationRejected, err.Error()))
 	}
 	return nil
 }
@@ -531,7 +532,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 
 // removeStorageObligation will remove a storage obligation from the host,
 // either due to failure or success.
-func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligationStatus) error {
+func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligationStatus, statusMessage string) error {
 
 	// Call removeSector for every sector in the storage obligation.
 	for _, root := range so.SectorRoots {
@@ -592,6 +593,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	// objects with little purpose once storage proofs are no longer needed.
 	h.financialMetrics.ContractCount--
 	so.ObligationStatus = sos
+	so.StatusMessage = statusMessage
 	so.SectorRoots = nil
 	return h.db.Update(func(tx *bolt.Tx) error {
 		return putStorageObligation(tx, *so)
@@ -628,7 +630,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			_, t := err.(modules.ConsensusConflict)
 			if t {
 				h.log.Println("Consensus conflict on the origin transaction set, id", so.id())
-				err = h.removeStorageObligation(so, obligationRejected)
+				err = h.removeStorageObligation(so, obligationRejected, err.Error())
 				if err != nil {
 					h.log.Println("Error removing storage obligation:", err)
 				}
@@ -654,14 +656,8 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 		// Check if the revision has failed to submit correctly.
 		if h.blockHeight > so.expiration() {
-			// TODO: Check this error.
-			//
-			// TODO: this is not quite right, because a previous revision may
-			// be confirmed, and the origin transaction may be confirmed, which
-			// would confuse the revenue stuff a bit. Might happen frequently
-			// due to the dynamic fee pool.
 			h.log.Println("Full time has elapsed, but the revision transaction could not be submitted to consensus, id", so.id())
-			h.removeStorageObligation(so, obligationRejected)
+			h.removeStorageObligation(so, obligationRejected, "most recent revision was not submitted to the blockchain in time")
 			return
 		}
 
@@ -715,7 +711,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		// be removed.
 		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
-			err := h.removeStorageObligation(so, obligationFailed)
+			err := h.removeStorageObligation(so, obligationFailed, "storage proof not confirmed by deadline")
 			if err != nil {
 				h.log.Println("Error removing storage obligation:", err)
 			}
@@ -814,7 +810,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 	// success, delete the obligation.
 	if so.ProofConfirmed && h.blockHeight >= so.proofDeadline() {
 		h.log.Println("file contract complete, id", so.id())
-		h.removeStorageObligation(so, obligationSucceeded)
+		h.removeStorageObligation(so, obligationSucceeded, "success")
 	}
 }
 
