@@ -42,6 +42,9 @@ type hostContractor interface {
 	// Allowance returns the current allowance
 	Allowance() modules.Allowance
 
+	// Contract returns the latest contract formed with the specified host.
+	Contract(modules.NetAddress) (modules.RenterContract, bool)
+
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 

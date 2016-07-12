@@ -189,13 +189,12 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
-	// Copy the file's metadata
-	// TODO: this is ugly because we only have the Contracts method for
-	// looking up contracts.
+	// Look up the most recent contract for each host.
+	// NOTE: this assumes that only one contract is made with each host.
 	contracts := make(map[*fileContract]modules.RenterContract)
 	file.mu.RLock()
-	for _, c := range r.hostContractor.Contracts() {
-		fc, ok := file.contracts[c.ID]
+	for _, fc := range file.contracts {
+		c, ok := r.hostContractor.Contract(fc.IP)
 		if ok {
 			contracts[&fc] = c
 		}
