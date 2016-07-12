@@ -31,6 +31,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -586,9 +587,9 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 
 // threadedHandleActionItem will look at a storage obligation and determine
 // which action is necessary for the storage obligation to succeed.
-func (h *Host) threadedHandleActionItem(soid types.FileContractID) {
+func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.WaitGroup) {
 	// The calling thread is responsible for calling Add to the thread group.
-	defer h.tg.Done()
+	defer wg.Done()
 
 	// Lock the storage obligation in question.
 	h.mu.Lock()
