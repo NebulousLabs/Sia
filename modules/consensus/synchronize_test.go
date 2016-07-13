@@ -915,7 +915,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	}
 	// Sleep to give the consensus sets time to finish the background startup
 	// routines - if the block mined below is mined before the sets finish
-	// synchronizing to eachother, it screws up the test.
+	// synchronizing to each other, it screws up the test.
 	time.Sleep(500 * time.Millisecond)
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
@@ -1302,10 +1302,10 @@ func TestIntegrationRelaySynchronize(t *testing.T) {
 	// is invalid because it has failed to be certain that blocks can make
 	// multiple hops.
 	if len(cst1.gateway.Peers()) != 1 || cst1.gateway.Peers()[0].NetAddress == cst3.gateway.Address() {
-		t.Fatal("Test is invalid, cst1 and cst3 have connected to eachother")
+		t.Fatal("Test is invalid, cst1 and cst3 have connected to each other")
 	}
 	if len(cst3.gateway.Peers()) != 1 || cst3.gateway.Peers()[0].NetAddress == cst1.gateway.Address() {
-		t.Fatal("Test is invalid, cst3 and cst1 have connected to eachother")
+		t.Fatal("Test is invalid, cst3 and cst1 have connected to each other")
 	}
 }
 

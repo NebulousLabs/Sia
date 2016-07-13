@@ -134,7 +134,14 @@ func (m *Miner) startupRescan() error {
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the miner has fully caught up to the current block.
-	return m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeBeginning)
+	err = m.cs.ConsensusSetSubscribe(m, modules.ConsensusChangeBeginning)
+	if err != nil {
+		return err
+	}
+	m.tg.OnStop(func() {
+		m.cs.Unsubscribe(m)
+	})
+	return nil
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -183,8 +190,14 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	} else if err != nil {
 		return nil, errors.New("miner subscription failed: " + err.Error())
 	}
+	m.tg.OnStop(func() {
+		m.cs.Unsubscribe(m)
+	})
 
 	m.tpool.TransactionPoolSubscribe(m)
+	m.tg.OnStop(func() {
+		m.tpool.Unsubscribe(m)
+	})
 
 	// Save after synchronizing with consensus
 	err = m.save()
@@ -206,7 +219,6 @@ func (m *Miner) Close() error {
 	defer m.mu.Unlock()
 
 	m.cs.Unsubscribe(m)
-	m.tpool.Unsubscribe(m)
 
 	var errs []error
 	if err := m.saveSync(); err != nil {

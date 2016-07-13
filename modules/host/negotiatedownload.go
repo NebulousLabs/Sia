@@ -274,18 +274,15 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 
 	// Lock the storage obligation during the revision.
 	h.mu.Lock()
-	err = h.lockStorageObligation(so)
+	err = h.tryLockStorageObligation(so.id())
 	h.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	defer func() {
 		h.mu.Lock()
-		err = h.unlockStorageObligation(so)
+		h.unlockStorageObligation(so.id())
 		h.mu.Unlock()
-		if err != nil {
-			h.log.Critical(err)
-		}
 	}()
 
 	// Perform a loop that will allow downloads to happen until the maximum

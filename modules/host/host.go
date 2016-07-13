@@ -3,29 +3,25 @@
 // internet bandwidth into profit for the user.
 package host
 
+// TODO: Review the pointer control on the host, particularly with respect to
+// the storage obligations being flung around in storageobligations.go.
+
+// TODO: what happens if the renter submits the revision early, before the
+// final revision. Will the host mark the contract as complete?
+
+// TODO: Host and renter are reporting errors where the renter is not adding
+// enough fees to the file contract.
+
 // TODO: Test the safety of the builder, it should be okay to have multiple
 // builders open for up to 600 seconds, which means multiple blocks could be
 // received in that time period. Should also check what happens if a prent gets
 // confirmed on the blockchain before the builder is finished.
 
-// TODO: Would be nice to have some sort of error transport to the user, so
-// that the user is notified in ways other than logs via the host that there
-// are issues such as disk, etc.
-
-// TODO: automated_settings.go, a file which can be responsible for
-// automatically regulating things like bandwidth price, storage price,
-// contract price, etc. One of the features in consideration is that the host
-// would start to steeply increase the contract price as it begins to run low
-// on collateral. The host would also inform the user that there doesn't seem
-// to be enough money to handle all of the file contracts, so that the user
-// could make a judgement call on whether to get more.
-
-// TODO: The host needs to somehow keep an awareness of its bandwidth limits,
-// and needs to reject calls if there is not enough bandwidth available.
-
-// TODO: The synchronization on the port forwarding is not perfect. Sometimes a
-// port will be cleared before it was set (if things happen fast enough),
-// because the port forwarding call is asynchronous.
+// TODO: Double check that any network connection has a finite deadline -
+// handling action items properly requires that the locks held on the
+// obligations eventually be released. There's also some more advanced
+// implementation that needs to happen with the storage obligation locks to
+// make sure that someone who wants a lock is able to get it eventually.
 
 // TODO: Add contract compensation from form contract to the storage obligation
 // financial metrics, and to the host's tracking.
@@ -72,10 +68,12 @@ package host
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"path/filepath"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
@@ -163,18 +161,10 @@ type Host struct {
 	settings         modules.HostInternalSettings
 	unlockHash       types.UnlockHash // A wallet address that can receive coins.
 
-	// Storage Obligation Management - different from file management in that
-	// the storage obligation management is the new way of handling storage
-	// obligations. Is a replacement for the contract obligation logic, but the
-	// old logic is being kept for compatibility purposes.
-	//
-	// Storage is broken up into sectors. The sectors are distributed across a
-	// set of storage folders using a strategy that tries to create even
-	// distributions, but not aggressively. Uneven distributions could be
-	// manufactured by an attacker given sufficient knowledge about the disk
-	// layout (knowledge which should be unavailable), but a limited amount of
-	// damage can be done even with this attack.
-	lockedStorageObligations map[types.FileContractID]struct{} // Which storage obligations are currently being modified.
+	// A map of storage obligations that are currently being modified. Locks on
+	// storage obligations can be long-running, and each storage obligation can
+	// be locked separately.
+	lockedStorageObligations map[types.FileContractID]*siasync.TryMutex
 
 	// Utilities.
 	db         *persist.BoltDatabase
@@ -233,7 +223,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		wallet:       wallet,
 		dependencies: dependencies,
 
-		lockedStorageObligations: make(map[types.FileContractID]struct{}),
+		lockedStorageObligations: make(map[types.FileContractID]*siasync.TryMutex),
 
 		persistDir: persistDir,
 	}
@@ -246,60 +236,69 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 		}
 	}()
 
-	// Add the storage manager to the host.
-	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the perist directory if it does not yet exist.
 	err = dependencies.mkdirAll(h.persistDir, 0700)
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize the logger. Logging should be initialized ASAP, because the
-	// rest of the initialization makes use of the logger.
+	// Initialize the logger, and set up the stop call that will close the
+	// logger.
 	h.log, err = dependencies.newLogger(filepath.Join(h.persistDir, logFile))
 	if err != nil {
 		return nil, err
 	}
+	h.tg.AfterStop(func() {
+		err = h.log.Close()
+		if err != nil {
+			// State of the logger is uncertain, a Println will have to
+			// suffice.
+			fmt.Println("Error when closing the logger:", err)
+		}
+	})
 
-	// Open the database containing the host's storage obligation metadata.
-	h.db, err = dependencies.openDatabase(dbMetadata, filepath.Join(h.persistDir, dbFilename))
+	// Add the storage manager to the host, and set up the stop call that will
+	// close the storage manager.
+	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
 	if err != nil {
-		// An error will be returned if the database has the wrong version, but
-		// as of writing there was only one version of the database and all
-		// other databases would be incompatible.
-		_ = h.log.Close()
+		h.log.Println("Could not open the storage manager:", err)
 		return nil, err
 	}
+	h.tg.AfterStop(func() {
+		err = h.StorageManager.Close()
+		if err != nil {
+			h.log.Println("Could not close storage manager:", err)
+		}
+	})
+
 	// After opening the database, it must be initialized. Most commonly,
 	// nothing happens. But for new databases, a set of buckets must be
 	// created. Initialization is also a good time to run sanity checks.
 	err = h.initDB()
 	if err != nil {
-		_ = h.log.Close()
-		_ = h.db.Close()
+		h.log.Println("Could not initalize database:", err)
 		return nil, err
 	}
 
-	// Load the prior persistence structures.
+	// Load the prior persistence structures, and configure the host to save
+	// before shutting down.
 	err = h.load()
 	if err != nil {
-		_ = h.log.Close()
-		_ = h.db.Close()
 		return nil, err
 	}
+	h.tg.AfterStop(func() {
+		err = h.saveSync()
+		if err != nil {
+			h.log.Println("Could not save host upon shutdown:", err)
+		}
+	})
 
-	// Get the host established on the network.
+	// Initialize the networking.
 	err = h.initNetworking(listenerAddress)
 	if err != nil {
-		_ = h.log.Close()
-		_ = h.db.Close()
+		h.log.Println("Could not initialize host networking:", err)
 		return nil, err
 	}
-
 	return h, nil
 }
 
@@ -308,53 +307,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 	return newHost(productionDependencies{}, cs, tpool, wallet, address, persistDir)
 }
 
-// Close shuts down the host, preparing it for garbage collection.
-func (h *Host) Close() (composedError error) {
-	err := h.tg.Stop()
-	if err != nil {
-		return err
-	}
-
-	// Unsubscribe the host from the consensus set. Call will not terminate
-	// until the last consensus update has been sent to the host.
-	// Unsubscription must happen before any resources are released or
-	// terminated because the process consensus change function makes use of
-	// those resources.
-	h.cs.Unsubscribe(h)
-
-	err = h.StorageManager.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Close the bolt database.
-	err = h.db.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Clear the port that was forwarded at startup. The port handling must
-	// happen before the logger is closed, as it leaves a logging message.
-	err = h.managedClearPort()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Save the latest host state.
-	h.mu.Lock()
-	err = h.saveSync()
-	h.mu.Unlock()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-
-	// Close the logger. The logger should be the last thing to shut down so
-	// that all other objects have access to logging while closing.
-	err = h.log.Close()
-	if err != nil {
-		composedError = composeErrors(composedError, err)
-	}
-	return composedError
+// Close shuts down the host.
+func (h *Host) Close() error {
+	return h.tg.Stop()
 }
 
 // ExternalSettings returns the hosts external settings. These values cannot be
@@ -363,6 +318,11 @@ func (h *Host) Close() (composedError error) {
 func (h *Host) ExternalSettings() modules.HostExternalSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	err := h.tg.Add()
+	if err != nil {
+		build.Critical("Call to ExternalSettings after close")
+	}
+	defer h.tg.Done()
 	return h.externalSettings()
 }
 
@@ -371,6 +331,11 @@ func (h *Host) ExternalSettings() modules.HostExternalSettings {
 func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	err := h.tg.Add()
+	if err != nil {
+		build.Critical("Call to FinancialMetrics after close")
+	}
+	defer h.tg.Done()
 	return h.financialMetrics
 }
 
@@ -421,5 +386,10 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 func (h *Host) InternalSettings() modules.HostInternalSettings {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	err := h.tg.Add()
+	if err != nil {
+		build.Critical("call to InternalSettings after close")
+	}
+	defer h.tg.Done()
 	return h.settings
 }

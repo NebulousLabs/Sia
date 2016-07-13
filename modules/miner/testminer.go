@@ -20,6 +20,30 @@ const (
 	solveAttempts = 16e3
 )
 
+// solveBlock takes a block and a target and tries to solve the block for the
+// target. A bool is returned indicating whether the block was successfully
+// solved.
+func solveBlock(b types.Block, target types.Target) (types.Block, bool) {
+	// Assemble the header.
+	merkleRoot := b.MerkleRoot()
+	header := make([]byte, 80)
+	copy(header, b.ParentID[:])
+	binary.LittleEndian.PutUint64(header[40:48], uint64(b.Timestamp))
+	copy(header[48:], merkleRoot[:])
+
+	var nonce uint64
+	for i := 0; i < solveAttempts; i++ {
+		id := crypto.HashBytes(header)
+		if bytes.Compare(target[:], id[:]) >= 0 {
+			copy(b.Nonce[:], header[32:40])
+			return b, true
+		}
+		*(*uint64)(unsafe.Pointer(&header[32])) = nonce
+		nonce++
+	}
+	return b, false
+}
+
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) BlockForWork() (b types.Block, t types.Target, err error) {
@@ -89,22 +113,5 @@ func (m *Miner) FindBlock() (types.Block, error) {
 // target. A bool is returned indicating whether the block was successfully
 // solved.
 func (m *Miner) SolveBlock(b types.Block, target types.Target) (types.Block, bool) {
-	// Assemble the header.
-	merkleRoot := b.MerkleRoot()
-	header := make([]byte, 80)
-	copy(header, b.ParentID[:])
-	binary.LittleEndian.PutUint64(header[40:48], uint64(b.Timestamp))
-	copy(header[48:], merkleRoot[:])
-
-	var nonce uint64
-	for i := 0; i < solveAttempts; i++ {
-		id := crypto.HashBytes(header)
-		if bytes.Compare(target[:], id[:]) >= 0 {
-			copy(b.Nonce[:], header[32:40])
-			return b, true
-		}
-		*(*uint64)(unsafe.Pointer(&header[32])) = nonce
-		nonce++
-	}
-	return b, false
+	return solveBlock(b, target)
 }

@@ -17,13 +17,8 @@ var rpcSettingsDeprecated = types.Specifier{'S', 'e', 't', 't', 'i', 'n', 'g', '
 // threadedUpdateHostname periodically runs 'managedLearnHostname', which
 // checks if the host's hostname has changed, and makes an updated host
 // announcement if so.
-func (h *Host) threadedUpdateHostname() {
-	err := h.tg.Add()
-	if err != nil {
-		return
-	}
-	defer h.tg.Done()
-
+func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
+	defer close(closeChan)
 	for {
 		h.managedLearnHostname()
 		// Wait 30 minutes to check again. If the hostname is changing
@@ -40,10 +35,11 @@ func (h *Host) threadedUpdateHostname() {
 	}
 }
 
-// initNetworking performs actions like port forwarding, and gets the host
-// established on the network.
+// initNetworking performs actions like port forwarding, and gets the
+// host established on the network.
 func (h *Host) initNetworking(address string) (err error) {
-	// Create listener and set address.
+	// Create the listener and setup the close procedures.
+	threadedListenerClosedChan := make(chan struct{})
 	h.listener, err = h.dependencies.listen("tcp", address)
 	if err != nil {
 		return err
@@ -54,6 +50,9 @@ func (h *Host) initNetworking(address string) (err error) {
 		if err != nil {
 			h.log.Println("WARN: closing the listener failed:", err)
 		}
+
+		// Wait until the threadedListener has returned to continue shutdown.
+		<-threadedListenerClosedChan
 	})
 
 	// Set the port.
@@ -61,31 +60,36 @@ func (h *Host) initNetworking(address string) (err error) {
 	if err != nil {
 		return err
 	}
-	h.mu.Lock()
 	h.port = port
 	if build.Release == "testing" {
 		// Set the autoAddress to localhost for testing builds only.
 		h.autoAddress = modules.NetAddress(net.JoinHostPort("localhost", h.port))
 	}
-	h.mu.Unlock()
 
-	// Non-blocking, perform port forwarding and hostname discovery.
+	// Non-blocking, perform port forwarding and create the hostname discovery
+	// thread.
 	go func() {
-		err := h.tg.Add()
-		if err != nil {
-			return
-		}
-		defer h.tg.Done()
-
-		err = h.managedForwardPort()
+		err := h.managedForwardPort()
 		if err != nil {
 			h.log.Println("ERROR: failed to forward port:", err)
 		}
-		go h.threadedUpdateHostname()
+		// Clear the port that was forwarded at startup.
+		h.tg.OnStop(func() {
+			err := h.managedClearPort()
+			if err != nil {
+				h.log.Println("ERROR: failed to clear port:", err)
+			}
+		})
+
+		threadedUpdateHostnameClosedChan := make(chan struct{})
+		go h.threadedUpdateHostname(threadedUpdateHostnameClosedChan)
+		h.tg.OnStop(func() {
+			<-threadedUpdateHostnameClosedChan
+		})
 	}()
 
 	// Launch the listener.
-	go h.threadedListen()
+	go h.threadedListen(threadedListenerClosedChan)
 	return nil
 }
 
@@ -169,12 +173,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 }
 
 // listen listens for incoming RPCs and spawns an appropriate handler for each.
-func (h *Host) threadedListen() {
-	err := h.tg.Add()
-	if err != nil {
-		return
-	}
-	defer h.tg.Done()
+func (h *Host) threadedListen(closeChan chan struct{}) {
+	defer close(closeChan)
 
 	// Receive connections until an error is returned by the listener. When an
 	// error is returned, there will be no more calls to receive.
@@ -206,8 +206,6 @@ func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return modules.HostNetworkMetrics{
-		// TODO: Up/Down bandwidth
-
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),
 		FormContractCalls: atomic.LoadUint64(&h.atomicFormContractCalls),

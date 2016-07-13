@@ -6,8 +6,8 @@ package host
 import (
 	"encoding/binary"
 	"encoding/json"
+	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -22,54 +22,53 @@ import (
 func (h *Host) initRescan() error {
 	// Reset all of the variables that have relevance to the consensus set.
 	var allObligations []*storageObligation
-	err := func() error {
-		h.mu.Lock()
-		defer h.mu.Unlock()
+	// Reset all of the consensus-relevant variables in the host.
+	h.blockHeight = 0
 
-		// Reset all of the consensus-relevant variables in the host.
-		h.blockHeight = 0
-
-		// Reset all of the storage obligations.
-		err := h.db.Update(func(tx *bolt.Tx) error {
-			bsu := tx.Bucket(bucketStorageObligations)
-			c := bsu.Cursor()
-			for k, soBytes := c.First(); soBytes != nil; k, soBytes = c.Next() {
-				var so storageObligation
-				err := json.Unmarshal(soBytes, &so)
-				if err != nil {
-					return err
-				}
-				so.OriginConfirmed = false
-				so.RevisionConfirmed = false
-				so.ProofConfirmed = false
-				allObligations = append(allObligations, &so)
-				soBytes, err = json.Marshal(so)
-				if err != nil {
-					return err
-				}
-				err = bsu.Put(k, soBytes)
-				if err != nil {
-					return err
-				}
+	// Reset all of the storage obligations.
+	err := h.db.Update(func(tx *bolt.Tx) error {
+		bsu := tx.Bucket(bucketStorageObligations)
+		c := bsu.Cursor()
+		for k, soBytes := c.First(); soBytes != nil; k, soBytes = c.Next() {
+			var so storageObligation
+			err := json.Unmarshal(soBytes, &so)
+			if err != nil {
+				return err
 			}
-			return nil
-		})
-		if err != nil {
-			return err
+			so.OriginConfirmed = false
+			so.RevisionConfirmed = false
+			so.ProofConfirmed = false
+			allObligations = append(allObligations, &so)
+			soBytes, err = json.Marshal(so)
+			if err != nil {
+				return err
+			}
+			err = bsu.Put(k, soBytes)
+			if err != nil {
+				return err
+			}
 		}
-
-		return h.save()
-	}()
+		return nil
+	})
 	if err != nil {
 		return err
 	}
 
 	// Subscribe to the consensus set. This is a blocking call that will not
 	// return until the host has fully caught up to the current block.
+	//
+	// Convention dictates that the host should not make external calls while
+	// under lock, but this function happens at startup while blocking. Because
+	// it happens while blocking, and because there is no actual host lock held
+	// at this time, none of the host external functions are exposed, so it is
+	// save to make the exported call.
 	err = h.cs.ConsensusSetSubscribe(h, modules.ConsensusChangeBeginning)
 	if err != nil {
 		return err
 	}
+	h.tg.OnStop(func() {
+		h.cs.Unsubscribe(h)
+	})
 
 	// Re-queue all of the action items for the storage obligations.
 	for _, so := range allObligations {
@@ -89,6 +88,11 @@ func (h *Host) initRescan() error {
 
 // initConsensusSubscription subscribes the host to the consensus set.
 func (h *Host) initConsensusSubscription() error {
+	// Convention dictates that the host should not make external calls while
+	// under lock, but this function happens at startup while blocking. Because
+	// it happens while blocking, and because there is no actual host lock held
+	// at this time, none of the host external functions are exposed, so it is
+	// save to make the exported call.
 	err := h.cs.ConsensusSetSubscribe(h, h.recentChange)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Perform a rescan of the consensus set if the change id that the host
@@ -97,23 +101,50 @@ func (h *Host) initConsensusSubscription() error {
 		// structure.
 		return h.initRescan()
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	h.tg.OnStop(func() {
+		h.cs.Unsubscribe(h)
+	})
+	return nil
 }
 
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change to the blockchain.
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	// ProcessConsensusChange spawns multiple threads which will wait until
+	// storage obligations are unlocked and then submit storage proofs to
+	// blockchain for those obligations. The ThreadGroup needs to wait for
+	// these threads to terminate. These threads also require a host lock,
+	//
+	// We use a local sync.WaitGroup to track the progress of these threads.
+	// Because these threads require a host lock, wg.Wait() should not be
+	// called until after the host lock has been released. And then tg.Done()
+	// should not be called until wg.Wait() returns.
+	//
+	// Because the host lock is released in a defer statement, wg.Wait() must
+	// be called in a defer statement that comes before the deferred
+	// h.mu.Unlock(). This is why the code for finishing the wait group is
+	// declared far above the place where threads are added to the wait group.
 	err := h.tg.Add()
 	if err != nil {
 		return
 	}
-	defer h.tg.Done()
+	wg := new(sync.WaitGroup)
+	defer func() {
+		wg.Wait()
+		h.tg.Done()
+	}()
+
+	// Host needs to unlock before wg.Wait() is called, so that the other
+	// threads may access the host lock.
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.
-	var actionItems []*storageObligation
+	var actionItems []types.FileContractID
 	err = h.db.Update(func(tx *bolt.Tx) error {
 		for _, block := range cc.RevertedBlocks {
 			// Look for transactions relevant to open storage obligations.
@@ -268,23 +299,10 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 			for i := 0; i < len(existingItems); i += crypto.HashSize {
 				copy(obligationIDs[i/crypto.HashSize][:], existingItems[i:i+crypto.HashSize])
 			}
-			bso := tx.Bucket(bucketStorageObligations)
 			for _, soid := range obligationIDs {
-				soBytes := bso.Get(soid[:])
-				if soBytes == nil {
-					// Obligation may have been cleared out by a previous
-					// action item.
-					continue
-				}
-				var so storageObligation
-				err := json.Unmarshal(soBytes, &so)
-				if err != nil {
-					build.Critical("json unmarshalling failed for storage obligation")
-					continue
-				}
 				_, exists := knownActionItems[soid]
 				if !exists {
-					actionItems = append(actionItems, &so)
+					actionItems = append(actionItems, soid)
 					knownActionItems[soid] = struct{}{}
 				}
 			}
@@ -296,8 +314,12 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	// Handle the list of action items.
-	for _, ai := range actionItems {
-		h.handleActionItem(ai)
+	for i := range actionItems {
+		// Add the action item to the wait group outside of the threaded call.
+		// The call to wg.Done() was established at the beginning of the
+		// function in a defer statement.
+		wg.Add(1)
+		go h.threadedHandleActionItem(actionItems[i], wg)
 	}
 
 	// Update the host's recent change pointer to point to the most recent

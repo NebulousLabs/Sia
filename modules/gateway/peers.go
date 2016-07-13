@@ -137,13 +137,11 @@ func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	return "", errNoPeers
 }
 
-// threadedListen handles incoming connection requests. If the connection is accepted,
-// the peer will be added to the Gateway's peer list.
-func (g *Gateway) threadedListen() {
-	if g.threads.Add() != nil {
-		return
-	}
-	defer g.threads.Done()
+// threadedListen handles incoming connection requests. If the connection is
+// accepted, the peer will be added to the Gateway's peer list.
+func (g *Gateway) threadedListen(closeChan chan struct{}) {
+	// Signal that the threadedListen thread has completed upon returning.
+	defer close(closeChan)
 
 	for {
 		conn, err := g.listener.Accept()

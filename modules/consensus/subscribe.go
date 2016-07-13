@@ -73,14 +73,16 @@ func (cs *ConsensusSet) computeConsensusChange(tx *bolt.Tx, ce changeEntry) (mod
 		}
 	}
 
-	cc.Synced = cs.synced
+	currentBlock := currentBlockID(tx)
+	if cs.synced && ce.AppliedBlocks[len(ce.AppliedBlocks)-1] == currentBlock {
+		cc.Synced = true
+	}
 	return cc, nil
 }
 
-// readlockUpdateSubscribers will inform all subscribers of a new update to the
-// consensus set. The call must be made with a demoted lock or a readlock.
-// readlockUpdateSubscribers does not alter the changelog, the changelog must
-// be updated beforehand.
+// readLockUpdateSubscribers will inform all subscribers of a new update to the
+// consensus set. readlockUpdateSubscribers does not alter the changelog, the
+// changelog must be updated beforehand.
 func (cs *ConsensusSet) readlockUpdateSubscribers(ce changeEntry) {
 	// Get the consensus change and send it to all subscribers.
 	var cc modules.ConsensusChange

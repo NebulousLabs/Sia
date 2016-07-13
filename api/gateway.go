@@ -8,8 +8,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// TODO: GatewayInfo is not the right name for this struct.
-type GatewayInfo struct {
+// GatewayGET contains the fields returned by a GET call to "/gateway".
+type GatewayGET struct {
 	NetAddress modules.NetAddress `json:"netaddress"`
 	Peers      []modules.Peer     `json:"peers"`
 }
@@ -23,7 +23,7 @@ func (srv *Server) gatewayHandler(w http.ResponseWriter, req *http.Request, _ ht
 	if peers == nil {
 		peers = make([]modules.Peer, 0)
 	}
-	writeJSON(w, GatewayInfo{srv.gateway.Address(), peers})
+	writeJSON(w, GatewayGET{srv.gateway.Address(), peers})
 }
 
 // gatewayConnectHandler handles the API call to add a peer to the gateway.

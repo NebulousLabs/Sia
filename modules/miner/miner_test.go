@@ -320,6 +320,8 @@ func TestIntegrationStartupRescan(t *testing.T) {
 	}
 }
 
+// TestMinerCloseDeadlock checks that the miner can cleanly close even if the
+// CPU miner is running.
 func TestMinerCloseDeadlock(t *testing.T) {
 	mt, err := createMinerTester("TestMinerCloseDeadlock")
 	if err != nil {
@@ -331,6 +333,7 @@ func TestMinerCloseDeadlock(t *testing.T) {
 	// I haven't seen this behavior since sticking Close() inside a goroutine,
 	// but I'm not sure that's comfort enough.
 	mt.miner.StartCPUMining()
+	time.Sleep(time.Millisecond * 250)
 
 	closed := make(chan struct{})
 	go func() {

@@ -9,90 +9,146 @@ import (
 // called.
 var ErrStopped = errors.New("ThreadGroup already stopped")
 
-// ThreadGroup is a sync.WaitGroup with additional functionality for
-// facilitating clean shutdown. Namely, it provides a StopChan method for
-// notifying callers when shutdown occurrs. Another key difference is that a
-// ThreadGroup is only intended be used once; as such, its Add and Stop
-// methods return errors if Stop has already been called.
+// A ThreadGroup is a one-time-use object to manage the life cycle of a group
+// of threads. It is a sync.WaitGroup that provides functions for coordinating
+// actions and shutting down threads. After Stop() is called, the thread group
+// is no longer useful.
 //
-// During shutdown, it is common to close resources such as net.Listeners.
-// Typically, this would require spawning a goroutine to wait on the
-// ThreadGroup's StopChan and then close the resource. To make this more
-// convenient, ThreadGroup provides an OnStop method. Functions passed to
-// OnStop will be called automatically when Stop is called.
+// It is safe to call Add(), Done(), and Stop() concurrently, however it is not
+// safe to nest calls to Add(). A simple example of a nested call to add would
+// be:
+//		tg.Add()
+//		tg.Add()
+//		tg.Done()
+//		tg.Done()
 type ThreadGroup struct {
-	stopChan chan struct{}
-	chanOnce sync.Once
+	onStopFns    []func()
+	afterStopFns []func()
+
+	once     sync.Once
 	mu       sync.Mutex
+	stopChan chan struct{}
 	wg       sync.WaitGroup
-	stopFns  []func()
 }
 
-// StopChan provides read-only access to the ThreadGroup's stopChan. Callers
-// should select on StopChan in order to interrupt long-running reads (such as
-// time.After).
-func (tg *ThreadGroup) StopChan() <-chan struct{} {
-	// Initialize tg.stopChan if it is nil; this makes an unitialized
-	// ThreadGroup valid. (Otherwise, a NewThreadGroup function would be
-	// necessary.)
-	tg.chanOnce.Do(func() { tg.stopChan = make(chan struct{}) })
-	return tg.stopChan
+// init creates the stop channel for the thread group.
+func (tg *ThreadGroup) init() {
+	tg.stopChan = make(chan struct{})
 }
 
-// IsStopped returns true if Stop has been called.
-func (tg *ThreadGroup) IsStopped() bool {
+// isStopped will return true if Stop() has been called on the thread group.
+func (tg *ThreadGroup) isStopped() bool {
+	tg.once.Do(tg.init)
 	select {
-	case <-tg.StopChan():
+	case <-tg.stopChan:
 		return true
 	default:
 		return false
 	}
 }
 
-// Add increments the ThreadGroup counter.
+// Add increments the thread group counter.
 func (tg *ThreadGroup) Add() error {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
-	if tg.IsStopped() {
+
+	if tg.isStopped() {
 		return ErrStopped
 	}
 	tg.wg.Add(1)
 	return nil
 }
 
-// Done decrements the ThreadGroup counter.
+// AfterStop ensures that a function will be called after Stop() has been
+// called and after all running routines have called Done(). The functions will
+// be called in reverse order to how they were added, similar to defer. If
+// Stop() has already been called, the input function will be called
+// immediately.
+//
+// The primary use of AfterStop is to allow code that opens and closes
+// resources to be positioned next to each other. The purpose is similar to
+// `defer`, except for resources that outlive the function which creates them.
+func (tg *ThreadGroup) AfterStop(fn func()) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+
+	if tg.isStopped() {
+		fn()
+		return
+	}
+	tg.afterStopFns = append(tg.afterStopFns, fn)
+}
+
+// OnStop ensures that a function will be called after Stop() has been called,
+// and before blocking until all running routines have called Done(). It is
+// safe to use OnStop to coordinate the closing of long-running threads. The
+// OnStop functions will be called in the reverse order in which they were
+// added, similar to defer. If Stop() has already been called, the input
+// function will be called immediately.
+func (tg *ThreadGroup) OnStop(fn func()) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+
+	if tg.isStopped() {
+		fn()
+		return
+	}
+	tg.onStopFns = append(tg.onStopFns, fn)
+}
+
+// Done decrements the thread group counter.
 func (tg *ThreadGroup) Done() {
 	tg.wg.Done()
 }
 
-// Stop closes the ThreadGroup's stopChan, closes members of the closer set,
-// and blocks until the counter is zero.
-func (tg *ThreadGroup) Stop() error {
+// Flush will block all calls to 'tg.Add' until all current routines have
+// called 'tg.Done'. This in effect 'flushes' the module, letting it complete
+// any tasks that are open before taking on new ones.
+func (tg *ThreadGroup) Flush() error {
 	tg.mu.Lock()
-	if tg.IsStopped() {
-		tg.mu.Unlock()
+	defer tg.mu.Unlock()
+
+	if tg.isStopped() {
 		return ErrStopped
 	}
-	close(tg.stopChan)
-	for i := len(tg.stopFns) - 1; i >= 0; i-- {
-		tg.stopFns[i]()
-	}
-	tg.stopFns = nil
-	tg.mu.Unlock()
 	tg.wg.Wait()
 	return nil
 }
 
-// OnStop adds a function to the ThreadGroup's stopFns set. Members of the set
-// will be called when Stop is called, in reverse order. If the ThreadGroup is
-// already stopped, the function will be called immediately.
-func (tg *ThreadGroup) OnStop(fn func()) {
+// Stop will close the stop channel of the thread group, then call all 'OnStop'
+// functions in reverse order, then will wait until the thread group counter
+// reaches zero, then will call all of the 'AfterStop' functions in reverse
+// order. After Stop is called, most actions will return ErrStopped.
+func (tg *ThreadGroup) Stop() error {
+	// Establish that Stop has been called.
 	tg.mu.Lock()
-	if tg.IsStopped() {
-		tg.mu.Unlock()
-		fn()
-	} else {
-		tg.stopFns = append(tg.stopFns, fn)
-		tg.mu.Unlock()
+	defer tg.mu.Unlock()
+
+	if tg.isStopped() {
+		return ErrStopped
 	}
+	close(tg.stopChan)
+
+	for i := len(tg.onStopFns) - 1; i >= 0; i-- {
+		tg.onStopFns[i]()
+	}
+	tg.onStopFns = nil
+
+	tg.wg.Wait()
+
+	// After waiting for all resources to release the thread group, iterate
+	// through the stop functions and call them in reverse oreder.
+	for i := len(tg.afterStopFns) - 1; i >= 0; i-- {
+		tg.afterStopFns[i]()
+	}
+	tg.afterStopFns = nil
+	return nil
+}
+
+// StopChan provides read-only access to the ThreadGroup's stopChan. Callers
+// should select on StopChan in order to interrupt long-running reads (such as
+// time.After).
+func (tg *ThreadGroup) StopChan() <-chan struct{} {
+	tg.once.Do(tg.init)
+	return tg.stopChan
 }

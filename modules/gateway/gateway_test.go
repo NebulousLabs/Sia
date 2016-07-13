@@ -69,6 +69,7 @@ func TestAddress(t *testing.T) {
 	}
 }
 
+// TestPeers checks that two gateways are able to connect to each other.
 func TestPeers(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -96,6 +97,7 @@ func TestPeers(t *testing.T) {
 	}
 }
 
+// TestNew checks that a call to New is effective.
 func TestNew(t *testing.T) {
 	if _, err := New("", ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
@@ -115,5 +117,19 @@ func TestNew(t *testing.T) {
 	}
 	if _, err := New("localhost:0", dir); err == nil {
 		t.Fatal("expected load error, got nil")
+	}
+}
+
+// TestClose creates and closes a gateway.
+func TestClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	g := newTestingGateway("TestClose", t)
+	err := g.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

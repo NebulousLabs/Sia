@@ -13,7 +13,7 @@ func TestIntegrationBlockHeightReorg(t *testing.T) {
 		t.SkipNow()
 	}
 
-	// Create 3 miner testers that will be used to cause eachother to reorg.
+	// Create 3 miner testers that will be used to cause each other to reorg.
 	mt1, err := createMinerTester("TestIntegrationBlockHeightReorg - 1")
 	if err != nil {
 		t.Fatal(err)

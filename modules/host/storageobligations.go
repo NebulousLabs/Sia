@@ -31,6 +31,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -88,10 +89,6 @@ var (
 	// attempted storage obligation revision which does not have sensical
 	// inputs.
 	errInsaneStorageObligationRevisionData = errors.New("revision to storage obligation has insane data")
-
-	// errObligationLocked is returned when a storage obligation is being put
-	// under lock, but is already locked.
-	errObligationLocked = errors.New("storage obligation is locked, and is unavailable for editing")
 
 	// errObligationUnlocked is returned when a storage obligation is being
 	// removed from lock, but is already unlocked.
@@ -407,16 +404,6 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 	return nil
 }
 
-// lockStorageObligation puts a storage obligation under lock in the host.
-func (h *Host) lockStorageObligation(so *storageObligation) error {
-	_, exists := h.lockedStorageObligations[so.id()]
-	if exists {
-		return errObligationLocked
-	}
-	h.lockedStorageObligations[so.id()] = struct{}{}
-	return nil
-}
-
 // modifyStorageObligation will take an updated storage obligation along with a
 // list of sector changes and update the database to account for all of it. The
 // sector modifications are only used to update the sector database, they will
@@ -598,9 +585,37 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	})
 }
 
-// handleActionItem will look at a storage obligation and determine which
-// action is necessary for the storage obligation to succeed.
-func (h *Host) handleActionItem(so *storageObligation) {
+// threadedHandleActionItem will look at a storage obligation and determine
+// which action is necessary for the storage obligation to succeed.
+func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.WaitGroup) {
+	// The calling thread is responsible for calling Add to the thread group.
+	defer wg.Done()
+
+	// Lock the storage obligation in question.
+	h.mu.Lock()
+	h.lockStorageObligation(soid)
+	h.mu.Unlock()
+	defer func() {
+		h.mu.Lock()
+		h.unlockStorageObligation(soid)
+		h.mu.Unlock()
+	}()
+
+	// Convert the storage obligation id into a storage obligation.
+	var err error
+	var so storageObligation
+	h.mu.RLock()
+	blockHeight := h.blockHeight
+	err = h.db.View(func(tx *bolt.Tx) error {
+		so, err = getStorageObligation(tx, soid)
+		return err
+	})
+	h.mu.RUnlock()
+	if err != nil {
+		h.log.Println("Could not get storage obligation:", err)
+		return
+	}
+
 	// Check whether the storage obligation has already been completed.
 	if so.ObligationStatus != obligationUnresolved {
 		// Storage obligation has already been completed, skip action item.
@@ -628,7 +643,9 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			_, t := err.(modules.ConsensusConflict)
 			if t {
 				h.log.Println("Consensus conflict on the origin transaction set, id", so.id())
-				err = h.removeStorageObligation(so, obligationRejected)
+				h.mu.Lock()
+				err = h.removeStorageObligation(&so, obligationRejected)
+				h.mu.Unlock()
 				if err != nil {
 					h.log.Println("Error removing storage obligation:", err)
 				}
@@ -637,14 +654,16 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		}
 
 		// Queue another action item to check the status of the transaction.
+		h.mu.Lock()
 		err = h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
+		h.mu.Unlock()
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
 	}
 
 	// Check if the file contract revision is ready for submission. Check for death.
-	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && h.blockHeight > so.expiration()-revisionSubmissionBuffer {
+	if !so.RevisionConfirmed && len(so.RevisionTransactionSet) > 0 && blockHeight > so.expiration()-revisionSubmissionBuffer {
 		// Sanity check - there should be a file contract revision.
 		rtsLen := len(so.RevisionTransactionSet)
 		if rtsLen < 1 || len(so.RevisionTransactionSet[rtsLen-1].FileContractRevisions) != 1 {
@@ -653,7 +672,7 @@ func (h *Host) handleActionItem(so *storageObligation) {
 		}
 
 		// Check if the revision has failed to submit correctly.
-		if h.blockHeight > so.expiration() {
+		if blockHeight > so.expiration() {
 			// TODO: Check this error.
 			//
 			// TODO: this is not quite right, because a previous revision may
@@ -661,12 +680,16 @@ func (h *Host) handleActionItem(so *storageObligation) {
 			// would confuse the revenue stuff a bit. Might happen frequently
 			// due to the dynamic fee pool.
 			h.log.Println("Full time has elapsed, but the revision transaction could not be submitted to consensus, id", so.id())
-			h.removeStorageObligation(so, obligationRejected)
+			h.mu.Lock()
+			h.removeStorageObligation(&so, obligationRejected)
+			h.mu.Unlock()
 			return
 		}
 
 		// Queue another action item to check the status of the transaction.
-		err := h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
+		h.mu.Lock()
+		err := h.queueActionItem(blockHeight+resubmissionTimeout, so.id())
+		h.mu.Unlock()
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
@@ -708,14 +731,16 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 	// Check whether a storage proof is ready to be provided, and whether it
 	// has been accepted. Check for death.
-	if !so.ProofConfirmed && h.blockHeight >= so.expiration()+resubmissionTimeout {
+	if !so.ProofConfirmed && blockHeight >= so.expiration()+resubmissionTimeout {
 		h.log.Debugln("Host is attempting a storage proof for", so.id())
 
 		// If the window has closed, the host has failed and the obligation can
 		// be removed.
-		if so.proofDeadline() < h.blockHeight || len(so.SectorRoots) == 0 {
+		if so.proofDeadline() < blockHeight || len(so.SectorRoots) == 0 {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
-			err := h.removeStorageObligation(so, obligationFailed)
+			h.mu.Lock()
+			err := h.removeStorageObligation(&so, obligationFailed)
+			h.mu.Unlock()
 			if err != nil {
 				h.log.Println("Error removing storage obligation:", err)
 			}
@@ -791,15 +816,17 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 		// Queue another action item to check whether there the storage proof
 		// got confirmed.
+		h.mu.Lock()
 		err = h.queueActionItem(so.proofDeadline(), so.id())
+		h.mu.Unlock()
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
 	}
 
 	// Save the storage obligation to account for any fee changes.
-	err := h.db.Update(func(tx *bolt.Tx) error {
-		soBytes, err := json.Marshal(*so)
+	err = h.db.Update(func(tx *bolt.Tx) error {
+		soBytes, err := json.Marshal(so)
 		if err != nil {
 			return err
 		}
@@ -812,20 +839,10 @@ func (h *Host) handleActionItem(so *storageObligation) {
 
 	// Check if all items have succeeded with the required confirmations. Report
 	// success, delete the obligation.
-	if so.ProofConfirmed && h.blockHeight >= so.proofDeadline() {
+	if so.ProofConfirmed && blockHeight >= so.proofDeadline() {
 		h.log.Println("file contract complete, id", so.id())
-		h.removeStorageObligation(so, obligationSucceeded)
+		h.mu.Lock()
+		h.removeStorageObligation(&so, obligationSucceeded)
+		h.mu.Unlock()
 	}
-}
-
-// unlockStorageObligation takes a storage obligation out from under lock in
-// the host.
-func (h *Host) unlockStorageObligation(so *storageObligation) error {
-	_, exists := h.lockedStorageObligations[so.id()]
-	if !exists {
-		h.log.Critical(errObligationUnlocked)
-		return errObligationUnlocked
-	}
-	delete(h.lockedStorageObligations, so.id())
-	return nil
 }

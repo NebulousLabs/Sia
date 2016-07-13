@@ -129,6 +129,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Create listener and set address.
+	threadedListenClosedChan := make(chan struct{})
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
@@ -139,6 +140,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		if err != nil {
 			g.log.Println("WARN: closing the listener failed:", err)
 		}
+		<-threadedListenClosedChan
 	})
 
 	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
@@ -162,7 +164,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	go g.threadedNodeManager()
 
 	// Spawn the primary listener.
-	go g.threadedListen()
+	go g.threadedListen(threadedListenClosedChan)
 
 	return
 }

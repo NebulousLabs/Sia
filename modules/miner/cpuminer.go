@@ -28,25 +28,31 @@ func (m *Miner) threadedMine() {
 	cycleStart := time.Now()
 	for {
 		m.mu.Lock()
-		// Kill the thread if the miner's threadgroup is stopped.
-		if m.tg.IsStopped() {
+
+		// Kill the thread if 'Stop' has been called.
+		select {
+		case <-m.tg.StopChan():
 			m.miningOn = false
 			m.mining = false
 			m.mu.Unlock()
 			return
+		default:
 		}
+
 		// Kill the thread if mining has been turned off.
 		if !m.miningOn {
 			m.mining = false
 			m.mu.Unlock()
 			return
 		}
+
+		// Prepare the work and release the miner lock.
 		bfw := m.blockForWork()
 		target := m.persist.Target
 		m.mu.Unlock()
 
-		// Grab a block and try to solve it.
-		b, solved := m.SolveBlock(bfw, target)
+		// Solve the block.
+		b, solved := solveBlock(bfw, target)
 		if solved {
 			err := m.managedSubmitBlock(b)
 			if err != nil {
