@@ -6,7 +6,8 @@ import (
 )
 
 // TryMutex provides a mutex that allows you to attempt to grab a mutex, and
-// then fail if the mutex is either not grabbed immediately or is
+// then fail if the mutex is either not grabbed immediately or is not grabbed
+// by the specified duration.
 type TryMutex struct {
 	once sync.Once
 	lock chan struct{}

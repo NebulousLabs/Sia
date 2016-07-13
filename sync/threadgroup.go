@@ -61,7 +61,7 @@ func (tg *ThreadGroup) Add() error {
 
 // AfterStop ensures that a function will be called after Stop() has been
 // called and after all running routines have called Done(). The functions will
-// be called in reverse order to how they were added, simiar to defer. If
+// be called in reverse order to how they were added, similar to defer. If
 // Stop() has already been called, the input function will be called
 // immediately.
 //
