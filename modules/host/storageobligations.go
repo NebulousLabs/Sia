@@ -333,11 +333,6 @@ func (h *Host) addStorageObligation(so storageObligation) error {
 		// contract ids should happen during the negotiation phase, and not
 		// during the 'addStorageObligation' phase.
 		bso := tx.Bucket(bucketStorageObligations)
-		soBytes := bso.Get(soid[:])
-		if soBytes != nil {
-			h.log.Critical("host already has a save storage obligation for this file contract")
-			return errDuplicateStorageObligation
-		}
 
 		// If the storage obligation already has sectors, it means that the
 		// file contract is being renewed, and that the sector should be
