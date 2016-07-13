@@ -91,7 +91,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 
 	// Create and add the storage obligation for this file contract.
 	fullTxn, _ := builder.View()
-	so := &storageObligation{
+	so := storageObligation{
 		SectorRoots: initialSectorRoots,
 
 		ContractCost:            h.settings.MinContractPrice,

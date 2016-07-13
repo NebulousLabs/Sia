@@ -15,33 +15,45 @@ import (
 )
 
 var (
-	// errRevisionFewPublicKeys is returned when a stored file contract
+	// errRevisionWrongPublicKeyCount is returned when a stored file contract
 	// revision does not have enough public keys - such a situation should
 	// never happen, and is a critical / developer error.
-	errRevisionFewPublicKeys = errors.New("too few public keys in the unlock conditions of the file contract revision")
+	errRevisionWrongPublicKeyCount = errors.New("wrong number of public keys in the unlock conditions of the file contract revision")
 )
 
 // verifyChallengeResponse will verify that the renter's response to the
 // challenge provided by the host is correct. In the process, the storage
 // obligation and file contract revision will be loaded and returned.
-func (h *Host) verifyChallengeResponse(fcid types.FileContractID, challenge crypto.Hash, challengeResponse crypto.Signature) (*storageObligation, types.FileContractRevision, []types.TransactionSignature, error) {
+//
+// The storage obligation is returned under a storage obligation lock.
+func (h *Host) verifyChallengeResponse(fcid types.FileContractID, challenge crypto.Hash, challengeResponse crypto.Signature) (so storageObligation, recentRevision types.FileContractRevision, revisionSigs []types.TransactionSignature, err error) {
+	// Grab a lock before it is possible to perform any operations on the
+	// storage obligation. Defer a call to unlock in the event of an error. If
+	// there is no error, the storage obligation will be returned with a lock.
+	err = h.tryLockStorageObligation(fcid)
+	if err != nil {
+		return storageObligation{}, types.FileContractRevision{}, nil, err
+	}
+	defer func() {
+		if err != nil {
+			h.unlockStorageObligation(fcid)
+		}
+	}()
+
 	// Fetch the storage obligation, which has the revision, which has the
 	// renter's public key.
-	var so *storageObligation
-	err := h.db.Update(func(tx *bolt.Tx) error {
-		fso, err := getStorageObligation(tx, fcid)
-		so = &fso
+	err = h.db.View(func(tx *bolt.Tx) error {
+		so, err = getStorageObligation(tx, fcid)
 		return err
 	})
 	if err != nil {
-		return nil, types.FileContractRevision{}, nil, err
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 
 	// Pull out the file contract revision and the revision's signatures from
 	// the transaction.
 	revisionTxn := so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1]
-	recentRevision := revisionTxn.FileContractRevisions[0]
-	var revisionSigs []types.TransactionSignature
+	recentRevision = revisionTxn.FileContractRevisions[0]
 	for _, sig := range revisionTxn.TransactionSignatures {
 		// Checking for just the parent id is sufficient, an over-signed file
 		// contract is invalid.
@@ -54,21 +66,25 @@ func (h *Host) verifyChallengeResponse(fcid types.FileContractID, challenge cryp
 	var renterPK crypto.PublicKey
 	// Sanity check - there should be two public keys.
 	if len(recentRevision.UnlockConditions.PublicKeys) != 2 {
-		h.log.Critical("found a revision with too few public keys")
-		return nil, types.FileContractRevision{}, nil, errRevisionFewPublicKeys
+		// The error has to be set here so that the defered error check will
+		// unlock the storage obligation.
+		err = errRevisionWrongPublicKeyCount
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 	copy(renterPK[:], recentRevision.UnlockConditions.PublicKeys[0].Key)
 	err = crypto.VerifyHash(challenge, renterPK, challengeResponse)
 	if err != nil {
-		return nil, types.FileContractRevision{}, nil, err
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 	return so, recentRevision, revisionSigs, nil
 }
 
 // managedRPCRecentRevision sends the most recent known file contract
 // revision, including signatures, to the renter, for the file contract with
-// the input id.
-func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *storageObligation, error) {
+// the id given by the renter.
+//
+// The storage obligation is returned under a storage obligation lock.
+func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, storageObligation, error) {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateRecentRevisionTime))
 
@@ -76,7 +92,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *s
 	var fcid types.FileContractID
 	err := encoding.ReadObject(conn, &fcid, uint64(len(fcid)))
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 
 	// Send a challenge to the renter to verify that the renter has write
@@ -84,39 +100,49 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, *s
 	var challenge crypto.Hash
 	_, err = rand.Read(challenge[:])
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	err = encoding.WriteObject(conn, challenge)
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 
 	// Read the signed response from the renter.
 	var challengeResponse crypto.Signature
 	err = encoding.ReadObject(conn, &challengeResponse, uint64(len(challengeResponse)))
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	// Verify the response. In the process, fetch the related storage
 	// obligation, file contract revision, and transaction signatures.
+	h.mu.Lock()
 	so, recentRevision, revisionSigs, err := h.verifyChallengeResponse(fcid, challenge, challengeResponse)
+	h.mu.Unlock()
 	if err != nil {
-		return types.FileContractID{}, nil, modules.WriteNegotiationRejection(conn, err)
+		return types.FileContractID{}, storageObligation{}, modules.WriteNegotiationRejection(conn, err)
 	}
+	// Defer a call to unlock the storage obligation in the event of an error.
+	defer func() {
+		if err != nil {
+			h.mu.Lock()
+			h.unlockStorageObligation(fcid)
+			h.mu.Unlock()
+		}
+	}()
 
 	// Send the file contract revision and the corresponding signatures to the
 	// renter.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	err = encoding.WriteObject(conn, recentRevision)
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	err = encoding.WriteObject(conn, revisionSigs)
 	if err != nil {
-		return types.FileContractID{}, nil, err
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	return fcid, so, nil
 }

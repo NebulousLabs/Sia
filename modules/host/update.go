@@ -21,7 +21,7 @@ import (
 // in the consensus set or the host.
 func (h *Host) initRescan() error {
 	// Reset all of the variables that have relevance to the consensus set.
-	var allObligations []*storageObligation
+	var allObligations []storageObligation
 	// Reset all of the consensus-relevant variables in the host.
 	h.blockHeight = 0
 
@@ -38,7 +38,7 @@ func (h *Host) initRescan() error {
 			so.OriginConfirmed = false
 			so.RevisionConfirmed = false
 			so.ProofConfirmed = false
-			allObligations = append(allObligations, &so)
+			allObligations = append(allObligations, so)
 			soBytes, err = json.Marshal(so)
 			if err != nil {
 				return err

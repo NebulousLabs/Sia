@@ -164,7 +164,7 @@ func putStorageObligation(tx *bolt.Tx, so storageObligation) error {
 }
 
 // expiration returns the height at which the storage obligation expires.
-func (so *storageObligation) expiration() types.BlockHeight {
+func (so storageObligation) expiration() types.BlockHeight {
 	if len(so.RevisionTransactionSet) > 0 {
 		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowStart
 	}
@@ -172,7 +172,7 @@ func (so *storageObligation) expiration() types.BlockHeight {
 }
 
 // fileSize returns the size of the data protected by the obligation.
-func (so *storageObligation) fileSize() uint64 {
+func (so storageObligation) fileSize() uint64 {
 	if len(so.RevisionTransactionSet) > 0 {
 		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewFileSize
 	}
@@ -181,13 +181,13 @@ func (so *storageObligation) fileSize() uint64 {
 
 // id returns the id of the storage obligation, which is definied by the file
 // contract id of the file contract that governs the storage contract.
-func (so *storageObligation) id() types.FileContractID {
+func (so storageObligation) id() types.FileContractID {
 	return so.OriginTransactionSet[len(so.OriginTransactionSet)-1].FileContractID(0)
 }
 
 // isSane checks that required assumptions about the storage obligation are
 // correct.
-func (so *storageObligation) isSane() error {
+func (so storageObligation) isSane() error {
 	// There should be an origin transaction set.
 	if len(so.OriginTransactionSet) == 0 {
 		build.Critical("origin transaction set is empty")
@@ -236,7 +236,7 @@ func (so *storageObligation) isSane() error {
 }
 
 // merkleRoot returns the file merkle root of a storage obligation.
-func (so *storageObligation) merkleRoot() crypto.Hash {
+func (so storageObligation) merkleRoot() crypto.Hash {
 	if len(so.RevisionTransactionSet) > 0 {
 		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewFileMerkleRoot
 	}
@@ -245,7 +245,7 @@ func (so *storageObligation) merkleRoot() crypto.Hash {
 
 // payous returns the set of valid payouts and missed payouts that represent
 // the latest revision for the storage obligation.
-func (so *storageObligation) payouts() (valid []types.SiacoinOutput, missed []types.SiacoinOutput) {
+func (so storageObligation) payouts() (valid []types.SiacoinOutput, missed []types.SiacoinOutput) {
 	valid = make([]types.SiacoinOutput, 2)
 	missed = make([]types.SiacoinOutput, 2)
 	if len(so.RevisionTransactionSet) > 0 {
@@ -260,7 +260,7 @@ func (so *storageObligation) payouts() (valid []types.SiacoinOutput, missed []ty
 
 // proofDeadline returns the height by which the storage proof must be
 // submitted.
-func (so *storageObligation) proofDeadline() types.BlockHeight {
+func (so storageObligation) proofDeadline() types.BlockHeight {
 	if len(so.RevisionTransactionSet) > 0 {
 		return so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowEnd
 	}
@@ -268,7 +268,7 @@ func (so *storageObligation) proofDeadline() types.BlockHeight {
 }
 
 // value returns the value of fulfilling the storage obligation to the host.
-func (so *storageObligation) value() types.Currency {
+func (so storageObligation) value() types.Currency {
 	return so.ContractCost.Add(so.PotentialDownloadRevenue).Add(so.PotentialStorageRevenue).Add(so.PotentialUploadRevenue).Add(so.RiskedCollateral)
 }
 
@@ -303,7 +303,7 @@ func (h *Host) queueActionItem(height types.BlockHeight, id types.FileContractID
 // disk, which means that addStorageObligation should be exclusively called
 // when creating a new, empty file contract or when renewing an existing file
 // contract.
-func (h *Host) addStorageObligation(so *storageObligation) error {
+func (h *Host) addStorageObligation(so storageObligation) error {
 	// Sanity check - obligation should be under lock while being added.
 	soid := so.id()
 	_, exists := h.lockedStorageObligations[soid]
@@ -358,7 +358,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 		}
 
 		// Add the storage obligation to the database.
-		soBytes, err := json.Marshal(*so)
+		soBytes, err := json.Marshal(so)
 		if err != nil {
 			return err
 		}
@@ -412,7 +412,7 @@ func (h *Host) addStorageObligation(so *storageObligation) error {
 // sectors will be removed the number of times that they are listed, to remove
 // multiple instances of the same virtual sector, the virtural sector will need
 // to appear in 'sectorsRemoved' multiple times. Same with 'sectorsGained'.
-func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []crypto.Hash, sectorsGained []crypto.Hash, gainedSectorData [][]byte) error {
+func (h *Host) modifyStorageObligation(so storageObligation, sectorsRemoved []crypto.Hash, sectorsGained []crypto.Hash, gainedSectorData [][]byte) error {
 	// Sanity check - obligation should be under lock while being modified.
 	soid := so.id()
 	_, exists := h.lockedStorageObligations[soid]
@@ -474,7 +474,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 		}
 
 		// Store the new storage obligation to replace the old one.
-		return putStorageObligation(tx, *so)
+		return putStorageObligation(tx, so)
 	})
 	if err != nil {
 		// Because there was an error, all of the sectors that got added need
@@ -518,7 +518,7 @@ func (h *Host) modifyStorageObligation(so *storageObligation, sectorsRemoved []c
 
 // removeStorageObligation will remove a storage obligation from the host,
 // either due to failure or success.
-func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligationStatus) error {
+func (h *Host) removeStorageObligation(so storageObligation, sos storageObligationStatus) error {
 
 	// Call removeSector for every sector in the storage obligation.
 	for _, root := range so.SectorRoots {
@@ -581,7 +581,7 @@ func (h *Host) removeStorageObligation(so *storageObligation, sos storageObligat
 	so.ObligationStatus = sos
 	so.SectorRoots = nil
 	return h.db.Update(func(tx *bolt.Tx) error {
-		return putStorageObligation(tx, *so)
+		return putStorageObligation(tx, so)
 	})
 }
 
@@ -644,7 +644,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 			if t {
 				h.log.Println("Consensus conflict on the origin transaction set, id", so.id())
 				h.mu.Lock()
-				err = h.removeStorageObligation(&so, obligationRejected)
+				err = h.removeStorageObligation(so, obligationRejected)
 				h.mu.Unlock()
 				if err != nil {
 					h.log.Println("Error removing storage obligation:", err)
@@ -681,7 +681,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 			// due to the dynamic fee pool.
 			h.log.Println("Full time has elapsed, but the revision transaction could not be submitted to consensus, id", so.id())
 			h.mu.Lock()
-			h.removeStorageObligation(&so, obligationRejected)
+			h.removeStorageObligation(so, obligationRejected)
 			h.mu.Unlock()
 			return
 		}
@@ -739,7 +739,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		if so.proofDeadline() < blockHeight || len(so.SectorRoots) == 0 {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
 			h.mu.Lock()
-			err := h.removeStorageObligation(&so, obligationFailed)
+			err := h.removeStorageObligation(so, obligationFailed)
 			h.mu.Unlock()
 			if err != nil {
 				h.log.Println("Error removing storage obligation:", err)
@@ -842,7 +842,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 	if so.ProofConfirmed && blockHeight >= so.proofDeadline() {
 		h.log.Println("file contract complete, id", so.id())
 		h.mu.Lock()
-		h.removeStorageObligation(&so, obligationSucceeded)
+		h.removeStorageObligation(so, obligationSucceeded)
 		h.mu.Unlock()
 	}
 }

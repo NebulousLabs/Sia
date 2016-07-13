@@ -3,9 +3,6 @@
 // internet bandwidth into profit for the user.
 package host
 
-// TODO: Review the pointer control on the host, particularly with respect to
-// the storage obligations being flung around in storageobligations.go.
-
 // TODO: what happens if the renter submits the revision early, before the
 // final revision. Will the host mark the contract as complete?
 
