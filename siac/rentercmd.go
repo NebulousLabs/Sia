@@ -84,40 +84,12 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:     wrap(renterfileslistcmd),
 	}
 
-	renterFilesLoadCmd = &cobra.Command{
-		Use:   "load [source]",
-		Short: "Load a .sia file",
-		Long:  "Load a .sia file, adding the file entries contained within.",
-		Run:   wrap(renterfilesloadcmd),
-	}
-
-	renterFilesLoadASCIICmd = &cobra.Command{
-		Use:   "loadascii [ascii]",
-		Short: "Load an ASCII-encoded .sia file",
-		Long:  "Load an ASCII-encoded .sia file.",
-		Run:   wrap(renterfilesloadasciicmd),
-	}
-
 	renterFilesRenameCmd = &cobra.Command{
 		Use:     "rename [path] [newpath]",
 		Aliases: []string{"mv"},
 		Short:   "Rename a file",
 		Long:    "Rename a file.",
 		Run:     wrap(renterfilesrenamecmd),
-	}
-
-	renterFilesShareCmd = &cobra.Command{
-		Use:   "share [path] [destination]",
-		Short: "Export a file to a .sia for sharing",
-		Long:  "Export a file to a .sia for sharing.",
-		Run:   wrap(renterfilessharecmd),
-	}
-
-	renterFilesShareASCIICmd = &cobra.Command{
-		Use:   "shareascii [path]",
-		Short: "Prints an ASCII-encoded .sia file for sharing",
-		Long:  "Prints an ASCII-encoded .sia file for sharing, but does not save the .sia file to disk.",
-		Run:   wrap(renterfilesshareasciicmd),
 	}
 
 	renterFilesUploadCmd = &cobra.Command{
@@ -384,34 +356,6 @@ func renterfileslistcmd() {
 	w.Flush()
 }
 
-// renterfilesloadcmd is the handler for the command `siac renter load [source]`.
-// Loads a .sia file, adding the file entries contained within.
-func renterfilesloadcmd(source string) {
-	var info api.RenterLoad
-	err := postResp("/renter/load", "source="+abs(source), &info)
-	if err != nil {
-		die("Could not load file:", err)
-	}
-	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
-	for _, file := range info.FilesAdded {
-		fmt.Printf("\t%s\n", file)
-	}
-}
-
-// renterfilesloadasciicmd is the handler for the command `siac renter loadascii [ascii]`.
-// Load an ASCII-encoded .sia file.
-func renterfilesloadasciicmd(ascii string) {
-	var info api.RenterLoad
-	err := postResp("/renter/loadascii", "asciisia="+ascii, &info)
-	if err != nil {
-		die("Could not load file:", err)
-	}
-	fmt.Printf("Loaded %d file(s):\n", len(info.FilesAdded))
-	for _, file := range info.FilesAdded {
-		fmt.Printf("\t%s\n", file)
-	}
-}
-
 // renterfilesrenamecmd is the handler for the command `siac renter rename [path] [newpath]`.
 // Renames a file on the Sia network.
 func renterfilesrenamecmd(path, newpath string) {
@@ -420,27 +364,6 @@ func renterfilesrenamecmd(path, newpath string) {
 		die("Could not rename file:", err)
 	}
 	fmt.Printf("Renamed %s to %s\n", path, newpath)
-}
-
-// renterfilessharecmd is the handler for the command `siac renter share [path] [destination]`.
-// Export a file to a .sia for sharing.
-func renterfilessharecmd(path, destination string) {
-	err := get(fmt.Sprintf("/renter/share?siapaths=%s&destination=%s", path, abs(destination)))
-	if err != nil {
-		die("Could not share file:", err)
-	}
-	fmt.Printf("Exported %s to %s\n", path, abs(destination))
-}
-
-// renterfilesshareasciicmd is the handler for the command `siac renter shareascii [path]`.
-// Prints an ascii-encoded sia file.
-func renterfilesshareasciicmd(path string) {
-	var data api.RenterShareASCII
-	err := getAPI("/renter/shareascii?siapaths="+path, &data)
-	if err != nil {
-		die("Could not share file:", err)
-	}
-	fmt.Println(data.ASCIIsia)
 }
 
 // renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
