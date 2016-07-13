@@ -23,6 +23,10 @@ type uploadDownloadContractor struct {
 	mu      sync.Mutex
 }
 
+func (uc *uploadDownloadContractor) Contract(modules.NetAddress) (modules.RenterContract, bool) {
+	return modules.RenterContract{}, true
+}
+
 func (uc *uploadDownloadContractor) Contracts() []modules.RenterContract {
 	return make([]modules.RenterContract, 24) // exact number shouldn't matter, as long as its large enough
 }

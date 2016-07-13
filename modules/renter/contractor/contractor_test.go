@@ -92,6 +92,45 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// TestContract tests the Contract method.
+func TestContract(t *testing.T) {
+	c := &Contractor{
+		contracts: map[types.FileContractID]modules.RenterContract{
+			{1}: {ID: types.FileContractID{1}, NetAddress: "foo"},
+			{2}: {ID: types.FileContractID{2}, NetAddress: "bar"},
+			{3}: {ID: types.FileContractID{3}, NetAddress: "baz"},
+		},
+	}
+	tests := []struct {
+		addr       modules.NetAddress
+		exists     bool
+		contractID types.FileContractID
+	}{
+		{"foo", true, types.FileContractID{1}},
+		{"bar", true, types.FileContractID{2}},
+		{"baz", true, types.FileContractID{3}},
+		{"quux", false, types.FileContractID{}},
+		{"nope", false, types.FileContractID{}},
+	}
+	for _, test := range tests {
+		contract, ok := c.Contract(test.addr)
+		if ok != test.exists {
+			t.Errorf("%v: expected %v, got %v", test.addr, test.exists, ok)
+		} else if contract.ID != test.contractID {
+			t.Errorf("%v: expected %v, got %v", test.addr, test.contractID, contract.ID)
+		}
+	}
+
+	// delete all contracts
+	c.contracts = map[types.FileContractID]modules.RenterContract{}
+	for _, test := range tests {
+		_, ok := c.Contract(test.addr)
+		if ok {
+			t.Error("no contracts should remain")
+		}
+	}
+}
+
 // TestContracts tests the Contracts method.
 func TestContracts(t *testing.T) {
 	c := &Contractor{

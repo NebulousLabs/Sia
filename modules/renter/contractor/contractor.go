@@ -64,6 +64,18 @@ func (c *Contractor) FinancialMetrics() modules.RenterFinancialMetrics {
 	return c.financialMetrics
 }
 
+// Contract returns the latest contract formed with the specified host.
+func (c *Contractor) Contract(hostAddr modules.NetAddress) (modules.RenterContract, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, c := range c.contracts {
+		if c.NetAddress == hostAddr {
+			return c, true
+		}
+	}
+	return modules.RenterContract{}, false
+}
+
 // Contracts returns the contracts formed by the contractor.
 func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	c.mu.RLock()
