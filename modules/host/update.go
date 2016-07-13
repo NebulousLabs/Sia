@@ -113,6 +113,20 @@ func (h *Host) initConsensusSubscription() error {
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change to the blockchain.
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
+	// ProcessConsensusChange spawns multiple threads which will wait until
+	// storage obligations are unlocked and then submit storage proofs to
+	// blockchain for those obligations. The ThreadGroup needs to wait for
+	// these threads to terminate. These threads also require a host lock,
+	//
+	// We use a local sync.WaitGroup to track the progress of these threads.
+	// Because these threads require a host lock, wg.Wait() should not be
+	// called until after the host lock has been released. And then tg.Done()
+	// should not be called until wg.Wait() returns.
+	//
+	// Because the host lock is released in a defer statement, wg.Wait() must
+	// be called in a defer statement that comes before the deferred
+	// h.mu.Unlock(). This is why the code for finishing the wait group is
+	// declared far above the place where threads are added to the wait group.
 	err := h.tg.Add()
 	if err != nil {
 		return
@@ -302,6 +316,8 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Handle the list of action items.
 	for i := range actionItems {
 		// Add the action item to the wait group outside of the threaded call.
+		// The call to wg.Done() was established at the beginning of the
+		// function in a defer statement.
 		wg.Add(1)
 		go h.threadedHandleActionItem(actionItems[i], wg)
 	}

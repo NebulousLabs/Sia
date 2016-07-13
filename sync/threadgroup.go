@@ -14,9 +14,13 @@ var ErrStopped = errors.New("ThreadGroup already stopped")
 // actions and shutting down threads. After Stop() is called, the thread group
 // is no longer useful.
 //
-// Nested calls to Add() are a deadlock risk. It is safe to call Add() and
-// Stop() and Flush() concurrently so long as there are no nested calls to
-// Add().
+// It is safe to call Add(), Done(), and Stop() concurrently, however it is not
+// safe to nest calls to Add(). A simple example of a nested call to add would
+// be:
+//		tg.Add()
+//		tg.Add()
+//		tg.Done()
+//		tg.Done()
 type ThreadGroup struct {
 	onStopFns    []func()
 	afterStopFns []func()

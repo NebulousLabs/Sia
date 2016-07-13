@@ -757,9 +757,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		sectorIndex := segmentIndex / (modules.SectorSize / crypto.SegmentSize)
 		// Pull the corresponding sector into memory.
 		sectorRoot := so.SectorRoots[sectorIndex]
-		h.mu.Lock()
 		sectorBytes, err := h.ReadSector(sectorRoot)
-		h.mu.Unlock()
 		if err != nil {
 			h.log.Debugln(err)
 			return
