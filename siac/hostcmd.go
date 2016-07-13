@@ -29,8 +29,8 @@ var (
 Available settings:
      acceptingcontracts:   boolean
      maxduration:          blocks
-     maxdownloadbatchsize: int
-     maxrevisebatchsize:   int
+     maxdownloadbatchsize: bytes
+     maxrevisebatchsize:   bytes
      netaddress:           string
      windowsize:           blocks
 
@@ -188,7 +188,7 @@ Host Internal Settings:
 	maxdownloadbatchsize: %v
 	maxrevisebatchsize:   %v
 	netaddress:           %v
-	windowsize:           %v Weeks
+	windowsize:           %v Hours
 
 	collateral:       %v / TB / Month
 	collateralbudget: %v 
@@ -230,7 +230,7 @@ RPC Stats:
 			yesNo(is.AcceptingContracts), periodUnits(is.MaxDuration),
 			filesizeUnits(int64(is.MaxDownloadBatchSize)),
 			filesizeUnits(int64(is.MaxReviseBatchSize)), netaddr,
-			periodUnits(is.WindowSize),
+			is.WindowSize/6,
 
 			currencyUnits(is.Collateral.Mul(modules.BlockBytesPerMonthTerabyte)),
 			currencyUnits(is.CollateralBudget),
@@ -313,7 +313,7 @@ func hostconfigcmd(param, value string) {
 		value = hastings
 
 	// currency/TB (convert to hastings/byte)
-	case "collateral", "mindownloadbandwidthprice", "minuploadbandwidthprice":
+	case "mindownloadbandwidthprice", "minuploadbandwidthprice":
 		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
@@ -323,7 +323,7 @@ func hostconfigcmd(param, value string) {
 		value = c.String()
 
 	// currency/TB/month (convert to hastings/byte/block)
-	case "minstorageprice":
+	case "collateral", "minstorageprice":
 		hastings, err := parseCurrency(value)
 		if err != nil {
 			die("Could not parse "+param+":", err)
