@@ -19,6 +19,21 @@ var (
 	errOrphan          = errors.New("block has no known parent")
 )
 
+// managedBroadcastBlock will broadcast a block to the consensus set's peers.
+func (cs *ConsensusSet) managedBroadcastBlock(b types.Block) {
+	// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
+	var relayBlockPeers, relayHeaderPeers []modules.Peer
+	for _, p := range cs.gateway.Peers() {
+		if build.VersionCmp(p.Version, "0.5.1") <= 0 {
+			relayBlockPeers = append(relayBlockPeers, p)
+		} else {
+			relayHeaderPeers = append(relayHeaderPeers, p)
+		}
+	}
+	go cs.gateway.Broadcast("RelayBlock", b, relayBlockPeers)
+	go cs.gateway.Broadcast("RelayHeader", b.Header(), relayHeaderPeers)
+}
+
 // validateHeaderAndBlock does some early, low computation verification on the
 // block. Callers should not assume that validation will happen in a particular
 // order.
@@ -237,10 +252,11 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 			if err == errFutureTimestamp {
 				go func() {
 					time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
-					err := cs.AcceptBlock(b)
+					err := cs.managedAcceptBlock(b)
 					if err != nil {
 						cs.log.Debugln("WARN: failed to accept a future block:", err)
 					}
+					cs.managedBroadcastBlock(b)
 				}()
 			}
 			return err
@@ -283,20 +299,16 @@ func (cs *ConsensusSet) managedAcceptBlock(b types.Block) error {
 // without error, it will be relayed to all connected peers. This function
 // should only be called for new blocks.
 func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
-	err := cs.managedAcceptBlock(b)
+	err := cs.tg.Add()
 	if err != nil {
 		return err
 	}
-	// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1.
-	var relayBlockPeers, relayHeaderPeers []modules.Peer
-	for _, p := range cs.gateway.Peers() {
-		if build.VersionCmp(p.Version, "0.5.1") <= 0 {
-			relayBlockPeers = append(relayBlockPeers, p)
-		} else {
-			relayHeaderPeers = append(relayHeaderPeers, p)
-		}
+	defer cs.tg.Done()
+
+	err = cs.managedAcceptBlock(b)
+	if err != nil {
+		return err
 	}
-	go cs.gateway.Broadcast("RelayBlock", b, relayBlockPeers)
-	go cs.gateway.Broadcast("RelayHeader", b.Header(), relayHeaderPeers)
+	cs.managedBroadcastBlock(b)
 	return nil
 }

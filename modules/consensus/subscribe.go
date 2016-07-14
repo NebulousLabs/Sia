@@ -163,12 +163,17 @@ func (cs *ConsensusSet) initializeSubscribe(subscriber modules.ConsensusSetSubsc
 // As a special case, using an empty id as the start will have all the changes
 // sent to the modules starting with the genesis block.
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber, start modules.ConsensusChangeID) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	cs.subscribers = append(cs.subscribers, subscriber)
 
 	// Get the input module caught up to the currenct consnesus set.
-	err := cs.initializeSubscribe(subscriber, start)
+	cs.subscribers = append(cs.subscribers, subscriber)
+	err = cs.initializeSubscribe(subscriber, start)
 	if err != nil {
 		// Remove the subscriber from the set of subscribers.
 		cs.subscribers = cs.subscribers[:len(cs.subscribers)-1]
@@ -182,6 +187,10 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 // garbage collection and rescanning. If the subscriber is not found in the
 // subscriber database, no action is taken.
 func (cs *ConsensusSet) Unsubscribe(subscriber modules.ConsensusSetSubscriber) {
+	if cs.tg.Add() != nil {
+		return
+	}
+	defer cs.tg.Done()
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 

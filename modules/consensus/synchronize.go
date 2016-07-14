@@ -343,7 +343,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	}
 
 	// Submit the block to the consensus set and broadcast it.
-	err = cs.AcceptBlock(b)
+	err = cs.managedAcceptBlock(b)
 	if err == errOrphan {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
@@ -358,6 +358,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	cs.managedBroadcastBlock(b)
 	return nil
 }
 
@@ -445,9 +446,10 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
 			return err
 		}
-		if err := cs.AcceptBlock(block); err != nil {
+		if err := cs.managedAcceptBlock(block); err != nil {
 			return err
 		}
+		cs.managedBroadcastBlock(block)
 		return nil
 	}
 	return managedFN
