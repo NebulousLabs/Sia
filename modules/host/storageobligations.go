@@ -699,7 +699,7 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		revisionParents := so.RevisionTransactionSet[:revisionTxnIndex]
 		revisionTxn := so.RevisionTransactionSet[revisionTxnIndex]
 		builder := h.wallet.RegisterTransaction(revisionTxn, revisionParents)
-		feeRecommendation, _ := h.tpool.FeeEstimation()
+		_, feeRecommendation := h.tpool.FeeEstimation()
 		if so.value().Div64(2).Cmp(feeRecommendation) < 0 {
 			// There's no sense submitting the revision if the fee is more than
 			// half of the anticipated revenue - fee market went up
@@ -786,9 +786,9 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 
 		// Create and build the transaction with the storage proof.
 		builder := h.wallet.StartTransaction()
-		feeRecommendation, _ := h.tpool.FeeEstimation()
+		_, feeRecommendation := h.tpool.FeeEstimation()
 		if so.value().Cmp(feeRecommendation) < 0 {
-			// There's no sense submitting the storage proof of the fee is more
+			// There's no sense submitting the storage proof if the fee is more
 			// than the anticipated revenue.
 			h.log.Debugln("Host not submitting storage proof due to a value that does not sufficiently exceed the fee cost")
 			return
