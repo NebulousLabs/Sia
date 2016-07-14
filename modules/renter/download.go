@@ -59,10 +59,10 @@ func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
 }
 
 // newHostFetcher creates a new hostFetcher.
-func newHostFetcher(d contractor.Downloader, fc fileContract, masterKey crypto.TwofishKey) *hostFetcher {
+func newHostFetcher(d contractor.Downloader, pieces []pieceData, masterKey crypto.TwofishKey) *hostFetcher {
 	// make piece map
 	pieceMap := make(map[uint64][]pieceData)
-	for _, p := range fc.Pieces {
+	for _, p := range pieces {
 		pieceMap[p.Chunk] = append(pieceMap[p.Chunk], p)
 	}
 	return &hostFetcher{
@@ -191,33 +191,41 @@ func (r *Renter) Download(path, destination string) error {
 
 	// Look up the most recent contract for each host.
 	// NOTE: this assumes that only one contract is made with each host.
-	contracts := make(map[*fileContract]modules.RenterContract)
+	var contractPieces []struct {
+		contract modules.RenterContract
+		pieces   []pieceData
+	}
 	file.mu.RLock()
 	for _, fc := range file.contracts {
-		c, ok := r.hostContractor.Contract(fc.IP)
+		rc, ok := r.hostContractor.Contract(fc.IP)
 		if ok {
-			contracts[&fc] = c
+			contractPieces = append(contractPieces, struct {
+				contract modules.RenterContract
+				pieces   []pieceData
+			}{rc, fc.Pieces})
 		}
 	}
 	file.mu.RUnlock()
-	r.log.Debugf("Starting Download, found %v contracts\n", len(contracts))
+	r.log.Debugf("Starting Download, found %v contracts\n", len(contractPieces))
 
-	if len(contracts) == 0 {
+	if len(contractPieces) == 0 {
 		return errors.New("no record of that file's contracts")
+	} else if len(contractPieces) < file.erasureCode.MinPieces() {
+		return fmt.Errorf("not enough contracts: needed %v, found %v", file.erasureCode.MinPieces(), len(contractPieces))
 	}
 
 	// Initiate connections to each host.
 	var hosts []fetcher
 	var errs []string
-	for fc, c := range contracts {
+	for _, cp := range contractPieces {
 		// TODO: connect in parallel
-		d, err := r.hostContractor.Downloader(c)
+		d, err := r.hostContractor.Downloader(cp.contract)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("\t%v: %v", c.NetAddress, err))
+			errs = append(errs, fmt.Sprintf("\t%v: %v", cp.contract.NetAddress, err))
 			continue
 		}
 		defer d.Close()
-		hosts = append(hosts, newHostFetcher(d, *fc, file.masterKey))
+		hosts = append(hosts, newHostFetcher(d, cp.pieces, file.masterKey))
 	}
 	if len(hosts) < file.erasureCode.MinPieces() {
 		return errors.New("Could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
