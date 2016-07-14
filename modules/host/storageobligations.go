@@ -587,25 +587,25 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 	defer wg.Done()
 
 	// Lock the storage obligation in question.
-	h.mu.Lock()
+	lockID := h.mu.Lock()
 	h.lockStorageObligation(soid)
-	h.mu.Unlock()
+	h.mu.Unlock(lockID)
 	defer func() {
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		h.unlockStorageObligation(soid)
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 	}()
 
 	// Convert the storage obligation id into a storage obligation.
 	var err error
 	var so storageObligation
-	h.mu.RLock()
+	lockID = h.mu.RLock()
 	blockHeight := h.blockHeight
 	err = h.db.View(func(tx *bolt.Tx) error {
 		so, err = getStorageObligation(tx, soid)
 		return err
 	})
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	if err != nil {
 		h.log.Println("Could not get storage obligation:", err)
 		return
@@ -638,9 +638,9 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 			_, t := err.(modules.ConsensusConflict)
 			if t {
 				h.log.Println("Consensus conflict on the origin transaction set, id", so.id())
-				h.mu.Lock()
+				lockID := h.mu.Lock()
 				err = h.removeStorageObligation(so, obligationRejected)
-				h.mu.Unlock()
+				h.mu.Unlock(lockID)
 				if err != nil {
 					h.log.Println("Error removing storage obligation:", err)
 				}
@@ -649,9 +649,9 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		}
 
 		// Queue another action item to check the status of the transaction.
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		err = h.queueActionItem(h.blockHeight+resubmissionTimeout, so.id())
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
@@ -675,16 +675,16 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 			// would confuse the revenue stuff a bit. Might happen frequently
 			// due to the dynamic fee pool.
 			h.log.Println("Full time has elapsed, but the revision transaction could not be submitted to consensus, id", so.id())
-			h.mu.Lock()
+			lockID := h.mu.Lock()
 			h.removeStorageObligation(so, obligationRejected)
-			h.mu.Unlock()
+			h.mu.Unlock(lockID)
 			return
 		}
 
 		// Queue another action item to check the status of the transaction.
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		err := h.queueActionItem(blockHeight+resubmissionTimeout, so.id())
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
@@ -733,9 +733,9 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		// be removed.
 		if so.proofDeadline() < blockHeight || len(so.SectorRoots) == 0 {
 			h.log.Debugln("storage proof not confirmed by deadline, id", so.id())
-			h.mu.Lock()
+			lockID := h.mu.Lock()
 			err := h.removeStorageObligation(so, obligationFailed)
-			h.mu.Unlock()
+			h.mu.Unlock(lockID)
 			if err != nil {
 				h.log.Println("Error removing storage obligation:", err)
 			}
@@ -811,9 +811,9 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 
 		// Queue another action item to check whether there the storage proof
 		// got confirmed.
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		err = h.queueActionItem(so.proofDeadline(), so.id())
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 		if err != nil {
 			h.log.Println("Error queuing action item:", err)
 		}
@@ -836,8 +836,8 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 	// success, delete the obligation.
 	if so.ProofConfirmed && blockHeight >= so.proofDeadline() {
 		h.log.Println("file contract complete, id", so.id())
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		h.removeStorageObligation(so, obligationSucceeded)
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 	}
 }

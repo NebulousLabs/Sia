@@ -139,8 +139,8 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 
 	// Host needs to unlock before wg.Wait() is called, so that the other
 	// threads may access the host lock.
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 
 	// Wrap the whole parsing into a single large database tx to keep things
 	// efficient.

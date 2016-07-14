@@ -127,11 +127,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	}
 
 	// Read some variables from the host for use later in the function.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	settings := h.settings
 	secretKey := h.secretKey
 	blockHeight := h.blockHeight
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 
 	// The renter is going to send its intended modifications, followed by the
 	// file contract revision that pays for them.
@@ -288,9 +288,9 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	// The storage obligation is received with a lock on it. Defer a call to
 	// unlock the storage obligation.
 	defer func() {
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		h.unlockStorageObligation(so.id())
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 	}()
 
 	// Begin the revision loop. The host will process revisions until a

@@ -97,11 +97,11 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	}
 
 	// Grab a set of variables that will be useful later in the function.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	secretKey := h.secretKey
 	settings := h.settings
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 
 	// Read the download requests, followed by the file contract revision that
 	// pays for them.
@@ -274,9 +274,9 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 	// The storage obligation is returned with a lock on it. Defer a call to
 	// unlock the storage obligation.
 	defer func() {
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		h.unlockStorageObligation(so.id())
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 	}()
 
 	// Perform a loop that will allow downloads to happen until the maximum

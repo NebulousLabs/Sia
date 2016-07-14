@@ -84,9 +84,9 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// The storage obligation is received with a lock. Defer a call to unlock
 	// the storage obligation.
 	defer func() {
-		h.mu.Lock()
+		lockID := h.mu.Lock()
 		h.unlockStorageObligation(so.id())
-		h.mu.Unlock()
+		h.mu.Unlock(lockID)
 	}()
 
 	// Perform the host settings exchange with the renter.
@@ -120,9 +120,9 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 		return err
 	}
 
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	settings := h.externalSettings()
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 
 	// Verify that the transaction coming over the wire is a proper renewal.
 	err = h.managedVerifyRenewedContract(so, txnSet, renterPK)
@@ -180,12 +180,12 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// completed file contract.
 	//
 	// During finalization the signatures sent by the renter are all checked.
-	h.mu.RLock()
+	lockID = h.mu.RLock()
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 	renewCollateral := renewContractCollateral(so, settings, fc)
 	renewRevenue := renewBasePrice(so, settings, fc)
 	renewRisk := renewBaseCollateral(so, settings, fc)
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
@@ -215,14 +215,14 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 		return errNoFileContract
 	}
 
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	externalSettings := h.externalSettings()
 	internalSettings := h.settings
 	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	publicKey := h.publicKey
 	unlockHash := h.unlockHash
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 
 	// The file size and merkle root must match the file size and merkle root

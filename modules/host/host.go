@@ -68,7 +68,6 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -167,7 +166,7 @@ type Host struct {
 	db         *persist.BoltDatabase
 	listener   net.Listener
 	log        *persist.Logger
-	mu         sync.RWMutex
+	mu         *siasync.RWMutex
 	persistDir string
 	port       string
 	tg         siasync.ThreadGroup
@@ -222,6 +221,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 
 		lockedStorageObligations: make(map[types.FileContractID]*siasync.TryMutex),
 
+		mu:         siasync.New(modules.SafeMutexDelay, 2),
 		persistDir: persistDir,
 	}
 
@@ -313,8 +313,8 @@ func (h *Host) Close() error {
 // set by the user (host is configured through InternalSettings), and are the
 // values that get displayed to other hosts on the network.
 func (h *Host) ExternalSettings() modules.HostExternalSettings {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
 		build.Critical("Call to ExternalSettings after close")
@@ -326,8 +326,8 @@ func (h *Host) ExternalSettings() modules.HostExternalSettings {
 // FinancialMetrics returns information about the financial commitments,
 // rewards, and activities of the host.
 func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
 		build.Critical("Call to FinancialMetrics after close")
@@ -338,8 +338,8 @@ func (h *Host) FinancialMetrics() modules.HostFinancialMetrics {
 
 // SetInternalSettings updates the host's internal HostInternalSettings object.
 func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
 		return err
@@ -381,8 +381,8 @@ func (h *Host) SetInternalSettings(settings modules.HostInternalSettings) error 
 
 // InternalSettings returns the settings of a host.
 func (h *Host) InternalSettings() modules.HostInternalSettings {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
 		build.Critical("call to InternalSettings after close")

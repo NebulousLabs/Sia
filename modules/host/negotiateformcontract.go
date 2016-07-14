@@ -133,9 +133,9 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// If the host is not accepting contracts, the connection can be closed.
 	// The renter has been given enough information in the host settings to
 	// understand that the connection is going to be closed.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	settings := h.settings
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	if !settings.AcceptingContracts {
 		return nil
 	}
@@ -225,9 +225,9 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	//
 	// During finalization, the siganture for the revision is also checked, and
 	// signatures for the revision transaction are created.
-	h.mu.RLock()
+	lockID = h.mu.RLock()
 	hostCollateral := contractCollateral(h.settings, txnSet[len(txnSet)-1].FileContracts[0])
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, nil, hostCollateral, types.ZeroCurrency, types.ZeroCurrency)
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
@@ -259,13 +259,13 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 		return errNoFileContract
 	}
 
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	publicKey := h.publicKey
 	settings := h.settings
 	unlockHash := h.unlockHash
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 
 	// A new file contract should have a file size of zero.

@@ -115,18 +115,18 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	}
 	// Verify the response. In the process, fetch the related storage
 	// obligation, file contract revision, and transaction signatures.
-	h.mu.Lock()
+	lockID := h.mu.Lock()
 	so, recentRevision, revisionSigs, err := h.verifyChallengeResponse(fcid, challenge, challengeResponse)
-	h.mu.Unlock()
+	h.mu.Unlock(lockID)
 	if err != nil {
 		return types.FileContractID{}, storageObligation{}, modules.WriteNegotiationRejection(conn, err)
 	}
 	// Defer a call to unlock the storage obligation in the event of an error.
 	defer func() {
 		if err != nil {
-			h.mu.Lock()
+			lockID := h.mu.Lock()
 			h.unlockStorageObligation(fcid)
-			h.mu.Unlock()
+			h.mu.Unlock(lockID)
 		}
 	}()
 
