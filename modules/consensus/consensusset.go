@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -81,6 +82,7 @@ type ConsensusSet struct {
 	log        *persist.Logger
 	mu         demotemutex.DemoteMutex
 	persistDir string
+	tg         sync.ThreadGroup
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If
@@ -144,6 +146,16 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+		cs.tg.OnStop(func() {
+			cs.mu.Lock()
+			defer cs.mu.Unlock()
+
+			cs.gateway.UnregisterRPC("SendBlocks")
+			cs.gateway.UnregisterRPC("RelayBlock")
+			cs.gateway.UnregisterRPC("RelayHeader")
+			cs.gateway.UnregisterRPC("SendBlk")
+			cs.gateway.UnregisterConnectCall("SendBlocks")
+		})
 
 		// Mark that we are synced with the network.
 		cs.mu.Lock()
@@ -188,15 +200,9 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
-	if cs.synced {
-		cs.gateway.UnregisterRPC("SendBlocks")
-		cs.gateway.UnregisterRPC("RelayBlock") // COMPATv0.5.1
-		cs.gateway.UnregisterRPC("RelayHeader")
-		cs.gateway.UnregisterRPC("SendBlk")
-		cs.gateway.UnregisterConnectCall("SendBlocks")
+	err := cs.tg.Stop()
+	if err != nil {
+		return err
 	}
 
 	var errs []error
