@@ -113,32 +113,14 @@ func (h *Host) initConsensusSubscription() error {
 // ProcessConsensusChange will be called by the consensus set every time there
 // is a change to the blockchain.
 func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
-	// ProcessConsensusChange spawns multiple threads which will wait until
-	// storage obligations are unlocked and then submit storage proofs to
-	// blockchain for those obligations. The ThreadGroup needs to wait for
-	// these threads to terminate. These threads also require a host lock,
-	//
-	// We use a local sync.WaitGroup to track the progress of these threads.
-	// Because these threads require a host lock, wg.Wait() should not be
-	// called until after the host lock has been released. And then tg.Done()
-	// should not be called until wg.Wait() returns.
-	//
-	// Because the host lock is released in a defer statement, wg.Wait() must
-	// be called in a defer statement that comes before the deferred
-	// h.mu.Unlock(). This is why the code for finishing the wait group is
-	// declared far above the place where threads are added to the wait group.
+	// Add is called at the beginning of the function, but Done cannot be
+	// called until all of the threads spawned by this function have also
+	// terminated. This function should not block while these threads wait to
+	// terminate.
 	err := h.tg.Add()
 	if err != nil {
 		return
 	}
-	wg := new(sync.WaitGroup)
-	defer func() {
-		wg.Wait()
-		h.tg.Done()
-	}()
-
-	// Host needs to unlock before wg.Wait() is called, so that the other
-	// threads may access the host lock.
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
@@ -313,7 +295,25 @@ func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 		h.log.Println(err)
 	}
 
-	// Handle the list of action items.
+	// Handle the list of action items. Action items require host locks and
+	// potentially require waiting for long periods of time while various
+	// network communications finish. To prevent the host lock from being held
+	// while the network I/O is blocking the action item execution, the action
+	// items are handled in their own thread. A wait group is used to prevent
+	// the host from releasing ThreadGroup control until all threads that this
+	// function have spawned have completed.
+	wg := new(sync.WaitGroup)
+	// The host should not release thread group control until all spawned
+	// threads have completed execution, though waiting for them should not
+	// block this function. The host should also not release thread group
+	// control until this function has terminated, hence the use of 'defer
+	// func() { go func() }' to coordinate waiting and done-ing.
+	defer func() {
+		go func() {
+			wg.Wait()
+			h.tg.Done()
+		}()
+	}()
 	for i := range actionItems {
 		// Add the action item to the wait group outside of the threaded call.
 		// The call to wg.Done() was established at the beginning of the
