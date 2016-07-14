@@ -245,18 +245,18 @@ func rentersetallowancecmd(amount, period string) {
 	fmt.Println("Allowance updated.")
 }
 
-// byHeight sorts contracts by their expiration, high to low. If two contracts
-// expire at the same height, they are sorted by their host's address.
-type byHeight []api.RenterContract
+// byValue sorts contracts by their value in siacoins, high to low. If two
+// contracts have the same value, they are sorted by their host's address.
+type byValue []api.RenterContract
 
-func (s byHeight) Len() int      { return len(s) }
-func (s byHeight) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s byHeight) Less(i, j int) bool {
-	hi, hj := s[i].EndHeight, s[j].EndHeight
-	if hi == hj {
+func (s byValue) Len() int      { return len(s) }
+func (s byValue) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s byValue) Less(i, j int) bool {
+	cmp := s[i].RenterFunds.Cmp(s[j].RenterFunds)
+	if cmp == 0 {
 		return s[i].NetAddress < s[j].NetAddress
 	}
-	return hi > hj
+	return cmp > 0
 }
 
 // rentercontractscmd is the handler for the comand `siac renter contracts`.
@@ -271,7 +271,7 @@ func rentercontractscmd() {
 		fmt.Println("No contracts have been formed.")
 		return
 	}
-	sort.Sort(byHeight(rc.Contracts))
+	sort.Sort(byValue(rc.Contracts))
 	fmt.Println("Contracts:")
 	w := tabwriter.NewWriter(os.Stdout, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Host\tValue\tData\tEnd Height\tID")
