@@ -84,9 +84,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// The storage obligation is received with a lock. Defer a call to unlock
 	// the storage obligation.
 	defer func() {
-		lockID := h.mu.Lock()
-		h.unlockStorageObligation(so.id())
-		h.mu.Unlock(lockID)
+		h.managedUnlockStorageObligation(so.id())
 	}()
 
 	// Perform the host settings exchange with the renter.

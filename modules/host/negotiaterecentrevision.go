@@ -26,22 +26,24 @@ var (
 // obligation and file contract revision will be loaded and returned.
 //
 // The storage obligation is returned under a storage obligation lock.
-func (h *Host) verifyChallengeResponse(fcid types.FileContractID, challenge crypto.Hash, challengeResponse crypto.Signature) (so storageObligation, recentRevision types.FileContractRevision, revisionSigs []types.TransactionSignature, err error) {
+func (h *Host) managedVerifyChallengeResponse(fcid types.FileContractID, challenge crypto.Hash, challengeResponse crypto.Signature) (so storageObligation, recentRevision types.FileContractRevision, revisionSigs []types.TransactionSignature, err error) {
 	// Grab a lock before it is possible to perform any operations on the
 	// storage obligation. Defer a call to unlock in the event of an error. If
 	// there is no error, the storage obligation will be returned with a lock.
-	err = h.tryLockStorageObligation(fcid)
+	err = h.managedTryLockStorageObligation(fcid)
 	if err != nil {
 		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 	defer func() {
 		if err != nil {
-			h.unlockStorageObligation(fcid)
+			h.managedUnlockStorageObligation(fcid)
 		}
 	}()
 
 	// Fetch the storage obligation, which has the revision, which has the
 	// renter's public key.
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
 	err = h.db.View(func(tx *bolt.Tx) error {
 		so, err = getStorageObligation(tx, fcid)
 		return err
@@ -115,18 +117,14 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	}
 	// Verify the response. In the process, fetch the related storage
 	// obligation, file contract revision, and transaction signatures.
-	lockID := h.mu.Lock()
-	so, recentRevision, revisionSigs, err := h.verifyChallengeResponse(fcid, challenge, challengeResponse)
-	h.mu.Unlock(lockID)
+	so, recentRevision, revisionSigs, err := h.managedVerifyChallengeResponse(fcid, challenge, challengeResponse)
 	if err != nil {
 		return types.FileContractID{}, storageObligation{}, modules.WriteNegotiationRejection(conn, err)
 	}
 	// Defer a call to unlock the storage obligation in the event of an error.
 	defer func() {
 		if err != nil {
-			lockID := h.mu.Lock()
-			h.unlockStorageObligation(fcid)
-			h.mu.Unlock(lockID)
+			h.managedUnlockStorageObligation(fcid)
 		}
 	}()
 

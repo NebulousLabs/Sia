@@ -149,9 +149,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		_, so, err = h.managedRPCRecentRevision(conn)
 		if err != nil {
 			defer func() {
-				lockID := h.mu.Lock()
-				h.unlockStorageObligation(so.id())
-				h.mu.Unlock(lockID)
+				h.managedUnlockStorageObligation(so.id())
 			}()
 		}
 	case modules.RPCSettings:

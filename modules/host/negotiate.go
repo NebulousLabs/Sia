@@ -104,9 +104,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	}
 
 	// Get a lock on the storage obligation.
-	lockID = h.mu.Lock()
-	lockErr := h.tryLockStorageObligation(so.id())
-	h.mu.Unlock(lockID)
+	lockErr := h.managedTryLockStorageObligation(so.id())
 	if lockErr != nil {
 		return nil, types.TransactionSignature{}, lockErr
 	}
@@ -117,7 +115,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// conflict, wait 30 seconds and try again.
 	err = func() error {
 		// Unlock the storage obligation when finished.
-		defer h.unlockStorageObligation(so.id())
+		defer h.managedUnlockStorageObligation(so.id())
 
 		// Try adding the storage obligation. If there's an error, wait a few
 		// seconds and try again. Eventually time out. It should be noted that

@@ -274,9 +274,7 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 	// The storage obligation is returned with a lock on it. Defer a call to
 	// unlock the storage obligation.
 	defer func() {
-		lockID := h.mu.Lock()
-		h.unlockStorageObligation(so.id())
-		h.mu.Unlock(lockID)
+		h.managedUnlockStorageObligation(so.id())
 	}()
 
 	// Perform a loop that will allow downloads to happen until the maximum

@@ -108,12 +108,12 @@ func TestBlankStorageObligation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.addStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Storage obligation should not be marked as having the transaction
 	// confirmed on the blockchain.
 	if so.OriginConfirmed {
@@ -193,12 +193,12 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.addStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Storage obligation should not be marked as having the transaction
 	// confirmed on the blockchain.
 	if so.OriginConfirmed {
@@ -235,12 +235,12 @@ func TestSingleSectorStorageObligationStack(t *testing.T) {
 			NewUnlockHash:         types.UnlockConditions{}.UnlockHash(),
 		}},
 	}}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.modifyStorageObligation(so, nil, []crypto.Hash{sectorRoot}, [][]byte{sectorData})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Submit the revision set to the transaction pool.
 	err = ht.tpool.AcceptTransactionSet(revisionSet)
 	if err != nil {
@@ -366,12 +366,12 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.addStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Storage obligation should not be marked as having the transaction
 	// confirmed on the blockchain.
 	if so.OriginConfirmed {
@@ -429,12 +429,12 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 			NewUnlockHash:         types.UnlockConditions{}.UnlockHash(),
 		}},
 	}}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.modifyStorageObligation(so, nil, []crypto.Hash{sectorRoot}, [][]byte{sectorData})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Submit the revision set to the transaction pool.
 	err = ht.tpool.AcceptTransactionSet(revisionSet)
 	if err != nil {
@@ -478,12 +478,12 @@ func TestMultiSectorStorageObligationStack(t *testing.T) {
 			NewUnlockHash:         types.UnlockConditions{}.UnlockHash(),
 		}},
 	}}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.modifyStorageObligation(so, nil, []crypto.Hash{sectorRoot2}, [][]byte{sectorData2})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Submit the revision set to the transaction pool.
 	err = ht.tpool.AcceptTransactionSet(revisionSet2)
 	if err != nil {
@@ -604,12 +604,12 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.addStorageObligation(so)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Storage obligation should not be marked as having the transaction
 	// confirmed on the blockchain.
 	if so.OriginConfirmed {
@@ -647,12 +647,12 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		}},
 	}}
 	so.RevisionTransactionSet = revisionSet
-	ht.host.lockStorageObligation(so.id())
+	ht.host.managedLockStorageObligation(so.id())
 	err = ht.host.modifyStorageObligation(so, nil, []crypto.Hash{sectorRoot}, [][]byte{sectorData})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.host.unlockStorageObligation(so.id())
+	ht.host.managedUnlockStorageObligation(so.id())
 	// Unlike the other tests, this test does not submit the file contract
 	// revision to the transaction pool for the host, the host is expected to
 	// do it automatically.

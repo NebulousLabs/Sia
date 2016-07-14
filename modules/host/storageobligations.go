@@ -587,19 +587,15 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 	defer wg.Done()
 
 	// Lock the storage obligation in question.
-	lockID := h.mu.Lock()
-	h.lockStorageObligation(soid)
-	h.mu.Unlock(lockID)
+	h.managedLockStorageObligation(soid)
 	defer func() {
-		lockID := h.mu.Lock()
-		h.unlockStorageObligation(soid)
-		h.mu.Unlock(lockID)
+		h.managedUnlockStorageObligation(soid)
 	}()
 
 	// Convert the storage obligation id into a storage obligation.
 	var err error
 	var so storageObligation
-	lockID = h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	err = h.db.View(func(tx *bolt.Tx) error {
 		so, err = getStorageObligation(tx, soid)
