@@ -15,7 +15,7 @@ import (
 // synchronizationCheck takes a bunch of server testers as input and checks
 // that they all have the same current block as the first server tester. The
 // first server tester needs to have the most recent block in order for the
-// test to work.
+// check to work.
 func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 	// Prefer returning an error in the event of a zero-length server tester -
 	// an error should be returned if the developer accidentally uses a nil
@@ -60,7 +60,6 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 // host must get a file contract to the blockchain despite not getting any of
 // the dependencies into the transaction pool from the flood network.
 func TestHostPoorConnectivity(t *testing.T) {
-	t.Skip("Necessary consensus functions unavailable")
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -188,6 +187,10 @@ func TestHostPoorConnectivity(t *testing.T) {
 		}
 		if !success {
 			t.Fatal("nodes do not seem to be synchronizing")
+		}
+		err := allTesters[i].cs.Flush()
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		// Mine a block for this node. The next iteration will wait for
