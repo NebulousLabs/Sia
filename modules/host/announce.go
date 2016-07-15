@@ -68,8 +68,8 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
 		return err
@@ -89,8 +89,8 @@ func (h *Host) Announce() error {
 // AnnounceAddress submits a host announcement to the blockchain to announce a
 // specific address. No checks for validity are performed on the address.
 func (h *Host) AnnounceAddress(addr modules.NetAddress) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
 		return err

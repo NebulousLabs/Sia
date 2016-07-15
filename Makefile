@@ -81,15 +81,15 @@ test:
 test-v:
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
-	go test -v -race -tags='testing debug' -timeout=600s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
 bench: clean fmt
-	go test -tags='testing' -timeout=600s -run=XXX -bench=. $(pkgs)
+	go test -tags='testing' -timeout=500s -run=XXX -bench=. $(pkgs)
 cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
 	@mkdir -p cover/modules/host
 	@for package in $(pkgs); do                                                                                     \
-		go test -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
@@ -98,7 +98,7 @@ cover-integration: clean
 	@mkdir -p cover/modules/renter
 	@mkdir -p cover/modules/host
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestIntegration -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestIntegration -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done
@@ -107,7 +107,7 @@ cover-unit: clean
 	@mkdir -p cover/modules/renter
 	@mkdir -p cover/modules/host
 	@for package in $(pkgs); do                                                                                     \
-		go test -run=TestUnit -tags='testing debug' -timeout=360s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -run=TestUnit -tags='testing debug' -timeout=500s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done

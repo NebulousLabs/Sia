@@ -153,7 +153,7 @@ var (
 			return time.Second * 60
 		}
 		if build.Release == "testing" {
-			return time.Second * 1
+			return time.Second * 3
 		}
 		panic("unrecognized release constant in host - obligationLockTimeout")
 	}()

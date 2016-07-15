@@ -127,11 +127,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	}
 
 	// Read some variables from the host for use later in the function.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	settings := h.settings
 	secretKey := h.secretKey
 	blockHeight := h.blockHeight
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 
 	// The renter is going to send its intended modifications, followed by the
 	// file contract revision that pays for them.
@@ -226,7 +226,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			}
 		}
 		newRevenue := storageRevenue.Add(bandwidthRevenue)
-		return verifyRevision(so, revision, blockHeight, newRevenue, newCollateral)
+		return verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral)
 	}()
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
@@ -253,7 +253,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	so.RiskedCollateral = so.RiskedCollateral.Add(newCollateral)
 	so.PotentialUploadRevenue = so.PotentialUploadRevenue.Add(bandwidthRevenue)
 	so.RevisionTransactionSet = []types.Transaction{txn}
-	err = h.modifyStorageObligation(so, sectorsRemoved, sectorsGained, gainedSectorData)
+	err = h.modifyStorageObligation(*so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
@@ -285,25 +285,17 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-
-	// Lock the storage obligation during the revision.
-	h.mu.Lock()
-	err = h.tryLockStorageObligation(so.id())
-	h.mu.Unlock()
-	if err != nil {
-		return err
-	}
+	// The storage obligation is received with a lock on it. Defer a call to
+	// unlock the storage obligation.
 	defer func() {
-		h.mu.Lock()
-		h.unlockStorageObligation(so.id())
-		h.mu.Unlock()
+		h.managedUnlockStorageObligation(so.id())
 	}()
 
 	// Begin the revision loop. The host will process revisions until a
 	// timeout is reached, or until the renter sends a StopResponse.
 	for timeoutReached := false; !timeoutReached; {
 		timeoutReached = time.Since(startTime) > iteratedConnectionTime
-		err := h.managedRevisionIteration(conn, so, timeoutReached)
+		err := h.managedRevisionIteration(conn, &so, timeoutReached)
 		if err == modules.ErrStopResponse {
 			return nil
 		} else if err != nil {
@@ -315,7 +307,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 
 // verifyRevision checks that the revision pays the host correctly, and that
 // the revision does not attempt any malicious or unexpected changes.
-func verifyRevision(so *storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, newRevenue, newCollateral types.Currency) error {
+func verifyRevision(so storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, newRevenue, newCollateral types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
 		return errInsaneFileContractRevisionOutputCounts

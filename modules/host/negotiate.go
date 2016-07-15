@@ -53,11 +53,11 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	}
 
 	// Verify that the signature for the revision from the renter is correct.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	hostSPK := h.publicKey
 	hostSK := h.secretKey
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	contractTxn := fullTxnSet[len(fullTxnSet)-1]
 	fc := contractTxn.FileContracts[0]
 	noOpRevision := types.FileContractRevision{
@@ -91,7 +91,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 
 	// Create and add the storage obligation for this file contract.
 	fullTxn, _ := builder.View()
-	so := &storageObligation{
+	so := storageObligation{
 		SectorRoots: initialSectorRoots,
 
 		ContractCost:            h.settings.MinContractPrice,
@@ -104,9 +104,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	}
 
 	// Get a lock on the storage obligation.
-	h.mu.Lock()
-	lockErr := h.tryLockStorageObligation(so.id())
-	h.mu.Unlock()
+	lockErr := h.managedTryLockStorageObligation(so.id())
 	if lockErr != nil {
 		return nil, types.TransactionSignature{}, lockErr
 	}
@@ -117,7 +115,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// conflict, wait 30 seconds and try again.
 	err = func() error {
 		// Unlock the storage obligation when finished.
-		defer h.unlockStorageObligation(so.id())
+		defer h.managedUnlockStorageObligation(so.id())
 
 		// Try adding the storage obligation. If there's an error, wait a few
 		// seconds and try again. Eventually time out. It should be noted that
@@ -129,9 +127,9 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		// just when the actual modification is happening.
 		i := 0
 		for {
-			h.mu.Lock()
+			lockID := h.mu.Lock()
 			err = h.addStorageObligation(so)
-			h.mu.Unlock()
+			h.mu.Unlock(lockID)
 			if err == nil {
 				return nil
 			}

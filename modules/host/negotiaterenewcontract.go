@@ -19,7 +19,7 @@ var (
 
 // renewBaseCollateral returns the base collateral on the storage in the file
 // contract, using the host's external settings and the starting file contract.
-func renewBaseCollateral(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
+func renewBaseCollateral(so storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
 	if fc.WindowEnd <= so.proofDeadline() {
 		return types.NewCurrency64(0)
 	}
@@ -29,7 +29,7 @@ func renewBaseCollateral(so *storageObligation, settings modules.HostExternalSet
 
 // renewBasePrice returns the base cost of the storage in the file contract,
 // using the host external settings and the starting file contract.
-func renewBasePrice(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
+func renewBasePrice(so storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
 	if fc.WindowEnd <= so.proofDeadline() {
 		return types.NewCurrency64(0)
 	}
@@ -40,13 +40,13 @@ func renewBasePrice(so *storageObligation, settings modules.HostExternalSettings
 // renewContractCollateral returns the amount of collateral that the host is
 // expected to add to the file contract based on the file contract and host
 // settings.
-func renewContractCollateral(so *storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
+func renewContractCollateral(so storageObligation, settings modules.HostExternalSettings, fc types.FileContract) types.Currency {
 	return fc.ValidProofOutputs[1].Value.Sub(settings.ContractPrice).Sub(renewBasePrice(so, settings, fc))
 }
 
 // managedAddRenewCollateral adds the host's collateral to the renewed file
 // contract.
-func (h *Host) managedAddRenewCollateral(so *storageObligation, settings modules.HostExternalSettings, txnSet []types.Transaction) (builder modules.TransactionBuilder, newParents []types.Transaction, newInputs []types.SiacoinInput, newOutputs []types.SiacoinOutput, err error) {
+func (h *Host) managedAddRenewCollateral(so storageObligation, settings modules.HostExternalSettings, txnSet []types.Transaction) (builder modules.TransactionBuilder, newParents []types.Transaction, newInputs []types.SiacoinInput, newOutputs []types.SiacoinOutput, err error) {
 	txn := txnSet[len(txnSet)-1]
 	parents := txnSet[:len(txnSet)-1]
 	fc := txn.FileContracts[0]
@@ -81,18 +81,10 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-
-	// Lock the storage obligation for the remainder of the connection.
-	h.mu.Lock()
-	err = h.tryLockStorageObligation(so.id())
-	h.mu.Unlock()
-	if err != nil {
-		return err
-	}
+	// The storage obligation is received with a lock. Defer a call to unlock
+	// the storage obligation.
 	defer func() {
-		h.mu.Lock()
-		h.unlockStorageObligation(so.id())
-		h.mu.Unlock()
+		h.managedUnlockStorageObligation(so.id())
 	}()
 
 	// Perform the host settings exchange with the renter.
@@ -126,9 +118,9 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 		return err
 	}
 
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	settings := h.externalSettings()
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 
 	// Verify that the transaction coming over the wire is a proper renewal.
 	err = h.managedVerifyRenewedContract(so, txnSet, renterPK)
@@ -186,12 +178,12 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// completed file contract.
 	//
 	// During finalization the signatures sent by the renter are all checked.
-	h.mu.RLock()
+	lockID = h.mu.RLock()
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 	renewCollateral := renewContractCollateral(so, settings, fc)
 	renewRevenue := renewBasePrice(so, settings, fc)
 	renewRisk := renewBaseCollateral(so, settings, fc)
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
@@ -211,7 +203,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 
 // managedVerifyRenewedContract checks that the contract renewal matches the
 // previous contract and makes all of the appropriate payments.
-func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []types.Transaction, renterPK crypto.PublicKey) error {
+func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types.Transaction, renterPK crypto.PublicKey) error {
 	// Check that the transaction set is not empty.
 	if len(txnSet) < 1 {
 		return errEmptyFileContractTransactionSet
@@ -221,14 +213,14 @@ func (h *Host) managedVerifyRenewedContract(so *storageObligation, txnSet []type
 		return errNoFileContract
 	}
 
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	externalSettings := h.externalSettings()
 	internalSettings := h.settings
 	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	publicKey := h.publicKey
 	unlockHash := h.unlockHash
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 
 	// The file size and merkle root must match the file size and merkle root

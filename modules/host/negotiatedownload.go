@@ -97,11 +97,11 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	}
 
 	// Grab a set of variables that will be useful later in the function.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	blockHeight := h.blockHeight
 	secretKey := h.secretKey
 	settings := h.settings
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 
 	// Read the download requests, followed by the file contract revision that
 	// pays for them.
@@ -176,7 +176,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		FileContractRevisions: []types.FileContractRevision{paymentRevision},
 		TransactionSignatures: []types.TransactionSignature{renterSignature, txn.TransactionSignatures[1]},
 	}}
-	err = h.modifyStorageObligation(so, nil, nil, nil)
+	err = h.modifyStorageObligation(*so, nil, nil, nil)
 	if err != nil {
 		return modules.WriteNegotiationRejection(conn, err)
 	}
@@ -271,24 +271,16 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-
-	// Lock the storage obligation during the revision.
-	h.mu.Lock()
-	err = h.tryLockStorageObligation(so.id())
-	h.mu.Unlock()
-	if err != nil {
-		return err
-	}
+	// The storage obligation is returned with a lock on it. Defer a call to
+	// unlock the storage obligation.
 	defer func() {
-		h.mu.Lock()
-		h.unlockStorageObligation(so.id())
-		h.mu.Unlock()
+		h.managedUnlockStorageObligation(so.id())
 	}()
 
 	// Perform a loop that will allow downloads to happen until the maximum
 	// time for a single connection has been reached.
 	for time.Now().Before(startTime.Add(iteratedConnectionTime)) {
-		err := h.managedDownloadIteration(conn, so)
+		err := h.managedDownloadIteration(conn, &so)
 		if err == modules.ErrStopResponse {
 			// The renter has indicated that it has finished downloading the
 			// data, therefore there is no error. Return nil.

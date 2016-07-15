@@ -64,10 +64,10 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 
 	var hes modules.HostExternalSettings
 	var secretKey crypto.SecretKey
-	h.mu.Lock()
+	lockID := h.mu.Lock()
 	h.revisionNumber++
 	secretKey = h.secretKey
 	hes = h.externalSettings()
-	h.mu.Unlock()
+	h.mu.Unlock(lockID)
 	return crypto.WriteSignedObject(conn, hes, secretKey)
 }

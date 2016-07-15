@@ -48,9 +48,9 @@ func (h *Host) managedLearnHostname() {
 	if build.Release == "testing" {
 		return
 	}
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	netAddr := h.settings.NetAddress
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	// If the settings indicate that an address has been manually set, there is
 	// no reason to learn the hostname.
 	if netAddr != "" {
@@ -71,8 +71,8 @@ func (h *Host) managedLearnHostname() {
 		return
 	}
 
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID = h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, h.port))
 	if err := autoAddress.IsValid(); err != nil {
 		h.log.Printf("WARN: discovered hostname %q is invalid: %v", autoAddress, err)
@@ -109,9 +109,9 @@ func (h *Host) managedLearnHostname() {
 func (h *Host) managedForwardPort() error {
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	port := h.port
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
@@ -137,9 +137,9 @@ func (h *Host) managedForwardPort() error {
 func (h *Host) managedClearPort() error {
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	port := h.port
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
