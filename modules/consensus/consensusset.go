@@ -228,6 +228,12 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 	return block
 }
 
+// Flush will block until the consensus set has finished all in-progress
+// routines.
+func (cs *ConsensusSet) Flush() error {
+	return cs.tg.Flush()
+}
+
 // Height returns the height of the consensus set.
 func (cs *ConsensusSet) Height() (height types.BlockHeight) {
 	_ = cs.db.View(func(tx *bolt.Tx) error {
