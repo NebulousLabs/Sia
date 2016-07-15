@@ -34,7 +34,7 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 	for i := range sts {
 		// Spin until the current block matches the leader block.
 		success := false
-		for j := 0; j < 50; j++ {
+		for j := 0; j < 100; j++ {
 			err = sts[i].getAPI("/consensus", &cg)
 			if err != nil {
 				return types.BlockID{}, err
@@ -43,7 +43,7 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 				success = true
 				break
 			}
-			time.Sleep(time.Millisecond * 50)
+			time.Sleep(time.Millisecond * 100)
 		}
 		if !success {
 			return types.BlockID{}, errors.New("synchronization check failed - nodes do not seem to be synchronized")
@@ -63,7 +63,6 @@ func TestHostPoorConnectivity(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Create the various nodes that will be forming the simulated ecosystem of
 	// this test.
@@ -174,7 +173,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 		// instead of creating orphans.
 		var cg ConsensusGET
 		success := false
-		for j := 0; j < 50; j++ {
+		for j := 0; j < 100; j++ {
 			err = allTesters[i].getAPI("/consensus", &cg)
 			if err != nil {
 				t.Fatal(err)
@@ -183,7 +182,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 				success = true
 				break
 			}
-			time.Sleep(time.Millisecond * 50)
+			time.Sleep(time.Millisecond * 100)
 		}
 		if !success {
 			t.Fatal("nodes do not seem to be synchronizing")
@@ -205,7 +204,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 	// Wait until the leader has the most recent block.
 	var cg ConsensusGET
 	success := false
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 100; i++ {
 		err = allTesters[0].getAPI("/consensus", &cg)
 		if err != nil {
 			t.Fatal(err)
@@ -214,7 +213,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 			success = true
 			break
 		}
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 100)
 	}
 	if !success {
 		t.Fatal("nodes do not seem to be synchronizing")
