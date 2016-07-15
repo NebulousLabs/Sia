@@ -26,8 +26,9 @@ type ThreadGroup struct {
 	afterStopFns []func()
 
 	once     sync.Once
-	mu       sync.Mutex
 	stopChan chan struct{}
+	bmu      sync.Mutex // Ensures blocking between calls to 'Add', 'Flush', and 'Stop'
+	mu       sync.Mutex // Protects the 'onStopFns' and 'afterStopFns' variable
 	wg       sync.WaitGroup
 }
 
@@ -49,8 +50,8 @@ func (tg *ThreadGroup) isStopped() bool {
 
 // Add increments the thread group counter.
 func (tg *ThreadGroup) Add() error {
-	tg.mu.Lock()
-	defer tg.mu.Unlock()
+	tg.bmu.Lock()
+	defer tg.bmu.Unlock()
 
 	if tg.isStopped() {
 		return ErrStopped
@@ -105,8 +106,8 @@ func (tg *ThreadGroup) Done() {
 // called 'tg.Done'. This in effect 'flushes' the module, letting it complete
 // any tasks that are open before taking on new ones.
 func (tg *ThreadGroup) Flush() error {
-	tg.mu.Lock()
-	defer tg.mu.Unlock()
+	tg.bmu.Lock()
+	defer tg.bmu.Unlock()
 
 	if tg.isStopped() {
 		return ErrStopped
@@ -121,27 +122,31 @@ func (tg *ThreadGroup) Flush() error {
 // order. After Stop is called, most actions will return ErrStopped.
 func (tg *ThreadGroup) Stop() error {
 	// Establish that Stop has been called.
-	tg.mu.Lock()
-	defer tg.mu.Unlock()
+	tg.bmu.Lock()
+	defer tg.bmu.Unlock()
 
 	if tg.isStopped() {
 		return ErrStopped
 	}
 	close(tg.stopChan)
 
+	tg.mu.Lock()
 	for i := len(tg.onStopFns) - 1; i >= 0; i-- {
 		tg.onStopFns[i]()
 	}
 	tg.onStopFns = nil
+	tg.mu.Unlock()
 
 	tg.wg.Wait()
 
 	// After waiting for all resources to release the thread group, iterate
 	// through the stop functions and call them in reverse oreder.
+	tg.mu.Lock()
 	for i := len(tg.afterStopFns) - 1; i >= 0; i-- {
 		tg.afterStopFns[i]()
 	}
 	tg.afterStopFns = nil
+	tg.mu.Unlock()
 	return nil
 }
 

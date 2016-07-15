@@ -416,6 +416,57 @@ func TestThreadGroupSiaExample(t *testing.T) {
 	}
 }
 
+// TestAddOnStop checks that you can safely call OnStop from under the
+// protection of an Add call.
+func TestAddOnStop(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	var tg ThreadGroup
+	var data int
+	addChan := make(chan struct{})
+	stopChan := make(chan struct{})
+	tg.OnStop(func() {
+		close(stopChan)
+	})
+	go func() {
+		err := tg.Add()
+		if err != nil {
+			t.Fatal(err)
+		}
+		close(addChan)
+
+		// Wait for the call to 'Stop' to be called in the parent thread, and
+		// then queue a bunch of 'OnStop' and 'AfterStop' functions before
+		// calling 'Done'.
+		<-stopChan
+		for i := 0; i < 10; i++ {
+			tg.OnStop(func() {
+				data++
+			})
+			tg.AfterStop(func() {
+				data++
+			})
+		}
+		tg.Done()
+	}()
+
+	// Wait for 'Add' to be called in the above thread, to guarantee that
+	// OnStop and AfterStop will be called after 'Add' and 'Stop' have been
+	// called together.
+	<-addChan
+	err := tg.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if data != 20 {
+		t.Error("20 calls were made to increment data, but value is", data)
+	}
+}
+
 // BenchmarkThreadGroup times how long it takes to add a ton of threads and
 // trigger goroutines that call Done.
 func BenchmarkThreadGroup(b *testing.B) {
