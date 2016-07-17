@@ -29,14 +29,9 @@ func handlerName(name string) (id rpcID) {
 	return
 }
 
-// RPC calls an RPC on the given address. RPC cannot be called on an address
-// that the Gateway is not connected to.
-func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	if err := g.threads.Add(); err != nil {
-		return err
-	}
-	defer g.threads.Done()
-
+// managedRPC calls an RPC on the given address. managedRPC cannot be called on
+// an address that the Gateway is not connected to.
+func (g *Gateway) managedRPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
 	g.mu.RLock()
 	peer, ok := g.peers[addr]
 	g.mu.RUnlock()
@@ -56,6 +51,16 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	}
 	// call fn
 	return fn(conn)
+}
+
+// RPC calls an RPC on the given address. RPC cannot be called on an address
+// that the Gateway is not connected to.
+func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+	return g.managedRPC(addr, name, fn)
 }
 
 // RegisterRPC registers an RPCFunc as a handler for a given identifier. To
@@ -208,7 +213,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 		wg.Add(1)
 		go func(addr modules.NetAddress) {
 			defer wg.Done()
-			err := g.RPC(addr, name, fn)
+			err := g.managedRPC(addr, name, fn)
 			if err != nil {
 				g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed (attempting again in 10 seconds): %v", name, addr, err)
 				// try one more time before giving up
