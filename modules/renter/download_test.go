@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // a testFetcher simulates a host. It implements the fetcher interface.
@@ -135,4 +138,49 @@ func TestErasureDownload(t *testing.T) {
 		t.Log("Optimal fetches:", i*uint64(rsc.MinPieces()))
 		t.Log("Total fetches:  ", totFetch)
 	*/
+}
+
+type downloadContractor struct {
+	stubContractor
+	downloaders int
+}
+
+func (dc *downloadContractor) Contract(modules.NetAddress) (modules.RenterContract, bool) {
+	return modules.RenterContract{}, true
+}
+
+// Downloader increments dc.downloaders and returns a generic error.
+func (dc *downloadContractor) Downloader(modules.RenterContract) (contractor.Downloader, error) {
+	dc.downloaders++
+	return nil, errInsufficientContracts
+}
+
+// TestDownloadContracts tests that Download is properly creating Downloaders
+// for each contract.
+func TestDownloadContracts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	var hc downloadContractor
+	rt, err := newContractorTester("TestDownloadContracts", nil, &hc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add a fake file
+	rsc, _ := NewRSCode(1, 1)
+	f := newFile("foo", rsc, 0, 0)
+	const nContracts = 10
+	for i := byte(0); i < nContracts; i++ {
+		f.contracts[types.FileContractID{i}] = fileContract{}
+	}
+	id := rt.renter.mu.Lock()
+	rt.renter.files["foo"] = f
+	rt.renter.mu.Unlock(id)
+
+	rt.renter.Download("foo", "")
+	if hc.downloaders != nContracts {
+		t.Fatalf("expected Downloader to be called %v times, got %v", nContracts, hc.downloaders)
+	}
 }
