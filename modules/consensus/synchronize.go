@@ -393,11 +393,13 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	cs.mu.RUnlock()
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
+		wg.Add(1)
 		go func() {
 			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
+			wg.Done()
 		}()
 		return nil
 	} else if err != nil {
