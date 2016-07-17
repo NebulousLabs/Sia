@@ -358,7 +358,7 @@ func hostannouncecmd(cmd *cobra.Command, args []string) {
 	case 1:
 		err = post("/host/announce", "netaddress="+args[0])
 	default:
-		cmd.UsageFunc()
+		cmd.UsageFunc()(cmd)
 		os.Exit(exitCodeUsage)
 	}
 	if err != nil {
