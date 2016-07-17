@@ -1125,7 +1125,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Give time for on connect RPCs to finish.
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Test that broadcasting an invalid block header over RelayHeader on cst1.cs
 	// does not result in cst2.cs.gateway receiving a broadcast.
@@ -1133,7 +1133,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 	select {
 	case <-mg.broadcastCalled:
 		t.Fatal("RelayHeader broadcasted an invalid block header")
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 	}
 
 	// Test that broadcasting a valid block header over RelayHeader on cst1.cs
@@ -1152,7 +1152,7 @@ func TestIntegrationBroadcastRelayHeader(t *testing.T) {
 		// Broadcast is called twice, once to broadcast blocks to peers <= v0.5.1
 		// and once to broadcast block headers to peers > v0.5.1.
 		<-mg.broadcastCalled
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 		t.Fatal("RelayHeader didn't broadcast a valid block header")
 	}
 }
