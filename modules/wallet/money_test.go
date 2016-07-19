@@ -122,7 +122,7 @@ func TestIntegrationSpendHalfHalf(t *testing.T) {
 		t.Error("unexpected error: ", err)
 	}
 	_, err = wt.wallet.SendSiacoins(halfPlus, types.UnlockHash{1})
-	if err != modules.ErrPotentialDoubleSpend {
+	if err != modules.ErrIncompleteTransactions {
 		t.Error("wallet appears to be reusing outputs when building transactions: ", err)
 	}
 }
