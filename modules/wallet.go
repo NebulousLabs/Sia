@@ -38,7 +38,7 @@ var (
 
 	// ErrIncompleteTransactions is returned if the wallet has incomplete
 	// transactions being built that are using all of the current outputs, and
-	// therefore the wallet is unable to spend money despite it not techincally
+	// therefore the wallet is unable to spend money despite it not technically
 	// being 'unconfirmed' yet.
 	ErrIncompleteTransactions = errors.New("wallet has coins spent in incomplete transactions - not enough remaining coins")
 
