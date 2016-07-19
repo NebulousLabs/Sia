@@ -1,11 +1,34 @@
 package wallet
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// addBlockNoPayout adds a block to the wallet tester that does not have any
+// payouts.
+func (wt *walletTester) addBlockNoPayout() error {
+	block, target, err := wt.miner.BlockForWork()
+	if err != nil {
+		return err
+	}
+	// Clear the miner payout so that the wallet is not getting additional
+	// outputs from these blocks.
+	for i := range block.MinerPayouts {
+		block.MinerPayouts[i].UnlockHash = types.UnlockHash{}
+	}
+
+	// Solve and submit the block.
+	solvedBlock, _ := wt.miner.SolveBlock(block, target)
+	err = wt.cs.AcceptBlock(solvedBlock)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 // TestViewAdded checks that 'ViewAdded' returns sane-seeming values when
 // indicating which elements have been added automatically to a transaction
@@ -139,5 +162,290 @@ func TestDoubleSignError(t *testing.T) {
 	err = wt.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestConcurrentBuilders checks that multiple transaction builders can safely
+// be opened at the same time, and that they will make valid transactions when
+// building concurrently.
+func TestConcurrentBuilders(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester("TestConcurrentBuilders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Mine a few more blocks so that the wallet has lots of outputs to pick
+	// from.
+	for i := 0; i < 5; i++ {
+		_, err := wt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Get a baseline balance for the wallet.
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
+	if !startingOutgoing.IsZero() {
+		t.Fatal(startingOutgoing)
+	}
+	if !startingIncoming.IsZero() {
+		t.Fatal(startingIncoming)
+	}
+
+	// Create two builders at the same time, then add money to each.
+	builder1 := wt.wallet.StartTransaction()
+	builder2 := wt.wallet.StartTransaction()
+	// Fund each builder with a siacoin output that is smaller than all of the
+	// outputs that the wallet should currently have.
+	funding := types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
+	err = builder1.FundSiacoins(funding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = builder2.FundSiacoins(funding)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get a second reading on the wallet's balance.
+	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	if startingSCConfirmed.Cmp(fundedSCConfirmed) != 0 {
+		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
+	}
+
+	// Spend the transaction funds on miner fees and the void output.
+	builder1.AddMinerFee(types.NewCurrency64(25).Mul(types.SiacoinPrecision))
+	builder2.AddMinerFee(types.NewCurrency64(25).Mul(types.SiacoinPrecision))
+	// Send the money to the void.
+	output := types.SiacoinOutput{Value: types.NewCurrency64(9975).Mul(types.SiacoinPrecision)}
+	builder1.AddSiacoinOutput(output)
+	builder2.AddSiacoinOutput(output)
+
+	// Sign the transactions and verify that both are valid.
+	tset1, err := builder1.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tset2, err := builder2.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(tset1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(tset2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block to get the transaction sets into the blockchain.
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestConcurrentBuildersSingleOutput probes the behavior when multiple
+// builders are created at the same time, but there is only a single wallet
+// output that they end up needing to share.
+func TestConcurrentBuildersSingleOutput(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester("TestConcurrentBuildersSingleOutput")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Mine MaturityDelay blocks on the wallet using blocks that don't give
+	// miner payouts to the wallet, so that all outputs can be condensed into a
+	// single confirmed output. Currently the wallet will be getting a new
+	// output per block because it has mined some blocks that haven't had their
+	// outputs matured.
+	for i := types.BlockHeight(0); i < types.MaturityDelay+1; i++ {
+		err = wt.addBlockNoPayout()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Send all coins to a single confirmed output for the wallet.
+	unlockConditions, err := wt.wallet.NextAddress()
+	scBal, _, _ := wt.wallet.ConfirmedBalance()
+	// Use a custom builder so that there is no transaction fee.
+	builder := wt.wallet.StartTransaction()
+	err = builder.FundSiacoins(scBal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := types.SiacoinOutput{
+		Value:      scBal,
+		UnlockHash: unlockConditions.UnlockHash(),
+	}
+	builder.AddSiacoinOutput(output)
+	tSet, err := builder.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(tSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Get the transaction into the blockchain without giving a miner payout to
+	// the wallet.
+	err = wt.addBlockNoPayout()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that there is only one output in the wallet.
+	if len(wt.wallet.siacoinOutputs) != 1 {
+		t.Fatal("wallet is supposed to have only one output", wt.wallet.siacoinOutputs)
+	}
+
+	// Get a baseline balance for the wallet.
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
+	if !startingOutgoing.IsZero() {
+		t.Fatal(startingOutgoing)
+	}
+	if !startingIncoming.IsZero() {
+		t.Fatal(startingIncoming)
+	}
+
+	// Create two builders at the same time, then add money to each.
+	builder1 := wt.wallet.StartTransaction()
+	builder2 := wt.wallet.StartTransaction()
+	// Fund each builder with a siacoin output.
+	funding := types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
+	err = builder1.FundSiacoins(funding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This add should fail, blocking the builder from completion.
+	err = builder2.FundSiacoins(funding)
+	if err != modules.ErrIncompleteTransactions {
+		t.Fatal(err)
+	}
+
+	// Get a second reading on the wallet's balance.
+	fundedSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	if startingSCConfirmed.Cmp(fundedSCConfirmed) != 0 {
+		t.Fatal("confirmed siacoin balance changed when no blocks have been mined", startingSCConfirmed, fundedSCConfirmed)
+	}
+
+	// Spend the transaction funds on miner fees and the void output.
+	builder1.AddMinerFee(types.NewCurrency64(25).Mul(types.SiacoinPrecision))
+	// Send the money to the void.
+	output = types.SiacoinOutput{Value: types.NewCurrency64(9975).Mul(types.SiacoinPrecision)}
+	builder1.AddSiacoinOutput(output)
+
+	// Sign the transaction and submit it.
+	tset1, err := builder1.Sign(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet(tset1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine a block to get the transaction sets into the blockchain.
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestParallelBuilders checks that multiple transaction builders can safely be
+// opened at the same time, and that they will make valid transactions when
+// building concurrently, using multiple gothreads to manage the builders.
+func TestParallelBuilders(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester("TestParallelBuilders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// Mine a few more blocks so that the wallet has lots of outputs to pick
+	// from.
+	outputsDesired := 10
+	for i := 0; i < outputsDesired; i++ {
+		_, err := wt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Add MatruityDelay blocks with no payout to make tracking the balance
+	// easier.
+	for i := types.BlockHeight(0); i < types.MaturityDelay+1; i++ {
+		err = wt.addBlockNoPayout()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Get a baseline balance for the wallet.
+	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
+	if !startingOutgoing.IsZero() {
+		t.Fatal(startingOutgoing)
+	}
+	if !startingIncoming.IsZero() {
+		t.Fatal(startingIncoming)
+	}
+
+	// Create several builders in parallel.
+	var wg sync.WaitGroup
+	funding := types.NewCurrency64(10e3).Mul(types.SiacoinPrecision)
+	for i := 0; i < outputsDesired; i++ {
+		wg.Add(1)
+		go func() {
+			// Create the builder and fund the transaction.
+			builder := wt.wallet.StartTransaction()
+			err = builder.FundSiacoins(funding)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Spend the transaction funds on miner fees and the void output.
+			builder.AddMinerFee(types.NewCurrency64(25).Mul(types.SiacoinPrecision))
+			output := types.SiacoinOutput{Value: types.NewCurrency64(9975).Mul(types.SiacoinPrecision)}
+			builder.AddSiacoinOutput(output)
+			// Sign the transactions and verify that both are valid.
+			tset, err := builder.Sign(true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = wt.tpool.AcceptTransactionSet(tset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	// Mine a block to get the transaction sets into the blockchain.
+	err = wt.addBlockNoPayout()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the final balance.
+	endingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
+	expected := startingSCConfirmed.Sub(funding.Mul(types.NewCurrency64(uint64(outputsDesired))))
+	if expected.Cmp(endingSCConfirmed) != 0 {
+		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)
 	}
 }
