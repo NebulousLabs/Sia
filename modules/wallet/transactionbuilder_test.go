@@ -413,7 +413,7 @@ func TestParallelBuilders(t *testing.T) {
 		go func() {
 			// Create the builder and fund the transaction.
 			builder := wt.wallet.StartTransaction()
-			err = builder.FundSiacoins(funding)
+			err := builder.FundSiacoins(funding)
 			if err != nil {
 				t.Fatal(err)
 			}
