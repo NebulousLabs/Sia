@@ -535,7 +535,7 @@ func (st *serverTester) stdGetAPIUA(call string, userAgent string) error {
 		return err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	resp, err := new(http.Client).Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}

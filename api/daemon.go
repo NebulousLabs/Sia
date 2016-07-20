@@ -104,7 +104,7 @@ func fetchLatestRelease() (githubRelease, error) {
 		return githubRelease{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	resp, err := new(http.Client).Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return githubRelease{}, err
 	}
