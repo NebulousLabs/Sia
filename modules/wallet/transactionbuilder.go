@@ -155,7 +155,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 		}
 	}
 	if potentialFund.Cmp(amount) >= 0 && fund.Cmp(amount) < 0 {
-		return modules.ErrPotentialDoubleSpend
+		return modules.ErrIncompleteTransactions
 	}
 	if fund.Cmp(amount) < 0 {
 		return modules.ErrLowBalance
@@ -266,7 +266,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		}
 	}
 	if potentialFund.Cmp(amount) >= 0 && fund.Cmp(amount) < 0 {
-		return modules.ErrPotentialDoubleSpend
+		return modules.ErrIncompleteTransactions
 	}
 	if fund.Cmp(amount) < 0 {
 		return modules.ErrLowBalance

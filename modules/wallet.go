@@ -36,9 +36,11 @@ var (
 	// complete the desired action.
 	ErrLowBalance = errors.New("insufficient balance")
 
-	// ErrPotentialDoubleSpend is returned when the wallet is uncertain whether
-	// a spend is going to be legal or not.
-	ErrPotentialDoubleSpend = errors.New("wallet has coins spent in unconfirmed transactions - not enough remaining coins to complete transaction")
+	// ErrIncompleteTransactions is returned if the wallet has incomplete
+	// transactions being built that are using all of the current outputs, and
+	// therefore the wallet is unable to spend money despite it not technically
+	// being 'unconfirmed' yet.
+	ErrIncompleteTransactions = errors.New("wallet has coins spent in incomplete transactions - not enough remaining coins")
 
 	// ErrLockedWallet is returned when an action cannot be performed due to
 	// the wallet being locked.
