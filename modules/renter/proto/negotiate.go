@@ -19,12 +19,9 @@ func extendDeadline(conn net.Conn, d time.Duration) { _ = conn.SetDeadline(time.
 // the host's settings confirms that the values are acceptable, and writes an acceptance.
 func startRevision(conn net.Conn, host modules.HostDBEntry) error {
 	// verify the host's settings and confirm its identity
-	recvSettings, err := verifySettings(conn, host)
+	_, err := verifySettings(conn, host)
 	if err != nil {
 		return err
-	} else if !recvSettings.AcceptingContracts {
-		// no need to reject; host will already have disconnected at this point
-		return errors.New("host is not accepting contracts")
 	}
 	return modules.WriteNegotiationAcceptance(conn)
 }
