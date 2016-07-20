@@ -42,7 +42,7 @@ func HttpGET(url string) (resp *http.Response, err error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Sia-Agent")
-	return new(http.Client).Do(req)
+	return http.DefaultClient.Do(req)
 }
 
 // HttpGETAuthenticated is a utility function for making authenticated http get
@@ -55,7 +55,7 @@ func HttpGETAuthenticated(url string, password string) (resp *http.Response, err
 	}
 	req.Header.Set("User-Agent", "Sia-Agent")
 	req.SetBasicAuth("", password)
-	return new(http.Client).Do(req)
+	return http.DefaultClient.Do(req)
 }
 
 // HttpPOST is a utility function for making post requests to sia with a
@@ -67,7 +67,7 @@ func HttpPOST(url string, data string) (resp *http.Response, err error) {
 	}
 	req.Header.Set("User-Agent", "Sia-Agent")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return new(http.Client).Do(req)
+	return http.DefaultClient.Do(req)
 }
 
 // HttpPOSTAuthenticated is a utility function for making authenticated http
@@ -81,7 +81,7 @@ func HttpPOSTAuthenticated(url string, data string, password string) (resp *http
 	req.Header.Set("User-Agent", "Sia-Agent")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth("", password)
-	return new(http.Client).Do(req)
+	return http.DefaultClient.Do(req)
 }
 
 // requireUserAgent is middleware that requires all requests to set a
