@@ -54,6 +54,7 @@ func (h *Host) managedAddRenewCollateral(so storageObligation, settings modules.
 	builder = h.wallet.RegisterTransaction(txn, parents)
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
+		h.log.Debugln("Could not add renew collateral:", err)
 		builder.Drop()
 		return nil, nil, nil, nil, err
 	}
@@ -79,6 +80,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// revised.
 	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
+		h.log.Debugln("Recent revision failed during RPCRenew:", err)
 		return err
 	}
 	// The storage obligation is received with a lock. Defer a call to unlock
@@ -90,6 +92,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// Perform the host settings exchange with the renter.
 	err = h.managedRPCSettings(conn)
 	if err != nil {
+		h.log.Debugln("RPCSettings failed during renew:", err)
 		return err
 	}
 
@@ -99,6 +102,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// The renter will either accept or reject the host's settings.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Acceptance failed:", err)
 		return err
 	}
 	// If the renter sends an acceptance of the settings, it will be followed
@@ -111,10 +115,12 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	var renterPK crypto.PublicKey
 	err = encoding.ReadObject(conn, &txnSet, modules.NegotiateMaxFileContractSetLen)
 	if err != nil {
+		h.log.Debugln("Could not read renter transaction set:", err)
 		return err
 	}
 	err = encoding.ReadObject(conn, &renterPK, modules.NegotiateMaxSiaPubkeySize)
 	if err != nil {
+		h.log.Debugln("Cound not read renter public key:", err)
 		return err
 	}
 
@@ -125,28 +131,34 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// Verify that the transaction coming over the wire is a proper renewal.
 	err = h.managedVerifyRenewedContract(so, txnSet, renterPK)
 	if err != nil {
+		h.log.Debugln("Renewal verification failed", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddRenewCollateral(so, settings, txnSet)
 	if err != nil {
+		h.log.Debugln("Renewal collateral failed:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	// The host indicates acceptance, then sends the new parents, inputs, and
 	// outputs to the transaction.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Writing acceptance failed:", err)
 		return err
 	}
 	err = encoding.WriteObject(conn, newParents)
 	if err != nil {
+		h.log.Debugln("Could not write parents:", err)
 		return err
 	}
 	err = encoding.WriteObject(conn, newInputs)
 	if err != nil {
+		h.log.Debugln("Could not write inputs:", err)
 		return err
 	}
 	err = encoding.WriteObject(conn, newOutputs)
 	if err != nil {
+		h.log.Debugln("Could not write outputs:", err)
 		return err
 	}
 
@@ -157,16 +169,19 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// new file contract.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Acceptance failed:", err)
 		return err
 	}
 	var renterTxnSignatures []types.TransactionSignature
 	var renterRevisionSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterTxnSignatures, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
+		h.log.Debugln("Could not read renter transaction signatures:", err)
 		return err
 	}
 	err = encoding.ReadObject(conn, &renterRevisionSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
+		h.log.Debugln("Could not read renter revision signatures:", err)
 		return err
 	}
 
@@ -186,19 +201,27 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	h.mu.RUnlock(lockID)
 	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk)
 	if err != nil {
+		h.log.Debugln("Could not finalize contract:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Could not write acceptance:", err)
 		return err
 	}
 	// The host sends the transaction signatures to the renter, followed by the
 	// revision signature. Negotiation is complete.
 	err = encoding.WriteObject(conn, hostTxnSignatures)
 	if err != nil {
+		h.log.Debugln("Could not write host transaction signatures:", err)
 		return err
 	}
-	return encoding.WriteObject(conn, hostRevisionSignature)
+	err = encoding.WriteObject(conn, hostRevisionSignature)
+	if err != nil {
+		h.log.Debugln("Could not write host revision signatures:", err)
+		return err
+	}
+	return nil
 }
 
 // managedVerifyRenewedContract checks that the contract renewal matches the

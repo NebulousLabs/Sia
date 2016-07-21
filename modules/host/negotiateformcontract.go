@@ -101,6 +101,7 @@ func (h *Host) managedAddCollateral(settings modules.HostInternalSettings, txnSe
 	builder = h.wallet.RegisterTransaction(txn, parents)
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
+		h.log.Debugln("Unable to fund transaction when trying to add collateral")
 		builder.Drop()
 		return nil, nil, nil, nil, err
 	}
@@ -128,6 +129,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// Send the host settings to the renter.
 	err := h.managedRPCSettings(conn)
 	if err != nil {
+		h.log.Debugln("RPCSettings call failed during form contract:", err)
 		return err
 	}
 	// If the host is not accepting contracts, the connection can be closed.
@@ -137,6 +139,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	settings := h.settings
 	h.mu.RUnlock(lockID)
 	if !settings.AcceptingContracts {
+		h.log.Debugln("Turning down contract because the host is not accepting contracts.")
 		return nil
 	}
 
@@ -146,6 +149,7 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// The renter will either accept or reject the host's settings.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Negotiation error during form contract:", err)
 		return err
 	}
 	// If the renter sends an acceptance of the settings, it will be followed
@@ -158,10 +162,12 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	var renterPK crypto.PublicKey
 	err = encoding.ReadObject(conn, &txnSet, modules.NegotiateMaxFileContractSetLen)
 	if err != nil {
+		h.log.Debugln("Could not read transaction set from renter:", err)
 		return err
 	}
 	err = encoding.ReadObject(conn, &renterPK, modules.NegotiateMaxSiaPubkeySize)
 	if err != nil {
+		h.log.Debugln("Cound not read public key from renter:", err)
 		return err
 	}
 
@@ -171,29 +177,35 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
+		h.log.Debugln("Could not verify new contract:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	// The host adds collateral to the transaction.
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddCollateral(settings, txnSet)
 	if err != nil {
+		h.log.Debugln("Could not add collateral:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	// The host indicates acceptance, and then sends any new parent
 	// transactions, inputs and outputs that were added to the transaction.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Count not write acceptance:", err)
 		return err
 	}
 	err = encoding.WriteObject(conn, newParents)
 	if err != nil {
+		h.log.Debugln("Could not write parents:", err)
 		return err
 	}
 	err = encoding.WriteObject(conn, newInputs)
 	if err != nil {
+		h.log.Debugln("Count not write inputs:", err)
 		return err
 	}
 	err = encoding.WriteObject(conn, newOutputs)
 	if err != nil {
+		h.log.Debugln("Could not write outputs:", err)
 		return err
 	}
 
@@ -203,16 +215,19 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	// siganture, to sign a no-op file contract revision.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Acceptance failure", err)
 		return err
 	}
 	var renterTxnSignatures []types.TransactionSignature
 	var renterRevisionSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterTxnSignatures, modules.NegotiateMaxTransactionSignaturesSize)
 	if err != nil {
+		h.log.Debugln("Count not read renter's transaction signatures:", err)
 		return err
 	}
 	err = encoding.ReadObject(conn, &renterRevisionSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
+		h.log.Debugln("Count not read renter's revision signatures:", err)
 		return err
 	}
 
@@ -232,19 +247,27 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
+		h.log.Debugln("Contract finalization failed:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Acceptance failed:", err)
 		return err
 	}
 	// The host sends the transaction signatures to the renter, followed by the
 	// revision signature. Negotiation is complete.
 	err = encoding.WriteObject(conn, hostTxnSignatures)
 	if err != nil {
+		h.log.Debugln("Could not write host transaction signatures:", err)
 		return err
 	}
-	return encoding.WriteObject(conn, hostRevisionSignature)
+	err = encoding.WriteObject(conn, hostRevisionSignature)
+	if err != nil {
+		h.log.Debugln("Could not write host revision signatures:", err)
+		return err
+	}
+	return nil
 }
 
 // managedVerifyNewContract checks that an incoming file contract matches the host's

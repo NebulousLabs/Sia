@@ -112,6 +112,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// exists.
 	err := h.managedRPCSettings(conn)
 	if err != nil {
+		h.log.Debugln("Settings call failed during revision:", err)
 		return err
 	}
 
@@ -123,6 +124,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// wishes to terminate the revision loop.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Renter acceptance failed:", err)
 		return err
 	}
 
@@ -139,10 +141,12 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	var revision types.FileContractRevision
 	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
 	if err != nil {
+		h.log.Debugln("Could not read contract modifications:", err)
 		return err
 	}
 	err = encoding.ReadObject(conn, &revision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
+		h.log.Debugln("Could not read revision:", err)
 		return err
 	}
 
@@ -229,11 +233,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 		return verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral)
 	}()
 	if err != nil {
+		h.log.Debugln("Could not apply modification:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 	// Revision is acceptable, write an acceptance string.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
+		h.log.Debugln("Could not write acceptance:", err)
 		return err
 	}
 
@@ -241,11 +247,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	var renterSig types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSig, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
+		h.log.Debugln("Could not read renter transaction signatures:", err)
 		return err
 	}
 	// Verify that the signature is valid and get the host's signature.
 	txn, err := createRevisionSignature(revision, renterSig, secretKey, blockHeight)
 	if err != nil {
+		h.log.Debugln("Could not create revision signatures:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 
@@ -255,6 +263,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	so.RevisionTransactionSet = []types.Transaction{txn}
 	err = h.modifyStorageObligation(*so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
+		h.log.Debugln("error modifying obligation:", err)
 		return modules.WriteNegotiationRejection(conn, err)
 	}
 
@@ -268,9 +277,15 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 		err = modules.WriteNegotiationAcceptance(conn)
 	}
 	if err != nil {
+		h.log.Debugln("Iteration signalling failed:", err)
 		return err
 	}
-	return encoding.WriteObject(conn, txn.TransactionSignatures[1])
+	err = encoding.WriteObject(conn, txn.TransactionSignatures[1])
+	if err != nil {
+		h.log.Debugln("Could not write revision signatures:", err)
+		return err
+	}
+	return nil
 }
 
 // managedRPCReviseContract accepts a request to revise an existing contract.
