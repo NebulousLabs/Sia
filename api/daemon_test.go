@@ -39,15 +39,31 @@ func TestUpdate(t *testing.T) {
 
 	var update UpdateInfo
 	if err = st.getAPI("/daemon/update", &update); err != nil {
-		// Notify tester that the API call failed, but allow testing to continue.
-		// Otherwise you have to be online to run tests.
+		// Skip test if the GitHub API call fails, since this seems to be a bug
+		// with Travis Darwin.
 		if strings.HasSuffix(err.Error(), errEmptyUpdateResponse.Error()) {
 			t.Skip(err)
 		}
+		// Skip test if testing machine is offline.
+		if strings.HasSuffix(err.Error(), "no such host") {
+			t.Skipf("skipping since testing machine appears to be offline; call to /daemon/update failed with error %v", err)
+		}
 		t.Fatal(err)
 	}
-	if update.Available && build.Version == update.Version {
-		t.Fatal("daemon should not have an update available")
+	// The /daemon/update call should report that the version is up to date and
+	// no update is available.
+	if update.Version != build.Version {
+		// It would be especially worrisome if the call were to report that the
+		// version was not up to date but no update was available.
+		if !update.Available {
+			t.Fatal("the /daemon/update API call is reporting a version that is not up to date but says no update is available")
+		}
+		t.Fatal("the /daemon/update API call is reporting that the daemon needs an update")
+	}
+	// It's also particularly concerning if the version is up to date but an
+	// update is somehow available.
+	if update.Available {
+		t.Fatal("the /daemon/update API call is reporting an up to date version but says an update is available")
 	}
 }
 
