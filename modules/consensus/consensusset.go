@@ -147,9 +147,6 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
 		cs.tg.OnStop(func() {
-			cs.mu.Lock()
-			defer cs.mu.Unlock()
-
 			cs.gateway.UnregisterRPC("SendBlocks")
 			cs.gateway.UnregisterRPC("RelayBlock")
 			cs.gateway.UnregisterRPC("RelayHeader")
@@ -204,6 +201,12 @@ func (cs *ConsensusSet) Close() error {
 	if err != nil {
 		return err
 	}
+
+	// Shouldn't be necessary when `Stop` call is complete, but currently
+	// `Stop` will not pause all ongoing processes, meaning a lock is needed
+	// during the rest of shutdown.
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	var errs []error
 	if err := cs.db.Close(); err != nil {
