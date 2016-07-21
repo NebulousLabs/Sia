@@ -33,7 +33,7 @@ func verifyAPISecurity(config Config) error {
 	// --disable-api-security flag has been used.
 	if !config.Siad.AllowAPIBind {
 		addr := modules.NetAddress(config.Siad.APIaddr)
-		if !addr.IsLoopback() && addr.Host() != "" {
+		if !addr.IsLoopback() {
 			return errors.New("you must pass --disable-api-security to bind Siad to a non-localhost address")
 		}
 		return nil
