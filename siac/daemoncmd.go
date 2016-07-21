@@ -50,6 +50,7 @@ func updatecmd() {
 	}
 	if !update.Available {
 		fmt.Println("Already up to date.")
+		return
 	}
 
 	err = post("/daemon/update", "")
