@@ -24,6 +24,27 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+// TestUpdate checks that /daemon/update correctly asserts that an update is
+// not available for the daemon (since the test build is always up to date).
+func TestUpdate(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestUpdate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	var update UpdateInfo
+	if err = st.getAPI("/daemon/update", &update); err != nil {
+		t.Fatal(err)
+	}
+	if update.Available && build.Version == update.Version {
+		t.Fatal("daemon should not have an update available")
+	}
+}
+
 /*
 // TODO: enable this test again once proper daemon shutdown is implemented (shutting down modules and listener separately).
 // TestStop tests the /daemon/stop handler.
