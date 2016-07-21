@@ -57,7 +57,7 @@ type UpdateInfo struct {
 	Version   string `json:"version"`
 }
 
-// githubRelease represents of the JSON returned by the GitHub release API
+// githubRelease represents some of the JSON returned by the GitHub release API
 // endpoint. Only the fields relevant to updating are included.
 type githubRelease struct {
 	TagName string `json:"tag_name"`
