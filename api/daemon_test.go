@@ -1,6 +1,7 @@
 package api
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -38,6 +39,11 @@ func TestUpdate(t *testing.T) {
 
 	var update UpdateInfo
 	if err = st.getAPI("/daemon/update", &update); err != nil {
+		// Notify tester that the API call failed, but allow testing to continue.
+		// Otherwise you have to be online to run tests.
+		if strings.HasSuffix(err.Error(), errEmptyUpdateResponse.Error()) {
+			t.Skip(err)
+		}
 		t.Fatal(err)
 	}
 	if update.Available && build.Version == update.Version {
