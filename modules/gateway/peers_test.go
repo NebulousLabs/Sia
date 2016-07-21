@@ -232,9 +232,10 @@ func TestConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	// g should have the node
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	g.mu.RLock()
 	if _, ok := g.nodes[dummyNode]; !ok {
+		g.mu.RUnlock() // Needed to prevent a deadlock if this error condition is reached.
 		t.Fatal("bootstrapper should have received dummyNode:", g.nodes)
 	}
 	g.mu.RUnlock()
