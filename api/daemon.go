@@ -22,6 +22,8 @@ import (
 	"github.com/kardianos/osext"
 )
 
+var errEmptyUpdateResponse = errors.New("API call to https://api.github.com/repos/NebulousLabs/Sia/releases/latest is returning an empty response")
+
 // SiaConstants is a struct listing all of the constants in use.
 type SiaConstants struct {
 	GenesisTimestamp      types.Timestamp   `json:"genesistimestamp"`
@@ -113,6 +115,9 @@ func fetchLatestRelease() (githubRelease, error) {
 	err = json.NewDecoder(resp.Body).Decode(&release)
 	if err != nil {
 		return githubRelease{}, err
+	}
+	if release.TagName == "" && len(release.Assets) == 0 {
+		return githubRelease{}, errEmptyUpdateResponse
 	}
 	return release, nil
 }
