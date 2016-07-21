@@ -76,12 +76,12 @@ func TestUnitProcessConfig(t *testing.T) {
 		expectedOutputs [][]string
 	}{
 		inputs: [][]string{
-			{"9980", "9981", "9982", "cghmrtwe"},
-			{":9980", ":9981", ":9982", "CGHMRTWE"},
+			{"localhost:9980", "localhost:9981", "localhost:9982", "cghmrtwe"},
+			{"localhost:9980", "localhost:9981", "localhost:9982", "CGHMRTWE"},
 		},
 		expectedOutputs: [][]string{
-			{":9980", ":9981", ":9982", "cghmrtwe"},
-			{":9980", ":9981", ":9982", "cghmrtwe"},
+			{"localhost:9980", "localhost:9981", "localhost:9982", "cghmrtwe"},
+			{"localhost:9980", "localhost:9981", "localhost:9982", "cghmrtwe"},
 		},
 	}
 	var config Config
@@ -126,12 +126,12 @@ func TestVerifyAPISecurity(t *testing.T) {
 		t.Error("loopback + securityOn was rejected")
 	}
 
-	// Check that the blank address is accepted when security is enabled.
+	// Check that the blank address is rejected when security is enabled.
 	var securityOnBlank Config
 	securityOnBlank.Siad.APIaddr = ":9980"
 	err = verifyAPISecurity(securityOnBlank)
-	if err != nil {
-		t.Error("blank + securityOn was rejected")
+	if err == nil {
+		t.Error("blank + securityOn was accepted")
 	}
 
 	// Check that a public hostname is rejected when security is enabled.
