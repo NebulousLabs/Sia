@@ -1010,11 +1010,8 @@ Wallet
 | [/wallet/transactions/:addr](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                      | POST      |
 
-The first time that the wallet is ever created, the wallet will be unencrypted
-and locked. The wallet must be initialized and encrypted using a call to 
-/wallet/init. After encrypting the wallet, the wallet must be unlocked. From 
-that point forward (including restarting siad), the wallet will be encrypted,
-and only the call to /wallet/unlock will be needed.
+For examples and detailed descriptions of request and response parameters,
+refer to [Wallet.md](/doc/api/Wallet.md).
 
 #### /wallet [GET]
 
