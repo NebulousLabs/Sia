@@ -1,4 +1,4 @@
-Sia 1.0.0
+Sia 1.0.1
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -128,6 +128,13 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+July 2016:
+
+v1.0.1 (patch release)
+- Restricted API address to localhost
+- Fixed renter/host desynchronization
+- Fixed host silently refusing new contracts
 
 June 2016:
 

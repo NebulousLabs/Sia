@@ -68,7 +68,7 @@ release-std:
 # Cross Compile - makes binaries for windows, linux, and mac, 64 bit only.
 xc: dependencies test test-long
 	goxc -arch="amd64" -bc="darwin linux windows" -d=release \
-	     -pv=v1.0.0 -include=LICENSE,README.md,doc/API.md \
+	     -pv=v1.0.1 -include=LICENSE,README.md,doc/API.md \
 	     -tasks-=archive,rmbin,deb,deb-dev,deb-source,go-test -n=Sia
 
 # clean removes all directories that get automatically created during
