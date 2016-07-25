@@ -3,6 +3,7 @@ package consensus
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -343,7 +344,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	}
 
 	// Submit the block to the consensus set and broadcast it.
-	err = cs.AcceptBlock(b)
+	err = cs.managedAcceptBlock(b)
 	if err == errOrphan {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
@@ -358,14 +359,27 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	cs.managedBroadcastBlock(b)
 	return nil
 }
 
-// rpcRelayHeader is an RPC that accepts a block header from a peer.
-func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
+// threadedRPCRelayHeader is an RPC that accepts a block header from a peer.
+func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	wg := new(sync.WaitGroup)
+	defer func() {
+		go func() {
+			wg.Wait()
+			cs.tg.Done()
+		}()
+	}()
+
 	// Decode the block header from the connection.
 	var h types.BlockHeader
-	err := encoding.ReadObject(conn, &h, types.BlockHeaderSize)
+	err = encoding.ReadObject(conn, &h, types.BlockHeaderSize)
 	if err != nil {
 		return err
 	}
@@ -379,23 +393,30 @@ func (cs *ConsensusSet) rpcRelayHeader(conn modules.PeerConn) error {
 	cs.mu.RUnlock()
 	if err == errOrphan {
 		// If the header is an orphan, try to find the parents.
+		wg.Add(1)
 		go func() {
 			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
+			wg.Done()
 		}()
 		return nil
 	} else if err != nil {
 		return err
 	}
-	// If the header is valid and extends the heaviest chain, fetch, accept it,
-	// and broadcast it.
+
+	// If the header is valid and extends the heaviest chain, fetch the
+	// corresponding block. Call needs to be made in a separate goroutine
+	// because an exported call to the gateway is used, which is a deadlock
+	// risk given that rpcRelayHeader is called from the gateway.
+	wg.Add(1)
 	go func() {
-		err := cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+		err = cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.threadedReceiveBlock(h.ID()))
 		if err != nil {
 			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
 		}
+		wg.Done()
 	}()
 	return nil
 }
@@ -431,13 +452,13 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	return nil
 }
 
-// threadedReceiveBlock takes a block id and returns an RPCFunc that requests
-// that block and then calls AcceptBlock on it. The returned function should be
-// used as the calling end of the SendBlk RPC. Note that although the function
+// threadedReceiveBlock takes a block id and returns an RPCFunc that requests that
+// block and then calls AcceptBlock on it. The returned function should be used
+// as the calling end of the SendBlk RPC. Note that although the function
 // itself does not do any locking, it is still prefixed with "threaded" because
 // the function it returns calls the exported method AcceptBlock.
 func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
-	managedFN := func(conn modules.PeerConn) error {
+	return func(conn modules.PeerConn) error {
 		if err := encoding.WriteObject(conn, id); err != nil {
 			return err
 		}
@@ -445,12 +466,12 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 		if err := encoding.ReadObject(conn, &block, types.BlockSizeLimit); err != nil {
 			return err
 		}
-		if err := cs.AcceptBlock(block); err != nil {
+		if err := cs.managedAcceptBlock(block); err != nil {
 			return err
 		}
+		cs.managedBroadcastBlock(block)
 		return nil
 	}
-	return managedFN
 }
 
 // threadedInitialBlockchainDownload performs the IBD on outbound peers. Blocks

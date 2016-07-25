@@ -1070,7 +1070,7 @@ func TestRelayHeader(t *testing.T) {
 		go func() {
 			errChan <- encoding.WriteObject(p1, tt.header)
 		}()
-		err = cst.cs.rpcRelayHeader(mockP2)
+		err = cst.cs.threadedRPCRelayHeader(mockP2)
 		if err != tt.errWant {
 			t.Errorf("%s: expected '%v', got '%v'", tt.errMSG, tt.errWant, err)
 		}

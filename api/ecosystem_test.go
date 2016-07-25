@@ -15,7 +15,7 @@ import (
 // synchronizationCheck takes a bunch of server testers as input and checks
 // that they all have the same current block as the first server tester. The
 // first server tester needs to have the most recent block in order for the
-// test to work.
+// check to work.
 func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 	// Prefer returning an error in the event of a zero-length server tester -
 	// an error should be returned if the developer accidentally uses a nil
@@ -34,7 +34,7 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 	for i := range sts {
 		// Spin until the current block matches the leader block.
 		success := false
-		for j := 0; j < 50; j++ {
+		for j := 0; j < 100; j++ {
 			err = sts[i].getAPI("/consensus", &cg)
 			if err != nil {
 				return types.BlockID{}, err
@@ -43,7 +43,7 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 				success = true
 				break
 			}
-			time.Sleep(time.Millisecond * 50)
+			time.Sleep(time.Millisecond * 100)
 		}
 		if !success {
 			return types.BlockID{}, errors.New("synchronization check failed - nodes do not seem to be synchronized")
@@ -60,11 +60,9 @@ func synchronizationCheck(sts []*serverTester) (types.BlockID, error) {
 // host must get a file contract to the blockchain despite not getting any of
 // the dependencies into the transaction pool from the flood network.
 func TestHostPoorConnectivity(t *testing.T) {
-	t.Skip("Necessary consensus functions unavailable")
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Create the various nodes that will be forming the simulated ecosystem of
 	// this test.
@@ -175,7 +173,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 		// instead of creating orphans.
 		var cg ConsensusGET
 		success := false
-		for j := 0; j < 50; j++ {
+		for j := 0; j < 100; j++ {
 			err = allTesters[i].getAPI("/consensus", &cg)
 			if err != nil {
 				t.Fatal(err)
@@ -184,10 +182,14 @@ func TestHostPoorConnectivity(t *testing.T) {
 				success = true
 				break
 			}
-			time.Sleep(time.Millisecond * 50)
+			time.Sleep(time.Millisecond * 100)
 		}
 		if !success {
 			t.Fatal("nodes do not seem to be synchronizing")
+		}
+		err := allTesters[i].cs.Flush()
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		// Mine a block for this node. The next iteration will wait for
@@ -202,7 +204,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 	// Wait until the leader has the most recent block.
 	var cg ConsensusGET
 	success := false
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 100; i++ {
 		err = allTesters[0].getAPI("/consensus", &cg)
 		if err != nil {
 			t.Fatal(err)
@@ -211,7 +213,7 @@ func TestHostPoorConnectivity(t *testing.T) {
 			success = true
 			break
 		}
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 100)
 	}
 	if !success {
 		t.Fatal("nodes do not seem to be synchronizing")

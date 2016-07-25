@@ -14,6 +14,7 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -81,6 +82,7 @@ type ConsensusSet struct {
 	log        *persist.Logger
 	mu         demotemutex.DemoteMutex
 	persistDir string
+	tg         sync.ThreadGroup
 }
 
 // New returns a new ConsensusSet, containing at least the genesis block. If
@@ -141,9 +143,16 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		// Register RPCs
 		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)
 		gateway.RegisterRPC("RelayBlock", cs.rpcRelayBlock) // COMPATv0.5.1
-		gateway.RegisterRPC("RelayHeader", cs.rpcRelayHeader)
+		gateway.RegisterRPC("RelayHeader", cs.threadedRPCRelayHeader)
 		gateway.RegisterRPC("SendBlk", cs.rpcSendBlk)
 		gateway.RegisterConnectCall("SendBlocks", cs.threadedReceiveBlocks)
+		cs.tg.OnStop(func() {
+			cs.gateway.UnregisterRPC("SendBlocks")
+			cs.gateway.UnregisterRPC("RelayBlock")
+			cs.gateway.UnregisterRPC("RelayHeader")
+			cs.gateway.UnregisterRPC("SendBlk")
+			cs.gateway.UnregisterConnectCall("SendBlocks")
+		})
 
 		// Mark that we are synced with the network.
 		cs.mu.Lock()
@@ -188,16 +197,16 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
+	err := cs.tg.Stop()
+	if err != nil {
+		return err
+	}
+
+	// Shouldn't be necessary when `Stop` call is complete, but currently
+	// `Stop` will not pause all ongoing processes, meaning a lock is needed
+	// during the rest of shutdown.
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-
-	if cs.synced {
-		cs.gateway.UnregisterRPC("SendBlocks")
-		cs.gateway.UnregisterRPC("RelayBlock") // COMPATv0.5.1
-		cs.gateway.UnregisterRPC("RelayHeader")
-		cs.gateway.UnregisterRPC("SendBlk")
-		cs.gateway.UnregisterConnectCall("SendBlocks")
-	}
 
 	var errs []error
 	if err := cs.db.Close(); err != nil {
@@ -220,6 +229,12 @@ func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
 		return nil
 	})
 	return block
+}
+
+// Flush will block until the consensus set has finished all in-progress
+// routines.
+func (cs *ConsensusSet) Flush() error {
+	return cs.tg.Flush()
 }
 
 // Height returns the height of the consensus set.
