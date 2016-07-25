@@ -991,24 +991,24 @@ Response: standard.
 Wallet
 ------
 
-Queries:
-
-* /wallet                      [GET]
-* /wallet/033x                 [POST]
-* /wallet/address              [GET]
-* /wallet/addresses            [GET]
-* /wallet/backup               [GET]
-* /wallet/init                 [POST]
-* /wallet/lock                 [POST]
-* /wallet/seed                 [POST]
-* /wallet/seeds                [GET]
-* /wallet/siacoins             [POST]
-* /wallet/siafunds             [POST]
-* /wallet/siagkey              [POST]
-* /wallet/transaction/{id}     [GET]
-* /wallet/transactions         [GET]
-* /wallet/transactions/{addr}  [GET]
-* /wallet/unlock               [POST]
+| Route                                                     | HTTP verb |
+| --------------------------------------------------------- | --------- |
+| [/wallet](#wallet-get)                                    | GET       |
+| [/wallet/033x](#wallet033x-post)                          | POST      |
+| [/wallet/address](#walletaddress-get)                     | GET       |
+| [/wallet/addresses](#walletaddresses-get)                 | GET       |
+| [/wallet/backup](#walletbackup-get)                       | GET       |
+| [/wallet/init](#walletinit-post)                          | POST      |
+| [/wallet/lock](#walletlock-post)                          | POST      |
+| [/wallet/seed](#walletseed-post)                          | POST      |
+| [/wallet/seeds](#walletseeds-get)                         | GET       |
+| [/wallet/siacoins](#walletsiacoins-post)                  | POST      |
+| [/wallet/siafunds](#walletsiafunds-post)                  | POST      |
+| [/wallet/siagkey](#walletsiagkey-post)                    | POST      |
+| [/wallet/transaction/:id](#wallettransactionid-get)       | GET       |
+| [/wallet/transactions](#wallettransactions-get)           | GET       |
+| [/wallet/transactions/:addr](#wallettransactionsaddr-get) | GET       |
+| [/wallet/unlock](#walletunlock-post)                      | POST      |
 
 The first time that the wallet is ever created, the wallet will be unencrypted
 and locked. The wallet must be initialized and encrypted using a call to 
@@ -1312,7 +1312,7 @@ Parameters: none
 
 Response: standard.
 
-#### /wallet/transaction/{id} [GET]
+#### /wallet/transaction/:id [GET]
 
 Function: Get the transaction associated with a specific transaction id.
 
@@ -1446,7 +1446,7 @@ height 'startheight' and height 'endheight' (inclusive).
 
 'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
-#### /wallet/transactions/{addr} [GET]
+#### /wallet/transactions/:addr [GET]
 
 Function: Return all of the transaction related to a specific address.
 
