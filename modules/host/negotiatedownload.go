@@ -95,7 +95,8 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		return nil
 	}()
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error not reported to preserve type in extendErr
+		return extendErr("download request rejected: ", err)
 	}
 	// Revision is acceptable, write acceptance.
 	err = modules.WriteNegotiationAcceptance(conn)
@@ -170,7 +171,7 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 	}
 	// The new revenue goes into the void outputs.
 	if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) < 0 {
-		return errHighVoidOutput
+		return errLowVoidOutput
 	}
 	// Check that the revision count has increased.
 	if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {

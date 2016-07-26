@@ -133,10 +133,10 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	switch id {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		err = h.managedRPCDownload(conn)
+		err = extendErr("incoming RPCDownload failed: ", h.managedRPCDownload(conn))
 	case modules.RPCRenewContract:
 		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		err = h.managedRPCRenewContract(conn)
+		err = extendErr("incoming RPCRenewContract failed: ", h.managedRPCRenewContract(conn))
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)
 		err = h.managedRPCFormContract(conn)

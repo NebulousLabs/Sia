@@ -9,6 +9,105 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	// errBadFileMerkleRoot is returned if the renter incorrectly updates the
+	// file merkle root during a file contract revision.
+	errBadFileMerkleRoot = ErrorCommunication("rejected for bad file merkle root")
+
+	// errBadFileSize is returned if the renter incorrectly download and
+	// changes the file size during a file contract revision.
+	errBadFileSize = ErrorCommunication("rejected for bad file size")
+
+	// errBadRevisionNumber number is returned if the renter incorrectly
+	// download and does not increase the revision number during a file
+	// contract revision.
+	errBadRevisionNumber = ErrorCommunication("rejected for bad revision number")
+
+	// errBadContractOutputCounts is returned if the presented file contract
+	// revision has the wrong number of outputs for either the valid or the
+	// missed proof outputs.
+	errBadContractOutputCounts = ErrorCommunication("rejected for having an unexpected number of outputs")
+
+	// errBadParentID is returned if the renter incorrectly download and
+	// provides the wrong parent id during a file contract revision.
+	errBadParentID = ErrorCommunication("rejected for bad parent id")
+
+	// errBadPayoutUnlockHashes is returned if the renter incorrectly sets the
+	// payout unlock hashes during contract formation.
+	errBadPayoutUnlockHashes = ErrorCommunication("rejected for bad unlock hashes in the payout")
+
+	// errBadUnlockConditions is returned if the renter incorrectly download
+	// and does not provide the right unlock conditions in the payment
+	// revision.
+	errBadUnlockConditions = ErrorCommunication("rejected for bad unlock conditions")
+
+	// errBadUnlockHash is returned if the renter incorrectly updates the
+	// unlock hash during a file contract revision.
+	errBadUnlockHash = ErrorCommunication("rejected for bad new unlock hash")
+
+	// errBadWindowEnd is returned if the renter incorrectly download and
+	// changes the window end during a file contract revision.
+	errBadWindowEnd = ErrorCommunication("rejected for bad new window end")
+
+	// errBadWindowStart is returned if the renter incorrectly updates the
+	// window start during a file contract revision.
+	errBadWindowStart = ErrorCommunication("rejected for bad new window start")
+
+	// errEarlyWindow is returned if the file contract provided by the renter
+	// has a storage proof window that is starting too near in the future.
+	errEarlyWindow = ErrorCommunication("rejected for a window that starts too soon")
+
+	// errEmptyObject is returned if the renter sends an empty or nil object
+	// unexpectedly.
+	errEmptyObject = ErrorCommunication("renter has unexpectedly send an empty/nil object")
+
+	// errHighRenterMissedOutput is returned if the renter incorrectly download
+	// and deducts an insufficient amount from the renter missed outputs during
+	// a file contract revision.
+	errHighRenterMissedOutput = ErrorCommunication("rejected for high paying renter missed output")
+
+	// errHighRenterValidOutput is returned if the renter incorrectly download
+	// and deducts an insufficient amount from the renter valid outputs during
+	// a file contract revision.
+	errHighRenterValidOutput = ErrorCommunication("rejected for high paying renter valid output")
+
+	// errLowVoidOutput is returned if the renter has not allocated enough
+	// funds to the void output.
+	errLowVoidOutput = ErrorCommunication("rejected for low value void output")
+
+	// errLateRevision is returned if the renter is attempting to revise a
+	// revision after the revision deadline. The host needs time to submit the
+	// final revision to the blockchain to guarantee payment, and therefore
+	// will not accept revisions once the window start is too close.
+	errLateRevision = ErrorCommunication("renter is requesting revision after the revision deadline")
+
+	// errLongDuration is returned if the renter proposes a file contract with
+	// an experation that is too far into the future according to the host's
+	// settings.
+	errLongDuration = ErrorCommunication("renter proposed a file contract with a too-long duration")
+
+	// errLowTransactionFees is returned if the renter provides a transaction
+	// that the host does not feel is able to make it onto the blockchain.
+	errLowTransactionFees = ErrorCommunication("rejected for including too few transaction fees")
+
+	// errLowHostMissedOutput is returned if the renter incorrectly updates the
+	// host missed proof output during a file contract revision.
+	errLowHostMissedOutput = ErrorCommunication("rejected for low paying host missed output")
+
+	// errLowHostValidOutput is returned if the renter incorrectly updates the
+	// host valid proof output during a file contract revision.
+	errLowHostValidOutput = ErrorCommunication("rejected for low paying host valid output")
+
+	// errMismatchedHostPayouts is returned if the renter incorrectly sets the
+	// host valid and missed payouts to different values during contract
+	// formation.
+	errMismatchedHostPayouts = ErrorCommunication("rejected because host valid and missed payouts are not the same value")
+
+	// errSmallWindow is returned if the renter suggests a storage proof window
+	// that is too small.
+	errSmallWindow = ErrorCommunication("rejected for small window size")
+)
+
 // createRevisionSignature creates a signature for a file contract revision
 // that signs on the file contract revision. The renter should have already
 // provided the signature. createRevisionSignature will check to make sure that

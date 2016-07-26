@@ -13,76 +13,6 @@ import (
 	"sync/atomic"
 )
 
-var (
-	// errBadFileMerkleRoot is returned if the renter incorrectly updates the
-	// file merkle root during a file contract revision.
-	errBadFileMerkleRoot = ErrorCommunication("rejected for bad file merkle root")
-
-	// errBadFileSize is returned if the renter incorrectly download and
-	// changes the file size during a file contract revision.
-	errBadFileSize = ErrorCommunication("rejected for bad file size")
-
-	// errBadRevisionNumber number is returned if the renter incorrectly
-	// download and does not increase the revision number during a file
-	// contract revision.
-	errBadRevisionNumber = ErrorCommunication("rejected for bad revision number")
-
-	// errBadContractOutputCounts is returned if the presented file contract
-	// revision has the wrong number of outputs for either the valid or the
-	// missed proof outputs.
-	errBadContractOutputCounts = ErrorCommunication("rejected for having an unexpected number of outputs")
-
-	// errBadParentID is returned if the renter incorrectly download and
-	// provides the wrong parent id during a file contract revision.
-	errBadParentID = ErrorCommunication("rejected for bad parent id")
-
-	// errBadUnlockConditions is returned if the renter incorrectly download
-	// and does not provide the right unlock conditions in the payment
-	// revision.
-	errBadUnlockConditions = ErrorCommunication("rejected for bad unlock conditions")
-
-	// errBadUnlockHash is returned if the renter incorrectly updates the
-	// unlock hash during a file contract revision.
-	errBadUnlockHash = ErrorCommunication("rejected for bad new unlock hash")
-
-	// errBadWindowEnd is returned if the renter incorrectly download and
-	// changes the window end during a file contract revision.
-	errBadWindowEnd = ErrorCommunication("rejected for bad new window end")
-
-	// errBadWindowStart is returned if the renter incorrectly updates the
-	// window start during a file contract revision.
-	errBadWindowStart = ErrorCommunication("rejected for bad new window start")
-
-	// errHighRenterMissedOutput is returned if the renter incorrectly download
-	// and deducts an insufficient amount from the renter missed outputs during
-	// a file contract revision.
-	errHighRenterMissedOutput = ErrorCommunication("rejected for high paying renter missed output")
-
-	// errHighRenterValidOutput is returned if the renter incorrectly download
-	// and deducts an insufficient amount from the renter valid outputs during
-	// a file contract revision.
-	errHighRenterValidOutput = ErrorCommunication("rejected for high paying renter valid output")
-
-	// errHighVoidOutput is returned if the renter incorrectly download and
-	// does not add sufficient payment to the void outputs in the payment
-	// revision.
-	errHighVoidOutput = ErrorCommunication("rejected for low value void output")
-
-	// errLateRevision is returned if the renter is attempting to revise a
-	// revision after the revision deadline. The host needs time to submit the
-	// final revision to the blockchain to guarantee payment, and therefore
-	// will not accept revisions once the window start is too close.
-	errLateRevision = ErrorCommunication("renter is requesting revision after the revision deadline")
-
-	// errLowHostMissedOutput is returned if the renter incorrectly updates the
-	// host missed proof output during a file contract revision.
-	errLowHostMissedOutput = ErrorCommunication("rejected for low paying host missed output")
-
-	// errLowHostValidOutput is returned if the renter incorrectly updates the
-	// host valid proof output during a file contract revision.
-	errLowHostValidOutput = ErrorCommunication("rejected for low paying host valid output")
-)
-
 type (
 	// ErrorCommunication errors are meant to be returned if the host and the
 	// renter seem to be miscommunicating. For example, if the renter attempts
@@ -130,8 +60,13 @@ func composeErrors(errs ...error) error {
 
 // extendErr will return an error that is the same type as the input error, but
 // prefixed with the provided context. This only works for the error types
-// defined in the host package.
+// defined in the host package. If the input error is nil, the extension is
+// ignored and nil will be returned.
 func extendErr(s string, err error) error {
+	if err == nil {
+		return nil
+	}
+
 	switch err.(type) {
 	case ErrorCommunication:
 		return ErrorCommunication(s + err.Error())

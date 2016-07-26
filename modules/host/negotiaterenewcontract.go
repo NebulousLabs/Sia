@@ -1,5 +1,7 @@
 package host
 
+// TODO: START HERE - ADVANCED ERROR LOGGING IN RENEW.
+
 import (
 	"errors"
 	"net"
@@ -229,11 +231,11 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types.Transaction, renterPK crypto.PublicKey) error {
 	// Check that the transaction set is not empty.
 	if len(txnSet) < 1 {
-		return errEmptyFileContractTransactionSet
+		return extendErr("zero-length transaction set: ", errEmptyObject)
 	}
 	// Check that the transaction set has a file contract.
 	if len(txnSet[len(txnSet)-1].FileContracts) < 1 {
-		return errNoFileContract
+		return extendErr("transaction without file contract: ", errEmptyObject)
 	}
 
 	lockID := h.mu.RLock()
@@ -257,11 +259,11 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	// The WindowStart must be at least revisionSubmissionBuffer blocks into
 	// the future.
 	if fc.WindowStart <= blockHeight+revisionSubmissionBuffer {
-		return errWindowStartTooSoon
+		return errEarlyWindow
 	}
 	// WindowEnd must be at least settings.WindowSize blocks after WindowStart.
 	if fc.WindowEnd < fc.WindowStart+externalSettings.WindowSize {
-		return errWindowSizeTooSmall
+		return errSmallWindow
 	}
 
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
@@ -273,7 +275,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	// must match the host's unlock hash. The third missed output should point
 	// to the void.
 	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[2].UnlockHash != (types.UnlockHash{}) {
-		return errBadPayoutsUnlockHashes
+		return errBadPayoutUnlockHashes
 	}
 
 	// Check that the collateral does not exceed the maximum amount of
@@ -288,21 +290,20 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 		return errCollateralBudgetExceeded
 	}
 	// Check that the missed proof outputs contain enough money, and that the
-	// void output contains enough money. Before calculating the expected
-	// value, check that the subtraction won't cause a negative currency.
+	// void output contains enough money.
 	basePrice := renewBasePrice(so, externalSettings, fc)
 	baseCollateral := renewBaseCollateral(so, externalSettings, fc)
 	if fc.ValidProofOutputs[1].Value.Cmp(basePrice.Add(baseCollateral)) < 0 {
-		return errBadPayoutsAmounts
+		return errLowHostValidOutput
 	}
 	expectedHostMissedOutput := fc.ValidProofOutputs[1].Value.Sub(basePrice).Sub(baseCollateral)
-	if fc.MissedProofOutputs[1].Value.Cmp(expectedHostMissedOutput) != 0 {
-		return errBadPayoutsAmounts
+	if fc.MissedProofOutputs[1].Value.Cmp(expectedHostMissedOutput) < 0 {
+		return errLowHostMissedOutput
 	}
 	// Check that the void output has the correct value.
 	expectedVoidOutput := basePrice.Add(baseCollateral)
-	if fc.MissedProofOutputs[2].Value.Cmp(expectedVoidOutput) != 0 {
-		return errBadPayoutsAmounts
+	if fc.MissedProofOutputs[2].Value.Cmp(expectedVoidOutput) > 0 {
+		return errLowVoidOutput
 	}
 
 	// The unlock hash for the file contract must match the unlock hash that
@@ -326,7 +327,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	setFee := modules.CalculateFee(txnSet)
 	minFee, _ := h.tpool.FeeEstimation()
 	if setFee.Cmp(minFee) < 0 {
-		return errLowFees
+		return errLowTransactionFees
 	}
 	return nil
 }

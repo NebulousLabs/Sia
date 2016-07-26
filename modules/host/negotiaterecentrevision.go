@@ -114,7 +114,7 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	var challengeResponse crypto.Signature
 	err = encoding.ReadObject(conn, &challengeResponse, uint64(len(challengeResponse)))
 	if err != nil {
-		return types.FileContractID{}, storageObligation{}, extendErr("count not read challenge response: ", ErrorConnection(err.Error()))
+		return types.FileContractID{}, storageObligation{}, extendErr("could not read challenge response: ", ErrorConnection(err.Error()))
 	}
 	// Verify the response. In the process, fetch the related storage
 	// obligation, file contract revision, and transaction signatures.
