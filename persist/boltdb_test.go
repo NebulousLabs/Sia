@@ -44,19 +44,16 @@ var (
 		{Metadata{"\n\n", "Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ ̖t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"}, Metadata{"\n\n", "Ṱ̺̺o͞ ̷i̲̬n̝̗v̟̜o̶̙kè͚̮ t̝͕h̼͓e͇̣ ̢̼h͚͎i̦̲v̻͍e̺̭-m̢iͅn̖̺d̵̼ ̞̥r̛̗e͙p͠r̼̞e̺̠s̘͇e͉̥ǹ̬͎t͍̬i̪̱n͠g̴͉ ͏͉c̬̟h͡a̫̻o̫̟s̗̦.̨̹"}, ErrBadVersion},
 	}
 	testFilenames = []string{
-		" ",
 		"_",
 		"-",
 		"1234sg",
 		"@#$%@#",
-		"¯|_(ツ)_|¯",
 		"你好好q wgc好",
 		"\xF0\x9F\x99\x8A",
 		"␣",
 		" ",
 		"$HOME",
 		",.;'[]-=",
-		"A:",
 		"%s",
 	}
 )
