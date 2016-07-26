@@ -10,6 +10,16 @@ import (
 )
 
 var (
+	// errBadContractOutputCounts is returned if the presented file contract
+	// revision has the wrong number of outputs for either the valid or the
+	// missed proof outputs.
+	errBadContractOutputCounts = ErrorCommunication("rejected for having an unexpected number of outputs")
+
+	// errBadContractParent is returned when a file contract revision is
+	// presented which has a parent id that doesn't match the file contract
+	// which is supposed to be getting revised.
+	errBadContractParent = ErrorCommunication("could not find contract's parent")
+
 	// errBadFileMerkleRoot is returned if the renter incorrectly updates the
 	// file merkle root during a file contract revision.
 	errBadFileMerkleRoot = ErrorCommunication("rejected for bad file merkle root")
@@ -18,15 +28,9 @@ var (
 	// changes the file size during a file contract revision.
 	errBadFileSize = ErrorCommunication("rejected for bad file size")
 
-	// errBadRevisionNumber number is returned if the renter incorrectly
-	// download and does not increase the revision number during a file
-	// contract revision.
-	errBadRevisionNumber = ErrorCommunication("rejected for bad revision number")
-
-	// errBadContractOutputCounts is returned if the presented file contract
-	// revision has the wrong number of outputs for either the valid or the
-	// missed proof outputs.
-	errBadContractOutputCounts = ErrorCommunication("rejected for having an unexpected number of outputs")
+	// errBadModificationIndex is returned if the renter requests a change on a
+	// sector root that is not in the file contract.
+	errBadModificationIndex = ErrorCommunication("renter has made a modification that points to a nonexistent sector")
 
 	// errBadParentID is returned if the renter incorrectly download and
 	// provides the wrong parent id during a file contract revision.
@@ -35,6 +39,15 @@ var (
 	// errBadPayoutUnlockHashes is returned if the renter incorrectly sets the
 	// payout unlock hashes during contract formation.
 	errBadPayoutUnlockHashes = ErrorCommunication("rejected for bad unlock hashes in the payout")
+
+	// errBadRevisionNumber number is returned if the renter incorrectly
+	// download and does not increase the revision number during a file
+	// contract revision.
+	errBadRevisionNumber = ErrorCommunication("rejected for bad revision number")
+
+	// errBadSectorSize is returned if the renter provides a sector to be
+	// inserted that is the wrong size.
+	errBadSectorSize = ErrorCommunication("renter has provided an incorrectly sized sector")
 
 	// errBadUnlockConditions is returned if the renter incorrectly download
 	// and does not provide the right unlock conditions in the payment
@@ -71,9 +84,14 @@ var (
 	// a file contract revision.
 	errHighRenterValidOutput = ErrorCommunication("rejected for high paying renter valid output")
 
-	// errLowVoidOutput is returned if the renter has not allocated enough
-	// funds to the void output.
-	errLowVoidOutput = ErrorCommunication("rejected for low value void output")
+	// errIllegalOffsetAndLength is returned if the renter tries perform a
+	// modify operation that uses a troublesome combination of offset and
+	// length.
+	errIllegalOffsetAndLength = ErrorCommunication("renter is trying to do a modify with an illegal offset and length")
+
+	// errLargeSector is returned if the renter sends a RevisionAction that has
+	// data which creates a sector that is larger than what the host uses.
+	errLargeSector = ErrorCommunication("renter has sent a sector that exceeds the host's sector size")
 
 	// errLateRevision is returned if the renter is attempting to revise a
 	// revision after the revision deadline. The host needs time to submit the
@@ -98,6 +116,10 @@ var (
 	// host valid proof output during a file contract revision.
 	errLowHostValidOutput = ErrorCommunication("rejected for low paying host valid output")
 
+	// errLowVoidOutput is returned if the renter has not allocated enough
+	// funds to the void output.
+	errLowVoidOutput = ErrorCommunication("rejected for low value void output")
+
 	// errMismatchedHostPayouts is returned if the renter incorrectly sets the
 	// host valid and missed payouts to different values during contract
 	// formation.
@@ -106,6 +128,10 @@ var (
 	// errSmallWindow is returned if the renter suggests a storage proof window
 	// that is too small.
 	errSmallWindow = ErrorCommunication("rejected for small window size")
+
+	// errUnknownModification is returned if the host receives a modification
+	// action from the renter that it does not understand.
+	errUnknownModification = ErrorCommunication("renter is attempting an action that the host does not understand")
 )
 
 // createRevisionSignature creates a signature for a file contract revision

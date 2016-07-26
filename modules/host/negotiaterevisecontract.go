@@ -1,7 +1,6 @@
 package host
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -9,39 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	// errBadModificationIndex is returned if the renter requests a change on a
-	// sector root that is not in the file contract.
-	errBadModificationIndex = errors.New("renter has made a modification that points to a nonexistent sector")
-
-	// badSectorSize is returned if the renter provides a sector to be inserted
-	// that is the wrong size.
-	errBadSectorSize = errors.New("renter has provided an incorrectly sized sector")
-
-	// errIllegalOffsetAndLength is returned if the renter tries perform a
-	// modify operation that uses a troublesome combination of offset and
-	// length.
-	errIllegalOffsetAndLength = errors.New("renter is trying to do a modify with an illegal offset and length")
-
-	// errLargeSector is returned if the renter sends a RevisionAction that has
-	// data which creates a sector that is larger than what the host uses.
-	errLargeSector = errors.New("renter has sent a sector that exceeds the host's sector size")
-
-	// errBadCollateralDeduction is returned if a proposed file contrct
-	// revision does not correctly deduct value from the host's missed proof
-	// output - which is the host's collateral pool.
-	errBadCollateralDeduction = errors.New("proposed file contract revision does not correctly deduct from the host's collateral pool")
-
-	// errBadParent is returned when a file contract revision is
-	// presented which has a parent id that doesn't match the file contract
-	// which is supposed to be getting revised.
-	errBadParent = errors.New("proposed file contract revision has the wrong parent id")
-
-	// errUnknownModification is returned if the host receives a modification
-	// action from the renter that it does not understand.
-	errUnknownModification = errors.New("renter is attempting an action that the host is not aware of")
 )
 
 // managedRevisionIteration handles one iteration of the revision loop. As a
@@ -53,8 +19,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// exists.
 	err := h.managedRPCSettings(conn)
 	if err != nil {
-		h.log.Debugln("Settings call failed during revision:", err)
-		return err
+		return extendErr("RPCSettings failed: ", err)
 	}
 
 	// Set the negotiation deadline.
@@ -65,8 +30,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// wishes to terminate the revision loop.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		h.log.Debugln("Renter acceptance failed:", err)
-		return err
+		return extendErr("renter rejected settings: ", err)
 	}
 
 	// Read some variables from the host for use later in the function.
@@ -82,13 +46,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	var revision types.FileContractRevision
 	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
 	if err != nil {
-		h.log.Debugln("Could not read contract modifications:", err)
-		return err
+		return extendErr("unable to read revision modifications: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.ReadObject(conn, &revision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
-		h.log.Debugln("Could not read revision:", err)
-		return err
+		return extendErr("unable to read proposed revision: ", ErrorConnection(err.Error()))
 	}
 
 	// First read all of the modifications. Then make the modifications, but
@@ -152,7 +114,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				// Get the data for the new sector.
 				sector, err := h.ReadSector(so.SectorRoots[modification.SectorIndex])
 				if err != nil {
-					return err
+					return extendErr("could not read sector: ", ErrorInternal(err.Error()))
 				}
 				copy(sector[modification.Offset:], modification.Data)
 
@@ -171,31 +133,29 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			}
 		}
 		newRevenue := storageRevenue.Add(bandwidthRevenue)
-		return verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral)
+		return extendErr("unable to verify revision: ", verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral))
 	}()
 	if err != nil {
-		h.log.Debugln("Could not apply modification:", err)
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("rejected proposed modifications: ", err)
 	}
 	// Revision is acceptable, write an acceptance string.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		h.log.Debugln("Could not write acceptance:", err)
-		return err
+		return extendErr("could not accept revision modifications: ", ErrorConnection(err.Error()))
 	}
 
 	// Renter will send a transaction signature for the file contract revision.
 	var renterSig types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSig, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
-		h.log.Debugln("Could not read renter transaction signatures:", err)
-		return err
+		return extendErr("could not read renter transaction signature: ", ErrorConnection(err.Error()))
 	}
 	// Verify that the signature is valid and get the host's signature.
 	txn, err := createRevisionSignature(revision, renterSig, secretKey, blockHeight)
 	if err != nil {
-		h.log.Debugln("Could not create revision signatures:", err)
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("could not create revision signature: ", err)
 	}
 
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(storageRevenue)
@@ -204,8 +164,8 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	so.RevisionTransactionSet = []types.Transaction{txn}
 	err = h.modifyStorageObligation(*so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
-		h.log.Debugln("error modifying obligation:", err)
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("could not modify storage obligation: ", ErrorInternal(err.Error()))
 	}
 
 	// Host will now send acceptance and its signature to the renter. This
@@ -218,13 +178,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 		err = modules.WriteNegotiationAcceptance(conn)
 	}
 	if err != nil {
-		h.log.Debugln("Iteration signalling failed:", err)
-		return err
+		return extendErr("iteration signal failed to send: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.WriteObject(conn, txn.TransactionSignatures[1])
 	if err != nil {
-		h.log.Debugln("Could not write revision signatures:", err)
-		return err
+		return extendErr("failed to write revision signatures: ", ErrorConnection(err.Error()))
 	}
 	return nil
 }
@@ -239,7 +197,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	// will be used to pay for the data.
 	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
-		return err
+		return extendErr("RPCRecentRevision failed: ", err)
 	}
 	// The storage obligation is received with a lock on it. Defer a call to
 	// unlock the storage obligation.
@@ -255,7 +213,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 		if err == modules.ErrStopResponse {
 			return nil
 		} else if err != nil {
-			return err
+			return extendErr("revision iteration failed: ", err)
 		}
 	}
 	return nil
@@ -279,7 +237,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 
 	// Check that all non-volatile fields are the same.
 	if oldFCR.ParentID != revision.ParentID {
-		return errBadParent
+		return errBadContractParent
 	}
 	if oldFCR.UnlockConditions.UnlockHash() != revision.UnlockConditions.UnlockHash() {
 		return errBadUnlockConditions
@@ -314,7 +272,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 	}
 	// The new collateral comes out of the host's missed outputs.
 	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) < 0 {
-		return errBadCollateralDeduction
+		return errLowHostMissedOutput
 	}
 
 	// The Merkle root is checked last because it is the most expensive check.
