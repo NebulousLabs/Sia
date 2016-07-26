@@ -18,7 +18,7 @@ siacoins and siafunds, and getting the wallet's balance.
 
 You must create a wallet before you can use the wallet's API endpoints. You can
 create a wallet with the `/wallet/init` endpoint. Wallets are always encrypted
-on disk. Calls to any wallet API endpoints will fail until the wallet is
+on disk. Calls to some wallet API endpoints will fail until the wallet is
 unlocked. The wallet can be unlocked with the `/wallet/unlock` endpoint. Once
 the wallet is unlocked calls to the API endpoints will succeed until the wallet
 is locked again with `/wallet/lock`, or Siad is restarted. The host and renter
@@ -48,207 +48,179 @@ Index
 
 #### /wallet [GET]
 
-Function: Returns basic information about the wallet, such as whether the
-wallet is locked or unlocked.
+returns basic information about the wallet, such as whether the wallet is
+locked or unlocked.
 
-Parameters: none
+###### JSON Response
+```javascript
+{
+  // Indicates whether the wallet has been encrypted or not. If the wallet
+  // has not been encrypted, then no data has been generated at all, and the
+  // first time the wallet is unlocked, the password given will be used as
+  // the password for encrypting all of the data. 'encrypted' will only be
+  // set to false if the wallet has never been unlocked before (the unlocked
+  // wallet is still encryped - but the encryption key is in memory).
+  "encrypted": true,
 
-Response:
-```
-struct {
-	encrypted bool
-	unlocked  bool
+  // Indicates whether the wallet is currently locked or unlocked. Some calls
+  // become unavailable when the wallet is locked.
+  "unlocked": true,
 
-	confirmedsiacoinbalance     types.Currency (string)
-	unconfirmedoutgoingsiacoins types.Currency (string)
-	unconfirmedincomingsiacoins types.Currency (string)
+  // Number of siacoins, in hastings, available to the wallet as of the most
+  // recent block in the blockchain.
+  "confirmedsiacoinbalance": "123456", // hastings, big int
 
-	siafundbalance      types.Currency (string)
-	siacoinclaimbalance types.Currency (string)
+  // Number of siacoins, in hastings, that are leaving the wallet according
+  // to the set of unconfirmed transactions. Often this number appears
+  // inflated, because outputs are frequently larger than the number of coins
+  // being sent, and there is a refund. These coins are counted as outgoing,
+  // and the refund is counted as incoming. The difference in balance can be
+  // calculated using 'unconfirmedincomingsiacoins' - 'unconfirmedoutgoingsiacoins'
+  "unconfirmedoutgoingsiacoins": "0", // hastings, big int
+
+  // Number of siacoins, in hastings, are entering the wallet according to
+  // the set of unconfirmed transactions. This number is often inflated by
+  // outgoing siacoins, because outputs are frequently larger than the amount
+  // being sent. The refund will be included in the unconfirmed incoming
+  // siacoins balance.
+  "unconfirmedincomingsiacoins": "789", // hastings, big int
+
+  // Number of siafunds available to the wallet as of the most recent block
+  // in the blockchain.
+  "siafundbalance": "1", // big int
+
+  // Number of siacoins, in hastings, that can be claimed from the siafunds
+  // as of the most recent block. Because the claim balance increases every
+  // time a file contract is created, it is possible that the balance will
+  // increase before any claim transaction is confirmed.
+  "siacoinclaimbalance": "9001", // hastings, big int
 }
 ```
-'encrypted' indicates whether the wallet has been encrypted or not. If the
-wallet has not been encrypted, then no data has been generated at all, and the
-first time the wallet is unlocked, the password given will be used as the
-password for encrypting all of the data. 'encrypted' will only be set to false
-if the wallet has never been unlocked before (the unlocked wallet is still
-encryped - but the encryption key is in memory).
-
-'unlocked' indicates whether the wallet is currently locked or unlocked. Some
-calls become unavailable when the wallet is locked.
-
-'confirmedsiacoinbalance' is the number of siacoins available to the wallet as
-of the most recent block in the blockchain.
-
-'unconfirmedoutgoingsiacoins' is the number of siacoins that are leaving the
-wallet according to the set of unconfirmed transactions. Often this number
-appears inflated, because outputs are frequently larger than the number of
-coins being sent, and there is a refund. These coins are counted as outgoing,
-and the refund is counted as incoming. The difference in balance can be
-calculated using 'unconfirmedincomingsiacoins' - 'unconfirmedoutgoingsiacoins'
-
-'unconfirmedincomingsiacoins' is the number of siacoins are entering the wallet
-according to the set of unconfirmed transactions. This number is often inflated
-by outgoing siacoins, because outputs are frequently larger than the amount
-being sent. The refund will be included in the unconfirmed incoming siacoins
-balance.
-
-'siafundbalance' is the number of siafunds available to the wallet as
-of the most recent block in the blockchain.
-
-'siacoinclaimbalance' is the number of siacoins that can be claimed from the
-siafunds as of the most recent block. Because the claim balance increases every
-time a file contract is created, it is possible that the balance will increase
-before any claim transaction is confirmed.
 
 #### /wallet/033x [POST]
 
-Function: Load a v0.3.3.x wallet into the current wallet, harvesting all of the
-secret keys. All spendable addresses in the loaded wallet will become spendable
-from the current wallet.
+loads a v0.3.3.x wallet into the current wallet, harvesting all of the secret
+keys. All spendable addresses in the loaded wallet will become spendable from
+the current wallet. An error will be returned if the given `encryptionpassword`
+is incorrect.
 
-Parameters:
+###### Query String Parameters
 ```
-source             string
-encryptionpassword string
+// Path on disk to the v0.3.3.x wallet to be loaded.
+source
+
+// Encryption key of the wallet.
+encryptionpassword
 ```
-'source' is the location on disk of the v0.3.3.x wallet that is being loaded.
 
-'encryptionpassword' is the encryption key of the wallet. An error will be
-returned if the wrong key is provided.
-
-Response: standard.
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/address [GET]
 
-Function: Get a new address from the wallet generated by the primary seed. An
-error will be returned if the wallet is locked.
+gets a new address from the wallet generated by the primary seed. An error will
+be returned if the wallet is locked.
 
-Parameters: none
-
-Response:
-```
-struct {
-	address types.UnlockHash (string)
+###### JSON Response
+```javascript
+{
+  // Wallet address that can receive siacoins or siafunds. Addresses are 76 character long hex strings.
+  "address": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab"
 }
 ```
-'address' is a wallet address that can receive siacoins or siafunds.
 
 #### /wallet/addresses [GET]
 
-Function: Fetch the list of addresses from the wallet.
+fetches the list of addresses from the wallet.
 
-Parameters: none
-
-Response:
-```
-struct {
-	addresses []types.UnlockHash (string)
+###### JSON Response
+```javascript
+{
+  // Array of wallet addresses owned by the wallet.
+  "addresses": [
+    "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ]
 }
 ```
-'addresses' is an array of wallet addresses.
 
 #### /wallet/backup [GET]
 
-Function: Create a backup of the wallet settings file. Though this can easily
-be done manually, the settings file is often in an unknown or difficult to find
+creates a backup of the wallet settings file. Though this can easily be done
+manually, the settings file is often in an unknown or difficult to find
 location. The /wallet/backup call can spare users the trouble of needing to
-find their wallet file.
+find their wallet file. The destination file is overwritten if it already
+exists.
 
-Parameters:
+###### Query String Parameters
 ```
-destination string
+// path to the location on disk where the backup file will be saved.
+destination
 ```
-'destination' is the location on disk where the file will be saved.
 
-Response: standard
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/init [POST]
 
-Function: Initialize the wallet. After the wallet has been initialized once, it
-does not need to be initialized again, and future calls to /wallet/init will
-return an error. The encryption password is provided by the api call. If the
-password is blank, then the password will be set to the same as the seed.
+initializes the wallet. After the wallet has been initialized once, it does not
+need to be initialized again, and future calls to /wallet/init will return an
+error. The encryption password is provided by the api call. If the password is
+blank, then the password will be set to the same as the seed.
 
-Parameters:
+###### Query String Parameters
 ```
-encryptionpassword string
-dictionary string
-```
-'encryptionpassword' is the password that will be used to encrypt the wallet.
-All subsequent calls should use this password. If left blank, the seed that
-gets returned will also be the encryption password.
+// Password that will be used to encrypt the wallet. All subsequent calls
+// should use this password. If left blank, the seed that gets returned will
+// also be the encryption password.
+encryptionpassword
 
-'dictionary' is the name of the dictionary that should be used when encoding
-the seed. 'english' is the most common choice when picking a dictionary.
-
-Response:
+// Name of the dictionary that should be used when encoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary // Optional, default is english.
 ```
-struct {
-	primaryseed string
+
+###### JSON Response
+```javascript
+{
+  // Wallet seed used to generate addresses that the wallet is able to spend.
+  "primaryseed": "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello"
 }
 ```
-'primaryseed' is the dictionary encoded seed that is used to generate addresses
-that the wallet is able to spend.
 
 #### /wallet/seed [POST]
 
-Function: Give the wallet a seed to track when looking for incoming
-transactions. The wallet will be able to spend outputs related to addresses
-created by the seed. The seed is added as an auxiliary seed, and does not
-replace the primary seed. Only the primary seed will be used for generating new
-addresses.
+gives the wallet a seed to track when looking for incoming transactions. The
+wallet will be able to spend outputs related to addresses created by the seed.
+The seed is added as an auxiliary seed, and does not replace the primary seed.
+Only the primary seed will be used for generating new addresses.
 
-Parameters:
+###### Query String Parameters
 ```
-encryptionpassword string
-dictionary         string
-seed               string
+// Key used to encrypt the new seed when it is saved to disk.
+encryptionpassword
+
+// Name of the dictionary that should be used when encoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary
+
+// Dictionary-encoded phrase that corresponds to the seed being added to the
+// wallet.
+seed
 ```
-'encryptionpassword' is the key that is used to encrypt the new seed when it is
-saved to disk.
 
-'dictionary' is the name of the dictionary that should be used when encoding
-the seed. 'english' is the most common choice when picking a dictionary.
-
-'seed' is the dictionary-encoded phrase that corresponds to the seed being
-added to the wallet.
-
-Response: standard
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/seeds [GET]
 
-Function: Return a list of seeds in use by the wallet. The primary seed is the
-only seed that gets used to generate new addresses. This call is unavailable
-when the wallet is locked.
-
-Parameters:
-```
-dictionary string
-```
-'dictionary' is the name of the dictionary that should be used when encoding
-the seed. 'english' is the most common choice when picking a dictionary.
-
-Response:
-```
-struct {
-	primaryseed        mnemonics.Phrase   (string)
-	addressesremaining int
-	allseeds           []mnemonics.Phrase ([]string)
-}
-```
-'primaryseed' is the seed that is actively being used to generate new addresses
-for the wallet.
-
-'addressesremaining' is the number of addresses that remain in the primary seed
-until exhaustion has been reached. Once exhaustion has been reached, new
-addresses will continue to be generated but they will be more difficult to
-recover in the event of a lost wallet file or encryption password.
-
-'allseeds' is an array of all seeds that the wallet references when scanning the
-blockchain for outputs. The wallet is able to spend any output generated by any
-of the seeds, however only the primary seed is being used to generate new
-addresses.
+returns a list of seeds in use by the wallet. The primary seed is the only seed
+that gets used to generate new addresses. This call is unavailable when the
+wallet is locked.
 
 A seed is an encoded version of a 128 bit random seed. The output is 15 words
 chosen from a small dictionary as indicated by the input. The most common
@@ -259,105 +231,142 @@ copying. The library
 [entropy-mnemonics](https://github.com/NebulousLabs/entropy-mnemonics) is used
 when encoding.
 
+###### Query String Parameters
+```
+// Name of the dictionary that should be used when encoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary
+```
+
+###### JSON Response
+```javascript
+{
+  // Seed that is actively being used to generate new addresses for the wallet.
+  "primaryseed": "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello",
+
+  // Number of addresses that remain in the primary seed until exhaustion has
+  // been reached. Once exhaustion has been reached, new addresses will
+  // continue to be generated but they will be more difficult to recover in the
+  // event of a lost wallet file or encryption password.
+  "addressesremaining": 2500,
+
+  // Array of all seeds that the wallet references when scanning the blockchain
+  // for outputs. The wallet is able to spend any output generated by any of
+  // the seeds, however only the primary seed is being used to generate new
+  // addresses.
+  "allseeds": [
+    "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello",
+    "foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo",
+  ]
+}
+```
+
 #### /wallet/siacoins [POST]
 
 Function: Send siacoins to an address. The outputs are arbitrarily selected
 from addresses in the wallet.
 
-Parameters:
+###### Query String Parameters
 ```
-amount      int
-destination types.UnlockHash (string)
-```
-'amount' is the number of hastings being sent. A hasting is the smallest unit
-in Sia. There are 10^24 hastings in a siacoin.
+// Number of hastings being sent. A hasting is the smallest unit in Sia. There
+// are 10^24 hastings in a siacoin.
+amount      // hastings
 
-'destination' is the address that is receiving the coins.
-
-Response:
+// Address that is receiving the coins.
+destination // address
 ```
-struct {
-	transactionids []types.TransactionID ([]string)
+
+###### JSON Response
+```javascript
+{
+  // Array of IDs of the transactions that were created when sending the coins.
+  // The last transaction contains the output headed to the 'destination'.
+  // Transaction IDs are 64 character long hex strings.
+  transactionids [
+    "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ]
 }
 ```
-'transactionids' are the ids of the transactions that were created when sending
-the coins. The last transaction contains the output headed to the
-'destination'.
 
 #### /wallet/siafunds [POST]
 
-Function: Send siafunds to an address. The outputs are arbitrarily selected
-from addresses in the wallet. Any siacoins available in the siafunds being sent
-(as well as the siacoins available in any siafunds that end up in a refund
-address) will become available to the wallet as siacoins after 144
-confirmations. To access all of the siacoins in the siacoin claim balance, send
-all of the siafunds to an address in your control (this will give you all the
-siacoins, while still letting you control the siafunds).
+sends siafunds to an address. The outputs are arbitrarily selected from
+addresses in the wallet. Any siacoins available in the siafunds being sent (as
+well as the siacoins available in any siafunds that end up in a refund address)
+will become available to the wallet as siacoins after 144 confirmations. To
+access all of the siacoins in the siacoin claim balance, send all of the
+siafunds to an address in your control (this will give you all the siacoins,
+while still letting you control the siafunds).
 
-Parameters:
+###### Query String Parameters
 ```
-amount      int
-destination string
-```
-'amount' is the number of siafunds being sent.
+// Number of siafunds being sent.
+amount      // siafunds
 
-'destination' is the address that is receiving the funds.
-
-Response:
+// Address that is receiving the funds.
+destination // address
 ```
-struct {
-	transactionids []types.TransactionID ([]string)
+
+###### JSON Response
+```javascript
+{
+  // Array of IDs of the transactions that were created when sending the coins.
+  // The last transaction contains the output headed to the 'destination'.
+  // Transaction IDs are 64 character long hex strings.
+  "transactionids": [
+    "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ]
 }
 ```
-'transactionids' are the ids of the transactions that were created when sending
-the coins. The last transaction contains the output headed to the
-'destination'.
 
 #### /wallet/siagkey [POST]
 
 Function: Load a key into the wallet that was generated by siag. Most siafunds
 are currently in addresses created by siag.
 
-Parameters:
+###### Query String Parameters
 ```
-encryptionpassword string
-keyfiles           string
-```
-'encryptionpassword' is the key that is used to encrypt the siag key when it is
-imported to the wallet.
+// Key that is used to encrypt the siag key when it is imported to the wallet.
+encryptionpassword
 
-'keyfiles' is a list of filepaths that point to the keyfiles that make up the
-siag key. There should be at least one keyfile per required signature. The
-filenames need to be commna separated (no spaces), which means filepaths that
-contain a comma are not allowed.
+// List of filepaths that point to the keyfiles that make up the siag key.
+// There should be at least one keyfile per required signature. The filenames
+// need to be commna separated (no spaces), which means filepaths that contain
+// a comma are not allowed.
+keyfiles
+```
+
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/lock [POST]
 
-Function: Locks the wallet, wiping all secret keys. After being locked, the
-keys are encrypted. Queries for the seed, to send siafunds, and related queries
-become unavailable. Queries concerning transaction history and balance are
-still available.
+locks the wallet, wiping all secret keys. After being locked, the keys are
+encrypted. Queries for the seed, to send siafunds, and related queries become
+unavailable. Queries concerning transaction history and balance are still
+available.
 
-Parameters: none
-
-Response: standard.
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/transaction/___:id___ [GET]
 
 Function: Get the transaction associated with a specific transaction id.
 
-Parameters:
+###### Path Parameters:
 ```
+// ID of the transaction being requested.
 id string
 ```
-'id' is the ID of the transaction being requested.
 
-Response:
-```
-struct {
-	transaction modules.ProcessedTransaction
-}
-```
+###### JSON Response
+// TODO: JSON schema is a work in progress, see API.md
 
 Processed transactions are transactions that have been processed by the wallet
 and given more information, such as a confirmation height and a timestamp.
@@ -498,14 +507,16 @@ address.  See the documentation for '/wallet/transaction' for more information.
 
 #### /wallet/unlock [POST]
 
-Function: Unlock the wallet. The wallet is capable of knowing whether the
-correct password was provided.
+unlocks the wallet. The wallet is capable of knowing whether the correct
+password was provided.
 
-Parameters:
+###### Query String Parameters
 ```
+// Password that gets used to decrypt the file. Most frequently, the encryption
+// password is the same as the primary wallet seed.
 encryptionpassword string
 ```
-'encryptionpassword' is the password that gets used to decrypt the file. Most
-frequently, the encryption password is the same as the primary wallet seed.
 
-Response: standard
+###### Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
