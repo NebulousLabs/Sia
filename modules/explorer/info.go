@@ -38,6 +38,26 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 	return bf.BlockFacts, true
 }
 
+// LatestBlockFacts returns a set of statistics about the blockchain as they appeared
+// at the latest block height in the explorer's consensus set.
+func (e *Explorer) LatestBlockFacts() (modules.BlockFacts, bool) {
+	var height types.BlockHeight
+	err := e.db.View(dbGetInternal(internalBlockHeight, &height))
+	if err != nil {
+		return modules.BlockFacts{}, false
+	}
+	block, exists := e.cs.BlockAtHeight(height)
+	if !exists {
+		return modules.BlockFacts{}, false
+	}
+	var bf blockFacts
+	err = e.db.View(dbGetAndDecode(bucketBlockFacts, block.ID(), &bf))
+	if err != nil {
+		return modules.BlockFacts{}, false
+	}
+	return bf.BlockFacts, true
+}
+
 // Transaction takes a transaction ID and finds the block containing the
 // transaction. Because of the miner payouts, the transaction ID might be a
 // block ID. To find the transaction, iterate through the block.

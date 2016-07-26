@@ -56,6 +56,10 @@ type (
 		// appeared at a given block.
 		BlockFacts(types.BlockHeight) (BlockFacts, bool)
 
+		// LatestBlockFacts returns the block facts of the last block
+		// in the explorer's database.
+		LatestBlockFacts() (BlockFacts, bool)
+
 		// Transaction returns the block that contains the input transaction
 		// id. The transaction itself is either the block (indicating the miner
 		// payouts are somehow involved), or it is a transaction inside of the
