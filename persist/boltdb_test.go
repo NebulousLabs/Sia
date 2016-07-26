@@ -99,17 +99,20 @@ func TestOpenDatabase(t *testing.T) {
 		// Create a new database.
 		db, err := OpenDatabase(in.md, dbFilepath)
 		if err != nil {
-			t.Fatalf("calling OpenDatabase on a new database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			t.Errorf("calling OpenDatabase on a new database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			continue
 		}
 		// Close the newly-created, empty database.
 		err = db.Close()
 		if err != nil {
-			t.Fatalf("closing a newly created database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			t.Errorf("closing a newly created database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			continue
 		}
 		// Call OpenDatabase again, this time on the existing empty database.
 		db, err = OpenDatabase(in.md, dbFilepath)
 		if err != nil {
-			t.Fatalf("calling OpenDatabase on an existing empty database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			t.Errorf("calling OpenDatabase on an existing empty database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			continue
 		}
 		// Create buckets in the database.
 		err = db.Update(func(tx *bolt.Tx) error {
@@ -123,7 +126,8 @@ func TestOpenDatabase(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			continue
 		}
 		// Make sure CreateBucketIfNotExists method handles invalid (nil)
 		// bucket name.
@@ -155,17 +159,20 @@ func TestOpenDatabase(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			continue
 		}
 		// Close the newly-filled database.
 		err = db.Close()
 		if err != nil {
-			t.Fatalf("closing a newly-filled database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			t.Errorf("closing a newly-filled database failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			continue
 		}
 		// Call OpenDatabase on the database now that it's been filled.
 		db, err = OpenDatabase(in.md, dbFilepath)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			continue
 		}
 		// Empty every bucket in the database.
 		err = db.Update(func(tx *bolt.Tx) error {
@@ -183,11 +190,13 @@ func TestOpenDatabase(t *testing.T) {
 		// Close and delete the newly emptied database.
 		err = db.Close()
 		if err != nil {
-			t.Fatalf("closing a newly-emptied database for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			t.Errorf("closing a newly-emptied database for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			continue
 		}
 		err = os.Remove(dbFilepath)
 		if err != nil {
-			t.Fatalf("removing database file failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			t.Errorf("removing database file failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
+			continue
 		}
 	}
 }
@@ -196,9 +205,8 @@ func TestOpenDatabase(t *testing.T) {
 // with the wrong filemode (< 0600), which should result in an os.ErrPermission
 // error.
 func TestErrPermissionOpenDatabase(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
+	t.Skip("can't reproduce on Windows")
+
 	const (
 		dbHeader   = "Fake Header"
 		dbVersion  = "0.0.0"
@@ -385,6 +393,7 @@ func TestErrIntegratedCheckMetadata(t *testing.T) {
 		boltDB, err := OpenDatabase(in.md, dbFilepath)
 		if err != nil {
 			t.Errorf("OpenDatabase failed on input %v, filename %v; error was %v", in, dbFilename, err)
+			continue
 		}
 		err = boltDB.Close()
 		if err != nil {

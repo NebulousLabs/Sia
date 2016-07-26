@@ -78,18 +78,6 @@ func TestNew(t *testing.T) {
 	if _, ok := err.(*json.SyntaxError); !ok {
 		t.Fatalf("expected invalid json, got %v", err)
 	}
-
-	// Corrupted logfile.
-	os.RemoveAll(filepath.Join(dir, "contractor.log"))
-	f, err := os.OpenFile(filepath.Join(dir, "contractor.log"), os.O_CREATE, 0000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	_, err = New(stub, stub, stub, stub, dir)
-	if !os.IsPermission(err) {
-		t.Fatalf("expected permissions error, got %v", err)
-	}
 }
 
 // TestContract tests the Contract method.
