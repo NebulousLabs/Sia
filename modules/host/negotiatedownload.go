@@ -1,7 +1,6 @@
 package host
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -11,71 +10,14 @@ import (
 )
 
 var (
-	// errDownloadBadHostValidOutputs is returned if the renter requests a
-	// download and pays an insufficient amount to the host valid addresses.
-	errDownloadBadHostValidOutputs = errors.New("download request rejected for bad host valid outputs")
-
-	// errDownloadBadNewFileMerkleRoot is returned if the renter requests a
-	// download and changes the file merkle root in the payment revision.
-	errDownloadBadNewFileMerkleRoot = errors.New("download request rejected for bad file merkle root")
-
-	// errDownloadBadNewFileSize is returned if the renter requests a download
-	// and changes the file size in the payment revision.
-	errDownloadBadNewFileSize = errors.New("download request rejected for bad file size")
-
-	// errDownloadBadHostMissedOutputs is returned if the renter requests a
-	// download and changes the host missed outputs in the payment revision.
-	errDownloadBadHostMissedOutputs = errors.New("download request rejected for bad host missed outputs")
-
-	// errDownloadBadNewWindowEnd is returned if the renter requests a download
-	// and changes the window end in the payment revision.
-	errDownloadBadNewWindowEnd = errors.New("download request rejected for bad new window end")
-
-	// errDownloadBadNewWindowStart is returned if the renter requests a
-	// download and changes the window start in the payment revision.
-	errDownloadBadNewWindowStart = errors.New("download request rejected for bad new window start")
-
-	// errDownloadBadNewUnlockHash is returned if the renter requests a
-	// download and changes the unlock hash in the payment revision.
-	errDownloadBadNewUnlockHash = errors.New("download request rejected for bad new unlock hash")
-
-	// errDownloadBadParentID is returned if the renter requests a download and
-	// provides the wrong parent id in the payment revision.
-	errDownloadBadParentID = errors.New("download request rejected for bad parent id")
-
-	// errDownloadBadRenterMissedOutputs is returned if the renter requests a
-	// download and deducts an insufficient amount from the renter missed
-	// outputs in the payment revision.
-	errDownloadBadRenterMissedOutputs = errors.New("download request rejected for bad renter missed outputs")
-
-	// errDownloadBadRenterValidOutputs is returned if the renter requests a
-	// download and deducts an insufficient amount from the renter valid
-	// outputs in the payment revision.
-	errDownloadBadRenterValidOutputs = errors.New("download request rejected for bad renter valid outputs")
-
-	// errDownloadBadRevision number is returned if the renter requests a
-	// download and does not increase the revision number in the payment
-	// revision.
-	errDownloadBadRevisionNumber = errors.New("download request rejected for bad revision number")
-
-	// errDownloadBadUnlockConditions is returned if the renter requests a
-	// download and does not provide the right unlock conditions in the payment
-	// revision.
-	errDownloadBadUnlockConditions = errors.New("download request rejected for bad unlock conditions")
-
-	// errDownloadBadVoidOutputs is returned if the renter requests a download
-	// and does not add sufficient payment to the void outputs in the payment
-	// revision.
-	errDownloadBadVoidOutputs = errors.New("download request rejected for bad void outputs")
-
 	// errLargeDownloadBatch is returned if the renter requests a download
 	// batch that exceeds the maximum batch size that the host will
 	// accomondate.
-	errLargeDownloadBatch = errors.New("download request exceeded maximum batch size")
+	errLargeDownloadBatch = ErrorCommunication("download request exceeded maximum batch size")
 
 	// errRequestOutOfBounds is returned when a download request is made which
 	// asks for elements of a sector which do not exist.
-	errRequestOutOfBounds = errors.New("download request has invalid sector bounds")
+	errRequestOutOfBounds = ErrorCommunication("download request has invalid sector bounds")
 )
 
 // managedDownloadIteration is responsible for managing a single iteration of
@@ -84,7 +26,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	// Exchange settings with the renter.
 	err := h.managedRPCSettings(conn)
 	if err != nil {
-		return err
+		return extendErr("RPCSettings failed: ", err)
 	}
 
 	// Extend the deadline for the download.
@@ -93,7 +35,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	// The renter will either accept or reject the host's settings.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("renter rejected host settings: ", ErrorCommunication(err.Error()))
 	}
 
 	// Grab a set of variables that will be useful later in the function.
@@ -109,11 +51,11 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	var paymentRevision types.FileContractRevision
 	err = encoding.ReadObject(conn, &requests, modules.NegotiateMaxDownloadActionRequestSize)
 	if err != nil {
-		return err
+		return extendErr("failed to read download requests:", ErrorConnection(err.Error()))
 	}
 	err = encoding.ReadObject(conn, &paymentRevision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
-		return err
+		return extendErr("failed to read payment revision:", ErrorConnection(err.Error()))
 	}
 
 	// Verify that the request is acceptable, and then fetch all of the data
@@ -126,12 +68,12 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		var totalSize uint64
 		for _, request := range requests {
 			if request.Length > modules.SectorSize || request.Offset+request.Length > modules.SectorSize {
-				return errRequestOutOfBounds
+				return extendErr("download iteration request failed: ", errRequestOutOfBounds)
 			}
 			totalSize += request.Length
 		}
 		if totalSize > settings.MaxDownloadBatchSize {
-			return errLargeDownloadBatch
+			return extendErr("download iteration batch failed: ", errLargeDownloadBatch)
 		}
 
 		// Verify that the correct amount of money has been moved from the
@@ -139,14 +81,14 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 		expectedTransfer := settings.MinDownloadBandwidthPrice.Mul64(totalSize)
 		err = verifyPaymentRevision(existingRevision, paymentRevision, blockHeight, expectedTransfer)
 		if err != nil {
-			return err
+			return extendErr("payment verification failed: ", err)
 		}
 
 		// Load the sectors and build the data payload.
 		for _, request := range requests {
 			sectorData, err := h.ReadSector(request.MerkleRoot)
 			if err != nil {
-				return err
+				return extendErr("failed to load sector: ", ErrorInternal(err.Error()))
 			}
 			payload = append(payload, sectorData[request.Offset:request.Offset+request.Length])
 		}
@@ -158,14 +100,14 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	// Revision is acceptable, write acceptance.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("failed to write acceptance for renter revision: ", ErrorConnection(err.Error()))
 	}
 
 	// Renter will send a transaction siganture for the file contract revision.
 	var renterSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
-		return err
+		return extendErr("failed to read renter signature: ", ErrorConnection(err.Error()))
 	}
 	txn, err := createRevisionSignature(paymentRevision, renterSignature, secretKey, blockHeight)
 
@@ -178,7 +120,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	}}
 	err = h.modifyStorageObligation(*so, nil, nil, nil)
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		return extendErr("failed to modify storage obligation: ", ErrorInternal(modules.WriteNegotiationRejection(conn, err).Error()))
 	}
 
 	// Write acceptance to the renter - the data request can be fulfilled by
@@ -186,13 +128,17 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 	// the host signature and all of the data.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("failed to write acceptance following obligation modification: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.WriteObject(conn, txn.TransactionSignatures[1])
 	if err != nil {
-		return err
+		return extendErr("failed to write signature: ", ErrorConnection(err.Error()))
 	}
-	return encoding.WriteObject(conn, payload)
+	err = encoding.WriteObject(conn, payload)
+	if err != nil {
+		return extendErr("failed to write payload: ", ErrorConnection(err.Error()))
+	}
+	return nil
 }
 
 // verifyPaymentRevision verifies that the revision being provided to pay for
@@ -201,7 +147,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, blockHeight types.BlockHeight, expectedTransfer types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(paymentRevision.NewValidProofOutputs) != 2 || len(paymentRevision.NewMissedProofOutputs) != 3 {
-		return errInsaneFileContractRevisionOutputCounts
+		return errBadRevisionOutputCounts
 	}
 
 	// Check that the time to finalize and submit the file contract revision
@@ -212,49 +158,49 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 
 	// The new revenue comes out of the renter's valid outputs.
 	if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
-		return errDownloadBadRenterValidOutputs
+		return errBadRevisionRenterValidOutput
 	}
 	// The new revenue goes into the host's valid outputs.
 	if existingRevision.NewValidProofOutputs[1].Value.Add(expectedTransfer).Cmp(paymentRevision.NewValidProofOutputs[1].Value) < 0 {
-		return errDownloadBadHostValidOutputs
+		return errBadRevisionHostValidOutput
 	}
 	// The new revenue comes out of the renter's missed outputs.
 	if paymentRevision.NewMissedProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewMissedProofOutputs[0].Value) > 0 {
-		return errDownloadBadRenterMissedOutputs
+		return errBadRevisionRenterMissedOutput
 	}
 	// The new revenue goes into the void outputs.
 	if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) < 0 {
-		return errDownloadBadVoidOutputs
+		return errBadRevisionVoidOutput
 	}
 	// Check that the revision count has increased.
 	if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {
-		return errDownloadBadRevisionNumber
+		return errBadRevisionNumber
 	}
 
 	// Check that all of the non-volatile fields are the same.
 	if paymentRevision.ParentID != existingRevision.ParentID {
-		return errDownloadBadParentID
+		return errBadRevisionParentID
 	}
 	if paymentRevision.UnlockConditions.UnlockHash() != existingRevision.UnlockConditions.UnlockHash() {
-		return errDownloadBadUnlockConditions
+		return errBadRevisionUnlockConditions
 	}
 	if paymentRevision.NewFileSize != existingRevision.NewFileSize {
-		return errDownloadBadNewFileSize
+		return errBadRevisionNewFileSize
 	}
 	if paymentRevision.NewFileMerkleRoot != existingRevision.NewFileMerkleRoot {
-		return errDownloadBadNewFileMerkleRoot
+		return errBadRevisionNewFileMerkleRoot
 	}
 	if paymentRevision.NewWindowStart != existingRevision.NewWindowStart {
-		return errDownloadBadNewWindowStart
+		return errBadRevisionNewWindowStart
 	}
 	if paymentRevision.NewWindowEnd != existingRevision.NewWindowEnd {
-		return errDownloadBadNewWindowEnd
+		return errBadRevisionNewWindowEnd
 	}
 	if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
-		return errDownloadBadNewUnlockHash
+		return errBadRevisionNewUnlockHash
 	}
 	if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
-		return errDownloadBadHostMissedOutputs
+		return errBadRevisionHostMissedOutput
 	}
 	return nil
 }
@@ -269,7 +215,7 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 	// will be used to pay for the data.
 	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
-		return err
+		return extendErr("failed RPCRecentRevision during RPCDownload: ", err)
 	}
 	// The storage obligation is returned with a lock on it. Defer a call to
 	// unlock the storage obligation.
@@ -286,7 +232,7 @@ func (h *Host) managedRPCDownload(conn net.Conn) error {
 			// data, therefore there is no error. Return nil.
 			return nil
 		} else if err != nil {
-			return err
+			return extendErr("download iteration failed: ", err)
 		}
 	}
 	return nil

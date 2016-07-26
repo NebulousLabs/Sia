@@ -29,12 +29,6 @@ var (
 	// data which creates a sector that is larger than what the host uses.
 	errLargeSector = errors.New("renter has sent a sector that exceeds the host's sector size")
 
-	// errLateRevision is returned if the renter is attempting to revise a
-	// revision after the revision deadline. The host needs time to submit the
-	// final revision to the blockchain to guarantee payment, and therefore
-	// will not accept revisions once the window start is too close.
-	errLateRevision = errors.New("renter is attempting to revise a revision which the host has closed")
-
 	// errReviseBadCollateralDeduction is returned if a proposed file contrct
 	// revision does not correctly deduct value from the host's missed proof
 	// output - which is the host's collateral pool.
@@ -68,16 +62,6 @@ var (
 	// presented which has a parent id that doesn't match the file contract
 	// which is supposed to be getting revised.
 	errReviseBadParent = errors.New("proposed file contract revision has the wrong parent id")
-
-	// errReviseBadRenterValidOutput is returned if a propsed file contract
-	// revision does not corectly deduct value from the renter's valid proof
-	// output.
-	errReviseBadRenterValidOutput = errors.New("proposed file contract revision does not correctly deduct from the renter's valid proof output")
-
-	// errReviseBadRenterMissedOutput is returned if a proposed file contract
-	// revision does not correctly deduct value from the renter's missed proof
-	// output.
-	errReviseBadRenterMissedOutput = errors.New("proposed file contract revision does not correctly deduct from the renter's missed proof output")
 
 	// errReviseBadRevisionNumber is returned if a proposed file contract
 	// revision does not have a revision number which is strictly greater than
@@ -325,7 +309,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 func verifyRevision(so storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, newRevenue, newCollateral types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
-		return errInsaneFileContractRevisionOutputCounts
+		return errBadRevisionOutputCounts
 	}
 
 	// Check that the time to finalize and submit the file contract revision
@@ -361,7 +345,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 
 	// The new revenue comes out of the renter's valid outputs.
 	if revision.NewValidProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
-		return errReviseBadRenterValidOutput
+		return errBadRevisionRenterValidOutput
 	}
 	// The new revenue goes into the host's valid outputs.
 	if oldFCR.NewValidProofOutputs[1].Value.Add(newRevenue).Cmp(revision.NewValidProofOutputs[1].Value) < 0 {
@@ -369,7 +353,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 	}
 	// The new revenue comes out of the renter's missed outputs.
 	if revision.NewMissedProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewMissedProofOutputs[0].Value) > 0 {
-		return errReviseBadRenterMissedOutput
+		return errBadRevisionRenterMissedOutput
 	}
 	// The new collateral comes out of the host's missed outputs.
 	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) < 0 {

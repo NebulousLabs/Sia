@@ -124,6 +124,15 @@ type Host struct {
 	atomicSettingsCalls       uint64
 	atomicUnrecognizedCalls   uint64
 
+	// Error management. There are a few different types of errors returned by
+	// the host. These errors intentionally not persistent, so that the logging
+	// limits of each error type will be reset each time the host is reset.
+	atomicCommunicationErrors uint64
+	atomicConnectionErrors    uint64
+	atomicConsensusErrors     uint64
+	atomicInternalErrors      uint64
+	atomicNormalErrors        uint64
+
 	// Dependencies.
 	cs     modules.ConsensusSet
 	tpool  modules.TransactionPool
