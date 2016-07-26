@@ -12,23 +12,6 @@ import (
 )
 
 var (
-	// errBadContractUnlockHash is returned when the host receives a file
-	// contract where it does not understand the unlock hash driving the
-	// contract.
-	errBadContractUnlockHash = errors.New("file contract has an unexpected unlock hash")
-
-	// errBadFileSize is returned if a file contract is provided by the renter
-	// which does not have the right file size.
-	errBadFileSize = errors.New("new file contract does not have the right file size")
-
-	// errBadFileMerkleRoot is returned if a file contract is provided by the
-	// renter which does not have the right file size.
-	errBadFileMerkleRoot = errors.New("new file contract does not have the right file Merkle root")
-
-	// errBadPayoutsLen is returned if a new file contract is presented that
-	// has the wrong number of valid or missed proof payouts.
-	errBadPayoutsLen = errors.New("file contract has the wrong number of payouts - there should be two valid and three missed payouts")
-
 	// errBadPayoutsAmounts is returned if a new file contract is presented that
 	// does not pay the correct amount to the host - by default, the payouts
 	// should be paying the contract price.
@@ -49,10 +32,6 @@ var (
 	// errEmptyFileContractTransactionSet is returned if the renter provides a
 	// nil file contract transaction set during file contract negotiation.
 	errEmptyFileContractTransactionSet = errors.New("file contract transaction set is empty")
-
-	// errLowHostPayout is returned if the host is not getting paid enough in
-	// the file contract to cover the contract price.
-	errLowHostPayout = errors.New("file contract payout does not cover the contract cost")
 
 	// errLowFees is returned if a transaction set provided by the renter does
 	// not have large enough transaction fees to have a reasonalbe chance at
@@ -318,7 +297,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
 	// outputs should have 3 (renter + host + void)
 	if len(fc.ValidProofOutputs) != 2 || len(fc.MissedProofOutputs) != 3 {
-		return errBadPayoutsLen
+		return errBadContractOutputCounts
 	}
 	// The unlock hashes of the valid and missed proof outputs for the host
 	// must match the host's unlock hash. The third missed output should point
@@ -336,7 +315,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 	// contract price. This will prevent negative currency panics when working
 	// with the collateral.
 	if fc.ValidProofOutputs[1].Value.Cmp(settings.MinContractPrice) < 0 {
-		return errLowHostPayout
+		return errLowHostValidOutput
 	}
 	// Check that the collateral does not exceed the maximum amount of
 	// collateral allowed.
@@ -363,7 +342,7 @@ func (h *Host) managedVerifyNewContract(txnSet []types.Transaction, renterPK cry
 		SignaturesRequired: 2,
 	}.UnlockHash()
 	if fc.UnlockHash != expectedUH {
-		return errBadContractUnlockHash
+		return errBadUnlockHash
 	}
 
 	// Check that the transaction set has enough fees on it to get into the

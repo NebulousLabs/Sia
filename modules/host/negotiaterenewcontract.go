@@ -267,7 +267,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
 	// outputs should have 3 (renter + host + void)
 	if len(fc.ValidProofOutputs) != 2 || len(fc.MissedProofOutputs) != 3 {
-		return errBadPayoutsLen
+		return errBadContractOutputCounts
 	}
 	// The unlock hashes of the valid and missed proof outputs for the host
 	// must match the host's unlock hash. The third missed output should point
@@ -318,7 +318,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 		SignaturesRequired: 2,
 	}.UnlockHash()
 	if fc.UnlockHash != expectedUH {
-		return errBadContractUnlockHash
+		return errBadUnlockHash
 	}
 
 	// Check that the transaction set has enough fees on it to get into the

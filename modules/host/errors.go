@@ -14,72 +14,73 @@ import (
 )
 
 var (
-	// errBadRevisionHostMissedOutput is returned if the renter incorrectly
-	// updates the host missed proof output during a file contract revision.
-	errBadRevisionHostMissedOutput = ErrorCommunication("revision rejected for bad host missed output")
+	// errBadFileMerkleRoot is returned if the renter incorrectly updates the
+	// file merkle root during a file contract revision.
+	errBadFileMerkleRoot = ErrorCommunication("rejected for bad file merkle root")
 
-	// errBadRevisionHostValidOutput is returned if the renter incorrectly
-	// updates the host valid proof output during a file contract revision.
-	errBadRevisionHostValidOutput = ErrorCommunication("revision rejected for bad host valid output")
+	// errBadFileSize is returned if the renter incorrectly download and
+	// changes the file size during a file contract revision.
+	errBadFileSize = ErrorCommunication("rejected for bad file size")
 
-	// errBadRevisionNewFileMerkleRoot is returned if the renter incorrectly
-	// updates the file merkle root during a file contract revision.
-	errBadRevisionNewFileMerkleRoot = ErrorCommunication("revision rejected for bad file merkle root")
+	// errBadRevisionNumber number is returned if the renter incorrectly
+	// download and does not increase the revision number during a file
+	// contract revision.
+	errBadRevisionNumber = ErrorCommunication("rejected for bad revision number")
 
-	// errBadRevisionNewFileSize is returned if the renter incorrectly download
-	// and changes the file size during a file contract revision.
-	errBadRevisionNewFileSize = ErrorCommunication("revision rejected for bad file size")
-
-	// errBadRevisionNewUnlockHash is returned if the renter incorrectly
-	// updates the unlock hash during a file contract revision.
-	errBadRevisionNewUnlockHash = ErrorCommunication("revision rejected for bad new unlock hash")
-
-	// errBadRevisionNewWindowEnd is returned if the renter incorrectly download
-	// and changes the window end during a file contract revision.
-	errBadRevisionNewWindowEnd = ErrorCommunication("revision rejected for bad new window end")
-
-	// errBadRevisionNewWindowStart is returned if the renter incorrectly
-	// updates the window start during a file contract revision.
-	errBadRevisionNewWindowStart = ErrorCommunication("revision rejected for bad new window start")
-
-	// errBadRevision number is returned if the renter incorrectly download and
-	// does not increase the revision number during a file contract revision.
-	errBadRevisionNumber = ErrorCommunication("revision rejected for bad revision number")
-
-	// errBadRevisionOutputCounts is returned if the presented file contract
+	// errBadContractOutputCounts is returned if the presented file contract
 	// revision has the wrong number of outputs for either the valid or the
 	// missed proof outputs.
-	errBadRevisionOutputCounts = ErrorCommunication("revision rejected for having an unexpected number of outputs")
+	errBadContractOutputCounts = ErrorCommunication("rejected for having an unexpected number of outputs")
 
-	// errBadRevisionParentID is returned if the renter incorrectly download and
+	// errBadParentID is returned if the renter incorrectly download and
 	// provides the wrong parent id during a file contract revision.
-	errBadRevisionParentID = ErrorCommunication("revision rejected for bad parent id")
+	errBadParentID = ErrorCommunication("rejected for bad parent id")
 
-	// errBadRevisionRenterMissedOutput is returned if the renter incorrectly
-	// download and deducts an insufficient amount from the renter missed
-	// outputs during a file contract revision.
-	errBadRevisionRenterMissedOutput = ErrorCommunication("revision rejected because the renter missed output was updated incorrectly")
-
-	// errBadRevisionRenterValidOutput is returned if the renter incorrectly
-	// download and deducts an insufficient amount from the renter valid
-	// outputs during a file contract revision.
-	errBadRevisionRenterValidOutput = ErrorCommunication("revision rejected because the renter valid output was updated incorrectly")
-
-	// errBadRevisionUnlockConditions is returned if the renter incorrectly
-	// download and does not provide the right unlock conditions in the payment
+	// errBadUnlockConditions is returned if the renter incorrectly download
+	// and does not provide the right unlock conditions in the payment
 	// revision.
-	errBadRevisionUnlockConditions = ErrorCommunication("revision rejected for bad unlock conditions")
+	errBadUnlockConditions = ErrorCommunication("rejected for bad unlock conditions")
 
-	// errBadRevisionVoidOutput is returned if the renter incorrectly download
-	// and does not add sufficient payment to the void outputs in the payment
+	// errBadUnlockHash is returned if the renter incorrectly updates the
+	// unlock hash during a file contract revision.
+	errBadUnlockHash = ErrorCommunication("rejected for bad new unlock hash")
+
+	// errBadWindowEnd is returned if the renter incorrectly download and
+	// changes the window end during a file contract revision.
+	errBadWindowEnd = ErrorCommunication("rejected for bad new window end")
+
+	// errBadWindowStart is returned if the renter incorrectly updates the
+	// window start during a file contract revision.
+	errBadWindowStart = ErrorCommunication("rejected for bad new window start")
+
+	// errHighRenterMissedOutput is returned if the renter incorrectly download
+	// and deducts an insufficient amount from the renter missed outputs during
+	// a file contract revision.
+	errHighRenterMissedOutput = ErrorCommunication("rejected for high paying renter missed output")
+
+	// errHighRenterValidOutput is returned if the renter incorrectly download
+	// and deducts an insufficient amount from the renter valid outputs during
+	// a file contract revision.
+	errHighRenterValidOutput = ErrorCommunication("rejected for high paying renter valid output")
+
+	// errHighVoidOutput is returned if the renter incorrectly download and
+	// does not add sufficient payment to the void outputs in the payment
 	// revision.
-	errBadRevisionVoidOutput = ErrorCommunication("revision rejected for bad void output")
+	errHighVoidOutput = ErrorCommunication("rejected for low value void output")
 
 	// errLateRevision is returned if the renter is attempting to revise a
 	// revision after the revision deadline. The host needs time to submit the
 	// final revision to the blockchain to guarantee payment, and therefore
 	// will not accept revisions once the window start is too close.
 	errLateRevision = ErrorCommunication("renter is requesting revision after the revision deadline")
+
+	// errLowHostMissedOutput is returned if the renter incorrectly updates the
+	// host missed proof output during a file contract revision.
+	errLowHostMissedOutput = ErrorCommunication("rejected for low paying host missed output")
+
+	// errLowHostValidOutput is returned if the renter incorrectly updates the
+	// host valid proof output during a file contract revision.
+	errLowHostValidOutput = ErrorCommunication("rejected for low paying host valid output")
 )
 
 type (

@@ -147,7 +147,7 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractRevision, blockHeight types.BlockHeight, expectedTransfer types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(paymentRevision.NewValidProofOutputs) != 2 || len(paymentRevision.NewMissedProofOutputs) != 3 {
-		return errBadRevisionOutputCounts
+		return errBadContractOutputCounts
 	}
 
 	// Check that the time to finalize and submit the file contract revision
@@ -158,19 +158,19 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 
 	// The new revenue comes out of the renter's valid outputs.
 	if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
-		return errBadRevisionRenterValidOutput
+		return errHighRenterValidOutput
 	}
 	// The new revenue goes into the host's valid outputs.
 	if existingRevision.NewValidProofOutputs[1].Value.Add(expectedTransfer).Cmp(paymentRevision.NewValidProofOutputs[1].Value) < 0 {
-		return errBadRevisionHostValidOutput
+		return errLowHostValidOutput
 	}
 	// The new revenue comes out of the renter's missed outputs.
 	if paymentRevision.NewMissedProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewMissedProofOutputs[0].Value) > 0 {
-		return errBadRevisionRenterMissedOutput
+		return errHighRenterMissedOutput
 	}
 	// The new revenue goes into the void outputs.
 	if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) < 0 {
-		return errBadRevisionVoidOutput
+		return errHighVoidOutput
 	}
 	// Check that the revision count has increased.
 	if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {
@@ -179,28 +179,28 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 
 	// Check that all of the non-volatile fields are the same.
 	if paymentRevision.ParentID != existingRevision.ParentID {
-		return errBadRevisionParentID
+		return errBadParentID
 	}
 	if paymentRevision.UnlockConditions.UnlockHash() != existingRevision.UnlockConditions.UnlockHash() {
-		return errBadRevisionUnlockConditions
+		return errBadUnlockConditions
 	}
 	if paymentRevision.NewFileSize != existingRevision.NewFileSize {
-		return errBadRevisionNewFileSize
+		return errBadFileSize
 	}
 	if paymentRevision.NewFileMerkleRoot != existingRevision.NewFileMerkleRoot {
-		return errBadRevisionNewFileMerkleRoot
+		return errBadFileMerkleRoot
 	}
 	if paymentRevision.NewWindowStart != existingRevision.NewWindowStart {
-		return errBadRevisionNewWindowStart
+		return errBadWindowStart
 	}
 	if paymentRevision.NewWindowEnd != existingRevision.NewWindowEnd {
-		return errBadRevisionNewWindowEnd
+		return errBadWindowEnd
 	}
 	if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
-		return errBadRevisionNewUnlockHash
+		return errBadUnlockHash
 	}
 	if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
-		return errBadRevisionHostMissedOutput
+		return errLowHostMissedOutput
 	}
 	return nil
 }
