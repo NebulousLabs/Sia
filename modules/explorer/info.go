@@ -1,8 +1,12 @@
 package explorer
 
 import (
+	"errors"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/bolt"
 )
 
 // Block takes a block ID and finds the corresponding block, provided that the
@@ -40,22 +44,28 @@ func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, boo
 
 // LatestBlockFacts returns a set of statistics about the blockchain as they appeared
 // at the latest block height in the explorer's consensus set.
-func (e *Explorer) LatestBlockFacts() (modules.BlockFacts, bool) {
-	var height types.BlockHeight
-	err := e.db.View(dbGetInternal(internalBlockHeight, &height))
-	if err != nil {
-		return modules.BlockFacts{}, false
-	}
-	block, exists := e.cs.BlockAtHeight(height)
-	if !exists {
-		return modules.BlockFacts{}, false
-	}
+func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
 	var bf blockFacts
-	err = e.db.View(dbGetAndDecode(bucketBlockFacts, block.ID(), &bf))
+	err := e.db.View(func(tx *bolt.Tx) error {
+		var height types.BlockHeight
+		err := encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalBlockHeight), &height)
+		if err != nil {
+			return err
+		}
+		block, exists := e.cs.BlockAtHeight(height)
+		if !exists {
+			build.Critical(errors.New("latest explorer block doesnt exist in consensus set"))
+		}
+		bfBytes := tx.Bucket(bucketBlockFacts).Get(encoding.Marshal(block.ID()))
+		if bfBytes == nil {
+			build.Critical(errors.New("block facts for the latest explorer block dont exist"))
+		}
+		return encoding.Unmarshal(bfBytes, &bf)
+	})
 	if err != nil {
-		return modules.BlockFacts{}, false
+		build.Critical(err)
 	}
-	return bf.BlockFacts, true
+	return bf.BlockFacts
 }
 
 // Transaction takes a transaction ID and finds the block containing the

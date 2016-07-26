@@ -58,7 +58,7 @@ type (
 
 		// LatestBlockFacts returns the block facts of the last block
 		// in the explorer's database.
-		LatestBlockFacts() (BlockFacts, bool)
+		LatestBlockFacts() BlockFacts
 
 		// Transaction returns the block that contains the input transaction
 		// id. The transaction itself is either the block (indicating the miner
