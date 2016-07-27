@@ -11,6 +11,16 @@ import (
 	"errors"
 	"strings"
 	"sync/atomic"
+
+	"github.com/NebulousLabs/Sia/crypto"
+)
+
+const (
+	errorCommunicationProbability = 5
+	errorConnectionProbability    = 20
+	errorConsensusProbability     = 1
+	errorInternalProbability      = 3
+	errorNormalProbability        = 20
 )
 
 type (
@@ -105,33 +115,62 @@ func (ec ErrorInternal) Error() string {
 // mangedLogError will take an error and log it to the host, depending on the
 // type of error and whether or not the DEBUG flag has been set.
 func (h *Host) managedLogError(err error) {
-	// Determine the error type and the number of errors we've seen of that
-	// type previously.
+	// Determine the type of error and the number of times that this error has
+	// been logged.
 	var num uint64
+	var probability int // Error will be logged with 1/probability chance.
 	switch err.(type) {
 	case ErrorCommunication:
-		atomic.AddUint64(&h.atomicCommunicationErrors, 1)
 		num = atomic.LoadUint64(&h.atomicCommunicationErrors)
+		probability = errorCommunicationProbability
 	case ErrorConnection:
-		atomic.AddUint64(&h.atomicConnectionErrors, 1)
 		num = atomic.LoadUint64(&h.atomicConnectionErrors)
+		probability = errorConnectionProbability
 	case ErrorConsensus:
-		atomic.AddUint64(&h.atomicConsensusErrors, 1)
 		num = atomic.LoadUint64(&h.atomicConsensusErrors)
+		probability = errorConsensusProbability
 	case ErrorInternal:
-		atomic.AddUint64(&h.atomicInternalErrors, 1)
 		num = atomic.LoadUint64(&h.atomicInternalErrors)
+		probability = errorInternalProbability
 	default:
-		atomic.AddUint64(&h.atomicNormalErrors, 1)
 		num = atomic.LoadUint64(&h.atomicNormalErrors)
+		probability = errorNormalProbability
 	}
 
-	// If we've seen less than 250 of that type of error before, log the error
-	// as a normal logging statement. If we've seen more than 250 of that error
-	// before, log the error as a debugging statement.
-	if num < 250 {
+	// If num > logFewLimit, substantially decrease the probability that the error
+	// gets logged.
+	if num > logFewLimit {
+		probability = probability * 25
+	}
+
+	// If we've seen less than logAllLimit of that type of error before, log
+	// the error as a normal logging statement. Otherwise, probabilistically
+	// log the statement. In debugging mode, log all statements.
+	logged := false
+	rand, randErr := crypto.RandIntn(probability + 1)
+	if randErr != nil {
+		h.log.Critical("random number generation failed")
+	}
+	if num < logAllLimit || rand == probability {
+		logged = true
 		h.log.Println(err)
 	} else {
 		h.log.Debugln(err)
+	}
+
+	// If the error was logged, increment the log counter.
+	if logged {
+		switch err.(type) {
+		case ErrorCommunication:
+			atomic.AddUint64(&h.atomicCommunicationErrors, 1)
+		case ErrorConnection:
+			atomic.AddUint64(&h.atomicConnectionErrors, 1)
+		case ErrorConsensus:
+			atomic.AddUint64(&h.atomicConsensusErrors, 1)
+		case ErrorInternal:
+			atomic.AddUint64(&h.atomicInternalErrors, 1)
+		default:
+			atomic.AddUint64(&h.atomicNormalErrors, 1)
+		}
 	}
 }
