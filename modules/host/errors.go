@@ -67,15 +67,15 @@ func extendErr(s string, err error) error {
 		return nil
 	}
 
-	switch err.(type) {
+	switch v := err.(type) {
 	case ErrorCommunication:
-		return ErrorCommunication(s + err.Error())
+		return ErrorCommunication(s) + v
 	case ErrorConnection:
-		return ErrorConnection(s + err.Error())
+		return ErrorConnection(s) + v
 	case ErrorConsensus:
-		return ErrorConsensus(s + err.Error())
+		return ErrorConsensus(s) + v
 	case ErrorInternal:
-		return ErrorInternal(s + err.Error())
+		return ErrorInternal(s) + v
 	default:
 		return errors.New(s + err.Error())
 	}
