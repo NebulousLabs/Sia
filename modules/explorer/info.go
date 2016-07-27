@@ -1,10 +1,7 @@
 package explorer
 
 import (
-	"errors"
-	
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -30,13 +27,8 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 // at a given block height, and a bool indicating whether facts exist for the
 // given height.
 func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
-	block, exists := e.cs.BlockAtHeight(height)
-	if !exists {
-		return modules.BlockFacts{}, false
-	}
-
 	var bf blockFacts
-	err := e.db.View(dbGetAndDecode(bucketBlockFacts, block.ID(), &bf))
+	err := e.db.View(e.dbGetBlockFacts(height, &bf))
 	if err != nil {
 		return modules.BlockFacts{}, false
 	}
@@ -50,19 +42,11 @@ func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
 	var bf blockFacts
 	err := e.db.View(func(tx *bolt.Tx) error {
 		var height types.BlockHeight
-		err := encoding.Unmarshal(tx.Bucket(bucketInternal).Get(internalBlockHeight), &height)
+		err := dbGetInternal(internalBlockHeight, &height)(tx)
 		if err != nil {
 			return err
 		}
-		block, exists := e.cs.BlockAtHeight(height)
-		if !exists {
-			build.Critical(errors.New("latest explorer block doesnt exist in consensus set"))
-		}
-		bfBytes := tx.Bucket(bucketBlockFacts).Get(encoding.Marshal(block.ID()))
-		if bfBytes == nil {
-			build.Critical(errors.New("block facts for the latest explorer block dont exist"))
-		}
-		return encoding.Unmarshal(bfBytes, &bf)
+		return e.dbGetBlockFacts(height, &bf)(tx)
 	})
 	if err != nil {
 		build.Critical(err)
