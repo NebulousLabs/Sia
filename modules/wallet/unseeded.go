@@ -33,9 +33,9 @@ var (
 	errDuplicateSpendableKey = errors.New("key has already been loaded into the wallet")
 )
 
-// A SiagKeyPair is the struct representation of the bytes that get saved to
+// A siagKeyPair is the struct representation of the bytes that get saved to
 // disk by siag when a new keyfile is created.
-type SiagKeyPair struct {
+type siagKeyPair struct {
 	Header           string
 	Version          string
 	Index            int // should be uint64 - too late now
@@ -43,9 +43,9 @@ type SiagKeyPair struct {
 	UnlockConditions types.UnlockConditions
 }
 
-// SavedKey033x is the persist structure that was used to save and load private
+// savedKey033x is the persist structure that was used to save and load private
 // keys in versions v0.3.3.x for siad.
-type SavedKey033x struct {
+type savedKey033x struct {
 	SecretKey        crypto.SecretKey
 	UnlockConditions types.UnlockConditions
 	Visible          bool
@@ -98,7 +98,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 	// TODO: Check that the key is actually spendable.
 
 	// Create a UID and encryption verification.
-	var skf SpendableKeyFile
+	var skf spendableKeyFile
 	_, err := rand.Read(skf.UID[:])
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if len(keyfiles) < 1 {
 		return ErrNoKeyfile
 	}
-	skps := make([]SiagKeyPair, len(keyfiles))
+	skps := make([]siagKeyPair, len(keyfiles))
 	for i, keyfile := range keyfiles {
 		err := encoding.ReadFile(keyfile, &skps[i])
 		if err != nil {
@@ -204,7 +204,7 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 		return err
 	}
 
-	var savedKeys []SavedKey033x
+	var savedKeys []savedKey033x
 	err = encoding.ReadFile(filepath033x, &savedKeys)
 	if err != nil {
 		return err
