@@ -93,6 +93,10 @@ type Wallet struct {
 	processedTransactionMap          map[types.TransactionID]*modules.ProcessedTransaction
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
+	// The wallet's database tracks its seeds, keys, outputs, and
+	// transactions.
+	db *persist.BoltDatabase
+
 	// TODO: Storing the whole set of historic outputs is expensive and
 	// unnecessary. There's a better way to do it.
 	historicOutputs     map[types.OutputID]types.Currency
@@ -165,6 +169,10 @@ func (w *Wallet) Close() error {
 
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
+
+	if err := w.db.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("db.Close failed: %v", err))
+	}
 
 	if err := w.log.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
