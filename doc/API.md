@@ -82,104 +82,63 @@ Table of contents
 Daemon
 ------
 
-Queries:
+| Route                                     | HTTP verb |
+| ----------------------------------------- | --------- |
+| [/daemon/constants](#daemonconstants-get) | GET       |
+| [/daemon/stop](#daemonstop-get)           | GET       |
+| [/daemon/version](#daemonversion-get)     | GET       |
 
-* /daemon/constants [GET]
-* /daemon/stop      [GET]
-* /daemon/version   [GET]
+For examples and detailed descriptions of request and response parameters,
+refer to [Daemon.md](/doc/api/Daemon.md).
 
 #### /daemon/constants [GET]
 
-Function: Returns the set of constants in use.
+returns the set of constants in use.
 
-Parameters: none
+###### JSON Response [(with comments)](/doc/api/Daemon.md#json-response)
+```javascript
+{
+  "genesistimestamp":      1257894000, // Unix time
+  "blocksizelimit":        2000000,    // bytes
+  "blockfrequency":        600,        // seconds per block
+  "targetwindow":          1000,       // blocks
+  "mediantimestampwindow": 11,         // blocks
+  "futurethreshold":       10800,      // seconds
+  "siafundcount":          "10000",
+  "siafundportion":        "39/1000",
+  "maturitydelay":         144,        // blocks
 
-Response:
-```
-struct {
-	genesistimestamp      types.Timestamp (uint64)
-	blocksizelimit        uint64
-	blockfrequency        types.BlockHeight (uint64)
-	targetwindow          types.BlockHeight (uint64)
-	mediantimestampwindow uint64
-	futurethreshold       types.Timestamp   (uint64)
-	siafundcount          types.Currency    (string)
-	siafundportion        *big.Rat          (string)
-	maturitydelay         types.BlockHeight (uint64)
+  "initialcoinbase": 300000, // SiaCoins (see note in Daemon.md)
+  "minimumcoinbase": 30000,  // SiaCoins (see note in Daemon.md)
 
-	initialcoinbase uint64
-	minimumcoinbase uint64
+  "roottarget": [0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  "rootdepth":  [255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255],
 
-	roottarget types.Target (byte array)
-	rootdepth  types.Target (byte array)
+  "maxadjustmentup":   "5/2",
+  "maxadjustmentdown": "2/5",
 
-	maxadjustmentup   *big.Rat (string)
-	maxadjustmentdown *big.Rat (string)
-
-	siacoinprecision types.Currency (string)
+  "siacoinprecision": "1000000000000000000000000" // hastings per siacoin
 }
 ```
-'genesistimestamp' is the timestamp of the genesis block.
-
-'blocksizelimit' is the maximum size a block can be without being rejected.
-
-'blockfrequency' is the target for how frequently new blocks should be mined.
-
-'targetwindow' is the height of the window used to adjust the difficulty.
-
-'mediantimestampwindow' is the duration of the window used to adjust the
-difficulty.
-
-'futurethreshold' is how far in the future a block can be without being
-rejected.
-
-'siafundcount' is the total number of siafunds.
-
-'siafundportion' is the percentage of each file contract payout given to
-siafund holders.
-
-'maturitydelay' is the number of children a block must have before it is
-considered "mature."
-
-'initialcoinbase' is the number of coins given to the miner of the first
-block.
-
-'minimumcoinbase' is the minimum number of coins paid out to the miner of a
-block (the coinbase decreases with each block).
-
-'roottarget' is the initial target.
-
-'rootdepth' is the initial depth.
-
-'maxadjustmentup' is the largest allowed ratio between the old difficulty and
-the new difficulty.
-
-'maxadjustmentdown' is the smallest allowed ratio between the old difficulty
-and the new difficulty.
-
-'siacoinprecision' is the number of Hastings in one siacoin.
 
 #### /daemon/stop [GET]
 
-Function: Cleanly shuts down the daemon. May take a few seconds.
+cleanly shuts down the daemon. May take a few seconds.
 
-Parameters: none
-
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /daemon/version [GET]
 
-Function: Returns the version of Sia currently running.
+returns the version of the Sia daemon currently running.
 
-Parameters: none
-
-Response:
-```
-struct {
-	version   string
+###### JSON Response [(with comments)](/doc/api/Daemon.md#json-response-1)
+```javascript
+{
+  "version": "1.0.0"
 }
 ```
-'version' is the version of the responding Sia daemon.
 
 Consensus
 ---------
