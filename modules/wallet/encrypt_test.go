@@ -95,19 +95,23 @@ func TestIntegrationPreEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer wt.closeWt()
-	// Check that the wallet knows it's not encrypted.
-	if wt.wallet.Encrypted() {
-		t.Error("wallet is reporting that it has been encrypted")
-	}
-	err = wt.wallet.Lock()
-	if err != modules.ErrLockedWallet {
-		t.Fatal(err)
-	}
-	err = wt.wallet.Unlock(crypto.TwofishKey{})
-	if err != errUnencryptedWallet {
-		t.Fatal(err)
-	}
+	// wt must be closed before test can continue. An enclosing function +
+	// defer is used to ensure that wt will be closed if t.Fatal is called.
+	func() {
+		defer wt.closeWt()
+		// Check that the wallet knows it's not encrypted.
+		if wt.wallet.Encrypted() {
+			t.Error("wallet is reporting that it has been encrypted")
+		}
+		err = wt.wallet.Lock()
+		if err != modules.ErrLockedWallet {
+			t.Fatal(err)
+		}
+		err = wt.wallet.Unlock(crypto.TwofishKey{})
+		if err != errUnencryptedWallet {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create a second wallet using the same directory - make sure that if any
 	// files have been created, the wallet is still being treated as new.
