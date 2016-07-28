@@ -22,7 +22,7 @@ var (
 
 // uidEncryptionKey creates an encryption key that is used to decrypt a
 // specific key file.
-func uidEncryptionKey(masterKey crypto.TwofishKey, uid UniqueID) crypto.TwofishKey {
+func uidEncryptionKey(masterKey crypto.TwofishKey, uid uniqueID) crypto.TwofishKey {
 	return crypto.TwofishKey(crypto.HashAll(masterKey, uid))
 }
 
