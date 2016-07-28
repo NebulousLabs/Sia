@@ -8,6 +8,8 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -111,7 +113,23 @@ func (w *Wallet) initSettings() error {
 // openDB loads the set database and populates it with the necessary buckets.
 func (w *Wallet) openDB(filename string) (err error) {
 	w.db, err = persist.OpenDatabase(dbMetadata, filename)
-	// TODO: initialize DB
+	if err != nil {
+		return err
+	}
+	// initialize the database
+	err = w.db.Update(func(tx *bolt.Tx) error {
+		buckets := [][]byte{
+			bucketHistoricOutputs,
+			bucketHistoricClaimStarts,
+		}
+		for _, b := range buckets {
+			_, err := tx.CreateBucketIfNotExists(b)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	return err
 }
 
