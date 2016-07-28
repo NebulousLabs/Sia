@@ -24,14 +24,14 @@ var (
 )
 
 type (
-	// UniqueID is a unique id randomly generated and put at the front of every
+	// uniqueID is a unique id randomly generated and put at the front of every
 	// persistence object. It is used to make sure that a different encryption
 	// key can be used for every persistence object.
-	UniqueID [crypto.EntropySize]byte
+	uniqueID [crypto.EntropySize]byte
 
-	// SeedFile stores an encrypted wallet seed on disk.
-	SeedFile struct {
-		UID                    UniqueID
+	// seedFile stores an encrypted wallet seed on disk.
+	seedFile struct {
+		UID                    uniqueID
 		EncryptionVerification crypto.Ciphertext
 		Seed                   crypto.Ciphertext
 	}
@@ -62,32 +62,32 @@ func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 }
 
 // encryptAndSaveSeedFile encrypts and saves a seed file.
-func (w *Wallet) encryptAndSaveSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) (SeedFile, error) {
-	var sf SeedFile
+func (w *Wallet) encryptAndSaveSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) (seedFile, error) {
+	var sf seedFile
 	_, err := rand.Read(sf.UID[:])
 	if err != nil {
-		return SeedFile{}, err
+		return seedFile{}, err
 	}
 	sek := uidEncryptionKey(masterKey, sf.UID)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
 	sf.EncryptionVerification, err = sek.EncryptBytes(plaintextVerification)
 	if err != nil {
-		return SeedFile{}, err
+		return seedFile{}, err
 	}
 	sf.Seed, err = sek.EncryptBytes(seed[:])
 	if err != nil {
-		return SeedFile{}, err
+		return seedFile{}, err
 	}
 	seedFilename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
 	err = persist.SaveFileSync(seedMetadata, sf, seedFilename)
 	if err != nil {
-		return SeedFile{}, err
+		return seedFile{}, err
 	}
 	return sf, nil
 }
 
 // decryptSeedFile decrypts a seed file using the encryption key.
-func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.Seed, err error) {
+func decryptSeedFile(masterKey crypto.TwofishKey, sf seedFile) (seed modules.Seed, err error) {
 	// Verify that the provided master key is the correct key.
 	decryptionKey := uidEncryptionKey(masterKey, sf.UID)
 	expectedDecryptedVerification := make([]byte, crypto.EntropySize)
