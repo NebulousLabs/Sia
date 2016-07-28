@@ -184,35 +184,26 @@ struct {
 Consensus
 ---------
 
-Queries:
+| Route                        | HTTP verb |
+| ---------------------------- | --------- |
+| [/consensus](#consensus-get) | GET       |
 
-* /consensus                 [GET]
+For examples and detailed descriptions of request and response parameters,
+refer to [Consensus.md](/doc/api/Consensus.md).
 
 #### /consensus [GET]
 
-Function: Returns information about the consensus set, such as the current
-block height.
+returns information about the consensus set, such as the current block height.
 
-Parameters: none
-
-Response:
-```
-struct {
-	synced       types.BlockHeight (bool)
-	height       types.BlockHeight (uint64)
-	currentblock types.BlockID     (string)
-	target       types.Target      (byte array)
+###### JSON Response [(with comments)](/doc/api/Consensus.md#json-response)
+```javascript
+{
+  "synced":       true,
+  "height":       62248,
+  "currentblock": "00000000000008a84884ba827bdc868a17ba9c14011de33ff763bd95779a9cf1",
+  "target":       [0,0,0,0,0,0,11,48,125,79,116,89,136,74,42,27,5,14,10,31,23,53,226,238,202,219,5,204,38,32,59,165]
 }
 ```
-'synced' is a bool that indicates if the consensus set is synced with the
-network. Will be false during initial blockchain download and true after.
-
-'height' is the number of blocks in the blockchain.
-
-'currentblock' is the hash of the current block.
-
-'target' is the hash that needs to be met by a block for the block to be valid.
-The target is inversely proportional to the difficulty.
 
 Explorer
 --------
