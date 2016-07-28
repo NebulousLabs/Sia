@@ -25,7 +25,7 @@ func countFileLines(filepath string) (uint64, error) {
 	lines := uint64(0)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.Contains(line, "DEBUG") {
+		if !strings.Contains(line, "[DEBUG]") {
 			lines++
 		}
 	}
@@ -146,9 +146,7 @@ func TestExtendErr(t *testing.T) {
 	if err2.Error() != "communication error: extend: err" {
 		t.Error("extending ErrorCommunication did not occur correctly:", err2.Error())
 	}
-	switch err2.(type) {
-	case ErrorCommunication:
-	default:
+	if _, ok := err2.(ErrorCommunication); !ok {
 		t.Error("extended error did not preserve error type")
 	}
 
