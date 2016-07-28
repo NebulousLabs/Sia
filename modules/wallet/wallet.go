@@ -97,11 +97,6 @@ type Wallet struct {
 	// transactions.
 	db *persist.BoltDatabase
 
-	// TODO: Storing the whole set of historic outputs is expensive and
-	// unnecessary. There's a better way to do it.
-	historicOutputs     map[types.OutputID]types.Currency
-	historicClaimStarts map[types.SiafundOutputID]types.Currency
-
 	persistDir string
 	log        *persist.Logger
 	mu         sync.RWMutex
@@ -134,9 +129,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		spentOutputs:   make(map[types.OutputID]types.BlockHeight),
 
 		processedTransactionMap: make(map[types.TransactionID]*modules.ProcessedTransaction),
-
-		historicOutputs:     make(map[types.OutputID]types.Currency),
-		historicClaimStarts: make(map[types.SiafundOutputID]types.Currency),
 
 		persistDir: persistDir,
 	}

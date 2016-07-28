@@ -95,7 +95,7 @@ func TestIntegrationPreEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// wt must be closed before test can continue. An enclosing function +
+	// wt must be closed before the test can continue. An enclosing function +
 	// defer is used to ensure that wt will be closed if t.Fatal is called.
 	func() {
 		defer wt.closeWt()
