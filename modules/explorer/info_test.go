@@ -14,10 +14,7 @@ func TestImmediateBlockFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	facts, exists := et.explorer.BlockFacts(et.cs.Height())
-	if !exists {
-		t.Fatal("could not find block facts for current height")
-	}
+	facts := et.explorer.LatestBlockFacts()
 	var explorerHeight types.BlockHeight
 	err = et.explorer.db.View(dbGetInternal(internalBlockHeight, &explorerHeight))
 	if err != nil {

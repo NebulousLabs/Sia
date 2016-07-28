@@ -90,6 +90,18 @@ func dbGetTransactionIDSet(bucket []byte, key interface{}, ids *[]types.Transact
 	}
 }
 
+// dbGetBlockFacts returns a 'func(*bolt.Tx) error' that decodes
+// the block facts for `height` into blockfacts
+func (e *Explorer) dbGetBlockFacts(height types.BlockHeight, bf *blockFacts) func(*bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
+		block, exists := e.cs.BlockAtHeight(height)
+		if !exists {
+			return errors.New("requested block facts for a block that does not exist")
+		}
+		return dbGetAndDecode(bucketBlockFacts, block.ID(), bf)(tx)
+	}
+}
+
 // dbSetInternal sets the specified key of bucketInternal to the encoded value.
 func dbSetInternal(key []byte, val interface{}) func(*bolt.Tx) error {
 	return func(tx *bolt.Tx) error {

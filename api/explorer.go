@@ -353,11 +353,7 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 
 // explorerHandler handles API calls to /explorer
 func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	height := srv.cs.Height()
-	facts, exists := srv.explorer.BlockFacts(height)
-	if !exists && build.DEBUG {
-		panic("stats for the most recent block do not exist")
-	}
+	facts := srv.explorer.LatestBlockFacts()
 	writeJSON(w, ExplorerGET{
 		BlockFacts: facts,
 	})

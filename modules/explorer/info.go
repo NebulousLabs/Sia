@@ -1,8 +1,11 @@
 package explorer
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // Block takes a block ID and finds the corresponding block, provided that the
@@ -24,18 +27,31 @@ func (e *Explorer) Block(id types.BlockID) (types.Block, types.BlockHeight, bool
 // at a given block height, and a bool indicating whether facts exist for the
 // given height.
 func (e *Explorer) BlockFacts(height types.BlockHeight) (modules.BlockFacts, bool) {
-	block, exists := e.cs.BlockAtHeight(height)
-	if !exists {
-		return modules.BlockFacts{}, false
-	}
-
 	var bf blockFacts
-	err := e.db.View(dbGetAndDecode(bucketBlockFacts, block.ID(), &bf))
+	err := e.db.View(e.dbGetBlockFacts(height, &bf))
 	if err != nil {
 		return modules.BlockFacts{}, false
 	}
 
 	return bf.BlockFacts, true
+}
+
+// LatestBlockFacts returns a set of statistics about the blockchain as they appeared
+// at the latest block height in the explorer's consensus set.
+func (e *Explorer) LatestBlockFacts() modules.BlockFacts {
+	var bf blockFacts
+	err := e.db.View(func(tx *bolt.Tx) error {
+		var height types.BlockHeight
+		err := dbGetInternal(internalBlockHeight, &height)(tx)
+		if err != nil {
+			return err
+		}
+		return e.dbGetBlockFacts(height, &bf)(tx)
+	})
+	if err != nil {
+		build.Critical(err)
+	}
+	return bf.BlockFacts
 }
 
 // Transaction takes a transaction ID and finds the block containing the
