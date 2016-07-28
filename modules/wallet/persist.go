@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	logFile            = modules.WalletDir + ".log"
-	settingsFileSuffix = ".json"
-	settingsFile       = modules.WalletDir + settingsFileSuffix
+	logFile      = modules.WalletDir + ".log"
+	settingsFile = modules.WalletDir + ".json"
+	dbFile       = modules.WalletDir + ".db"
 
 	encryptionVerificationLen = 32
 )
@@ -26,6 +26,11 @@ var (
 	seedMetadata = persist.Metadata{
 		Header:  "Wallet Seed",
 		Version: "0.4.0",
+	}
+
+	dbMetadata = persist.Metadata{
+		Header:  "Wallet Database",
+		Version: "1.0.0",
 	}
 )
 
@@ -103,6 +108,13 @@ func (w *Wallet) initSettings() error {
 	return w.loadSettings()
 }
 
+// openDB loads the set database and populates it with the necessary buckets.
+func (w *Wallet) openDB(filename string) (err error) {
+	w.db, err = persist.OpenDatabase(dbMetadata, filename)
+	// TODO: initialize DB
+	return err
+}
+
 // initPersist loads all of the wallet's persistence files into memory,
 // creating them if they do not exist.
 func (w *Wallet) initPersist() error {
@@ -124,6 +136,13 @@ func (w *Wallet) initPersist() error {
 	if err != nil {
 		return err
 	}
+
+	// Open the database.
+	err = w.openDB(filepath.Join(w.persistDir, dbFile))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

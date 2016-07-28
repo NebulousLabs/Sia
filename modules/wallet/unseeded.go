@@ -172,7 +172,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if err != nil {
 		return err
 	}
-	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+settingsFileSuffix))
+	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+".json"))
 }
 
 // LoadSiagKeys loads a set of siag-generated keys into the wallet.
@@ -230,5 +230,5 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	if seedsLoaded == 0 {
 		return errAllDuplicates
 	}
-	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+settingsFileSuffix))
+	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+".json"))
 }
