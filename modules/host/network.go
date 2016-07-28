@@ -163,6 +163,7 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
+		err = extendErr("error with "+conn.RemoteAddr().String()+": ", err)
 		h.managedLogError(err)
 	}
 }
