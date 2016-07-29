@@ -196,7 +196,7 @@ func (h *Host) checkUnlockHash() error {
 		// the host will be using this unlock hash to establish identity, and
 		// losing it will mean silently losing part of the host identity.
 		h.unlockHash = uc.UnlockHash()
-		err = h.save()
+		err = h.saveSync()
 		if err != nil {
 			return err
 		}
@@ -394,7 +394,7 @@ func (h *Host) InternalSettings() modules.HostInternalSettings {
 	defer h.mu.RUnlock(lockID)
 	err := h.tg.Add()
 	if err != nil {
-		build.Critical("call to InternalSettings after close")
+		return modules.HostInternalSettings{}
 	}
 	defer h.tg.Done()
 	return h.settings
