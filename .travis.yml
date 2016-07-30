@@ -18,6 +18,7 @@ sudo: false
 branches:
   only:
     - master
+    - wallet
 
 notifications:
   email: false
