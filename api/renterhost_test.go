@@ -135,6 +135,23 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatal("data mismatch when downloading a file")
 	}
 
+	// Rename the second file's entry in the renter's list of files.
+	renameValues := url.Values{}
+	renameValues.Set("newsiapath", "newtest2")
+	if err = st.stdPostAPI("/renter/rename/test2", renameValues); err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the list of files is updated to reflect the name change.
+	files := RenterFiles{}
+	if err = st.getAPI("/renter/files", &files); err != nil {
+		t.Fatal(err)
+	}
+	// The second file entry is at the front of files.Files since new entries
+	// are prepended.
+	if name := files.Files[0].SiaPath; name != "newtest2" {
+		t.Fatalf("test2 should have been renamed to newtest2; named %v instead", name)
+	}
+
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
 	// of 40 blocks should be mined.
