@@ -24,6 +24,7 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	wt.wallet.db.Close() // db must be closed before reuse
 
 	// Create a second wallet that loads the persist structures of the existing
 	// wallet. This wallet should have a siafund balance.
@@ -74,6 +75,7 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	wt.wallet.db.Close() // db must be closed before reuse
 
 	// Create a second wallet that loads the persist structures of the existing
 	// wallet. This wallet should have a siafund balance.
