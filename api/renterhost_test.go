@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -64,8 +65,10 @@ func TestIntegrationHostAndRent(t *testing.T) {
 
 	// set an allowance for the renter, allowing a contract to be formed
 	allowanceValues := url.Values{}
-	allowanceValues.Set("funds", "10000000000000000000000000000") // 10k SC
-	allowanceValues.Set("period", "5")
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "5"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +80,37 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 	if len(contracts.Contracts) != 1 {
 		t.Fatalf("expected renter to have 1 contract; got %v", len(contracts.Contracts))
+	}
+	// Check that a call to /renter returns the expected values.
+	var get RenterGET
+	if err = st.getAPI("/renter", &get); err != nil {
+		t.Fatal(err)
+	}
+	expectedFunds, ok := scanAmount(testFunds)
+	if !ok {
+		t.Fatal("scanAmount failed")
+	}
+	if got := get.Settings.Allowance.Funds; got.Cmp(expectedFunds) != 0 {
+		t.Fatalf("expected funds to be %v; got %v", expectedFunds, got)
+	}
+	intPeriod, err := strconv.Atoi(testPeriod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedPeriod := types.BlockHeight(intPeriod)
+	if got := get.Settings.Allowance.Period; got != expectedPeriod {
+		t.Fatalf("expected period to be %v; got %v", expectedPeriod, got)
+	}
+	expectedRenewWindow := expectedPeriod / 2
+	if got := get.Settings.Allowance.RenewWindow; got != expectedRenewWindow {
+		t.Fatalf("expected renew window to be %v; got %v", expectedRenewWindow, got)
+	}
+	var expectedContractSpending types.Currency
+	for _, contract := range contracts.Contracts {
+		expectedContractSpending = expectedContractSpending.Add(contract.RenterFunds)
+	}
+	if got := get.FinancialMetrics.ContractSpending; got.Cmp(expectedContractSpending) != 0 {
+		t.Fatalf("expected contract spending to be %v; got %v", expectedContractSpending, got)
 	}
 
 	// create a file
