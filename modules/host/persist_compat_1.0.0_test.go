@@ -2,7 +2,6 @@ package host
 
 import (
 	"path/filepath"
-	"sync/atomic"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -41,10 +40,6 @@ func TestHostPersistCompat100(t *testing.T) {
 	// Check that, after loading the compatibility file, all of the values are
 	// still correct. The file that was transplanted had no zero-value fields.
 	ht.host.mu.Lock()
-	errCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-	if errCalls == 0 {
-		t.Error("error calls incorrectly loaded after compatibility loading")
-	}
 	if h.financialMetrics.PotentialStorageRevenue.IsZero() {
 		t.Error("potential storage revenue not loaded correctly")
 	}

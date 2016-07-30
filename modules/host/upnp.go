@@ -1,19 +1,10 @@
 package host
 
 import (
-	"errors"
-	"io"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/NebulousLabs/go-upnp"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
 )
 
 // managedLearnHostname discovers the external IP of the Host. If the host's
