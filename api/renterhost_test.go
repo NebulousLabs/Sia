@@ -141,16 +141,6 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if err = st.stdPostAPI("/renter/rename/test2", renameValues); err != nil {
 		t.Fatal(err)
 	}
-	// Make sure the list of files is updated to reflect the name change.
-	files := RenterFiles{}
-	if err = st.getAPI("/renter/files", &files); err != nil {
-		t.Fatal(err)
-	}
-	// The second file entry is at the front of files.Files since new entries
-	// are prepended.
-	if name := files.Files[0].SiaPath; name != "newtest2" {
-		t.Fatalf("test2 should have been renamed to newtest2; named %v instead", name)
-	}
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12
 	// blocks after the storage window has closed to report the profit, a total
@@ -167,5 +157,21 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Log("Bandwidth Revenue:", hg.FinancialMetrics.DownloadBandwidthRevenue)
 		t.Log("Full Financial Metrics:", hg.FinancialMetrics)
 		t.Fatal("Host is not displaying revenue after resolving a storage proof.")
+	}
+
+	// Delete both files.
+	if err = st.stdPostAPI("/renter/delete/test", url.Values{}); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.stdPostAPI("/renter/delete/newtest2", url.Values{}); err != nil {
+		t.Fatal(err)
+	}
+	// The renter's list of files should now be empty.
+	files := RenterFiles{}
+	if err = st.getAPI("/renter/files", &files); err != nil {
+		t.Fatal(err)
+	}
+	if len(files.Files) != 0 {
+		t.Fatalf("renter's list of files should be empty; got %v instead", files)
 	}
 }
