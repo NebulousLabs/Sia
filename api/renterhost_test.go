@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -125,7 +126,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	allowanceValues.Set("funds", "")
 	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err.Error() != "Couldn't parse funds" {
+	if err == nil || err.Error() != "Couldn't parse funds" {
 		t.Errorf("expected error to be 'Couldn't parse funds'; got %v", err)
 	}
 	// Try an invalid funds string. Can't test a negative value since
@@ -133,26 +134,26 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	// debug mode.
 	allowanceValues.Set("funds", "0")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err.Error() != contractor.ErrInsufficientAllowance.Error() {
+	if err == nil || err.Error() != contractor.ErrInsufficientAllowance.Error() {
 		t.Errorf("expected error to be %v; got %v", contractor.ErrInsufficientAllowance, err)
 	}
 	// Try a empty period string.
 	allowanceValues.Set("funds", testFunds)
 	allowanceValues.Set("period", "")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err.Error()[:23] != "Couldn't parse period: " {
+	if err == nil || !strings.HasPrefix(err.Error(), "Couldn't parse period: ") {
 		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
 	}
 	// Try an invalid period string.
 	allowanceValues.Set("period", "-1")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err.Error()[:23] != "Couldn't parse period: " {
+	if err == nil || err.Error()[:23] != "Couldn't parse period: " {
 		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
 	}
 	// Try a period that will lead to a length-zero RenewWindow.
 	allowanceValues.Set("period", "1")
 	err = st.stdPostAPI("/renter", allowanceValues)
-	if err.Error() != contractor.ErrAllowanceZeroWindow.Error() {
+	if err == nil || err.Error() != contractor.ErrAllowanceZeroWindow.Error() {
 		t.Errorf("expected error to be %v, got %v", contractor.ErrAllowanceZeroWindow, err)
 	}
 
@@ -206,7 +207,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	uploadValues = url.Values{}
 	uploadValues.Set("source", path)
 	err = st.stdPostAPI("/renter/upload/fake", uploadValues)
-	if n := len(err.Error()); err.Error()[n-25:] != "no such file or directory" {
+	if err == nil || !strings.HasSuffix(err.Error(), "no such file or directory") {
 		t.Errorf("expected error to end with 'no such file or directory'; got %v", err)
 	}
 
@@ -231,7 +232,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 
 	// Try downloading a nonexistent file.
 	err = st.stdGetAPI("/renter/download/fake?destination=" + downpath)
-	if err.Error() != "Download failed: no file with that path" {
+	if err == nil || err.Error() != "Download failed: no file with that path" {
 		t.Errorf("expected error to be 'Download failed: no file with that path'; got %v instead", err)
 	}
 
@@ -252,12 +253,14 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 	// Try renaming a nonexistent file.
 	renameValues.Set("newsiapath", "newfake")
-	if err = st.stdPostAPI("/renter/rename/fake", renameValues); err.Error() != renter.ErrUnknownPath.Error() {
+	err = st.stdPostAPI("/renter/rename/fake", renameValues)
+	if err == nil || err.Error() != renter.ErrUnknownPath.Error() {
 		t.Errorf("expected %v, got %v", renter.ErrUnknownPath, err)
 	}
 	// Try renaming the first file to a name that's already taken.
 	renameValues.Set("newsiapath", "newtest2")
-	if err = st.stdPostAPI("/renter/rename/test", renameValues); err.Error() != renter.ErrPathOverload.Error() {
+	err = st.stdPostAPI("/renter/rename/test", renameValues)
+	if err == nil || err.Error() != renter.ErrPathOverload.Error() {
 		t.Errorf("expected error to be %v, got %v", renter.ErrPathOverload, err)
 	}
 
