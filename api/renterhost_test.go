@@ -31,7 +31,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	// announce the host and start accepting contracts
+	// Announce the host and start accepting contracts.
 	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +45,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// the renter should not have any contracts yet
+	// The renter should not have any contracts yet.
 	contracts := RenterContracts{}
 	if err = st.getAPI("/renter/contracts", &contracts); err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatalf("expected renter to have 0 contracts; got %v", len(contracts.Contracts))
 	}
 
-	// the renter's downloads queue should be empty
+	// The renter's downloads queue should be empty.
 	queue := RenterDownloadQueue{}
 	if err = st.getAPI("/renter/downloads", &queue); err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatalf("expected renter to have 0 downloads in the queue; got %v", len(queue.Downloads))
 	}
 
-	// set an allowance for the renter, allowing a contract to be formed
+	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
 	testFunds := "10000000000000000000000000000" // 10k SC
 	testPeriod := "5"
@@ -74,18 +74,20 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// the renter should now have 1 contract
+	// The renter should now have 1 contract.
 	if err = st.getAPI("/renter/contracts", &contracts); err != nil {
 		t.Fatal(err)
 	}
 	if len(contracts.Contracts) != 1 {
 		t.Fatalf("expected renter to have 1 contract; got %v", len(contracts.Contracts))
 	}
+
 	// Check that a call to /renter returns the expected values.
 	var get RenterGET
 	if err = st.getAPI("/renter", &get); err != nil {
 		t.Fatal(err)
 	}
+	// Check the renter's funds.
 	expectedFunds, ok := scanAmount(testFunds)
 	if !ok {
 		t.Fatal("scanAmount failed")
@@ -93,6 +95,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if got := get.Settings.Allowance.Funds; got.Cmp(expectedFunds) != 0 {
 		t.Fatalf("expected funds to be %v; got %v", expectedFunds, got)
 	}
+	// Check the renter's period.
 	intPeriod, err := strconv.Atoi(testPeriod)
 	if err != nil {
 		t.Fatal(err)
@@ -101,10 +104,12 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if got := get.Settings.Allowance.Period; got != expectedPeriod {
 		t.Fatalf("expected period to be %v; got %v", expectedPeriod, got)
 	}
+	// Check the renter's renew window.
 	expectedRenewWindow := expectedPeriod / 2
 	if got := get.Settings.Allowance.RenewWindow; got != expectedRenewWindow {
 		t.Fatalf("expected renew window to be %v; got %v", expectedRenewWindow, got)
 	}
+	// Check the renter's contract spending.
 	var expectedContractSpending types.Currency
 	for _, contract := range contracts.Contracts {
 		expectedContractSpending = expectedContractSpending.Add(contract.RenterFunds)
@@ -113,21 +118,21 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatalf("expected contract spending to be %v; got %v", expectedContractSpending, got)
 	}
 
-	// create a file
+	// Create a file.
 	path := filepath.Join(st.dir, "test.dat")
 	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// upload to host
+	// Upload to host.
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// only one piece will be uploaded (10% at current redundancy)
+	// Only one piece will be uploaded (10% at current redundancy).
 	var rf RenterFiles
 	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
@@ -150,7 +155,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// only one piece will be uploaded (10% at current redundancy)
+	// Only one piece will be uploaded (10% at current redundancy).
 	for i := 0; i < 200 && (len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(100 * time.Millisecond)
