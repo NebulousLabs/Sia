@@ -53,6 +53,15 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatalf("expected renter to have 0 contracts; got %v", len(contracts.Contracts))
 	}
 
+	// the renter's downloads queue should be empty
+	queue := RenterDownloadQueue{}
+	if err = st.getAPI("/renter/downloads", &queue); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.Downloads) != 0 {
+		t.Fatalf("expected renter to have 0 downloads in the queue; got %v", len(queue.Downloads))
+	}
+
 	// set an allowance for the renter, allowing a contract to be formed
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "10000000000000000000000000000") // 10k SC
@@ -133,6 +142,14 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
+	}
+	// The downloads queue should now contain the second file's download.
+	// Downloads are never removed from the queue within a siad session.
+	if err = st.getAPI("/renter/downloads", &queue); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.Downloads) != 1 {
+		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
 
 	// Rename the second file's entry in the renter's list of files.
