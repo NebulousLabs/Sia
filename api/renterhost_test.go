@@ -44,13 +44,30 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create contracts
+	// the renter should not have any contracts yet
+	contracts := RenterContracts{}
+	if err = st.getAPI("/renter/contracts", &contracts); err != nil {
+		t.Fatal(err)
+	}
+	if len(contracts.Contracts) != 0 {
+		t.Fatalf("expected renter to have 0 contracts; got %v", len(contracts.Contracts))
+	}
+
+	// set an allowance for the renter, allowing a contract to be formed
 	allowanceValues := url.Values{}
 	allowanceValues.Set("funds", "10000000000000000000000000000") // 10k SC
 	allowanceValues.Set("period", "5")
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// the renter should now have 1 contract
+	if err = st.getAPI("/renter/contracts", &contracts); err != nil {
+		t.Fatal(err)
+	}
+	if len(contracts.Contracts) != 1 {
+		t.Fatalf("expected renter to have 1 contract; got %v", len(contracts.Contracts))
 	}
 
 	// create a file
