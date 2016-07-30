@@ -254,6 +254,8 @@ func TestRenterHostsAllHandler(t *testing.T) {
 	}
 }
 
+// TestRenterHandlerContracts checks that contract formation between a host and
+// renter behaves as expected, and that contract spending is the right amount.
 func TestRenterHandlerContracts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -316,6 +318,9 @@ func TestRenterHandlerContracts(t *testing.T) {
 
 }
 
+// TestRenterHandlerGetAndPost checks that valid /renter calls successfully set
+// allowance values, while /renter calls with invalid allowance values are
+// correctly handled.
 func TestRenterHandlerGetAndPost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -411,6 +416,8 @@ func TestRenterHandlerGetAndPost(t *testing.T) {
 	}
 }
 
+// TestRenterLoadNonexistent checks that attempting to upload or download a
+// nonexistent file triggers the appropriate error.
 func TestRenterLoadNonexistent(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -467,6 +474,8 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	}
 }
 
+// TestRenterHandlerRename checks that valid /renter/rename calls are
+// successful, and that invalid  calls fail with the appropriate error.
 func TestRenterHandlerRename(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -547,6 +556,9 @@ func TestRenterHandlerRename(t *testing.T) {
 	}
 }
 
+// TestRenterHandlerDelete checks that deleting a valid file from the renter
+// goes as planned and that attempting to delete a nonexistent file fails with
+// the appropriate error.
 func TestRenterHandlerDelete(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
