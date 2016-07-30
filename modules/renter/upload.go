@@ -41,6 +41,9 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	if strings.HasPrefix(up.SiaPath, "/") {
 		return errors.New("nicknames cannot begin with /")
 	}
+	if up.SiaPath == "" {
+		return ErrEmptyFilename
+	}
 
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
