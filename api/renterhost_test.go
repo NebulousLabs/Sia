@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
+	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -46,7 +48,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 
 	// The renter should not have any contracts yet.
-	contracts := RenterContracts{}
+	var contracts RenterContracts
 	if err = st.getAPI("/renter/contracts", &contracts); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +57,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 
 	// The renter's downloads queue should be empty.
-	queue := RenterDownloadQueue{}
+	var queue RenterDownloadQueue
 	if err = st.getAPI("/renter/downloads", &queue); err != nil {
 		t.Fatal(err)
 	}
@@ -118,6 +120,42 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatalf("expected contract spending to be %v; got %v", expectedContractSpending, got)
 	}
 
+	// Check that renterHandlerGET correctly handles invalid inputs.
+	// Try an empty funds string.
+	allowanceValues.Set("funds", "")
+	allowanceValues.Set("period", testPeriod)
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err.Error() != "Couldn't parse funds" {
+		t.Errorf("expected error to be 'Couldn't parse funds'; got %v", err)
+	}
+	// Try an invalid funds string. Can't test a negative value since
+	// ErrNegativeCurrency triggers a build.Critical, which calls a panic in
+	// debug mode.
+	allowanceValues.Set("funds", "0")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err.Error() != contractor.ErrInsufficientAllowance.Error() {
+		t.Errorf("expected error to be %v; got %v", contractor.ErrInsufficientAllowance, err)
+	}
+	// Try a empty period string.
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", "")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err.Error()[:23] != "Couldn't parse period: " {
+		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
+	}
+	// Try an invalid period string.
+	allowanceValues.Set("period", "-1")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err.Error()[:23] != "Couldn't parse period: " {
+		t.Errorf("expected error to begin with 'Couldn't parse period: '; got %v", err)
+	}
+	// Try a period that will lead to a length-zero RenewWindow.
+	allowanceValues.Set("period", "1")
+	err = st.stdPostAPI("/renter", allowanceValues)
+	if err.Error() != contractor.ErrAllowanceZeroWindow.Error() {
+		t.Errorf("expected error to be %v, got %v", contractor.ErrAllowanceZeroWindow, err)
+	}
+
 	// Create a file.
 	path := filepath.Join(st.dir, "test.dat")
 	err = createRandFile(path, 1024)
@@ -163,6 +201,14 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10 {
 		t.Fatal("the uploading is not succeeding for some reason:", rf.Files[0], rf.Files[1])
 	}
+	// Try uploading a nonexistent file.
+	path = filepath.Join(st.dir, "fake.dat")
+	uploadValues = url.Values{}
+	uploadValues.Set("source", path)
+	err = st.stdPostAPI("/renter/upload/fake", uploadValues)
+	if n := len(err.Error()); err.Error()[n-25:] != "no such file or directory" {
+		t.Errorf("expected error to end with 'no such file or directory'; got %v", err)
+	}
 
 	// Try downloading the second file.
 	downpath := filepath.Join(st.dir, "testdown.dat")
@@ -182,6 +228,13 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
 	}
+
+	// Try downloading a nonexistent file.
+	err = st.stdGetAPI("/renter/download/fake?destination=" + downpath)
+	if err.Error() != "Download failed: no file with that path" {
+		t.Errorf("expected error to be 'Download failed: no file with that path'; got %v instead", err)
+	}
+
 	// The downloads queue should now contain the second file's download.
 	// Downloads are never removed from the queue within a siad session.
 	if err = st.getAPI("/renter/downloads", &queue); err != nil {
@@ -196,6 +249,16 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	renameValues.Set("newsiapath", "newtest2")
 	if err = st.stdPostAPI("/renter/rename/test2", renameValues); err != nil {
 		t.Fatal(err)
+	}
+	// Try renaming a nonexistent file.
+	renameValues.Set("newsiapath", "newfake")
+	if err = st.stdPostAPI("/renter/rename/fake", renameValues); err.Error() != renter.ErrUnknownPath.Error() {
+		t.Errorf("expected %v, got %v", renter.ErrUnknownPath, err)
+	}
+	// Try renaming the first file to a name that's already taken.
+	renameValues.Set("newsiapath", "newtest2")
+	if err = st.stdPostAPI("/renter/rename/test", renameValues); err.Error() != renter.ErrPathOverload.Error() {
+		t.Errorf("expected error to be %v, got %v", renter.ErrPathOverload, err)
 	}
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12
@@ -223,11 +286,15 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The renter's list of files should now be empty.
-	files := RenterFiles{}
+	var files RenterFiles
 	if err = st.getAPI("/renter/files", &files); err != nil {
 		t.Fatal(err)
 	}
 	if len(files.Files) != 0 {
 		t.Fatalf("renter's list of files should be empty; got %v instead", files)
+	}
+	// Try deleting a nonexistent file.
+	if err = st.stdPostAPI("/renter/delete/dne", url.Values{}); err.Error() != renter.ErrUnknownPath.Error() {
+		t.Errorf("expected error to be %v, got %v", renter.ErrUnknownPath, err)
 	}
 }

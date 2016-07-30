@@ -12,8 +12,12 @@ import (
 var (
 	errAllowanceNoHosts    = errors.New("hosts must be non-zero")
 	errAllowanceZeroPeriod = errors.New("period must be non-zero")
-	errAllowanceZeroWindow = errors.New("renew window must be non-zero")
 	errAllowanceWindowSize = errors.New("renew window must be less than period")
+
+	// ErrAllowanceZeroWindow is returned when the caller requests a
+	// zero-length renewal window. This will happen if the caller sets the
+	// period to 1 block, since RenewWindow := period / 2.
+	ErrAllowanceZeroWindow = errors.New("renew window must be non-zero")
 )
 
 // contractEndHeight returns the height at which the Contractor's contracts
@@ -58,7 +62,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	} else if a.Period == 0 {
 		return errAllowanceZeroPeriod
 	} else if a.RenewWindow == 0 {
-		return errAllowanceZeroWindow
+		return ErrAllowanceZeroWindow
 	} else if a.RenewWindow >= a.Period {
 		return errAllowanceWindowSize
 	}
@@ -68,7 +72,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	if err != nil {
 		return err
 	} else if numSectors == 0 {
-		return errInsufficientAllowance
+		return ErrInsufficientAllowance
 	}
 
 	c.mu.RLock()
