@@ -3,9 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
-	// "os"
-	// "strconv"
-	// "sync"
+	"os"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -48,7 +48,6 @@ func main() {
 	}
 	fmt.Println("done:", time.Since(start).Seconds())
 
-	/*
 	fmt.Println("Serial fsync test")
 	testData := make([]byte, 1<<20)
 	for i := range testData {
@@ -89,22 +88,24 @@ func main() {
 
 	fmt.Println("Serial trailing fsync test")
 	start = time.Now()
+	func() {
 	for i := 0; i < 150; i++ {
 		filename := strconv.Itoa(i)
 		file, err := os.Create("/home/david/siat/" + filename)
 		if err != nil {
 			panic(err)
 		}
+		defer file.Close()
 		file.Write(testData)
-		file.Close()
 	}
 	file, err := os.Create("/home/david/siat/trail")
 	if err != nil {
 		panic(err)
 	}
+	defer file.Close()
 	file.Write(testData)
 	file.Sync()
-	file.Close()
+	}()
 	fmt.Println("done:", time.Since(start).Seconds())
 
 	fmt.Println("Parallel trailing fsync test")
@@ -118,12 +119,12 @@ func main() {
 				panic(err)
 			}
 			file.Write(testData)
-			file.Close()
+			defer file.Close()
 			wg.Done()
 		}()
 		wg.Wait()
 	}
-	file, err = os.Create("/home/david/siat/trail")
+	file, err := os.Create("/home/david/siat/trail")
 	if err != nil {
 		panic(err)
 	}
@@ -131,5 +132,4 @@ func main() {
 	file.Sync()
 	file.Close()
 	fmt.Println("done:", time.Since(start).Seconds())
-	*/
 }

@@ -3,19 +3,131 @@ package contractmanager
 // storagefolders.go is responsible for managing the folders/files that contain
 // the sectors within the contract manager. Storage folders can be added,
 // resized, or removed.
-//
-// A large map is kept in memory that points from the sector id to the
+
+var (
+	// errBadStorageFolderIndex is returned if a storage folder is requested
+	// that does not have the correct index.
+	errBadStorageFolderIndex = errors.New("no storage folder exists at that index")
+
+	// errIncompleteOffload is returned when the host is tasked with offloading
+	// sectors from a storage folder but is unable to offload the requested
+	// number - but is able to offload some of them.
+	errIncompleteOffload = errors.New("could not successfully offload specified number of sectors from storage folder")
+
+	// errInsufficientRemainingStorageForRemoval is returned if the remaining
+	// storage folders do not have enough space remaining to support being
+	// removed.
+	errInsufficientRemainingStorageForRemoval = errors.New("not enough storage remaining to support removal of disk")
+
+	// errInsufficientRemainingStorageForShrink is returned if the remaining
+	// storage folders do not have enough space remaining to support being
+	// reduced in size.
+	errInsufficientRemainingStorageForShrink = errors.New("not enough storage remaining to support shrinking of disk")
+
+	// errLargeStorageFolder is returned if a new storage folder or a resized
+	// storage folder would exceed the maximum allowed size.
+	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumStorageFolderSize)
+
+	// errMaxStorageFolders indicates that the limit on the number of allowed
+	// storage folders has been reached.
+	errMaxStorageFolders = fmt.Errorf("host can only accept up to %v storage folders", maximumStorageFolders)
+
+	// errNoResize is returned if a new size is provided for a storage folder
+	// that is the same as the current size of the storage folder.
+	errNoResize = errors.New("storage folder selected for resize, but new size is same as current size")
+
+	// errRepeatFolder is returned if a storage folder is added which links to
+	// a path that is already in use by another storage folder. Only exact path
+	// matches will trigger the error.
+	errRepeatFolder = errors.New("selected path is already in use as a storage folder, please use 'resize'")
+
+	// errSmallStorageFolder is returned if a new storage folder is not large
+	// enough to meet the requirements for the minimum storage folder size.
+	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
+
+	// errStorageFolderGranularity is returned if a call to AddStorageFolder
+	// tries to use a storage folder size that does not evenly fit into a
+	// factor of 8 sectors.
+	errStorageFolderGranularity = fmt.Errorf("storage folder must be a factor of %v sectors", storageFolderGranularity)
+
+	// errStorageFolderNotFolder is returned if a storage folder gets added
+	// that is not a folder.
+	errStorageFolderNotFolder = errors.New("must use an existing folder")
+
+	// errRelativePath is returned if a path must be absolute.
+	errRelativePath = errors.New("storage folder paths must be absolute")
+)
 
 type storageFolder struct {
-	Path string
-
 	// TODO: Explain how the bitfield works. 'Usage' is the bitfield.
+	Path string
 	Usage []byte
 
 	FailedReads      uint64
 	FailedWrites     uint64
 	SuccessfulReads  uint64
 	SuccessfulWrites uint64
+}
+
+// AddStorageFolder adds a storage folder to the contract manager.
+func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
+	err = cm.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cm.tg.Done()
+
+	// Check that the maximum number of allowed storage folders has not been
+	// exceeded.
+	if len(cm.storageFolders) >= maximumStorageFolders {
+		return errMaxStorageFolders
+	}
+	// Check that the storage folder being added meets the size requirements.
+	if size > maximumStorageFolderSize {
+		return errLargeStorageFolder
+	}
+	if size < minimumStorageFolderSize {
+		return errSmallStorageFolder
+	}
+	if (size / modules.SectorSize)%storageFolderGranularity != 0 {
+		return errStorageFolderGranularity
+	}
+	// Check that the path is an absolute path.
+	if !filepath.IsAbs(path) {
+		return errRelativePath
+	}
+
+	// TODO: Find a safe way to vet the adding of the storage folder? Should it
+	// happen with the WAL? I think anything regarding duplicates should view
+	// the WAL.
+
+	// Check that the folder being linked to is not already in use.
+	for _, sf := range cm.storageFolders {
+		// TODO: There could be 2^16 storage folders, which is a lot to iterate
+		// through. Make sure it only takes a few milliseconds. This function
+		// as a whole is allowed to take a few seconds, given that it allocates
+		// a giant file.
+		if sf.Path == path {
+			return errRepeatFolder
+		}
+	}
+	// Check that the folder being linked to both exists and is a folder.
+	pathInfo, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !pathInfo.Mode().IsDir() {
+		return errStorageFolderNotFolder
+	}
+
+	// Create a storage folder object.
+	newSF := &storageFolder{
+		Path: path,
+		Usage: make([]byte, size/modules.SectorSize/8),
+	}
+
+	// Add the storage folder to the list of folders for the host.
+	return cm.wal.AddStorageFolder(newSF)
 }
 
 /*

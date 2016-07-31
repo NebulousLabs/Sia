@@ -50,9 +50,6 @@ type (
 		// removeFile removes a file from file filesystem.
 		removeFile(string) error
 
-		// symlink creates a sym link between a source and a destination.
-		symlink(s1, s2 string) error
-
 		// writeFile writes data to the filesystem using the provided filename.
 		writeFile(string, []byte, os.FileMode) error
 	}
@@ -115,11 +112,6 @@ func (productionDependencies) readFile(s string) ([]byte, error) {
 // removeFile removes a file from the filesystem.
 func (productionDependencies) removeFile(s string) error {
 	return os.Remove(s)
-}
-
-// symlink creates a symlink between a source and a destination file.
-func (productionDependencies) symlink(s1, s2 string) error {
-	return os.Symlink(s1, s2)
 }
 
 // writeFile writes a file to the filesystem.

@@ -11,21 +11,21 @@ import (
 )
 
 type ContractManager struct {
-	// Dependencies.
-	dependencies
-
 	// Storage management information.
 	//
 	// TODO: explain that the sector salt is necessary to reduce the internal
 	// names for the sectors from 32bytes to just 12 bytes.
+	sectorLocations map[string]sectorLocation
 	sectorSalt      crypto.Hash
 	storageFolders  []*storageFolder
 
 	// Utilities.
+	dependencies
 	log        *persist.Logger
 	mu         sync.RWMutex
 	persistDir string
 	tg         siasync.ThreadGroup
+	wal        writeAheadLog
 }
 
 // Close will cleanly shutdown the contract manager, closing all resources and
@@ -44,6 +44,7 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 
 		persistDir: persistDir,
 	}
+	cm.wal.cm = cm
 
 	// If startup is unsuccessful, shutdown any resources that were
 	// successfully spun up.

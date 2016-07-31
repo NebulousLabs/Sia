@@ -22,7 +22,8 @@ type (
 		// events like power outages or disk failures. Therefore, preserving
 		// ACID properties requires that all changes defined in the WAL are
 		// idempotent.
-		slcs []sectorLocationChanges
+		addedStorageFolders   []storageFolder
+		sectorLocationChanges []sectorLocationChanges
 
 		// Variables to coordinate ACID transcations. Multiple transactions may
 		// be batched together, and none of them will return until the WAL has
@@ -65,6 +66,13 @@ func (wal *writeAheadLog) sync() {
 	// locking is safely happening, and the sync.Once is being replaced
 	// correctly.
 }
+
+func (wal *writeAheadLog) AddStorageFolder(sf *storageFolder) {
+}
+
+
+
+/////// GUIDING FORCES BELOW /////////////////////////
 
 // Open will open the writeAheadLog for modifications. All modifications
 // submitted between the call to Open and Close will be applied as a single
