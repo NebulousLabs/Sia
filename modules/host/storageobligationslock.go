@@ -21,13 +21,13 @@ func (h *Host) managedLockStorageObligation(soid types.FileContractID) {
 	// Check if a lock has been created for this storage obligation. If not,
 	// create one. The map must be accessed under lock, but the request for the
 	// storage lock must not be made under lock.
-	lockID := h.mu.Lock()
+	h.mu.Lock()
 	tl, exists := h.lockedStorageObligations[soid]
 	if !exists {
 		tl = new(sync.TryMutex)
 		h.lockedStorageObligations[soid] = tl
 	}
-	h.mu.Unlock(lockID)
+	h.mu.Unlock()
 
 	tl.Lock()
 }
@@ -38,13 +38,13 @@ func (h *Host) managedTryLockStorageObligation(soid types.FileContractID) error 
 	// Check if a lock has been created for this storage obligation. If not,
 	// create one. The map must be accessed under lock, but the request for the
 	// storage lock must not be made under lock.
-	lockID := h.mu.Lock()
+	h.mu.Lock()
 	tl, exists := h.lockedStorageObligations[soid]
 	if !exists {
 		tl = new(sync.TryMutex)
 		h.lockedStorageObligations[soid] = tl
 	}
-	h.mu.Unlock(lockID)
+	h.mu.Unlock()
 
 	if tl.TryLockTimed(obligationLockTimeout) {
 		return nil
@@ -58,13 +58,13 @@ func (h *Host) managedUnlockStorageObligation(soid types.FileContractID) {
 	// Check if a lock has been created for this storage obligation. If not,
 	// create one. The map must be accessed under lock, but the request for the
 	// storage lock must not be made under lock.
-	lockID := h.mu.Lock()
+	h.mu.Lock()
 	tl, exists := h.lockedStorageObligations[soid]
 	if !exists {
 		h.log.Critical(errObligationUnlocked)
 		return
 	}
-	h.mu.Unlock(lockID)
+	h.mu.Unlock()
 
 	tl.Unlock()
 }

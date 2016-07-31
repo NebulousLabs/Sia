@@ -187,8 +187,8 @@ func (h *Host) threadedListen(closeChan chan struct{}) {
 
 // NetAddress returns the address at which the host can be reached.
 func (h *Host) NetAddress() modules.NetAddress {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 
 	if h.settings.NetAddress != "" {
 		return h.settings.NetAddress
@@ -199,8 +199,8 @@ func (h *Host) NetAddress() modules.NetAddress {
 // NetworkMetrics returns information about the types of rpc calls that have
 // been made to the host.
 func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return modules.HostNetworkMetrics{
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),

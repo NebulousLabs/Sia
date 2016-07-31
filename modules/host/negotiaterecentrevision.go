@@ -42,8 +42,8 @@ func (h *Host) managedVerifyChallengeResponse(fcid types.FileContractID, challen
 
 	// Fetch the storage obligation, which has the revision, which has the
 	// renter's public key.
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	err = h.db.View(func(tx *bolt.Tx) error {
 		so, err = getStorageObligation(tx, fcid)
 		return err

@@ -178,11 +178,11 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	}
 
 	// Verify that the signature for the revision from the renter is correct.
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	blockHeight := h.blockHeight
 	hostSPK := h.publicKey
 	hostSK := h.secretKey
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 	contractTxn := fullTxnSet[len(fullTxnSet)-1]
 	fc := contractTxn.FileContracts[0]
 	noOpRevision := types.FileContractRevision{
@@ -252,9 +252,9 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		// just when the actual modification is happening.
 		i := 0
 		for {
-			lockID := h.mu.Lock()
+			h.mu.Lock()
 			err = h.addStorageObligation(so)
-			h.mu.Unlock(lockID)
+			h.mu.Unlock()
 			if err == nil {
 				return nil
 			}

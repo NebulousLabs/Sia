@@ -74,11 +74,11 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	// external settings.
 	var hes modules.HostExternalSettings
 	var secretKey crypto.SecretKey
-	lockID := h.mu.Lock()
+	h.mu.Lock()
 	h.revisionNumber++
 	secretKey = h.secretKey
 	hes = h.externalSettings()
-	h.mu.Unlock(lockID)
+	h.mu.Unlock()
 
 	// Write the settings to the renter. If the write fails, return a
 	// connection error.
