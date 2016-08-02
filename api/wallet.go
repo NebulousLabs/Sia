@@ -237,9 +237,9 @@ func (srv *Server) walletSiagkeyHandler(w http.ResponseWriter, req *http.Request
 	keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 
-	for _, key := range potentialKeys {
+	for _, keypath := range keyfiles {
 	    // Check that all key paths are absolute paths.
-	    if !filepath.IsAbs(key) {
+	    if !filepath.IsAbs(keypath) {
 			writeError(w, Error{"error when calling /wallet/siagkey: keyfiles contains a non-absolute path"}, http.StatusBadRequest)
 	        return
 	    }
