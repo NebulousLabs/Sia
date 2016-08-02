@@ -30,7 +30,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	// announce the host and start accepting contracts
+	// Announce the host and start accepting contracts.
 	err = st.announceHost()
 	if err != nil {
 		t.Fatal(err)
@@ -44,30 +44,32 @@ func TestIntegrationHostAndRent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create contracts
+	// Set an allowance for the renter, allowing a contract to be formed.
 	allowanceValues := url.Values{}
-	allowanceValues.Set("funds", "10000000000000000000000000000") // 10k SC
-	allowanceValues.Set("period", "5")
+	testFunds := "10000000000000000000000000000" // 10k SC
+	testPeriod := "5"
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
 	err = st.stdPostAPI("/renter", allowanceValues)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create a file
+	// Create a file.
 	path := filepath.Join(st.dir, "test.dat")
 	err = createRandFile(path, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// upload to host
+	// Upload to host.
 	uploadValues := url.Values{}
 	uploadValues.Set("source", path)
 	err = st.stdPostAPI("/renter/upload/test", uploadValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// only one piece will be uploaded (10% at current redundancy)
+	// Only one piece will be uploaded (10% at current redundancy).
 	var rf RenterFiles
 	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
@@ -90,7 +92,7 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// only one piece will be uploaded (10% at current redundancy)
+	// Only one piece will be uploaded (10% at current redundancy).
 	for i := 0; i < 200 && (len(rf.Files) != 2 || rf.Files[0].UploadProgress < 10 || rf.Files[1].UploadProgress < 10); i++ {
 		st.getAPI("/renter/files", &rf)
 		time.Sleep(100 * time.Millisecond)
@@ -116,6 +118,15 @@ func TestIntegrationHostAndRent(t *testing.T) {
 	}
 	if bytes.Compare(orig, download) != 0 {
 		t.Fatal("data mismatch when downloading a file")
+	}
+
+	// The renter's downloads queue should have 1 entry now.
+	var queue RenterDownloadQueue
+	if err = st.getAPI("/renter/downloads", &queue); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.Downloads) != 1 {
+		t.Fatalf("expected renter to have 1 download in the queue; got %v", len(queue.Downloads))
 	}
 
 	// Mine blocks until the host recognizes profit. The host will wait for 12

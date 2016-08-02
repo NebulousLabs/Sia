@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	ErrUnknownPath  = errors.New("no file known with that path")
-	ErrPathOverload = errors.New("a file already exists at that location")
+	ErrEmptyFilename = errors.New("filename must be a nonempty string")
+	ErrUnknownPath   = errors.New("no file known with that path")
+	ErrPathOverload  = errors.New("a file already exists at that location")
 )
 
 // A file is a single file that has been uploaded to the network. Files are
@@ -237,6 +238,11 @@ func (r *Renter) FileList() []modules.FileInfo {
 func (r *Renter) RenameFile(currentName, newName string) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
+
+	// Check that newName is nonempty.
+	if newName == "" {
+		return ErrEmptyFilename
+	}
 
 	// Check that currentName exists and newName doesn't.
 	file, exists := r.files[currentName]

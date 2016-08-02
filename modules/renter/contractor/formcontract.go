@@ -20,7 +20,9 @@ var (
 	// the contractor will cap host's MaxCollateral setting to this value
 	maxCollateral = types.SiacoinPrecision.Mul64(1e3) // 1k SC
 
-	errInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
+	// ErrInsufficientAllowance indicates that the renter's allowance is less
+	// than the amount necessary to store at least one sector
+	ErrInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
 	errTooExpensive          = errors.New("host price was too high")
 )
 

@@ -195,8 +195,8 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	}
 	a.Period = 20
 	err = c.SetAllowance(a)
-	if err != errAllowanceZeroWindow {
-		t.Errorf("expected %q, got %q", errAllowanceZeroWindow, err)
+	if err != ErrAllowanceZeroWindow {
+		t.Errorf("expected %q, got %q", ErrAllowanceZeroWindow, err)
 	}
 	a.RenewWindow = 20
 	err = c.SetAllowance(a)
