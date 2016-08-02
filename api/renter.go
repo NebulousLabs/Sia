@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -158,7 +159,13 @@ func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request
 
 // renterLoadHandler handles the API call to load a '.sia' file.
 func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	files, err := srv.renter.LoadSharedFiles(req.FormValue("source"))
+	source := req.FormValue("source")
+	if !filepath.IsAbs(source) {
+	    writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
+	    return
+	}
+
+	files, err := srv.renter.LoadSharedFiles(source)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -212,7 +219,14 @@ func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request,
 
 // renterDownloadHandler handles the API call to download a file.
 func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), req.FormValue("destination"))
+	destination := req.FormValue("destination")
+	// Check that the destination path is absolute.
+	if !filepath.IsAbs(destination) {
+	    writeError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
+	    return
+	}
+
+	err := srv.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
 	if err != nil {
 		writeError(w, Error{"Download failed: " + err.Error()}, http.StatusInternalServerError)
 		return
@@ -224,7 +238,14 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 // renterShareHandler handles the API call to create a '.sia' file that
 // shares a set of file.
 func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.ShareFiles(strings.Split(req.FormValue("siapaths"), ","), req.FormValue("destination"))
+	destination := req.FormValue("destination")
+	// Check that the destination path is absolute.
+	if !filepath.IsAbs(destination) {
+	    writeError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
+	    return
+	}
+
+	err := srv.renter.ShareFiles(strings.Split(req.FormValue("siapaths"), ","), destination)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -248,8 +269,14 @@ func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Requ
 
 // renterUploadHandler handles the API call to upload a file.
 func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	source := req.FormValue("source")
+	if !filepath.IsAbs(source) {
+	    writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
+	    return
+	}
+
 	err := srv.renter.Upload(modules.FileUploadParams{
-		Source:  req.FormValue("source"),
+		Source:  source,
 		SiaPath: strings.TrimPrefix(ps.ByName("siapath"), "/"),
 		// let the renter decide these values; eventually they will be configurable
 		ErasureCode: nil,

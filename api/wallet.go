@@ -164,7 +164,7 @@ func (srv *Server) walletAddressesHandler(w http.ResponseWriter, req *http.Reque
 // walletBackupHandler handles API calls to /wallet/backup.
 func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	destination := req.FormValue("destination")
-	// Check that all key paths are absolute paths.
+	// Check that the destination is absolute.
 	if !filepath.IsAbs(destination) {
 	    writeError(w, Error{"error when calling /wallet/backup: destination must be an absolute path"}, http.StatusBadRequest)
 	    return
