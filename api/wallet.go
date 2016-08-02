@@ -2,9 +2,9 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -124,8 +124,8 @@ func (srv *Server) wallet033xHandler(w http.ResponseWriter, req *http.Request, _
 	source := req.FormValue("source")
 	// Check that source is an absolute paths.
 	if !filepath.IsAbs(source) {
-	    writeError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
-	    return
+		writeError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
+		return
 	}
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
@@ -166,8 +166,8 @@ func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request,
 	destination := req.FormValue("destination")
 	// Check that the destination is absolute.
 	if !filepath.IsAbs(destination) {
-	    writeError(w, Error{"error when calling /wallet/backup: destination must be an absolute path"}, http.StatusBadRequest)
-	    return
+		writeError(w, Error{"error when calling /wallet/backup: destination must be an absolute path"}, http.StatusBadRequest)
+		return
 	}
 	err := srv.wallet.CreateBackup(destination)
 	if err != nil {
@@ -238,11 +238,11 @@ func (srv *Server) walletSiagkeyHandler(w http.ResponseWriter, req *http.Request
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 
 	for _, keypath := range keyfiles {
-	    // Check that all key paths are absolute paths.
-	    if !filepath.IsAbs(keypath) {
+		// Check that all key paths are absolute paths.
+		if !filepath.IsAbs(keypath) {
 			writeError(w, Error{"error when calling /wallet/siagkey: keyfiles contains a non-absolute path"}, http.StatusBadRequest)
-	        return
-	    }
+			return
+		}
 	}
 
 	for _, key := range potentialKeys {

@@ -3,8 +3,8 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"path/filepath"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -161,8 +161,8 @@ func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request
 func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	source := req.FormValue("source")
 	if !filepath.IsAbs(source) {
-	    writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
-	    return
+		writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
+		return
 	}
 
 	files, err := srv.renter.LoadSharedFiles(source)
@@ -222,8 +222,8 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 	destination := req.FormValue("destination")
 	// Check that the destination path is absolute.
 	if !filepath.IsAbs(destination) {
-	    writeError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
-	    return
+		writeError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
+		return
 	}
 
 	err := srv.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
@@ -241,8 +241,8 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 	destination := req.FormValue("destination")
 	// Check that the destination path is absolute.
 	if !filepath.IsAbs(destination) {
-	    writeError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
-	    return
+		writeError(w, Error{"destination must be an absolute path"}, http.StatusBadRequest)
+		return
 	}
 
 	err := srv.renter.ShareFiles(strings.Split(req.FormValue("siapaths"), ","), destination)
@@ -271,8 +271,8 @@ func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Requ
 func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	source := req.FormValue("source")
 	if !filepath.IsAbs(source) {
-	    writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
-	    return
+		writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
+		return
 	}
 
 	err := srv.renter.Upload(modules.FileUploadParams{
