@@ -125,6 +125,39 @@ var (
 		panic("unrecognized release constant in host - defaultWindowSize")
 	}()
 
+	// logAllLimit is the number of errors of each type that the host will log
+	// before switching to probabilistic logging. If there are not many errors,
+	// it is reasonable that all errors get logged. If there are lots of
+	// errors, to cut down on the noise only some of the errors get logged.
+	logAllLimit = func() uint64 {
+		if build.Release == "dev" {
+			return 50
+		}
+		if build.Release == "standard" {
+			return 250
+		}
+		if build.Release == "testing" {
+			return 10
+		}
+		panic("unrecognized release constant in host - logAllLimit")
+	}()
+
+	// logFewLimit is the number of errors of each type that the host will log
+	// before substantially constricting the amount of logging that it is
+	// doing.
+	logFewLimit = func() uint64 {
+		if build.Release == "dev" {
+			return 500
+		}
+		if build.Release == "standard" {
+			return 2500
+		}
+		if build.Release == "testing" {
+			return 50
+		}
+		panic("unrecognized release constant in host - logAllLimit")
+	}()
+
 	// maximumLockedStorageObligations sets the maximum number of storage
 	// obligations that are allowed to be locked at a time. The map uses an
 	// in-memory lock, but also a locked storage obligation could be reading a

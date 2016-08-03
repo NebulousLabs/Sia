@@ -202,6 +202,7 @@ Host Internal Settings:
 Host Financials:
 	Contract Count:               %v
 	Transaction Fee Compensation: %v
+	Potential Fee Compensation:   %v
 	Transaction Fee Expenses:     %v
 
 	Storage Revenue:           %v
@@ -242,6 +243,7 @@ RPC Stats:
 			currencyUnits(is.MinUploadBandwidthPrice.Mul(modules.BytesPerTerabyte)),
 
 			fm.ContractCount, currencyUnits(fm.ContractCompensation),
+			currencyUnits(fm.PotentialContractCompensation),
 			currencyUnits(fm.TransactionFeeExpenses),
 
 			currencyUnits(fm.StorageRevenue),

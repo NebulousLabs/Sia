@@ -55,7 +55,7 @@ func (h *Host) managedAddRenewCollateral(so storageObligation, settings modules.
 	err = builder.FundSiacoins(hostPortion)
 	if err != nil {
 		builder.Drop()
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, extendErr("could not add collateral: ", ErrorInternal(err.Error()))
 	}
 
 	// Return which inputs and outputs have been added by the collateral call.
@@ -79,7 +79,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// revised.
 	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
-		return err
+		return extendErr("RPCRecentRevision failed: ", err)
 	}
 	// The storage obligation is received with a lock. Defer a call to unlock
 	// the storage obligation.
@@ -90,7 +90,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// Perform the host settings exchange with the renter.
 	err = h.managedRPCSettings(conn)
 	if err != nil {
-		return err
+		return extendErr("RPCSettings failed: ", err)
 	}
 
 	// Set the renewal deadline.
@@ -99,7 +99,7 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// The renter will either accept or reject the host's settings.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("renter rejected the host settings: ", ErrorCommunication(err.Error()))
 	}
 	// If the renter sends an acceptance of the settings, it will be followed
 	// by an unsigned transaction containing funding from the renter and a file
@@ -111,43 +111,45 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	var renterPK crypto.PublicKey
 	err = encoding.ReadObject(conn, &txnSet, modules.NegotiateMaxFileContractSetLen)
 	if err != nil {
-		return err
+		return extendErr("unable to read transaction set: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.ReadObject(conn, &renterPK, modules.NegotiateMaxSiaPubkeySize)
 	if err != nil {
-		return err
+		return extendErr("unable to read renter public key: ", ErrorConnection(err.Error()))
 	}
 
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	settings := h.externalSettings()
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 
 	// Verify that the transaction coming over the wire is a proper renewal.
 	err = h.managedVerifyRenewedContract(so, txnSet, renterPK)
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored to preserve type for extendErr
+		return extendErr("verification of renewal failed: ", err)
 	}
 	txnBuilder, newParents, newInputs, newOutputs, err := h.managedAddRenewCollateral(so, settings, txnSet)
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored to preserve type for extendErr
+		return extendErr("failed to add collateral: ", err)
 	}
 	// The host indicates acceptance, then sends the new parents, inputs, and
 	// outputs to the transaction.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("failed to write acceptance: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.WriteObject(conn, newParents)
 	if err != nil {
-		return err
+		return extendErr("failed to write new parents: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.WriteObject(conn, newInputs)
 	if err != nil {
-		return err
+		return extendErr("failed to write new inputs: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.WriteObject(conn, newOutputs)
 	if err != nil {
-		return err
+		return extendErr("failed to write new outputs: ", ErrorConnection(err.Error()))
 	}
 
 	// The renter will send a negotiation response, followed by transaction
@@ -157,17 +159,17 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// new file contract.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("renter rejected collateral extension: ", ErrorCommunication(err.Error()))
 	}
 	var renterTxnSignatures []types.TransactionSignature
 	var renterRevisionSignature types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterTxnSignatures, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
-		return err
+		return extendErr("failed to read renter transaction signatures: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.ReadObject(conn, &renterRevisionSignature, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
-		return err
+		return extendErr("failed to read renter revision signatures: ", ErrorConnection(err.Error()))
 	}
 
 	// The host adds the renter transaction signatures, then signs the
@@ -178,27 +180,32 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 	// completed file contract.
 	//
 	// During finalization the signatures sent by the renter are all checked.
-	lockID = h.mu.RLock()
+	h.mu.RLock()
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 	renewCollateral := renewContractCollateral(so, settings, fc)
 	renewRevenue := renewBasePrice(so, settings, fc)
 	renewRisk := renewBaseCollateral(so, settings, fc)
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, so.SectorRoots, renewCollateral, renewRevenue, renewRisk)
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored to preserve type for extendErr
+		return extendErr("failed to finalize contract: ", err)
 	}
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("failed to write acceptance: ", ErrorConnection(err.Error()))
 	}
 	// The host sends the transaction signatures to the renter, followed by the
 	// revision signature. Negotiation is complete.
 	err = encoding.WriteObject(conn, hostTxnSignatures)
 	if err != nil {
-		return err
+		return extendErr("failed to write transaction signatures: ", ErrorConnection(err.Error()))
 	}
-	return encoding.WriteObject(conn, hostRevisionSignature)
+	err = encoding.WriteObject(conn, hostRevisionSignature)
+	if err != nil {
+		return extendErr("failed to write revision signature: ", ErrorConnection(err.Error()))
+	}
+	return nil
 }
 
 // managedVerifyRenewedContract checks that the contract renewal matches the
@@ -206,21 +213,21 @@ func (h *Host) managedRPCRenewContract(conn net.Conn) error {
 func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types.Transaction, renterPK crypto.PublicKey) error {
 	// Check that the transaction set is not empty.
 	if len(txnSet) < 1 {
-		return errEmptyFileContractTransactionSet
+		return extendErr("zero-length transaction set: ", errEmptyObject)
 	}
 	// Check that the transaction set has a file contract.
 	if len(txnSet[len(txnSet)-1].FileContracts) < 1 {
-		return errNoFileContract
+		return extendErr("transaction without file contract: ", errEmptyObject)
 	}
 
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	blockHeight := h.blockHeight
 	externalSettings := h.externalSettings()
 	internalSettings := h.settings
 	lockedStorageCollateral := h.financialMetrics.LockedStorageCollateral
 	publicKey := h.publicKey
 	unlockHash := h.unlockHash
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 	fc := txnSet[len(txnSet)-1].FileContracts[0]
 
 	// The file size and merkle root must match the file size and merkle root
@@ -234,23 +241,23 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	// The WindowStart must be at least revisionSubmissionBuffer blocks into
 	// the future.
 	if fc.WindowStart <= blockHeight+revisionSubmissionBuffer {
-		return errWindowStartTooSoon
+		return errEarlyWindow
 	}
 	// WindowEnd must be at least settings.WindowSize blocks after WindowStart.
 	if fc.WindowEnd < fc.WindowStart+externalSettings.WindowSize {
-		return errWindowSizeTooSmall
+		return errSmallWindow
 	}
 
 	// ValidProofOutputs shoud have 2 outputs (renter + host) and missed
 	// outputs should have 3 (renter + host + void)
 	if len(fc.ValidProofOutputs) != 2 || len(fc.MissedProofOutputs) != 3 {
-		return errBadPayoutsLen
+		return errBadContractOutputCounts
 	}
 	// The unlock hashes of the valid and missed proof outputs for the host
 	// must match the host's unlock hash. The third missed output should point
 	// to the void.
 	if fc.ValidProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[1].UnlockHash != unlockHash || fc.MissedProofOutputs[2].UnlockHash != (types.UnlockHash{}) {
-		return errBadPayoutsUnlockHashes
+		return errBadPayoutUnlockHashes
 	}
 
 	// Check that the collateral does not exceed the maximum amount of
@@ -265,21 +272,20 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 		return errCollateralBudgetExceeded
 	}
 	// Check that the missed proof outputs contain enough money, and that the
-	// void output contains enough money. Before calculating the expected
-	// value, check that the subtraction won't cause a negative currency.
+	// void output contains enough money.
 	basePrice := renewBasePrice(so, externalSettings, fc)
 	baseCollateral := renewBaseCollateral(so, externalSettings, fc)
 	if fc.ValidProofOutputs[1].Value.Cmp(basePrice.Add(baseCollateral)) < 0 {
-		return errBadPayoutsAmounts
+		return errLowHostValidOutput
 	}
 	expectedHostMissedOutput := fc.ValidProofOutputs[1].Value.Sub(basePrice).Sub(baseCollateral)
-	if fc.MissedProofOutputs[1].Value.Cmp(expectedHostMissedOutput) != 0 {
-		return errBadPayoutsAmounts
+	if fc.MissedProofOutputs[1].Value.Cmp(expectedHostMissedOutput) < 0 {
+		return errLowHostMissedOutput
 	}
 	// Check that the void output has the correct value.
 	expectedVoidOutput := basePrice.Add(baseCollateral)
-	if fc.MissedProofOutputs[2].Value.Cmp(expectedVoidOutput) != 0 {
-		return errBadPayoutsAmounts
+	if fc.MissedProofOutputs[2].Value.Cmp(expectedVoidOutput) > 0 {
+		return errLowVoidOutput
 	}
 
 	// The unlock hash for the file contract must match the unlock hash that
@@ -295,7 +301,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 		SignaturesRequired: 2,
 	}.UnlockHash()
 	if fc.UnlockHash != expectedUH {
-		return errBadContractUnlockHash
+		return errBadUnlockHash
 	}
 
 	// Check that the transaction set has enough fees on it to get into the
@@ -303,7 +309,7 @@ func (h *Host) managedVerifyRenewedContract(so storageObligation, txnSet []types
 	setFee := modules.CalculateFee(txnSet)
 	minFee, _ := h.tpool.FeeEstimation()
 	if setFee.Cmp(minFee) < 0 {
-		return errLowFees
+		return errLowTransactionFees
 	}
 	return nil
 }

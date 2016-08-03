@@ -40,7 +40,7 @@ func TestHostPersistCompat100(t *testing.T) {
 
 	// Check that, after loading the compatibility file, all of the values are
 	// still correct. The file that was transplanted had no zero-value fields.
-	lockID := ht.host.mu.Lock()
+	ht.host.mu.Lock()
 	errCalls := atomic.LoadUint64(&h.atomicErroredCalls)
 	if errCalls == 0 {
 		t.Error("error calls incorrectly loaded after compatibility loading")
@@ -66,5 +66,5 @@ func TestHostPersistCompat100(t *testing.T) {
 	if h.unlockHash == (types.UnlockHash{}) {
 		t.Error("unlock hash loaded incorrectly")
 	}
-	ht.host.mu.Unlock(lockID)
+	ht.host.mu.Unlock()
 }

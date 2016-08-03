@@ -45,7 +45,7 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 // it is a no-op.
 func (l *Logger) Debugln(v ...interface{}) {
 	if build.DEBUG {
-		l.Output(2, fmt.Sprintln(v...))
+		l.Output(2, "[DEBUG] "+fmt.Sprintln(v...))
 	}
 }
 

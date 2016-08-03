@@ -1,7 +1,6 @@
 package host
 
 import (
-	"errors"
 	"net"
 	"time"
 
@@ -9,98 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	// errBadModificationIndex is returned if the renter requests a change on a
-	// sector root that is not in the file contract.
-	errBadModificationIndex = errors.New("renter has made a modification that points to a nonexistent sector")
-
-	// badSectorSize is returned if the renter provides a sector to be inserted
-	// that is the wrong size.
-	errBadSectorSize = errors.New("renter has provided an incorrectly sized sector")
-
-	// errIllegalOffsetAndLength is returned if the renter tries perform a
-	// modify operation that uses a troublesome combination of offset and
-	// length.
-	errIllegalOffsetAndLength = errors.New("renter is trying to do a modify with an illegal offset and length")
-
-	// errLargeSector is returned if the renter sends a RevisionAction that has
-	// data which creates a sector that is larger than what the host uses.
-	errLargeSector = errors.New("renter has sent a sector that exceeds the host's sector size")
-
-	// errLateRevision is returned if the renter is attempting to revise a
-	// revision after the revision deadline. The host needs time to submit the
-	// final revision to the blockchain to guarantee payment, and therefore
-	// will not accept revisions once the window start is too close.
-	errLateRevision = errors.New("renter is attempting to revise a revision which the host has closed")
-
-	// errReviseBadCollateralDeduction is returned if a proposed file contrct
-	// revision does not correctly deduct value from the host's missed proof
-	// output - which is the host's collateral pool.
-	errReviseBadCollateralDeduction = errors.New("proposed file contract revision does not correctly deduct from the host's collateral pool")
-
-	// errReviseBadFileMerkleRoot is returned if the renter sends a file
-	// contract revision with a Merkle root that does not match the changes
-	// presented by the revision request.
-	errReviseBadFileMerkleRoot = errors.New("proposed file contract revision has an incorrect Merkle root")
-
-	// errReviseBadHostValidOutput is returned if a proposed file contract
-	// revision does not correctly add value to the host's valid proof outputs.
-	errReviseBadHostValidOutput = errors.New("proposed file contract revision does not correctly add to the host's valid proof output")
-
-	// errReviseBadNewFileSize is returned if a proposed file contract revision
-	// does not have a file size which matches the revisions that have been
-	// made.
-	errReviseBadNewFileSize = errors.New("propsed file contract revision has a bad filesize")
-
-	// errReviseBadNewWindowEnd is returned if a proposed file contract
-	// revision does not have a window end which matches the original file
-	// contract revision.
-	errReviseBadNewWindowEnd = errors.New("proposed file contract revision has a bad window end")
-
-	// errReviseBadNewWindowStart is returned if a proposed file contract
-	// revision does not have a window start which matches the window start of
-	// the original file contract.
-	errReviseBadNewWindowStart = errors.New("propsed file contract revision has a bad window start")
-
-	// errReviseBadParent is returned when a file contract revision is
-	// presented which has a parent id that doesn't match the file contract
-	// which is supposed to be getting revised.
-	errReviseBadParent = errors.New("proposed file contract revision has the wrong parent id")
-
-	// errReviseBadRenterValidOutput is returned if a propsed file contract
-	// revision does not corectly deduct value from the renter's valid proof
-	// output.
-	errReviseBadRenterValidOutput = errors.New("proposed file contract revision does not correctly deduct from the renter's valid proof output")
-
-	// errReviseBadRenterMissedOutput is returned if a proposed file contract
-	// revision does not correctly deduct value from the renter's missed proof
-	// output.
-	errReviseBadRenterMissedOutput = errors.New("proposed file contract revision does not correctly deduct from the renter's missed proof output")
-
-	// errReviseBadRevisionNumber is returned if a proposed file contract
-	// revision does not have a revision number which is strictly greater than
-	// the most recent revision number for the file contract being modified.
-	errReviseBadRevisionNumber = errors.New("proposed file contract revision did not correctly increase the revision number")
-
-	// errReviseBadUnlockConditions is returned when a file contract revision
-	// has unlock conditions that do not match the file contract being revised.
-	errReviseBadUnlockConditions = errors.New("propsed file contract revision appears to have the wrong unlock conditions")
-
-	// errRevisionBadUnlockHash is returned if a proposed file contract
-	// revision does not have an unlock hash which matches the unlock hash of
-	// the previous file contract revision.
-	errReviseBadUnlockHash = errors.New("proposed file contract revision has a bad new unlock hash")
-
-	// errReviseBadVoidOutput is returned if a proposed file contract revision
-	// does not correct add value to the void output to compensate for revenue
-	// from the renter.
-	errReviseBadVoidOutput = errors.New("proposed file contract revision does not correctly add to the host's void outputs")
-
-	// errUnknownModification is returned if the host receives a modification
-	// action from the renter that it does not understand.
-	errUnknownModification = errors.New("renter is attempting an action that the host is not aware of")
 )
 
 // managedRevisionIteration handles one iteration of the revision loop. As a
@@ -112,7 +19,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// exists.
 	err := h.managedRPCSettings(conn)
 	if err != nil {
-		return err
+		return extendErr("RPCSettings failed: ", err)
 	}
 
 	// Set the negotiation deadline.
@@ -123,15 +30,15 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// wishes to terminate the revision loop.
 	err = modules.ReadNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("renter rejected settings: ", err)
 	}
 
 	// Read some variables from the host for use later in the function.
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	settings := h.settings
 	secretKey := h.secretKey
 	blockHeight := h.blockHeight
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 
 	// The renter is going to send its intended modifications, followed by the
 	// file contract revision that pays for them.
@@ -139,11 +46,11 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	var revision types.FileContractRevision
 	err = encoding.ReadObject(conn, &modifications, settings.MaxReviseBatchSize)
 	if err != nil {
-		return err
+		return extendErr("unable to read revision modifications: ", ErrorConnection(err.Error()))
 	}
 	err = encoding.ReadObject(conn, &revision, modules.NegotiateMaxFileContractRevisionSize)
 	if err != nil {
-		return err
+		return extendErr("unable to read proposed revision: ", ErrorConnection(err.Error()))
 	}
 
 	// First read all of the modifications. Then make the modifications, but
@@ -207,7 +114,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 				// Get the data for the new sector.
 				sector, err := h.ReadSector(so.SectorRoots[modification.SectorIndex])
 				if err != nil {
-					return err
+					return extendErr("could not read sector: ", ErrorInternal(err.Error()))
 				}
 				copy(sector[modification.Offset:], modification.Data)
 
@@ -226,27 +133,29 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			}
 		}
 		newRevenue := storageRevenue.Add(bandwidthRevenue)
-		return verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral)
+		return extendErr("unable to verify revision: ", verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral))
 	}()
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("rejected proposed modifications: ", err)
 	}
 	// Revision is acceptable, write an acceptance string.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return err
+		return extendErr("could not accept revision modifications: ", ErrorConnection(err.Error()))
 	}
 
 	// Renter will send a transaction signature for the file contract revision.
 	var renterSig types.TransactionSignature
 	err = encoding.ReadObject(conn, &renterSig, modules.NegotiateMaxTransactionSignatureSize)
 	if err != nil {
-		return err
+		return extendErr("could not read renter transaction signature: ", ErrorConnection(err.Error()))
 	}
 	// Verify that the signature is valid and get the host's signature.
 	txn, err := createRevisionSignature(revision, renterSig, secretKey, blockHeight)
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("could not create revision signature: ", err)
 	}
 
 	so.PotentialStorageRevenue = so.PotentialStorageRevenue.Add(storageRevenue)
@@ -255,7 +164,8 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	so.RevisionTransactionSet = []types.Transaction{txn}
 	err = h.modifyStorageObligation(*so, sectorsRemoved, sectorsGained, gainedSectorData)
 	if err != nil {
-		return modules.WriteNegotiationRejection(conn, err)
+		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
+		return extendErr("could not modify storage obligation: ", ErrorInternal(err.Error()))
 	}
 
 	// Host will now send acceptance and its signature to the renter. This
@@ -268,9 +178,13 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 		err = modules.WriteNegotiationAcceptance(conn)
 	}
 	if err != nil {
-		return err
+		return extendErr("iteration signal failed to send: ", ErrorConnection(err.Error()))
 	}
-	return encoding.WriteObject(conn, txn.TransactionSignatures[1])
+	err = encoding.WriteObject(conn, txn.TransactionSignatures[1])
+	if err != nil {
+		return extendErr("failed to write revision signatures: ", ErrorConnection(err.Error()))
+	}
+	return nil
 }
 
 // managedRPCReviseContract accepts a request to revise an existing contract.
@@ -283,7 +197,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 	// will be used to pay for the data.
 	_, so, err := h.managedRPCRecentRevision(conn)
 	if err != nil {
-		return err
+		return extendErr("RPCRecentRevision failed: ", err)
 	}
 	// The storage obligation is received with a lock on it. Defer a call to
 	// unlock the storage obligation.
@@ -299,7 +213,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 		if err == modules.ErrStopResponse {
 			return nil
 		} else if err != nil {
-			return err
+			return extendErr("revision iteration failed: ", err)
 		}
 	}
 	return nil
@@ -310,7 +224,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 func verifyRevision(so storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, newRevenue, newCollateral types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
-		return errInsaneFileContractRevisionOutputCounts
+		return errBadContractOutputCounts
 	}
 
 	// Check that the time to finalize and submit the file contract revision
@@ -323,42 +237,42 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 
 	// Check that all non-volatile fields are the same.
 	if oldFCR.ParentID != revision.ParentID {
-		return errReviseBadParent
+		return errBadContractParent
 	}
 	if oldFCR.UnlockConditions.UnlockHash() != revision.UnlockConditions.UnlockHash() {
-		return errReviseBadUnlockConditions
+		return errBadUnlockConditions
 	}
 	if oldFCR.NewRevisionNumber >= revision.NewRevisionNumber {
-		return errReviseBadRevisionNumber
+		return errBadRevisionNumber
 	}
 	if revision.NewFileSize != uint64(len(so.SectorRoots))*modules.SectorSize {
-		return errReviseBadNewFileSize
+		return errBadFileSize
 	}
 	if oldFCR.NewWindowStart != revision.NewWindowStart {
-		return errReviseBadNewWindowStart
+		return errBadWindowStart
 	}
 	if oldFCR.NewWindowEnd != revision.NewWindowEnd {
-		return errReviseBadNewWindowEnd
+		return errBadWindowEnd
 	}
 	if oldFCR.NewUnlockHash != revision.NewUnlockHash {
-		return errReviseBadUnlockHash
+		return errBadUnlockHash
 	}
 
 	// The new revenue comes out of the renter's valid outputs.
 	if revision.NewValidProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
-		return errReviseBadRenterValidOutput
+		return errHighRenterValidOutput
 	}
 	// The new revenue goes into the host's valid outputs.
 	if oldFCR.NewValidProofOutputs[1].Value.Add(newRevenue).Cmp(revision.NewValidProofOutputs[1].Value) < 0 {
-		return errReviseBadHostValidOutput
+		return errLowHostValidOutput
 	}
 	// The new revenue comes out of the renter's missed outputs.
 	if revision.NewMissedProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewMissedProofOutputs[0].Value) > 0 {
-		return errReviseBadRenterMissedOutput
+		return errHighRenterMissedOutput
 	}
 	// The new collateral comes out of the host's missed outputs.
 	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) < 0 {
-		return errReviseBadCollateralDeduction
+		return errLowHostMissedOutput
 	}
 
 	// The Merkle root is checked last because it is the most expensive check.
@@ -372,7 +286,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 	}
 	expectedMerkleRoot := ct.Root()
 	if revision.NewFileMerkleRoot != expectedMerkleRoot {
-		return errReviseBadFileMerkleRoot
+		return errBadFileMerkleRoot
 	}
 
 	return nil

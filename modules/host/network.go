@@ -96,6 +96,12 @@ func (h *Host) initNetworking(address string) (err error) {
 // threadedHandleConn handles an incoming connection to the host, typically an
 // RPC.
 func (h *Host) threadedHandleConn(conn net.Conn) {
+	err := h.tg.Add()
+	if err != nil {
+		return
+	}
+	defer h.tg.Done()
+
 	// Close the conn on host.Close or when the method terminates, whichever comes
 	// first.
 	connCloseChan := make(chan struct{})
@@ -107,12 +113,6 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		}
 		conn.Close()
 	}()
-
-	err := h.tg.Add()
-	if err != nil {
-		return
-	}
-	defer h.tg.Done()
 
 	// Set an initial duration that is generous, but finite. RPCs can extend
 	// this if desired.
@@ -133,10 +133,10 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	switch id {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
-		err = h.managedRPCDownload(conn)
+		err = extendErr("incoming RPCDownload failed: ", h.managedRPCDownload(conn))
 	case modules.RPCRenewContract:
 		atomic.AddUint64(&h.atomicRenewCalls, 1)
-		err = h.managedRPCRenewContract(conn)
+		err = extendErr("incoming RPCRenewContract failed: ", h.managedRPCRenewContract(conn))
 	case modules.RPCFormContract:
 		atomic.AddUint64(&h.atomicFormContractCalls, 1)
 		err = h.managedRPCFormContract(conn)
@@ -163,18 +163,8 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	}
 	if err != nil {
 		atomic.AddUint64(&h.atomicErroredCalls, 1)
-
-		// If there have been less than 1000 errored rpcs, print the error
-		// message. This is to help developers debug live systems that are
-		// running into issues. Ultimately though, this error can be triggered
-		// by a malicious actor, and therefore should not be logged except for
-		// DEBUG builds.
-		erroredCalls := atomic.LoadUint64(&h.atomicErroredCalls)
-		if erroredCalls < 1e3 {
-			h.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
-		} else {
-			h.log.Debugf("WARN: incoming RPC \"%v\" failed: %v", id, err)
-		}
+		err = extendErr("error with "+conn.RemoteAddr().String()+": ", err)
+		h.managedLogError(err)
 	}
 }
 
@@ -197,8 +187,8 @@ func (h *Host) threadedListen(closeChan chan struct{}) {
 
 // NetAddress returns the address at which the host can be reached.
 func (h *Host) NetAddress() modules.NetAddress {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 
 	if h.settings.NetAddress != "" {
 		return h.settings.NetAddress
@@ -209,8 +199,8 @@ func (h *Host) NetAddress() modules.NetAddress {
 // NetworkMetrics returns information about the types of rpc calls that have
 // been made to the host.
 func (h *Host) NetworkMetrics() modules.HostNetworkMetrics {
-	lockID := h.mu.RLock()
-	defer h.mu.RUnlock(lockID)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return modules.HostNetworkMetrics{
 		DownloadCalls:     atomic.LoadUint64(&h.atomicDownloadCalls),
 		ErrorCalls:        atomic.LoadUint64(&h.atomicErroredCalls),

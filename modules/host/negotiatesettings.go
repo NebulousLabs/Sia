@@ -62,12 +62,29 @@ func (h *Host) managedRPCSettings(conn net.Conn) error {
 	// Set the negotiation deadline.
 	conn.SetDeadline(time.Now().Add(modules.NegotiateSettingsTime))
 
+	// The revision number is updated so that the renter can be certain that
+	// they have the most recent copy of the settings. The revision number and
+	// signature can be compared against other settings objects that the renter
+	// may have, and if the new revision number is not higher the renter can
+	// suspect foul play. Largely, the revision number is in place to enable
+	// renters to share host settings with each other, a feature that has not
+	// yet been implemented.
+	//
+	// While updating the revision number, also grab the secret key and
+	// external settings.
 	var hes modules.HostExternalSettings
 	var secretKey crypto.SecretKey
-	lockID := h.mu.Lock()
+	h.mu.Lock()
 	h.revisionNumber++
 	secretKey = h.secretKey
 	hes = h.externalSettings()
-	h.mu.Unlock(lockID)
-	return crypto.WriteSignedObject(conn, hes, secretKey)
+	h.mu.Unlock()
+
+	// Write the settings to the renter. If the write fails, return a
+	// connection error.
+	err := crypto.WriteSignedObject(conn, hes, secretKey)
+	if err != nil {
+		return ErrorConnection("failed WriteSignedObject during RPCSettings: " + err.Error())
+	}
+	return nil
 }
