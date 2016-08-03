@@ -368,7 +368,8 @@ func TestWalletRelativePathError033x(t *testing.T) {
 		t.Fatal(err)
 	}
 	// This is not the actual wallet password. The createServerTester doesn't
-	// return the string password.
+	// return the string password. So for the sucess test we check if we make
+    // it past the absolute value check and instead error because of the key.
 	seed, err := modules.SeedToString(rawSeed, "english")
 	if err != nil {
 		t.Fatal(err)
@@ -401,6 +402,104 @@ func TestWalletRelativePathError033x(t *testing.T) {
 	load033xValues.Set("encryptionpassword", seed)
 	err = st.stdPostAPI("/wallet/033x", load033xValues)
 	if err == nil || err.Error() != "provided encryption key is incorrect" {
+		t.Fatal(err)
+	}
+}
+
+// Tests that the /wallet/siagkey call checks for relative paths.
+func TestWalletRelativePathErrorSiag(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestWalletRelativePathErrorSiag")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create tmp directory for uploads/downloads.
+	walletTestDir := build.TempDir("wallet_relative_path_sig")
+	err = os.MkdirAll(walletTestDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wallet loading from siag should error if its source is a relative path
+	loadSiagAbsoluteError := "error when calling /wallet/siagkey: keyfiles contains a non-absolute path"
+	rawSeed, _, err := st.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This is not the actual wallet password. The createServerTester does not
+	// return the string password. So for the sucess tests we check if we make
+    // it past the absolute value check and instead error because of the key.
+	seed, err := modules.SeedToString(rawSeed, "english")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	loadSiagValues := url.Values{}
+	loadSiagValues.Set("keyfiles", "test.dat")
+	loadSiagValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err == nil || err.Error() != loadSiagAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// As should this.
+	loadSiagValues = url.Values{}
+	loadSiagValues.Set("keyfiles", "../test.dat")
+	loadSiagValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err == nil || err.Error() != loadSiagAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	loadSiagValues = url.Values{}
+	loadSiagValues.Set("keyfiles", "/test.dat,test.dat,../test.dat")
+	loadSiagValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err == nil || err.Error() != loadSiagAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// As should this.
+	loadSiagValues = url.Values{}
+	loadSiagValues.Set("keyfiles", "../test.dat,/test.dat")
+	loadSiagValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err == nil || err.Error() != loadSiagAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// This should succeed.
+	loadSiagValues = url.Values{}
+	if err = createRandFile(filepath.Join(walletTestDir, "test.dat"), 0); err != nil {
+		t.Fatal(err)
+	}
+	loadSiagValues.Set("keyfiles", filepath.Join(walletTestDir, "test.dat"))
+	loadSiagValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err == nil || err.Error() != "error when calling /wallet/siagkey: provided encryption key is incorrect" {
+		t.Fatal(err)
+	}
+
+	// As should this.
+	loadSiagValues = url.Values{}
+	if err = createRandFile(filepath.Join(walletTestDir, "test1.dat"), 0); err != nil {
+		t.Fatal(err)
+	}
+	loadSiagValues.Set("keyfiles", filepath.Join(walletTestDir, "test.dat")+","+filepath.Join(walletTestDir, "test1.dat"))
+	loadSiagValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/siagkey", loadSiagValues)
+	if err == nil || err.Error() != "error when calling /wallet/siagkey: provided encryption key is incorrect" {
 		t.Fatal(err)
 	}
 }
