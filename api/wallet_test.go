@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -287,5 +288,51 @@ func TestIntegrationWalletTransactionGETid(t *testing.T) {
 	}
 	if wtgid.Transaction.Outputs[0].FundType != types.SpecifierMinerPayout {
 		t.Error("fund type should be a miner payout")
+	}
+}
+
+// Tests that /wallet/033x, /wallet/siag, and /wallet/backup calls
+// check for relative paths.
+func TestWalletAPIRelativePathError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestWalletAPIRelativePathError")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wallet backup should error if its destination is a relative path
+	backupAbsoluteError := "error when calling /wallet/backup: destination must be an absolute path"
+	// This should error.
+	err = st.stdGetAPI("/wallet/backup?destination=test_wallet.backup")
+	if err == nil || err.Error() != backupAbsoluteError {
+		t.Fatal(err)
+	}
+	// This as well.
+	err = st.stdGetAPI("/wallet/backup?destination=../test_wallet.backup")
+	if err == nil || err.Error() != backupAbsoluteError {
+		t.Fatal(err)
+	}
+	walletTestDir := build.TempDir("wallet_relative_path")
+	err = os.MkdirAll(walletTestDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This should succeed.
+	err = st.stdGetAPI("/wallet/backup?destination=" + filepath.Join(walletTestDir, "test_wallet.backup"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure the backup was actually created.
+	_, errStat := os.Stat(filepath.Join(walletTestDir, "test_wallet.backup"))
+	if errStat != nil {
+		t.Error(errStat)
 	}
 }
