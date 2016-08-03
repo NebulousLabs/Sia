@@ -2,9 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
@@ -153,6 +156,35 @@ func NewAPI(requiredUserAgent string, requiredPassword string, cs modules.Consen
 	// Register API handlers
 	api.Handler = api.initAPI(requiredPassword)
 	return api
+}
+
+func (api *API) Close() error {
+	var errs []error
+
+	// Safely close each module.
+	mods := []struct {
+		name string
+		c    io.Closer
+	}{
+		{"host", api.host},
+		{"renter", api.renter},
+		{"explorer", api.explorer},
+		{"miner", api.miner},
+		{"wallet", api.wallet},
+		{"tpool", api.tpool},
+		{"consensus", api.cs},
+		{"gateway", api.gateway},
+	}
+
+	for _, mod := range mods {
+		if mod.c != nil {
+			if err := mod.c.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("%v.Close faileD: %v", mod.name, err))
+			}
+		}
+	}
+
+	return build.JoinErrors(errs, "\n")
 }
 
 // initAPI determines which functions handle each API call. An empty string as
