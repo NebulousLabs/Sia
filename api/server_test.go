@@ -49,7 +49,7 @@ func TestReloading(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rst.server.Close()
-	if rst.server.cs.Height() != height {
+	if st.server.api.cs.Height() != rst.server.api.cs.Height() {
 		t.Error("server heights do not match")
 	}
 

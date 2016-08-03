@@ -28,17 +28,17 @@ func TestIntegrationMinerGET(t *testing.T) {
 	}
 
 	// Verify the correctness of the results.
-	blocksMined, staleBlocksMined := st.server.miner.BlocksMined()
+	blocksMined, staleBlocksMined := st.server.api.miner.BlocksMined()
 	if mg.BlocksMined != blocksMined {
 		t.Error("blocks mined did not succeed")
 	}
 	if mg.StaleBlocksMined != staleBlocksMined {
 		t.Error("stale blocks mined is incorrect")
 	}
-	if mg.CPUHashrate != st.server.miner.CPUHashrate() {
+	if mg.CPUHashrate != st.server.api.miner.CPUHashrate() {
 		t.Error("mismatched cpu hashrate")
 	}
-	if mg.CPUMining != st.server.miner.CPUMining() {
+	if mg.CPUMining != st.server.api.miner.CPUMining() {
 		t.Error("mismatched cpu miner status")
 	}
 }
@@ -62,7 +62,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	if !st.server.miner.CPUMining() {
+	if !st.server.api.miner.CPUMining() {
 		t.Error("cpu miner is reporting that it is not on")
 	}
 
@@ -82,7 +82,7 @@ func TestIntegrationMinerStartStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	if st.server.miner.CPUMining() {
+	if st.server.api.miner.CPUMining() {
 		t.Error("cpu miner is reporting that it is on after being stopped")
 	}
 

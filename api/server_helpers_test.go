@@ -396,7 +396,7 @@ func (st *serverTester) reloadedServerTester() (*serverTester, error) {
 
 // netAddress returns the NetAddress of the caller.
 func (st *serverTester) netAddress() modules.NetAddress {
-	return st.server.gateway.Address()
+	return st.server.api.gateway.Address()
 }
 
 // coinAddress returns a coin address that the caller is able to spend from.
