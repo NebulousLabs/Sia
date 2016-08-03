@@ -291,13 +291,12 @@ func TestIntegrationWalletTransactionGETid(t *testing.T) {
 	}
 }
 
-// Tests that /wallet/033x, /wallet/siag, and /wallet/backup calls
-// check for relative paths.
-func TestWalletAPIRelativePathError(t *testing.T) {
+// Tests that the /wallet/backup call checks for relative paths.
+func TestWalletRelativePathErrorBackup(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	st, err := createServerTester("TestWalletAPIRelativePathError")
+	st, err := createServerTester("TestWalletRelativePathErrorBackup")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,6 +304,13 @@ func TestWalletAPIRelativePathError(t *testing.T) {
 
 	// Announce the host.
 	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create tmp directory for uploads/downloads.
+	walletTestDir := build.TempDir("wallet_relative_path_backup")
+	err = os.MkdirAll(walletTestDir, 0700)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -320,11 +326,6 @@ func TestWalletAPIRelativePathError(t *testing.T) {
 	if err == nil || err.Error() != backupAbsoluteError {
 		t.Fatal(err)
 	}
-	walletTestDir := build.TempDir("wallet_relative_path")
-	err = os.MkdirAll(walletTestDir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// This should succeed.
 	err = st.stdGetAPI("/wallet/backup?destination=" + filepath.Join(walletTestDir, "test_wallet.backup"))
 	if err != nil {
@@ -334,5 +335,72 @@ func TestWalletAPIRelativePathError(t *testing.T) {
 	_, errStat := os.Stat(filepath.Join(walletTestDir, "test_wallet.backup"))
 	if errStat != nil {
 		t.Error(errStat)
+	}
+}
+
+// Tests that the /wallet/033x call checks for relative paths.
+func TestWalletRelativePathError033x(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestWalletRelativePathError033x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create tmp directory for uploads/downloads.
+	walletTestDir := build.TempDir("wallet_relative_path_033x")
+	err = os.MkdirAll(walletTestDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wallet loading from 033x should error if its source is a relative path
+	load033xAbsoluteError := "error when calling /wallet/033x: source must be an absolute path"
+	rawSeed, _, err := st.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This is not the actual wallet password. The createServerTester doesn't
+	// return the string password.
+	seed, err := modules.SeedToString(rawSeed, "english")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	load033xValues := url.Values{}
+	load033xValues.Set("source", "test.dat")
+	load033xValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/033x", load033xValues)
+	if err == nil || err.Error() != load033xAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// As should this.
+	load033xValues = url.Values{}
+	load033xValues.Set("source", "../test.dat")
+	load033xValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/033x", load033xValues)
+	if err == nil || err.Error() != load033xAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// This should succeed.
+	load033xValues = url.Values{}
+	if err = createRandFile(filepath.Join(walletTestDir, "test.dat"), 0); err != nil {
+		t.Fatal(err)
+	}
+	load033xValues.Set("source", filepath.Join(walletTestDir, "test.dat"))
+	load033xValues.Set("encryptionpassword", seed)
+	err = st.stdPostAPI("/wallet/033x", load033xValues)
+	if err == nil || err.Error() != "provided encryption key is incorrect" {
+		t.Fatal(err)
 	}
 }
