@@ -82,15 +82,15 @@ type (
 )
 
 // renterHandlerGET handles the API call to /renter.
-func (srv *Server) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterGET{
-		Settings:         srv.renter.Settings(),
-		FinancialMetrics: srv.renter.FinancialMetrics(),
+		Settings:         api.renter.Settings(),
+		FinancialMetrics: api.renter.FinancialMetrics(),
 	})
 }
 
 // renterHandlerPOST handles the API call to set the Renter's settings.
-func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// scan values
 	funds, ok := scanAmount(req.FormValue("funds"))
 	if !ok {
@@ -116,7 +116,7 @@ func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _
 	// 	return
 	// }
 
-	err = srv.renter.SetSettings(modules.RenterSettings{
+	err = api.renter.SetSettings(modules.RenterSettings{
 		Allowance: modules.Allowance{
 			Funds:  funds,
 			Period: period,
@@ -134,9 +134,9 @@ func (srv *Server) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _
 }
 
 // renterContractsHandler handles the API call to request the Renter's contracts.
-func (srv *Server) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	contracts := []RenterContract{}
-	for _, c := range srv.renter.Contracts() {
+	for _, c := range api.renter.Contracts() {
 		contracts = append(contracts, RenterContract{
 			EndHeight:   c.EndHeight(),
 			ID:          c.ID,
@@ -151,21 +151,21 @@ func (srv *Server) renterContractsHandler(w http.ResponseWriter, _ *http.Request
 }
 
 // renterDownloadsHandler handles the API call to request the download queue.
-func (srv *Server) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterDownloadQueue{
-		Downloads: srv.renter.DownloadQueue(),
+		Downloads: api.renter.DownloadQueue(),
 	})
 }
 
 // renterLoadHandler handles the API call to load a '.sia' file.
-func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterLoadHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	source := req.FormValue("source")
 	if !filepath.IsAbs(source) {
 		writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
 		return
 	}
 
-	files, err := srv.renter.LoadSharedFiles(source)
+	files, err := api.renter.LoadSharedFiles(source)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -176,8 +176,8 @@ func (srv *Server) renterLoadHandler(w http.ResponseWriter, req *http.Request, _
 
 // renterLoadAsciiHandler handles the API call to load a '.sia' file
 // in ASCII form.
-func (srv *Server) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	files, err := srv.renter.LoadSharedFilesAscii(req.FormValue("asciisia"))
+func (api *API) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	files, err := api.renter.LoadSharedFilesAscii(req.FormValue("asciisia"))
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -188,8 +188,8 @@ func (srv *Server) renterLoadAsciiHandler(w http.ResponseWriter, req *http.Reque
 
 // renterRenameHandler handles the API call to rename a file entry in the
 // renter.
-func (srv *Server) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.RenameFile(strings.TrimPrefix(ps.ByName("siapath"), "/"), req.FormValue("newsiapath"))
+func (api *API) renterRenameHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	err := api.renter.RenameFile(strings.TrimPrefix(ps.ByName("siapath"), "/"), req.FormValue("newsiapath"))
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -199,16 +199,16 @@ func (srv *Server) renterRenameHandler(w http.ResponseWriter, req *http.Request,
 }
 
 // renterFilesHandler handles the API call to list all of the files.
-func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterFilesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	writeJSON(w, RenterFiles{
-		Files: srv.renter.FileList(),
+		Files: api.renter.FileList(),
 	})
 }
 
 // renterDeleteHandler handles the API call to delete a file entry from the
 // renter.
-func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	err := srv.renter.DeleteFile(strings.TrimPrefix(ps.ByName("siapath"), "/"))
+func (api *API) renterDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	err := api.renter.DeleteFile(strings.TrimPrefix(ps.ByName("siapath"), "/"))
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -218,7 +218,7 @@ func (srv *Server) renterDeleteHandler(w http.ResponseWriter, req *http.Request,
 }
 
 // renterDownloadHandler handles the API call to download a file.
-func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	destination := req.FormValue("destination")
 	// Check that the destination path is absolute.
 	if !filepath.IsAbs(destination) {
@@ -226,7 +226,7 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	err := srv.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
+	err := api.renter.Download(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination)
 	if err != nil {
 		writeError(w, Error{"Download failed: " + err.Error()}, http.StatusInternalServerError)
 		return
@@ -237,7 +237,7 @@ func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Reques
 
 // renterShareHandler handles the API call to create a '.sia' file that
 // shares a set of file.
-func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+func (api *API) renterShareHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	destination := req.FormValue("destination")
 	// Check that the destination path is absolute.
 	if !filepath.IsAbs(destination) {
@@ -245,7 +245,7 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 		return
 	}
 
-	err := srv.renter.ShareFiles(strings.Split(req.FormValue("siapaths"), ","), destination)
+	err := api.renter.ShareFiles(strings.Split(req.FormValue("siapaths"), ","), destination)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -256,8 +256,8 @@ func (srv *Server) renterShareHandler(w http.ResponseWriter, req *http.Request, 
 
 // renterShareAsciiHandler handles the API call to return a '.sia' file
 // in ascii form.
-func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-	ascii, err := srv.renter.ShareFilesAscii(strings.Split(req.FormValue("siapaths"), ","))
+func (api *API) renterShareAsciiHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	ascii, err := api.renter.ShareFilesAscii(strings.Split(req.FormValue("siapaths"), ","))
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -268,14 +268,14 @@ func (srv *Server) renterShareAsciiHandler(w http.ResponseWriter, req *http.Requ
 }
 
 // renterUploadHandler handles the API call to upload a file.
-func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+func (api *API) renterUploadHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	source := req.FormValue("source")
 	if !filepath.IsAbs(source) {
 		writeError(w, Error{"source must be an absolute path"}, http.StatusBadRequest)
 		return
 	}
 
-	err := srv.renter.Upload(modules.FileUploadParams{
+	err := api.renter.Upload(modules.FileUploadParams{
 		Source:  source,
 		SiaPath: strings.TrimPrefix(ps.ByName("siapath"), "/"),
 		// let the renter decide these values; eventually they will be configurable
@@ -291,9 +291,9 @@ func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request,
 
 // renterHostsActiveHandler handles the API call asking for the list of active
 // hosts.
-func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterHostsActiveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var numHosts uint64
-	hosts := srv.renter.ActiveHosts()
+	hosts := api.renter.ActiveHosts()
 
 	if req.FormValue("numhosts") == "" {
 		// Default value for 'numhosts' is all of them.
@@ -318,8 +318,8 @@ func (srv *Server) renterHostsActiveHandler(w http.ResponseWriter, req *http.Req
 }
 
 // renterHostsAllHandler handles the API call asking for the list of all hosts.
-func (srv *Server) renterHostsAllHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) renterHostsAllHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	writeJSON(w, AllHosts{
-		Hosts: srv.renter.AllHosts(),
+		Hosts: api.renter.AllHosts(),
 	})
 }

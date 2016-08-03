@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/modules"
+
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -115,120 +117,150 @@ func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
+// API encapsulates a collection of modules and exposes a http.Handler
+// to access their methods.
+type API struct {
+	cs       modules.ConsensusSet
+	explorer modules.Explorer
+	gateway  modules.Gateway
+	host     modules.Host
+	miner    modules.Miner
+	renter   modules.Renter
+	tpool    modules.TransactionPool
+	wallet   modules.Wallet
+
+	requiredUserAgent string
+	Handler           http.Handler
+}
+
+// NewAPI creates a new Sia API from the provided modules.
+// The API will require authentication using HTTP basic auth for certain endpoints
+// if the suppliecd password is not the empty string.  Usernames are ignored for authentication.
+func NewAPI(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *API {
+	api := &API{
+		cs:       cs,
+		explorer: e,
+		gateway:  g,
+		host:     h,
+		miner:    m,
+		renter:   r,
+		tpool:    tp,
+		wallet:   w,
+
+		requiredUserAgent: requiredUserAgent,
+	}
+
+	// Register API handlers
+	api.Handler = api.initAPI(requiredPassword)
+	return api
+}
+
 // initAPI determines which functions handle each API call. An empty string as
 // the password indicates no password.
-func (srv *Server) initAPI(password string) {
+func (api *API) initAPI(password string) http.Handler {
 	router := httprouter.New()
-	router.NotFound = http.HandlerFunc(srv.unrecognizedCallHandler) // custom 404
-
-	// Daemon API Calls
-	router.GET("/daemon/constants", srv.daemonConstantsHandler)
-	router.GET("/daemon/version", srv.daemonVersionHandler)
-	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
-	router.POST("/daemon/update", srv.daemonUpdateHandlerPOST)
-	router.GET("/daemon/stop", requirePassword(srv.daemonStopHandler, password))
+	router.NotFound = http.HandlerFunc(api.unrecognizedCallHandler) // custom 404
 
 	// Consensus API Calls
-	if srv.cs != nil {
-		router.GET("/consensus", srv.consensusHandler)
+	if api.cs != nil {
+		router.GET("/consensus", api.consensusHandler)
 	}
 
 	// Explorer API Calls
-	if srv.explorer != nil {
-		router.GET("/explorer", srv.explorerHandler)
-		router.GET("/explorer/blocks/:height", srv.explorerBlocksHandler)
-		router.GET("/explorer/hashes/:hash", srv.explorerHashHandler)
+	if api.explorer != nil {
+		router.GET("/explorer", api.explorerHandler)
+		router.GET("/explorer/blocks/:height", api.explorerBlocksHandler)
+		router.GET("/explorer/hashes/:hash", api.explorerHashHandler)
 	}
 
 	// Gateway API Calls
-	if srv.gateway != nil {
-		router.GET("/gateway", srv.gatewayHandler)
-		router.POST("/gateway/connect/:netaddress", requirePassword(srv.gatewayConnectHandler, password))
-		router.POST("/gateway/disconnect/:netaddress", requirePassword(srv.gatewayDisconnectHandler, password))
+	if api.gateway != nil {
+		router.GET("/gateway", api.gatewayHandler)
+		router.POST("/gateway/connect/:netaddress", requirePassword(api.gatewayConnectHandler, password))
+		router.POST("/gateway/disconnect/:netaddress", requirePassword(api.gatewayDisconnectHandler, password))
 	}
 
 	// Host API Calls
-	if srv.host != nil {
+	if api.host != nil {
 		// Calls directly pertaining to the host.
-		router.GET("/host", srv.hostHandlerGET)                                           // Get the host status.
-		router.POST("/host", requirePassword(srv.hostHandlerPOST, password))              // Change the settings of the host.
-		router.POST("/host/announce", requirePassword(srv.hostAnnounceHandler, password)) // Announce the host to the network.
+		router.GET("/host", api.hostHandlerGET)                                           // Get the host status.
+		router.POST("/host", requirePassword(api.hostHandlerPOST, password))              // Change the settings of the host.
+		router.POST("/host/announce", requirePassword(api.hostAnnounceHandler, password)) // Announce the host to the network.
 
 		// Calls pertaining to the storage manager that the host uses.
-		router.GET("/host/storage", srv.storageHandler)
-		router.POST("/host/storage/folders/add", requirePassword(srv.storageFoldersAddHandler, password))
-		router.POST("/host/storage/folders/remove", requirePassword(srv.storageFoldersRemoveHandler, password))
-		router.POST("/host/storage/folders/resize", requirePassword(srv.storageFoldersResizeHandler, password))
-		router.POST("/host/storage/sectors/delete/:merkleroot", requirePassword(srv.storageSectorsDeleteHandler, password))
+		router.GET("/host/storage", api.storageHandler)
+		router.POST("/host/storage/folders/add", requirePassword(api.storageFoldersAddHandler, password))
+		router.POST("/host/storage/folders/remove", requirePassword(api.storageFoldersRemoveHandler, password))
+		router.POST("/host/storage/folders/resize", requirePassword(api.storageFoldersResizeHandler, password))
+		router.POST("/host/storage/sectors/delete/:merkleroot", requirePassword(api.storageSectorsDeleteHandler, password))
 	}
 
 	// Miner API Calls
-	if srv.miner != nil {
-		router.GET("/miner", srv.minerHandler)
-		router.GET("/miner/header", requirePassword(srv.minerHeaderHandlerGET, password))
-		router.POST("/miner/header", requirePassword(srv.minerHeaderHandlerPOST, password))
-		router.GET("/miner/start", requirePassword(srv.minerStartHandler, password))
-		router.GET("/miner/stop", requirePassword(srv.minerStopHandler, password))
+	if api.miner != nil {
+		router.GET("/miner", api.minerHandler)
+		router.GET("/miner/header", requirePassword(api.minerHeaderHandlerGET, password))
+		router.POST("/miner/header", requirePassword(api.minerHeaderHandlerPOST, password))
+		router.GET("/miner/start", requirePassword(api.minerStartHandler, password))
+		router.GET("/miner/stop", requirePassword(api.minerStopHandler, password))
 	}
 
 	// Renter API Calls
-	if srv.renter != nil {
-		router.GET("/renter", srv.renterHandlerGET)
-		router.POST("/renter", requirePassword(srv.renterHandlerPOST, password))
-		router.GET("/renter/contracts", srv.renterContractsHandler)
-		router.GET("/renter/downloads", srv.renterDownloadsHandler)
-		router.GET("/renter/files", srv.renterFilesHandler)
+	if api.renter != nil {
+		router.GET("/renter", api.renterHandlerGET)
+		router.POST("/renter", requirePassword(api.renterHandlerPOST, password))
+		router.GET("/renter/contracts", api.renterContractsHandler)
+		router.GET("/renter/downloads", api.renterDownloadsHandler)
+		router.GET("/renter/files", api.renterFilesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
 		// standardized and implemented.
-		// router.POST("/renter/load", requirePassword(srv.renterLoadHandler, password))
-		// router.POST("/renter/loadascii", requirePassword(srv.renterLoadAsciiHandler, password))
-		// router.GET("/renter/share", requirePassword(srv.renterShareHandler, password))
-		// router.GET("/renter/shareascii", requirePassword(srv.renterShareAsciiHandler, password))
+		// router.POST("/renter/load", requirePassword(api.renterLoadHandler, password))
+		// router.POST("/renter/loadascii", requirePassword(api.renterLoadAsciiHandler, password))
+		// router.GET("/renter/share", requirePassword(api.renterShareHandler, password))
+		// router.GET("/renter/shareascii", requirePassword(api.renterShareAsciiHandler, password))
 
-		router.POST("/renter/delete/*siapath", requirePassword(srv.renterDeleteHandler, password))
-		router.GET("/renter/download/*siapath", requirePassword(srv.renterDownloadHandler, password))
-		router.POST("/renter/rename/*siapath", requirePassword(srv.renterRenameHandler, password))
-		router.POST("/renter/upload/*siapath", requirePassword(srv.renterUploadHandler, password))
+		router.POST("/renter/delete/*siapath", requirePassword(api.renterDeleteHandler, password))
+		router.GET("/renter/download/*siapath", requirePassword(api.renterDownloadHandler, password))
+		router.POST("/renter/rename/*siapath", requirePassword(api.renterRenameHandler, password))
+		router.POST("/renter/upload/*siapath", requirePassword(api.renterUploadHandler, password))
 
 		// HostDB endpoints.
-		router.GET("/hostdb/active", srv.renterHostsActiveHandler)
-		router.GET("/hostdb/all", srv.renterHostsAllHandler)
+		router.GET("/hostdb/active", api.renterHostsActiveHandler)
+		router.GET("/hostdb/all", api.renterHostsAllHandler)
 	}
 
 	// TransactionPool API Calls
-	if srv.tpool != nil {
+	if api.tpool != nil {
 		// TODO: re-enable this route once the transaction pool API has been finalized
-		//router.GET("/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+		//router.GET("/transactionpool/transactions", api.transactionpoolTransactionsHandler)
 	}
 
 	// Wallet API Calls
-	if srv.wallet != nil {
-		router.GET("/wallet", srv.walletHandler)
-		router.POST("/wallet/033x", requirePassword(srv.wallet033xHandler, password))
-		router.GET("/wallet/address", requirePassword(srv.walletAddressHandler, password))
-		router.GET("/wallet/addresses", srv.walletAddressesHandler)
-		router.GET("/wallet/backup", requirePassword(srv.walletBackupHandler, password))
-		router.POST("/wallet/init", requirePassword(srv.walletInitHandler, password))
-		router.POST("/wallet/lock", requirePassword(srv.walletLockHandler, password))
-		router.POST("/wallet/seed", requirePassword(srv.walletSeedHandler, password))
-		router.GET("/wallet/seeds", requirePassword(srv.walletSeedsHandler, password))
-		router.POST("/wallet/siacoins", requirePassword(srv.walletSiacoinsHandler, password))
-		router.POST("/wallet/siafunds", requirePassword(srv.walletSiafundsHandler, password))
-		router.POST("/wallet/siagkey", requirePassword(srv.walletSiagkeyHandler, password))
-		router.GET("/wallet/transaction/:id", srv.walletTransactionHandler)
-		router.GET("/wallet/transactions", srv.walletTransactionsHandler)
-		router.GET("/wallet/transactions/:addr", srv.walletTransactionsAddrHandler)
-		router.POST("/wallet/unlock", requirePassword(srv.walletUnlockHandler, password))
+	if api.wallet != nil {
+		router.GET("/wallet", api.walletHandler)
+		router.POST("/wallet/033x", requirePassword(api.wallet033xHandler, password))
+		router.GET("/wallet/address", requirePassword(api.walletAddressHandler, password))
+		router.GET("/wallet/addresses", api.walletAddressesHandler)
+		router.GET("/wallet/backup", requirePassword(api.walletBackupHandler, password))
+		router.POST("/wallet/init", requirePassword(api.walletInitHandler, password))
+		router.POST("/wallet/lock", requirePassword(api.walletLockHandler, password))
+		router.POST("/wallet/seed", requirePassword(api.walletSeedHandler, password))
+		router.GET("/wallet/seeds", requirePassword(api.walletSeedsHandler, password))
+		router.POST("/wallet/siacoins", requirePassword(api.walletSiacoinsHandler, password))
+		router.POST("/wallet/siafunds", requirePassword(api.walletSiafundsHandler, password))
+		router.POST("/wallet/siagkey", requirePassword(api.walletSiagkeyHandler, password))
+		router.GET("/wallet/transaction/:id", api.walletTransactionHandler)
+		router.GET("/wallet/transactions", api.walletTransactionsHandler)
+		router.GET("/wallet/transactions/:addr", api.walletTransactionsAddrHandler)
+		router.POST("/wallet/unlock", requirePassword(api.walletUnlockHandler, password))
 	}
 
-	// Apply UserAgent middleware and create HTTP server
-	uaRouter := requireUserAgent(router, srv.requiredUserAgent)
-	srv.apiServer = &http.Server{Handler: uaRouter}
+	// Apply UserAgent middleware and return the router
+	return requireUserAgent(router, api.requiredUserAgent)
 }
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
-func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
+func (api *API) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 	writeError(w, Error{"404 - Refer to API.md"}, http.StatusNotFound)
 }
 

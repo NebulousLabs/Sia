@@ -14,6 +14,6 @@ type TransactionPoolGET struct {
 
 // transactionpoolTransactionsHandler handles the API call to get the
 // transaction pool trasactions.
-func (srv *Server) transactionpoolTransactionsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, TransactionPoolGET{Transactions: srv.tpool.TransactionList()})
+func (api *API) transactionpoolTransactionsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	writeJSON(w, TransactionPoolGET{Transactions: api.tpool.TransactionList()})
 }

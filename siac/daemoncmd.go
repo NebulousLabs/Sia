@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/api"
-
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +57,6 @@ func updatecmd() {
 		return
 	}
 	fmt.Printf("Updated to version %s! Restart siad now.\n", update.Version)
-
 }
 
 func updatecheckcmd() {

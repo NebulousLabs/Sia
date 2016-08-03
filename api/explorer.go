@@ -78,7 +78,7 @@ type (
 
 // buildExplorerTransaction takes a transaction and the height + id of the
 // block it appears in an uses that to build an explorer transaction.
-func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
+func (api *API) buildExplorerTransaction(height types.BlockHeight, parent types.BlockID, txn types.Transaction) (et ExplorerTransaction) {
 	// Get the header information for the transaction.
 	et.ID = txn.ID()
 	et.Height = height
@@ -87,7 +87,7 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 
 	// Add the siacoin outputs that correspond with each siacoin input.
 	for _, sci := range txn.SiacoinInputs {
-		sco, exists := srv.explorer.SiacoinOutput(sci.ParentID)
+		sco, exists := api.explorer.SiacoinOutput(sci.ParentID)
 		if build.DEBUG && !exists {
 			panic("could not find corresponding siacoin output")
 		}
@@ -133,7 +133,7 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 	// Add all of the output ids and outputs corresponding with each storage
 	// proof.
 	for _, sp := range txn.StorageProofs {
-		fileContract, fileContractRevisions, fileContractExists, _ := srv.explorer.FileContractHistory(sp.ParentID)
+		fileContract, fileContractRevisions, fileContractExists, _ := api.explorer.FileContractHistory(sp.ParentID)
 		if !fileContractExists && build.DEBUG {
 			panic("could not find a file contract connected with a storage proof")
 		}
@@ -153,7 +153,7 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 
 	// Add the siafund outputs that correspond to each siacoin input.
 	for _, sci := range txn.SiafundInputs {
-		sco, exists := srv.explorer.SiafundOutput(sci.ParentID)
+		sco, exists := api.explorer.SiafundOutput(sci.ParentID)
 		if build.DEBUG && !exists {
 			panic("could not find corresponding siafund output")
 		}
@@ -172,7 +172,7 @@ func (srv *Server) buildExplorerTransaction(height types.BlockHeight, parent typ
 
 // buildExplorerBlock takes a block and its height and uses it to construct an
 // explorer block.
-func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
+func (api *API) buildExplorerBlock(height types.BlockHeight, block types.Block) ExplorerBlock {
 	var mpoids []types.SiacoinOutputID
 	for i := range block.MinerPayouts {
 		mpoids = append(mpoids, block.MinerPayoutID(uint64(i)))
@@ -180,10 +180,10 @@ func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Bloc
 
 	var etxns []ExplorerTransaction
 	for _, txn := range block.Transactions {
-		etxns = append(etxns, srv.buildExplorerTransaction(height, block.ID(), txn))
+		etxns = append(etxns, api.buildExplorerTransaction(height, block.ID(), txn))
 	}
 
-	facts, exists := srv.explorer.BlockFacts(height)
+	facts, exists := api.explorer.BlockFacts(height)
 	if build.DEBUG && !exists {
 		panic("incorrect request to buildExplorerBlock - block does not exist")
 	}
@@ -198,7 +198,7 @@ func (srv *Server) buildExplorerBlock(height types.BlockHeight, block types.Bloc
 }
 
 // explorerHandler handles API calls to /explorer/blocks/:height.
-func (srv *Server) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+func (api *API) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// Parse the height that's being requested.
 	var height types.BlockHeight
 	_, err := fmt.Sscan(ps.ByName("height"), &height)
@@ -208,35 +208,35 @@ func (srv *Server) explorerBlocksHandler(w http.ResponseWriter, req *http.Reques
 	}
 
 	// Fetch and return the explorer block.
-	block, exists := srv.cs.BlockAtHeight(height)
+	block, exists := api.cs.BlockAtHeight(height)
 	if !exists {
 		writeError(w, Error{"no block found at input height in call to /explorer/block"}, http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, ExplorerBlockGET{
-		Block: srv.buildExplorerBlock(height, block),
+		Block: api.buildExplorerBlock(height, block),
 	})
 }
 
 // buildTransactionSet returns the blocks and transactions that are associated
 // with a set of transaction ids.
-func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []ExplorerTransaction, blocks []ExplorerBlock) {
+func (api *API) buildTransactionSet(txids []types.TransactionID) (txns []ExplorerTransaction, blocks []ExplorerBlock) {
 	for _, txid := range txids {
 		// Get the block containing the transaction - in the case of miner
 		// payouts, the block might be the transaction.
-		block, height, exists := srv.explorer.Transaction(txid)
+		block, height, exists := api.explorer.Transaction(txid)
 		if !exists && build.DEBUG {
 			panic("explorer pointing to nonexistent txn")
 		}
 
 		// Check if the block is the transaction.
 		if types.TransactionID(block.ID()) == txid {
-			blocks = append(blocks, srv.buildExplorerBlock(height, block))
+			blocks = append(blocks, api.buildExplorerBlock(height, block))
 		} else {
 			// Find the transaction within the block with the correct id.
 			for _, t := range block.Transactions {
 				if t.ID() == txid {
-					txns = append(txns, srv.buildExplorerTransaction(height, block.ID(), t))
+					txns = append(txns, api.buildExplorerTransaction(height, block.ID(), t))
 					break
 				}
 			}
@@ -246,7 +246,7 @@ func (srv *Server) buildTransactionSet(txids []types.TransactionID) (txns []Expl
 }
 
 // explorerHashHandler handles GET requests to /explorer/hash/:hash.
-func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// Scan the hash as a hash. If that fails, try scanning the hash as an
 	// address.
 	hash, err := scanHash(ps.ByName("hash"))
@@ -267,17 +267,17 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	}
 
 	// Try the hash as a block id.
-	block, height, exists := srv.explorer.Block(types.BlockID(hash))
+	block, height, exists := api.explorer.Block(types.BlockID(hash))
 	if exists {
 		writeJSON(w, ExplorerHashGET{
 			HashType: "blockid",
-			Block:    srv.buildExplorerBlock(height, block),
+			Block:    api.buildExplorerBlock(height, block),
 		})
 		return
 	}
 
 	// Try the hash as a transaction id.
-	block, height, exists = srv.explorer.Transaction(types.TransactionID(hash))
+	block, height, exists = api.explorer.Transaction(types.TransactionID(hash))
 	if exists {
 		var txn types.Transaction
 		for _, t := range block.Transactions {
@@ -287,15 +287,15 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 		}
 		writeJSON(w, ExplorerHashGET{
 			HashType:    "transactionid",
-			Transaction: srv.buildExplorerTransaction(height, block.ID(), txn),
+			Transaction: api.buildExplorerTransaction(height, block.ID(), txn),
 		})
 		return
 	}
 
 	// Try the hash as a siacoin output id.
-	txids := srv.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
+	txids := api.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
 	if len(txids) != 0 {
-		txns, blocks := srv.buildTransactionSet(txids)
+		txns, blocks := api.buildTransactionSet(txids)
 		writeJSON(w, ExplorerHashGET{
 			HashType:     "siacoinoutputid",
 			Blocks:       blocks,
@@ -305,9 +305,9 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	}
 
 	// Try the hash as a file contract id.
-	txids = srv.explorer.FileContractID(types.FileContractID(hash))
+	txids = api.explorer.FileContractID(types.FileContractID(hash))
 	if len(txids) != 0 {
-		txns, blocks := srv.buildTransactionSet(txids)
+		txns, blocks := api.buildTransactionSet(txids)
 		writeJSON(w, ExplorerHashGET{
 			HashType:     "filecontractid",
 			Blocks:       blocks,
@@ -317,9 +317,9 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	}
 
 	// Try the hash as a siafund output id.
-	txids = srv.explorer.SiafundOutputID(types.SiafundOutputID(hash))
+	txids = api.explorer.SiafundOutputID(types.SiafundOutputID(hash))
 	if len(txids) != 0 {
-		txns, blocks := srv.buildTransactionSet(txids)
+		txns, blocks := api.buildTransactionSet(txids)
 		writeJSON(w, ExplorerHashGET{
 			HashType:     "siafundoutputid",
 			Blocks:       blocks,
@@ -336,9 +336,9 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 	// a colliding unlock hash (such a collision can only happen if done
 	// intentionally) will be unable to find their unlock hash in the
 	// blockchain through the explorer hash lookup.
-	txids = srv.explorer.UnlockHash(types.UnlockHash(hash))
+	txids = api.explorer.UnlockHash(types.UnlockHash(hash))
 	if len(txids) != 0 {
-		txns, blocks := srv.buildTransactionSet(txids)
+		txns, blocks := api.buildTransactionSet(txids)
 		writeJSON(w, ExplorerHashGET{
 			HashType:     "unlockhash",
 			Blocks:       blocks,
@@ -352,8 +352,8 @@ func (srv *Server) explorerHashHandler(w http.ResponseWriter, req *http.Request,
 }
 
 // explorerHandler handles API calls to /explorer
-func (srv *Server) explorerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	facts := srv.explorer.LatestBlockFacts()
+func (api *API) explorerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	facts := api.explorer.LatestBlockFacts()
 	writeJSON(w, ExplorerGET{
 		BlockFacts: facts,
 	})

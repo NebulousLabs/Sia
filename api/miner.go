@@ -21,33 +21,33 @@ type (
 )
 
 // minerHandler handles the API call that queries the miner's status.
-func (srv *Server) minerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	blocksMined, staleMined := srv.miner.BlocksMined()
+func (api *API) minerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	blocksMined, staleMined := api.miner.BlocksMined()
 	mg := MinerGET{
 		BlocksMined:      blocksMined,
-		CPUHashrate:      srv.miner.CPUHashrate(),
-		CPUMining:        srv.miner.CPUMining(),
+		CPUHashrate:      api.miner.CPUHashrate(),
+		CPUMining:        api.miner.CPUMining(),
 		StaleBlocksMined: staleMined,
 	}
 	writeJSON(w, mg)
 }
 
 // minerStartHandler handles the API call that starts the miner.
-func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	srv.miner.StartCPUMining()
+func (api *API) minerStartHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	api.miner.StartCPUMining()
 	writeSuccess(w)
 }
 
 // minerStopHandler handles the API call to stop the miner.
-func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	srv.miner.StopCPUMining()
+func (api *API) minerStopHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	api.miner.StopCPUMining()
 	writeSuccess(w)
 }
 
 // minerHeaderHandlerGET handles the API call that retrieves a block header
 // for work.
-func (srv *Server) minerHeaderHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	bhfw, target, err := srv.miner.HeaderForWork()
+func (api *API) minerHeaderHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	bhfw, target, err := api.miner.HeaderForWork()
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -57,14 +57,14 @@ func (srv *Server) minerHeaderHandlerGET(w http.ResponseWriter, req *http.Reques
 
 // minerHeaderHandlerPOST handles the API call to submit a block header to the
 // miner.
-func (srv *Server) minerHeaderHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+func (api *API) minerHeaderHandlerPOST(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var bh types.BlockHeader
 	err := encoding.NewDecoder(req.Body).Decode(&bh)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	err = srv.miner.SubmitHeader(bh)
+	err = api.miner.SubmitHeader(bh)
 	if err != nil {
 		writeError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
