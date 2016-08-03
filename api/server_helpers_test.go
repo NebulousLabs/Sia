@@ -8,8 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -77,22 +75,6 @@ func (srv *Server) Serve() error {
 	// Block the Close() method until Serve() has finished.
 	srv.wg.Add(1)
 	defer srv.wg.Done()
-
-	// stop the server if a kill signal is caught
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, os.Kill)
-	defer signal.Stop(sigChan)
-	stop := make(chan struct{})
-	defer close(stop)
-	go func() {
-		select {
-		case <-sigChan:
-			fmt.Println("\rCaught stop signal, quitting...")
-			srv.Close()
-		case <-stop:
-			// Don't leave a dangling goroutine.
-		}
-	}()
 
 	// The server will run until an error is encountered or the listener is
 	// closed, via either the Close method or the signal handling above.
