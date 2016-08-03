@@ -369,7 +369,7 @@ func TestWalletRelativePathError033x(t *testing.T) {
 	}
 	// This is not the actual wallet password. The createServerTester doesn't
 	// return the string password. So for the sucess test we check if we make
-    // it past the absolute value check and instead error because of the key.
+	// it past the absolute value check and instead error because of the key.
 	seed, err := modules.SeedToString(rawSeed, "english")
 	if err != nil {
 		t.Fatal(err)
@@ -437,7 +437,7 @@ func TestWalletRelativePathErrorSiag(t *testing.T) {
 	}
 	// This is not the actual wallet password. The createServerTester does not
 	// return the string password. So for the sucess tests we check if we make
-    // it past the absolute value check and instead error because of the key.
+	// it past the absolute value check and instead error because of the key.
 	seed, err := modules.SeedToString(rawSeed, "english")
 	if err != nil {
 		t.Fatal(err)
