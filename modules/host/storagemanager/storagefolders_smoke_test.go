@@ -916,11 +916,12 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 	// Check the filesystem, there should be 3 files in the manager folder
 	// (storagemanager.db, storagemanager.json, storagemanager.log).
+	// NOTE: on Windows, a lock file for the db will also be present.
 	infos, err = ioutil.ReadDir(smt.sm.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(infos) != 3 {
+	if len(infos) != 3 && len(infos) != 4 {
 		t.Error("unexpected number of files in the manager directory")
 	}
 }
