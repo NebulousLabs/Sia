@@ -42,7 +42,9 @@ returns the set of constants in use.
   "targetwindow": 1000, // blocks
   // Duration of the window used to adjust the difficulty.
   "mediantimestampwindow": 11, // blocks
-  // How far in the future a block can be without being rejected.
+  // How far in the future a block can be without being rejected. A block
+  // further into the future will not be accepted immediately, but the daemon
+  // will attempt to accept the block as soon as it is valid.
   "futurethreshold": 10800, // seconds
   // Total number of siafunds.
   "siafundcount": "10000",
