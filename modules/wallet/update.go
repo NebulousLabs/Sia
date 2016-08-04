@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -120,7 +121,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 			})
 			err := dbPutHistoricOutput(tx, types.OutputID(block.MinerPayoutID(uint64(i))), mp.Value)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not put historic output: %v", err)
 			}
 		}
 		if relevant {
@@ -143,7 +144,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				}
 				val, err := dbGetHistoricOutput(tx, types.OutputID(sci.ParentID))
 				if err != nil {
-					return err
+					return fmt.Errorf("could not get historic output: %v", err)
 				}
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
 					FundType:       types.SpecifierSiacoinInput,
@@ -167,7 +168,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				})
 				err := dbPutHistoricOutput(tx, types.OutputID(txn.SiacoinOutputID(uint64(i))), sco.Value)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not put historic output: %v", err)
 				}
 			}
 
@@ -178,7 +179,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				}
 				sfiValue, err := dbGetHistoricOutput(tx, types.OutputID(sfi.ParentID))
 				if err != nil {
-					return err
+					return fmt.Errorf("could not get historic output: %v", err)
 				}
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
 					FundType:       types.SpecifierSiafundInput,
@@ -188,7 +189,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				})
 				startVal, err := dbGetHistoricClaimStart(tx, sfi.ParentID)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not get historic claim start: %v", err)
 				}
 				claimValue := w.siafundPool.Sub(startVal).Mul(sfiValue)
 				pt.Outputs = append(pt.Outputs, modules.ProcessedOutput{
@@ -215,11 +216,11 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				id := txn.SiafundOutputID(uint64(i))
 				err := dbPutHistoricOutput(tx, types.OutputID(id), sfo.Value)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not put historic output: %v", err)
 				}
 				err = dbPutHistoricClaimStart(tx, id, sfo.ClaimStart)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not put historic claim start: %v", err)
 				}
 			}
 
@@ -291,7 +292,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 				}
 				val, err := dbGetHistoricOutput(tx, types.OutputID(sci.ParentID))
 				if err != nil {
-					return err
+					return fmt.Errorf("could not get historic output: %v", err)
 				}
 				pt.Inputs = append(pt.Inputs, modules.ProcessedInput{
 					FundType:       types.SpecifierSiacoinInput,
@@ -314,7 +315,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 				})
 				err := dbPutHistoricOutput(tx, types.OutputID(txn.SiacoinOutputID(uint64(i))), sco.Value)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not put historic output: %v", err)
 				}
 			}
 			for _, fee := range txn.MinerFees {
