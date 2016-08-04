@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -121,6 +122,11 @@ func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request, _ htt
 // wallet033xHandler handles API calls to /wallet/033x.
 func (srv *Server) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	source := req.FormValue("source")
+	// Check that source is an absolute paths.
+	if !filepath.IsAbs(source) {
+		writeError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
+		return
+	}
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
 		err := srv.wallet.Load033xWallet(key, source)
@@ -157,7 +163,13 @@ func (srv *Server) walletAddressesHandler(w http.ResponseWriter, req *http.Reque
 
 // walletBackupHandler handles API calls to /wallet/backup.
 func (srv *Server) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	err := srv.wallet.CreateBackup(req.FormValue("destination"))
+	destination := req.FormValue("destination")
+	// Check that the destination is absolute.
+	if !filepath.IsAbs(destination) {
+		writeError(w, Error{"error when calling /wallet/backup: destination must be an absolute path"}, http.StatusBadRequest)
+		return
+	}
+	err := srv.wallet.CreateBackup(destination)
 	if err != nil {
 		writeError(w, Error{"error after call to /wallet/backup: " + err.Error()}, http.StatusBadRequest)
 		return
@@ -224,6 +236,15 @@ func (srv *Server) walletSiagkeyHandler(w http.ResponseWriter, req *http.Request
 	// Fetch the list of keyfiles from the post body.
 	keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
+
+	for _, keypath := range keyfiles {
+		// Check that all key paths are absolute paths.
+		if !filepath.IsAbs(keypath) {
+			writeError(w, Error{"error when calling /wallet/siagkey: keyfiles contains a non-absolute path"}, http.StatusBadRequest)
+			return
+		}
+	}
+
 	for _, key := range potentialKeys {
 		err := srv.wallet.LoadSiagKeys(key, keyfiles)
 		if err == nil {

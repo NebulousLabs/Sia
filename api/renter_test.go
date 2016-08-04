@@ -622,3 +622,127 @@ func TestRenterHandlerDelete(t *testing.T) {
 		t.Errorf("expected error to be %v, got %v", renter.ErrUnknownPath, err)
 	}
 }
+
+// Tests that the /renter/upload call checks for relative paths.
+func TestRenterRelativePathErrorUpload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	st, err := createServerTester("TestRenterRelativePathErrorUpload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Anounce the host and start accepting contracts.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
+		t.Fatal(err)
+	}
+
+	renterUploadAbsoluteError := "source must be an absolute path"
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	if err = createRandFile(path, 1024); err != nil {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", "test.dat")
+	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err.Error() != renterUploadAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// As should this.
+	uploadValues = url.Values{}
+	uploadValues.Set("source", "../test.dat")
+	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err.Error() != renterUploadAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// This should succeed.
+	uploadValues = url.Values{}
+	uploadValues.Set("source", path)
+	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Tests that the /renter/download call checks for relative paths.
+func TestRenterRelativePathErrorDownload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	st, err := createServerTester("TestRenterRelativePathErrorUpload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Anounce the host and start accepting contracts.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err = st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
+		t.Fatal(err)
+	}
+
+	renterDownloadAbsoluteError := "destination must be an absolute path"
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	if err = createRandFile(path, 1024); err != nil {
+		t.Fatal(err)
+	}
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	downloadPath := "test1.dat"
+	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != renterDownloadAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	downloadPath = "../test1.dat"
+	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != renterDownloadAbsoluteError {
+		t.Fatal(err)
+	}
+
+	// This should fail.
+	downloadPath = filepath.Join(st.dir, "test1.dat")
+	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != "Download failed: no record of that file's contracts" {
+		t.Fatal(err)
+	}
+}
