@@ -453,8 +453,8 @@ func TestRenterLoadNonexistent(t *testing.T) {
 	uploadValues := url.Values{}
 	uploadValues.Set("source", fakepath)
 	err = st.stdPostAPI("/renter/upload/dne", uploadValues)
-	if err == nil || !strings.HasSuffix(err.Error(), "no such file or directory") {
-		t.Errorf("expected error to end with 'no such file or directory; got %v", err)
+	if err == nil {
+		t.Errorf("expected error when uploading nonexistent file")
 	}
 
 	// Try downloading a nonexistent file.
