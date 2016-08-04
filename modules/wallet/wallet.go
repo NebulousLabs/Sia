@@ -156,15 +156,8 @@ func (w *Wallet) Close() error {
 		}
 	}
 
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	w.cs.Unsubscribe(w)
 	w.tpool.Unsubscribe(w)
-
-	if err := w.db.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("db.Close failed: %v", err))
-	}
 
 	if err := w.log.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
