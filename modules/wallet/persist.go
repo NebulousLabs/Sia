@@ -160,6 +160,7 @@ func (w *Wallet) initPersist() error {
 	if err != nil {
 		return err
 	}
+	w.tg.AfterStop(func() { w.db.Close() })
 
 	return nil
 }
