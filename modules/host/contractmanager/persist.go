@@ -12,8 +12,8 @@ type (
 	// savedSettings contains the contract manager settings that get saved to
 	// disk.
 	savedSettings struct {
-		SectorSalt      crypto.Hash
-		StorageFolders  []*storageFolder
+		SectorSalt     crypto.Hash
+		StorageFolders []*storageFolder
 	}
 
 	// sectorLocationEntry contains all the information necessary to add an
@@ -78,4 +78,8 @@ func (cm *ContractManager) load() error {
 	// idempotent.
 
 	return nil
+}
+
+// save will commit the in-memory contract manager data to disk.
+func (cm *ContractManager) save() error {
 }

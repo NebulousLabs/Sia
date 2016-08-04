@@ -60,6 +60,9 @@ var (
 
 type storageFolder struct {
 	// TODO: Explain how the bitfield works. 'Usage' is the bitfield.
+	//
+	// TODO: Explain that storage folders are identified by their path, and
+	// that there must not be duplicates or the WAL will get confused.
 	Path string
 	Usage []byte
 
@@ -76,6 +79,8 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 		return err
 	}
 	defer cm.tg.Done()
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 
 	// Check that the maximum number of allowed storage folders has not been
 	// exceeded.
@@ -97,20 +102,6 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 		return errRelativePath
 	}
 
-	// TODO: Find a safe way to vet the adding of the storage folder? Should it
-	// happen with the WAL? I think anything regarding duplicates should view
-	// the WAL.
-
-	// Check that the folder being linked to is not already in use.
-	for _, sf := range cm.storageFolders {
-		// TODO: There could be 2^16 storage folders, which is a lot to iterate
-		// through. Make sure it only takes a few milliseconds. This function
-		// as a whole is allowed to take a few seconds, given that it allocates
-		// a giant file.
-		if sf.Path == path {
-			return errRepeatFolder
-		}
-	}
 	// Check that the folder being linked to both exists and is a folder.
 	pathInfo, err := os.Stat(path)
 	if err != nil {

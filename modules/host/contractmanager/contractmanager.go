@@ -10,6 +10,10 @@ import (
 	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
+// CM isa
+//
+// Content represents everything excluding events in the committed and
+// uncommitted WAL.
 type ContractManager struct {
 	// Storage management information.
 	//

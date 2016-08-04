@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 const (
@@ -63,10 +64,10 @@ func (sf *safeFile) Commit() error {
 // final filename. CommitSync should not be called from a defer if the
 // function it is being called from can return an error.
 func (sf *safeFile) CommitSync() error {
-	if err := sf.Sync(); err != nil {
+	if err := sf.Commit(); err != nil {
 		return err
 	}
-	return sf.Commit()
+	return syscall.Sync()
 }
 
 // NewSafeFile returns a file that can atomically be written to disk,

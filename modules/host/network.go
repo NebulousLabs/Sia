@@ -67,9 +67,9 @@ func (h *Host) managedLearnHostname() {
 	if build.Release == "testing" {
 		return
 	}
-	lockID := h.mu.RLock()
+	h.mu.RLock()
 	netAddr := h.settings.NetAddress
-	h.mu.RUnlock(lockID)
+	h.mu.RUnlock()
 	// If the settings indicate that an address has been manually set, there is
 	// no reason to learn the hostname.
 	if netAddr != "" {
@@ -90,8 +90,8 @@ func (h *Host) managedLearnHostname() {
 		return
 	}
 
-	lockID = h.mu.Lock()
-	defer h.mu.Unlock(lockID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	autoAddress := modules.NetAddress(net.JoinHostPort(hostname, h.port))
 	if err := autoAddress.IsValid(); err != nil {
 		h.log.Printf("WARN: discovered hostname %q is invalid: %v", autoAddress, err)
