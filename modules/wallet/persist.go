@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"crypto/rand"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -125,7 +126,7 @@ func (w *Wallet) openDB(filename string) (err error) {
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists(b)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not create bucket %v: %v", string(b), err)
 			}
 		}
 		return nil
