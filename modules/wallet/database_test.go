@@ -1,13 +1,48 @@
 package wallet
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
 )
 
+// TestDBOpen tests the wallet.openDB method.
+func TestDBOpen(t *testing.T) {
+	w := new(Wallet)
+	err := w.openDB("")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	testdir := build.TempDir(modules.WalletDir, "TestDBOpen")
+	os.MkdirAll(testdir, 0700)
+	err = w.openDB(filepath.Join(testdir, dbFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.db.View(func(tx *bolt.Tx) error {
+		buckets := [][]byte{
+			bucketHistoricOutputs,
+			bucketHistoricClaimStarts,
+		}
+		for _, b := range buckets {
+			if tx.Bucket(b) == nil {
+				t.Error("bucket", string(b), "does not exist")
+			}
+		}
+		return nil
+	})
+	w.db.Close()
+}
+
+// TestDBHistoricHelpers tests the get/put helpers for the HistoricOutputs and
+// HistoricClaimStarts buckets.
 func TestDBHistoricHelpers(t *testing.T) {
 	wt, err := createBlankWalletTester("TestDBHistoricOutputs")
 	if err != nil {
