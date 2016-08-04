@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"os"
+	"os/signal"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
@@ -115,8 +117,20 @@ func startDaemon(config Config) (err error) {
 	fmt.Println("Loading...")
 	loadStart := time.Now()
 
-	// Create all of the modules.
+	// Create the server and start serving daemon routes immediately.
 	i := 0
+	fmt.Printf("(%d/%d) Loading siad...\n", i, len(config.Siad.Modules))
+	srv, err := newSiadServer(config.Siad.APIaddr)
+	if err != nil {
+		return err
+	}
+
+	serverrs := make(chan error)
+	go func() {
+		serverrs <- srv.Serve()
+	}()
+
+	// Create all of the modules.
 	var g modules.Gateway
 	if strings.Contains(config.Siad.Modules, "g") {
 		i++
@@ -189,8 +203,9 @@ func startDaemon(config Config) (err error) {
 			return err
 		}
 	}
-	srv, err := api.NewServer(
-		config.Siad.APIaddr,
+
+	// Create the Sia API 
+	a := api.NewAPI(
 		config.Siad.RequiredUserAgent,
 		config.APIPassword,
 		cs,
@@ -202,9 +217,25 @@ func startDaemon(config Config) (err error) {
 		tpool,
 		w,
 	)
-	if err != nil {
-		return err
-	}
+
+	// connect the API to the server
+	srv.ConnectAPI(a)
+
+	// stop the server if a kill signal is caught
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, os.Kill)
+	defer signal.Stop(sigChan)
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		select {
+		case <-sigChan:
+			fmt.Println("\rCaught stop signal, quitting...")
+			srv.Close()
+		case <-stop:
+			// Don't leave a dangling goroutine.
+		}
+	}()
 
 	// Bootstrap to the network.
 	if !config.Siad.NoBootstrap && g != nil {
@@ -222,8 +253,8 @@ func startDaemon(config Config) (err error) {
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
-	// Start serving api requests.
-	err = srv.Serve()
+	// Wait until the Server stops serving to exit
+	err = <-serverrs
 	if err != nil {
 		return err
 	}
