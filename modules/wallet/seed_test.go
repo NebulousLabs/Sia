@@ -107,8 +107,7 @@ func TestLoadSeed(t *testing.T) {
 	if allSeeds[0] != seed {
 		t.Error("AllSeeds returned the wrong seed")
 	}
-
-	wt.wallet.db.Close() // db must be closed before reuse
+	wt.wallet.Close()
 
 	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestLoadSeed - 0"), modules.WalletDir)
 	w, err := New(wt.cs, wt.tpool, dir)
@@ -145,8 +144,7 @@ func TestLoadSeed(t *testing.T) {
 	if !bytes.Equal(allSeeds[1][:], seed[:]) {
 		t.Error("AllSeeds returned the wrong seed")
 	}
-
-	w.db.Close() // db must be closed before reuse
+	w.Close()
 
 	// Rather than worry about a rescan, which isn't implemented and has
 	// synchronization difficulties, just load a new wallet from the same
@@ -176,4 +174,5 @@ func TestLoadSeed(t *testing.T) {
 	if !bytes.Equal(allSeeds[1][:], seed[:]) {
 		t.Error("AllSeeds returned the wrong seed")
 	}
+	w2.Close()
 }
