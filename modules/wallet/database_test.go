@@ -27,11 +27,7 @@ func TestDBOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.db.View(func(tx *bolt.Tx) error {
-		buckets := [][]byte{
-			bucketHistoricOutputs,
-			bucketHistoricClaimStarts,
-		}
-		for _, b := range buckets {
+		for _, b := range dbBuckets {
 			if tx.Bucket(b) == nil {
 				t.Error("bucket", string(b), "does not exist")
 			}
