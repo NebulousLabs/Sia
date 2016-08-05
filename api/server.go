@@ -30,9 +30,7 @@ type Server struct {
 	listener          net.Listener
 	requiredUserAgent string
 
-	// wg is used to block Close() from returning until Serve() has finished. A
-	// WaitGroup is used instead of a chan struct{} so that Close() can be called
-	// without necessarily calling Serve() first.
+	// wg is used to block Serve() from returning until Close() has finished.
 	wg sync.WaitGroup
 }
 
@@ -69,10 +67,6 @@ func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string
 
 // Serve listens for and handles API calls. It is a blocking function.
 func (srv *Server) Serve() error {
-	// Block the Close() method until Serve() has finished.
-	srv.wg.Add(1)
-	defer srv.wg.Done()
-
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
@@ -93,6 +87,10 @@ func (srv *Server) Serve() error {
 	// closed, via either the Close method or the signal handling above.
 	// Closing the listener will result in the benign error handled below.
 	err := srv.apiServer.Serve(srv.listener)
+
+	// Wait for srv.Close to finish before returning.
+	srv.wg.Wait()
+
 	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
 		return err
 	}
@@ -101,17 +99,15 @@ func (srv *Server) Serve() error {
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *Server) Close() error {
+	// Block Serve() from returning until we have finished closing.
+	srv.wg.Add(1)
+	defer srv.wg.Done()
 	var errs []error
 
 	// Close the listener, which will cause Server.Serve() to return.
 	if err := srv.listener.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
 	}
-
-	// Wait for Server.Serve() to exit. We wait so that it's guaranteed that the
-	// server has completely closed after Close() returns. This is particularly
-	// useful during testing so that we don't exit a test before Serve() finishes.
-	srv.wg.Wait()
 
 	// Safely close each module.
 	mods := []struct {
