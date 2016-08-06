@@ -71,10 +71,9 @@ type Wallet struct {
 	//
 	// siacoinOutptus, siafundOutputs, and spentOutputs are kept so that they
 	// can be scanned when trying to fund transactions.
-	seeds          []modules.Seed
-	keys           map[types.UnlockHash]spendableKey
-	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
-	spentOutputs   map[types.OutputID]types.BlockHeight
+	seeds        []modules.Seed
+	keys         map[types.UnlockHash]spendableKey
+	spentOutputs map[types.OutputID]types.BlockHeight
 
 	// The following fields are kept to track transaction history.
 	// processedTransactions are stored in chronological order, and have a map for
@@ -122,9 +121,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		cs:    cs,
 		tpool: tpool,
 
-		keys:           make(map[types.UnlockHash]spendableKey),
-		siacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		spentOutputs:   make(map[types.OutputID]types.BlockHeight),
+		keys:         make(map[types.UnlockHash]spendableKey),
+		spentOutputs: make(map[types.OutputID]types.BlockHeight),
 
 		processedTransactionMap: make(map[types.TransactionID]*modules.ProcessedTransaction),
 
