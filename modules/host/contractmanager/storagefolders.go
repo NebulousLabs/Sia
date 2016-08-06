@@ -50,7 +50,7 @@ var (
 
 	// errSmallStorageFolder is returned if a new storage folder is not large
 	// enough to meet the requirements for the minimum storage folder size.
-	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
+	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumSectorsPerStorageFolder*modules.SectorSize)
 
 	// errStorageFolderGranularity is returned if a call to AddStorageFolder
 	// tries to use a storage folder size that does not evenly fit into a

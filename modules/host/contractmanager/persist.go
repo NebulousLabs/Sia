@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
 )
@@ -41,18 +42,16 @@ func (cm *ContractManager) initSettings() error {
 	// Initialize the sector salt to a random value.
 	_, err := cm.dependencies.randRead(cm.sectorSalt[:])
 	if err != nil {
-		return err
+		return build.ExtendErr("error creating salt for contract manager", err)
 	}
 
 	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
 	// with the new settings values.
-	return cm.saveSync()
+	return build.ExtendErr("error saving contract manager after initialization", cm.saveSync())
 }
 
 // load will pull all saved state from the contract manager off of the disk and
-// into memory. The contract manager has a write ahead log, so after the saved
-// state is loaded, the write ahead log will be checked and applied, to make
-// sure that any actions have been fully atomic.
+// into memory.
 func (cm *ContractManager) load() error {
 	// Load the most recent saved settings into the contract manager.
 	var ss savedSettings
@@ -63,7 +62,7 @@ func (cm *ContractManager) load() error {
 		// default settings.
 		return cm.initSettings()
 	} else if err != nil {
-		return err
+		return build.ExtendErr("error loading the contract manager settings file", err)
 	}
 
 	// Copy the saved settings into the contract manager.
@@ -72,22 +71,18 @@ func (cm *ContractManager) load() error {
 
 	// TODO: Load the sector locations from the various storage folders.
 
-	// TODO: Load in the WAL, handle any outstanding items.
-	err = cm.wal.load()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	//  Load any uncommitted changes that were recorded by the WAL.
+	return build.ExtendErr("error loading the contract manager WAL", cm.wal.load())
 }
 
 // save will commit the in-memory contract manager data to disk.
 func (cm *ContractManager) saveSync() error {
 	ss := cm.savedSettings()
-	return persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
+	return build.ExtendErr("error saving contract manager settings", persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile)))
 }
 
-// and so on
+// savedSettings returns the settings of the contract manager in an
+// easily-serializable form.
 func (cm *ContractManager) savedSettings() savedSettings {
 	return savedSettings{
 		SectorSalt:     cm.sectorSalt,

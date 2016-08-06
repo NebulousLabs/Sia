@@ -2,16 +2,24 @@ package contractmanager
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 type (
 	// stateChange defines a change to the state that has not yet been applied
 	// to the contract manager, but will be applied in a future commitment.
+	//
+	// All changes in the stateChange object need to be idempotent, as it's
+	// possible that multiple corruptions or failures will result in the
+	// changes being committed to the state multiple times.
 	stateChange struct {
 		// Fields related to adding a storage folder. When a storage folder is
 		// added, it first appears in the 'unfinished storage folder additions'
@@ -34,9 +42,27 @@ type (
 		UnfinishedStorageFolderAdditions []storageFolder
 	}
 
-	// In cases where nested locking is happening, the outside lock should be
-	// held be the WAL, and not by the cm.
+	// writeAheadLog coordinates ACID transaction which update the state of the
+	// contract manager. WAL should be the only entity that is accessing the
+	// contract manager's mutex.
 	writeAheadLog struct {
+		// The file is being constantly written to. Sync operations are very
+		// slow, but they are faster if most of the data has already had time
+		// to hit the disk. Rather than writing the entire WAL to disk every
+		// time there is a desired sync operation, the WAL is continuously
+		// writing to disk which should make the sync and commit operations a
+		// lot faster.
+		//
+		// The syncChan lets external callers know when an operation that they
+		// have requested has been completed and successfully, consistently,
+		// and durably hit the disk. Multiple callers can be listening on the
+		// syncChan, so to send them all the same consistent message, the
+		// channel is closed every time a commit operation finishes. After the
+		// channel is closed, it is deleted and a new one is created.
+		//
+		// uncommittedChanges details a list of operations which have been
+		// suggested or queued to be made to the state, but are not yet
+		// guaranteed to have completed.
 		file               *os.File
 		syncChan           chan struct{}
 		uncommittedChanges []stateChange
@@ -49,17 +75,61 @@ type (
 	}
 )
 
+// readWALMetadata reads WAL metadata from the input file, returning an error
+// if the result is unexpected.
+func readWALMetadata(f *os.File) error {
+	decoder := json.NewDecoder(f)
+	var md persist.Metadata
+	err := decoder.Decode(&md)
+	if err != nil {
+		return build.ExtendErr("error reading WAL metadata", err)
+	}
+	if md.Header != walMetadata.Header {
+		return errors.New("WAL metadata header does not match header found in WAL file")
+	}
+	if md.Version != walMetadata.Version {
+		return errors.New("WAL metadata version does not match version found in WAL file")
+	}
+	return nil
+}
+
+// writeWALMetadata writes WAL metadata to the input file.
+func writeWALMetadata(f *os.File) error {
+	changeBytes, err := json.MarshalIndent(walMetadata, "", "\t")
+	if err != nil {
+		return build.ExtendErr("could not marshal WAL metadata", err)
+	}
+	_, err = f.Write(changeBytes)
+	if err != nil {
+		return build.ExtendErr("unable to write WAL metadata", err)
+	}
+	return nil
+}
+
+// appendChange will add a change to the WAL, writing the details of the change
+// to the WAL file but not syncing - the syncing will occur during the sync and
+// commit operations that are orchestrated by the sync loop. Waiting to perform
+// the syncing provides a parallelism across multiple disks, and gives the
+// operating system time to optimize the operations that will be performed on
+// disk, greatly improving performance, especially for random writes.
+//
+// Once a change is appended, it can only be revoked by appending another
+// change. If a long running operation such as the addition or removal of a
+// storage folder is occurring, they will need to use multiple types of
+// stateChange directives to ensure safety of the operation. An alternative
+// method would be to hold a lock on the WAL for the entirety of the operation,
+// but this would too greatly impact performance.
 func (wal *writeAheadLog) appendChange(sc stateChange) error {
 	// Marshal the change and then write the change to the WAL file. Do not
 	// sync the WAL file, as this operation does not need to guarantee that the
 	// data hits the platter, the syncLoop will handle that piece.
 	changeBytes, err := json.MarshalIndent(sc, "", "\t")
 	if err != nil {
-		return err
+		return build.ExtendErr("could not marshal state change", err)
 	}
 	_, err = wal.file.Write(changeBytes)
 	if err != nil {
-		return err
+		return build.ExtendErr("unable to write state change to WAL", err)
 	}
 
 	// Update the WAL to include the new storage folder in the uncommitted
@@ -68,15 +138,24 @@ func (wal *writeAheadLog) appendChange(sc stateChange) error {
 	return nil
 }
 
-// commit
+// commit will take all of the changes that have been added to the WAL and
+// atomically commit the WAL to disk, then apply the actions in the WAL to the
+// state. commit will do lots of syncing disk I/O, and so can take a while,
+// especially if there are a large number of actions queued up.
+//
+// A bool is returned indicating whether or not the commit was successful.
+// False does not indiciate an error, it can also indicate that there was
+// nothing to do.
 //
 // commit should only be called from threadedSyncLoop.
 func (wal *writeAheadLog) commit() bool {
+	// If there is nothing to do, do nothing.
 	if len(wal.uncommittedChanges) == 0 {
 		return false
 	}
 
-	// Write the committed changes to disk.
+	// Sync the WAL file, so that there is a guarantee that all pending actions
+	// are safe from power disruptions.
 	err := wal.file.Sync()
 	if err != nil {
 		wal.cm.log.Critical("Could not call sync before migrating the host write-ahead-log")
@@ -92,6 +171,12 @@ func (wal *writeAheadLog) commit() bool {
 		}
 		return false
 	}
+
+	// The WAL file writes to a temporary file, so that there is a guarantee
+	// that the actual WAL file will not ever be corrupted. Now that the tmp
+	// file is closed and synced, rename the tmp file. Renaming is an atomic
+	// action, meaning that the replacement to the WAL file is guaranteed not
+	// to be corrupt.
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
 	err = os.Rename(walTmpName, walFileName)
@@ -104,23 +189,32 @@ func (wal *writeAheadLog) commit() bool {
 		}
 		return false
 	}
+	// Remove the temporary WAL file as it's no longer useful.
 	err = os.Remove(walTmpName)
 	if err != nil {
 		wal.cm.log.Println("ERROR: unable to remove temporary write-ahead-log after successful commit-to-log")
 	}
 
-	// Commit all of the changes to the state.
+	// Take all of the changes that have been queued in the WAL and apply them
+	// to the state.
 	for _, uc := range wal.uncommittedChanges {
 		for _, sfa := range uc.StorageFolderAdditions {
 			wal.commitAddStorageFolder(sfa)
 		}
 	}
-	// Save all of the unfinished long-running tasks.
+
+	// Use helper functions to extract all remaining unfinished long-running
+	// jobs from the WAL. Save these for later, when the WAL tmp file gets
+	// reopened (the remaining unfinished jobs need to be written to the tmp
+	// file to preserve their presence as understood by the WAL state).
 	unfinishedAdditions := wal.findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
-	// Done applying uncommitted changes, set them to 'nil'.
+
+	// Set the list of uncommitted changes to nil, as everything has been
+	// applied and/or saved to be appended later.
 	wal.uncommittedChanges = nil
 
-	// Write all of the committed changes to disk.
+	// Save the updated contract manager to disk, syncing to be certain that
+	// all changes will be durable.
 	err = wal.cm.saveSync()
 	if err != nil {
 		// Log an error and abort the commitment. Commitments are not currently
@@ -130,7 +224,7 @@ func (wal *writeAheadLog) commit() bool {
 		wal.cm.log.Critical("Could not save the contract manager - crashing to prevent corruption.")
 		panic("Could not save the contract manager - crashing to prevent corruption.")
 	}
-	// Recreate the wal file so that it can be appended to fresh.
+	// Recreate the wal file so that it can receive new updates.
 	wal.file, err = os.Create(walTmpName)
 	if err != nil {
 		// Log the error, and crash the program. Without a working WAL, the
@@ -141,13 +235,23 @@ func (wal *writeAheadLog) commit() bool {
 		wal.cm.log.Println("ERROR: unable to create write-ahead-log")
 		panic("unable to create write-ahead-log in contract manager")
 	}
-	// Write all of the long running uncommitted changes to the WAL
-	// immediately.
+	// Write the WAL metadata to the file.
+	err = writeWALMetadata(wal.file)
+	if err != nil {
+		wal.cm.log.Critical("Unable to properly initialize WAL file, crashing to prevent corruption.")
+		panic("Unable to properly initialize WAL file, crashing to prevent corruption.")
+	}
+	// Append all of the remaining long running uncommitted changes to the WAL.
 	for _, change := range unfinishedAdditions {
 		err = wal.appendChange(change)
 		if err != nil {
 			wal.cm.log.Println("ERROR: in-progress action lost due to disk failure")
 		}
+	}
+	// Remove the WAL file, as all changes have been applied successfully.
+	err = os.Remove(walFileName)
+	if err != nil {
+		wal.cm.log.Println("trouble removing WAL - no risk of corruption, but the file is not needed anymore either")
 	}
 
 	// The state has been updated successfully. Notify all functions that are
@@ -161,8 +265,9 @@ func (wal *writeAheadLog) commit() bool {
 	return true
 }
 
-// TODO: document all of the potentially long-running unfinished tasks and
-// determine how they may affect where a sector gets placed.
+// load will pull any changes from the uncommited WAL into memory, decoding
+// them and doing any necessary preprocessing. In the most common case (any
+// time the previous shutdown was clean), there will not be a WAL file.
 func (wal *writeAheadLog) load() error {
 	// Open up the WAL file.
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
@@ -172,18 +277,27 @@ func (wal *writeAheadLog) load() error {
 		// committed safely, and that there was a clean shutdown.
 		return nil
 	} else if err != nil {
-		return err
+		return build.ExtendErr("walFile was not opened successfully", err)
 	}
 	defer file.Close()
 
+	// Read the WAL metadata to make sure that the version is correct.
+	err = readWALMetadata(file)
+	if err != nil {
+		return build.ExtendErr("walFile metadata mismatch", err)
+	}
+
 	// Read changes from the WAL one at a time and load them back into memory.
-	// Because they are already in the WAL, they do not need to be written to
-	// the WAL again.
 	var sc stateChange
 	decoder := json.NewDecoder(file)
 	for err == nil {
 		err = decoder.Decode(&sc)
 		if err == nil {
+			// The uncommitted changes are loaded into memory using a simple
+			// append, because the tmp WAL file has not been created yet, and
+			// will not be created until the sync loop is spawned. The sync
+			// loop spawner will make sure that the uncommitted changes are
+			// written to the tmp WAL file.
 			wal.uncommittedChanges = append(wal.uncommittedChanges, sc)
 		}
 	}
@@ -193,17 +307,36 @@ func (wal *writeAheadLog) load() error {
 
 	// Do any cleanup regarding long-running unfinished tasks.
 	wal.cleanupUnfinishedStorageFolderAdditions()
-
 	return nil
 }
 
+// spawnSyncLoop prepares and establishes the loop which will be running in the
+// background to coordinate disk syncronizations. Disk syncing is done in a
+// background loop to help with performance, and to allow multiple things to
+// modify the WAL simultaneously.
 func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	// Create the file resource that gets used when committing. Then establish
 	// the AfterStop call that will close the file resource.
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 	wal.file, err = os.Open(walTmpName)
 	if err != nil {
-		return err
+		return build.ExtendErr("unable to open WAL temporary file", err)
+	}
+	err = writeWALMetadata(wal.file)
+	if err != nil {
+		return build.ExtendErr("unable to write WAL metadata", err)
+	}
+
+	// During loading, a bunch of changes may have been pulled into the WAL's
+	// memory, but were not written to disk because the temporary WAL file had
+	// not been created yet.
+	ucs := wal.uncommittedChanges
+	wal.uncommittedChanges = nil
+	for _, uc := range ucs {
+		err = wal.appendChange(uc)
+		if err != nil {
+			return build.ExtendErr("could not re-add an uncommitted change to the WAL temporary file", err)
+		}
 	}
 
 	// Create a signal so we know when the sync loop has stopped, which means
@@ -230,6 +363,10 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	return nil
 }
 
+// threadedSyncLoop is a background thread that occasionally commits the WAL to
+// the state as an ACID transaction. This process can be very slow, so
+// transactions to the contract manager are batched automatically and
+// occasionally committed together.
 func (wal *writeAheadLog) threadedSyncLoop(syncLoopStopped chan struct{}) {
 	syncInterval := time.Millisecond * 100
 	for {

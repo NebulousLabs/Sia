@@ -4,13 +4,31 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// ASF isa
+// managedAddStorageFolder is a WAL operation to add a storage folder to the
+// contract manager. Some of the error checking has already been performed by
+// the parent function, contractmanager.AddStorageFolder. The parent function
+// performs checking that can be done without access to the state, and
+// writeAheadLog.managedAddStorageFolder will perform all checking that
+// requires access to the state.
 //
-// TODO: Need to vet that the maximum number of allowed storage folders has not
-// been eclipsed.
+// managedAddStorageFolder can take a long time, as it writes a giant, zeroed
+// out file to disk covering the entire range of the storage folder. Having the
+// WAL locked throughout the whole operation is unacceptable, which means that
+// some additional management is needed to make sure that concurrent calls to
+// managedAddStorageFolder do not conflict or race. The WAL is adapted to
+// support long running operations which may eventually change the state, but
+// which also may eventually fail - three fields are then used. One to indicate
+// that process for adding a storage folder has begun, one to indicate that the
+// process for adding a storage folder has completed, and one to indicate that
+// the process for adding a storage folder has failed.
+//
+// TODO: We can use fallocate on linux systems to speed things up. If a Windows
+// equivalent cannot be found, it is acceptable that Linux systems would have
+// better performance.
 func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 	err := func() error {
 		wal.mu.Lock()
@@ -21,8 +39,12 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 		// The safety of this function depends on the fact that the WAL will always
 		// hold the outside lock in situations where both a WAL lock and a cm lock
 		// are needed.
+		//
+		// The number of storage folders are also counted, to make sure that
+		// the maximum number of storage folders allowed is not exceeded.
 		duplicate := false
 		wal.cm.mu.RLock()
+		numStorageFolders := uint64(len(wal.cm.storageFolders))
 		for i := range wal.cm.storageFolders {
 			if wal.cm.storageFolders[i].Path == sf.Path {
 				duplicate = true
@@ -30,13 +52,17 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 			}
 		}
 		wal.cm.mu.RUnlock()
-		// Check the uncommitted changes for updates to the storage folders which
-		// alter the 'duplicate' status of this storage folder.
+		// Check the uncommitted changes for updates to the storage folders
+		// which alter the 'duplicate' status of this storage folder. When
+		// counting the number of active storage folders, do not count storage
+		// folders which are queued for removal, because the commitment is not
+		// complete and that may mean that the operation will fail.
 		for i := range wal.uncommittedChanges {
 			for j := range wal.uncommittedChanges[i].StorageFolderAdditions {
 				if wal.uncommittedChanges[i].StorageFolderAdditions[j].Path == sf.Path {
 					duplicate = true
 				}
+				numStorageFolders++
 			}
 		}
 		for _, uc := range wal.uncommittedChanges {
@@ -44,10 +70,14 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 				if usfa.Path == sf.Path {
 					duplicate = true
 				}
+				numStorageFolders++
 			}
 		}
 		if duplicate {
 			return errRepeatFolder
+		}
+		if numStorageFolders > maximumStorageFolders {
+			return errMaxStorageFolders
 		}
 
 		// Add the storage folder to the list of unfinished storage folder
@@ -61,16 +91,19 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 	if err != nil {
 		return err
 	}
+
 	// If there's an error in the rest of the function, the storage folder
 	// needs to be removed from the list of unfinished storage folder
-	// additions.
+	// additions. Because the WAL is append-only, a stateChange needs to be
+	// appended which indicates that the storage folder was unable to be added
+	// successfully.
 	defer func() {
 		if err != nil {
 			wal.mu.Lock()
 			defer wal.mu.Unlock()
-			err = wal.appendChange(stateChange{
+			err = build.ComposeErrors(err, wal.appendChange(stateChange{
 				ErroredStorageFolderAdditions: []string{sf.Path},
-			})
+			}))
 		}
 	}()
 
@@ -87,15 +120,12 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 	sectorHousingName := filepath.Join(sf.Path, sectorFile)
 	file, err := os.Open(sectorHousingName)
 	if err != nil {
-		return err
+		return build.ExtendErr("unable to create storage file for storage folder", err)
 	}
 	defer file.Close()
 	defer func() {
 		if err != nil {
-			err := os.Remove(sectorHousingName)
-			if err != nil {
-				wal.cm.log.Println("could not remove sector housing after failed storage folder add:", err)
-			}
+			err = build.ComposeErrors(err, os.Remove(sectorHousingName))
 		}
 	}()
 	totalSize := sectorLookupSize + sectorHousingSize
@@ -106,27 +136,28 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 	for i := uint64(0); i < hundredMBWrites; i++ {
 		_, err = file.Write(hundredMB)
 		if err != nil {
-			return err
+			return build.ExtendErr("could not allocate storage folder", err)
 		}
 	}
 	_, err = file.Write(finalBytes)
 	if err != nil {
-		return err
+		return build.ExtendErr("could not allocate storage folder", err)
 	}
 	err = file.Sync()
 	if err != nil {
-		return err
+		return build.ExtendErr("could not syncronize allocated storage folder", err)
 	}
 
-	// Update the WAL to include the new storage folder in the uncommitted
-	// changes.
+	// All of the required setup for the storage folder is complete, add the
+	// directive to modify the contract manager state to the WAL, so that the
+	// operation can be fully integrated.
 	wal.mu.Lock()
 	err = wal.appendChange(stateChange{
 		StorageFolderAdditions: []storageFolder{sf},
 	})
 	wal.mu.Unlock()
 	if err != nil {
-		return err
+		return build.ExtendErr("storage folder commitment assignment failed", err)
 	}
 
 	// Unlock the WAL as we are done making modifications, but do not return
@@ -136,9 +167,12 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf storageFolder) error {
 	return nil
 }
 
-// cleanupUnfinishedStorageFolderAdditions will
+// cleanupUnfinishedStorageFolderAdditions should only be called at startup.
+// Any unfinished storage folder additions will be purged from the disk. There
+// should only be storage folder additions left behind if there was power loss
+// during the setup of a storage folder.
 func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions() error {
-	for _, uc := range wal.uncommittedChanges {
+	for i, uc := range wal.uncommittedChanges {
 		for _, usfa := range uc.UnfinishedStorageFolderAdditions {
 			// The storage folder addition was interrupted due to an unexpected
 			// error, and the change should be aborted. This can be completed
@@ -149,14 +183,12 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions() error {
 			if err != nil {
 				wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
 			}
-
-			err = wal.appendChange(stateChange{
-				ErroredStorageFolderAdditions: []string{usfa.Path},
-			})
-			if err != nil {
-				return err
-			}
 		}
+		// Because we're in the middle of startup, the sync loop has not
+		// spawned and the changes that we are processing have not been written
+		// to disk. That means that we can modify the uncommitted changes
+		// directly to remove the actions that are no longer relevant.
+		wal.uncommittedChanges[i].UnfinishedStorageFolderAdditions = nil
 	}
 	return nil
 }
@@ -169,6 +201,12 @@ func (wal *writeAheadLog) commitAddStorageFolder(sf storageFolder) {
 	wal.cm.storageFolders = append(wal.cm.storageFolders, &sf)
 }
 
+// findUnfinishedStorageFolderAdditions will scroll through a set of state
+// changes and figure out which of the unfinished storage folder additions are
+// still unfinished. If a storage folder addition has finished, it will be
+// discoverable through the presence of a storage folder addition object using
+// the same path, or through an errored storage folder addition object using
+// the same path. Putting the logic here keeps the WAL logic cleaner.
 func (wal *writeAheadLog) findUnfinishedStorageFolderAdditions(scs []stateChange) []stateChange {
 	// Create a map containing a list of all unfinished storage folder
 	// additions identified by their path to the storage folder that is being
@@ -186,6 +224,8 @@ func (wal *writeAheadLog) findUnfinishedStorageFolderAdditions(scs []stateChange
 		}
 	}
 
+	// Assemble all of the unfinished storage folder additions that still
+	// remain.
 	var sfs []storageFolder
 	for _, sf := range usfMap {
 		sfs = append(sfs, sf)
@@ -203,19 +243,17 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	}
 	defer cm.tg.Done()
 
-	// TODO: Document somewhere that we don't actually want to lock the
-	// contract manager while we are adding the storage folder. All state
-	// changes and state handling should be done in the WAL, which will do the
-	// contract manager locking manually.
+	// Because the state of the contract manager depends on uncommitted changes
+	// that are in the WAL, the state of the contract manager should not be
+	// accessed at all inside of this function. Instead, the WAL should take
+	// care of all state-related error checking.
 
 	// Check that the storage folder being added meets the size requirements.
 	sectors := size / modules.SectorSize
 	if sectors > maximumSectorsPerStorageFolder {
-		// TODO: This should be consistent - min currently is size, and max is
-		// sector count. Pick one.
 		return errLargeStorageFolder
 	}
-	if size < minimumStorageFolderSize {
+	if sectors < minimumSectorsPerStorageFolder {
 		return errSmallStorageFolder
 	}
 	if (size/modules.SectorSize)%storageFolderGranularity != 0 {

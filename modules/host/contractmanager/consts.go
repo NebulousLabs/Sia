@@ -69,21 +69,6 @@ var (
 	// On slower machines, it takes around 4ms to scan the bitfield for a
 	// completely full 4 million sector bitfield, at which point the bitfield
 	// becomes a limiting performance factor when adding a new sector.
-	//
-	// There is a second bottleneck, which is the sector map. There are some
-	// optimizations in place which help, but occasionally the contract manager
-	// will perform an operation that involves writing the entire sector map
-	// for a storage folder to disk. A 4 million sector storage folder has a
-	// storage map which is 80 MiB. The commit, while rare, will pause all
-	// operations in the contract manager (due to the ACID requirements) until
-	// the full 80 MiB can be synced to disk. On slower disks (and, most of the
-	// disks are expected to be on the slower side), this can take several
-	// seconds.
-	//
-	// The commit should be rare even when there are thousands of drives, as
-	// they will usually all sync at the same time, causing a few seconds of
-	// delay, but then providing minutes to hours before the next round of
-	// syncing.
 	maximumSectorsPerStorageFolder = func() uint64 {
 		if build.Release == "dev" {
 			return 1 << 20 // 4 TiB
@@ -97,20 +82,25 @@ var (
 		panic("unrecognized release constant in host - maximum storage folder size")
 	}()
 
-	// minimumStorageFolderSize defines the smallest size that a storage folder
-	// is allowed to be. The minimum is in place to help guide the network
-	// health, and to keep out spammy hosts with very little storage. After Sia
-	// has more maturity, the plan is to raise the production minimum storage
-	// size from 32 GiB to 256 GiB.
-	minimumStorageFolderSize = func() uint64 {
+	// minimumSectorsPerStorageFolder defines the minimum number of sectors
+	// that a storage folder is allowed to have. The minimum has been set as a
+	// guide to assist with network health, and to help discourage spammy hosts
+	// with very little storage. Even if the spammy hosts were allowed, they
+	// would be ignored, but the blockchain would still clutter with their
+	// announcements and users may fall into the trap of thinking that such
+	// small volumes of storage are worthwhile.
+	//
+	// There are plans to continue raising the minimum storage requirements as
+	// the network gains maturity.
+	minimumSectorsPerStorageFolder = func() uint64 {
 		if build.Release == "dev" {
-			return 1 << 25 // 32 MiB
+			return 1 << 3 // 32 MiB
 		}
 		if build.Release == "standard" {
-			return 1 << 35 // 32 GiB
+			return 1 << 12 // 32 GiB
 		}
 		if build.Release == "testing" {
-			return 1 << 15 // 32 KiB
+			return 1 << 3 // 32 KiB
 		}
 		panic("unrecognized release constant in host - minimum storage folder size")
 	}()
