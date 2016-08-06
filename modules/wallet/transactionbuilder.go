@@ -94,10 +94,17 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 
 	// Collect a value-sorted set of siacoin outputs.
 	var so sortedOutputs
-	for scoid, sco := range tb.wallet.siacoinOutputs {
-		so.ids = append(so.ids, scoid)
-		so.outputs = append(so.outputs, sco)
-	}
+	tb.wallet.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketSiacoinOutputs).ForEach(func(idBytes, scoBytes []byte) error {
+			var scoid types.SiacoinOutputID
+			var sco types.SiacoinOutput
+			encoding.Unmarshal(idBytes, &scoid)
+			encoding.Unmarshal(scoBytes, &sco)
+			so.ids = append(so.ids, scoid)
+			so.outputs = append(so.outputs, sco)
+			return nil
+		})
+	})
 	// Add all of the unconfirmed outputs as well.
 	for _, upt := range tb.wallet.unconfirmedProcessedTransactions {
 		for i, sco := range upt.Transaction.SiacoinOutputs {

@@ -305,11 +305,6 @@ func TestConcurrentBuildersSingleOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check that there is only one output in the wallet.
-	if len(wt.wallet.siacoinOutputs) != 1 {
-		t.Fatal("wallet is supposed to have only one output", wt.wallet.siacoinOutputs)
-	}
-
 	// Get a baseline balance for the wallet.
 	startingSCConfirmed, _, _ := wt.wallet.ConfirmedBalance()
 	startingOutgoing, startingIncoming := wt.wallet.UnconfirmedBalance()
