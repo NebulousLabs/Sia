@@ -36,8 +36,8 @@ type ContractManager struct {
 	//
 	// TODO: explain that the sector salt is necessary to reduce the internal
 	// names for the sectors from 32bytes to just 12 bytes.
-	sectorSalt      crypto.Hash
-	storageFolders  []*storageFolder
+	sectorSalt     crypto.Hash
+	storageFolders []*storageFolder
 
 	// In-memory representation of the sector location lookups which are kept
 	// on disk. This representation is kept in-memory so that efficient
@@ -82,7 +82,7 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		sectorLocations: make(map[string]sectorLocation),
 
 		dependencies: dependencies,
-		persistDir: persistDir,
+		persistDir:   persistDir,
 	}
 	cm.wal.cm = cm
 

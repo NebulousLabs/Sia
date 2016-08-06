@@ -8,31 +8,56 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 type replace struct {
 	c chan struct{}
 }
 
+func setBits(i uint32) uint64 {
+	i = i - ((i >> 1) & 0x55555555)
+	i = (i & 0x33333333) + ((i >> 2) & 0x33333333)
+	return uint64((((i + (i >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24)
+}
+
 // TODO: turn this into a benchmark in the storagemanager2
 func main() {
-	/*
-		var r replace
-		r.c = make(chan struct{})
-		tt := make(chan struct{})
-		aa := make(chan struct{})
-		go func(c chan struct{}) {
-			<-tt
-			<-c
-			fmt.Println("whoop")
-			close(aa)
-		}(r.c)
+	var r replace
+	r.c = make(chan struct{})
+	tt := make(chan struct{})
+	aa := make(chan struct{})
+	go func(c chan struct{}) {
+		<-tt
+		<-c
+		fmt.Println("whoop")
+		close(aa)
+	}(r.c)
 
-		close(r.c)
-		r.c = make(chan struct{})
-		close(tt)
-		<-aa
-	*/
+	close(r.c)
+	r.c = make(chan struct{})
+	close(tt)
+	<-aa
+
+	fmt.Println(setBits(1))
+	fmt.Println(setBits(2))
+	fmt.Println(setBits(3))
+	fmt.Println(setBits(4))
+	fmt.Println(setBits(33))
+
+	fmt.Println("SWAR performance test")
+	ints := make([]uint32, 10e6)
+	for i := range ints {
+		rand, _ := crypto.RandIntn(1 << 32)
+		ints[i] = uint32(rand)
+	}
+	bits := uint64(0)
+	start := time.Now()
+	for i := range ints {
+		bits += setBits(ints[i])
+	}
+	fmt.Println("SWAR finished after", time.Since(start).Seconds())
 
 	fmt.Println("bf scanning time!")
 
@@ -40,7 +65,7 @@ func main() {
 	field = append(field, 1)
 
 	fmt.Println("starting scan")
-	start := time.Now()
+	start = time.Now()
 	for i := 0; i < 100; i++ {
 		reduce := bytes.TrimLeft(field, string(byte(0)))
 		if len(reduce) != 1 {

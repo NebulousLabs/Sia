@@ -38,8 +38,8 @@ type (
 		// field, which also means that the storage folder does not need to be
 		// preserved.
 		ErroredStorageFolderAdditions    []string
-		StorageFolderAdditions           []storageFolder
-		UnfinishedStorageFolderAdditions []storageFolder
+		StorageFolderAdditions           []*storageFolder
+		UnfinishedStorageFolderAdditions []*storageFolder
 	}
 
 	// writeAheadLog coordinates ACID transaction which update the state of the
@@ -242,11 +242,11 @@ func (wal *writeAheadLog) commit() bool {
 		panic("Unable to properly initialize WAL file, crashing to prevent corruption.")
 	}
 	// Append all of the remaining long running uncommitted changes to the WAL.
-	for _, change := range unfinishedAdditions {
-		err = wal.appendChange(change)
-		if err != nil {
-			wal.cm.log.Println("ERROR: in-progress action lost due to disk failure")
-		}
+	err = wal.appendChange(stateChange{
+		UnfinishedStorageFolderAdditions: unfinishedAdditions,
+	})
+	if err != nil {
+		wal.cm.log.Println("ERROR: in-progress action lost due to disk failure")
 	}
 	// Remove the WAL file, as all changes have been applied successfully.
 	err = os.Remove(walFileName)
@@ -318,7 +318,7 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	// Create the file resource that gets used when committing. Then establish
 	// the AfterStop call that will close the file resource.
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-	wal.file, err = os.Open(walTmpName)
+	wal.file, err = os.Create(walTmpName)
 	if err != nil {
 		return build.ExtendErr("unable to open WAL temporary file", err)
 	}
@@ -342,6 +342,7 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	// Create a signal so we know when the sync loop has stopped, which means
 	// there will be no more open commits.
 	syncLoopStopped := make(chan struct{})
+	wal.syncChan = make(chan struct{})
 	go wal.threadedSyncLoop(syncLoopStopped)
 	wal.cm.tg.AfterStop(func() {
 		// Because this is being called in an 'AfterStop' routine, all open
@@ -350,9 +351,6 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 		// manager should have completed, so the number of uncommitted changes
 		// should be zero.
 		<-syncLoopStopped // Wait for the sync loop to signal proper termination.
-		if len(wal.uncommittedChanges) != 0 {
-			wal.cm.log.Critical("Unsafe shutdown, contract manager has uncommitted changes yet the sync loop is terminating.")
-		}
 
 		// Close the dangling commit resources.
 		err = wal.file.Close()

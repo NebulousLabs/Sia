@@ -7,6 +7,7 @@ package contractmanager
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -70,15 +71,119 @@ type storageFolder struct {
 	//
 	// TODO: Explain that storage folders are identified by their path, and
 	// that there must not be duplicates or the WAL will get confused.
+	//
+	// Explain that Path is immutable, and that Usage is updated atomically
 	Path  string
-	Usage []byte
+	Usage []uint32
 
-	// TODO: probably better if these values do not get saved to disk, that way
-	// they reset if the disk is repaired or swapped out or whatever.
-	FailedReads      uint64
-	FailedWrites     uint64
-	SuccessfulReads  uint64
-	SuccessfulWrites uint64
+	/*
+		// TODO: probably better if these values do not get saved to disk, that
+		// way they reset if the disk is repaired or swapped out or whatever.
+		FailedReads      uint64
+		FailedWrites     uint64
+		SuccessfulReads  uint64
+		SuccessfulWrites uint64
+	*/
+
+	// Certain operations on a storage folder can take a long time (Add,
+	// Remove, and Resize). The fields below indicate any long running
+	// operations that might be under way in the storage folder, as well as
+	// indicate how far progressed those operations are. Progress is always
+	// reported in bytes.
+	//
+	// The mutex only covers the three fields below, the other fields are
+	// managed using other concurrency patterns.
+	CurrentOperation    string
+	ProgressNumerator   uint64
+	ProgressDenominator uint64
+	mu                  sync.Mutex
+}
+
+// numSetBits returns the number of bits set in the input uint32, useful for
+// counting the number of sectors in a storage folder.
+//
+// Algorithm used is SWAR, taken from the following link:
+//   http://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer
+func numSetBits(i uint32) uint64 {
+	i = i - ((i >> 1) & 0x55555555)
+	i = (i & 0x33333333) + ((i >> 2) & 0x33333333)
+	return uint64((((i + (i >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24)
+}
+
+// StorageFolders will return a list of storage folders in the host, each
+// containing information about the storage folder and any operations currently
+// being executed on the storage folder.
+func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
+	// Because getting information on the storage folders requires looking at
+	// the state of the contract manager, we should go through the WAL.
+	return cm.wal.managedStorageFolders()
+}
+
+// managedStorageFolders will return a list of storage folders in the host,
+// each containing information about the storage folder and any operations
+// currently being executed on the storage folder.
+func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderMetadata) {
+	wal.mu.Lock()
+	defer wal.mu.Unlock()
+
+	func() {
+		wal.cm.mu.RLock()
+		defer wal.cm.mu.RUnlock()
+
+		for _, sf := range wal.cm.storageFolders {
+			sf.mu.Lock()
+			// Grab the non-computational data.
+			sfm := modules.StorageFolderMetadata{
+				Capacity: modules.SectorSize * 32 * uint64(len(sf.Usage)),
+				Path:     sf.Path,
+
+				CurrentOperation:    sf.CurrentOperation,
+				ProgressNumerator:   sf.ProgressNumerator,
+				ProgressDenominator: sf.ProgressDenominator,
+			}
+
+			// Perform computation on the Usage value to determine the number
+			// of sectors in use.
+			var sectorsInUse uint64
+			for _, i := range sf.Usage {
+				sectorsInUse += numSetBits(i)
+			}
+			sfm.CapacityRemaining = sfm.Capacity - modules.SectorSize*sectorsInUse
+
+			// Add this storage folder to the list of storage folders.
+			smfs = append(smfs, sfm)
+			sf.mu.Unlock()
+		}
+	}()
+
+	// Iterate through the uncommitted changes to the contract manager and find
+	// any storage folders which have been added but aren't in the actual state
+	// yet.
+	for _, uc := range wal.uncommittedChanges {
+		for _, sf := range uc.StorageFolderAdditions {
+			smfs = append(smfs, modules.StorageFolderMetadata{
+				Capacity:          modules.SectorSize * 32 * uint64(len(sf.Usage)),
+				CapacityRemaining: modules.SectorSize * 32 * uint64(len(sf.Usage)),
+				Path:              sf.Path,
+
+				CurrentOperation:    sf.CurrentOperation,
+				ProgressNumerator:   sf.ProgressNumerator,
+				ProgressDenominator: sf.ProgressDenominator,
+			})
+		}
+	}
+	for _, sf := range wal.findUnfinishedStorageFolderAdditions(wal.uncommittedChanges) {
+		smfs = append(smfs, modules.StorageFolderMetadata{
+			Capacity:          modules.SectorSize * 32 * uint64(len(sf.Usage)),
+			CapacityRemaining: modules.SectorSize * 32 * uint64(len(sf.Usage)),
+			Path:              sf.Path,
+
+			CurrentOperation:    sf.CurrentOperation,
+			ProgressNumerator:   sf.ProgressNumerator,
+			ProgressDenominator: sf.ProgressDenominator,
+		})
+	}
+	return smfs
 }
 
 /*
@@ -448,96 +553,6 @@ func (sf *storageFolder) uidString() string {
 		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
 	}
 	return hex.EncodeToString(sf.UID)
-}
-
-// AddStorageFolder adds a storage folder to the host.
-func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
-	// Lock the host for the duration of the add operation - it is important
-	// that the host not be manipulated while sectors are being moved around.
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	// The resource lock is required as the sector movements require access to
-	// the logger.
-	sm.resourceLock.RLock()
-	defer sm.resourceLock.RUnlock()
-	if sm.closed {
-		return errStorageManagerClosed
-	}
-
-	// Check that the maximum number of allowed storage folders has not been
-	// exceeded.
-	if len(sm.storageFolders) >= maximumStorageFolders {
-		return errMaxStorageFolders
-	}
-	// Check that the storage folder being added meets the size requirements.
-	if size > maximumStorageFolderSize {
-		return errLargeStorageFolder
-	}
-	if size < minimumStorageFolderSize {
-		return errSmallStorageFolder
-	}
-	// Check that the path is an absolute path.
-	if !filepath.IsAbs(path) {
-		return errRelativePath
-	}
-	// Check that the folder being linked to is not already in use.
-	for _, sf := range sm.storageFolders {
-		if sf.Path == path {
-			return errRepeatFolder
-		}
-	}
-
-	// Check that the folder being linked to both exists and is a folder.
-	pathInfo, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if !pathInfo.Mode().IsDir() {
-		return errStorageFolderNotFolder
-	}
-
-	// Create a storage folder object.
-	newSF := &storageFolder{
-		Path: path,
-
-		Size:          size,
-		SizeRemaining: size,
-	}
-	// Give the storage folder a new UID, while enforcing that the storage
-	// folder can't have a collision with any of the other storage folders.
-	newSF.UID = make([]byte, storageFolderUIDSize)
-	for {
-		// Generate an attempt UID for the storage folder.
-		_, err = sm.dependencies.randRead(newSF.UID)
-		if err != nil {
-			return err
-		}
-
-		// Check for collsions. Check should be relatively inexpensive at all
-		// times, because the total number of storage folders is limited to
-		// 256.
-		safe := true
-		for _, sf := range sm.storageFolders {
-			if bytes.Equal(newSF.UID, sf.UID) {
-				safe = false
-				break
-			}
-		}
-		if safe {
-			break
-		}
-	}
-
-	// Symlink the path for the data to the UID location of the host.
-	symPath := filepath.Join(sm.persistDir, newSF.uidString())
-	err = sm.dependencies.symlink(path, symPath)
-	if err != nil {
-		return err
-	}
-
-	// Add the storage folder to the list of folders for the host.
-	sm.storageFolders = append(sm.storageFolders, newSF)
-	return sm.saveSync()
 }
 
 // ResetStorageFolderHealth will reset the read and write statistics for the

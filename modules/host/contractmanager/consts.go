@@ -106,13 +106,13 @@ var (
 	}()
 
 	// storageFolderGranularity defines the number of sectors that a storage
-	// folder must cleanly divide into. 8 sectors is a requirement due to the
+	// folder must cleanly divide into. 32 sectors is a requirement due to the
 	// way the storage folder bitfield (field 'Usage') is constructed - the
 	// bitfield defines which sectors are available, and the bitfield must be
-	// constructed 1 byte at a time.
+	// constructed 1 uint32 at a time (4 bytes, 32 bits, or 32 sectors).
 	//
 	// This corresponds to a granularity of 32 MiB on the production network,
 	// which relative to the TiBs of storage that hosts are expected to
 	// provide, is a large amount of granularity.
-	storageFolderGranularity = uint64(8)
+	storageFolderGranularity = uint64(32)
 )

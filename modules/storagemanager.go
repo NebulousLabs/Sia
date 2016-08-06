@@ -6,6 +6,10 @@ import (
 )
 
 const (
+	// ContractManagerDir is the standard name used for the directory that
+	// contains all files directly related to the contract manager.
+	ContractManagerDir = "contractmanager"
+
 	// StorageManagerDir is standard name used for the directory that contains
 	// all of the storage manager files.
 	StorageManagerDir = "storagemanager"
@@ -29,6 +33,15 @@ type (
 		FailedWrites     uint64 `json:"failedwrites"`
 		SuccessfulReads  uint64 `json:"successfulreads"`
 		SuccessfulWrites uint64 `json:"successfulwrites"`
+
+		// Certain operations on a storage folder can take a long time (Add,
+		// Remove, and Resize). The fields below indicate any long running
+		// operations that might be under way in the storage folder, as well as
+		// indicate how far progressed those operations are. Progress is always
+		// reported in bytes.
+		CurrentOperation    string
+		ProgressNumerator   uint64
+		ProgressDenominator uint64
 	}
 
 	// A StorageManager is responsible for managing storage folders and
