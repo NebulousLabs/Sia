@@ -21,10 +21,13 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	for _, sco := range w.siacoinOutputs {
-		siacoinBalance = siacoinBalance.Add(sco.Value)
-	}
 	w.db.View(func(tx *bolt.Tx) error {
+		tx.Bucket(bucketSiacoinOutputs).ForEach(func(_, scoBytes []byte) error {
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(scoBytes, &sco)
+			siacoinBalance = siacoinBalance.Add(sco.Value)
+			return err
+		})
 		return tx.Bucket(bucketSiafundOutputs).ForEach(func(_, sfoBytes []byte) error {
 			var sfo types.SiafundOutput
 			err := encoding.Unmarshal(sfoBytes, &sfo)
