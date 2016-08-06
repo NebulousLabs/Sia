@@ -14,9 +14,19 @@ const (
 	// manager's settings.
 	settingsFile = "contractmanager.json"
 
+	// sectorFile is the file that is placed inside of a storage folder to
+	// house all of the sectors and sector metadata associated with a storage
+	// folder.
+	sectorFile = "siahostdata.dat"
+
 	// walFile is the name of the file that is used to save the write ahead log
 	// for the contract manager.
 	walFile = "contractmanager.wal"
+
+	// walFileTmp is used for incomplete writes to the WAL. Data could be
+	// interrupted by power outages, etc., and is therefore written to a
+	// temporary file before being atomically renamed to the correct name.
+	walFileTmp = "contractmanager.wal.tmp"
 )
 
 var (
@@ -79,7 +89,7 @@ var (
 			return 1 << 20 // 4 TiB
 		}
 		if build.Release == "standard" {
-			return 1 << 22 // 16 TiB
+			return 1 << 25 // 256 TiB
 		}
 		if build.Release == "testing" {
 			return 1 << 8 // 1 MiB
@@ -114,5 +124,5 @@ var (
 	// This corresponds to a granularity of 32 MiB on the production network,
 	// which relative to the TiBs of storage that hosts are expected to
 	// provide, is a large amount of granularity.
-	storageFolderGranularity = 8
+	storageFolderGranularity = uint64(8)
 )

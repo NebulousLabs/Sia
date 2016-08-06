@@ -4,6 +4,15 @@ package contractmanager
 // the sectors within the contract manager. Storage folders can be added,
 // resized, or removed.
 
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/NebulousLabs/Sia/modules"
+)
+
 var (
 	// errBadStorageFolderIndex is returned if a storage folder is requested
 	// that does not have the correct index.
@@ -26,7 +35,7 @@ var (
 
 	// errLargeStorageFolder is returned if a new storage folder or a resized
 	// storage folder would exceed the maximum allowed size.
-	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumStorageFolderSize)
+	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumSectorsPerStorageFolder*modules.SectorSize)
 
 	// errMaxStorageFolders indicates that the limit on the number of allowed
 	// storage folders has been reached.
@@ -63,9 +72,11 @@ type storageFolder struct {
 	//
 	// TODO: Explain that storage folders are identified by their path, and
 	// that there must not be duplicates or the WAL will get confused.
-	Path string
+	Path  string
 	Usage []byte
 
+	// TODO: probably better if these values do not get saved to disk, that way
+	// they reset if the disk is repaired or swapped out or whatever.
 	FailedReads      uint64
 	FailedWrites     uint64
 	SuccessfulReads  uint64
@@ -74,7 +85,7 @@ type storageFolder struct {
 
 // AddStorageFolder adds a storage folder to the contract manager.
 func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
-	err = cm.tg.Add()
+	err := cm.tg.Add()
 	if err != nil {
 		return err
 	}
@@ -84,17 +95,20 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 
 	// Check that the maximum number of allowed storage folders has not been
 	// exceeded.
-	if len(cm.storageFolders) >= maximumStorageFolders {
+	if uint64(len(cm.storageFolders)) >= maximumStorageFolders {
 		return errMaxStorageFolders
 	}
 	// Check that the storage folder being added meets the size requirements.
-	if size > maximumStorageFolderSize {
+	sectors := size / modules.SectorSize
+	if sectors > maximumSectorsPerStorageFolder {
+		// TODO: This should be consistent - min currently is size, and max is
+		// sector count. Pick one.
 		return errLargeStorageFolder
 	}
 	if size < minimumStorageFolderSize {
 		return errSmallStorageFolder
 	}
-	if (size / modules.SectorSize)%storageFolderGranularity != 0 {
+	if (size/modules.SectorSize)%storageFolderGranularity != 0 {
 		return errStorageFolderGranularity
 	}
 	// Check that the path is an absolute path.
@@ -112,8 +126,8 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	}
 
 	// Create a storage folder object.
-	newSF := &storageFolder{
-		Path: path,
+	newSF := storageFolder{
+		Path:  path,
 		Usage: make([]byte, size/modules.SectorSize/8),
 	}
 

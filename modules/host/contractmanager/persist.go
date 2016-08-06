@@ -9,8 +9,9 @@ import (
 )
 
 type (
-	// savedSettings contains the contract manager settings that get saved to
-	// disk.
+	// savedSettings contains all of the contract manager persistent details
+	// that are single fields or otherwise do not need to go into a database or
+	// onto another disk.
 	savedSettings struct {
 		SectorSalt     crypto.Hash
 		StorageFolders []*storageFolder
@@ -31,9 +32,11 @@ func (cm *ContractManager) initSettings() error {
 	// Typically any time a change is made to the persistent state of the
 	// contract manager, the write ahead log should be used. We have a unique
 	// situation where there is a brand new contract manager, and we can rely
-	// on the safety features of persist.SaveFile to be certain that everything
-	// will be saved cleanly to disk or not at all before the function is
-	// returned, therefore the write ahead log is not used.
+	// on the safety features of persist.SaveFileSync to be certain that
+	// everything will be saved cleanly to disk or not at all before the
+	// function is returned, therefore the WAL is not used, and this saves some
+	// code, especially regarding changes to the sector salt. Aside from
+	// initialization, the sector salt is never changed.
 
 	// Initialize the sector salt to a random value.
 	_, err := cm.dependencies.randRead(cm.sectorSalt[:])
@@ -43,11 +46,7 @@ func (cm *ContractManager) initSettings() error {
 
 	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
 	// with the new settings values.
-	ss := savedSettings{
-		SectorSalt:     cm.sectorSalt,
-		StorageFolders: cm.storageFolders,
-	}
-	return persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
+	return cm.saveSync()
 }
 
 // load will pull all saved state from the contract manager off of the disk and
@@ -73,13 +72,25 @@ func (cm *ContractManager) load() error {
 
 	// TODO: Load the sector locations from the various storage folders.
 
-	// TODO: Open up the WAL, check the checksum, and apply any outstanding
-	// updates. Then delete the WAL. Remember that WAL updates need to be
-	// idempotent.
+	// TODO: Load in the WAL, handle any outstanding items.
+	err = cm.wal.load()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 // save will commit the in-memory contract manager data to disk.
-func (cm *ContractManager) save() error {
+func (cm *ContractManager) saveSync() error {
+	ss := cm.savedSettings()
+	return persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
+}
+
+// and so on
+func (cm *ContractManager) savedSettings() savedSettings {
+	return savedSettings{
+		SectorSalt:     cm.sectorSalt,
+		StorageFolders: cm.storageFolders,
+	}
 }

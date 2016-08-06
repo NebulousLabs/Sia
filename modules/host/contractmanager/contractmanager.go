@@ -1,5 +1,7 @@
 package contractmanager
 
+// TODO: cleanup/generalize the error management.
+
 import (
 	"fmt"
 	"path/filepath"
@@ -86,6 +88,16 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	if err != nil {
 		return nil, err
 	}
+
+	// Spin up the sync loop. Note that the sync loop needs to be created after
+	// the loading process is complete, otherwise there might be conflicts on
+	// the contract state, as commit() will be modifying the state and saving
+	// things to disk.
+	err = cm.wal.spawnSyncLoop()
+	if err != nil {
+		return nil, err
+	}
+
 	return cm, nil
 }
 
