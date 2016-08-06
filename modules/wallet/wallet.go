@@ -74,7 +74,6 @@ type Wallet struct {
 	seeds          []modules.Seed
 	keys           map[types.UnlockHash]spendableKey
 	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
-	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
 	spentOutputs   map[types.OutputID]types.BlockHeight
 
 	// The following fields are kept to track transaction history.
@@ -125,7 +124,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 
 		keys:           make(map[types.UnlockHash]spendableKey),
 		siacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		siafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
 		spentOutputs:   make(map[types.OutputID]types.BlockHeight),
 
 		processedTransactionMap: make(map[types.TransactionID]*modules.ProcessedTransaction),
