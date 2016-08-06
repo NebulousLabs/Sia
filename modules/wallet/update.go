@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -21,17 +20,14 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 			continue
 		}
 
-		_, exists = w.siacoinOutputs[diff.ID]
+		var err error
 		if diff.Direction == modules.DiffApply {
-			if build.DEBUG && exists {
-				panic("adding an existing output to wallet")
-			}
-			w.siacoinOutputs[diff.ID] = diff.SiacoinOutput
+			err = dbPutSiacoinOutput(tx, diff.ID, diff.SiacoinOutput)
 		} else {
-			if build.DEBUG && !exists {
-				panic("deleting nonexisting output from wallet")
-			}
-			delete(w.siacoinOutputs, diff.ID)
+			err = dbDeleteSiacoinOutput(tx, diff.ID)
+		}
+		if err != nil {
+			return err
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
