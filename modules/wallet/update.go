@@ -13,7 +13,7 @@ import (
 
 // updateConfirmedSet uses a consensus change to update the confirmed set of
 // outputs as understood by the wallet.
-func (w *Wallet) updateConfirmedSet(cc modules.ConsensusChange) {
+func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) error {
 	for _, diff := range cc.SiacoinOutputDiffs {
 		// Verify that the diff is relevant to the wallet.
 		_, exists := w.keys[diff.SiacoinOutput.UnlockHash]
@@ -41,17 +41,14 @@ func (w *Wallet) updateConfirmedSet(cc modules.ConsensusChange) {
 			continue
 		}
 
-		_, exists = w.siafundOutputs[diff.ID]
+		var err error
 		if diff.Direction == modules.DiffApply {
-			if build.DEBUG && exists {
-				panic("adding an existing output to wallet")
-			}
-			w.siafundOutputs[diff.ID] = diff.SiafundOutput
+			err = dbPutSiafundOutput(tx, diff.ID, diff.SiafundOutput)
 		} else {
-			if build.DEBUG && !exists {
-				panic("deleting nonexisting output from wallet")
-			}
-			delete(w.siafundOutputs, diff.ID)
+			err = dbDeleteSiafundOutput(tx, diff.ID)
+		}
+		if err != nil {
+			return err
 		}
 	}
 	for _, diff := range cc.SiafundPoolDiffs {
@@ -61,6 +58,7 @@ func (w *Wallet) updateConfirmedSet(cc modules.ConsensusChange) {
 			w.siafundPool = diff.Previous
 		}
 	}
+	return nil
 }
 
 // revertHistory reverts any transaction history that was destroyed by reverted
@@ -253,7 +251,10 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	err := w.db.Update(func(tx *bolt.Tx) error {
-		w.updateConfirmedSet(cc)
+		err := w.updateConfirmedSet(tx, cc)
+		if err != nil {
+			return err
+		}
 		w.revertHistory(cc)
 		return w.applyHistory(tx, cc.AppliedBlocks)
 	})
