@@ -7,18 +7,30 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/NebulousLabs/Sia/modules"
 )
 
 type (
 	// stateChange defines a change to the state that has not yet been applied
 	// to the contract manager, but will be applied in a future commitment.
 	stateChange struct {
-		StorageFolderAdditions []storageFolder
-		StorageFolderRemovals  []storageFolder
-
+		// Fields related to adding a storage folder. When a storage folder is
+		// added, it first appears in the 'unfinished storage folder additions'
+		// field. A lot of I/O is incurred when adding a storage folder, and a
+		// WAL lock should not be held throughout the preparation operations.
+		// When the I/O is complete, the WAL is locked again and the unfinished
+		// storage folder is moved to the StorageFolderAdditions list.
+		//
+		// When committing, only StorageFolderAdditions will be committed to
+		// the state. Some filtering is executed at commit time to determine
+		// which UnfinishedStorageFolderAdditions need to be preserved through
+		// to the next commit. Any unfinished storage folders which end up in
+		// the StorageFolderAdditions list will not need to be preserved. If
+		// there is an error during the I/O preperation, the storage folder
+		// will be cleaned up and added to the ErroredStorageFolderAdditions
+		// field, which also means that the storage folder does not need to be
+		// preserved.
 		ErroredStorageFolderAdditions    []string
+		StorageFolderAdditions           []storageFolder
 		UnfinishedStorageFolderAdditions []storageFolder
 	}
 
@@ -149,40 +161,6 @@ func (wal *writeAheadLog) commit() bool {
 	return true
 }
 
-func (wal *writeAheadLog) findUnfinishedStorageFolderAdditions(scs []stateChange) []stateChange {
-	// Create a map containing a list of all unfinished storage folder
-	// additions identified by their path to the storage folder that is being
-	// added.
-	usfMap := make(map[string]storageFolder)
-	for _, sc := range scs {
-		for _, sf := range sc.UnfinishedStorageFolderAdditions {
-			usfMap[sf.Path] = sf
-		}
-		for _, sf := range sc.StorageFolderAdditions {
-			delete(usfMap, sf.Path)
-		}
-		for _, path := range sc.ErroredStorageFolderAdditions {
-			delete(usfMap, path)
-		}
-	}
-
-	var sfs []storageFolder
-	for _, sf := range usfMap {
-		sfs = append(sfs, sf)
-	}
-	return []stateChange{{
-		UnfinishedStorageFolderAdditions: sfs,
-	}}
-}
-
-// commitAddStorageFolder integrates a pending AddStorageFolder call into the
-// state. commitAddStorageFolder should only be called when finalizing an ACID
-// transaction, and only after the WAL has been synced to disk, to ensure that
-// the state change has been guaranteed even in the event of sudden power loss.
-func (wal *writeAheadLog) commitAddStorageFolder(sf storageFolder) {
-	wal.cm.storageFolders = append(wal.cm.storageFolders, &sf)
-}
-
 // TODO: document all of the potentially long-running unfinished tasks and
 // determine how they may affect where a sector gets placed.
 func (wal *writeAheadLog) load() error {
@@ -199,6 +177,8 @@ func (wal *writeAheadLog) load() error {
 	defer file.Close()
 
 	// Read changes from the WAL one at a time and load them back into memory.
+	// Because they are already in the WAL, they do not need to be written to
+	// the WAL again.
 	var sc stateChange
 	decoder := json.NewDecoder(file)
 	for err == nil {
@@ -212,17 +192,8 @@ func (wal *writeAheadLog) load() error {
 	}
 
 	// Do any cleanup regarding long-running unfinished tasks.
-	for i, uc := range wal.uncommittedChanges {
-		for _, usfa := range uc.UnfinishedStorageFolderAdditions {
-			// The storage folder addition was interrupted due to an unexpected
-			// error, and the change should be aborted. This can be completed
-			// by simply removing the file that was partially created to house
-			// the sectors that would have appeared in the storage folder.
-			sectorHousingName := filepath.Join(usfa.Path, sectorFile)
-			os.Remove(sectorHousingName)
-		}
-		wal.uncommittedChanges[i].UnfinishedStorageFolderAdditions = nil
-	}
+	wal.cleanupUnfinishedStorageFolderAdditions()
+
 	return nil
 }
 
@@ -287,135 +258,4 @@ func (wal *writeAheadLog) threadedSyncLoop(syncLoopStopped chan struct{}) {
 			}
 		}
 	}
-}
-
-// ASF isa
-func (wal *writeAheadLog) AddStorageFolder(sf storageFolder) error {
-	err := func() error {
-		wal.mu.Lock()
-		defer wal.mu.Unlock()
-		// Check that the storage folder is not a duplicate. That requires first
-		// checking the contract manager and then checking the WAL. An RLock is
-		// held on the contract manager while viewing the contract manager data.
-		// The safety of this function depends on the fact that the WAL will always
-		// hold the outside lock in situations where both a WAL lock and a cm lock
-		// are needed.
-		duplicate := false
-		wal.cm.mu.RLock()
-		for i := range wal.cm.storageFolders {
-			if wal.cm.storageFolders[i].Path == sf.Path {
-				duplicate = true
-				break
-			}
-		}
-		wal.cm.mu.RUnlock()
-		// Check the uncommitted changes for updates to the storage folders which
-		// alter the 'duplicate' status of this storage folder.
-		for i := range wal.uncommittedChanges {
-			for j := range wal.uncommittedChanges[i].StorageFolderAdditions {
-				if wal.uncommittedChanges[i].StorageFolderAdditions[j].Path == sf.Path {
-					duplicate = true
-				}
-			}
-			for j := range wal.uncommittedChanges[i].StorageFolderRemovals {
-				if wal.uncommittedChanges[i].StorageFolderRemovals[j].Path == sf.Path {
-					duplicate = false
-				}
-			}
-		}
-		for _, uc := range wal.uncommittedChanges {
-			for _, usfa := range uc.UnfinishedStorageFolderAdditions {
-				if usfa.Path == sf.Path {
-					duplicate = true
-				}
-			}
-		}
-		if duplicate {
-			return errRepeatFolder
-		}
-
-		// Add the storage folder to the list of unfinished storage folder
-		// additions, so that no naming conflicts can appear while this storage
-		// folder is being processed.
-		wal.appendChange(stateChange{
-			UnfinishedStorageFolderAdditions: []storageFolder{sf},
-		})
-		return nil
-	}()
-	if err != nil {
-		return err
-	}
-	// If there's an error in the rest of the function, the storage folder
-	// needs to be removed from the list of unfinished storage folder
-	// additions.
-	defer func() {
-		if err != nil {
-			wal.mu.Lock()
-			defer wal.mu.Unlock()
-			err = wal.appendChange(stateChange{
-				ErroredStorageFolderAdditions: []string{sf.Path},
-			})
-		}
-	}()
-
-	// The WAL now contains a commitment to create the storage folder, but the
-	// storage folder actually needs to be created. The storage folder should
-	// be big enough to house all the potential sectors, and also needs to
-	// contain a prefix that is 16 bytes per sector which indicates where each
-	// sector is located on disk.
-	numSectors := uint64(len(sf.Usage)) * 2
-	sectorLookupSize := numSectors * 16
-	sectorHousingSize := numSectors * modules.SectorSize
-	// Open a file and write empty data across the whole file to reserve space
-	// on disk for sector activities.
-	sectorHousingName := filepath.Join(sf.Path, sectorFile)
-	file, err := os.Open(sectorHousingName)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	defer func() {
-		if err != nil {
-			err := os.Remove(sectorHousingName)
-			if err != nil {
-				wal.cm.log.Println("could not remove sector housing after failed storage folder add:", err)
-			}
-		}
-	}()
-	totalSize := sectorLookupSize + sectorHousingSize
-	hundredMBWrites := totalSize / 100e6
-	finalWriteSize := totalSize % 100e6
-	hundredMB := make([]byte, 100e6)
-	finalBytes := make([]byte, finalWriteSize)
-	for i := uint64(0); i < hundredMBWrites; i++ {
-		_, err = file.Write(hundredMB)
-		if err != nil {
-			return err
-		}
-	}
-	_, err = file.Write(finalBytes)
-	if err != nil {
-		return err
-	}
-	err = file.Sync()
-	if err != nil {
-		return err
-	}
-
-	// Update the WAL to include the new storage folder in the uncommitted
-	// changes.
-	wal.mu.Lock()
-	err = wal.appendChange(stateChange{
-		StorageFolderAdditions: []storageFolder{sf},
-	})
-	wal.mu.Unlock()
-	if err != nil {
-		return err
-	}
-
-	// Unlock the WAL as we are done making modifications, but do not return
-	// until the WAL has comitted to return the function.
-	syncWait := wal.syncChan
-	<-syncWait
-	return nil
 }

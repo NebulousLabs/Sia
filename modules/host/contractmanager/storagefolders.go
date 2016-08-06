@@ -7,8 +7,6 @@ package contractmanager
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -81,58 +79,6 @@ type storageFolder struct {
 	FailedWrites     uint64
 	SuccessfulReads  uint64
 	SuccessfulWrites uint64
-}
-
-// AddStorageFolder adds a storage folder to the contract manager.
-func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
-	err := cm.tg.Add()
-	if err != nil {
-		return err
-	}
-	defer cm.tg.Done()
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	// Check that the maximum number of allowed storage folders has not been
-	// exceeded.
-	if uint64(len(cm.storageFolders)) >= maximumStorageFolders {
-		return errMaxStorageFolders
-	}
-	// Check that the storage folder being added meets the size requirements.
-	sectors := size / modules.SectorSize
-	if sectors > maximumSectorsPerStorageFolder {
-		// TODO: This should be consistent - min currently is size, and max is
-		// sector count. Pick one.
-		return errLargeStorageFolder
-	}
-	if size < minimumStorageFolderSize {
-		return errSmallStorageFolder
-	}
-	if (size/modules.SectorSize)%storageFolderGranularity != 0 {
-		return errStorageFolderGranularity
-	}
-	// Check that the path is an absolute path.
-	if !filepath.IsAbs(path) {
-		return errRelativePath
-	}
-
-	// Check that the folder being linked to both exists and is a folder.
-	pathInfo, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if !pathInfo.Mode().IsDir() {
-		return errStorageFolderNotFolder
-	}
-
-	// Create a storage folder object.
-	newSF := storageFolder{
-		Path:  path,
-		Usage: make([]byte, size/modules.SectorSize/8),
-	}
-
-	// Add the storage folder to the list of folders for the host.
-	return cm.wal.AddStorageFolder(newSF)
 }
 
 /*
