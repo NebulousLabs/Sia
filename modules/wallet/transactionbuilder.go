@@ -9,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -228,42 +230,57 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	var potentialFund types.Currency
 	parentTxn := types.Transaction{}
 	var spentSfoids []types.SiafundOutputID
-	for sfoid, sfo := range tb.wallet.siafundOutputs {
-		// Check that this output has not recently been spent by the wallet.
-		spendHeight := tb.wallet.spentOutputs[types.OutputID(sfoid)]
-		// Prevent an underflow error.
-		allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
-		if tb.wallet.consensusSetHeight < RespendTimeout {
-			allowedHeight = 0
-		}
-		if spendHeight > allowedHeight {
+	err := tb.wallet.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(bucketSiafundOutputs).Cursor()
+		for idBytes, sfoBytes := c.First(); idBytes != nil; idBytes, sfoBytes = c.Next() {
+			var sfoid types.SiafundOutputID
+			var sfo types.SiafundOutput
+			if err := encoding.Unmarshal(idBytes, &sfoid); err != nil {
+				return err
+			} else if err := encoding.Unmarshal(sfoBytes, &sfo); err != nil {
+				return err
+			}
+
+			// Check that this output has not recently been spent by the wallet.
+			spendHeight := tb.wallet.spentOutputs[types.OutputID(sfoid)]
+			// Prevent an underflow error.
+			allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
+			if tb.wallet.consensusSetHeight < RespendTimeout {
+				allowedHeight = 0
+			}
+			if spendHeight > allowedHeight {
+				potentialFund = potentialFund.Add(sfo.Value)
+				continue
+			}
+			outputUnlockConditions := tb.wallet.keys[sfo.UnlockHash].UnlockConditions
+			if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
+				continue
+			}
+
+			// Add a siafund input for this output.
+			parentClaimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+			if err != nil {
+				return err
+			}
+			sfi := types.SiafundInput{
+				ParentID:         sfoid,
+				UnlockConditions: outputUnlockConditions,
+				ClaimUnlockHash:  parentClaimUnlockConditions.UnlockHash(),
+			}
+			parentTxn.SiafundInputs = append(parentTxn.SiafundInputs, sfi)
+			spentSfoids = append(spentSfoids, sfoid)
+
+			// Add the output to the total fund
+			fund = fund.Add(sfo.Value)
 			potentialFund = potentialFund.Add(sfo.Value)
-			continue
+			if fund.Cmp(amount) >= 0 {
+				break
+			}
 		}
-		outputUnlockConditions := tb.wallet.keys[sfo.UnlockHash].UnlockConditions
-		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
-			continue
-		}
-
-		// Add a siafund input for this output.
-		parentClaimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
-		if err != nil {
-			return err
-		}
-		sfi := types.SiafundInput{
-			ParentID:         sfoid,
-			UnlockConditions: outputUnlockConditions,
-			ClaimUnlockHash:  parentClaimUnlockConditions.UnlockHash(),
-		}
-		parentTxn.SiafundInputs = append(parentTxn.SiafundInputs, sfi)
-		spentSfoids = append(spentSfoids, sfoid)
-
-		// Add the output to the total fund
-		fund = fund.Add(sfo.Value)
-		potentialFund = potentialFund.Add(sfo.Value)
-		if fund.Cmp(amount) >= 0 {
-			break
-		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	if potentialFund.Cmp(amount) >= 0 && fund.Cmp(amount) < 0 {
 		return modules.ErrIncompleteTransactions
