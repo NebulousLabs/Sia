@@ -45,6 +45,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
+
 		// Check that the storage folder is not a duplicate. That requires first
 		// checking the contract manager and then checking the WAL. An RLock is
 		// held on the contract manager while viewing the contract manager data.
@@ -54,40 +55,58 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		//
 		// The number of storage folders are also counted, to make sure that
 		// the maximum number of storage folders allowed is not exceeded.
-		duplicate := false
+		var err error
 		wal.cm.mu.RLock()
 		numStorageFolders := uint64(len(wal.cm.storageFolders))
 		for i := range wal.cm.storageFolders {
 			if wal.cm.storageFolders[i].Path == sf.Path {
-				duplicate = true
+				err = errRepeatFolder
 				break
 			}
 		}
 		wal.cm.mu.RUnlock()
+		if err != nil {
+			return err
+		}
+
 		// Check the uncommitted changes for updates to the storage folders
-		// which alter the 'duplicate' status of this storage folder. When
-		// counting the number of active storage folders, do not count storage
-		// folders which are queued for removal, because the commitment is not
-		// complete and that may mean that the operation will fail.
+		// which alter the 'duplicate' status of this storage folder.
 		for i := range wal.uncommittedChanges {
 			for j := range wal.uncommittedChanges[i].StorageFolderAdditions {
 				if wal.uncommittedChanges[i].StorageFolderAdditions[j].Path == sf.Path {
-					duplicate = true
+					return errRepeatFolder
 				}
-				numStorageFolders++
 			}
 		}
 		for _, uc := range wal.uncommittedChanges {
 			for _, usfa := range uc.UnfinishedStorageFolderAdditions {
 				if usfa.Path == sf.Path {
-					duplicate = true
+					return errRepeatFolder
 				}
-				numStorageFolders++
 			}
 		}
-		if duplicate {
-			return errRepeatFolder
+
+		// Count the number of uncommitted storage folders, and add it to the
+		// number of committed storage folders. Folders which are in the
+		// process of being removed are not considered in this count. There
+		// will only be one uncommitted storage folder with each path, though
+		// that storage folder may have multiple entries in the uncommitted
+		// changes (ifit has progressed from UnfinishedStorageFolderAdditions
+		// to StorageFolderAdditions, for example). A map can therefore be used
+		// to determine how many unique storage folders are currently being
+		// added.
+		uniqueFolders := make(map[string]struct{})
+		for _, uc := range wal.uncommittedChanges {
+			for _, sfa := range uc.StorageFolderAdditions {
+				uniqueFolders[sfa.Path] = struct{}{}
+			}
 		}
+		for _, uc := range wal.uncommittedChanges {
+			for _, usfa := range uc.UnfinishedStorageFolderAdditions {
+				uniqueFolders[usfa.Path] = struct{}{}
+			}
+		}
+		numStorageFolders += uint64(len(uniqueFolders))
 		if numStorageFolders > maximumStorageFolders {
 			return errMaxStorageFolders
 		}

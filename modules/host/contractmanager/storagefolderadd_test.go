@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -253,6 +254,263 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	// Check that the storage folder has been added.
 	sfs = cmt.cm.StorageFolders()
 	if len(sfs) != 3 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// All actions should have completed, so all storage folders should be
+	// reporting '0' in the progress denominator.
+	for _, sf := range sfs {
+		if sf.ProgressDenominator != 0 {
+			t.Error("ProgressDenominator is indicating that actions still remain")
+		}
+	}
+}
+
+// TestAddStorageFolderConsecutive adds multiple storage folders consecutively
+// to the contract manager, blocking on the first one to make sure that the
+// others are still allowed to complete.
+func TestAddStorageFolderConsecutive(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a contract manager tester with the mocked dependencies.
+	cmt, err := newContractManagerTester("TestAddStorageFolderConsecutive")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	storageFolderTwo := filepath.Join(cmt.persistDir, "storageFolderTwo")
+	storageFolderThree := filepath.Join(cmt.persistDir, "storageFolderThree")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.MkdirAll(storageFolderTwo, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.MkdirAll(storageFolderThree, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Spin off the first goroutine, and then wait until write has been called
+	// on the underlying file.
+	sfSize := modules.SectorSize * 32 * 8
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderTwo, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderThree, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 3 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// All actions should have completed, so all storage folders should be
+	// reporting '0' in the progress denominator.
+	for _, sf := range sfs {
+		if sf.ProgressDenominator != 0 {
+			t.Error("ProgressDenominator is indicating that actions still remain")
+		}
+	}
+}
+
+// TestAddStorageFolderDoubleAdd concurrently adds two storage
+// folders with the same path to the contract manager.
+func TestAddStorageFolderDoubleAdd(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a contract manager tester with the mocked dependencies.
+	cmt, err := newContractManagerTester("TestAddStorageFolderDoubleAdd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Call AddStorageFolder in three separate goroutines, where the same path
+	// is used in each. The errors are not checked because one of the storage
+	// folders will succeed, but it's uncertain which one.
+	sfSize := modules.SectorSize * 32 * 8
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize*2)
+	if err != errRepeatFolder {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// All actions should have completed, so all storage folders should be
+	// reporting '0' in the progress denominator
+	for _, sf := range sfs {
+		if sf.ProgressDenominator != 0 {
+			t.Error("ProgressDenominator is indicating that actions still remain")
+		}
+	}
+}
+
+// dependencyFreezeSyncLoop is a mocked dependency that will prevent the sync
+// loop from ever calling commit()
+type dependencyFreezeSyncLoop struct {
+	productionDependencies
+}
+
+// afterDuration will never return.
+func (dependencyFreezeSyncLoop) afterDuration(time.Duration) <-chan time.Time {
+	// Return a channel that will never be closed.
+	return make(chan time.Time)
+}
+
+// TestAddStorageFolderDoubleAddNoCommit hijacks the sync loop in the contract
+// manager such that the sync loop will not run automatically. Then, without
+// doing an actual commit, the test will indicate to open functions that a
+// commit has completed, allowing the next storage folder operation to happen.
+// Because the changes were finalized but not committed, extra code coverage
+// should be achieved, though the result of the storage folder being rejected
+// should be the same.
+func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a contract manager tester with the mocked dependencies.
+	var d dependencyFreezeSyncLoop
+	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderDoubleAddNoCommit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// The sync loop will never run, which means naively AddStorageFolder will
+	// never return. To get AddStorageFolder to return before the commit
+	// completes, spin up an alternate sync loop which only performs the
+	// signaling responsibilities of the commit function.
+	closeFakeSyncChan := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-closeFakeSyncChan:
+				return
+			case <-time.After(time.Millisecond * 250):
+				// Signal that the commit operation has completed, even though
+				// it has not.
+				cmt.cm.wal.mu.Lock()
+				close(cmt.cm.wal.syncChan)
+				cmt.cm.wal.syncChan = make(chan struct{})
+				cmt.cm.wal.mu.Unlock()
+			}
+		}
+	}()
+	defer close(closeFakeSyncChan)
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Call AddStorageFolder in three separate goroutines, where the same path
+	// is used in each. The errors are not checked because one of the storage
+	// folders will succeed, but it's uncertain which one.
+	sfSize := modules.SectorSize * 32 * 8
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize*2)
+	if err != errRepeatFolder {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// All actions should have completed, so all storage folders should be
+	// reporting '0' in the progress denominator
+	for _, sf := range sfs {
+		if sf.ProgressDenominator != 0 {
+			t.Error("ProgressDenominator is indicating that actions still remain")
+		}
+	}
+}
+
+// TestAddStorageFolderDoubleAddConcurrent concurrently adds two storage
+// folders with the same path to the contract manager.
+func TestAddStorageFolderDoubleAddConcurrent(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a contract manager tester with the mocked dependencies.
+	cmt, err := newContractManagerTester("TestAddStorageFolderDoubleAddConcurrent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Call AddStorageFolder in three separate goroutines, where the same path
+	// is used in each. The errors are not checked because one of the storage
+	// folders will succeed, but it's uncertain which one.
+	var wg sync.WaitGroup
+	sfSize := modules.SectorSize * 32 * 8
+	wg.Add(3)
+	go func() {
+		_ = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+		wg.Done()
+	}()
+	go func() {
+		_ = cmt.cm.AddStorageFolder(storageFolderOne, sfSize*2)
+		wg.Done()
+	}()
+	go func() {
+		_ = cmt.cm.AddStorageFolder(storageFolderOne, sfSize*3)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported")
 	}
 	// All actions should have completed, so all storage folders should be

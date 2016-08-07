@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"time"
 
 	"github.com/NebulousLabs/Sia/persist"
 )
@@ -29,6 +30,12 @@ var (
 type (
 	// dependencies defines all of the dependencies of the StorageManager.
 	dependencies interface {
+		// afterDuration gives the caller the ability to wait for a certain
+		// duration before receiving on a channel.
+		afterDuration(time.Duration) <-chan time.Time
+
+		// createFile gives the host the ability to create files on the
+		// operating system.
 		createFile(string) (file, error)
 
 		// loadFile allows the host to load a persistence structure form disk.
@@ -59,6 +66,12 @@ type (
 	// dependencies using full featured libraries.
 	productionDependencies struct{}
 )
+
+// afterDuration gives the host the ability to wait for a certain duration
+// before receiving on a channel.
+func (productionDependencies) afterDuration(d time.Duration) <-chan time.Time {
+	return time.After(d)
+}
 
 // createFile gives the host the ability to create files on the operating
 // system.

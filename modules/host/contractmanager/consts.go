@@ -77,7 +77,7 @@ var (
 			return 1 << 25 // 256 TiB
 		}
 		if build.Release == "testing" {
-			return 1 << 8 // 1 MiB
+			return 1 << 12 // 16 MiB
 		}
 		panic("unrecognized release constant in host - maximum storage folder size")
 	}()

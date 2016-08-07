@@ -377,7 +377,7 @@ func (wal *writeAheadLog) threadedSyncLoop(threadsStopped chan struct{}, syncLoo
 		case <-threadsStopped:
 			close(syncLoopStopped)
 			return
-		case <-time.After(syncInterval):
+		case <-wal.cm.dependencies.afterDuration(syncInterval):
 			// Commit all of the changes in the WAL to disk, and then apply the
 			// changes. Measure how long it takes to apply the changes, and use
 			// that to steer the amount of time that should be waited to the
