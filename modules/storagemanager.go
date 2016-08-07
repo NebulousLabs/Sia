@@ -35,11 +35,9 @@ type (
 		SuccessfulWrites uint64 `json:"successfulwrites"`
 
 		// Certain operations on a storage folder can take a long time (Add,
-		// Remove, and Resize). The fields below indicate any long running
-		// operations that might be under way in the storage folder, as well as
-		// indicate how far progressed those operations are. Progress is always
-		// reported in bytes.
-		CurrentOperation    string
+		// Remove, and Resize). The fields below indicate the progress of any
+		// long running operations that might be under way in the storage
+		// folder. Progress is always reported in bytes.
 		ProgressNumerator   uint64
 		ProgressDenominator uint64
 	}

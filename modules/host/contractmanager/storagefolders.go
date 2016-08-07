@@ -7,7 +7,7 @@ package contractmanager
 import (
 	"errors"
 	"fmt"
-	"sync"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -66,7 +66,29 @@ var (
 	errRelativePath = errors.New("storage folder paths must be absolute")
 )
 
+// storageFolder contains the metadata for a storage folder, including where
+// sectors are being stored in the folder. What sectors are being stored is
+// managed by the contract manager's sectorLocations map.
 type storageFolder struct {
+	// Certain operations on a storage folder can take a long time (Add,
+	// Remove, and Resize). The fields below indicate progress on any long
+	// running action being performed on them. Determining which action is
+	// being performed can be determined using the context of the WAL state
+	// changes that are currently open.
+	//
+	// These fields are updated atomically to avoid race conditions and
+	// performance bottlenecks. The only body that should be modifying the
+	// fields is the one that is actively performing the long running
+	// operation.
+	//
+	// These values are not saved to disk when the WAL closes, loading from the
+	// WAL must accordingly take this into account.
+	//
+	// As always, atomic fields go at the top of the struct to preserve
+	// compatibility with 32bit machines.
+	atomicProgressNumerator   uint64
+	atomicProgressDenominator uint64
+
 	// TODO: Explain how the bitfield works. 'Usage' is the bitfield.
 	//
 	// TODO: Explain that storage folders are identified by their path, and
@@ -85,18 +107,6 @@ type storageFolder struct {
 		SuccessfulWrites uint64
 	*/
 
-	// Certain operations on a storage folder can take a long time (Add,
-	// Remove, and Resize). The fields below indicate any long running
-	// operations that might be under way in the storage folder, as well as
-	// indicate how far progressed those operations are. Progress is always
-	// reported in bytes.
-	//
-	// The mutex only covers the three fields below, the other fields are
-	// managed using other concurrency patterns.
-	CurrentOperation    string
-	ProgressNumerator   uint64
-	ProgressDenominator uint64
-	mu                  sync.Mutex
 }
 
 // numSetBits returns the number of bits set in the input uint32, useful for
@@ -126,20 +136,20 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 
+	// Iterate over the storage folders that are in memory first, and then
+	// suppliment them with the storage folders that are not in memory.
 	func() {
 		wal.cm.mu.RLock()
 		defer wal.cm.mu.RUnlock()
 
 		for _, sf := range wal.cm.storageFolders {
-			sf.mu.Lock()
 			// Grab the non-computational data.
 			sfm := modules.StorageFolderMetadata{
 				Capacity: modules.SectorSize * 32 * uint64(len(sf.Usage)),
 				Path:     sf.Path,
 
-				CurrentOperation:    sf.CurrentOperation,
-				ProgressNumerator:   sf.ProgressNumerator,
-				ProgressDenominator: sf.ProgressDenominator,
+				ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
+				ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 			}
 
 			// Perform computation on the Usage value to determine the number
@@ -152,7 +162,6 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 
 			// Add this storage folder to the list of storage folders.
 			smfs = append(smfs, sfm)
-			sf.mu.Unlock()
 		}
 	}()
 
@@ -166,9 +175,8 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 				CapacityRemaining: modules.SectorSize * 32 * uint64(len(sf.Usage)),
 				Path:              sf.Path,
 
-				CurrentOperation:    sf.CurrentOperation,
-				ProgressNumerator:   sf.ProgressNumerator,
-				ProgressDenominator: sf.ProgressDenominator,
+				ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
+				ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 			})
 		}
 	}
@@ -178,9 +186,8 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 			CapacityRemaining: modules.SectorSize * 32 * uint64(len(sf.Usage)),
 			Path:              sf.Path,
 
-			CurrentOperation:    sf.CurrentOperation,
-			ProgressNumerator:   sf.ProgressNumerator,
-			ProgressDenominator: sf.ProgressDenominator,
+			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
+			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 		})
 	}
 	return smfs

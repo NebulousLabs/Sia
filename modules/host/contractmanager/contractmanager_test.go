@@ -51,6 +51,25 @@ func newContractManagerTester(name string) (*contractManagerTester, error) {
 	return cmt, nil
 }
 
+// newMockedContractManagerTester returns a contract manager tester that uses
+// the input dependencies instead of the production ones.
+func newMockedContractManagerTester(d dependencies, name string) (*contractManagerTester, error) {
+	if testing.Short() {
+		panic("use of newContractManagerTester during short testing")
+	}
+
+	testdir := build.TempDir(modules.ContractManagerDir, name)
+	cm, err := newContractManager(d, filepath.Join(testdir, modules.ContractManagerDir))
+	if err != nil {
+		return nil, err
+	}
+	cmt := &contractManagerTester{
+		cm:         cm,
+		persistDir: testdir,
+	}
+	return cmt, nil
+}
+
 // TestNewContractManager does basic startup and shutdown of a contract
 // manager, checking for egregious errors.
 func TestNewContractManager(t *testing.T) {

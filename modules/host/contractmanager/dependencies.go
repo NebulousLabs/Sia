@@ -3,7 +3,7 @@ package contractmanager
 import (
 	"crypto/rand"
 	"errors"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/NebulousLabs/Sia/persist"
@@ -29,6 +29,8 @@ var (
 type (
 	// dependencies defines all of the dependencies of the StorageManager.
 	dependencies interface {
+		createFile(string) (file, error)
+
 		// loadFile allows the host to load a persistence structure form disk.
 		loadFile(persist.Metadata, interface{}, string) error
 
@@ -42,15 +44,13 @@ type (
 
 		// randRead fills the input bytes with random data.
 		randRead([]byte) (int, error)
+	}
 
-		// readFile reads a file in full from the filesystem.
-		readFile(string) ([]byte, error)
-
-		// removeFile removes a file from file filesystem.
-		removeFile(string) error
-
-		// writeFile writes data to the filesystem using the provided filename.
-		writeFile(string, []byte, os.FileMode) error
+	// file implements all of the methods that can be called on an os.File.
+	file interface {
+		io.Closer
+		io.Writer
+		Sync() error
 	}
 )
 
@@ -59,6 +59,12 @@ type (
 	// dependencies using full featured libraries.
 	productionDependencies struct{}
 )
+
+// createFile gives the host the ability to create files on the operating
+// system.
+func (productionDependencies) createFile(s string) (file, error) {
+	return os.Create(s)
+}
 
 // loadFile allows the host to load a persistence structure form disk.
 func (productionDependencies) loadFile(m persist.Metadata, i interface{}, s string) error {
@@ -80,19 +86,4 @@ func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
 // randRead fills the input bytes with random data.
 func (productionDependencies) randRead(b []byte) (int, error) {
 	return rand.Read(b)
-}
-
-// readFile reads a file from the filesystem.
-func (productionDependencies) readFile(s string) ([]byte, error) {
-	return ioutil.ReadFile(s)
-}
-
-// removeFile removes a file from the filesystem.
-func (productionDependencies) removeFile(s string) error {
-	return os.Remove(s)
-}
-
-// writeFile writes a file to the filesystem.
-func (productionDependencies) writeFile(s string, b []byte, fm os.FileMode) error {
-	return ioutil.WriteFile(s, b, fm)
 }

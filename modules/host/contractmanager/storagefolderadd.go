@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -30,6 +31,17 @@ import (
 // equivalent cannot be found, it is acceptable that Linux systems would have
 // better performance.
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
+	// Precompute the total on-disk size of the storage folder. The storage
+	// folder needs to have modules.SectorSize available for each sector, plus
+	// another 16 bytes per sector to store a mapping from sector id to its
+	// location in the storage folder.
+	numSectors := uint64(len(sf.Usage)) * 32
+	sectorLookupSize := numSectors * 16
+	sectorHousingSize := numSectors * modules.SectorSize
+	totalSize := sectorLookupSize + sectorHousingSize
+
+	// Update the uncommitted state to include the storage folder, returning an
+	// error if any checks fail.
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
@@ -90,6 +102,10 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		wal.appendChange(stateChange{
 			UnfinishedStorageFolderAdditions: []*storageFolder{sf},
 		})
+
+		// Establish the progress fields for the add operation in the storage
+		// folder.
+		atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 		return nil
 	}()
 	if err != nil {
@@ -112,24 +128,11 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	}()
 
 	// The WAL now contains a commitment to create the storage folder, but the
-	// storage folder actually needs to be created. The storage folder should
-	// be big enough to house all the potential sectors, and also needs to
-	// contain a prefix that is 16 bytes per sector which indicates where each
-	// sector is located on disk.
-	numSectors := uint64(len(sf.Usage)) * 2
-	sectorLookupSize := numSectors * 16
-	sectorHousingSize := numSectors * modules.SectorSize
-	totalSize := sectorLookupSize + sectorHousingSize
-	// Establish the progress fields for the add operation in the storage
-	// folder.
-	sf.mu.Lock()
-	sf.CurrentOperation = "Add Storage Folder"
-	sf.ProgressDenominator = totalSize
-	sf.mu.Unlock()
-	// Open a file and write empty data across the whole file to reserve space
-	// on disk for sector activities.
+	// storage folder still needs to be created. Open a file and write empty
+	// data across the whole file to reserve space on disk for sector
+	// activities.
 	sectorHousingName := filepath.Join(sf.Path, sectorFile)
-	file, err := os.Create(sectorHousingName)
+	file, err := wal.cm.dependencies.createFile(sectorHousingName)
 	if err != nil {
 		return build.ExtendErr("unable to create storage file for storage folder", err)
 	}
@@ -149,9 +152,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			return build.ExtendErr("could not allocate storage folder", err)
 		}
 		// After each iteration, update the progress numerator.
-		sf.mu.Lock()
-		sf.ProgressNumerator += uint64(len(hundredMB))
-		sf.mu.Unlock()
+		atomic.AddUint64(&sf.atomicProgressNumerator, 100e6)
 	}
 	_, err = file.Write(finalBytes)
 	if err != nil {
@@ -163,9 +164,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	}
 	// The file creation process is essentially complete at this point, report
 	// complete progress.
-	sf.mu.Lock()
-	sf.ProgressNumerator = sf.ProgressDenominator
-	sf.mu.Unlock()
+	atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 
 	// All of the required setup for the storage folder is complete, add the
 	// directive to modify the contract manager state to the WAL, so that the
@@ -174,7 +173,12 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	err = wal.appendChange(stateChange{
 		StorageFolderAdditions: []*storageFolder{sf},
 	})
+	// Grab the sync lock and reset the progress values for the storage folder.
+	// The values are reset before the lock is released so that conflicting
+	// directives do not make overlapping atomic operations.
 	syncWait := wal.syncChan
+	atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
+	atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
 	wal.mu.Unlock()
 	if err != nil {
 		return build.ExtendErr("storage folder commitment assignment failed", err)
@@ -182,14 +186,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Only return after the wallet has finished committing, which we can
 	// measure by watching the sync chan.
 	<-syncWait
-
-	// Reset the progress field in the storage folder, as nothing is happening
-	// anymore.
-	sf.mu.Lock()
-	sf.CurrentOperation = ""
-	sf.ProgressNumerator = 0
-	sf.ProgressDenominator = 0
-	sf.mu.Unlock()
 	return nil
 }
 

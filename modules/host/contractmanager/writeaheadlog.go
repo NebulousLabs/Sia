@@ -341,10 +341,15 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 
 	// Create a signal so we know when the sync loop has stopped, which means
 	// there will be no more open commits.
+	threadsStopped := make(chan struct{})
 	syncLoopStopped := make(chan struct{})
 	wal.syncChan = make(chan struct{})
-	go wal.threadedSyncLoop(syncLoopStopped)
+	go wal.threadedSyncLoop(threadsStopped, syncLoopStopped)
 	wal.cm.tg.AfterStop(func() {
+		// Close the threadsStopped channel to let the sync loop know that all
+		// calls to tg.Add() in the contract manager have cleaned up.
+		close(threadsStopped)
+
 		// Because this is being called in an 'AfterStop' routine, all open
 		// calls to the contract manager should have completed, and all open
 		// threads should have closed. The last call to change the contract
@@ -365,11 +370,11 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 // the state as an ACID transaction. This process can be very slow, so
 // transactions to the contract manager are batched automatically and
 // occasionally committed together.
-func (wal *writeAheadLog) threadedSyncLoop(syncLoopStopped chan struct{}) {
+func (wal *writeAheadLog) threadedSyncLoop(threadsStopped chan struct{}, syncLoopStopped chan struct{}) {
 	syncInterval := time.Millisecond * 100
 	for {
 		select {
-		case <-wal.cm.tg.StopChan():
+		case <-threadsStopped:
 			close(syncLoopStopped)
 			return
 		case <-time.After(syncInterval):
