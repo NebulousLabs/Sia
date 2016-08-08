@@ -28,7 +28,6 @@ func TestVersion(t *testing.T) {
 // TestUpdate checks that /daemon/update correctly asserts that an update is
 // not available for the daemon (since the test build is always up to date).
 func TestUpdate(t *testing.T) {
-	t.Skip("offline")
 	if testing.Short() {
 		t.SkipNow()
 	}

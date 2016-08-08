@@ -681,25 +681,4 @@ func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize ui
 	resizeFolder.SizeRemaining = 0
 	return sm.saveSync()
 }
-
-// StorageFolders provides information about all of the storage folders in the
-// host.
-func (sm *StorageManager) StorageFolders() (sfms []modules.StorageFolderMetadata) {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-
-	for _, sf := range sm.storageFolders {
-		sfms = append(sfms, modules.StorageFolderMetadata{
-			Capacity:          sf.Size,
-			CapacityRemaining: sf.SizeRemaining,
-			Path:              sf.Path,
-
-			FailedReads:      sf.FailedReads,
-			FailedWrites:     sf.FailedWrites,
-			SuccessfulReads:  sf.SuccessfulReads,
-			SuccessfulWrites: sf.SuccessfulWrites,
-		})
-	}
-	return sfms
-}
 */
