@@ -1,6 +1,8 @@
 package contractmanager
 
 import (
+	"errors"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,6 +48,107 @@ func TestAddStorageFolder(t *testing.T) {
 	}
 	if sfs[0].Capacity != modules.SectorSize*32*2 {
 		t.Error("storage folder reported with wrong sector size")
+	}
+}
+
+// dependencyLargeFolder is a mocked dependency that will return files which
+// can only handle 1 MiB of data being written to them.
+type dependencyLargeFolder struct {
+	productionDependencies
+}
+
+// limitFile will return an error if a call to Write is made that will put the
+// total throughput of the file over 1 MiB.
+type limitFile struct {
+	throughput int
+	mu         sync.Mutex
+	*os.File
+}
+
+// createFile will return a file that will return an error if a write will put
+// the total throughput of the file over 1 MiB.
+func (dependencyLargeFolder) createFile(s string) (file, error) {
+	osFile, err := os.Create(s)
+	if err != nil {
+		return osFile, err
+	}
+
+	lf := &limitFile{
+		File: osFile,
+	}
+	return lf, nil
+}
+
+// Write returns an error if the operation will put the total throughput of the
+// file over 8 MiB. The write will write all the way to 8 MiB before returning
+// the error.
+func (l *limitFile) Write(b []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	// If the limit has already been reached, return an error.
+	if l.throughput >= 1<<20 {
+		return 0, errors.New("limitFile throughput limit reached earlier")
+	}
+
+	// If the limit has not been reached, pass the call through to the
+	// underlying file.
+	if l.throughput+len(b) <= 1<<20 {
+		l.throughput += len(b)
+		return l.File.Write(b)
+	}
+
+	// If the limit has been reached, write enough bytes to get to 8 MiB, then
+	// return an error.
+	remaining := 1<<20 - l.throughput
+	l.throughput = 1 << 20
+	written, err := l.File.Write(b[:remaining])
+	if err != nil {
+		return written, err
+	}
+	return written, errors.New("limitFile throughput limit reached before all input was written to disk")
+}
+
+// TestAddLargeStorageFolder tries to add a storage folder that is too large to
+// fit on disk. This is represented by mocking a file that returns an error
+// after more than 8 MiB have been written.
+func TestAddLargeStorageFolder(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	var d dependencyLargeFolder
+	cmt, err := newMockedContractManagerTester(d, "TestAddLargeStorageFolder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderDir := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*32*16) // Total size must exceed the limit of the limitFile.
+	// Should be a storage folder error, but with all the context adding, I'm
+	// not sure how to check the error type.
+	if err == nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 0 {
+		t.Fatal("Storage folder add should have failed.")
+	}
+	// Check that the storage folder is empty - because the operation failed,
+	// any files that got created should have been removed.
+	files, err := ioutil.ReadDir(storageFolderDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 0 {
+		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed.")
 	}
 }
 
@@ -377,16 +480,20 @@ func TestAddStorageFolderDoubleAdd(t *testing.T) {
 	}
 }
 
-// dependencyFreezeSyncLoop is a mocked dependency that will prevent the sync
-// loop from ever calling commit()
-type dependencyFreezeSyncLoop struct {
+// dependencyNoSyncLoop is a mocked dependency that will disable the sync loop.
+type dependencyNoSyncLoop struct {
 	productionDependencies
 }
 
-// afterDuration will never return.
-func (dependencyFreezeSyncLoop) afterDuration(time.Duration) <-chan time.Time {
-	// Return a channel that will never be closed.
-	return make(chan time.Time)
+// disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
+// soon as it is created.
+func (dependencyNoSyncLoop) disrupt(s string) bool {
+	if s == "threadedSyncLoopStart" {
+		// Disrupt threadedSyncLoop. The sync loop will exit immediately
+		// instead of executing commits.
+		return true
+	}
+	return false
 }
 
 // TestAddStorageFolderDoubleAddNoCommit hijacks the sync loop in the contract
@@ -400,9 +507,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	// Create a contract manager tester with the mocked dependencies.
-	var d dependencyFreezeSyncLoop
+	var d dependencyNoSyncLoop
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderDoubleAddNoCommit")
 	if err != nil {
 		t.Fatal(err)
@@ -463,6 +568,241 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 		if sf.ProgressDenominator != 0 {
 			t.Error("ProgressDenominator is indicating that actions still remain")
 		}
+	}
+}
+
+// TestAddStorageFolderFailedCommit utilizes the sync-loop hijacking in
+// TestAddStorageFolderDoubleAddNoCommit to create a commit scheme that sync's
+// the WAL, but does not actually commit the actions. This simulates a disk
+// failure or power failure, resulting in a partial-completion of the storage
+// folder addition.
+func TestAddStorageFolderFailedCommit(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	var d dependencyNoSyncLoop
+	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderFailedCommit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// The sync loop will never run, which means naively AddStorageFolder will
+	// never return. To get AddStorageFolder to return before the commit
+	// completes, spin up an alternate sync loop which only performs the
+	// signaling responsibilities of the commit function.
+	//
+	// This new sync-loop will also write the WAL file to disk and sync the
+	// write, but will not properly call the commit() action.
+	closeFakeSyncChan := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-closeFakeSyncChan:
+				return
+			case <-time.After(time.Millisecond * 250):
+				// Signal that the commit operation has completed, even though
+				// it has not.
+				cmt.cm.wal.mu.Lock()
+				close(cmt.cm.wal.syncChan)
+				cmt.cm.wal.syncChan = make(chan struct{})
+				cmt.cm.wal.mu.Unlock()
+			}
+		}
+	}()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Call AddStorageFolder, knowing that the changes will not be properly
+	// committed.
+	sfSize := modules.SectorSize * 32 * 8
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
+	// skip the part where the changes are actually committed.
+	err = cmt.cm.wal.file.Sync()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.wal.file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	walTmpName := filepath.Join(cmt.cm.persistDir, walFileTmp)
+	walFileName := filepath.Join(cmt.cm.persistDir, walFile)
+	err = os.Rename(walTmpName, walFileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm.wal.file, err = os.Create(walTmpName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// All actions should have completed, so all storage folders should be
+	// reporting '0' in the progress denominator
+	if sfs[0].ProgressDenominator != 0 {
+		t.Error("ProgressDenominator is indicating that actions still remain")
+	}
+
+	// Close the contract manager and replace it with a new contract manager.
+	// The new contract manager should have normal dependencies.
+	close(closeFakeSyncChan)
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create the new contract manager using the same persist dir, so that it
+	// will see the uncommitted WAL.
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the storage folder was properly recovered.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+}
+
+// dependencyNoSyncBadAdd is a mocked dependency that will disable the sync
+// loop and prevent AddStorageFolder from successfully completing.
+type dependencyNoSyncBadAdd struct {
+	productionDependencies
+}
+
+// disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
+// soon as it is created.
+func (dependencyNoSyncBadAdd) disrupt(s string) bool {
+	if s == "threadedSyncLoopStart" || s == "incompleteAddStorageFolder" {
+		// Disrupt threadedSyncLoop. The sync loop will exit immediately
+		// instead of executing commits.
+		return true
+	}
+	return false
+}
+
+// TestAddStorageFolderUnfinishedCreate hijacks both the sync loop and the
+// AddStorageFolder code to create a situation where the added storage folder
+// is started but not seen through to conclusion, and no commit is run.
+func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	var d dependencyNoSyncBadAdd
+	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderUnfinishedCreate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// The sync loop will never run, which means naively AddStorageFolder will
+	// never return. To get AddStorageFolder to return before the commit
+	// completes, spin up an alternate sync loop which only performs the
+	// signaling responsibilities of the commit function.
+	//
+	// This new sync-loop will also write the WAL file to disk and sync the
+	// write, but will not properly call the commit() action.
+	closeFakeSyncChan := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-closeFakeSyncChan:
+				return
+			case <-time.After(time.Millisecond * 250):
+				// Signal that the commit operation has completed, even though
+				// it has not.
+				cmt.cm.wal.mu.Lock()
+				close(cmt.cm.wal.syncChan)
+				cmt.cm.wal.syncChan = make(chan struct{})
+				cmt.cm.wal.mu.Unlock()
+			}
+		}
+	}()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Call AddStorageFolder, knowing that the changes will not be properly
+	// committed, and that the call itself will not actually complete.
+	sfSize := modules.SectorSize * 32 * 8
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
+	// skip the part where the changes are actually committed.
+	err = cmt.cm.wal.file.Sync()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.wal.file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	walTmpName := filepath.Join(cmt.cm.persistDir, walFileTmp)
+	walFileName := filepath.Join(cmt.cm.persistDir, walFile)
+	err = os.Rename(walTmpName, walFileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm.wal.file, err = os.Create(walTmpName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+
+	// Close the contract manager and replace it with a new contract manager.
+	// The new contract manager should have normal dependencies.
+	close(closeFakeSyncChan)
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create the new contract manager using the same persist dir, so that it
+	// will see the uncommitted WAL.
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Check that the storage folder was properly removed - incomplete storage
+	// folder adds should be removed upon startup.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 0 {
+		t.Error("Storage folder add should have failed.")
+	}
+	// Check that the storage folder is empty - because the operation failed,
+	// any files that got created should have been removed.
+	files, err := ioutil.ReadDir(storageFolderOne)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(files) != 0 {
+		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed.")
 	}
 }
 

@@ -185,6 +185,16 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// complete progress.
 	atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 
+	// Under certain testing scenarious, be disrupted at this point such that
+	// AddStorageFolder does not complete, simulating a power-failure while in
+	// the middle of adding a storage folder.
+	if wal.cm.dependencies.disrupt("incompleteAddStorageFolder") {
+		// An error is not returned, as this is simulating a power failure. I'm
+		// not certain this is the best thing to return here, but so far it has
+		// not caused issues while testing.
+		return nil
+	}
+
 	// All of the required setup for the storage folder is complete, add the
 	// directive to modify the contract manager state to the WAL, so that the
 	// operation can be fully integrated.
@@ -224,6 +234,12 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions() error {
 			if err != nil {
 				wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
 			}
+
+			// Append an error call to the changeset, indicating that the
+			// storage folder add was not completed successfully.
+			err = build.ComposeErrors(err, wal.appendChange(stateChange{
+				ErroredStorageFolderAdditions: []string{usfa.Path},
+			}))
 		}
 		// Because we're in the middle of startup, the sync loop has not
 		// spawned and the changes that we are processing have not been written
@@ -239,6 +255,20 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions() error {
 // transaction, and only after the WAL has been synced to disk, to ensure that
 // the state change has been guaranteed even in the event of sudden power loss.
 func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
+	// Commit functions need to be idempotent. There should only be one storage
+	// folder of each path in the list of storage folders. If there is already
+	// a storage folder sharing the path with the folder of the input, that
+	// means that this function was called twice resulting from an unexpected
+	// failure (e.g. power failure). The second call should be a no-op.
+	for _, rsf := range wal.cm.storageFolders {
+		if rsf.Path == sf.Path {
+			// No-op, because this folder has actually already been committed
+			// to the state, likely in a previous process that got interrupted
+			// unexpectedly.
+			return
+		}
+	}
+
 	wal.cm.storageFolders = append(wal.cm.storageFolders, sf)
 }
 

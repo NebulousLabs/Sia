@@ -77,8 +77,7 @@ type (
 
 // readWALMetadata reads WAL metadata from the input file, returning an error
 // if the result is unexpected.
-func readWALMetadata(f *os.File) error {
-	decoder := json.NewDecoder(f)
+func readWALMetadata(f *os.File, decoder *json.Decoder) error {
 	var md persist.Metadata
 	err := decoder.Decode(&md)
 	if err != nil {
@@ -197,9 +196,21 @@ func (wal *writeAheadLog) commit() bool {
 
 	// Take all of the changes that have been queued in the WAL and apply them
 	// to the state.
+	//
+	// All commits should be idempotent. To verify that the commits are
+	// idempotent, in debug mode the commits are occasionally applied multiple
+	// times. If they are idempotent, testing should be entirely unaffected.
 	for _, uc := range wal.uncommittedChanges {
 		for _, sfa := range uc.StorageFolderAdditions {
-			wal.commitAddStorageFolder(sfa)
+			// Rather than have some code that will randomly run the commit
+			// multiple times if testing is active, a dependency is used that
+			// tester's can hijack to guarantee that the action will be run
+			// multiple times, or if needed can also guarantee that it'll be
+			// run exactly once. In productions, atLeastOne() will always
+			// return exactly 1.
+			for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+				wal.commitAddStorageFolder(sfa)
+			}
 		}
 	}
 
@@ -282,14 +293,14 @@ func (wal *writeAheadLog) load() error {
 	defer file.Close()
 
 	// Read the WAL metadata to make sure that the version is correct.
-	err = readWALMetadata(file)
+	decoder := json.NewDecoder(file)
+	err = readWALMetadata(file, decoder)
 	if err != nil {
 		return build.ExtendErr("walFile metadata mismatch", err)
 	}
 
 	// Read changes from the WAL one at a time and load them back into memory.
 	var sc stateChange
-	decoder := json.NewDecoder(file)
 	for err == nil {
 		err = decoder.Decode(&sc)
 		if err == nil {
@@ -302,7 +313,7 @@ func (wal *writeAheadLog) load() error {
 		}
 	}
 	if err != io.EOF {
-		return err
+		return build.ExtendErr("error loading WAL json", err)
 	}
 
 	// Do any cleanup regarding long-running unfinished tasks.
@@ -371,13 +382,19 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 // transactions to the contract manager are batched automatically and
 // occasionally committed together.
 func (wal *writeAheadLog) threadedSyncLoop(threadsStopped chan struct{}, syncLoopStopped chan struct{}) {
+	// Provide a place for the testing to disable the sync loop.
+	if wal.cm.dependencies.disrupt("threadedSyncLoopStart") {
+		close(syncLoopStopped)
+		return
+	}
+
 	syncInterval := time.Millisecond * 100
 	for {
 		select {
 		case <-threadsStopped:
 			close(syncLoopStopped)
 			return
-		case <-wal.cm.dependencies.afterDuration(syncInterval):
+		case <-time.After(syncInterval):
 			// Commit all of the changes in the WAL to disk, and then apply the
 			// changes. Measure how long it takes to apply the changes, and use
 			// that to steer the amount of time that should be waited to the

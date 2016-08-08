@@ -1,6 +1,7 @@
 package contractmanager
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -30,6 +31,9 @@ func (cmt *contractManagerTester) panicClose() {
 
 // Close will perform clean shutdown on the contract manager tester.
 func (cmt *contractManagerTester) Close() error {
+	if cmt.cm == nil {
+		return errors.New("nil contract manager")
+	}
 	return cmt.cm.Close()
 }
 

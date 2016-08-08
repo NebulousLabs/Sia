@@ -5,8 +5,9 @@ import (
 	"errors"
 	"io"
 	"os"
-	"time"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/persist"
 )
 
@@ -30,13 +31,27 @@ var (
 type (
 	// dependencies defines all of the dependencies of the StorageManager.
 	dependencies interface {
-		// afterDuration gives the caller the ability to wait for a certain
-		// duration before receiving on a channel.
-		afterDuration(time.Duration) <-chan time.Time
+		// atLeastOne will return a value that is at least one. In production,
+		// the value should always be one. This function is used to test the
+		// idempotency of actions, so during testing sometimes the value
+		// returned will be higher, causing an idempotent action to be
+		// committed multiple times. If the action is truly idempotent,
+		// committing it multiple times should not cause any problems or
+		// changes. The function is created as a dependency so that it can be
+		// hijacked during testing to provide non-probabilistic outcomes.
+		atLeastOne() uint64
 
 		// createFile gives the host the ability to create files on the
 		// operating system.
 		createFile(string) (file, error)
+
+		// disrupt is a general purpose testing function which will return true
+		// if a disruption is happening and false if a disruption is not. Most
+		// frequently it is used to simulate power-failures by forcing some of
+		// the code to terminate partway through. The string input can be used
+		// by the testing code to distinguish between the many places where
+		// production code can be disrupted.
+		disrupt(string) bool
 
 		// loadFile allows the host to load a persistence structure form disk.
 		loadFile(persist.Metadata, interface{}, string) error
@@ -67,16 +82,39 @@ type (
 	productionDependencies struct{}
 )
 
-// afterDuration gives the host the ability to wait for a certain duration
-// before receiving on a channel.
-func (productionDependencies) afterDuration(d time.Duration) <-chan time.Time {
-	return time.After(d)
+// atLeastOne will return a value that is equal to 1 if debugging is disabled.
+// If debugging is enabled, a higher value may be returned.
+func (productionDependencies) atLeastOne() uint64 {
+	if !build.DEBUG {
+		return 1
+	}
+
+	// Probabilistically return a number greater than one.
+	var val uint64
+	for {
+		val++
+		coin, err := crypto.RandIntn(2)
+		if err != nil {
+			panic(err)
+		}
+		if coin == 0 {
+			break
+		}
+	}
+	return val
+
 }
 
 // createFile gives the host the ability to create files on the operating
 // system.
 func (productionDependencies) createFile(s string) (file, error) {
 	return os.Create(s)
+}
+
+// disrupt will always return false when using the production dependencies,
+// because production code should never be intentionally disrupted.
+func (productionDependencies) disrupt(string) bool {
+	return false
 }
 
 // loadFile allows the host to load a persistence structure form disk.
