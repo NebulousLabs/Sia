@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -202,7 +203,9 @@ func TestOpenDatabase(t *testing.T) {
 // with the wrong filemode (< 0600), which should result in an os.ErrPermission
 // error.
 func TestErrPermissionOpenDatabase(t *testing.T) {
-	t.Skip("can't reproduce on Windows")
+	if runtime.GOOS == "windows" {
+		t.Skip("can't reproduce on Windows")
+	}
 
 	const (
 		dbHeader   = "Fake Header"
