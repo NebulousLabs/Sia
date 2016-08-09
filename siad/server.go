@@ -9,13 +9,10 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
-	"net"
 	"net/http"
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
@@ -26,78 +23,81 @@ import (
 	"github.com/kardianos/osext"
 )
 
-// writeError an error to the API caller.
-func writeError(w http.ResponseWriter, err api.Error, code int) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(code)
-	if json.NewEncoder(w).Encode(err) != nil {
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
-}
-
-// writeJSON writes the object to the ResponseWriter. If the encoding fails, an
-// error is written instead. The Content-Type of the response header is set
-// accordingly.
-func writeJSON(w http.ResponseWriter, obj interface{}) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if json.NewEncoder(w).Encode(obj) != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
-}
-
-// writeSuccess writes the HTTP header with status 204 No Content to the
-// ResponseWriter. writeSuccess should only be used to indicate that the
-// requested action succeeded AND there is no data to return.
-func writeSuccess(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNoContent)
-}
-
 var errEmptyUpdateResponse = errors.New("API call to https://api.github.com/repos/NebulousLabs/Sia/releases/latest is returning an empty response")
 
-// SiaConstants is a struct listing all of the constants in use.
-type SiaConstants struct {
-	GenesisTimestamp      types.Timestamp   `json:"genesistimestamp"`
-	BlockSizeLimit        uint64            `json:"blocksizelimit"`
-	BlockFrequency        types.BlockHeight `json:"blockfrequency"`
-	TargetWindow          types.BlockHeight `json:"targetwindow"`
-	MedianTimestampWindow uint64            `json:"mediantimestampwindow"`
-	FutureThreshold       types.Timestamp   `json:"futurethreshold"`
-	SiafundCount          types.Currency    `json:"siafundcount"`
-	SiafundPortion        *big.Rat          `json:"siafundportion"`
-	MaturityDelay         types.BlockHeight `json:"maturitydelay"`
+type (
+	// Server creates and serves a HTTP server that offers communication with a Sia API.
+	Server struct {
+		cs       modules.ConsensusSet
+		explorer modules.Explorer
+		gateway  modules.Gateway
+		host     modules.Host
+		miner    modules.Miner
+		renter   modules.Renter
+		tpool    modules.TransactionPool
+		wallet   modules.Wallet
 
-	InitialCoinbase uint64 `json:"initialcoinbase"`
-	MinimumCoinbase uint64 `json:"minimumcoinbase"`
+		httpServer *http.Server
+		mux        *http.ServeMux
+		listener   net.Listener
+	}
 
-	RootTarget types.Target `json:"roottarget"`
-	RootDepth  types.Target `json:"rootdepth"`
+	// DaemonStatus is used by the server to return the loading status of each Sia
+	// module.  Because the server starts serving before modules are done
+	// initializing, callers can display information about the loading state of
+	// each module using the struct.
+	DaemonStatus struct {
+		Consensus float64 `json:"consensus"`
+		Explorer  float64 `json:"explorer"`
+		Gateway   float64 `json:"gateway"`
+		Host      float64 `json:"host"`
+		Miner     float64 `json:"miner"`
+		Renter    float64 `json:"renter"`
+		Tpool     float64 `json:"tpool"`
+		Wallet    float64 `json:"wallet"`
+	}
+	// SiaConstants is a struct listing all of the constants in use.
+	SiaConstants struct {
+		GenesisTimestamp      types.Timestamp   `json:"genesistimestamp"`
+		BlockSizeLimit        uint64            `json:"blocksizelimit"`
+		BlockFrequency        types.BlockHeight `json:"blockfrequency"`
+		TargetWindow          types.BlockHeight `json:"targetwindow"`
+		MedianTimestampWindow uint64            `json:"mediantimestampwindow"`
+		FutureThreshold       types.Timestamp   `json:"futurethreshold"`
+		SiafundCount          types.Currency    `json:"siafundcount"`
+		SiafundPortion        *big.Rat          `json:"siafundportion"`
+		MaturityDelay         types.BlockHeight `json:"maturitydelay"`
 
-	MaxAdjustmentUp   *big.Rat `json:"maxadjustmentup"`
-	MaxAdjustmentDown *big.Rat `json:"maxadjustmentdown"`
+		InitialCoinbase uint64 `json:"initialcoinbase"`
+		MinimumCoinbase uint64 `json:"minimumcoinbase"`
 
-	SiacoinPrecision types.Currency `json:"siacoinprecision"`
-}
+		RootTarget types.Target `json:"roottarget"`
+		RootDepth  types.Target `json:"rootdepth"`
 
-type DaemonVersion struct {
-	Version string `json:"version"`
-}
+		MaxAdjustmentUp   *big.Rat `json:"maxadjustmentup"`
+		MaxAdjustmentDown *big.Rat `json:"maxadjustmentdown"`
 
-// UpdateInfo indicates whether an update is available, and to what
-// version.
-type UpdateInfo struct {
-	Available bool   `json:"available"`
-	Version   string `json:"version"`
-}
-
-// githubRelease represents some of the JSON returned by the GitHub release API
-// endpoint. Only the fields relevant to updating are included.
-type githubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
-		Name        string `json:"name"`
-		DownloadURL string `json:"browser_download_url"`
-	} `json:"assets"`
-}
+		SiacoinPrecision types.Currency `json:"siacoinprecision"`
+	}
+	DaemonVersion struct {
+		Version string `json:"version"`
+	}
+	// UpdateInfo indicates whether an update is available, and to what
+	// version.
+	UpdateInfo struct {
+		Available bool   `json:"available"`
+		Version   string `json:"version"`
+	}
+	// githubRelease represents some of the JSON returned by the GitHub release API
+	// endpoint. Only the fields relevant to updating are included.
+	githubRelease struct {
+		TagName string `json:"tag_name"`
+		Assets  []struct {
+			Name        string `json:"name"`
+			DownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+)
 
 const (
 	// The developer key is used to sign updates and other important Sia-
@@ -128,6 +128,32 @@ t+JydcdJLbIG+kb3jB9QIIu5A4TlSGlHV6ewtxIWLS1473jEkITiVTt0Y5k+VLfW
 bwIDAQAB
 -----END PUBLIC KEY-----`
 )
+
+// writeError an error to the API caller.
+func writeError(w http.ResponseWriter, err api.Error, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+	if json.NewEncoder(w).Encode(err) != nil {
+		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
+	}
+}
+
+// writeJSON writes the object to the ResponseWriter. If the encoding fails, an
+// error is written instead. The Content-Type of the response header is set
+// accordingly.
+func writeJSON(w http.ResponseWriter, obj interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if json.NewEncoder(w).Encode(obj) != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// writeSuccess writes the HTTP header with status 204 No Content to the
+// ResponseWriter. writeSuccess should only be used to indicate that the
+// requested action succeeded AND there is no data to return.
+func writeSuccess(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNoContent)
+}
 
 // fetchLatestRelease returns metadata about the most recent GitHub release.
 func fetchLatestRelease() (githubRelease, error) {
@@ -333,10 +359,6 @@ func (srv *siadServer) daemonStopHandler(w http.ResponseWriter, _ *http.Request,
 	}
 }
 
-type DaemonStatus struct {
-	Ready bool `json:"ready"`
-}
-
 // daemonStatusHandler returns the status of the API's loading process.
 func (srv *siadServer) daemonStatusHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	statuses := make(map[string]DaemonStatus)
@@ -358,18 +380,6 @@ func (srv *siadServer) daemonHandler() http.Handler {
 	router.GET("/daemon/status", srv.daemonStatusHandler)
 
 	return router
-}
-
-type siadServer struct {
-	httpServer *http.Server
-	mux        *http.ServeMux
-	listener   net.Listener
-	api        *api.API
-
-	// wg is used to block Close() from returning until Serve() has finished. A
-	// WaitGroup is used instead of a chan struct{} so that Close() can be called
-	// without necessarily calling Serve() first.
-	wg sync.WaitGroup
 }
 
 func newSiadServer(bindAddr string) (*siadServer, error) {
@@ -395,15 +405,10 @@ func newSiadServer(bindAddr string) (*siadServer, error) {
 }
 
 func (srv *siadServer) ConnectAPI(a *api.API) {
-	srv.api = a
-	srv.mux.Handle("/", a.Handler)
+	srv.mux.Handle("/", a)
 }
 
 func (srv *siadServer) Serve() error {
-	// Block the Close() method until Serve() has finished.
-	srv.wg.Add(1)
-	defer srv.wg.Done()
-
 	// The server will run until an error is encountered or the listener is
 	// closed, via either the Close method or the signal handling above.
 	// Closing the listener will result in the benign error handled below.
@@ -416,20 +421,9 @@ func (srv *siadServer) Serve() error {
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
 func (srv *siadServer) Close() error {
-	var errs []error
-
 	// Close the listener, which will cause Server.Serve() to return.
 	if err := srv.listener.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("listener.Close failed: %v", err))
-	}
-
-	// Wait for Server.Serve() to exit. We wait so that it's guaranteed that the
-	// server has completely closed after Close() returns. This is particularly
-	// useful during testing so that we don't exit a test before Serve() finishes.
-	srv.wg.Wait()
-
-	if srv.api != nil {
-		return srv.api.Close()
+		return err
 	}
 	return nil
 }
