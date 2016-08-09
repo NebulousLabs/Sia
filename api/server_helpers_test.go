@@ -55,9 +55,9 @@ func NewServer(APIaddr string, requiredUserAgent string, requiredPassword string
 		return nil, err
 	}
 
-	a := NewAPI(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
+	a := New(requiredUserAgent, requiredPassword, cs, e, g, h, m, r, tp, w)
 	serv := &http.Server{
-		Handler: a.Handler,
+		Handler: a,
 	}
 	srv := &Server{
 		api: a,

@@ -3,12 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"os"
-	"os/signal"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
@@ -204,7 +204,7 @@ func startDaemon(config Config) (err error) {
 		}
 	}
 
-	// Create the Sia API 
+	// Create the Sia API
 	a := api.NewAPI(
 		config.Siad.RequiredUserAgent,
 		config.APIPassword,

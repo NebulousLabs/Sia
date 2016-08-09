@@ -2,12 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
@@ -120,7 +117,7 @@ func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	}
 }
 
-// API encapsulates a collection of modules and exposes a http.Handler
+// API encapsulates a collection of modules and implements a http.Handler
 // to access their methods.
 type API struct {
 	cs       modules.ConsensusSet
@@ -133,13 +130,18 @@ type API struct {
 	wallet   modules.Wallet
 
 	requiredUserAgent string
-	Handler           http.Handler
+	router            http.Handler
 }
 
-// NewAPI creates a new Sia API from the provided modules.
+// api.ServeHTTP implements the http.Handler interface.
+func (api *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	api.router.ServeHTTP(w, r)
+}
+
+// New creates a new Sia API from the provided modules.
 // The API will require authentication using HTTP basic auth for certain endpoints
 // if the suppliecd password is not the empty string.  Usernames are ignored for authentication.
-func NewAPI(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *API {
+func New(requiredUserAgent string, requiredPassword string, cs modules.ConsensusSet, e modules.Explorer, g modules.Gateway, h modules.Host, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *API {
 	api := &API{
 		cs:       cs,
 		explorer: e,
@@ -154,41 +156,13 @@ func NewAPI(requiredUserAgent string, requiredPassword string, cs modules.Consen
 	}
 
 	// Register API handlers
-	api.Handler = api.initAPI(requiredPassword)
+	api.router = api.initAPI(requiredPassword)
 	return api
 }
 
-func (api *API) Close() error {
-	var errs []error
-
-	// Safely close each module.
-	mods := []struct {
-		name string
-		c    io.Closer
-	}{
-		{"host", api.host},
-		{"renter", api.renter},
-		{"explorer", api.explorer},
-		{"miner", api.miner},
-		{"wallet", api.wallet},
-		{"tpool", api.tpool},
-		{"consensus", api.cs},
-		{"gateway", api.gateway},
-	}
-
-	for _, mod := range mods {
-		if mod.c != nil {
-			if err := mod.c.Close(); err != nil {
-				errs = append(errs, fmt.Errorf("%v.Close faileD: %v", mod.name, err))
-			}
-		}
-	}
-
-	return build.JoinErrors(errs, "\n")
-}
-
-// initAPI determines which functions handle each API call. An empty string as
-// the password indicates no password.
+// initAPI constructs a http.Handler for the Sia API.
+// This method is responsible for constructing a http.Handler that conforms to the
+// documented, finalized Sia API routes.
 func (api *API) initAPI(password string) http.Handler {
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(api.unrecognizedCallHandler) // custom 404

@@ -1,25 +1,25 @@
 package main
 
 import (
-	"net/http"
-	"net"
-	"fmt"
-	"strings"
-	"sync"
-	"math/big"
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"errors"
-	"archive/zip"
-	"runtime"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"bytes"
+	"math/big"
+	"net"
+	"net/http"
 	"path"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/api"
-	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/inconshreveable/go-update"
 	"github.com/julienschmidt/httprouter"
@@ -51,6 +51,7 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 func writeSuccess(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
 }
+
 var errEmptyUpdateResponse = errors.New("API call to https://api.github.com/repos/NebulousLabs/Sia/releases/latest is returning an empty response")
 
 // SiaConstants is a struct listing all of the constants in use.
@@ -333,7 +334,7 @@ func (srv *siadServer) daemonStopHandler(w http.ResponseWriter, _ *http.Request,
 }
 
 type DaemonStatus struct {
-	Ready bool `json:"ready"`	
+	Ready bool `json:"ready"`
 }
 
 // daemonStatusHandler returns the status of the API's loading process.
@@ -343,7 +344,7 @@ func (srv *siadServer) daemonStatusHandler(w http.ResponseWriter, _ *http.Reques
 	if srv.api != nil {
 		st.Ready = true
 	}
-	
+
 	writeJSON(w, st)
 }
 func (srv *siadServer) daemonHandler() http.Handler {
@@ -361,9 +362,9 @@ func (srv *siadServer) daemonHandler() http.Handler {
 
 type siadServer struct {
 	httpServer *http.Server
-	mux *http.ServeMux
-	listener net.Listener
-	api *api.API
+	mux        *http.ServeMux
+	listener   net.Listener
+	api        *api.API
 
 	// wg is used to block Close() from returning until Serve() has finished. A
 	// WaitGroup is used instead of a chan struct{} so that Close() can be called
@@ -378,9 +379,9 @@ func newSiadServer(bindAddr string) (*siadServer, error) {
 		return nil, err
 	}
 
-	// Create the siadServer 
+	// Create the siadServer
 	siadServ := &siadServer{
-		mux: http.NewServeMux(),
+		mux:      http.NewServeMux(),
 		listener: l,
 	}
 	siadServ.httpServer = &http.Server{
@@ -427,7 +428,7 @@ func (srv *siadServer) Close() error {
 	// useful during testing so that we don't exit a test before Serve() finishes.
 	srv.wg.Wait()
 
-	if (srv.api != nil) {
+	if srv.api != nil {
 		return srv.api.Close()
 	}
 	return nil
