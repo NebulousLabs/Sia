@@ -42,6 +42,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 
 	// Update the uncommitted state to include the storage folder, returning an
 	// error if any checks fail.
+	var syncChan chan struct{}
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
@@ -125,11 +126,17 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// Establish the progress fields for the add operation in the storage
 		// folder.
 		atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
+
+		// Grab a sync channel so that we know when the unfinished storage
+		// folder addition has been committed to the WAL. Sync chan must be
+		// grabbed inside the WAL lock.
+		syncChan = wal.syncChan
 		return nil
 	}()
 	if err != nil {
 		return err
 	}
+	<-syncChan
 
 	// If there's an error in the rest of the function, the storage folder
 	// needs to be removed from the list of unfinished storage folder
