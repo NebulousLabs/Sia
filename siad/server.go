@@ -9,13 +9,16 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
+	"net"
 	"net/http"
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/inconshreveable/go-update"
@@ -26,17 +29,9 @@ import (
 var errEmptyUpdateResponse = errors.New("API call to https://api.github.com/repos/NebulousLabs/Sia/releases/latest is returning an empty response")
 
 type (
-	// Server creates and serves a HTTP server that offers communication with a Sia API.
+	// Server creates and serves a HTTP server that offers communication with a
+	// Sia API.
 	Server struct {
-		cs       modules.ConsensusSet
-		explorer modules.Explorer
-		gateway  modules.Gateway
-		host     modules.Host
-		miner    modules.Miner
-		renter   modules.Renter
-		tpool    modules.TransactionPool
-		wallet   modules.Wallet
-
 		httpServer *http.Server
 		mux        *http.ServeMux
 		listener   net.Listener
@@ -274,7 +269,7 @@ func updateToRelease(release githubRelease) error {
 }
 
 // daemonUpdateHandlerGET handles the API call that checks for an update.
-func (srv *siadServer) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (srv *Server) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	release, err := fetchLatestRelease()
 	if err != nil {
 		writeError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
@@ -291,7 +286,7 @@ func (srv *siadServer) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Req
 // There is no safeguard to prevent "updating" to the same release, so callers
 // should always check the latest version via daemonUpdateHandlerGET first.
 // TODO: add support for specifying version to update to.
-func (srv *siadServer) daemonUpdateHandlerPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (srv *Server) daemonUpdateHandlerPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	release, err := fetchLatestRelease()
 	if err != nil {
 		writeError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
@@ -310,7 +305,7 @@ func (srv *siadServer) daemonUpdateHandlerPOST(w http.ResponseWriter, _ *http.Re
 }
 
 // debugConstantsHandler prints a json file containing all of the constants.
-func (srv *siadServer) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	sc := SiaConstants{
 		GenesisTimestamp:      types.GenesisTimestamp,
 		BlockSizeLimit:        types.BlockSizeLimit,
@@ -338,12 +333,12 @@ func (srv *siadServer) daemonConstantsHandler(w http.ResponseWriter, _ *http.Req
 }
 
 // daemonVersionHandler handles the API call that requests the daemon's version.
-func (srv *siadServer) daemonVersionHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (srv *Server) daemonVersionHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	writeJSON(w, DaemonVersion{Version: build.Version})
 }
 
 // daemonStopHandler handles the API call to stop the daemon cleanly.
-func (srv *siadServer) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	// can't write after we stop the server, so lie a bit.
 	writeSuccess(w)
 
@@ -360,16 +355,9 @@ func (srv *siadServer) daemonStopHandler(w http.ResponseWriter, _ *http.Request,
 }
 
 // daemonStatusHandler returns the status of the API's loading process.
-func (srv *siadServer) daemonStatusHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	statuses := make(map[string]DaemonStatus)
-	st := DaemonStatus{Ready: false}
-	if srv.api != nil {
-		st.Ready = true
-	}
-
-	writeJSON(w, st)
+func (srv *Server) daemonStatusHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 }
-func (srv *siadServer) daemonHandler() http.Handler {
+func (srv *Server) daemonHandler() http.Handler {
 	router := httprouter.New()
 
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
@@ -382,15 +370,15 @@ func (srv *siadServer) daemonHandler() http.Handler {
 	return router
 }
 
-func newSiadServer(bindAddr string) (*siadServer, error) {
+func NewServer(bindAddr string) (*Server, error) {
 	// Create the listener for the server
 	l, err := net.Listen("tcp", bindAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create the siadServer
-	siadServ := &siadServer{
+	// Create the Server
+	siadServ := &Server{
 		mux:      http.NewServeMux(),
 		listener: l,
 	}
@@ -404,11 +392,11 @@ func newSiadServer(bindAddr string) (*siadServer, error) {
 	return siadServ, nil
 }
 
-func (srv *siadServer) ConnectAPI(a *api.API) {
+func (srv *Server) ConnectAPI(a *api.API) {
 	srv.mux.Handle("/", a)
 }
 
-func (srv *siadServer) Serve() error {
+func (srv *Server) Serve() error {
 	// The server will run until an error is encountered or the listener is
 	// closed, via either the Close method or the signal handling above.
 	// Closing the listener will result in the benign error handled below.
@@ -420,7 +408,7 @@ func (srv *siadServer) Serve() error {
 }
 
 // Close closes the Server's listener, causing the HTTP server to shut down.
-func (srv *siadServer) Close() error {
+func (srv *Server) Close() error {
 	// Close the listener, which will cause Server.Serve() to return.
 	if err := srv.listener.Close(); err != nil {
 		return err

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -26,6 +27,17 @@ import (
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
+)
+
+var (
+	g     modules.Gateway
+	cs    modules.ConsensusSet
+	r     modules.Renter
+	tpool modules.TransactionPool
+	w     modules.Wallet
+	m     modules.Miner
+	h     modules.Host
+	e     modules.Explorer
 )
 
 // verifyAPISecurity checks that the security values are consistent with a
@@ -94,6 +106,100 @@ func processConfig(config Config) (Config, error) {
 	return config, nil
 }
 
+// initModules initializes the modules defined by `modules` and returns a
+// []struct containing each module's name and closer, used to cleanly close the
+// module.
+func initModules(config Config) ([]io.Closer, error) {
+	// Create all of the config.Siad.Modules.
+	i := 0
+	var closers []io.Closer
+	var err error
+	if strings.Contains(config.Siad.Modules, "g") {
+		i++
+		fmt.Printf("(%d/%d) Loading gateway...\n", i, len(config.Siad.Modules))
+		g, err = gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, g)
+	}
+	if strings.Contains(config.Siad.Modules, "c") {
+		i++
+		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(config.Siad.Modules))
+		cs, err = consensus.New(g, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, cs)
+	}
+	if strings.Contains(config.Siad.Modules, "e") {
+		i++
+		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(config.Siad.Modules))
+		e, err = explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, e)
+	}
+	if strings.Contains(config.Siad.Modules, "t") {
+		i++
+		fmt.Printf("(%d/%d) Loading transaction pool...\n", i, len(config.Siad.Modules))
+		tpool, err = transactionpool.New(cs, g, filepath.Join(config.Siad.SiaDir, modules.TransactionPoolDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, tpool)
+	}
+	if strings.Contains(config.Siad.Modules, "w") {
+		i++
+		fmt.Printf("(%d/%d) Loading wallet...\n", i, len(config.Siad.Modules))
+		w, err = wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, w)
+	}
+	if strings.Contains(config.Siad.Modules, "m") {
+		i++
+		fmt.Printf("(%d/%d) Loading miner...\n", i, len(config.Siad.Modules))
+		m, err = miner.New(cs, tpool, w, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, m)
+	}
+	if strings.Contains(config.Siad.Modules, "h") {
+		i++
+		fmt.Printf("(%d/%d) Loading host...\n", i, len(config.Siad.Modules))
+		h, err = host.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, h)
+	}
+	if strings.Contains(config.Siad.Modules, "r") {
+		i++
+		fmt.Printf("(%d/%d) Loading renter...\n", i, len(config.Siad.Modules))
+		r, err = renter.New(cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
+		if err != nil {
+			return closers, err
+		}
+		closers = append(closers, r)
+	}
+	// Bootstrap to the network.
+	if !config.Siad.NoBootstrap && g != nil {
+		// connect to 3 random bootstrap nodes
+		perm, err := crypto.Perm(len(modules.BootstrapPeers))
+		if err != nil {
+			return closers, err
+		}
+		for _, i := range perm[:3] {
+			go g.Connect(modules.BootstrapPeers[i])
+		}
+	}
+	return closers, nil
+}
+
 // startDaemonCmd uses the config parameters to start siad.
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
@@ -118,9 +224,8 @@ func startDaemon(config Config) (err error) {
 	loadStart := time.Now()
 
 	// Create the server and start serving daemon routes immediately.
-	i := 0
-	fmt.Printf("(%d/%d) Loading siad...\n", i, len(config.Siad.Modules))
-	srv, err := newSiadServer(config.Siad.APIaddr)
+	fmt.Printf("(0/%d) Loading siad...\n", len(config.Siad.Modules))
+	srv, err := NewServer(config.Siad.APIaddr)
 	if err != nil {
 		return err
 	}
@@ -130,82 +235,22 @@ func startDaemon(config Config) (err error) {
 		serverrs <- srv.Serve()
 	}()
 
-	// Create all of the modules.
-	var g modules.Gateway
-	if strings.Contains(config.Siad.Modules, "g") {
-		i++
-		fmt.Printf("(%d/%d) Loading gateway...\n", i, len(config.Siad.Modules))
-		g, err = gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
-		if err != nil {
-			return err
+	// Initialize the Sia modules
+	closers, err := initModules(config)
+
+	// Close all returned modules when `siad` exits.
+	defer func() {
+		for _, closer := range closers {
+			closer.Close()
 		}
-	}
-	var cs modules.ConsensusSet
-	if strings.Contains(config.Siad.Modules, "c") {
-		i++
-		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(config.Siad.Modules))
-		cs, err = consensus.New(g, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
-		if err != nil {
-			return err
-		}
-	}
-	var e modules.Explorer
-	if strings.Contains(config.Siad.Modules, "e") {
-		i++
-		fmt.Printf("(%d/%d) Loading explorer...\n", i, len(config.Siad.Modules))
-		e, err = explorer.New(cs, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
-		if err != nil {
-			return err
-		}
-	}
-	var tpool modules.TransactionPool
-	if strings.Contains(config.Siad.Modules, "t") {
-		i++
-		fmt.Printf("(%d/%d) Loading transaction pool...\n", i, len(config.Siad.Modules))
-		tpool, err = transactionpool.New(cs, g, filepath.Join(config.Siad.SiaDir, modules.TransactionPoolDir))
-		if err != nil {
-			return err
-		}
-	}
-	var w modules.Wallet
-	if strings.Contains(config.Siad.Modules, "w") {
-		i++
-		fmt.Printf("(%d/%d) Loading wallet...\n", i, len(config.Siad.Modules))
-		w, err = wallet.New(cs, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
-		if err != nil {
-			return err
-		}
-	}
-	var m modules.Miner
-	if strings.Contains(config.Siad.Modules, "m") {
-		i++
-		fmt.Printf("(%d/%d) Loading miner...\n", i, len(config.Siad.Modules))
-		m, err = miner.New(cs, tpool, w, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
-		if err != nil {
-			return err
-		}
-	}
-	var h modules.Host
-	if strings.Contains(config.Siad.Modules, "h") {
-		i++
-		fmt.Printf("(%d/%d) Loading host...\n", i, len(config.Siad.Modules))
-		h, err = host.New(cs, tpool, w, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
-		if err != nil {
-			return err
-		}
-	}
-	var r modules.Renter
-	if strings.Contains(config.Siad.Modules, "r") {
-		i++
-		fmt.Printf("(%d/%d) Loading renter...\n", i, len(config.Siad.Modules))
-		r, err = renter.New(cs, w, tpool, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
-		if err != nil {
-			return err
-		}
+	}()
+
+	if err != nil {
+		return err
 	}
 
 	// Create the Sia API
-	a := api.NewAPI(
+	a := api.New(
 		config.Siad.RequiredUserAgent,
 		config.APIPassword,
 		cs,
@@ -224,40 +269,23 @@ func startDaemon(config Config) (err error) {
 	// stop the server if a kill signal is caught
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
-	defer signal.Stop(sigChan)
-	stop := make(chan struct{})
-	defer close(stop)
 	go func() {
 		select {
 		case <-sigChan:
 			fmt.Println("\rCaught stop signal, quitting...")
 			srv.Close()
-		case <-stop:
-			// Don't leave a dangling goroutine.
 		}
 	}()
-
-	// Bootstrap to the network.
-	if !config.Siad.NoBootstrap && g != nil {
-		// connect to 3 random bootstrap nodes
-		perm, err := crypto.Perm(len(modules.BootstrapPeers))
-		if err != nil {
-			return err
-		}
-		for _, i := range perm[:3] {
-			go g.Connect(modules.BootstrapPeers[i])
-		}
-	}
 
 	// Print a 'startup complete' message.
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
-	// Wait until the Server stops serving to exit
 	err = <-serverrs
 	if err != nil {
-		return err
+		build.Critical(err)
 	}
+
 	return nil
 }
 
