@@ -140,7 +140,7 @@ func writeSuccess(w http.ResponseWriter) {
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
 func unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	writeError(w, api.Error{"404 - Refer to API.md"}, http.StatusNotFound)
+	writeError(w, api.Error{Message: "404 - Refer to API.md"}, http.StatusNotFound)
 }
 
 // requireUserAgent is middleware that requires all requests to set a
@@ -148,7 +148,7 @@ func unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 func requireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !strings.Contains(req.UserAgent(), ua) {
-			writeError(w, api.Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
+			writeError(w, api.Error{Message: "Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
 		h.ServeHTTP(w, req)
@@ -167,7 +167,7 @@ func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		_, pass, ok := req.BasicAuth()
 		if !ok || pass != password {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
-			writeError(w, api.Error{"API authentication failed."}, http.StatusUnauthorized)
+			writeError(w, api.Error{Message: "API authentication failed."}, http.StatusUnauthorized)
 			return
 		}
 		h(w, req, ps)

@@ -29,6 +29,13 @@ var (
 	}
 )
 
+type (
+	UpdateInfo struct {
+		Available bool   `json:"available"`
+		Version   string `json:"version"`
+	}
+)
+
 // stopcmd is the handler for the command `siac stop`.
 // Stops the daemon.
 func stopcmd() {
@@ -40,7 +47,7 @@ func stopcmd() {
 }
 
 func updatecmd() {
-	var update api.UpdateInfo
+	var update UpdateInfo
 	err := getAPI("/daemon/update", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
@@ -60,7 +67,7 @@ func updatecmd() {
 }
 
 func updatecheckcmd() {
-	var update api.UpdateInfo
+	var update UpdateInfo
 	err := getAPI("/daemon/update", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
