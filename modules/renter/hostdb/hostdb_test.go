@@ -3,7 +3,6 @@ package hostdb
 import (
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -55,17 +54,5 @@ func TestNew(t *testing.T) {
 	_, err = New(stub, "")
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected invalid directory, got %v", err)
-	}
-
-	// Corrupted logfile.
-	os.RemoveAll(filepath.Join(dir, "hostdb.log"))
-	f, err := os.OpenFile(filepath.Join(dir, "hostdb.log"), os.O_CREATE, 0000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	_, err = New(stub, dir)
-	if !os.IsPermission(err) {
-		t.Fatalf("expected permissions error, got %v", err)
 	}
 }

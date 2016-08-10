@@ -1,0 +1,23 @@
+version: "{build}"
+
+platform: x64
+
+clone_folder: c:\GOPATH\src\github.com\NebulousLabs\Sia
+
+shallow_clone: true
+
+environment:
+  GOPATH: c:\GOPATH
+
+branches:
+  only:
+    - master
+
+install:
+  - go version
+  - go env
+  - go get -d ./...
+
+build_script:
+  - go test -tags="testing debug" -short ./...
+  - go test -tags="testing debug" -v -race ./...

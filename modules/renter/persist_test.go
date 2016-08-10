@@ -285,7 +285,7 @@ func TestRenterPaths(t *testing.T) {
 	})
 	// walk will descend into foo/bar/, reading baz, bar, and finally foo
 	expWalkStr := (f3.name + ".sia") + (f2.name + ".sia") + (f1.name + ".sia")
-	if walkStr != expWalkStr {
+	if filepath.ToSlash(walkStr) != expWalkStr {
 		t.Fatalf("Bad walk string: expected %v, got %v", expWalkStr, walkStr)
 	}
 }

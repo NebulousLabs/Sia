@@ -39,12 +39,17 @@ func TestReloading(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.server.Close()
+	height := st.server.cs.Height()
+	err = st.server.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	rst, err := st.reloadedServerTester()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.server.cs.Height() != rst.server.cs.Height() {
+	defer rst.server.Close()
+	if rst.server.cs.Height() != height {
 		t.Error("server heights do not match")
 	}
 
