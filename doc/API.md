@@ -1251,67 +1251,14 @@ id
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-7)
-A single transaction contains many objects of the same type. These types are
-listed below.
-```javascript
-// SiacoinInput
-{
-  // TODO: fill this out
-  "parentid":         "1111111111111111111111111111111111111111111111111111111111111111",
-  "unlockconditions": {
-  "timelock":   0,
-  "publickeys": [
-    // TODO: fill this out
-  ],
-  "signaturesrequired": 1
-}
-
-// SiacoinOutput
-{
-  // TODO: fill this out
-}
-```
-
-The response schema is:
 ```javascript
 {
   "transaction": {
     "transaction": {
-      // TODO: fill this out
-      "siacoininputs": [
-        // See SiacoinInput schema above.
-      ],
-      "siacoinoutputs": [
-        // See SiacoinOutput schema above.
-      ],
-      "filecontracts": [
-        // TODO: fill this out
-      ],
-      "filecontractrevisions": [
-        // TODO: fill this out
-      ],
-      "storageproofs": [
-        // TODO: fill this out
-      ],
-      "siafundinputs": [
-        // TODO: fill this out
-      ],
-      "siafundoutputs": [
-        // TODO: fill this out
-      ],
-      "minerfees": [
-        // TODO: fill this out, why is this an array of types.Currency's?
-      ],
-      "arbitrarydata": [
-        // TODO: is there a restriction on arbitrary data? Why is it an array of array of bytes vs a single byte array?
-        "Zm9v"
-      ],
-      "transactionsignatures": [
-        // TODO: fill this out
-      ],
+      // See types.Transaction in https://github.com/NebulousLabs/Sia/blob/master/types/transactions.go
     },
-    "transactionid": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "confirmationheight": 50000,
+    "transactionid":         "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "confirmationheight":    50000,
     "confirmationtimestamp": 1257894000,
     "inputs": [
       {
@@ -1334,149 +1281,58 @@ The response schema is:
 }
 ```
 
-Processed transactions are transactions that have been processed by the wallet
-and given more information, such as a confirmation height and a timestamp.
-Processed transactions will always be returned in chronological order.
-
-A processed transaction takes the following form:
-```
-struct modules.ProcessedTransaction {
-	transaction           types.Transaction
-	transactionid         types.TransactionID (string)
-	confirmationheight    types.BlockHeight   (int)
-	confirmationtimestamp types.Timestamp     (uint64)
-
-	inputs  []modules.ProcessedInput
-	outputs []modules.ProcessedOutput
-}
-```
-'transaction' is a types.Transaction, and is defined in types/transactions.go
-
-'transactionid' is the id of the transaction from which the wallet transaction
-was derived.
-
-'confirmationheight' is the height at which the transaction was confirmed. The
-height will be set to 'uint64max' if the transaction has not been confirmed.
-
-'confirmationtimestamp' is the time at which a transaction was confirmed. The
-timestamp is an unsigned 64bit unix timestamp, and will be set to 'uint64max'
-if the transaction is unconfirmed.
-
-'inputs' is an array of processed inputs detailing the inputs to the
-transaction. More information below.
-
-'outputs' is an array of processed outputs detailing the outputs of
-the transaction. Outputs related to file contracts are excluded.
-
-A modules.ProcessedInput takes the following form:
-```
-struct modules.ProcessedInput {
-	fundtype       types.Specifier  (string)
-	walletaddress  bool
-	relatedaddress types.UnlockHash (string)
-	value          types.Currency   (string)
-}
-```
-
-'fundtype' indicates what type of fund is represented by the input. Inputs can
-be of type 'siacoin input', and 'siafund input'.
-
-'walletaddress' indicates whether the address is owned by the wallet.
- 
-'relatedaddress' is the address that is affected. For inputs (outgoing money),
-the related address is usually not important because the wallet arbitrarily
-selects which addresses will fund a transaction. For outputs (incoming money),
-the related address field can be used to determine who has sent money to the
-wallet.
-
-'value' indicates how much money has been moved in the input or output.
-
-A modules.ProcessedOutput takes the following form:
-```
-struct modules.ProcessedOutput {
-	fundtype       types.Specifier   (string)
-	maturityheight types.BlockHeight (int)
-	walletaddress  bool
-	relatedaddress types.UnlockHash  (string)
-	value          types.Currency    (string)
-}
-```
-
-'fundtype' indicates what type of fund is represented by the output. Outputs
-can be of type 'siacoin output', 'siafund output', and 'claim output'. Siacoin
-outputs and claim outputs both relate to siacoins. Siafund outputs relate to
-siafunds. Another output type, 'miner payout', points to siacoins that have been
-spent on a miner payout. Because the destination of the miner payout is determined by
-the block and not the transaction, the data 'maturityheight', 'walletaddress',
-and 'relatedaddress' are left blank.
-
-'maturityheight' indicates what height the output becomes available to be
-spent. Siacoin outputs and siafund outputs mature immediately - their maturity
-height will always be the confirmation height of the transaction. Claim outputs
-cannot be spent until they have had 144 confirmations, thus the maturity height
-of a claim output will always be 144 larger than the confirmation height of the
-transaction.
-
-'walletaddress' indicates whether the address is owned by the wallet.
- 
-'relatedaddress' is the address that is affected.
-
-'value' indicates how much money has been moved in the input or output.
-
 #### /wallet/transactions [GET]
 
-Function: Return a list of transactions related to the wallet.
+returns a list of transactions related to the wallet in chronological order.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-8)
 ```
-startheight types.BlockHeight (uint64)
-endheight   types.BlockHeight (uint64)
+startheight // block height
+endheight   // block height
 ```
-'startheight' refers to the height of the block where transaction history
-should begin.
 
-'endheight' refers to the height of of the block where the transaction history
-should end. If 'endheight' is greater than the current height, all transactions
-up to and including the most recent block will be provided.
-
-Response:
-```
-struct {
-	confirmedtransactions   []modules.ProcessedTransaction
-	unconfirmedtransactions []modules.ProcessedTransaction
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-8)
+```javascript
+{
+  "confirmedtransactions": [
+    {
+      // See the documentation for '/wallet/transaction/:id' for more information.
+    }
+  ],
+  "unconfirmedtransactions": [
+    {
+      // See the documentation for '/wallet/transaction/:id' for more information.
+    }
+  ]
 }
 ```
-'confirmedtransactions' lists all of the confirmed transactions appearing between
-height 'startheight' and height 'endheight' (inclusive).
-
-'unconfirmedtransactions' lists all of the unconfirmed transactions.
 
 #### /wallet/transactions/___:addr___ [GET]
 
-Function: Return all of the transaction related to a specific address.
+returns all of the transactions related to a specific address.
 
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Wallet.md#path-parameters-1)
 ```
-addr types.UnlockHash
+addr
 ```
-'addr' is the unlock hash (i.e. wallet address) whose transactions are being
-requested.
 
-Response:
-```
-struct {
-	transactions []modules.ProcessedTransaction.
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-9)
+```javascript
+{
+  "transactions": [
+    {
+      // See the documentation for '/wallet/transaction/:id' for more information.
+    }
+  ]
 }
 ```
-'transactions' is a list of processed transactions that relate to the supplied
-address.  See the documentation for '/wallet/transaction' for more information.
 
 #### /wallet/unlock [POST]
 
 unlocks the wallet. The wallet is capable of knowing whether the correct
 password was provided.
 
-###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-8)
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-9)
 ```
 encryptionpassword
 ```
