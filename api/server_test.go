@@ -39,7 +39,6 @@ func TestReloading(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	height := st.server.cs.Height()
 	err = st.server.Close()
 	if err != nil {
 		t.Fatal(err)
