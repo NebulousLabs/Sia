@@ -94,7 +94,8 @@ func processConfig(config Config) (Config, error) {
 	return config, nil
 }
 
-// startDaemonCmd uses the config parameters to start siad.
+// startDaemon uses the config parameters to initialize Sia modules and start
+// siad.
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
 	if config.Siad.AuthenticateAPI {
