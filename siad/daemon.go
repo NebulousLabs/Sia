@@ -244,11 +244,9 @@ func startDaemon(config Config) (err error) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
 	go func() {
-		select {
-		case <-sigChan:
-			fmt.Println("\rCaught stop signal, quitting...")
-			srv.Close()
-		}
+		<-sigChan
+		fmt.Println("\rCaught stop signal, quitting...")
+		srv.Close()
 	}()
 
 	// Print a 'startup complete' message.
