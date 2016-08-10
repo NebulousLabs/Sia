@@ -155,6 +155,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// Register API handlers
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(api.unrecognizedCallHandler)
+
 	// Consensus API Calls
 	if api.cs != nil {
 		router.GET("/consensus", api.consensusHandler)
