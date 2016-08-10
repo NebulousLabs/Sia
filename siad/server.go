@@ -18,7 +18,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/inconshreveable/go-update"
@@ -37,20 +36,6 @@ type (
 		listener   net.Listener
 	}
 
-	// DaemonStatus is used by the server to return the loading status of each Sia
-	// module.  Because the server starts serving before modules are done
-	// initializing, callers can display information about the loading state of
-	// each module using the struct.
-	DaemonStatus struct {
-		Consensus float64 `json:"consensus"`
-		Explorer  float64 `json:"explorer"`
-		Gateway   float64 `json:"gateway"`
-		Host      float64 `json:"host"`
-		Miner     float64 `json:"miner"`
-		Renter    float64 `json:"renter"`
-		Tpool     float64 `json:"tpool"`
-		Wallet    float64 `json:"wallet"`
-	}
 	// SiaConstants is a struct listing all of the constants in use.
 	SiaConstants struct {
 		GenesisTimestamp      types.Timestamp   `json:"genesistimestamp"`
@@ -354,9 +339,6 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ h
 	}
 }
 
-// daemonStatusHandler returns the status of the API's loading process.
-func (srv *Server) daemonStatusHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-}
 func (srv *Server) daemonHandler() http.Handler {
 	router := httprouter.New()
 
@@ -365,11 +347,13 @@ func (srv *Server) daemonHandler() http.Handler {
 	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
 	router.POST("/daemon/update", srv.daemonUpdateHandlerPOST)
 	router.GET("/daemon/stop", srv.daemonStopHandler)
-	router.GET("/daemon/status", srv.daemonStatusHandler)
 
 	return router
 }
 
+// NewServer creates a new net.http server listening on bindAddr.  Only the
+// /daemon/ routes are registered by this func, additional routes can be
+// registered later by calling serv.mux.Handle.
 func NewServer(bindAddr string) (*Server, error) {
 	// Create the listener for the server
 	l, err := net.Listen("tcp", bindAddr)
@@ -378,22 +362,19 @@ func NewServer(bindAddr string) (*Server, error) {
 	}
 
 	// Create the Server
+	mux := http.NewServeMux()
 	siadServ := &Server{
-		mux:      http.NewServeMux(),
+		mux:      mux,
 		listener: l,
 	}
 	siadServ.httpServer = &http.Server{
-		Handler: siadServ.mux,
+		Handler: mux,
 	}
 
 	// Register siad routes
 	siadServ.mux.Handle("/daemon/", siadServ.daemonHandler())
 
 	return siadServ, nil
-}
-
-func (srv *Server) ConnectAPI(a *api.API) {
-	srv.mux.Handle("/", a)
 }
 
 func (srv *Server) Serve() error {
