@@ -119,7 +119,7 @@ func startDaemon(config Config) (err error) {
 
 	// Create the server and start serving daemon routes immediately.
 	fmt.Printf("(0/%d) Loading siad...\n", len(config.Siad.Modules))
-	srv, err := NewServer(config.Siad.APIaddr)
+	srv, err := NewServer(config.Siad.APIaddr, config.Siad.RequiredUserAgent, config.APIPassword)
 	if err != nil {
 		return err
 	}

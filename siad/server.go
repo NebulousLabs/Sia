@@ -109,6 +109,9 @@ bwIDAQAB
 -----END PUBLIC KEY-----`
 )
 
+// NOTE: these functions are duplicated from the api package.
+// Should they be exported instead?
+
 // writeError an error to the API caller.
 func writeError(w http.ResponseWriter, err api.Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -133,6 +136,42 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 // requested action succeeded AND there is no data to return.
 func writeSuccess(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// unrecognizedCallHandler handles calls to unknown pages (404).
+func unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
+	writeError(w, api.Error{"404 - Refer to API.md"}, http.StatusNotFound)
+}
+
+// requireUserAgent is middleware that requires all requests to set a
+// UserAgent that contains the specified string.
+func requireUserAgent(h http.Handler, ua string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.UserAgent(), ua) {
+			writeError(w, api.Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
+			return
+		}
+		h.ServeHTTP(w, req)
+	})
+}
+
+// requirePassword is middleware that requires a request to authenticate with a
+// password using HTTP basic auth. Usernames are ignored. Empty passwords
+// indicate no authentication is required.
+func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
+	// An empty password is equivalent to no password.
+	if password == "" {
+		return h
+	}
+	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		_, pass, ok := req.BasicAuth()
+		if !ok || pass != password {
+			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
+			writeError(w, api.Error{"API authentication failed."}, http.StatusUnauthorized)
+			return
+		}
+		h(w, req, ps)
+	}
 }
 
 // fetchLatestRelease returns metadata about the most recent GitHub release.
@@ -339,14 +378,14 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ h
 	}
 }
 
-func (srv *Server) daemonHandler() http.Handler {
+func (srv *Server) daemonHandler(password string) http.Handler {
 	router := httprouter.New()
 
 	router.GET("/daemon/constants", srv.daemonConstantsHandler)
 	router.GET("/daemon/version", srv.daemonVersionHandler)
 	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
 	router.POST("/daemon/update", srv.daemonUpdateHandlerPOST)
-	router.GET("/daemon/stop", srv.daemonStopHandler)
+	router.GET("/daemon/stop", requirePassword(srv.daemonStopHandler, password))
 
 	return router
 }
@@ -354,7 +393,7 @@ func (srv *Server) daemonHandler() http.Handler {
 // NewServer creates a new net.http server listening on bindAddr.  Only the
 // /daemon/ routes are registered by this func, additional routes can be
 // registered later by calling serv.mux.Handle.
-func NewServer(bindAddr string) (*Server, error) {
+func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, error) {
 	// Create the listener for the server
 	l, err := net.Listen("tcp", bindAddr)
 	if err != nil {
@@ -372,7 +411,7 @@ func NewServer(bindAddr string) (*Server, error) {
 	}
 
 	// Register siad routes
-	siadServ.mux.Handle("/daemon/", siadServ.daemonHandler())
+	siadServ.mux.Handle("/daemon/", requireUserAgent(siadServ.daemonHandler(requiredPassword), requiredUserAgent))
 
 	return siadServ, nil
 }
