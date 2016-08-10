@@ -141,7 +141,8 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 			// Check that this output has not recently been spent by the wallet.
 			spendHeight, err := dbGetSpentOutput(tx, types.OutputID(scoid))
 			if err != nil {
-				return err
+				// mimic map behavior: no entry means zero value
+				spendHeight = 0
 			}
 			// Prevent an underflow error.
 			allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
@@ -267,7 +268,8 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 			// Check that this output has not recently been spent by the wallet.
 			spendHeight, err := dbGetSpentOutput(tx, types.OutputID(sfoid))
 			if err != nil {
-				return err
+				// mimic map behavior: no entry means zero value
+				spendHeight = 0
 			}
 			// Prevent an underflow error.
 			allowedHeight := tb.wallet.consensusSetHeight - RespendTimeout
