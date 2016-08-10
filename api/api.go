@@ -129,8 +129,7 @@ type API struct {
 	tpool    modules.TransactionPool
 	wallet   modules.Wallet
 
-	requiredUserAgent string
-	router            http.Handler
+	router http.Handler
 }
 
 // api.ServeHTTP implements the http.Handler interface.
@@ -151,22 +150,11 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		renter:   r,
 		tpool:    tp,
 		wallet:   w,
-
-		requiredUserAgent: requiredUserAgent,
 	}
 
 	// Register API handlers
-	api.router = api.initAPI(requiredPassword)
-	return api
-}
-
-// initAPI constructs a http.Handler for the Sia API.
-// This method is responsible for constructing a http.Handler that conforms to the
-// documented, finalized Sia API routes.
-func (api *API) initAPI(password string) http.Handler {
 	router := httprouter.New()
-	router.NotFound = http.HandlerFunc(api.unrecognizedCallHandler) // custom 404
-
+	router.NotFound = http.HandlerFunc(api.unrecognizedCallHandler)
 	// Consensus API Calls
 	if api.cs != nil {
 		router.GET("/consensus", api.consensusHandler)
@@ -182,53 +170,53 @@ func (api *API) initAPI(password string) http.Handler {
 	// Gateway API Calls
 	if api.gateway != nil {
 		router.GET("/gateway", api.gatewayHandler)
-		router.POST("/gateway/connect/:netaddress", requirePassword(api.gatewayConnectHandler, password))
-		router.POST("/gateway/disconnect/:netaddress", requirePassword(api.gatewayDisconnectHandler, password))
+		router.POST("/gateway/connect/:netaddress", requirePassword(api.gatewayConnectHandler, requiredPassword))
+		router.POST("/gateway/disconnect/:netaddress", requirePassword(api.gatewayDisconnectHandler, requiredPassword))
 	}
 
 	// Host API Calls
 	if api.host != nil {
 		// Calls directly pertaining to the host.
-		router.GET("/host", api.hostHandlerGET)                                           // Get the host status.
-		router.POST("/host", requirePassword(api.hostHandlerPOST, password))              // Change the settings of the host.
-		router.POST("/host/announce", requirePassword(api.hostAnnounceHandler, password)) // Announce the host to the network.
+		router.GET("/host", api.hostHandlerGET)                                                   // Get the host status.
+		router.POST("/host", requirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
+		router.POST("/host/announce", requirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/host/storage", api.storageHandler)
-		router.POST("/host/storage/folders/add", requirePassword(api.storageFoldersAddHandler, password))
-		router.POST("/host/storage/folders/remove", requirePassword(api.storageFoldersRemoveHandler, password))
-		router.POST("/host/storage/folders/resize", requirePassword(api.storageFoldersResizeHandler, password))
-		router.POST("/host/storage/sectors/delete/:merkleroot", requirePassword(api.storageSectorsDeleteHandler, password))
+		router.POST("/host/storage/folders/add", requirePassword(api.storageFoldersAddHandler, requiredPassword))
+		router.POST("/host/storage/folders/remove", requirePassword(api.storageFoldersRemoveHandler, requiredPassword))
+		router.POST("/host/storage/folders/resize", requirePassword(api.storageFoldersResizeHandler, requiredPassword))
+		router.POST("/host/storage/sectors/delete/:merkleroot", requirePassword(api.storageSectorsDeleteHandler, requiredPassword))
 	}
 
 	// Miner API Calls
 	if api.miner != nil {
 		router.GET("/miner", api.minerHandler)
-		router.GET("/miner/header", requirePassword(api.minerHeaderHandlerGET, password))
-		router.POST("/miner/header", requirePassword(api.minerHeaderHandlerPOST, password))
-		router.GET("/miner/start", requirePassword(api.minerStartHandler, password))
-		router.GET("/miner/stop", requirePassword(api.minerStopHandler, password))
+		router.GET("/miner/header", requirePassword(api.minerHeaderHandlerGET, requiredPassword))
+		router.POST("/miner/header", requirePassword(api.minerHeaderHandlerPOST, requiredPassword))
+		router.GET("/miner/start", requirePassword(api.minerStartHandler, requiredPassword))
+		router.GET("/miner/stop", requirePassword(api.minerStopHandler, requiredPassword))
 	}
 
 	// Renter API Calls
 	if api.renter != nil {
 		router.GET("/renter", api.renterHandlerGET)
-		router.POST("/renter", requirePassword(api.renterHandlerPOST, password))
+		router.POST("/renter", requirePassword(api.renterHandlerPOST, requiredPassword))
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
 		// standardized and implemented.
-		// router.POST("/renter/load", requirePassword(api.renterLoadHandler, password))
-		// router.POST("/renter/loadascii", requirePassword(api.renterLoadAsciiHandler, password))
-		// router.GET("/renter/share", requirePassword(api.renterShareHandler, password))
-		// router.GET("/renter/shareascii", requirePassword(api.renterShareAsciiHandler, password))
+		// router.POST("/renter/load", requirePassword(api.renterLoadHandler, requiredPassword))
+		// router.POST("/renter/loadascii", requirePassword(api.renterLoadAsciiHandler, requiredPassword))
+		// router.GET("/renter/share", requirePassword(api.renterShareHandler, requiredPassword))
+		// router.GET("/renter/shareascii", requirePassword(api.renterShareAsciiHandler, requiredPassword))
 
-		router.POST("/renter/delete/*siapath", requirePassword(api.renterDeleteHandler, password))
-		router.GET("/renter/download/*siapath", requirePassword(api.renterDownloadHandler, password))
-		router.POST("/renter/rename/*siapath", requirePassword(api.renterRenameHandler, password))
-		router.POST("/renter/upload/*siapath", requirePassword(api.renterUploadHandler, password))
+		router.POST("/renter/delete/*siapath", requirePassword(api.renterDeleteHandler, requiredPassword))
+		router.GET("/renter/download/*siapath", requirePassword(api.renterDownloadHandler, requiredPassword))
+		router.POST("/renter/rename/*siapath", requirePassword(api.renterRenameHandler, requiredPassword))
+		router.POST("/renter/upload/*siapath", requirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
 		router.GET("/hostdb/active", api.renterHostsActiveHandler)
@@ -244,25 +232,26 @@ func (api *API) initAPI(password string) http.Handler {
 	// Wallet API Calls
 	if api.wallet != nil {
 		router.GET("/wallet", api.walletHandler)
-		router.POST("/wallet/033x", requirePassword(api.wallet033xHandler, password))
-		router.GET("/wallet/address", requirePassword(api.walletAddressHandler, password))
+		router.POST("/wallet/033x", requirePassword(api.wallet033xHandler, requiredPassword))
+		router.GET("/wallet/address", requirePassword(api.walletAddressHandler, requiredPassword))
 		router.GET("/wallet/addresses", api.walletAddressesHandler)
-		router.GET("/wallet/backup", requirePassword(api.walletBackupHandler, password))
-		router.POST("/wallet/init", requirePassword(api.walletInitHandler, password))
-		router.POST("/wallet/lock", requirePassword(api.walletLockHandler, password))
-		router.POST("/wallet/seed", requirePassword(api.walletSeedHandler, password))
-		router.GET("/wallet/seeds", requirePassword(api.walletSeedsHandler, password))
-		router.POST("/wallet/siacoins", requirePassword(api.walletSiacoinsHandler, password))
-		router.POST("/wallet/siafunds", requirePassword(api.walletSiafundsHandler, password))
-		router.POST("/wallet/siagkey", requirePassword(api.walletSiagkeyHandler, password))
+		router.GET("/wallet/backup", requirePassword(api.walletBackupHandler, requiredPassword))
+		router.POST("/wallet/init", requirePassword(api.walletInitHandler, requiredPassword))
+		router.POST("/wallet/lock", requirePassword(api.walletLockHandler, requiredPassword))
+		router.POST("/wallet/seed", requirePassword(api.walletSeedHandler, requiredPassword))
+		router.GET("/wallet/seeds", requirePassword(api.walletSeedsHandler, requiredPassword))
+		router.POST("/wallet/siacoins", requirePassword(api.walletSiacoinsHandler, requiredPassword))
+		router.POST("/wallet/siafunds", requirePassword(api.walletSiafundsHandler, requiredPassword))
+		router.POST("/wallet/siagkey", requirePassword(api.walletSiagkeyHandler, requiredPassword))
 		router.GET("/wallet/transaction/:id", api.walletTransactionHandler)
 		router.GET("/wallet/transactions", api.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", api.walletTransactionsAddrHandler)
-		router.POST("/wallet/unlock", requirePassword(api.walletUnlockHandler, password))
+		router.POST("/wallet/unlock", requirePassword(api.walletUnlockHandler, requiredPassword))
 	}
 
-	// Apply UserAgent middleware and return the router
-	return requireUserAgent(router, api.requiredUserAgent)
+	// Apply UserAgent middleware and return the API
+	api.router = requireUserAgent(router, requiredUserAgent)
+	return api
 }
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
