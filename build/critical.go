@@ -3,6 +3,7 @@ package build
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 )
 
 // Critical will print a message to os.Stderr unless DEBUG has been set, in
@@ -13,4 +14,5 @@ func Critical(v ...interface{}) {
 		panic(s)
 	}
 	os.Stderr.WriteString(s)
+	debug.PrintStack()
 }
