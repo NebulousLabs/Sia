@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
 )
@@ -554,6 +555,101 @@ func TestRemoveStorageFolderForced(t *testing.T) {
 	err = st.stdPostAPI("/host/storage/folders/remove", removeValues)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestDeleteSector tests the call to delete a storage sector from the host.
+func TestDeleteSector(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestDeleteSector")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Set up the host for forming contracts.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing contracts to formed.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	if err := createRandFile(path, 1024); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	if err = st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Only one piece will be uploaded (10%  at current redundancy)
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Error(rf.Files[0].UploadProgress)
+		t.Fatal("uploading has failed")
+	}
+
+	// Get the Merkle root of the piece that was uploaded.
+	contracts := st.renter.Contracts()
+	if len(contracts) != 1 {
+		t.Fatalf("expected exactly 1 contract to have been formed; got %v instead", len(contracts))
+	}
+	sectorRoot := contracts[0].MerkleRoots[0].String()
+
+	if err = st.stdPostAPI("/host/storage/sectors/delete/"+sectorRoot, url.Values{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDeleteNonexistentSector checks that attempting to delete a storage
+// sector that doesn't exist will fail with the appropriate error.
+func TestDeleteNonexistentSector(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestDeleteNonexistentSector")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// These calls to delete imaginary sectors should fail for a few reasons:
+	// - the given sector root strings are invalid
+	// - the renter hasn't uploaded anything
+	// - the host has no storage folders yet
+	// Right now, the calls fail for the first reason. This test will report if that behavior changes.
+	badHash := crypto.HashObject("fake object").String()
+	err = st.stdPostAPI("/host/storage/sectors/delete/"+badHash, url.Values{})
+	if err == nil || err.Error() != storagemanager.ErrSectorNotFound.Error() {
+		t.Fatalf("expected error to be %v; got %v", storagemanager.ErrSectorNotFound, err)
+	}
+	wrongSize := "wrong size string"
+	err = st.stdPostAPI("/host/storage/sectors/delete/"+wrongSize, url.Values{})
+	if err == nil || err.Error() != crypto.ErrHashWrongLen.Error() {
+		t.Fatalf("expected error to be %v; got %v", crypto.ErrHashWrongLen, err)
 	}
 }
 
