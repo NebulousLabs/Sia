@@ -405,9 +405,9 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 	siadServ := &Server{
 		mux:      mux,
 		listener: l,
-	}
-	siadServ.httpServer = &http.Server{
-		Handler: mux,
+		httpServer: &http.Server{
+			Handler: mux,
+		},
 	}
 
 	// Register siad routes
