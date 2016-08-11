@@ -357,7 +357,7 @@ func TestRepeatStorageFolderPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = smt.sm.AddStorageFolder(smt.persistDir, minimumStorageFolderSize)
-	if err != errRepeatFolder {
-		t.Fatal("expected errRepeatFolder, got", err)
+	if err != ErrRepeatFolder {
+		t.Fatal("expected ErrRepeatFolder, got", err)
 	}
 }

@@ -196,7 +196,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// folder is not going to be able to be deleted successfully.
 	ffs.brokenSubstrings = []string{filepath.Join(smt.persistDir, modules.StorageManagerDir, smt.sm.storageFolders[0].uidString())}
 	err = smt.sm.RemoveStorageFolder(0, false)
-	if err != errIncompleteOffload {
+	if err != ErrIncompleteOffload {
 		t.Fatal(err)
 	}
 	// Check that the storage folder was not removed.
@@ -228,7 +228,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 	// error in the destination folder.
 	ffs.brokenSubstrings = []string{filepath.Join(smt.persistDir, modules.StorageManagerDir, smt.sm.storageFolders[1].uidString())}
 	err = smt.sm.RemoveStorageFolder(0, false)
-	if err != errIncompleteOffload {
+	if err != ErrIncompleteOffload {
 		t.Fatal(err)
 	}
 	// Do a probabilistic reset of the storage manager, to verify that the
@@ -444,7 +444,7 @@ func TestStorageFolderTolerance(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
-	if err != errIncompleteOffload {
+	if err != ErrIncompleteOffload {
 		t.Fatal(err)
 	}
 	// Do a probabilistic reset of the storage manager, to verify that the

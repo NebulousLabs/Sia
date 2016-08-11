@@ -57,8 +57,8 @@ var (
 			// or 3 virtual sectors when manipulating data, so 250 is generous
 			// as long as the renter is properly encrypting data. 250 is
 			// unlikely to cause the host problems, even if an attacker is
-			// creating hundreds of thousands of phsyical sectors (an expensive
-			// action!) each with 250 vitrual sectors.
+			// creating hundreds of thousands of physical sectors (an expensive
+			// action!) each with 250 virtual sectors.
 			return 250
 		}
 		if build.Release == "testing" {
@@ -73,7 +73,7 @@ var (
 	// little storage capacity are not very useful to the network, and can
 	// actually frustrate price planning. 32 GB has been chosen as a minimum
 	// for the early days of the network, to allow people to experiment in the
-	// beta, but in the future I think something like 256GB would be much more
+	// beta, but in the future I think something like 256 GB would be much more
 	// appropriate.
 	minimumStorageFolderSize = func() uint64 {
 		if build.Release == "dev" {
@@ -115,3 +115,15 @@ var (
 	// times a sector is in use is encoded as a big endian uint64.
 	bucketSectorUsage = []byte("BucketSectorUsage")
 )
+
+// MaximumStorageFolderSize provides the maximumStorageFolderSize value to
+// other modules for testing purposes.
+func MaximumStorageFolderSize() uint64 {
+	return maximumStorageFolderSize
+}
+
+// MinimumStorageFolderSize provides the minimumStorageFolderSize value to
+// other modules for testing purposes.
+func MinimumStorageFolderSize() uint64 {
+	return minimumStorageFolderSize
+}

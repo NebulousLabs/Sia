@@ -15,8 +15,8 @@ type (
 	// StorageFolderMetadata contains metadata about a storage folder that is
 	// tracked by the storage folder manager.
 	StorageFolderMetadata struct {
-		Capacity          uint64 `json:"capacity"`
-		CapacityRemaining uint64 `json:"capacityremaining"`
+		Capacity          uint64 `json:"capacity"`          // bytes
+		CapacityRemaining uint64 `json:"capacityremaining"` // bytes
 		Path              string `json:"path"`
 
 		// Below are statistics about the filesystem. FailedReads and

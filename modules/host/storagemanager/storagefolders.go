@@ -1,11 +1,12 @@
 package storagemanager
 
-// storgaefolder.go is responsible for managing the storage folders within the
+// storagefolder.go is responsible for managing the storage folders within the
 // host. Storage folders can be added, resized, or removed. There are several
 // features in place to make sure that the host is always using a reasonable
-// amount of resources. Sectors in the host are currently always 4MiB, though
-// support for different sizes is planned. Becaues of the reliance on the
-// cached Merkle trees, sector sizes are likely to always be a power of 2.
+// amount of resources. Sectors in the host are currently always 4 MiB (in the
+// standard release), though support for different sizes is planned. Because of
+// the reliance on the cached Merkle trees, sector sizes are likely to always
+// be a power of 2.
 //
 // Though storage folders each contain a bunch of sectors, there is no mapping
 // from a storage folder to the sectors that it contains. Instead, one must
@@ -18,7 +19,7 @@ package storagemanager
 // memory at once, and these directories may contain millions of sectors.
 //
 // Strict resource limits are maintained, to make sure that any user behavior
-// which would strain the host will return an error instead of cause the user
+// that would strain the host will return an error instead of causing the user
 // problems. The number of storage folders is capped, the allowed size for a
 // storage folder has a range, and anything else that might have a linear or
 // nonconstant effect on resource consumption is capped.
@@ -35,7 +36,7 @@ package storagemanager
 // folder IDs (if a conflict is generated randomly, a new random folder is
 // chosen). A counter was rejected because storage folders can be removed and
 // added arbitrarily, and there should be a firm difference between accessing a
-// storage folder by index vs. accessing a storage folder by id.
+// storage folder by index vs. accessing a storage folder by ID.
 //
 // Storage folders statically track how much of their storage is unused.
 // Because there is no mapping from a storage folder to the sectors that it
@@ -68,14 +69,38 @@ import (
 )
 
 var (
+	// ErrEmptyPath is returned if a path is an empty string or was not
+	// provided.
+	ErrEmptyPath = errors.New("must provide nonempty path string for storage folder")
+
+	// ErrLargeStorageFolder is returned if a new storage folder or a resized
+	// storage folder would exceed the maximum allowed size.
+	ErrLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumStorageFolderSize)
+
+	// ErrNoResize is returned if a new size is provided for a storage folder
+	// that is the same as the current size of the storage folder.
+	ErrNoResize = errors.New("storage folder selected for resize, but new size is same as current size")
+
+	// ErrSmallStorageFolder is returned if a new storage folder is not large
+	// enough to meet the requirements for the minimum storage folder size.
+	ErrSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
+
+	// ErrIncompleteOffload is returned when the host is tasked with offloading
+	// sectors from a storage folder but is unable to offload the requested
+	// number - but is able to offload some of them.
+	ErrIncompleteOffload = errors.New("could not successfully offload specified number of sectors from storage folder")
+
+	// ErrRelativePath is returned if a path must be absolute.
+	ErrRelativePath = errors.New("storage folder paths must be absolute")
+
+	// ErrRepeatFolder is returned if a storage folder is added which links to
+	// a path that is already in use by another storage folder. Only exact path
+	// matches will trigger the error.
+	ErrRepeatFolder = errors.New("selected path is already in use as a storage folder, please use 'resize'")
+
 	// errBadStorageFolderIndex is returned if a storage folder is requested
 	// that does not have the correct index.
 	errBadStorageFolderIndex = errors.New("no storage folder exists at that index")
-
-	// errIncompleteOffload is returned when the host is tasked with offloading
-	// sectors from a storage folder but is unable to offload the requested
-	// number - but is able to offload some of them.
-	errIncompleteOffload = errors.New("could not successfully offload specified number of sectors from storage folder")
 
 	// errInsufficientRemainingStorageForRemoval is returned if the remaining
 	// storage folders do not have enough space remaining to support being
@@ -87,33 +112,13 @@ var (
 	// reduced in size.
 	errInsufficientRemainingStorageForShrink = errors.New("not enough storage remaining to support shrinking of disk")
 
-	// errLargeStorageFolder is returned if a new storage folder or a resized
-	// storage folder would exceed the maximum allowed size.
-	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumStorageFolderSize)
-
 	// errMaxStorageFolders indicates that the limit on the number of allowed
 	// storage folders has been reached.
 	errMaxStorageFolders = fmt.Errorf("host can only accept up to %v storage folders", maximumStorageFolders)
 
-	// errNoResize is returned if a new size is provided for a storage folder
-	// that is the same as the current size of the storage folder.
-	errNoResize = errors.New("storage folder selected for resize, but new size is same as current size")
-
-	// errRepeatFolder is returned if a storage folder is added which links to
-	// a path that is already in use by another storage folder. Only exact path
-	// matches will trigger the error.
-	errRepeatFolder = errors.New("selected path is already in use as a storage folder, please use 'resize'")
-
-	// errSmallStorageFolder is returned if a new storage folder is not large
-	// enough to meet the requirements for the minimum storage folder size.
-	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
-
 	// errStorageFolderNotFolder is returned if a storage folder gets added
 	// that is not a folder.
 	errStorageFolderNotFolder = errors.New("must use an existing folder")
-
-	// errRelativePath is returned if a path must be absolute.
-	errRelativePath = errors.New("storage folder paths must be absolute")
 )
 
 // storageFolder tracks a folder that is being used to store sectors. There is
@@ -157,8 +162,8 @@ type storageFolder struct {
 	Path string
 	UID  []byte
 
-	Size          uint64
-	SizeRemaining uint64
+	Size          uint64 // bytes
+	SizeRemaining uint64 // bytes
 
 	FailedReads      uint64
 	FailedWrites     uint64
@@ -221,7 +226,7 @@ func (sm *StorageManager) offloadStorageFolder(offloadFolder *storageFolder, dat
 
 	// Create a list of available folders. As folders are filled up, this list
 	// will be pruned. Once all folders are full, the offload loop will quit
-	// and return with errIncompleteOffload.
+	// and return with ErrIncompleteOffload.
 	availableFolders := make([]*storageFolder, 0)
 	for _, sf := range sm.storageFolders {
 		if sf == offloadFolder {
@@ -352,7 +357,7 @@ func (sm *StorageManager) offloadStorageFolder(offloadFolder *storageFolder, dat
 		}
 	}
 	if dataOffloaded < dataToOffload {
-		return errIncompleteOffload
+		return ErrIncompleteOffload
 	}
 	return nil
 }
@@ -399,19 +404,22 @@ func (sm *StorageManager) AddStorageFolder(path string, size uint64) error {
 	}
 	// Check that the storage folder being added meets the size requirements.
 	if size > maximumStorageFolderSize {
-		return errLargeStorageFolder
+		return ErrLargeStorageFolder
 	}
 	if size < minimumStorageFolderSize {
-		return errSmallStorageFolder
+		return ErrSmallStorageFolder
 	}
 	// Check that the path is an absolute path.
 	if !filepath.IsAbs(path) {
-		return errRelativePath
+		if path == "" {
+			return ErrEmptyPath
+		}
+		return ErrRelativePath
 	}
 	// Check that the folder being linked to is not already in use.
 	for _, sf := range sm.storageFolders {
 		if sf.Path == path {
-			return errRepeatFolder
+			return ErrRepeatFolder
 		}
 	}
 
@@ -511,10 +519,10 @@ func (sm *StorageManager) RemoveStorageFolder(removalIndex int, force bool) erro
 	// Move all of the sectors in the storage folder to other storage folders.
 	usedSize := removalFolder.Size - removalFolder.SizeRemaining
 	offloadErr := sm.offloadStorageFolder(removalFolder, usedSize)
-	// If 'force' is set, we want to ignore 'errIncopmleteOffload' and try to
+	// If 'force' is set, we want to ignore 'ErrIncompleteOffload' and try to
 	// remove the storage folder anyway. For any other error, we want to halt
 	// and return the error.
-	if force && offloadErr == errIncompleteOffload {
+	if force && offloadErr == ErrIncompleteOffload {
 		offloadErr = nil
 	}
 	if offloadErr != nil {
@@ -549,13 +557,13 @@ func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize ui
 	}
 	resizeFolder := sm.storageFolders[storageFolderIndex]
 	if newSize > maximumStorageFolderSize {
-		return errLargeStorageFolder
+		return ErrLargeStorageFolder
 	}
 	if newSize < minimumStorageFolderSize {
-		return errSmallStorageFolder
+		return ErrSmallStorageFolder
 	}
 	if resizeFolder.Size == newSize {
-		return errNoResize
+		return ErrNoResize
 	}
 
 	// Sectors do not need to be moved onto or away from the resize folder if
@@ -572,7 +580,7 @@ func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize ui
 	// storage folder.
 	offloadSize := resizeFolderSizeConsumed - newSize
 	offloadErr := sm.offloadStorageFolder(resizeFolder, offloadSize)
-	if offloadErr == errIncompleteOffload {
+	if offloadErr == ErrIncompleteOffload {
 		// Offloading has not fully succeeded, but may have partially
 		// succeeded. To prevent new sectors from being added to the storage
 		// folder, clamp the size of the storage folder to the current amount
