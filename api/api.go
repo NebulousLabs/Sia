@@ -154,7 +154,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 	// Register API handlers
 	router := httprouter.New()
-	router.NotFound = http.HandlerFunc(api.unrecognizedCallHandler)
+	router.NotFound = http.HandlerFunc(unrecognizedCallHandler)
 
 	// Consensus API Calls
 	if api.cs != nil {
@@ -256,7 +256,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 }
 
 // unrecognizedCallHandler handles calls to unknown pages (404).
-func (api *API) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
+func unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 	writeError(w, Error{"404 - Refer to API.md"}, http.StatusNotFound)
 }
 
