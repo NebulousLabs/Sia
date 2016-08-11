@@ -14,6 +14,12 @@ const (
 	// manager's settings.
 	settingsFile = "contractmanager.json"
 
+	// settingsFileTmp is the name of the file that is used to hold unfinished
+	// writes to the contract manager's settings. After this file is completed,
+	// a copy-on-write operation is performed to make sure that the contract
+	// manager's persistent settings are updated atomically.
+	settingsFileTmp = "contractmanager.json_temp"
+
 	// sectorFile is the file that is placed inside of a storage folder to
 	// house all of the sectors and sector metadata associated with a storage
 	// folder.
@@ -26,7 +32,7 @@ const (
 	// walFileTmp is used for incomplete writes to the WAL. Data could be
 	// interrupted by power outages, etc., and is therefore written to a
 	// temporary file before being atomically renamed to the correct name.
-	walFileTmp = "contractmanager.wal.tmp"
+	walFileTmp = "contractmanager.wal_temp"
 )
 
 var (
@@ -106,13 +112,13 @@ var (
 	}()
 
 	// storageFolderGranularity defines the number of sectors that a storage
-	// folder must cleanly divide into. 32 sectors is a requirement due to the
+	// folder must cleanly divide into. 64 sectors is a requirement due to the
 	// way the storage folder bitfield (field 'Usage') is constructed - the
 	// bitfield defines which sectors are available, and the bitfield must be
-	// constructed 1 uint32 at a time (4 bytes, 32 bits, or 32 sectors).
+	// constructed 1 uint64 at a time (8 bytes, 64 bits, or 64 sectors).
 	//
-	// This corresponds to a granularity of 32 MiB on the production network,
-	// which relative to the TiBs of storage that hosts are expected to
-	// provide, is a large amount of granularity.
-	storageFolderGranularity = uint64(32)
+	// This corresponds to a granularity of 256 MiB on the production network,
+	// which is a high granluarity relative the to the TiBs of storage that
+	// hosts are expected to provide.
+	storageFolderGranularity = uint64(64)
 )

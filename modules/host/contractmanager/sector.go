@@ -1,20 +1,80 @@
 package contractmanager
 
+import (
+	"errors"
+
+	"github.com/NebulousLabs/Sia/crypto"
+)
+
+var (
+	// errDiskTrouble is returned when the host is supposed to have enough
+	// storage to hold a new sector but failures that are likely related to the
+	// disk have prevented the host from successfully adding the sector.
+	errDiskTrouble = errors.New("host unable to add sector despite having the storage capacity to do so")
+
+	// errInsufficientStorageForSector is returned if the host tries to add a
+	// sector when there is not enough storage remaining on the host to accept
+	// the sector.
+	//
+	// Ideally, the host will adjust pricing as the host starts to fill up, so
+	// this error should be pretty rare. Demand should drive the price up
+	// faster than the Host runs out of space, such that the host is always
+	// hovering around 95% capacity and rarely over 98% or under 90% capacity.
+	errInsufficientStorageForSector = errors.New("not enough storage remaining to accept sector")
+
+	// errMaxVirtualSectors is returned when a sector cannot be added because
+	// the maximum number of virtual sectors for that sector id already exist.
+	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
+
+	// errSectorNotFound is returned when a lookup for a sector fails.
+	errSectorNotFound = errors.New("could not find the desired sector")
+)
+
 // sectorLocation indicates the location of a sector on disk.
-type sectorLocation struct {
-	// index indicates the index of the sector's location within the storage
-	// folder.
-	index uint32
+type (
+	sectorID [12]byte
 
-	// storageFolder indicates the index of the storage folder that the sector
-	// is stored on.
-	storageFolder uint16
+	sectorLocation struct {
+		// index indicates the index of the sector's location within the storage
+		// folder.
+		index uint32
 
-	// count indicates the number of virtual sectors represented by the
-	// phsyical sector described by this object. A maximum of 2^16 virtual
-	// sectors are allowed for each sector. Proper use by the renter should
-	// mean that the host never has more than 3 virtual sectors for any sector.
-	count uint16
+		// storageFolder indicates the index of the storage folder that the sector
+		// is stored on.
+		storageFolder uint16
+
+		// count indicates the number of virtual sectors represented by the
+		// phsyical sector described by this object. A maximum of 2^16 virtual
+		// sectors are allowed for each sector. Proper use by the renter should
+		// mean that the host never has more than 3 virtual sectors for any sector.
+		count uint16
+	}
+)
+
+// sectorID returns the id that should be used when referring to a sector.
+// There are lots of sectors, and to minimize their footprint a reduced size
+// hash is used. Hashes are typically 256bits to provide collision resistance
+// against an attacker that is able to peform an obscene number of trials per
+// second on each of an obscene number of machines. Potential collisions for
+// sectors are limited because hosts have secret data that the attacker does
+// not know which is used to salt the transformation of a sector hash to a
+// sectorID. As a result, an attacker is limited in the number of times they
+// can try to cause a collision - one random shot every time they upload a
+// sector, and the attacker has limited ability to learn of the success of the
+// attempt. Uploads are very slow, even on fast machines there will be less
+// than 1000 per second. It is therefore safe to reduce the security from
+// 256bits to 96bits, which has a collision resistance of 2^48. A reasonable
+// upper bound for the number of sectors on a host is 2^32, corresponding with
+// 16PB of data.
+//
+// 12 bytes can be represented as a filepath using 16 base64 characters. This
+// keeps the filesize small and therefore limits the amount of load placed on
+// the filesystem when trying to manage hundreds of thousands or even tens of
+// millions of sectors in a single folder.
+func (cm *ContractManager) managedSectorID(sectorRoot crypto.Hash) (id sectorID) {
+	saltedRoot := crypto.HashAll(sectorRoot, sm.sectorSalt)
+	copy(id[:], saltedRoot)
+	return id
 }
 
 /*
@@ -71,30 +131,6 @@ import (
 // TODO: Make sure the host will not stutter if it needs to perform operations
 // on sectors that have been manually deleted.
 
-var (
-	// errDiskTrouble is returned when the host is supposed to have enough
-	// storage to hold a new sector but failures that are likely related to the
-	// disk have prevented the host from successfully adding the sector.
-	errDiskTrouble = errors.New("host unable to add sector despite having the storage capacity to do so")
-
-	// errInsufficientStorageForSector is returned if the host tries to add a
-	// sector when there is not enough storage remaining on the host to accept
-	// the sector.
-	//
-	// Ideally, the host will adjust pricing as the host starts to fill up, so
-	// this error should be pretty rare. Demand should drive the price up
-	// faster than the Host runs out of space, such that the host is always
-	// hovering around 95% capacity and rarely over 98% or under 90% capacity.
-	errInsufficientStorageForSector = errors.New("not enough storage remaining to accept sector")
-
-	// errMaxVirtualSectors is returned when a sector cannot be added because
-	// the maximum number of virtual sectors for that sector id already exist.
-	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
-
-	// errSectorNotFound is returned when a lookup for a sector fails.
-	errSectorNotFound = errors.New("could not find the desired sector")
-)
-
 // sectorUsage indicates how a sector is being used. Each block height
 // represents a point at which a file contract using the sector expires. File
 // contracts that use the sector multiple times will have their block height
@@ -108,33 +144,6 @@ type sectorUsage struct {
 	Corrupted     bool // If the corrupted flag is set, it means the sector is permanently unreachable.
 	Expiry        []types.BlockHeight
 	StorageFolder []byte
-}
-
-// sectorID returns the id that should be used when referring to a sector.
-// There are lots of sectors, and to minimize their footprint a reduced size
-// hash is used. Hashes are typically 256bits to provide collision resistance
-// against an attacker that is able to peform an obscene number of trials per
-// second on each of an obscene number of machines. Potential collisions for
-// sectors are limited because hosts have secret data that the attacker does
-// not know which is used to salt the transformation of a sector hash to a
-// sectorID. As a result, an attacker is limited in the number of times they
-// can try to cause a collision - one random shot every time they upload a
-// sector, and the attacker has limited ability to learn of the success of the
-// attempt. Uploads are very slow, even on fast machines there will be less
-// than 1000 per second. It is therefore safe to reduce the security from
-// 256bits to 96bits, which has a collision resistance of 2^48. A reasonable
-// upper bound for the number of sectors on a host is 2^32, corresponding with
-// 16PB of data.
-//
-// 12 bytes can be represented as a filepath using 16 base64 characters. This
-// keeps the filesize small and therefore limits the amount of load placed on
-// the filesystem when trying to manage hundreds of thousands or even tens of
-// millions of sectors in a single folder.
-func (sm *StorageManager) sectorID(sectorRootBytes []byte) []byte {
-	saltedRoot := crypto.HashAll(sectorRootBytes, sm.sectorSalt)
-	id := make([]byte, base64.RawURLEncoding.EncodedLen(12))
-	base64.RawURLEncoding.Encode(id, saltedRoot[:12])
-	return id
 }
 
 // AddSector will add a data sector to the host, correctly selecting the

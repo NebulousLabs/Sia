@@ -1,5 +1,27 @@
 package contractmanager
 
+// TODO: Currently, we don't do any directory Sync'ing following COW
+// operations, that may be necessary to provide strong guarantees against data
+// corruption.
+
+// TODO: The writeaheadlog is misusing log.Critical - it's using log.Critical
+// to indicate that there are severe problems with the host, but these are not
+// developer issues, they are likely disk issues. Instead of log.Critical,
+// there should be a log.Crash. The program should be crashing regardless of
+// DEBUG mode, which is why the logging statements are followed by a bunch of
+// panics. Extending the logger could clean up this code some.
+
+// TODO: There might be a smarter way to manage the sync interval. Some syncs
+// are going to take several seconds, and some are going to take almost no time
+// at all. The goal is to maximize throughput, but it's also important that the
+// host be responsive when accepting changes from the renter. Batched calls on
+// the renter side can improve throughput despite 1.5 second latencies
+// per-change, but that's basically requiring the renter to add code complexity
+// in order to achieve throughputs greater than 4 MiB every 1.5 seconds.
+//
+// It should be noted that if the renter is properly doing parallel uploads, a
+// throughput of 10+ mbps per host is pretty decent, even without batching.
+
 import (
 	"path/filepath"
 	"sync"
@@ -13,31 +35,35 @@ import (
 // ContractManager is responsible for managing contracts that the host has with
 // renters, including storing the data, submitting storage proofs, and deleting
 // the data when a contract is complete.
-//
-// The contract manager controls many resources which are spread across
-// multiple files yet must all be consistent and durable. Both have been
-// achieved by using write-ahead-logging and ACID transactions. The state of
-// the contract manager object itself contains only what has happened in
-// updates which have been fully committed - the contract manager is not
-// updated unless the changes for the update have been fully committed to all
-// resources which adjust according to the changes.
-//
-// The memory management and concurrency model of the contract manager is
-// pretty sharply different from that of other modules, as there is a lot of
-// I/O, much of which is happening on slow/cheap HDDs, yet performance is
-// critical.
-//
-// All operations that mutate the contract manager (except for during
-// initialization) go through a write-ahead-logger (WAL). The WAL manages most
-// of the locking and blockhing that happens when external modules are
-// interacting with the contract manager.
 type ContractManager struct {
-	// Storage management information.
+	// The contract manager controls many resources which are spread across
+	// multiple files yet must all be consistent and durable. ACID properties
+	// have been achieved by using a write-ahead-logger (WAL). All operations
+	// that read or mutate the stateful fields of the contract manager must go
+	// through the WAL or inconsistency is risked.
 	//
-	// TODO: explain that the sector salt is necessary to reduce the internal
-	// names for the sectors from 32bytes to just 12 bytes.
-	sectorSalt     crypto.Hash
-	storageFolders []*storageFolder
+	// The state of the contract manager is broken up into two separate
+	// categories. The first category is atomic state, and the second category
+	// is non-atomic state. Fields like the sector salt and storage folders are
+	// always saved to disk atomically using a copy-on-write technique. Sector
+	// location information and sector data are written directly to a large
+	// file, without using copy-on-write, which means that the writes are
+	// non-atomic.
+	//
+	// Each category of state must be treated differently. The non-atomic data
+	// is formatted very cleanly - every field on disk has an exact size, which
+	// means that the WAL can write idempotent commits that specify the exact
+	// location on disk where a write should happen to successfully execute an
+	// action. The atomic state contains fields with variable sizes, and
+	// therefore must be approached differently.
+	//
+	// The exact-location writing style of the disk can be mimiced by pulling
+	// all of the variable size state into memory, and then indexing it using
+	// explit key-value pairs.
+	//
+	// The in-progress updates in the WAL itself should all be idempotent, and
+	// constructed in a way such that they do not rely on any state at all to
+	// execute properly, as the current state may be inconsistent or unknown.
 
 	// In-memory representation of the sector location lookups which are kept
 	// on disk. This representation is kept in-memory so that efficient
@@ -45,7 +71,15 @@ type ContractManager struct {
 	// on disk. This prevents I/O from being a significant bottleneck. 10TiB of
 	// data stored on the host will bloat the map to about 1.5GiB in size, and
 	// the map will be able to support millions of reads and writes per second.
-	sectorLocations map[string]sectorLocation
+	//
+	// folderLocations contains a mapping from storage folder indexes to the
+	// on-disk location of that storage folder. The folderLocations object can
+	// be updated before commitments are made without losing durability,
+	// because the folderLocations object does not get saved to disk directly,
+	// instead its status is inferred entirely at startup.
+	sectorSalt      crypto.Hash
+	sectorLocations map[sectorID]sectorLocation
+	storageFolders  map[uint16]*storageFolder
 
 	// Utilities. The dependencies are package or filesystem dependencies, and
 	// are provided so that the dependencies can be mocked during testing. Sia
@@ -63,7 +97,6 @@ type ContractManager struct {
 	// mutex.
 	dependencies
 	log        *persist.Logger
-	mu         sync.RWMutex
 	persistDir string
 	tg         siasync.ThreadGroup
 	wal        writeAheadLog
@@ -79,7 +112,8 @@ func (cm *ContractManager) Close() error {
 // the provided dependencies.
 func newContractManager(dependencies dependencies, persistDir string) (*ContractManager, error) {
 	cm := &ContractManager{
-		sectorLocations: make(map[string]sectorLocation),
+		storageFolders:  make(map[uint16]string),
+		sectorLocations: make(map[sectorID]sectorLocation),
 
 		dependencies: dependencies,
 		persistDir:   persistDir,

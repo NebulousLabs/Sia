@@ -35,7 +35,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// folder needs to have modules.SectorSize available for each sector, plus
 	// another 16 bytes per sector to store a mapping from sector id to its
 	// location in the storage folder.
-	numSectors := uint64(len(sf.Usage)) * 32
+	numSectors := uint64(len(sf.Usage)) * 64
 	sectorLookupSize := numSectors * 16
 	sectorHousingSize := numSectors * modules.SectorSize
 	totalSize := sectorLookupSize + sectorHousingSize
@@ -57,7 +57,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// The number of storage folders are also counted, to make sure that
 		// the maximum number of storage folders allowed is not exceeded.
 		var err error
-		wal.cm.mu.RLock()
 		numStorageFolders := uint64(len(wal.cm.storageFolders))
 		for i := range wal.cm.storageFolders {
 			if wal.cm.storageFolders[i].Path == sf.Path {
@@ -65,7 +64,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 				break
 			}
 		}
-		wal.cm.mu.RUnlock()
 		if err != nil {
 			return err
 		}
@@ -111,6 +109,25 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		if numStorageFolders > maximumStorageFolders {
 			return errMaxStorageFolders
 		}
+
+		// Determine the index of the storage folder by scanning for an empty
+		// spot in the folderLocations map.
+		//
+		// TODO: performance could be improved by starting from a random place.
+		var i uint16
+		for i = 0; i < 65536; i++ {
+			_, exists := wal.cm.folderLocations[i]
+			if !exists {
+				break
+			}
+		}
+		if i == 65536 {
+			wal.cm.log.Critical("Previous check indicated that there was room to add another storage folder, but folderLocations amp is full.")
+			return errMaxStorageFolders
+		}
+		// Assign the empty index to the storage folder.
+		sf.Index = i
+		wal.cm.folderLocations[i] = sf.Path
 
 		// Add the storage folder to the list of unfinished storage folder
 		// additions, so that no naming conflicts can appear while this storage
@@ -352,7 +369,7 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	// Create a storage folder object and add it to the WAL.
 	newSF := &storageFolder{
 		Path:  path,
-		Usage: make([]uint32, size/modules.SectorSize/32),
+		Usage: make([]uint64, size/modules.SectorSize/64),
 	}
 	return cm.wal.managedAddStorageFolder(newSF)
 }

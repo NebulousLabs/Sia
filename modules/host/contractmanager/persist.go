@@ -15,7 +15,7 @@ type (
 	// onto another disk.
 	savedSettings struct {
 		SectorSalt     crypto.Hash
-		StorageFolders []*storageFolder
+		StorageFolders []storageFolder
 	}
 
 	// sectorLocationEntry contains all the information necessary to add an
@@ -47,13 +47,24 @@ func (cm *ContractManager) initSettings() error {
 
 	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
 	// with the new settings values.
-	return build.ExtendErr("error saving contract manager after initialization", cm.saveSync())
+	ss := cm.savedSettings()
+	return build.ExtendErr("error saving contract manager after initialization", persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile)))
 }
 
 // load will pull all saved state from the contract manager off of the disk and
 // into memory.
 func (cm *ContractManager) load() error {
-	// Load the most recent saved settings into the contract manager.
+	// Before passing things off to the write-ahead-log, pull all in-memory
+	// state from an atomic file into memory. The WAL, while loading, will
+	// directly apply any changes to memory. The changes being pulled off disk
+	// will have been made atomically, but they may not be complete with the
+	// most recent state of the WAL. This is okay, so long as data has been
+	// loaded atomically, the WAL applying itself will catch up the in-memory
+	// state, bringing the contract manager to a point of consistency.
+	//
+	// The in-memory state is all currently stored in the settings file. If
+	// there is no settings file, this is probably the first run for the
+	// contract manager, a default settings file can be created.
 	var ss savedSettings
 	err := cm.dependencies.loadFile(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
 	if os.IsNotExist(err) {
@@ -65,27 +76,31 @@ func (cm *ContractManager) load() error {
 		return build.ExtendErr("error loading the contract manager settings file", err)
 	}
 
-	// Copy the saved settings into the contract manager.
+	// Copy the saved settings into the contract manager. Any saved settings
+	// that are in the file on disk have also been committed successfully to
+	// the other state of the contract manager.
 	cm.sectorSalt = ss.SectorSalt
-	cm.storageFolders = ss.StorageFolders
+	for _, sf := range ss.StorageFolders {
+		cm.storageFolders[sf.Index] = &sf
+		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_WRONLY, 0700)
+		if err != nil {
+			return build.ExtendErr("error loading storage folder file handle", err)
+		}
+	}
 
-	// TODO: Load the sector locations from the various storage folders.
-
-	//  Load any uncommitted changes that were recorded by the WAL.
+	// Load the WAL, which will finish up any in-progress changes to the state,
+	// bringing the system to consistency.
 	return build.ExtendErr("error loading the contract manager WAL", cm.wal.load())
-}
-
-// save will commit the in-memory contract manager data to disk.
-func (cm *ContractManager) saveSync() error {
-	ss := cm.savedSettings()
-	return build.ExtendErr("error saving contract manager settings", persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile)))
 }
 
 // savedSettings returns the settings of the contract manager in an
 // easily-serializable form.
 func (cm *ContractManager) savedSettings() savedSettings {
-	return savedSettings{
+	ss := savedSettings{
 		SectorSalt:     cm.sectorSalt,
-		StorageFolders: cm.storageFolders,
 	}
+	for _, sf := range cm.storageFolders {
+		ss.StorageFolders = append(ss.StorageFolders, *sf)
+	}
+	return ss
 }

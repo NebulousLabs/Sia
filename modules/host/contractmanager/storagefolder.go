@@ -7,6 +7,7 @@ package contractmanager
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -94,9 +95,22 @@ type storageFolder struct {
 	// TODO: Explain that storage folders are identified by their path, and
 	// that there must not be duplicates or the WAL will get confused.
 	//
-	// Explain that Path is immutable, and that Usage is updated atomically
-	Path  string
-	Usage []uint32
+	// TODO: Explain that Path is immutable, and that Usage is updated atomically
+	//
+	// TODO: Expalin that the number of sectors is equivalent to the number of
+	// flipped bits in Usage, and that the number of flipped bits can be
+	// counted really quickly as far as startup goes, but not as far as adding
+	// 250 sectors which each check the remaining capacity of every storage
+	// folder.
+	Index   uint16
+	Path    string
+	Sectors uint64
+	Usage   []uint64
+
+	// An open file handle is kept so that writes can easily be made to the
+	// storage folder without needing to grab a new file handle. This also
+	// makes it easy to do delayed-syncing.
+	file *os.File
 
 	/*
 		// TODO: probably better if these values do not get saved to disk, that
@@ -109,17 +123,6 @@ type storageFolder struct {
 
 }
 
-// numSetBits returns the number of bits set in the input uint32, useful for
-// counting the number of sectors in a storage folder.
-//
-// Algorithm used is SWAR, taken from the following link:
-//   http://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer
-func numSetBits(i uint32) uint64 {
-	i = i - ((i >> 1) & 0x55555555)
-	i = (i & 0x33333333) + ((i >> 2) & 0x33333333)
-	return uint64((((i + (i >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24)
-}
-
 // StorageFolders will return a list of storage folders in the host, each
 // containing information about the storage folder and any operations currently
 // being executed on the storage folder.
@@ -127,6 +130,28 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 	// Because getting information on the storage folders requires looking at
 	// the state of the contract manager, we should go through the WAL.
 	return cm.wal.managedStorageFolders()
+}
+
+// emptiestStorageFolder takes a set of storage folders and returns the storage
+// folder with the lowest utilization by percentage. 'nil' is returned if there
+// are no storage folders provided with sufficient free space for a sector.
+func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
+	enoughRoom := false
+	mostFree := float64(-1)
+	winningIndex := -1
+	for i, sf := range sfs {
+		totalCapacity := uint64(len(sf.Usage)) * 64
+		freeCapacity := float64(totalCapacity-sf.Sectors) / float64(totalCapacity)
+		if freeCapacity > 0 && freeCapacity > mostFree {
+			enoughRoom = true
+			mostFree = freeCapacity
+			winningIndex = i
+		}
+	}
+	if !enoughRoom {
+		return nil, -1
+	}
+	return sfs[winningIndex], winningIndex
 }
 
 // managedStorageFolders will return a list of storage folders in the host,
@@ -145,21 +170,13 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 		for _, sf := range wal.cm.storageFolders {
 			// Grab the non-computational data.
 			sfm := modules.StorageFolderMetadata{
-				Capacity: modules.SectorSize * 32 * uint64(len(sf.Usage)),
-				Path:     sf.Path,
+				Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
+				CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.Sectors) * modules.SectorSize,
+				Path:              sf.Path,
 
 				ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
 				ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 			}
-
-			// Perform computation on the Usage value to determine the number
-			// of sectors in use.
-			var sectorsInUse uint64
-			for _, i := range sf.Usage {
-				sectorsInUse += numSetBits(i)
-			}
-			sfm.CapacityRemaining = sfm.Capacity - modules.SectorSize*sectorsInUse
-
 			// Add this storage folder to the list of storage folders.
 			smfs = append(smfs, sfm)
 		}
@@ -171,8 +188,8 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 	for _, uc := range wal.uncommittedChanges {
 		for _, sf := range uc.StorageFolderAdditions {
 			smfs = append(smfs, modules.StorageFolderMetadata{
-				Capacity:          modules.SectorSize * 32 * uint64(len(sf.Usage)),
-				CapacityRemaining: modules.SectorSize * 32 * uint64(len(sf.Usage)),
+				Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
+				CapacityRemaining: modules.SectorSize * 64 * uint64(len(sf.Usage)),
 				Path:              sf.Path,
 
 				ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
@@ -182,8 +199,8 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 	}
 	for _, sf := range wal.findUnfinishedStorageFolderAdditions(wal.uncommittedChanges) {
 		smfs = append(smfs, modules.StorageFolderMetadata{
-			Capacity:          modules.SectorSize * 32 * uint64(len(sf.Usage)),
-			CapacityRemaining: modules.SectorSize * 32 * uint64(len(sf.Usage)),
+			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
+			CapacityRemaining: modules.SectorSize * 64 * uint64(len(sf.Usage)),
 			Path:              sf.Path,
 
 			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
@@ -351,37 +368,6 @@ type storageFolder struct {
 	FailedWrites     uint64
 	SuccessfulReads  uint64
 	SuccessfulWrites uint64
-}
-
-// emptiestStorageFolder takes a set of storage folders and returns the storage
-// folder with the lowest utilization by percentage. 'nil' is returned if there
-// are no storage folders provided with sufficient free space for a sector.
-func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
-	mostFree := float64(-1) // Set lower than the min amount available to protect from floating point imprecision.
-	winningIndex := -1      // Set to impossible value to prevent unintentionally returning the wrong storage folder.
-	winner := false
-	for i, sf := range sfs {
-		// Check that this storage folder has at least enough space to hold a
-		// new sector. Also perform a sanity check that the storage folder has
-		// a sane amount of storage remaining.
-		if sf.SizeRemaining < modules.SectorSize || sf.Size < sf.SizeRemaining {
-			continue
-		}
-		winner = true // at least one storage folder has enough space for a new sector.
-
-		// Check this storage folder against the current winning storage folder's utilization.
-		sfFree := float64(sf.SizeRemaining) / float64(sf.Size)
-		if mostFree < sfFree {
-			mostFree = sfFree
-			winningIndex = i
-		}
-	}
-	// Do not return any storage folder if none of them have enough room for a
-	// new sector.
-	if !winner {
-		return nil, -1
-	}
-	return sfs[winningIndex], winningIndex
 }
 
 // offloadStorageFolder takes sectors in a storage folder and moves them to
