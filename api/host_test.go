@@ -42,6 +42,76 @@ var (
 	}
 )
 
+// TestStorageHandler tests that host storage is being reported correctly.
+func TestStorageHandler(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestStorageHandler")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host and start accepting contracts.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file.
+	path := filepath.Join(st.dir, "test.dat")
+	fileBytes := 1024
+	if err := createRandFile(path, fileBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	if err := st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Only one piece will be uploaded (10% at current redundancy)
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Error(rf.Files[0].UploadProgress)
+		t.Fatal("uploading has failed")
+	}
+
+	var sg StorageGET
+	if err := st.getAPI("/host/storage", &sg); err != nil {
+		t.Fatal(err)
+	}
+
+	// Uploading succeeded, so /host/storage should be reporting a successful
+	// write.
+	if sg.Folders[0].SuccessfulWrites != 1 {
+		t.Fatalf("expected 1 successful write, got %v", sg.Folders[0].SuccessfulWrites)
+	}
+	if used := sg.Folders[0].Capacity - sg.Folders[0].CapacityRemaining; used != modules.SectorSize {
+		t.Fatalf("expected used capacity to be the size of one sector (%v bytes), got %v bytes", modules.SectorSize, used)
+	}
+}
+
 // TestAddFolderNoPath tests that an API call to add a storage folder fails if
 // no path was provided.
 func TestAddFolderNoPath(t *testing.T) {
