@@ -42,6 +42,81 @@ var (
 	}
 )
 
+// TestAddFolderNoPath tests that an API call to add a storage folder fails if
+// no path was provided.
+func TestAddFolderNoPath(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	st, err := createServerTester("TestAddFolderNoPath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Try adding a storage folder without setting "path" in the API call.
+	addValues := url.Values{}
+	addValues.Set("size", mediumSizeFolderString)
+	err = st.stdPostAPI("/host/storage/folders/add", addValues)
+	if err == nil || err.Error() != storagemanager.ErrEmptyPath.Error() {
+		t.Fatalf("expected error to be %v; got %v", storagemanager.ErrEmptyPath, err)
+	}
+
+	// Setting the path to an empty string should trigger the same error.
+	addValues.Set("path", "")
+	err = st.stdPostAPI("/host/storage/folders/add", addValues)
+	if err == nil || err.Error() != storagemanager.ErrEmptyPath.Error() {
+		t.Fatalf("expected error to be %v; got %v", storagemanager.ErrEmptyPath, err)
+	}
+}
+
+// TestAddFolderNoSize tests that an API call to add a storage folder fails if
+// no path was provided.
+func TestAddFolderNoSize(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestAddFolderNoSize")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Try adding a storage folder without setting "size" in the API call.
+	addValues := url.Values{}
+	addValues.Set("path", st.dir)
+	err = st.stdPostAPI("/host/storage/folders/add", addValues)
+	if err == nil || err.Error() != io.EOF.Error() {
+		t.Fatalf("expected error to be %v, got %v", io.EOF, err)
+	}
+}
+
+// TestAddSameFolderTwice tests that an API call that attempts to add a
+// host storage folder that's already been added is handled gracefully.
+func TestAddSameFolderTwice(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestAddSameFolderTwice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Make the call to add a storage folder twice.
+	addValues := url.Values{}
+	addValues.Set("path", st.dir)
+	addValues.Set("size", mediumSizeFolderString)
+	err = st.stdPostAPI("/host/storage/folders/add", addValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.stdPostAPI("/host/storage/folders/add", addValues)
+	if err == nil || err.Error() != storagemanager.ErrRepeatFolder.Error() {
+		t.Fatalf("expected err to be %v, got %v", err, storagemanager.ErrRepeatFolder)
+	}
+}
+
 // TestResizeEmptyStorageFolder tests that invalid and valid calls to resize
 // an empty storage folder are properly handled.
 func TestResizeEmptyStorageFolder(t *testing.T) {
