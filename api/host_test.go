@@ -419,8 +419,141 @@ func TestResizeFolderNoPath(t *testing.T) {
 	resizeValues := url.Values{}
 	resizeValues.Set("newsize", mediumSizeFolderString)
 	err = st.stdPostAPI("/host/storage/folders/resize", resizeValues)
-	if err == nil || err.Error() != "path parameter is required" {
-		t.Fatalf("expected error to be path parameter is required; got %v", err)
+	if err == nil || err.Error() != errNoPath.Error() {
+		t.Fatalf("expected error to be %v; got %v", errNoPath, err)
+	}
+}
+
+// TestRemoveEmptyStorageFolder checks that removing an empty storage folder
+// succeeds -- even if the host is left with zero storage folders.
+func TestRemoveEmptyStorageFolder(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	st, err := createServerTester("TestRemoveEmptyStorageFolder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Set up a storage folder for the host.
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Try to delete the host's empty storage folder.
+	removeValues := url.Values{}
+	removeValues.Set("path", st.dir)
+	if err = st.stdPostAPI("/host/storage/folders/remove", removeValues); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestRemoveStorageFolderError checks that invalid calls to
+// /host/storage/folders/remove fail with the appropriate error.
+func TestRemoveStorageFolderError(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	st, err := createServerTester("TestRemoveStorageFolderErr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Set up a storage folder for the host.
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Try removing a nonexistent folder.
+	removeValues := url.Values{}
+	removeValues.Set("path", "/foo/bar")
+	err = st.stdPostAPI("/host/storage/folders/remove", removeValues)
+	if err == nil || err.Error() != errStorageFolderNotFound.Error() {
+		t.Fatalf("expected error %v, got %v", errStorageFolderNotFound, err)
+	}
+
+	// The folder path can't be an empty string.
+	removeValues.Set("path", "")
+	err = st.stdPostAPI("/host/storage/folders/remove", removeValues)
+	if err == nil || err.Error() != errNoPath.Error() {
+		t.Fatalf("expected error to be %v; got %v", errNoPath, err)
+	}
+}
+
+// TestRemoveStorageFolderForced checks that if a call to remove a storage
+// folder will result in data loss, that call succeeds if and only if "force"
+// has been set to "true".
+func TestRemoveStorageFolderForced(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	st, err := createServerTester("TestRemoveStorageFolderForced")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Announce the host.
+	if err := st.announceHost(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.acceptContracts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.setHostStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set an allowance for the renter, allowing a contract to be formed.
+	allowanceValues := url.Values{}
+	allowanceValues.Set("funds", testFunds)
+	allowanceValues.Set("period", testPeriod)
+	if err = st.stdPostAPI("/renter", allowanceValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file for upload.
+	path := filepath.Join(st.dir, "test.dat")
+	if err := createRandFile(path, 512); err != nil {
+		t.Fatal(err)
+	}
+	// Upload to host.
+	uploadValues := url.Values{}
+	uploadValues.Set("source", path)
+	if err := st.stdPostAPI("/renter/upload/test", uploadValues); err != nil {
+		t.Fatal(err)
+	}
+
+	// Only one piece will be uploaded (10%  at current redundancy)
+	var rf RenterFiles
+	for i := 0; i < 200 && (len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10); i++ {
+		st.getAPI("/renter/files", &rf)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(rf.Files) != 1 || rf.Files[0].UploadProgress < 10 {
+		t.Error(rf.Files[0].UploadProgress)
+		t.Fatal("uploading has failed")
+	}
+
+	// The host should not be able to remove its only folder without setting
+	// "force" to "true", since this will result in data loss (there are no
+	// other folders for the data to be redistributed to).
+	removeValues := url.Values{}
+	removeValues.Set("path", st.dir)
+	err = st.stdPostAPI("/host/storage/folders/remove", removeValues)
+	if err == nil || err.Error() != storagemanager.ErrIncompleteOffload.Error() {
+		t.Fatalf("expected err to be %v; got %v", storagemanager.ErrIncompleteOffload, err)
+	}
+	// Forced removal of the folder should succeed, though.
+	removeValues.Set("force", "true")
+	err = st.stdPostAPI("/host/storage/folders/remove", removeValues)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

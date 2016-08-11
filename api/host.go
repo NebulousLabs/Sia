@@ -11,6 +11,10 @@ import (
 )
 
 var (
+	// errNoPath is returned when a call fails to provide a nonempty string
+	// for the path parameter.
+	errNoPath = Error{"path parameter is required"}
+
 	// errStorageFolderNotFound is returned if a call is made looking for a
 	// storage folder which does not appear to exist within the storage
 	// manager.
@@ -149,7 +153,7 @@ func (srv *Server) storageFoldersAddHandler(w http.ResponseWriter, req *http.Req
 func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folderPath := req.FormValue("path")
 	if folderPath == "" {
-		writeError(w, Error{"path parameter is required"}, http.StatusBadRequest)
+		writeError(w, errNoPath, http.StatusBadRequest)
 		return
 	}
 
@@ -179,7 +183,7 @@ func (srv *Server) storageFoldersResizeHandler(w http.ResponseWriter, req *http.
 func (srv *Server) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folderPath := req.FormValue("path")
 	if folderPath == "" {
-		writeError(w, Error{"path parameter is required"}, http.StatusBadRequest)
+		writeError(w, errNoPath, http.StatusBadRequest)
 		return
 	}
 
