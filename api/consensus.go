@@ -21,7 +21,7 @@ type ConsensusGET struct {
 func (api *API) consensusHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	cbid := api.cs.CurrentBlock().ID()
 	currentTarget, _ := api.cs.ChildTarget(cbid)
-	writeJSON(w, ConsensusGET{
+	WriteJSON(w, ConsensusGET{
 		Synced:       api.cs.Synced(),
 		Height:       api.cs.Height(),
 		CurrentBlock: cbid,

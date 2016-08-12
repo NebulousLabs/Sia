@@ -23,7 +23,7 @@ func (api *API) gatewayHandler(w http.ResponseWriter, req *http.Request, _ httpr
 	if peers == nil {
 		peers = make([]modules.Peer, 0)
 	}
-	writeJSON(w, GatewayGET{api.gateway.Address(), peers})
+	WriteJSON(w, GatewayGET{api.gateway.Address(), peers})
 }
 
 // gatewayConnectHandler handles the API call to add a peer to the gateway.
@@ -31,11 +31,11 @@ func (api *API) gatewayConnectHandler(w http.ResponseWriter, req *http.Request, 
 	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := api.gateway.Connect(addr)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // gatewayDisconnectHandler handles the API call to remove a peer from the gateway.
@@ -43,9 +43,9 @@ func (api *API) gatewayDisconnectHandler(w http.ResponseWriter, req *http.Reques
 	addr := modules.NetAddress(ps.ByName("netaddress"))
 	err := api.gateway.Disconnect(addr)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
-	writeSuccess(w)
+	WriteSuccess(w)
 }

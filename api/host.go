@@ -63,7 +63,7 @@ func (api *API) hostHandlerGET(w http.ResponseWriter, req *http.Request, _ httpr
 		InternalSettings: is,
 		NetworkMetrics:   nm,
 	}
-	writeJSON(w, hg)
+	WriteJSON(w, hg)
 }
 
 // hostHandlerPOST handles POST request to the /host API endpoint, which sets
@@ -95,17 +95,17 @@ func (api *API) hostHandlerPOST(w http.ResponseWriter, req *http.Request, _ http
 		if req.FormValue(qs) != "" { // skip empty values
 			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
 			if err != nil {
-				writeError(w, Error{"Malformed " + qs}, http.StatusBadRequest)
+				WriteError(w, Error{"Malformed " + qs}, http.StatusBadRequest)
 				return
 			}
 		}
 	}
 	err := api.host.SetInternalSettings(settings)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // hostAnnounceHandler handles the API call to get the host to announce itself
@@ -118,16 +118,16 @@ func (api *API) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ 
 		err = api.host.Announce()
 	}
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // storageHandler returns a bunch of information about storage management on
 // the host.
 func (api *API) storageHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, StorageGET{
+	WriteJSON(w, StorageGET{
 		Folders: api.host.StorageFolders(),
 	})
 }
@@ -138,44 +138,44 @@ func (api *API) storageFoldersAddHandler(w http.ResponseWriter, req *http.Reques
 	var folderSize uint64
 	_, err := fmt.Sscan(req.FormValue("size"), &folderSize)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = api.host.AddStorageFolder(folderPath, folderSize)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // storageFoldersResizeHandler resizes a storage folder in the storage manager.
 func (api *API) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folderPath := req.FormValue("path")
 	if folderPath == "" {
-		writeError(w, errNoPath, http.StatusBadRequest)
+		WriteError(w, Error{"path parameter is required"}, http.StatusBadRequest)
 		return
 	}
 
 	storageFolders := api.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	var newSize uint64
 	_, err = fmt.Sscan(req.FormValue("newsize"), &newSize)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = api.host.ResizeStorageFolder(folderIndex, newSize)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // storageFoldersRemoveHandler removes a storage folder from the storage
@@ -183,24 +183,24 @@ func (api *API) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Req
 func (api *API) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	folderPath := req.FormValue("path")
 	if folderPath == "" {
-		writeError(w, errNoPath, http.StatusBadRequest)
+		WriteError(w, Error{"path parameter is required"}, http.StatusBadRequest)
 		return
 	}
 
 	storageFolders := api.host.StorageFolders()
 	folderIndex, err := folderIndex(folderPath, storageFolders)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	force := req.FormValue("force") == "true"
 	err = api.host.RemoveStorageFolder(folderIndex, force)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // storageSectorsDeleteHandler handles the call to delete a sector from the
@@ -208,13 +208,13 @@ func (api *API) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Req
 func (api *API) storageSectorsDeleteHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	sectorRoot, err := scanHash(ps.ByName("merkleroot"))
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = api.host.DeleteSector(sectorRoot)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }

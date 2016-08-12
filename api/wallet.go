@@ -106,7 +106,7 @@ func encryptionKeys(seedStr string) (validKeys []crypto.TwofishKey) {
 func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	siacoinBal, siafundBal, siaclaimBal := api.wallet.ConfirmedBalance()
 	siacoinsOut, siacoinsIn := api.wallet.UnconfirmedBalance()
-	writeJSON(w, WalletGET{
+	WriteJSON(w, WalletGET{
 		Encrypted: api.wallet.Encrypted(),
 		Unlocked:  api.wallet.Unlocked(),
 
@@ -124,39 +124,39 @@ func (api *API) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ ht
 	source := req.FormValue("source")
 	// Check that source is an absolute paths.
 	if !filepath.IsAbs(source) {
-		writeError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
 		return
 	}
 	potentialKeys := encryptionKeys(req.FormValue("encryptionpassword"))
 	for _, key := range potentialKeys {
 		err := api.wallet.Load033xWallet(key, source)
 		if err == nil {
-			writeSuccess(w)
+			WriteSuccess(w)
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, Error{"error when calling /wallet/033x: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"error when calling /wallet/033x: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
-	writeError(w, Error{modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+	WriteError(w, Error{modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 }
 
 // walletAddressHandler handles API calls to /wallet/address.
 func (api *API) walletAddressHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	unlockConditions, err := api.wallet.NextAddress()
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/addresses: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/addresses: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, WalletAddressGET{
+	WriteJSON(w, WalletAddressGET{
 		Address: unlockConditions.UnlockHash(),
 	})
 }
 
 // walletAddressHandler handles API calls to /wallet/addresses.
 func (api *API) walletAddressesHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	writeJSON(w, WalletAddressesGET{
+	WriteJSON(w, WalletAddressesGET{
 		Addresses: api.wallet.AllAddresses(),
 	})
 }
@@ -166,15 +166,15 @@ func (api *API) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ 
 	destination := req.FormValue("destination")
 	// Check that the destination is absolute.
 	if !filepath.IsAbs(destination) {
-		writeError(w, Error{"error when calling /wallet/backup: destination must be an absolute path"}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/backup: destination must be an absolute path"}, http.StatusBadRequest)
 		return
 	}
 	err := api.wallet.CreateBackup(destination)
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/backup: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/backup: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // walletInitHandler handles API calls to /wallet/init.
@@ -185,7 +185,7 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	}
 	seed, err := api.wallet.Encrypt(encryptionKey)
 	if err != nil {
-		writeError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -195,10 +195,10 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	}
 	seedStr, err := modules.SeedToString(seed, dictID)
 	if err != nil {
-		writeError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, WalletInitPOST{
+	WriteJSON(w, WalletInitPOST{
 		PrimarySeed: seedStr,
 	})
 }
@@ -212,7 +212,7 @@ func (api *API) walletSeedHandler(w http.ResponseWriter, req *http.Request, _ ht
 	}
 	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
 	if err != nil {
-		writeError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
@@ -220,15 +220,15 @@ func (api *API) walletSeedHandler(w http.ResponseWriter, req *http.Request, _ ht
 	for _, key := range potentialKeys {
 		err := api.wallet.LoadSeed(key, seed)
 		if err == nil {
-			writeSuccess(w)
+			WriteSuccess(w)
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
-	writeError(w, Error{"error when calling /wallet/seed: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+	WriteError(w, Error{"error when calling /wallet/seed: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 }
 
 // walletSiagkeyHandler handles API calls to /wallet/siagkey.
@@ -240,7 +240,7 @@ func (api *API) walletSiagkeyHandler(w http.ResponseWriter, req *http.Request, _
 	for _, keypath := range keyfiles {
 		// Check that all key paths are absolute paths.
 		if !filepath.IsAbs(keypath) {
-			writeError(w, Error{"error when calling /wallet/siagkey: keyfiles contains a non-absolute path"}, http.StatusBadRequest)
+			WriteError(w, Error{"error when calling /wallet/siagkey: keyfiles contains a non-absolute path"}, http.StatusBadRequest)
 			return
 		}
 	}
@@ -248,25 +248,25 @@ func (api *API) walletSiagkeyHandler(w http.ResponseWriter, req *http.Request, _
 	for _, key := range potentialKeys {
 		err := api.wallet.LoadSiagKeys(key, keyfiles)
 		if err == nil {
-			writeSuccess(w)
+			WriteSuccess(w)
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, Error{"error when calling /wallet/siagkey: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"error when calling /wallet/siagkey: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
-	writeError(w, Error{"error when calling /wallet/siagkey: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+	WriteError(w, Error{"error when calling /wallet/siagkey: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 }
 
 // walletLockHanlder handles API calls to /wallet/lock.
 func (api *API) walletLockHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	err := api.wallet.Lock()
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // walletSeedsHandler handles API calls to /wallet/seeds.
@@ -279,31 +279,31 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 	// Get the primary seed information.
 	primarySeed, progress, err := api.wallet.PrimarySeed()
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	primarySeedStr, err := modules.SeedToString(primarySeed, dictionary)
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	// Get the list of seeds known to the wallet.
 	allSeeds, err := api.wallet.AllSeeds()
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	var allSeedsStrs []string
 	for _, seed := range allSeeds {
 		str, err := modules.SeedToString(seed, dictionary)
 		if err != nil {
-			writeError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 		allSeedsStrs = append(allSeedsStrs, str)
 	}
-	writeJSON(w, WalletSeedsGET{
+	WriteJSON(w, WalletSeedsGET{
 		PrimarySeed:        primarySeedStr,
 		AddressesRemaining: int(modules.PublicKeysPerSeed - progress),
 		AllSeeds:           allSeedsStrs,
@@ -314,25 +314,25 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	amount, ok := scanAmount(req.FormValue("amount"))
 	if !ok {
-		writeError(w, Error{"could not read 'amount' from POST call to /wallet/siacoins"}, http.StatusBadRequest)
+		WriteError(w, Error{"could not read 'amount' from POST call to /wallet/siacoins"}, http.StatusBadRequest)
 		return
 	}
 	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	txns, err := api.wallet.SendSiacoins(amount, dest)
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{"error after call to /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 	var txids []types.TransactionID
 	for _, txn := range txns {
 		txids = append(txids, txn.ID())
 	}
-	writeJSON(w, WalletSiacoinsPOST{
+	WriteJSON(w, WalletSiacoinsPOST{
 		TransactionIDs: txids,
 	})
 }
@@ -341,25 +341,25 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 func (api *API) walletSiafundsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	amount, ok := scanAmount(req.FormValue("amount"))
 	if !ok {
-		writeError(w, Error{"could not read 'amount' from POST call to /wallet/siafunds"}, http.StatusBadRequest)
+		WriteError(w, Error{"could not read 'amount' from POST call to /wallet/siafunds"}, http.StatusBadRequest)
 		return
 	}
 	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	txns, err := api.wallet.SendSiafunds(amount, dest)
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusInternalServerError)
+		WriteError(w, Error{"error after call to /wallet/siafunds: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 	var txids []types.TransactionID
 	for _, txn := range txns {
 		txids = append(txids, txn.ID())
 	}
-	writeJSON(w, WalletSiafundsPOST{
+	WriteJSON(w, WalletSiafundsPOST{
 		TransactionIDs: txids,
 	})
 }
@@ -371,16 +371,16 @@ func (api *API) walletTransactionHandler(w http.ResponseWriter, req *http.Reques
 	jsonID := "\"" + ps.ByName("id") + "\""
 	err := id.UnmarshalJSON([]byte(jsonID))
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/history: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/history: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	txn, ok := api.wallet.Transaction(id)
 	if !ok {
-		writeError(w, Error{"error when calling /wallet/transaction/$(id): transaction not found"}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/transaction/$(id): transaction not found"}, http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, WalletTransactionGETid{
+	WriteJSON(w, WalletTransactionGETid{
 		Transaction: txn,
 	})
 }
@@ -389,28 +389,28 @@ func (api *API) walletTransactionHandler(w http.ResponseWriter, req *http.Reques
 func (api *API) walletTransactionsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	startheightStr, endheightStr := req.FormValue("startheight"), req.FormValue("endheight")
 	if startheightStr == "" || endheightStr == "" {
-		writeError(w, Error{"startheight and endheight must be provided to a /wallet/transactions call."}, http.StatusBadRequest)
+		WriteError(w, Error{"startheight and endheight must be provided to a /wallet/transactions call."}, http.StatusBadRequest)
 		return
 	}
 	// Get the start and end blocks.
 	start, err := strconv.Atoi(startheightStr)
 	if err != nil {
-		writeError(w, Error{"parsing integer value for parameter `startheight` failed: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"parsing integer value for parameter `startheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	end, err := strconv.Atoi(endheightStr)
 	if err != nil {
-		writeError(w, Error{"parsing integer value for parameter `endheight` failed: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"parsing integer value for parameter `endheight` failed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	confirmedTxns, err := api.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	unconfirmedTxns := api.wallet.UnconfirmedTransactions()
 
-	writeJSON(w, WalletTransactionsGET{
+	WriteJSON(w, WalletTransactionsGET{
 		ConfirmedTransactions:   confirmedTxns,
 		UnconfirmedTransactions: unconfirmedTxns,
 	})
@@ -424,13 +424,13 @@ func (api *API) walletTransactionsAddrHandler(w http.ResponseWriter, req *http.R
 	var addr types.UnlockHash
 	err := addr.UnmarshalJSON([]byte(jsonAddr))
 	if err != nil {
-		writeError(w, Error{"error after call to /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error after call to /wallet/transactions: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	confirmedATs := api.wallet.AddressTransactions(addr)
 	unconfirmedATs := api.wallet.AddressUnconfirmedTransactions(addr)
-	writeJSON(w, WalletTransactionsGETaddr{
+	WriteJSON(w, WalletTransactionsGETaddr{
 		ConfirmedTransactions:   confirmedATs,
 		UnconfirmedTransactions: unconfirmedATs,
 	})
@@ -442,13 +442,13 @@ func (api *API) walletUnlockHandler(w http.ResponseWriter, req *http.Request, _ 
 	for _, key := range potentialKeys {
 		err := api.wallet.Unlock(key)
 		if err == nil {
-			writeSuccess(w)
+			WriteSuccess(w)
 			return
 		}
 		if err != nil && err != modules.ErrBadEncryptionKey {
-			writeError(w, Error{"error when calling /wallet/unlock: " + err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{"error when calling /wallet/unlock: " + err.Error()}, http.StatusBadRequest)
 			return
 		}
 	}
-	writeError(w, Error{"error when calling /wallet/unlock: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+	WriteError(w, Error{"error when calling /wallet/unlock: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 }

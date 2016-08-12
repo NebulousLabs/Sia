@@ -86,22 +86,22 @@ func HttpPOSTAuthenticated(url string, data string, password string) (resp *http
 	return http.DefaultClient.Do(req)
 }
 
-// requireUserAgent is middleware that requires all requests to set a
+// RequireUserAgent is middleware that requires all requests to set a
 // UserAgent that contains the specified string.
-func requireUserAgent(h http.Handler, ua string) http.Handler {
+func RequireUserAgent(h http.Handler, ua string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !strings.Contains(req.UserAgent(), ua) {
-			writeError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
+			WriteError(w, Error{"Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
 			return
 		}
 		h.ServeHTTP(w, req)
 	})
 }
 
-// requirePassword is middleware that requires a request to authenticate with a
+// RequirePassword is middleware that requires a request to authenticate with a
 // password using HTTP basic auth. Usernames are ignored. Empty passwords
 // indicate no authentication is required.
-func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
+func RequirePassword(h httprouter.Handle, password string) httprouter.Handle {
 	// An empty password is equivalent to no password.
 	if password == "" {
 		return h
@@ -110,7 +110,7 @@ func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
 		_, pass, ok := req.BasicAuth()
 		if !ok || pass != password {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
-			writeError(w, Error{"API authentication failed."}, http.StatusUnauthorized)
+			WriteError(w, Error{"API authentication failed."}, http.StatusUnauthorized)
 			return
 		}
 		h(w, req, ps)
@@ -154,7 +154,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 
 	// Register API handlers
 	router := httprouter.New()
-	router.NotFound = http.HandlerFunc(unrecognizedCallHandler)
+	router.NotFound = http.HandlerFunc(UnrecognizedCallHandler)
 
 	// Consensus API Calls
 	if api.cs != nil {
@@ -171,53 +171,53 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// Gateway API Calls
 	if api.gateway != nil {
 		router.GET("/gateway", api.gatewayHandler)
-		router.POST("/gateway/connect/:netaddress", requirePassword(api.gatewayConnectHandler, requiredPassword))
-		router.POST("/gateway/disconnect/:netaddress", requirePassword(api.gatewayDisconnectHandler, requiredPassword))
+		router.POST("/gateway/connect/:netaddress", RequirePassword(api.gatewayConnectHandler, requiredPassword))
+		router.POST("/gateway/disconnect/:netaddress", RequirePassword(api.gatewayDisconnectHandler, requiredPassword))
 	}
 
 	// Host API Calls
 	if api.host != nil {
 		// Calls directly pertaining to the host.
 		router.GET("/host", api.hostHandlerGET)                                                   // Get the host status.
-		router.POST("/host", requirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
-		router.POST("/host/announce", requirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
+		router.POST("/host", RequirePassword(api.hostHandlerPOST, requiredPassword))              // Change the settings of the host.
+		router.POST("/host/announce", RequirePassword(api.hostAnnounceHandler, requiredPassword)) // Announce the host to the network.
 
 		// Calls pertaining to the storage manager that the host uses.
 		router.GET("/host/storage", api.storageHandler)
-		router.POST("/host/storage/folders/add", requirePassword(api.storageFoldersAddHandler, requiredPassword))
-		router.POST("/host/storage/folders/remove", requirePassword(api.storageFoldersRemoveHandler, requiredPassword))
-		router.POST("/host/storage/folders/resize", requirePassword(api.storageFoldersResizeHandler, requiredPassword))
-		router.POST("/host/storage/sectors/delete/:merkleroot", requirePassword(api.storageSectorsDeleteHandler, requiredPassword))
+		router.POST("/host/storage/folders/add", RequirePassword(api.storageFoldersAddHandler, requiredPassword))
+		router.POST("/host/storage/folders/remove", RequirePassword(api.storageFoldersRemoveHandler, requiredPassword))
+		router.POST("/host/storage/folders/resize", RequirePassword(api.storageFoldersResizeHandler, requiredPassword))
+		router.POST("/host/storage/sectors/delete/:merkleroot", RequirePassword(api.storageSectorsDeleteHandler, requiredPassword))
 	}
 
 	// Miner API Calls
 	if api.miner != nil {
 		router.GET("/miner", api.minerHandler)
-		router.GET("/miner/header", requirePassword(api.minerHeaderHandlerGET, requiredPassword))
-		router.POST("/miner/header", requirePassword(api.minerHeaderHandlerPOST, requiredPassword))
-		router.GET("/miner/start", requirePassword(api.minerStartHandler, requiredPassword))
-		router.GET("/miner/stop", requirePassword(api.minerStopHandler, requiredPassword))
+		router.GET("/miner/header", RequirePassword(api.minerHeaderHandlerGET, requiredPassword))
+		router.POST("/miner/header", RequirePassword(api.minerHeaderHandlerPOST, requiredPassword))
+		router.GET("/miner/start", RequirePassword(api.minerStartHandler, requiredPassword))
+		router.GET("/miner/stop", RequirePassword(api.minerStopHandler, requiredPassword))
 	}
 
 	// Renter API Calls
 	if api.renter != nil {
 		router.GET("/renter", api.renterHandlerGET)
-		router.POST("/renter", requirePassword(api.renterHandlerPOST, requiredPassword))
+		router.POST("/renter", RequirePassword(api.renterHandlerPOST, requiredPassword))
 		router.GET("/renter/contracts", api.renterContractsHandler)
 		router.GET("/renter/downloads", api.renterDownloadsHandler)
 		router.GET("/renter/files", api.renterFilesHandler)
 
 		// TODO: re-enable these routes once the new .sia format has been
 		// standardized and implemented.
-		// router.POST("/renter/load", requirePassword(api.renterLoadHandler, requiredPassword))
-		// router.POST("/renter/loadascii", requirePassword(api.renterLoadAsciiHandler, requiredPassword))
-		// router.GET("/renter/share", requirePassword(api.renterShareHandler, requiredPassword))
-		// router.GET("/renter/shareascii", requirePassword(api.renterShareAsciiHandler, requiredPassword))
+		// router.POST("/renter/load", RequirePassword(api.renterLoadHandler, requiredPassword))
+		// router.POST("/renter/loadascii", RequirePassword(api.renterLoadAsciiHandler, requiredPassword))
+		// router.GET("/renter/share", RequirePassword(api.renterShareHandler, requiredPassword))
+		// router.GET("/renter/shareascii", RequirePassword(api.renterShareAsciiHandler, requiredPassword))
 
-		router.POST("/renter/delete/*siapath", requirePassword(api.renterDeleteHandler, requiredPassword))
-		router.GET("/renter/download/*siapath", requirePassword(api.renterDownloadHandler, requiredPassword))
-		router.POST("/renter/rename/*siapath", requirePassword(api.renterRenameHandler, requiredPassword))
-		router.POST("/renter/upload/*siapath", requirePassword(api.renterUploadHandler, requiredPassword))
+		router.POST("/renter/delete/*siapath", RequirePassword(api.renterDeleteHandler, requiredPassword))
+		router.GET("/renter/download/*siapath", RequirePassword(api.renterDownloadHandler, requiredPassword))
+		router.POST("/renter/rename/*siapath", RequirePassword(api.renterRenameHandler, requiredPassword))
+		router.POST("/renter/upload/*siapath", RequirePassword(api.renterUploadHandler, requiredPassword))
 
 		// HostDB endpoints.
 		router.GET("/hostdb/active", api.renterHostsActiveHandler)
@@ -233,35 +233,35 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 	// Wallet API Calls
 	if api.wallet != nil {
 		router.GET("/wallet", api.walletHandler)
-		router.POST("/wallet/033x", requirePassword(api.wallet033xHandler, requiredPassword))
-		router.GET("/wallet/address", requirePassword(api.walletAddressHandler, requiredPassword))
+		router.POST("/wallet/033x", RequirePassword(api.wallet033xHandler, requiredPassword))
+		router.GET("/wallet/address", RequirePassword(api.walletAddressHandler, requiredPassword))
 		router.GET("/wallet/addresses", api.walletAddressesHandler)
-		router.GET("/wallet/backup", requirePassword(api.walletBackupHandler, requiredPassword))
-		router.POST("/wallet/init", requirePassword(api.walletInitHandler, requiredPassword))
-		router.POST("/wallet/lock", requirePassword(api.walletLockHandler, requiredPassword))
-		router.POST("/wallet/seed", requirePassword(api.walletSeedHandler, requiredPassword))
-		router.GET("/wallet/seeds", requirePassword(api.walletSeedsHandler, requiredPassword))
-		router.POST("/wallet/siacoins", requirePassword(api.walletSiacoinsHandler, requiredPassword))
-		router.POST("/wallet/siafunds", requirePassword(api.walletSiafundsHandler, requiredPassword))
-		router.POST("/wallet/siagkey", requirePassword(api.walletSiagkeyHandler, requiredPassword))
+		router.GET("/wallet/backup", RequirePassword(api.walletBackupHandler, requiredPassword))
+		router.POST("/wallet/init", RequirePassword(api.walletInitHandler, requiredPassword))
+		router.POST("/wallet/lock", RequirePassword(api.walletLockHandler, requiredPassword))
+		router.POST("/wallet/seed", RequirePassword(api.walletSeedHandler, requiredPassword))
+		router.GET("/wallet/seeds", RequirePassword(api.walletSeedsHandler, requiredPassword))
+		router.POST("/wallet/siacoins", RequirePassword(api.walletSiacoinsHandler, requiredPassword))
+		router.POST("/wallet/siafunds", RequirePassword(api.walletSiafundsHandler, requiredPassword))
+		router.POST("/wallet/siagkey", RequirePassword(api.walletSiagkeyHandler, requiredPassword))
 		router.GET("/wallet/transaction/:id", api.walletTransactionHandler)
 		router.GET("/wallet/transactions", api.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", api.walletTransactionsAddrHandler)
-		router.POST("/wallet/unlock", requirePassword(api.walletUnlockHandler, requiredPassword))
+		router.POST("/wallet/unlock", RequirePassword(api.walletUnlockHandler, requiredPassword))
 	}
 
 	// Apply UserAgent middleware and return the API
-	api.router = requireUserAgent(router, requiredUserAgent)
+	api.router = RequireUserAgent(router, requiredUserAgent)
 	return api
 }
 
-// unrecognizedCallHandler handles calls to unknown pages (404).
-func unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	writeError(w, Error{"404 - Refer to API.md"}, http.StatusNotFound)
+// UnrecognizedCallHandler handles calls to unknown pages (404).
+func UnrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
+	WriteError(w, Error{"404 - Refer to API.md"}, http.StatusNotFound)
 }
 
-// writeError an error to the API caller.
-func writeError(w http.ResponseWriter, err Error, code int) {
+// WriteError an error to the API caller.
+func WriteError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	if json.NewEncoder(w).Encode(err) != nil {
@@ -269,19 +269,19 @@ func writeError(w http.ResponseWriter, err Error, code int) {
 	}
 }
 
-// writeJSON writes the object to the ResponseWriter. If the encoding fails, an
+// WriteJSON writes the object to the ResponseWriter. If the encoding fails, an
 // error is written instead. The Content-Type of the response header is set
 // accordingly.
-func writeJSON(w http.ResponseWriter, obj interface{}) {
+func WriteJSON(w http.ResponseWriter, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if json.NewEncoder(w).Encode(obj) != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
 
-// writeSuccess writes the HTTP header with status 204 No Content to the
-// ResponseWriter. writeSuccess should only be used to indicate that the
+// WriteSuccess writes the HTTP header with status 204 No Content to the
+// ResponseWriter. WriteSuccess should only be used to indicate that the
 // requested action succeeded AND there is no data to return.
-func writeSuccess(w http.ResponseWriter) {
+func WriteSuccess(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
 }

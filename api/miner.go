@@ -29,19 +29,19 @@ func (api *API) minerHandler(w http.ResponseWriter, req *http.Request, _ httprou
 		CPUMining:        api.miner.CPUMining(),
 		StaleBlocksMined: staleMined,
 	}
-	writeJSON(w, mg)
+	WriteJSON(w, mg)
 }
 
 // minerStartHandler handles the API call that starts the miner.
 func (api *API) minerStartHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	api.miner.StartCPUMining()
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // minerStopHandler handles the API call to stop the miner.
 func (api *API) minerStopHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	api.miner.StopCPUMining()
-	writeSuccess(w)
+	WriteSuccess(w)
 }
 
 // minerHeaderHandlerGET handles the API call that retrieves a block header
@@ -49,7 +49,7 @@ func (api *API) minerStopHandler(w http.ResponseWriter, req *http.Request, _ htt
 func (api *API) minerHeaderHandlerGET(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	bhfw, target, err := api.miner.HeaderForWork()
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	w.Write(encoding.MarshalAll(target, bhfw))
@@ -61,13 +61,13 @@ func (api *API) minerHeaderHandlerPOST(w http.ResponseWriter, req *http.Request,
 	var bh types.BlockHeader
 	err := encoding.NewDecoder(req.Body).Decode(&bh)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 	err = api.miner.SubmitHeader(bh)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	writeSuccess(w)
+	WriteSuccess(w)
 }

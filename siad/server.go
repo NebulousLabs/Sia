@@ -109,71 +109,6 @@ bwIDAQAB
 -----END PUBLIC KEY-----`
 )
 
-// NOTE: these functions are duplicated from the api package.
-// Should they be exported instead?
-
-// writeError an error to the API caller.
-func writeError(w http.ResponseWriter, err api.Error, code int) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(code)
-	if json.NewEncoder(w).Encode(err) != nil {
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
-}
-
-// writeJSON writes the object to the ResponseWriter. If the encoding fails, an
-// error is written instead. The Content-Type of the response header is set
-// accordingly.
-func writeJSON(w http.ResponseWriter, obj interface{}) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if json.NewEncoder(w).Encode(obj) != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
-}
-
-// writeSuccess writes the HTTP header with status 204 No Content to the
-// ResponseWriter. writeSuccess should only be used to indicate that the
-// requested action succeeded AND there is no data to return.
-func writeSuccess(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// unrecognizedCallHandler handles calls to unknown pages (404).
-func unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
-	writeError(w, api.Error{Message: "404 - Refer to API.md"}, http.StatusNotFound)
-}
-
-// requireUserAgent is middleware that requires all requests to set a
-// UserAgent that contains the specified string.
-func requireUserAgent(h http.Handler, ua string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.UserAgent(), ua) {
-			writeError(w, api.Error{Message: "Browser access disabled due to security vulnerability. Use Sia-UI or siac."}, http.StatusBadRequest)
-			return
-		}
-		h.ServeHTTP(w, req)
-	})
-}
-
-// requirePassword is middleware that requires a request to authenticate with a
-// password using HTTP basic auth. Usernames are ignored. Empty passwords
-// indicate no authentication is required.
-func requirePassword(h httprouter.Handle, password string) httprouter.Handle {
-	// An empty password is equivalent to no password.
-	if password == "" {
-		return h
-	}
-	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-		_, pass, ok := req.BasicAuth()
-		if !ok || pass != password {
-			w.Header().Set("WWW-Authenticate", "Basic realm=\"SiaAPI\"")
-			writeError(w, api.Error{Message: "API authentication failed."}, http.StatusUnauthorized)
-			return
-		}
-		h(w, req, ps)
-	}
-}
-
 // fetchLatestRelease returns metadata about the most recent GitHub release.
 func fetchLatestRelease() (githubRelease, error) {
 	req, err := http.NewRequest("GET", "https://api.github.com/repos/NebulousLabs/Sia/releases/latest", nil)
@@ -296,11 +231,11 @@ func updateToRelease(release githubRelease) error {
 func (srv *Server) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	release, err := fetchLatestRelease()
 	if err != nil {
-		writeError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
+		api.WriteError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 	latestVersion := release.TagName[1:] // delete leading 'v'
-	writeJSON(w, UpdateInfo{
+	api.WriteJSON(w, UpdateInfo{
 		Available: build.VersionCmp(latestVersion, build.Version) > 0,
 		Version:   latestVersion,
 	})
@@ -313,19 +248,19 @@ func (srv *Server) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Request
 func (srv *Server) daemonUpdateHandlerPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	release, err := fetchLatestRelease()
 	if err != nil {
-		writeError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
+		api.WriteError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 	err = updateToRelease(release)
 	if err != nil {
 		if rerr := update.RollbackError(err); rerr != nil {
-			writeError(w, api.Error{Message: "Serious error: Failed to rollback from bad update: " + rerr.Error()}, http.StatusInternalServerError)
+			api.WriteError(w, api.Error{Message: "Serious error: Failed to rollback from bad update: " + rerr.Error()}, http.StatusInternalServerError)
 		} else {
-			writeError(w, api.Error{Message: "Failed to apply update: " + err.Error()}, http.StatusInternalServerError)
+			api.WriteError(w, api.Error{Message: "Failed to apply update: " + err.Error()}, http.StatusInternalServerError)
 		}
 		return
 	}
-	writeSuccess(w)
+	api.WriteSuccess(w)
 }
 
 // debugConstantsHandler prints a json file containing all of the constants.
@@ -353,18 +288,18 @@ func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, _ *http.Request
 		SiacoinPrecision: types.SiacoinPrecision,
 	}
 
-	writeJSON(w, sc)
+	api.WriteJSON(w, sc)
 }
 
 // daemonVersionHandler handles the API call that requests the daemon's version.
 func (srv *Server) daemonVersionHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	writeJSON(w, DaemonVersion{Version: build.Version})
+	api.WriteJSON(w, DaemonVersion{Version: build.Version})
 }
 
 // daemonStopHandler handles the API call to stop the daemon cleanly.
 func (srv *Server) daemonStopHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	// can't write after we stop the server, so lie a bit.
-	writeSuccess(w)
+	api.WriteSuccess(w)
 
 	// need to flush the response before shutting down the server
 	f, ok := w.(http.Flusher)
@@ -385,7 +320,7 @@ func (srv *Server) daemonHandler(password string) http.Handler {
 	router.GET("/daemon/version", srv.daemonVersionHandler)
 	router.GET("/daemon/update", srv.daemonUpdateHandlerGET)
 	router.POST("/daemon/update", srv.daemonUpdateHandlerPOST)
-	router.GET("/daemon/stop", requirePassword(srv.daemonStopHandler, password))
+	router.GET("/daemon/stop", api.RequirePassword(srv.daemonStopHandler, password))
 
 	return router
 }
@@ -411,7 +346,7 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 	}
 
 	// Register siad routes
-	srv.mux.Handle("/daemon/", requireUserAgent(siadServ.daemonHandler(requiredPassword), requiredUserAgent))
+	srv.mux.Handle("/daemon/", api.RequireUserAgent(srv.daemonHandler(requiredPassword), requiredUserAgent))
 
 	return srv, nil
 }

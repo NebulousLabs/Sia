@@ -203,17 +203,17 @@ func (api *API) explorerBlocksHandler(w http.ResponseWriter, req *http.Request, 
 	var height types.BlockHeight
 	_, err := fmt.Sscan(ps.ByName("height"), &height)
 	if err != nil {
-		writeError(w, Error{err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	// Fetch and return the explorer block.
 	block, exists := api.cs.BlockAtHeight(height)
 	if !exists {
-		writeError(w, Error{"no block found at input height in call to /explorer/block"}, http.StatusBadRequest)
+		WriteError(w, Error{"no block found at input height in call to /explorer/block"}, http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, ExplorerBlockGET{
+	WriteJSON(w, ExplorerBlockGET{
 		Block: api.buildExplorerBlock(height, block),
 	})
 }
@@ -253,7 +253,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	if err != nil {
 		addr, err := scanAddress(ps.ByName("hash"))
 		if err != nil {
-			writeError(w, Error{err.Error()}, http.StatusBadRequest)
+			WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 			return
 		}
 		hash = crypto.Hash(addr)
@@ -262,14 +262,14 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	// TODO: lookups on the zero hash are too expensive to allow. Need a
 	// better way to handle this case.
 	if hash == (crypto.Hash{}) {
-		writeError(w, Error{"can't lookup the empty unlock hash"}, http.StatusBadRequest)
+		WriteError(w, Error{"can't lookup the empty unlock hash"}, http.StatusBadRequest)
 		return
 	}
 
 	// Try the hash as a block id.
 	block, height, exists := api.explorer.Block(types.BlockID(hash))
 	if exists {
-		writeJSON(w, ExplorerHashGET{
+		WriteJSON(w, ExplorerHashGET{
 			HashType: "blockid",
 			Block:    api.buildExplorerBlock(height, block),
 		})
@@ -285,7 +285,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 				txn = t
 			}
 		}
-		writeJSON(w, ExplorerHashGET{
+		WriteJSON(w, ExplorerHashGET{
 			HashType:    "transactionid",
 			Transaction: api.buildExplorerTransaction(height, block.ID(), txn),
 		})
@@ -296,7 +296,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	txids := api.explorer.SiacoinOutputID(types.SiacoinOutputID(hash))
 	if len(txids) != 0 {
 		txns, blocks := api.buildTransactionSet(txids)
-		writeJSON(w, ExplorerHashGET{
+		WriteJSON(w, ExplorerHashGET{
 			HashType:     "siacoinoutputid",
 			Blocks:       blocks,
 			Transactions: txns,
@@ -308,7 +308,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	txids = api.explorer.FileContractID(types.FileContractID(hash))
 	if len(txids) != 0 {
 		txns, blocks := api.buildTransactionSet(txids)
-		writeJSON(w, ExplorerHashGET{
+		WriteJSON(w, ExplorerHashGET{
 			HashType:     "filecontractid",
 			Blocks:       blocks,
 			Transactions: txns,
@@ -320,7 +320,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	txids = api.explorer.SiafundOutputID(types.SiafundOutputID(hash))
 	if len(txids) != 0 {
 		txns, blocks := api.buildTransactionSet(txids)
-		writeJSON(w, ExplorerHashGET{
+		WriteJSON(w, ExplorerHashGET{
 			HashType:     "siafundoutputid",
 			Blocks:       blocks,
 			Transactions: txns,
@@ -339,7 +339,7 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	txids = api.explorer.UnlockHash(types.UnlockHash(hash))
 	if len(txids) != 0 {
 		txns, blocks := api.buildTransactionSet(txids)
-		writeJSON(w, ExplorerHashGET{
+		WriteJSON(w, ExplorerHashGET{
 			HashType:     "unlockhash",
 			Blocks:       blocks,
 			Transactions: txns,
@@ -348,13 +348,13 @@ func (api *API) explorerHashHandler(w http.ResponseWriter, req *http.Request, ps
 	}
 
 	// Hash not found, return an error.
-	writeError(w, Error{"unrecognized hash used as input to /explorer/hash"}, http.StatusBadRequest)
+	WriteError(w, Error{"unrecognized hash used as input to /explorer/hash"}, http.StatusBadRequest)
 }
 
 // explorerHandler handles API calls to /explorer
 func (api *API) explorerHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	facts := api.explorer.LatestBlockFacts()
-	writeJSON(w, ExplorerGET{
+	WriteJSON(w, ExplorerGET{
 		BlockFacts: facts,
 	})
 }
