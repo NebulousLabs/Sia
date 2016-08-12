@@ -21,15 +21,15 @@ import (
 // a testing check, because the host is tolerant of disk corruption - it is
 // okay for there to be information in the sector usage struct that cannot be
 // retrieved from the disk. The consistency check should return information on
-// how much corruption there is an what shape it takes. If there are files
+// how much corruption there is and what shape it takes. If there are files
 // found on disk that are not represented in the usage struct, those files
-// should be reported as well. The consistency check should be acoompanied by a
+// should be reported as well. The consistency check should be accompanied by a
 // 'purge' mode (perhaps multiple modes) which will delete any files in the
 // storage folders which are not represented in the sector usage database.
 //
-// A simliar check should exist for verifying that the host has the correct
+// A similar check should exist for verifying that the host has the correct
 // folder structure. All of the standard files, plus all of the storage
-// folders, nothing more. This check belongs in storagefolders.go
+// folders, nothing more. This check belongs in storagefolders.go.
 //
 // A final check, the obligations check, should verify that every sector in the
 // sector usage database is represented correctly by the storage obligations,
@@ -56,6 +56,9 @@ import (
 // on sectors that have been manually deleted.
 
 var (
+	// ErrSectorNotFound is returned when a lookup for a sector fails.
+	ErrSectorNotFound = errors.New("could not find the desired sector")
+
 	// errDiskTrouble is returned when the host is supposed to have enough
 	// storage to hold a new sector but failures that are likely related to the
 	// disk have prevented the host from successfully adding the sector.
@@ -74,9 +77,6 @@ var (
 	// errMaxVirtualSectors is returned when a sector cannot be added because
 	// the maximum number of virtual sectors for that sector id already exist.
 	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
-
-	// errSectorNotFound is returned when a lookup for a sector fails.
-	errSectorNotFound = errors.New("could not find the desired sector")
 )
 
 // sectorUsage indicates how a sector is being used. Each block height
@@ -96,7 +96,7 @@ type sectorUsage struct {
 
 // sectorID returns the id that should be used when referring to a sector.
 // There are lots of sectors, and to minimize their footprint a reduced size
-// hash is used. Hashes are typically 256bits to provide collision resistance
+// hash is used. Hashes are typically 256 bits to provide collision resistance
 // against an attacker that is able to peform an obscene number of trials per
 // second on each of an obscene number of machines. Potential collisions for
 // sectors are limited because hosts have secret data that the attacker does
@@ -104,11 +104,11 @@ type sectorUsage struct {
 // sectorID. As a result, an attacker is limited in the number of times they
 // can try to cause a collision - one random shot every time they upload a
 // sector, and the attacker has limited ability to learn of the success of the
-// attempt. Uploads are very slow, even on fast machines there will be less
+// attempt. Uploads are very slow; even on fast machines there will be less
 // than 1000 per second. It is therefore safe to reduce the security from
-// 256bits to 96bits, which has a collision resistance of 2^48. A reasonable
+// 256 bits to 96 bits, which has a collision resistance of 2^48. A reasonable
 // upper bound for the number of sectors on a host is 2^32, corresponding with
-// 16PB of data.
+// 16 PB of data.
 //
 // 12 bytes can be represented as a filepath using 16 base64 characters. This
 // keeps the filesize small and therefore limits the amount of load placed on
@@ -245,7 +245,7 @@ func (sm *StorageManager) ReadSector(sectorRoot crypto.Hash) (sectorBytes []byte
 		sectorKey := sm.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 		var su sectorUsage
 		err = json.Unmarshal(sectorUsageBytes, &su)
@@ -280,7 +280,7 @@ func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight type
 		sectorKey := sm.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 		var usage sectorUsage
 		err := json.Unmarshal(sectorUsageBytes, &usage)
@@ -289,10 +289,10 @@ func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight type
 		}
 		if len(usage.Expiry) == 0 {
 			sm.log.Critical("sector recorded in database, but has no expirations")
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 		if len(usage.Expiry) == 1 && usage.Expiry[0] != expiryHeight {
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 
 		// If there are multiple entries in the usage expiry, it means that the
@@ -311,7 +311,7 @@ func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight type
 				}
 			}
 			if !found {
-				return errSectorNotFound
+				return ErrSectorNotFound
 			}
 			usage.Expiry = append(usage.Expiry[0:i], usage.Expiry[i+1:]...)
 
@@ -323,7 +323,7 @@ func (sm *StorageManager) RemoveSector(sectorRoot crypto.Hash, expiryHeight type
 			return bsu.Put(sectorKey, sectorUsageBytes)
 		}
 
-		// Get the storage folder that contains the phsyical sector.
+		// Get the storage folder that contains the physical sector.
 		var folder *storageFolder
 		for _, sf := range sm.storageFolders {
 			if bytes.Equal(sf.UID, usage.StorageFolder) {
@@ -373,7 +373,7 @@ func (sm *StorageManager) DeleteSector(sectorRoot crypto.Hash) error {
 		sectorKey := sm.sectorID(sectorRoot[:])
 		sectorUsageBytes := bsu.Get(sectorKey)
 		if sectorUsageBytes == nil {
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 		var usage sectorUsage
 		err := json.Unmarshal(sectorUsageBytes, &usage)
@@ -381,7 +381,7 @@ func (sm *StorageManager) DeleteSector(sectorRoot crypto.Hash) error {
 			return err
 		}
 
-		// Get the storage folder that contains the phsyical sector.
+		// Get the storage folder that contains the physical sector.
 		var folder *storageFolder
 		for _, sf := range sm.storageFolders {
 			if bytes.Equal(sf.UID, usage.StorageFolder) {

@@ -95,13 +95,13 @@ func TestStorageFolderUsage(t *testing.T) {
 	// Try using a file size that is too small. Because a filesize check is
 	// quicker than a disk check, the filesize check should come first.
 	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize-1)
-	if err != errSmallStorageFolder {
-		t.Fatal("expecting errSmallStorageFolder:", err)
+	if err != ErrSmallStorageFolder {
+		t.Fatal("expecting ErrSmallStorageFolder:", err)
 	}
 	// Try a file size that is too large.
 	err = smt.sm.AddStorageFolder(storageFolderOne, maximumStorageFolderSize+1)
-	if err != errLargeStorageFolder {
-		t.Fatal("expecting errLargeStorageFolder:", err)
+	if err != ErrLargeStorageFolder {
+		t.Fatal("expecting ErrLargeStorageFolder:", err)
 	}
 	// Try linking to a storage folder that does not exist.
 	err = smt.sm.AddStorageFolder(storageFolderOne, minimumStorageFolderSize)
@@ -285,11 +285,11 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Error(err)
 	}
 	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize-1)
-	if err != errSmallStorageFolder {
+	if err != ErrSmallStorageFolder {
 		t.Error(err)
 	}
 	err = smt.sm.ResizeStorageFolder(0, maximumStorageFolderSize+1)
-	if err != errLargeStorageFolder {
+	if err != ErrLargeStorageFolder {
 		t.Error(err)
 	}
 	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*10)
@@ -297,7 +297,7 @@ func TestStorageFolderUsage(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize*10)
-	if err != errNoResize {
+	if err != ErrNoResize {
 		t.Fatal(err)
 	}
 	// Do a probabilistic reset of the manager, to verify that the persistence
@@ -352,7 +352,7 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 	oldSize := smt.sm.storageFolders[0].Size
 	err = smt.sm.ResizeStorageFolder(0, minimumStorageFolderSize)
-	if err != errIncompleteOffload {
+	if err != ErrIncompleteOffload {
 		t.Fatal(err)
 	}
 	size := smt.sm.storageFolders[0].Size
@@ -591,13 +591,13 @@ func TestStorageFolderUsage(t *testing.T) {
 	}
 	// Try some illegal sector removal operations before trying a legal one.
 	err = smt.sm.RemoveSector(sectorRoot, sectorExpiry+50e6)
-	if err != errSectorNotFound {
+	if err != ErrSectorNotFound {
 		t.Fatal("wrong error when removing illegal sector:", err)
 	}
 	alteredRoot := sectorRoot
 	alteredRoot[0]++
 	err = smt.sm.RemoveSector(alteredRoot, 81)
-	if err != errSectorNotFound {
+	if err != ErrSectorNotFound {
 		t.Fatal("wrong error when removing illegal sector:", err)
 	}
 	// Now try the legal sector removal.
@@ -675,7 +675,7 @@ func TestStorageFolderUsage(t *testing.T) {
 
 			// Try to remove the sector using a wildcard expiry height.
 			err = smt.sm.RemoveSector(root, expiryHeights[0]+548e6)
-			if err != errSectorNotFound {
+			if err != ErrSectorNotFound {
 				t.Fatal(err)
 			}
 
