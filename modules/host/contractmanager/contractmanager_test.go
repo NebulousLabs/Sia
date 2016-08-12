@@ -80,6 +80,7 @@ func TestNewContractManager(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Create a contract manager.
 	parentDir := build.TempDir(modules.ContractManagerDir, "TestNewContractManager")

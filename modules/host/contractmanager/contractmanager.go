@@ -22,9 +22,13 @@ package contractmanager
 // It should be noted that if the renter is properly doing parallel uploads, a
 // throughput of 10+ mbps per host is pretty decent, even without batching.
 
+// TODO: In managedAddStorageFolder, fallocate can be used instead of
+// file.Write, which means that storage folders can be added substantially
+// faster. Windows and other non-linux systems will need to continue doing it
+// using the current implementation.
+
 import (
 	"path/filepath"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -112,12 +116,20 @@ func (cm *ContractManager) Close() error {
 // the provided dependencies.
 func newContractManager(dependencies dependencies, persistDir string) (*ContractManager, error) {
 	cm := &ContractManager{
-		storageFolders:  make(map[uint16]string),
+		storageFolders:  make(map[uint16]*storageFolder),
 		sectorLocations: make(map[sectorID]sectorLocation),
 
 		dependencies: dependencies,
 		persistDir:   persistDir,
 	}
+	// Because the wal and the cm each have eachother as objects in their
+	// structs, they really operate as a single larger object. When designing
+	// and implementing, I found it easier to reason about each when keeping
+	// their functions separate, though they rely heavily on eachother.
+	//
+	// The wal is used any time that the state of the cm is read or modified.
+	// The cm is just a record of how things currently look. A future refactor
+	// would probably combine the structs into a single object.
 	cm.wal.cm = cm
 
 	// If startup is unsuccessful, shutdown any resources that were
@@ -148,10 +160,23 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		err = build.ComposeErrors(cm.log.Close(), err)
 	})
 
-	// Load any persistent state of the contract manager from disk.
-	err = cm.load()
+	// Load any state of the contract manager that gets saved atomically.
+	// Changes that were incompletely applied will not be represented as
+	// corruption, because the data is copied atomically. Instead, they will be
+	// represented as absent altogether. When the WAL is recovered, the absent
+	// changes will be reapplied.
+	err = cm.loadAtomicPersistence()
 	if err != nil {
-		return nil, build.ExtendErr("error while performing contract manager load", err)
+		return nil, build.ExtendErr("error while loading contract manager atomic data", err)
+	}
+
+	// Allow the WAL to load. The WAL will check for an unclean shutdown, make
+	// any repairs necessary following the unclean shutdown, and then establish
+	// the sync loop and sync resources that are used to maintain ACID
+	// properties as the contact manager state is manipulated.
+	err = cm.wal.load()
+	if err != nil {
+		return nil, build.ExtendErr("error while loading the WAL at startup", err)
 	}
 
 	// Spin up the sync loop. Note that the sync loop needs to be created after

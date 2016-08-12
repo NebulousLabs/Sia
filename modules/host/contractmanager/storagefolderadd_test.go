@@ -19,6 +19,7 @@ func TestAddStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cmt, err := newContractManagerTester("TestAddStorageFolder")
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +33,7 @@ func TestAddStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*32*2)
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64*2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +47,7 @@ func TestAddStorageFolder(t *testing.T) {
 	if sfs[0].Path != storageFolderDir {
 		t.Error("storage folder reported with wrong path")
 	}
-	if sfs[0].Capacity != modules.SectorSize*32*2 {
+	if sfs[0].Capacity != modules.SectorSize*64*2 {
 		t.Error("storage folder reported with wrong sector size")
 	}
 }
@@ -115,6 +116,7 @@ func TestAddLargeStorageFolder(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	var d dependencyLargeFolder
 	cmt, err := newMockedContractManagerTester(d, "TestAddLargeStorageFolder")
 	if err != nil {
@@ -129,7 +131,7 @@ func TestAddLargeStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*32*16) // Total size must exceed the limit of the limitFile.
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64*16) // Total size must exceed the limit of the limitFile.
 	// Should be a storage folder error, but with all the context adding, I'm
 	// not sure how to check the error type.
 	if err == nil {
@@ -158,6 +160,7 @@ func TestAddStorageFolderConcurrent(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	cmt, err := newContractManagerTester("TestAddStorageFolderConcurrent")
 	if err != nil {
 		t.Fatal(err)
@@ -187,21 +190,21 @@ func TestAddStorageFolderConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() {
-		err := cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*32*8)
+		err := cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*64*8)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*32*8)
+		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*8)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*32*8)
+		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*64*8)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -272,7 +275,7 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	// Create the mocked dependencies that will block for the first storage
 	// folder.
 	d := &dependencyBlockSFOne{
@@ -307,7 +310,7 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 
 	// Spin off the first goroutine, and then wait until write has been called
 	// on the underlying file.
-	sfOneSize := modules.SectorSize * 32 * 8
+	sfOneSize := modules.SectorSize * 64 * 8
 	go func() {
 		err := cmt.cm.AddStorageFolder(storageFolderOne, sfOneSize)
 		if err != nil {
@@ -327,8 +330,8 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	if sfs[0].ProgressNumerator != 0 {
 		t.Error("storage folder is showing progress despite being blocked")
 	}
-	if sfs[0].ProgressDenominator != sfOneSize+16*32*8 {
-		// The 16*32*8 comes from the fact that there are 8*32 sectors storage
+	if sfs[0].ProgressDenominator != sfOneSize+16*64*8 {
+		// The 16*64*8 comes from the fact that there are 8*64 sectors storage
 		// folder one, and that 16 additional bytes are needed per sector to
 		// store metadata.
 		t.Error("storage folder is not showing that an action is in progress, though one is", sfs[0].ProgressDenominator, sfOneSize)
@@ -337,14 +340,14 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*32*8)
+		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*8)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*32*8)
+		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*64*8)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -375,7 +378,7 @@ func TestAddStorageFolderConsecutive(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	// Create a contract manager tester with the mocked dependencies.
 	cmt, err := newContractManagerTester("TestAddStorageFolderConsecutive")
 	if err != nil {
@@ -403,7 +406,7 @@ func TestAddStorageFolderConsecutive(t *testing.T) {
 
 	// Spin off the first goroutine, and then wait until write has been called
 	// on the underlying file.
-	sfSize := modules.SectorSize * 32 * 8
+	sfSize := modules.SectorSize * 64 * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -437,7 +440,7 @@ func TestAddStorageFolderDoubleAdd(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	// Create a contract manager tester with the mocked dependencies.
 	cmt, err := newContractManagerTester("TestAddStorageFolderDoubleAdd")
 	if err != nil {
@@ -456,7 +459,7 @@ func TestAddStorageFolderDoubleAdd(t *testing.T) {
 	// Call AddStorageFolder in three separate goroutines, where the same path
 	// is used in each. The errors are not checked because one of the storage
 	// folders will succeed, but it's uncertain which one.
-	sfSize := modules.SectorSize * 32 * 8
+	sfSize := modules.SectorSize * 64 * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -488,9 +491,10 @@ type dependencyNoSyncLoop struct {
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
 func (dependencyNoSyncLoop) disrupt(s string) bool {
-	if s == "threadedSyncLoopStart" {
+	if s == "threadedSyncLoopStart" || s == "cleanWALFile" {
 		// Disrupt threadedSyncLoop. The sync loop will exit immediately
-		// instead of executing commits.
+		// instead of executing commits. Also disrupt the process that removes
+		// the WAL file following clean shutdown.
 		return true
 	}
 	return false
@@ -507,6 +511,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	var d dependencyNoSyncLoop
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderDoubleAddNoCommit")
 	if err != nil {
@@ -547,7 +552,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	// Call AddStorageFolder in three separate goroutines, where the same path
 	// is used in each. The errors are not checked because one of the storage
 	// folders will succeed, but it's uncertain which one.
-	sfSize := modules.SectorSize * 32 * 8
+	sfSize := modules.SectorSize * 64 * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -560,7 +565,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	// Check that the storage folder has been added.
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
-		t.Fatal("There should be one storage folder reported")
+		t.Fatal("There should be one storage folder reported", len(sfs))
 	}
 	// All actions should have completed, so all storage folders should be
 	// reporting '0' in the progress denominator
@@ -572,7 +577,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 }
 
 // TestAddStorageFolderFailedCommit utilizes the sync-loop hijacking in
-// TestAddStorageFolderDoubleAddNoCommit to create a commit scheme that sync's
+// TestAddStorageFolderDoubleAddNoCommit to create a commit scheme that syncs
 // the WAL, but does not actually commit the actions. This simulates a disk
 // failure or power failure, resulting in a partial-completion of the storage
 // folder addition.
@@ -580,6 +585,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	var d dependencyNoSyncLoop
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderFailedCommit")
 	if err != nil {
@@ -621,7 +627,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Call AddStorageFolder, knowing that the changes will not be properly
 	// committed.
-	sfSize := modules.SectorSize * 32 * 8
+	sfSize := modules.SectorSize * 64 * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -629,11 +635,11 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
 	// skip the part where the changes are actually committed.
-	err = cmt.cm.wal.file.Sync()
+	err = cmt.cm.wal.fileWALTmp.Sync()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.wal.file.Close()
+	err = cmt.cm.wal.fileWALTmp.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,7 +649,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmt.cm.wal.file, err = os.Create(walTmpName)
+	cmt.cm.wal.fileWALTmp, err = os.Create(walTmpName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -675,7 +681,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	// Check that the storage folder was properly recovered.
 	sfs = cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
-		t.Fatal("There should be one storage folder reported")
+		t.Fatal("There should be one storage folder reported", len(sfs))
 	}
 }
 
@@ -688,7 +694,7 @@ type dependencyNoSyncBadAdd struct {
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
 func (dependencyNoSyncBadAdd) disrupt(s string) bool {
-	if s == "threadedSyncLoopStart" || s == "incompleteAddStorageFolder" {
+	if s == "threadedSyncLoopStart" || s == "incompleteAddStorageFolder" || s == "cleanWALFile" {
 		// Disrupt threadedSyncLoop. The sync loop will exit immediately
 		// instead of executing commits.
 		return true
@@ -703,6 +709,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 	var d dependencyNoSyncBadAdd
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderUnfinishedCreate")
 	if err != nil {
@@ -743,7 +750,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	}
 	// Call AddStorageFolder, knowing that the changes will not be properly
 	// committed, and that the call itself will not actually complete.
-	sfSize := modules.SectorSize * 32 * 8
+	sfSize := modules.SectorSize * 64 * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -751,11 +758,11 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 
 	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
 	// skip the part where the changes are actually committed.
-	err = cmt.cm.wal.file.Sync()
+	err = cmt.cm.wal.fileWALTmp.Sync()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.wal.file.Close()
+	err = cmt.cm.wal.fileWALTmp.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -765,7 +772,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmt.cm.wal.file, err = os.Create(walTmpName)
+	cmt.cm.wal.fileWALTmp, err = os.Create(walTmpName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +809,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 		t.Error(err)
 	}
 	if len(files) != 0 {
-		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed.")
+		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed.", len(files))
 	}
 }
 
@@ -812,7 +819,7 @@ func TestAddStorageFolderDoubleAddConcurrent(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
+	t.Parallel()
 	// Create a contract manager tester with the mocked dependencies.
 	cmt, err := newContractManagerTester("TestAddStorageFolderDoubleAddConcurrent")
 	if err != nil {
@@ -832,7 +839,7 @@ func TestAddStorageFolderDoubleAddConcurrent(t *testing.T) {
 	// is used in each. The errors are not checked because one of the storage
 	// folders will succeed, but it's uncertain which one.
 	var wg sync.WaitGroup
-	sfSize := modules.SectorSize * 32 * 8
+	sfSize := modules.SectorSize * 64 * 8
 	wg.Add(3)
 	go func() {
 		_ = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
@@ -859,5 +866,89 @@ func TestAddStorageFolderDoubleAddConcurrent(t *testing.T) {
 		if sf.ProgressDenominator != 0 {
 			t.Error("ProgressDenominator is indicating that actions still remain")
 		}
+	}
+}
+
+// TestAddStorageFolderReload adds a storage folder to the contract manager,
+// and then reloads the contract manager to see if the storage folder is still
+// there.
+func TestAddStorageFolderReload(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// Create a contract manager tester with the mocked dependencies.
+	cmt, err := newContractManagerTester("TestAddStorageFolderReload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfSize := modules.SectorSize * 64 * 24
+	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported")
+	}
+	// Check that the size of the storage folder is correct.
+	if sfs[0].Capacity != sfSize {
+		t.Error("capacity reported by storage folder is not the capacity alloacted")
+	}
+	if sfs[0].CapacityRemaining != sfSize {
+		t.Error("capacity remaining reported by storage folder is not the capacity alloacted")
+	}
+	// All actions should have completed, so all storage folders should be
+	// reporting '0' in the progress denominator.
+	for _, sf := range sfs {
+		if sf.ProgressDenominator != 0 {
+			t.Error("ProgressDenominator is indicating that actions still remain")
+		}
+	}
+
+	// Close the contract manager and open a new one using the same
+	// persistence.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the storage folder has been added.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("There should be one storage folder reported", len(sfs))
+	}
+	// Check that the size of the storage folder is correct.
+	if sfs[0].Capacity != sfSize {
+		t.Error("capacity reported by storage folder is not the capacity alloacted")
+	}
+	if sfs[0].CapacityRemaining != sfSize {
+		t.Error("capacity remaining reported by storage folder is not the capacity alloacted")
+	}
+	// Check that the storage folder as represented on disk has the correct
+	// size.
+	sectorLookupTableSize := int64(64 * 24 * 16)
+	expectedSize := int64(sfSize) + sectorLookupTableSize
+	fi, err := os.Stat(filepath.Join(storageFolderOne, sectorFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Size() != expectedSize {
+		t.Error("sector file had unexpected size", fi.Size(), expectedSize)
 	}
 }

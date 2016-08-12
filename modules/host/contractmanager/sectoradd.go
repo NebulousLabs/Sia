@@ -1,11 +1,12 @@
 package contractmanager
 
 import (
+	"encoding/binary"
 	"math"
-	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // mostSignificantBit returns the index of the most significant bit of an input
@@ -70,14 +71,11 @@ func randFreeSector(usage []uint64) uint32 {
 	}
 
 	// Get the most significant zero. This is achieved by performing a 'most
-	// significant bit' on the XOR of the actual value.
+	// significant bit' on the XOR of the actual value. Set that bit, and
+	// return the index of the sector that has been selected.
 	msb := mostSignificantBit(^usage[i])
-	// Before returning, we want to set that bit.
-	newUsage := usage[i] + (1 << msb)
-	atomic.StoreUint64(&usage[i], newUsage)
-
-	// Calculate and return the index of the free sector.
-	return uint32((i * 64) + msb)
+	usage[i] = usage[i] + (1 << msb)
+	return uint32((uint64(i) * 64) + msb)
 }
 
 // managedAddSector is a WAL operation to add a sector to the contract manager.
@@ -90,7 +88,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 		// Create and fill out the sectorAdd object.
 		sa := sectorAdd{
 			Data: data,
-			ID: id,
+			ID:   id,
 		}
 
 		// Grab the number of virtual sectors that have been committed with
@@ -102,6 +100,10 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			sa.Count = location.count + 1
 			sa.Folder = location.storageFolder
 			sa.Index = location.index
+
+			// Data can be wiped, as the data is already there, there's no need
+			// to commit to the data or to write it to disk.
+			sa.Data = nil
 
 			// Update the location count to indicate that a sector has been
 			// added.
@@ -117,7 +119,8 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			// incomplete. This would look like a pre-process which compares
 			// the list of committed storage folders to the list of uncommitted
 			// removals, before passing the result to emptiestStorageFolder.
-			sf, _ := emptiestStorageFolder(wal.cm.storageFolders)
+			sfs := wal.storageFolders()
+			sf, _ := emptiestStorageFolder(sfs)
 			if sf == nil {
 				// None of the storage folders have enough room to house the
 				// sector.
@@ -134,15 +137,15 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			sa.Folder = sf.Index
 			sa.Index = sectorIndex
 			wal.cm.sectorLocations[id] = sectorLocation{
-				index: sectorIndex,
+				index:         sectorIndex,
 				storageFolder: sf.Index,
-				count: 1,
+				count:         1,
 			}
 		}
 
 		// Add a change to the WAL to commit this sector to the provided index.
-		err = wa.appendChange(stateChange{
-			AddedSctors: []sectorAdd{sa},
+		err := wal.appendChange(stateChange{
+			AddedSectors: []sectorAdd{sa},
 		})
 		if err != nil {
 			return build.ExtendErr("failed to add a state change", err)
@@ -166,12 +169,48 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 // commit should be idempotent, meaning if this function is run multiple times
 // on the same sector, there should be no issues.
 func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
-	// TODO TODO TODO: pick up here. Don't forget that your memory model has
-	// evolved, and that it will allow you to pull a pretty significant amount
-	// of code from AddStorageFolder.
+	sf := wal.cm.storageFolders[sa.Folder]
+	lookupTableSize := len(sf.Usage) * 64 * 16
+
+	// Write the sector metadata to disk.
+	writeData := make([]byte, 16)
+	copy(writeData, sa.ID[:])
+	binary.LittleEndian.PutUint16(writeData[12:14], sa.Count)
+	binary.LittleEndian.PutUint16(writeData[14:], sa.Folder)
+	_, err := sf.file.Seek(16*int64(sa.Index), 0)
+	if err != nil {
+		wal.cm.log.Println("ERROR: unable to seek to sector metadata when adding sector")
+		sf.FailedWrites += 1
+		return
+	}
+	_, err = sf.file.Write(writeData)
+	if err != nil {
+		sf.FailedWrites += 1
+		return
+	}
+
+	// Write the sector to disk. The write only needs to happen if the count is
+	// equal to 1, otherwise the data can be assumed to already be there.
+	if sa.Count == 1 {
+		_, err = sf.file.Seek(int64(modules.SectorSize)*int64(sa.Index)+int64(lookupTableSize), 0)
+		if err != nil {
+			wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
+			sf.FailedWrites += 1
+			return
+		}
+		_, err = sf.file.Write(sa.Data)
+		if err != nil {
+			wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
+			sf.FailedWrites += 1
+			return
+		}
+	}
+
+	// Writes were successful, update the storage folder stats.
+	sf.SuccessfulWrites += 1
 }
 
 // AddSector will add a sector to the contract manager.
-func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) {
-	return managedAddSector(cm.managedSectorID(root), sectorData)
+func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error {
+	return cm.wal.managedAddSector(cm.managedSectorID(root), sectorData)
 }

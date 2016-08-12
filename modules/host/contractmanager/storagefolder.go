@@ -7,7 +7,6 @@ package contractmanager
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -90,46 +89,20 @@ type storageFolder struct {
 	atomicProgressNumerator   uint64
 	atomicProgressDenominator uint64
 
-	// TODO: Explain how the bitfield works. 'Usage' is the bitfield.
-	//
-	// TODO: Explain that storage folders are identified by their path, and
-	// that there must not be duplicates or the WAL will get confused.
-	//
-	// TODO: Explain that Path is immutable, and that Usage is updated atomically
-	//
-	// TODO: Expalin that the number of sectors is equivalent to the number of
-	// flipped bits in Usage, and that the number of flipped bits can be
-	// counted really quickly as far as startup goes, but not as far as adding
-	// 250 sectors which each check the remaining capacity of every storage
-	// folder.
 	Index   uint16
 	Path    string
 	Sectors uint64
 	Usage   []uint64
 
+	FailedReads      uint64
+	FailedWrites     uint64
+	SuccessfulReads  uint64
+	SuccessfulWrites uint64
+
 	// An open file handle is kept so that writes can easily be made to the
 	// storage folder without needing to grab a new file handle. This also
 	// makes it easy to do delayed-syncing.
-	file *os.File
-
-	/*
-		// TODO: probably better if these values do not get saved to disk, that
-		// way they reset if the disk is repaired or swapped out or whatever.
-		FailedReads      uint64
-		FailedWrites     uint64
-		SuccessfulReads  uint64
-		SuccessfulWrites uint64
-	*/
-
-}
-
-// StorageFolders will return a list of storage folders in the host, each
-// containing information about the storage folder and any operations currently
-// being executed on the storage folder.
-func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
-	// Because getting information on the storage folders requires looking at
-	// the state of the contract manager, we should go through the WAL.
-	return cm.wal.managedStorageFolders()
+	file file
 }
 
 // emptiestStorageFolder takes a set of storage folders and returns the storage
@@ -154,50 +127,42 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	return sfs[winningIndex], winningIndex
 }
 
-// managedStorageFolders will return a list of storage folders in the host,
-// each containing information about the storage folder and any operations
-// currently being executed on the storage folder.
-func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderMetadata) {
+// StorageFolders will return a list of storage folders in the host, each
+// containing information about the storage folder and any operations currently
+// being executed on the storage folder.
+func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
+	// Because getting information on the storage folders requires looking at
+	// the state of the contract manager, we should go through the WAL.
+	return cm.wal.managedStorageFolderMetadata()
+}
+
+// managedStorageFolderMetadata will return a list of storage folders in the
+// host, each containing information about the storage folder and any
+// operations currently being executed on the storage folder.
+func (wal *writeAheadLog) managedStorageFolderMetadata() (smfs []modules.StorageFolderMetadata) {
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 
 	// Iterate over the storage folders that are in memory first, and then
 	// suppliment them with the storage folders that are not in memory.
-	func() {
-		wal.cm.mu.RLock()
-		defer wal.cm.mu.RUnlock()
+	for _, sf := range wal.cm.storageFolders {
+		// Grab the non-computational data.
+		sfm := modules.StorageFolderMetadata{
+			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
+			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.Sectors) * modules.SectorSize,
+			Path:              sf.Path,
 
-		for _, sf := range wal.cm.storageFolders {
-			// Grab the non-computational data.
-			sfm := modules.StorageFolderMetadata{
-				Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
-				CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.Sectors) * modules.SectorSize,
-				Path:              sf.Path,
-
-				ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
-				ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
-			}
-			// Add this storage folder to the list of storage folders.
-			smfs = append(smfs, sfm)
+			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
+			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 		}
-	}()
+		// Add this storage folder to the list of storage folders.
+		smfs = append(smfs, sfm)
+	}
 
 	// Iterate through the uncommitted changes to the contract manager and find
 	// any storage folders which have been added but aren't in the actual state
 	// yet.
-	for _, uc := range wal.uncommittedChanges {
-		for _, sf := range uc.StorageFolderAdditions {
-			smfs = append(smfs, modules.StorageFolderMetadata{
-				Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
-				CapacityRemaining: modules.SectorSize * 64 * uint64(len(sf.Usage)),
-				Path:              sf.Path,
-
-				ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
-				ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
-			})
-		}
-	}
-	for _, sf := range wal.findUnfinishedStorageFolderAdditions(wal.uncommittedChanges) {
+	for _, sf := range findUnfinishedStorageFolderAdditions(wal.uncommittedChanges) {
 		smfs = append(smfs, modules.StorageFolderMetadata{
 			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
 			CapacityRemaining: modules.SectorSize * 64 * uint64(len(sf.Usage)),
@@ -208,6 +173,27 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 		})
 	}
 	return smfs
+}
+
+// storageFolder will return a list of storage folders that are accessible to
+// the contract manager. This list will exclude storage folders that are still
+// being added, are being resized, or are being removed.
+func (wal *writeAheadLog) storageFolders() (sfs []*storageFolder) {
+	// First copy the map, so that elements can be deleted from the new map
+	// without causing issues.
+	newMap := make(map[uint16]*storageFolder)
+	for i, sf := range wal.cm.storageFolders {
+		newMap[i] = sf
+	}
+
+	// TODO: Iterate through all of the storage folders that are being resized
+	// or removed, and delete them from newMap.
+
+	// Copy what remains of newMap into the array that gets returned.
+	for _, sf := range newMap {
+		sfs = append(sfs, sf)
+	}
+	return sfs
 }
 
 /*
@@ -250,11 +236,6 @@ func (wal *writeAheadLog) managedStorageFolders() (smfs []modules.StorageFolderM
 // tracking the amount of storage remaining. Also the introduction of nested
 // buckets relies on fancier, less used features in the boltdb dependency,
 // which carries a higher error risk.
-
-// TODO: Need to add some command to 'siad' that will correctly repoint a
-// storage folder to a new mountpoint. As best I can tell, this needs to happen
-// while siad is not running. Either that, or 'siac' needs to do the whole
-// shutdown thing itself? Still unclear.
 
 import (
 	"bytes"
@@ -320,55 +301,10 @@ var (
 	errRelativePath = errors.New("storage folder paths must be absolute")
 )
 
-// storageFolder tracks a folder that is being used to store sectors. There is
-// a corresponding symlink in the host directory that points to whatever folder
-// the user has chosen for storing data (usually, a separate drive will be
-// mounted at that point).
-//
-// 'Size' is set by the user, indicating how much data can be placed into that
-// folder before the host should consider it full. Size is measured in bytes,
-// but only accounts for the actual raw data. Sia also places a nontrivial
-// amount of load on the filesystem, potentially to the tune of millions of
-// files. These files have long, cryptographic names and may take up as much as
-// a gigabyte of space in filesystem overhead, depending on how the filesystem
-// is architected. The host is programmed to gracefully handle full disks, so
-// while it might cause the user surprise that the host can't break past 99%
-// utilization, there should not be any issues if the user overestimates how
-// much storage is available in the folder they have offered to Sia. The host
-// will put the drive at 100% utilization, which may cause performance
-// slowdowns or other errors if non-Sia programs are also trying to use the
-// filesystem. If users are experiencing problems, having them set the storage
-// folder size to 98% of the actual drive size is probably going to fix most of
-// the issues.
-//
-// 'SizeRemaining' is a variable that remembers how much storage is remaining
-// in the storage folder. It is managed manually, and is updated every time a
-// sector is added to or removed from the storage folder. Because there is no
-// property that inherently guarantees the correctness of 'SizeRemaining',
-// implementation must be careful to maintain consistency.
-//
-// The UID of the storage folder is a small number of bytes that uniquely
-// identify the storage folder. The UID is generated randomly, but in such a
-// way as to guarantee that it will not collide with the ids of other storage
-// folders. The UID is used (via the uidString function) to determine the name
-// of the symlink which points to the folder holding the data for this storage
-// folder.
-//
-// Statistics are kept on the integrity of reads and writes. Ideally, the
-// filesystem is never returning errors, but if errors are being returned they
-// will be tracked and can be reported to the user.
-type storageFolder struct {
-	Path string
-	UID  []byte
-
-	Size          uint64
-	SizeRemaining uint64
-
-	FailedReads      uint64
-	FailedWrites     uint64
-	SuccessfulReads  uint64
-	SuccessfulWrites uint64
-}
+// TODO: Need to add some command to 'siad' that will correctly repoint a
+// storage folder to a new mountpoint. As best I can tell, this needs to happen
+// while siad is not running. Either that, or 'siac' needs to do the whole
+// shutdown thing itself? Still unclear.
 
 // offloadStorageFolder takes sectors in a storage folder and moves them to
 // another storage folder.

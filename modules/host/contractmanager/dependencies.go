@@ -71,7 +71,9 @@ type (
 	// file implements all of the methods that can be called on an os.File.
 	file interface {
 		io.Closer
+		io.Reader
 		io.Writer
+		Seek(int64, int) (int64, error)
 		Sync() error
 	}
 )

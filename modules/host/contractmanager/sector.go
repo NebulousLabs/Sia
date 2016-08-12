@@ -72,8 +72,8 @@ type (
 // the filesystem when trying to manage hundreds of thousands or even tens of
 // millions of sectors in a single folder.
 func (cm *ContractManager) managedSectorID(sectorRoot crypto.Hash) (id sectorID) {
-	saltedRoot := crypto.HashAll(sectorRoot, sm.sectorSalt)
-	copy(id[:], saltedRoot)
+	saltedRoot := crypto.HashAll(sectorRoot, cm.sectorSalt)
+	copy(id[:], saltedRoot[:])
 	return id
 }
 

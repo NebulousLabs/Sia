@@ -51,20 +51,14 @@ func (cm *ContractManager) initSettings() error {
 	return build.ExtendErr("error saving contract manager after initialization", persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile)))
 }
 
-// load will pull all saved state from the contract manager off of the disk and
-// into memory.
-func (cm *ContractManager) load() error {
-	// Before passing things off to the write-ahead-log, pull all in-memory
-	// state from an atomic file into memory. The WAL, while loading, will
-	// directly apply any changes to memory. The changes being pulled off disk
-	// will have been made atomically, but they may not be complete with the
-	// most recent state of the WAL. This is okay, so long as data has been
-	// loaded atomically, the WAL applying itself will catch up the in-memory
-	// state, bringing the contract manager to a point of consistency.
-	//
-	// The in-memory state is all currently stored in the settings file. If
-	// there is no settings file, this is probably the first run for the
-	// contract manager, a default settings file can be created.
+// loadAtomicPersistence will load all data that has been saved to disk
+// atomically. This usually means that the data was saved with a copy-on-write
+// call.
+//
+// The WAL is not included in atomic persistence, though it is saved
+// atomically. The WAL is a recovery mechanism that gets used after all other
+// state has been loaded, and restores consistency to the host.
+func (cm *ContractManager) loadAtomicPersistence() error {
 	var ss savedSettings
 	err := cm.dependencies.loadFile(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
 	if os.IsNotExist(err) {
@@ -88,16 +82,20 @@ func (cm *ContractManager) load() error {
 		}
 	}
 
-	// Load the WAL, which will finish up any in-progress changes to the state,
-	// bringing the system to consistency.
-	return build.ExtendErr("error loading the contract manager WAL", cm.wal.load())
+	// If extending the contract manager, any in-memory changes should be
+	// loaded here, before wal.load() is called. The first thing that
+	// wal.load() will do is check for a previous WAL, which indicates an
+	// unclean shutdown. wal.load() depends on all in-memory resources being
+	// fully loaded already.
+
+	return nil
 }
 
 // savedSettings returns the settings of the contract manager in an
 // easily-serializable form.
 func (cm *ContractManager) savedSettings() savedSettings {
 	ss := savedSettings{
-		SectorSalt:     cm.sectorSalt,
+		SectorSalt: cm.sectorSalt,
 	}
 	for _, sf := range cm.storageFolders {
 		ss.StorageFolders = append(ss.StorageFolders, *sf)
