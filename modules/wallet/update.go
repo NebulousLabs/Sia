@@ -10,8 +10,8 @@ import (
 	"github.com/NebulousLabs/bolt"
 )
 
-// isWalletAddress is a helper function that an UnlockHash is derived from
-// one of the wallet's spendable keys.
+// isWalletAddress is a helper function that checks if an UnlockHash is
+// derived from one of the wallet's spendable keys.
 func (w *Wallet) isWalletAddress(uh types.UnlockHash) bool {
 	_, exists := w.keys[uh]
 	return exists
