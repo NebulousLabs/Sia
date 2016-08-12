@@ -125,9 +125,9 @@ func startDaemon(config Config) (err error) {
 		return err
 	}
 
-	serverrs := make(chan error)
+	servErrs := make(chan error)
 	go func() {
-		serverrs <- srv.Serve()
+		servErrs <- srv.Serve()
 	}()
 
 	// Initialize the Sia modules
@@ -254,7 +254,7 @@ func startDaemon(config Config) (err error) {
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
-	err = <-serverrs
+	err = <-servErrs
 	if err != nil {
 		build.Critical(err)
 	}
