@@ -35,6 +35,23 @@ const (
 	walFileTmp = "contractmanager.wal_temp"
 )
 
+const (
+	// sectorMetadataDiskSize defines the number of bytes it takes to store the
+	// metadata of a single sector on disk.
+	sectorMetadataDiskSize = 14
+
+	// storageFolderGranularity defines the number of sectors that a storage
+	// folder must cleanly divide into. 64 sectors is a requirement due to the
+	// way the storage folder bitfield (field 'Usage') is constructed - the
+	// bitfield defines which sectors are available, and the bitfield must be
+	// constructed 1 uint64 at a time (8 bytes, 64 bits, or 64 sectors).
+	//
+	// This corresponds to a granularity of 256 MiB on the production network,
+	// which is a high granluarity relative the to the TiBs of storage that
+	// hosts are expected to provide.
+	storageFolderGranularity = 64
+)
+
 var (
 	// settingsMetadata is the header that is used when writing the contract
 	// manager's settings to disk.
@@ -71,10 +88,6 @@ var (
 	// folders in the host are allowed to be. There is a hard limit at 4
 	// billion sectors because the sector location map only uses 4 bytes to
 	// indicate the location of a sector.
-	//
-	// On slower machines, it takes around 4ms to scan the bitfield for a
-	// completely full 4 million sector bitfield, at which point the bitfield
-	// becomes a limiting performance factor when adding a new sector.
 	maximumSectorsPerStorageFolder = func() uint64 {
 		if build.Release == "dev" {
 			return 1 << 20 // 4 TiB
@@ -110,15 +123,4 @@ var (
 		}
 		panic("unrecognized release constant in host - minimum storage folder size")
 	}()
-
-	// storageFolderGranularity defines the number of sectors that a storage
-	// folder must cleanly divide into. 64 sectors is a requirement due to the
-	// way the storage folder bitfield (field 'Usage') is constructed - the
-	// bitfield defines which sectors are available, and the bitfield must be
-	// constructed 1 uint64 at a time (8 bytes, 64 bits, or 64 sectors).
-	//
-	// This corresponds to a granularity of 256 MiB on the production network,
-	// which is a high granluarity relative the to the TiBs of storage that
-	// hosts are expected to provide.
-	storageFolderGranularity = uint64(64)
 )

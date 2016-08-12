@@ -33,7 +33,7 @@ func TestAddStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64*2)
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*storageFolderGranularity*2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestAddStorageFolder(t *testing.T) {
 	if sfs[0].Path != storageFolderDir {
 		t.Error("storage folder reported with wrong path")
 	}
-	if sfs[0].Capacity != modules.SectorSize*64*2 {
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*2 {
 		t.Error("storage folder reported with wrong sector size")
 	}
 }
@@ -131,7 +131,7 @@ func TestAddLargeStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64*16) // Total size must exceed the limit of the limitFile.
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*storageFolderGranularity*16) // Total size must exceed the limit of the limitFile.
 	// Should be a storage folder error, but with all the context adding, I'm
 	// not sure how to check the error type.
 	if err == nil {
@@ -190,21 +190,21 @@ func TestAddStorageFolderConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() {
-		err := cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*64*8)
+		err := cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*8)
+		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*64*8)
+		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,7 +310,7 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 
 	// Spin off the first goroutine, and then wait until write has been called
 	// on the underlying file.
-	sfOneSize := modules.SectorSize * 64 * 8
+	sfOneSize := modules.SectorSize * storageFolderGranularity * 8
 	go func() {
 		err := cmt.cm.AddStorageFolder(storageFolderOne, sfOneSize)
 		if err != nil {
@@ -330,24 +330,21 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	if sfs[0].ProgressNumerator != 0 {
 		t.Error("storage folder is showing progress despite being blocked")
 	}
-	if sfs[0].ProgressDenominator != sfOneSize+16*64*8 {
-		// The 16*64*8 comes from the fact that there are 8*64 sectors storage
-		// folder one, and that 16 additional bytes are needed per sector to
-		// store metadata.
+	if sfs[0].ProgressDenominator != sfOneSize+sectorMetadataDiskSize*storageFolderGranularity*8 {
 		t.Error("storage folder is not showing that an action is in progress, though one is", sfs[0].ProgressDenominator, sfOneSize)
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*8)
+		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*64*8)
+		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -406,7 +403,7 @@ func TestAddStorageFolderConsecutive(t *testing.T) {
 
 	// Spin off the first goroutine, and then wait until write has been called
 	// on the underlying file.
-	sfSize := modules.SectorSize * 64 * 8
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -459,7 +456,7 @@ func TestAddStorageFolderDoubleAdd(t *testing.T) {
 	// Call AddStorageFolder in three separate goroutines, where the same path
 	// is used in each. The errors are not checked because one of the storage
 	// folders will succeed, but it's uncertain which one.
-	sfSize := modules.SectorSize * 64 * 8
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -552,7 +549,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	// Call AddStorageFolder in three separate goroutines, where the same path
 	// is used in each. The errors are not checked because one of the storage
 	// folders will succeed, but it's uncertain which one.
-	sfSize := modules.SectorSize * 64 * 8
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -627,7 +624,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Call AddStorageFolder, knowing that the changes will not be properly
 	// committed.
-	sfSize := modules.SectorSize * 64 * 8
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -750,7 +747,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	}
 	// Call AddStorageFolder, knowing that the changes will not be properly
 	// committed, and that the call itself will not actually complete.
-	sfSize := modules.SectorSize * 64 * 8
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -839,7 +836,7 @@ func TestAddStorageFolderDoubleAddConcurrent(t *testing.T) {
 	// is used in each. The errors are not checked because one of the storage
 	// folders will succeed, but it's uncertain which one.
 	var wg sync.WaitGroup
-	sfSize := modules.SectorSize * 64 * 8
+	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	wg.Add(3)
 	go func() {
 		_ = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
@@ -891,7 +888,7 @@ func TestAddStorageFolderReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sfSize := modules.SectorSize * 64 * 24
+	sfSize := modules.SectorSize * storageFolderGranularity * 24
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
@@ -942,7 +939,7 @@ func TestAddStorageFolderReload(t *testing.T) {
 	}
 	// Check that the storage folder as represented on disk has the correct
 	// size.
-	sectorLookupTableSize := int64(64 * 24 * 16)
+	sectorLookupTableSize := int64(storageFolderGranularity * 24 * sectorMetadataDiskSize)
 	expectedSize := int64(sfSize) + sectorLookupTableSize
 	fi, err := os.Stat(filepath.Join(storageFolderOne, sectorFile))
 	if err != nil {

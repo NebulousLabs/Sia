@@ -13,9 +13,6 @@ import (
 )
 
 type (
-	// TODO: For greatly improved space efficiency, and also probably encoding
-	// time efficiency, make a custom json marshaller that can pack this stuff.
-	// The big killer is 'Data', which is often going to be 4 MiB large.
 	sectorAdd struct {
 		Count  uint16
 		Data   []byte
@@ -91,9 +88,8 @@ type (
 		// Utilities. The WAL needs access to the ContractManager because all
 		// mutations to ACID fields of the contract manager happen through the
 		// WAL.
-		cm           *ContractManager
-		loadComplete bool
-		mu           sync.Mutex
+		cm *ContractManager
+		mu sync.Mutex
 	}
 )
 
@@ -285,7 +281,5 @@ func (wal *writeAheadLog) load() error {
 	if err != nil {
 		build.ExtendErr("unable to write to settings temp file", err)
 	}
-
-	wal.loadComplete = true
 	return nil
 }

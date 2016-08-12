@@ -94,10 +94,13 @@ type storageFolder struct {
 	Sectors uint64
 	Usage   []uint64
 
-	FailedReads      uint64
-	FailedWrites     uint64
-	SuccessfulReads  uint64
-	SuccessfulWrites uint64
+	// Not exporting these values means that they will not be saved between
+	// restarts of the contract manager. This is intentional, as it is expected
+	// that these values will be more useful if they are reset every restart.
+	failedReads      uint64
+	failedWrites     uint64
+	successfulReads  uint64
+	successfulWrites uint64
 
 	// An open file handle is kept so that writes can easily be made to the
 	// storage folder without needing to grab a new file handle. This also
@@ -152,6 +155,11 @@ func (wal *writeAheadLog) managedStorageFolderMetadata() (smfs []modules.Storage
 			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.Sectors) * modules.SectorSize,
 			Path:              sf.Path,
 
+			FailedReads:      sf.failedReads,
+			FailedWrites:     sf.failedWrites,
+			SuccessfulReads:  sf.successfulReads,
+			SuccessfulWrites: sf.successfulWrites,
+
 			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
 			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 		}
@@ -168,6 +176,11 @@ func (wal *writeAheadLog) managedStorageFolderMetadata() (smfs []modules.Storage
 			CapacityRemaining: modules.SectorSize * 64 * uint64(len(sf.Usage)),
 			Path:              sf.Path,
 
+			FailedReads:      sf.failedReads,
+			FailedWrites:     sf.failedWrites,
+			SuccessfulReads:  sf.successfulReads,
+			SuccessfulWrites: sf.successfulWrites,
+
 			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
 			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 		})
@@ -183,6 +196,9 @@ func (wal *writeAheadLog) storageFolders() (sfs []*storageFolder) {
 	// without causing issues.
 	newMap := make(map[uint16]*storageFolder)
 	for i, sf := range wal.cm.storageFolders {
+		// TODO: Consider not adding a storage folder if the number of failures
+		// is above some threshold.
+
 		newMap[i] = sf
 	}
 
@@ -300,11 +316,6 @@ var (
 	// errRelativePath is returned if a path must be absolute.
 	errRelativePath = errors.New("storage folder paths must be absolute")
 )
-
-// TODO: Need to add some command to 'siad' that will correctly repoint a
-// storage folder to a new mountpoint. As best I can tell, this needs to happen
-// while siad is not running. Either that, or 'siac' needs to do the whole
-// shutdown thing itself? Still unclear.
 
 // offloadStorageFolder takes sectors in a storage folder and moves them to
 // another storage folder.

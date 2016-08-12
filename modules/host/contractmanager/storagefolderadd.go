@@ -62,10 +62,10 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Precompute the total on-disk size of the storage folder. The storage
 	// folder needs to have modules.SectorSize available for each sector, plus
-	// another 16 bytes per sector to store a mapping from sector id to its
-	// location in the storage folder.
+	// another sectorMetadataDiskSize bytes per sector to store a mapping from
+	// sector id to its location in the storage folder.
 	numSectors := uint64(len(sf.Usage)) * 64
-	sectorLookupSize := numSectors * 16
+	sectorLookupSize := numSectors * sectorMetadataDiskSize
 	sectorHousingSize := numSectors * modules.SectorSize
 	totalSize := sectorLookupSize + sectorHousingSize
 	sectorHousingName := filepath.Join(sf.Path, sectorFile)
@@ -294,9 +294,9 @@ func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
 		wal.cm.storageFolders[sf.Index] = sf
 	} else {
 		var err error
-		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_WRONLY, 0700)
+		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
-			sf.FailedReads += 1
+			sf.failedReads += 1
 			wal.cm.log.Println("Difficulties opening storage folder:", err)
 		}
 		wal.cm.storageFolders[sf.Index] = sf

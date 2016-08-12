@@ -1,6 +1,7 @@
 package contractmanager
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 
@@ -16,14 +17,6 @@ type (
 	savedSettings struct {
 		SectorSalt     crypto.Hash
 		StorageFolders []storageFolder
-	}
-
-	// sectorLocationEntry contains all the information necessary to add an
-	// entry to the sectorLocations map in the contract manager.
-	sectorLocationEntry struct {
-		index         uint32
-		sectorID      string
-		storageFolder uint16
 	}
 )
 
@@ -76,7 +69,7 @@ func (cm *ContractManager) loadAtomicPersistence() error {
 	cm.sectorSalt = ss.SectorSalt
 	for _, sf := range ss.StorageFolders {
 		cm.storageFolders[sf.Index] = &sf
-		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_WRONLY, 0700)
+		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
 			return build.ExtendErr("error loading storage folder file handle", err)
 		}
@@ -89,6 +82,60 @@ func (cm *ContractManager) loadAtomicPersistence() error {
 	// fully loaded already.
 
 	return nil
+}
+
+// loadSectorLocations will read the metadata portion of each storage folder
+// file and load the sector location information into memory. Note that this
+// function should only be called after the WAL has restored consistency to the
+// state of the storage folder database.
+func (cm *ContractManager) loadSectorLocations() {
+	// Each storage folder houses separate sector location data.
+	for _, sf := range cm.storageFolders {
+		// The storage folder's file should already be open from where the WAL
+		// was doing repairs. For the sake of speed, read the whole sector
+		// lookup table into memory.
+		sectorLookupBytes := make([]byte, len(sf.Usage)*storageFolderGranularity*sectorMetadataDiskSize)
+		// Seek to the beginning of the file and read the whole lookup table.
+		// In the event of a failure, assume disk error and continue to the
+		// next storage folder.
+		_, err := sf.file.Seek(0, 0)
+		if err != nil {
+			cm.log.Println("Error: difficulty seeking in storge folder file during startup", err)
+			sf.failedReads++
+			continue
+		}
+		_, err = sf.file.Read(sectorLookupBytes)
+		if err != nil {
+			cm.log.Println("Error: difficulty reading from storge folder file during startup", err)
+			sf.failedReads++
+			continue
+		}
+
+		// Parse the data storageFolderGranularity at a time. Compare against
+		// Usage to determine if a sector is represented by the metadata at a
+		// given point, and if it is load the metadata into the sectorLocations
+		// map.
+		readHead := 0
+		for i, usage := range sf.Usage {
+			usageMask := uint64(1)
+			for j := 0; j < 64; j++ {
+				if usage&usageMask == usage {
+					// There is valid sector metadata here.
+					var id sectorID
+					copy(id[:], sectorLookupBytes[readHead:readHead+12])
+					count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
+					sl := sectorLocation{
+						index:         uint32(i*64 + j),
+						storageFolder: sf.Index,
+						count:         count,
+					}
+					cm.sectorLocations[id] = sl
+				}
+				usageMask = usageMask << 1
+				readHead += sectorMetadataDiskSize
+			}
+		}
+	}
 }
 
 // savedSettings returns the settings of the contract manager in an

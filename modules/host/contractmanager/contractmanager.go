@@ -179,6 +179,10 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		return nil, build.ExtendErr("error while loading the WAL at startup", err)
 	}
 
+	// Now that the contract manager has been brought back to a state of
+	// consistency, load the sector location data.
+	cm.loadSectorLocations()
+
 	// Spin up the sync loop. Note that the sync loop needs to be created after
 	// the loading process is complete, otherwise there might be conflicts on
 	// the contract state, as commit() will be modifying the state and saving

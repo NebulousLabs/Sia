@@ -2,6 +2,7 @@ package contractmanager
 
 import (
 	"encoding/binary"
+	"errors"
 	"math"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -63,11 +64,12 @@ func randFreeSector(usage []uint64) uint32 {
 				break
 			}
 		}
-	}
-	// If nothing was found even after scanning the front of the array, panic
-	// as this function should not be called with a full usage array.
-	if i == start {
-		panic("unable to find an empty sector in the usage array")
+
+		// If nothing was found even after scanning the front of the array,
+		// panic as this function should not be called with a full usage array.
+		if i == start {
+			panic("unable to find an empty sector in the usage array")
+		}
 	}
 
 	// Get the most significant zero. This is achieved by performing a 'most
@@ -95,6 +97,12 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 		// this root.
 		location, exists := wal.cm.sectorLocations[id]
 		if exists {
+			// Check whether the maximum number of virtual sectors has been
+			// reached.
+			if location.count == 65535 {
+				return errMaxVirtualSectors
+			}
+
 			// All that needs to happen is the count should be incremented and
 			// updated, and the sectorAdd should be filled out.
 			sa.Count = location.count + 1
@@ -110,15 +118,14 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			location.count += 1
 			wal.cm.sectorLocations[id] = location
 		} else {
+			// Sanity check - data should have modules.SectorSize bytes.
+			if uint64(len(data)) != modules.SectorSize {
+				wal.cm.log.Critical("sector has the wrong size", modules.SectorSize, len(data))
+				return errors.New("malformed sector")
+			}
+
 			// Find a committed storage folder that has enough space to receive
 			// this sector.
-			//
-			// TODO: this search needs to consider storage folders that are in
-			// the process of being removed, and should avoid any storage
-			// folders which are undergoing a remove operation which is
-			// incomplete. This would look like a pre-process which compares
-			// the list of committed storage folders to the list of uncommitted
-			// removals, before passing the result to emptiestStorageFolder.
 			sfs := wal.storageFolders()
 			sf, _ := emptiestStorageFolder(sfs)
 			if sf == nil {
@@ -141,6 +148,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 				storageFolder: sf.Index,
 				count:         1,
 			}
+			sf.Sectors += 1
 		}
 
 		// Add a change to the WAL to commit this sector to the provided index.
@@ -170,22 +178,22 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 // on the same sector, there should be no issues.
 func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
 	sf := wal.cm.storageFolders[sa.Folder]
-	lookupTableSize := len(sf.Usage) * 64 * 16
+	lookupTableSize := len(sf.Usage) * storageFolderGranularity * sectorMetadataDiskSize
 
 	// Write the sector metadata to disk.
-	writeData := make([]byte, 16)
+	writeData := make([]byte, sectorMetadataDiskSize)
 	copy(writeData, sa.ID[:])
-	binary.LittleEndian.PutUint16(writeData[12:14], sa.Count)
-	binary.LittleEndian.PutUint16(writeData[14:], sa.Folder)
-	_, err := sf.file.Seek(16*int64(sa.Index), 0)
+	binary.LittleEndian.PutUint16(writeData[12:], sa.Count)
+	_, err := sf.file.Seek(sectorMetadataDiskSize*int64(sa.Index), 0)
 	if err != nil {
 		wal.cm.log.Println("ERROR: unable to seek to sector metadata when adding sector")
-		sf.FailedWrites += 1
+		sf.failedWrites += 1
 		return
 	}
 	_, err = sf.file.Write(writeData)
 	if err != nil {
-		sf.FailedWrites += 1
+		wal.cm.log.Println("ERROR: unable to write sector metadata when adding sector")
+		sf.failedWrites += 1
 		return
 	}
 
@@ -195,19 +203,19 @@ func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
 		_, err = sf.file.Seek(int64(modules.SectorSize)*int64(sa.Index)+int64(lookupTableSize), 0)
 		if err != nil {
 			wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
-			sf.FailedWrites += 1
+			sf.failedWrites += 1
 			return
 		}
 		_, err = sf.file.Write(sa.Data)
 		if err != nil {
 			wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
-			sf.FailedWrites += 1
+			sf.failedWrites += 1
 			return
 		}
 	}
 
 	// Writes were successful, update the storage folder stats.
-	sf.SuccessfulWrites += 1
+	sf.successfulWrites += 1
 }
 
 // AddSector will add a sector to the contract manager.
