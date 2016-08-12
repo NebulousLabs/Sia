@@ -402,7 +402,7 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 
 	// Create the Server
 	mux := http.NewServeMux()
-	siadServ := &Server{
+	srv := &Server{
 		mux:      mux,
 		listener: l,
 		httpServer: &http.Server{
@@ -411,9 +411,9 @@ func NewServer(bindAddr, requiredUserAgent, requiredPassword string) (*Server, e
 	}
 
 	// Register siad routes
-	siadServ.mux.Handle("/daemon/", requireUserAgent(siadServ.daemonHandler(requiredPassword), requiredUserAgent))
+	srv.mux.Handle("/daemon/", requireUserAgent(siadServ.daemonHandler(requiredPassword), requiredUserAgent))
 
-	return siadServ, nil
+	return srv, nil
 }
 
 func (srv *Server) Serve() error {
