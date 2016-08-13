@@ -2,7 +2,10 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 // sortedOutputs is a struct containing a slice of siacoin outputs and their
@@ -18,13 +21,21 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	for _, sco := range w.siacoinOutputs {
-		siacoinBalance = siacoinBalance.Add(sco.Value)
-	}
-	for _, sfo := range w.siafundOutputs {
-		siafundBalance = siafundBalance.Add(sfo.Value)
-		siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
-	}
+	w.db.View(func(tx *bolt.Tx) error {
+		tx.Bucket(bucketSiacoinOutputs).ForEach(func(_, scoBytes []byte) error {
+			var sco types.SiacoinOutput
+			err := encoding.Unmarshal(scoBytes, &sco)
+			siacoinBalance = siacoinBalance.Add(sco.Value)
+			return err
+		})
+		return tx.Bucket(bucketSiafundOutputs).ForEach(func(_, sfoBytes []byte) error {
+			var sfo types.SiafundOutput
+			err := encoding.Unmarshal(sfoBytes, &sfo)
+			siafundBalance = siafundBalance.Add(sfo.Value)
+			siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
+			return err
+		})
+	})
 	return
 }
 

@@ -119,11 +119,7 @@ func (w *Wallet) openDB(filename string) (err error) {
 	}
 	// initialize the database
 	err = w.db.Update(func(tx *bolt.Tx) error {
-		buckets := [][]byte{
-			bucketHistoricOutputs,
-			bucketHistoricClaimStarts,
-		}
-		for _, b := range buckets {
+		for _, b := range dbBuckets {
 			_, err := tx.CreateBucketIfNotExists(b)
 			if err != nil {
 				return fmt.Errorf("could not create bucket %v: %v", string(b), err)
