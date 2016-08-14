@@ -89,8 +89,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 
 		// Create and fill out the sectorAdd object.
 		sa := sectorAdd{
-			Data: data,
-			ID:   id,
+			ID: id,
 		}
 
 		// Grab the number of virtual sectors that have been committed with
@@ -109,10 +108,6 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			sa.Folder = location.storageFolder
 			sa.Index = location.index
 
-			// Data can be wiped, as the data is already there, there's no need
-			// to commit to the data or to write it to disk.
-			sa.Data = nil
-
 			// Update the location count to indicate that a sector has been
 			// added.
 			location.count += 1
@@ -123,6 +118,11 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 				wal.cm.log.Critical("sector has the wrong size", modules.SectorSize, len(data))
 				return errors.New("malformed sector")
 			}
+
+			// TODO: Need to make sure that the disk write which happens here
+			// will not over-write any sectors which are committed to be
+			// removed, but have not actually been removed yet, because data
+			// will be destroyed.
 
 			// Find a committed storage folder that has enough space to receive
 			// this sector.
@@ -149,6 +149,32 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 				count:         1,
 			}
 			sf.Sectors += 1
+
+			// Write the sector to disk. The sector will overwrite existing
+			// data, but if this loop has been set up correctly, there should
+			// be no existing data to be lost. If the write fails halfway
+			// through, the operation to update the metadata will have also
+			// failed, which means you don't even need a cleanup operation.
+			//
+			// If the sector write succeeds and the metadata write fails (which
+			// is possible and likely under this setup), then nothing happens
+			// because data was not over-written when the sector was written.
+			// It will fail equivalently to the whole operation failing.
+			if sa.Count == 1 {
+				lookupTableSize := len(sf.Usage) * storageFolderGranularity * sectorMetadataDiskSize
+				_, err := sf.file.Seek(int64(modules.SectorSize)*int64(sa.Index)+int64(lookupTableSize), 0)
+				if err != nil {
+					wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
+					sf.failedWrites += 1
+					return errDiskTrouble
+				}
+				_, err = sf.file.Write(data)
+				if err != nil {
+					wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
+					sf.failedWrites += 1
+					return errDiskTrouble
+				}
+			}
 		}
 
 		// Add a change to the WAL to commit this sector to the provided index.
@@ -178,7 +204,6 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 // on the same sector, there should be no issues.
 func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
 	sf := wal.cm.storageFolders[sa.Folder]
-	lookupTableSize := len(sf.Usage) * storageFolderGranularity * sectorMetadataDiskSize
 
 	// Write the sector metadata to disk.
 	writeData := make([]byte, sectorMetadataDiskSize)
@@ -197,25 +222,9 @@ func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
 		return
 	}
 
-	// Write the sector to disk. The write only needs to happen if the count is
-	// equal to 1, otherwise the data can be assumed to already be there.
-	if sa.Count == 1 {
-		_, err = sf.file.Seek(int64(modules.SectorSize)*int64(sa.Index)+int64(lookupTableSize), 0)
-		if err != nil {
-			wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
-			sf.failedWrites += 1
-			return
-		}
-		_, err = sf.file.Write(sa.Data)
-		if err != nil {
-			wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
-			sf.failedWrites += 1
-			return
-		}
-	}
-
 	// Writes were successful, update the storage folder stats.
 	sf.successfulWrites += 1
+
 }
 
 // AddSector will add a sector to the contract manager.

@@ -15,7 +15,6 @@ import (
 type (
 	sectorAdd struct {
 		Count  uint16
-		Data   []byte
 		Folder uint16
 		ID     sectorID
 		Index  uint32

@@ -38,12 +38,6 @@ func (wal *writeAheadLog) syncResources() {
 			wal.cm.log.Critical("ERROR: unable to atomically copy the contract manager settings:", err)
 			panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
 		}
-		// Remove the temporary file as the contents are no longer relevant.
-		// Another will be created shortly.
-		err = os.Remove(tmpFilename)
-		if err != nil {
-			wal.cm.log.Println("ERROR: unable to remove temporary settings file:", err)
-		}
 		wg.Done()
 	}()
 	// Queue threads to sync all of the storage folders.
@@ -115,12 +109,6 @@ func (wal *writeAheadLog) commit() {
 		// Crash if the list of uncommitted changes has grown very large.
 		wal.cm.log.Critical("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
 		panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
-	}
-	// Remove the temporary WAL file as it has been committed. A new temporary
-	// log file will be created shortly.
-	err = os.Remove(walTmpName)
-	if err != nil {
-		wal.cm.log.Println("ERROR: unable to remove temporary write-ahead-log after successful commit-to-log:", err)
 	}
 	// Any module waiting for a synchronization has now had the changes
 	// permanently committed, as of the WAL COW operation. Signal that syncing
@@ -262,7 +250,7 @@ func (wal *writeAheadLog) threadedSyncLoop(threadsStopped chan struct{}, syncLoo
 		return
 	}
 
-	syncInterval := 1500 * time.Millisecond
+	syncInterval := 500 * time.Millisecond
 	for {
 		select {
 		case <-threadsStopped:

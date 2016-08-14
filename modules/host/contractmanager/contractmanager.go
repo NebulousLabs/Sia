@@ -27,6 +27,10 @@ package contractmanager
 // faster. Windows and other non-linux systems will need to continue doing it
 // using the current implementation.
 
+// TODO: Some of the locking, especially with regards to ReadSector, could be
+// moved to a per-storage-folder basis instead of grabbing the WAL lock, which
+// blocks everything to access just a single resource.
+
 import (
 	"path/filepath"
 
