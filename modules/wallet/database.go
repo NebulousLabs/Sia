@@ -93,6 +93,19 @@ func dbDeleteProcessedTransaction(tx *bolt.Tx, id types.TransactionID) error {
 	return dbDelete(tx.Bucket(bucketProcessedTransactions), id)
 }
 
+// dbForEachProcessedTransaction iterates over the ProcessedTransactions
+// bucket, calling fn on each entry.
+func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(modules.ProcessedTransaction)) error {
+	return tx.Bucket(bucketProcessedTransactions).ForEach(func(_, val []byte) error {
+		var pt modules.ProcessedTransaction
+		if err := encoding.Unmarshal(val, &pt); err != nil {
+			return err
+		}
+		fn(pt)
+		return nil
+	})
+}
+
 // dbPutSiacoinOutput stores the output corresponding to the specified
 // SiacoinOutputID.
 func dbPutSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, output types.SiacoinOutput) error {
@@ -112,6 +125,22 @@ func dbDeleteSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
 	return dbDelete(tx.Bucket(bucketSiacoinOutputs), id)
 }
 
+// dbForEachSiacoinOutput iterates over the SiacoinOutputs bucket, calling fn
+// on each entry.
+func dbForEachSiacoinOutput(tx *bolt.Tx, fn func(types.SiacoinOutputID, types.SiacoinOutput)) error {
+	return tx.Bucket(bucketSiacoinOutputs).ForEach(func(key, val []byte) error {
+		var id types.SiacoinOutputID
+		var output types.SiacoinOutput
+		if err := encoding.Unmarshal(key, &id); err != nil {
+			return err
+		} else if err := encoding.Unmarshal(val, &output); err != nil {
+			return err
+		}
+		fn(id, output)
+		return nil
+	})
+}
+
 // dbPutSiafundOutput stores the output corresponding to the specified
 // SiafundOutputID.
 func dbPutSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, output types.SiafundOutput) error {
@@ -129,6 +158,22 @@ func dbGetSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (output types.Sia
 // SiafundOutputID.
 func dbDeleteSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) error {
 	return dbDelete(tx.Bucket(bucketSiafundOutputs), id)
+}
+
+// dbForEachSiafundOutput iterates over the SiafundOutputs bucket, calling fn
+// on each entry.
+func dbForEachSiafundOutput(tx *bolt.Tx, fn func(types.SiafundOutputID, types.SiafundOutput)) error {
+	return tx.Bucket(bucketSiafundOutputs).ForEach(func(key, val []byte) error {
+		var id types.SiafundOutputID
+		var output types.SiafundOutput
+		if err := encoding.Unmarshal(key, &id); err != nil {
+			return err
+		} else if err := encoding.Unmarshal(val, &output); err != nil {
+			return err
+		}
+		fn(id, output)
+		return nil
+	})
 }
 
 // dbPutSpentOutput registers an output as being spent as of the specified
