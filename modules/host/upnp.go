@@ -16,31 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// myExternalIP discovers the host's external IP by querying a centralized
-// service, http://myexternalip.com.
-func myExternalIP() (string, error) {
-	// timeout after 10 seconds
-	client := http.Client{Timeout: time.Duration(10 * time.Second)}
-	resp, err := client.Get("http://myexternalip.com/raw")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		errResp, _ := ioutil.ReadAll(resp.Body)
-		return "", errors.New(string(errResp))
-	}
-	buf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 64))
-	if err != nil {
-		return "", err
-	}
-	if len(buf) == 0 {
-		return "", errors.New("myexternalip.com returned a 0 length IP address")
-	}
-	// trim newline
-	return strings.TrimSpace(string(buf)), nil
-}
-
 // managedLearnHostname discovers the external IP of the Host. If the host's
 // net address is blank and the host's auto address appears to have changed,
 // the host will make an announcement on the blockchain.
@@ -159,4 +134,29 @@ func (h *Host) managedClearPort() error {
 
 	h.log.Println("INFO: successfully unforwarded port", port)
 	return nil
+}
+
+// myExternalIP discovers the host's external IP by querying a centralized
+// service, http://myexternalip.com.
+func myExternalIP() (string, error) {
+	// timeout after 10 seconds
+	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	resp, err := client.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		return "", errors.New(string(errResp))
+	}
+	buf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 64))
+	if err != nil {
+		return "", err
+	}
+	if len(buf) == 0 {
+		return "", errors.New("myexternalip.com returned a 0 length IP address")
+	}
+	// trim newline
+	return strings.TrimSpace(string(buf)), nil
 }
