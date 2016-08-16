@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/NebulousLabs/bolt"
@@ -22,18 +21,12 @@ func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalan
 	defer w.mu.Unlock()
 
 	w.db.View(func(tx *bolt.Tx) error {
-		tx.Bucket(bucketSiacoinOutputs).ForEach(func(_, scoBytes []byte) error {
-			var sco types.SiacoinOutput
-			err := encoding.Unmarshal(scoBytes, &sco)
+		dbForEachSiacoinOutput(tx, func(_ types.SiacoinOutputID, sco types.SiacoinOutput) {
 			siacoinBalance = siacoinBalance.Add(sco.Value)
-			return err
 		})
-		return tx.Bucket(bucketSiafundOutputs).ForEach(func(_, sfoBytes []byte) error {
-			var sfo types.SiafundOutput
-			err := encoding.Unmarshal(sfoBytes, &sfo)
+		return dbForEachSiafundOutput(tx, func(_ types.SiafundOutputID, sfo types.SiafundOutput) {
 			siafundBalance = siafundBalance.Add(sfo.Value)
 			siafundClaimBalance = siafundClaimBalance.Add(w.siafundPool.Sub(sfo.ClaimStart).Mul(sfo.Value).Div(types.SiafundCount))
-			return err
 		})
 	})
 	return

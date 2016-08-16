@@ -3,7 +3,6 @@ package wallet
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -22,12 +21,7 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	defer w.mu.Unlock()
 
 	w.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketProcessedTransactions).ForEach(func(_, ptBytes []byte) error {
-			var pt modules.ProcessedTransaction
-			if err := encoding.Unmarshal(ptBytes, &pt); err != nil {
-				return err
-			}
-
+		return dbForEachProcessedTransaction(tx, func(pt modules.ProcessedTransaction) {
 			relevant := false
 			for _, input := range pt.Inputs {
 				relevant = relevant || input.RelatedAddress == uh
@@ -38,8 +32,6 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 			if relevant {
 				pts = append(pts, pt)
 			}
-
-			return nil
 		})
 	})
 
@@ -101,15 +93,10 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	}
 
 	err = w.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketProcessedTransactions).ForEach(func(_, ptBytes []byte) error {
-			var pt modules.ProcessedTransaction
-			if err := encoding.Unmarshal(ptBytes, &pt); err != nil {
-				return err
-			}
+		return dbForEachProcessedTransaction(tx, func(pt modules.ProcessedTransaction) {
 			if startHeight <= pt.ConfirmationHeight && pt.ConfirmationHeight <= endHeight {
 				pts = append(pts, pt)
 			}
-			return nil
 		})
 	})
 	return
