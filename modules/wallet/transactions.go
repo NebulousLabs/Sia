@@ -3,8 +3,11 @@ package wallet
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 var (
@@ -18,24 +21,28 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	for _, pt := range w.processedTransactions {
-		relevant := false
-		for _, input := range pt.Inputs {
-			if input.RelatedAddress == uh {
-				relevant = true
-				break
+	w.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketProcessedTransactions).ForEach(func(_, ptBytes []byte) error {
+			var pt modules.ProcessedTransaction
+			if err := encoding.Unmarshal(ptBytes, &pt); err != nil {
+				return err
 			}
-		}
-		for _, output := range pt.Outputs {
-			if output.RelatedAddress == uh {
-				relevant = true
-				break
+
+			relevant := false
+			for _, input := range pt.Inputs {
+				relevant = relevant || input.RelatedAddress == uh
 			}
-		}
-		if relevant {
-			pts = append(pts, pt)
-		}
-	}
+			for _, output := range pt.Outputs {
+				relevant = relevant || output.RelatedAddress == uh
+			}
+			if relevant {
+				pts = append(pts, pt)
+			}
+
+			return nil
+		})
+	})
+
 	return pts
 }
 
@@ -74,12 +81,13 @@ func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransac
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	for _, pt := range w.processedTransactions {
-		if pt.TransactionID == txid {
-			return pt, true
-		}
-	}
-	return modules.ProcessedTransaction{}, false
+	var pt modules.ProcessedTransaction
+	err := w.db.View(func(tx *bolt.Tx) error {
+		var err error
+		pt, err = dbGetProcessedTransaction(tx, txid)
+		return err
+	})
+	return pt, err == nil
 }
 
 // Transactions returns all transactions relevant to the wallet that were
@@ -91,19 +99,20 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	if startHeight > w.consensusSetHeight || startHeight > endHeight {
 		return nil, errOutOfBounds
 	}
-	if len(w.processedTransactions) == 0 {
-		return nil, nil
-	}
 
-	for _, pt := range w.processedTransactions {
-		if pt.ConfirmationHeight > endHeight {
-			break
-		}
-		if pt.ConfirmationHeight >= startHeight {
-			pts = append(pts, pt)
-		}
-	}
-	return pts, nil
+	err = w.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketProcessedTransactions).ForEach(func(_, ptBytes []byte) error {
+			var pt modules.ProcessedTransaction
+			if err := encoding.Unmarshal(ptBytes, &pt); err != nil {
+				return err
+			}
+			if startHeight <= pt.ConfirmationHeight && pt.ConfirmationHeight <= endHeight {
+				pts = append(pts, pt)
+			}
+			return nil
+		})
+	})
+	return
 }
 
 // UnconfirmedTransactions returns the set of unconfirmed transactions that are
