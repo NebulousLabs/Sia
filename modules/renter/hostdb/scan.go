@@ -136,10 +136,16 @@ func (hdb *HostDB) threadedProbeHosts() {
 	for hostEntry := range hdb.scanPool {
 		// Request settings from the queued host entry.
 		// TODO: use dialer.Cancel to shutdown quickly
-		hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey)
+		//
+		// A readlock is necessary when viewing the elements of the host entry.
+		hdb.mu.RLock()
+		netAddr := hostEntry.NetAddress
+		pubKey := hostEntry.PublicKey
+		hdb.mu.RUnlock()
+		hdb.log.Debugln("Scanning", netAddr, pubKey)
 		var settings modules.HostExternalSettings
 		err := func() error {
-			conn, err := hdb.dialer.DialTimeout(hostEntry.NetAddress, hostRequestTimeout)
+			conn, err := hdb.dialer.DialTimeout(netAddr, hostRequestTimeout)
 			if err != nil {
 				return err
 			}
@@ -149,13 +155,13 @@ func (hdb *HostDB) threadedProbeHosts() {
 				return err
 			}
 			var pubkey crypto.PublicKey
-			copy(pubkey[:], hostEntry.PublicKey.Key)
+			copy(pubkey[:], pubKey.Key)
 			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 		if err != nil {
-			hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey, "failed", err)
+			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed", err)
 		} else {
-			hdb.log.Debugln("Scanning", hostEntry.NetAddress, hostEntry.PublicKey, "succeeded")
+			hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
 		}
 
 		// Update the host tree to have a new entry.
