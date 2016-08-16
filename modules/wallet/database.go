@@ -2,20 +2,24 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
 	"github.com/NebulousLabs/bolt"
 )
 
 var (
-	bucketHistoricClaimStarts = []byte("bucketHistoricClaimStarts")
-	bucketHistoricOutputs     = []byte("bucketHistoricOutputs")
-	bucketSiacoinOutputs      = []byte("bucketSiacoinOutputs")
-	bucketSiafundOutputs      = []byte("bucketSiafundOutputs")
-	bucketSpentOutputs        = []byte("bucketSpentOutputs")
+	bucketHistoricClaimStarts   = []byte("bucketHistoricClaimStarts")
+	bucketHistoricOutputs       = []byte("bucketHistoricOutputs")
+	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
+	bucketSiacoinOutputs        = []byte("bucketSiacoinOutputs")
+	bucketSiafundOutputs        = []byte("bucketSiafundOutputs")
+	bucketSpentOutputs          = []byte("bucketSpentOutputs")
 
 	dbBuckets = [][]byte{
 		bucketHistoricClaimStarts,
 		bucketHistoricOutputs,
+		bucketProcessedTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
 		bucketSpentOutputs,
@@ -68,6 +72,25 @@ func dbPutHistoricOutput(tx *bolt.Tx, id types.OutputID, c types.Currency) error
 func dbGetHistoricOutput(tx *bolt.Tx, id types.OutputID) (c types.Currency, err error) {
 	err = dbGet(tx.Bucket(bucketHistoricOutputs), id, &c)
 	return
+}
+
+// dbPutProcessedTransaction stores the ProcessedTransaction corresponding to the
+// specified TransactionID.
+func dbPutProcessedTransaction(tx *bolt.Tx, id types.TransactionID, pt modules.ProcessedTransaction) error {
+	return dbPut(tx.Bucket(bucketProcessedTransactions), id, pt)
+}
+
+// dbGetProcessedTransaction retrieves the ProcessedTransaction corresponding to the
+// specified TransactionID.
+func dbGetProcessedTransaction(tx *bolt.Tx, id types.TransactionID) (pt modules.ProcessedTransaction, err error) {
+	err = dbGet(tx.Bucket(bucketProcessedTransactions), id, &pt)
+	return
+}
+
+// dbDeleteProcessedTransaction deletes the ProcessedTransaction corresponding to the
+// specified TransactionID.
+func dbDeleteProcessedTransaction(tx *bolt.Tx, id types.TransactionID) error {
+	return dbDelete(tx.Bucket(bucketProcessedTransactions), id)
 }
 
 // dbPutSiacoinOutput stores the output corresponding to the specified
