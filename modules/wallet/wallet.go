@@ -71,8 +71,7 @@ type Wallet struct {
 	seeds []modules.Seed
 	keys  map[types.UnlockHash]spendableKey
 
-	// The following fields are kept to track transaction history.
-	processedTransactions            []modules.ProcessedTransaction
+	// unconfirmedProcessedTransactions tracks unconfirmed transactions.
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
