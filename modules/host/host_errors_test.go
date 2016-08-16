@@ -37,8 +37,15 @@ func TestHostFailedMkdirAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(dependencyErrMkdirAll{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrMkdirAll {
+		t.Fatal(err)
+	}
+	// Set ht.host to something non-nil - nil was returned because startup was
+	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
+	// operation will fail.
+	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -70,8 +77,15 @@ func TestHostFailedNewLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrNewLogger{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(dependencyErrNewLogger{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrNewLogger {
+		t.Fatal(err)
+	}
+	// Set ht.host to something non-nil - nil was returned because startup was
+	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
+	// operation will fail.
+	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -103,8 +117,15 @@ func TestHostFailedOpenDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(dependencyErrOpenDatabase{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrOpenDatabase {
+		t.Fatal(err)
+	}
+	// Set ht.host to something non-nil - nil was returned because startup was
+	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
+	// operation will fail.
+	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -136,8 +157,15 @@ func TestHostFailedLoadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrLoadFile{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(dependencyErrLoadFile{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrLoadFile {
+		t.Fatal(err)
+	}
+	// Set ht.host to something non-nil - nil was returned because startup was
+	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
+	// operation will fail.
+	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -169,8 +197,15 @@ func TestHostFailedListen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = newHost(dependencyErrListen{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	ht.host, err = newHost(dependencyErrListen{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
 	if err != mockErrListen {
+		t.Fatal(err)
+	}
+	// Set ht.host to something non-nil - nil was returned because startup was
+	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
+	// operation will fail.
+	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 }

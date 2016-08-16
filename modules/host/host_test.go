@@ -203,10 +203,11 @@ func newHostTester(name string) (*hostTester, error) {
 // isn't a good way to errcheck when deferring a close.
 func (ht *hostTester) Close() error {
 	errs := []error{
+		ht.host.Close(),
+		ht.miner.Close(),
+		ht.tpool.Close(),
 		ht.cs.Close(),
 		ht.gateway.Close(),
-		ht.tpool.Close(),
-		ht.miner.Close(),
 	}
 	if err := build.JoinErrors(errs, "; "); err != nil {
 		panic(err)
@@ -269,6 +270,13 @@ func TestHostMultiClose(t *testing.T) {
 	}
 	err = ht.host.Close()
 	if err != siasync.ErrStopped {
+		t.Fatal(err)
+	}
+	// Set ht.host to something non-nil - nil was returned because startup was
+	// incomplete. If ht.host is nil at the end of the function, the ht.Close()
+	// operation will fail.
+	ht.host, err = newHost(productionDependencies{}, ht.cs, ht.tpool, ht.wallet, "localhost:0", filepath.Join(ht.persistDir, modules.HostDir))
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -398,6 +406,10 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 	if rebootSettings.NetAddress != settings.NetAddress {
 		t.Error("settings retrieval did not return updated value")
 	}
+
+	// Set ht.host to 'h' so that the 'ht.Close()' method will close everything
+	// cleanly.
+	ht.host = rebootHost
 }
 
 /*
