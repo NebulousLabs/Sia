@@ -165,10 +165,9 @@ func Marshal(v interface{}) []byte {
 func MarshalAll(vs ...interface{}) []byte {
 	b := new(bytes.Buffer)
 	enc := NewEncoder(b)
-	// can't encode with EncodeAll (type information is lost)
-	for _, v := range vs {
-		enc.Encode(v)
-	}
+	// Error from EncodeAll is ignored as encoding cannot fail when writing
+	// to a bytes.Buffer.
+	_ = enc.EncodeAll(vs...)
 	return b.Bytes()
 }
 
@@ -354,13 +353,7 @@ func Unmarshal(b []byte, v interface{}) error {
 // must be pointers.
 func UnmarshalAll(b []byte, vs ...interface{}) error {
 	dec := NewDecoder(bytes.NewReader(b))
-	// can't use DecodeAll (type information is lost)
-	for _, v := range vs {
-		if err := dec.Decode(v); err != nil {
-			return err
-		}
-	}
-	return nil
+	return dec.DecodeAll(vs...)
 }
 
 // ReadFile reads the contents of a file and decodes them into v.
