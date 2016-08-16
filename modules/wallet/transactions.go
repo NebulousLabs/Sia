@@ -73,11 +73,13 @@ func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (pts []modu
 func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransaction, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	pt, exists := w.processedTransactionMap[txid]
-	if !exists {
-		return modules.ProcessedTransaction{}, exists
+
+	for _, pt := range w.processedTransactions {
+		if pt.TransactionID == txid {
+			return pt, true
+		}
 	}
-	return *pt, exists
+	return modules.ProcessedTransaction{}, false
 }
 
 // Transactions returns all transactions relevant to the wallet that were
