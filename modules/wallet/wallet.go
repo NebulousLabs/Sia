@@ -72,19 +72,7 @@ type Wallet struct {
 	keys  map[types.UnlockHash]spendableKey
 
 	// The following fields are kept to track transaction history.
-	// processedTransactions are stored in chronological order, and have a map for
-	// constant time random access. The set of full transactions is kept as
-	// well, ordering can be determined by the processedTransactions slice.
-	//
-	// The unconfirmed transactions are kept the same way, except without the
-	// random access. It is assumed that the list of unconfirmed transactions
-	// will be small enough that this will not be a problem.
-	//
-	// historicOutputs is kept so that the values of transaction inputs can be
-	// determined. historicOutputs is never cleared, but in general should be
-	// small compared to the list of transactions.
 	processedTransactions            []modules.ProcessedTransaction
-	processedTransactionMap          map[types.TransactionID]*modules.ProcessedTransaction
 	unconfirmedProcessedTransactions []modules.ProcessedTransaction
 
 	// The wallet's database tracks its seeds, keys, outputs, and
@@ -118,7 +106,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		tpool: tpool,
 
 		keys: make(map[types.UnlockHash]spendableKey),
-		processedTransactionMap: make(map[types.TransactionID]*modules.ProcessedTransaction),
 
 		persistDir: persistDir,
 	}

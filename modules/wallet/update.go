@@ -76,7 +76,6 @@ func (w *Wallet) revertHistory(cc modules.ConsensusChange) {
 			txid := txn.ID()
 			if len(w.processedTransactions) > 0 && txid == w.processedTransactions[len(w.processedTransactions)-1].TransactionID {
 				w.processedTransactions = w.processedTransactions[:len(w.processedTransactions)-1]
-				delete(w.processedTransactionMap, txid)
 			}
 		}
 
@@ -84,7 +83,6 @@ func (w *Wallet) revertHistory(cc modules.ConsensusChange) {
 		for _, mp := range block.MinerPayouts {
 			if w.isWalletAddress(mp.UnlockHash) {
 				w.processedTransactions = w.processedTransactions[:len(w.processedTransactions)-1]
-				delete(w.processedTransactionMap, types.TransactionID(block.ID()))
 				break
 			}
 		}
@@ -123,7 +121,6 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				})
 			}
 			w.processedTransactions = append(w.processedTransactions, minerPT)
-			w.processedTransactionMap[minerPT.TransactionID] = &w.processedTransactions[len(w.processedTransactions)-1]
 		}
 		for _, txn := range block.Transactions {
 			// determine if transaction is relevant
@@ -233,7 +230,6 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 			}
 
 			w.processedTransactions = append(w.processedTransactions, pt)
-			w.processedTransactionMap[pt.TransactionID] = &w.processedTransactions[len(w.processedTransactions)-1]
 		}
 	}
 
