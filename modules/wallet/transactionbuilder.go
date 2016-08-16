@@ -95,18 +95,9 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	return tb.wallet.db.Update(func(tx *bolt.Tx) error {
 		// Collect a value-sorted set of siacoin outputs.
 		var so sortedOutputs
-		err := tx.Bucket(bucketSiacoinOutputs).ForEach(func(idBytes, scoBytes []byte) error {
-			var scoid types.SiacoinOutputID
-			var sco types.SiacoinOutput
-			if err := encoding.Unmarshal(idBytes, &scoid); err != nil {
-				return err
-			}
-			if err := encoding.Unmarshal(scoBytes, &sco); err != nil {
-				return err
-			}
+		err := dbForEachSiacoinOutput(tx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
 			so.ids = append(so.ids, scoid)
 			so.outputs = append(so.outputs, sco)
-			return nil
 		})
 		if err != nil {
 			return err
