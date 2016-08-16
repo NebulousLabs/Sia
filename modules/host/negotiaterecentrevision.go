@@ -21,7 +21,7 @@ var (
 	errRevisionWrongPublicKeyCount = errors.New("wrong number of public keys in the unlock conditions of the file contract revision")
 )
 
-// verifyChallengeResponse will verify that the renter's response to the
+// managedVerifyChallengeResponse will verify that the renter's response to the
 // challenge provided by the host is correct. In the process, the storage
 // obligation and file contract revision will be loaded and returned.
 //
@@ -32,7 +32,8 @@ func (h *Host) managedVerifyChallengeResponse(fcid types.FileContractID, challen
 	// there is no error, the storage obligation will be returned with a lock.
 	err = h.managedTryLockStorageObligation(fcid)
 	if err != nil {
-		return storageObligation{}, types.FileContractRevision{}, nil, extendErr("could not get "+fcid.String()+" lock: ", ErrorInternal(err.Error()))
+		err = extendErr("could not get "+fcid.String()+" lock: ", ErrorInternal(err.Error()))
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 	defer func() {
 		if err != nil {
@@ -49,7 +50,8 @@ func (h *Host) managedVerifyChallengeResponse(fcid types.FileContractID, challen
 		return err
 	})
 	if err != nil {
-		return storageObligation{}, types.FileContractRevision{}, nil, extendErr("could not fetch "+fcid.String()+": ", ErrorInternal(err.Error()))
+		err = extendErr("could not fetch "+fcid.String()+": ", ErrorInternal(err.Error()))
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 
 	// Pull out the file contract revision and the revision's signatures from
@@ -72,12 +74,14 @@ func (h *Host) managedVerifyChallengeResponse(fcid types.FileContractID, challen
 		// unlock the storage obligation.
 		h.log.Critical("wrong public key count in file contract revision")
 		err = errRevisionWrongPublicKeyCount
-		return storageObligation{}, types.FileContractRevision{}, nil, extendErr("wrong public key count for "+fcid.String()+": ", ErrorInternal(err.Error()))
+		err = extendErr("wrong public key count for "+fcid.String()+": ", ErrorInternal(err.Error()))
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 	copy(renterPK[:], recentRevision.UnlockConditions.PublicKeys[0].Key)
 	err = crypto.VerifyHash(challenge, renterPK, challengeResponse)
 	if err != nil {
-		return storageObligation{}, types.FileContractRevision{}, nil, extendErr("bad signature from renter: ", ErrorCommunication(err.Error()))
+		err = extendErr("bad signature from renter: ", ErrorCommunication(err.Error()))
+		return storageObligation{}, types.FileContractRevision{}, nil, err
 	}
 	return so, recentRevision, revisionSigs, nil
 }
@@ -134,15 +138,18 @@ func (h *Host) managedRPCRecentRevision(conn net.Conn) (types.FileContractID, st
 	// renter.
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
-		return types.FileContractID{}, storageObligation{}, extendErr("failed to write challenge acceptance: ", ErrorConnection(err.Error()))
+		err = extendErr("failed to write challenge acceptance: ", ErrorConnection(err.Error()))
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	err = encoding.WriteObject(conn, recentRevision)
 	if err != nil {
-		return types.FileContractID{}, storageObligation{}, extendErr("failed to write recent revision: ", ErrorConnection(err.Error()))
+		err = extendErr("failed to write recent revision: ", ErrorConnection(err.Error()))
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	err = encoding.WriteObject(conn, revisionSigs)
 	if err != nil {
-		return types.FileContractID{}, storageObligation{}, extendErr("failed to write recent revision singatures: ", ErrorConnection(err.Error()))
+		err = extendErr("failed to write recent revision singatures: ", ErrorConnection(err.Error()))
+		return types.FileContractID{}, storageObligation{}, err
 	}
 	return fcid, so, nil
 }

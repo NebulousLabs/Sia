@@ -821,7 +821,6 @@ func (h *Host) threadedHandleActionItem(soid types.FileContractID, wg *sync.Wait
 		if err != nil {
 			return err
 		}
-		soid := so.id()
 		return tx.Bucket(bucketStorageObligations).Put(soid[:], soBytes)
 	})
 	if err != nil {

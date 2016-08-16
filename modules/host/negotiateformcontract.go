@@ -171,13 +171,14 @@ func (h *Host) managedRPCFormContract(conn net.Conn) error {
 	h.mu.RLock()
 	hostCollateral := contractCollateral(h.settings, txnSet[len(txnSet)-1].FileContracts[0])
 	h.mu.RUnlock()
-	hostTxnSignatures, hostRevisionSignature, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, nil, hostCollateral, types.ZeroCurrency, types.ZeroCurrency)
+	hostTxnSignatures, hostRevisionSignature, newSOID, err := h.managedFinalizeContract(txnBuilder, renterPK, renterTxnSignatures, renterRevisionSignature, nil, hostCollateral, types.ZeroCurrency, types.ZeroCurrency)
 	if err != nil {
 		// The incoming file contract is not acceptable to the host, indicate
 		// why to the renter.
 		modules.WriteNegotiationRejection(conn, err) // Error ignored to preserve type in extendErr
 		return extendErr("contract finalization failed: ", err)
 	}
+	defer h.managedUnlockStorageObligation(newSOID)
 	err = modules.WriteNegotiationAcceptance(conn)
 	if err != nil {
 		return extendErr("failed to write acceptance after contract finalization: ", ErrorConnection(err.Error()))

@@ -148,9 +148,9 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 		var so storageObligation
 		_, so, err = h.managedRPCRecentRevision(conn)
 		if err != nil {
-			defer func() {
-				h.managedUnlockStorageObligation(so.id())
-			}()
+			// The unlock can be called immediately, as no action is taken with
+			// the storage obligation that gets returned.
+			h.managedUnlockStorageObligation(so.id())
 		}
 	case modules.RPCSettings:
 		atomic.AddUint64(&h.atomicSettingsCalls, 1)
