@@ -39,12 +39,12 @@ func (h *Host) threadedUpdateHostname(closeChan chan struct{}) {
 // host established on the network.
 func (h *Host) initNetworking(address string) (err error) {
 	// Create the listener and setup the close procedures.
-	threadedListenerClosedChan := make(chan struct{})
 	h.listener, err = h.dependencies.listen("tcp", address)
 	if err != nil {
 		return err
 	}
 	// Automatically close the listener when h.tg.Stop() is called.
+	threadedListenerClosedChan := make(chan struct{})
 	h.tg.OnStop(func() {
 		err := h.listener.Close()
 		if err != nil {
@@ -69,7 +69,18 @@ func (h *Host) initNetworking(address string) (err error) {
 	// Non-blocking, perform port forwarding and create the hostname discovery
 	// thread.
 	go func() {
-		err := h.managedForwardPort()
+		// Add this function to the threadgroup, so that the logger will not
+		// disappear before port closing can be registered to the threadgrourp
+		// OnStop functions.
+		err := h.tg.Add()
+		if err != nil {
+			// If this goroutine is not run before shutdown starts, this
+			// codeblock is reachable.
+			return
+		}
+		defer h.tg.Done()
+
+		err = h.managedForwardPort()
 		if err != nil {
 			h.log.Println("ERROR: failed to forward port:", err)
 		}

@@ -82,6 +82,21 @@ func (h *Host) managedLearnHostname() {
 
 // managedForwardPort adds a port mapping to the router.
 func (h *Host) managedForwardPort() error {
+	if build.Release == "testing" {
+		// Add a blocking placeholder where testing is able to mock behaviors
+		// such as a port forward action that blocks for 10 seconds before
+		// completing.
+		if h.dependencies.disrupt("managedForwardPort") {
+			return nil
+		}
+
+		// Port forwarding functions are frequently unavailable during testing,
+		// and the long blocking can be highly disruptive. Under normal
+		// scenarios, return without complaint, and without running the
+		// port-forward logic.
+		return nil
+	}
+
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
 	h.mu.RLock()
@@ -90,9 +105,6 @@ func (h *Host) managedForwardPort() error {
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
-	}
-	if build.Release == "testing" {
-		return nil
 	}
 
 	d, err := upnp.Discover()
@@ -110,6 +122,14 @@ func (h *Host) managedForwardPort() error {
 
 // managedClearPort removes a port mapping from the router.
 func (h *Host) managedClearPort() error {
+	if build.Release == "testing" {
+		// Allow testing to force an error to be returned here.
+		if h.dependencies.disrupt("managedClearPort return error") {
+			return errors.New("Mocked managedClearPortErr")
+		}
+		return nil
+	}
+
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
 	h.mu.RLock()
@@ -118,9 +138,6 @@ func (h *Host) managedClearPort() error {
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
-	}
-	if build.Release == "testing" {
-		return nil
 	}
 
 	d, err := upnp.Discover()

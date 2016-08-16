@@ -104,6 +104,13 @@ func (ht *hostTester) initWallet() error {
 // extra initialization has been done, for example no blocks have been mined
 // and the wallet keys have not been created.
 func blankHostTester(name string) (*hostTester, error) {
+	return blankMockHostTester(productionDependencies{}, name)
+}
+
+// blankMockHostTester creates a host tester where the modules are created but no
+// extra initialization has been done, for example no blocks have been mined
+// and the wallet keys have not been created.
+func blankMockHostTester(d dependencies, name string) (*hostTester, error) {
 	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the modules.
@@ -127,7 +134,7 @@ func blankHostTester(name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	h, err := newHost(d, cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
@@ -158,8 +165,14 @@ func blankHostTester(name string) (*hostTester, error) {
 // newHostTester creates a host tester with an initialized wallet and money in
 // that wallet.
 func newHostTester(name string) (*hostTester, error) {
+	return newMockHostTester(productionDependencies{}, name)
+}
+
+// newMockHostTester creates a host tester with an initialized wallet and money
+// in that wallet, using the dependencies provided.
+func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	// Create a blank host tester.
-	ht, err := blankHostTester(name)
+	ht, err := blankMockHostTester(d, name)
 	if err != nil {
 		return nil, err
 	}
