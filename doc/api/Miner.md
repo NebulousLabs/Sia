@@ -76,22 +76,47 @@ provides a block header that is ready to be grinded on for work.
 For efficiency the header for work is returned as a raw byte encoding of the
 header, rather than encoded to JSON.
 
-The response bytes contain a target followed by a block header
-followed by a block. The target is the first 32 bytes. The block header is the
-following 80 bytes, and the nonce is bytes 32-39 (inclusive) of the header
-(bytes 64-71 of the whole array).
+Blocks are mined by repeatedly changing the nonce of the header, hashing the
+header's bytes, and comparing the resulting hash to the target. The block with
+that nonce is valid if the hash is less than the target. If none of the 2^64
+possible nonces result in a header with a hash less than the target, call
+`/miner/header [GET]` again to get a new block header with a different merkle
+root. The above process can then be repeated for the new block header.
 
-Layout:
+The other fields can generally be ignored. The parent block ID field is the
+hash of the parent block's header. The timestamp is the time at which the block
+was mined. The merkle root is the merkle root of a merkle tree consisting of
+the timestamp, the miner outputs (one leaf per payout), and the transactions
+(one leaf per transaction).
 
-0-31: target
-
-32-111: header
+| Field           | Byte range within response | Byte range within header |
+| --------------- | -------------------------- | ------------------------ |
+| target          | [0-32)                     |                          |
+| header          | [32-112)                   |                          |
+| parent block ID | [32-64)                    | [0-32)                   |
+| nonce           | [64-72)                    | [32-40)                  |
+| timestamp       | [72-80)                    | [40-48)                  |
+| merkle root     | [80-112)                   | [48-80)                  |
 
 ```
 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (returned bytes)
 tttttttttttttttttttttttttttttttt (target)
                                 hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh (header)
+                                pppppppppppppppppppppppppppppppp (parent block ID)
                                                                 nnnnnnnn (nonce)
+                                                                        ssssssss (timestamp)
+                                                                                mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm (merkle root)
+```
+
+```
+                                                                                                                                                                                                         1                   1
+                     1                   2                   3                   4                   5                   6                   7                   8                   9                   0                   1
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Target                                                        | Header                                                                                                                                                        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                                                               | Parent block ID                                                 | Nonce         | Timestamp     | Merkle root                                                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
 #### /miner/header [POST]
