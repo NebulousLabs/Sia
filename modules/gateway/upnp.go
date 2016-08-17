@@ -54,9 +54,8 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
-	var host string
-
 	// try UPnP first, then fallback to myexternalip.com
+	var host string
 	d, err := upnp.Discover()
 	if err == nil {
 		host, err = d.ExternalIP()
@@ -77,6 +76,8 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
+	// TODO: Is this safe? What happens to processes or nodes that have already
+	// request the IP address?
 	g.mu.Lock()
 	g.myAddr = addr
 	g.mu.Unlock()
