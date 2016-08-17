@@ -653,7 +653,7 @@ period // (optional) block height
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /renter/contracts [GET]
 
@@ -727,7 +727,7 @@ only the entry in the renter.
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /renter/download/___*siapath___ [GET]
 
@@ -746,7 +746,7 @@ destination
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /renter/rename/___*siapath___ [POST]
 
@@ -766,7 +766,7 @@ newsiapath
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /renter/upload/___*siapath___ [POST]
 
@@ -784,7 +784,7 @@ source
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 
 Wallet
@@ -846,7 +846,7 @@ encryptionpassword
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/address [GET]
 
@@ -889,7 +889,7 @@ destination
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/init [POST]
 
@@ -927,7 +927,7 @@ seed
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/seeds [GET]
 
@@ -1014,7 +1014,7 @@ keyfiles
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/lock [POST]
 
@@ -1025,7 +1025,7 @@ available.
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/transaction/___:id___ [GET]
 
@@ -1125,4 +1125,4 @@ encryptionpassword
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
