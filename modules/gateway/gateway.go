@@ -59,23 +59,9 @@ func (g *Gateway) Close() error {
 	if err := g.threads.Stop(); err != nil {
 		return err
 	}
-
-	var errs []error
-	// Unregister RPCs. Not strictly necessary for clean shutdown in this specific
-	// case, as the handlers should only contain references to the gateway itself,
-	// but do it anyways as an example for other modules to follow.
-	// save the latest gateway state
 	g.mu.RLock()
-	if err := g.saveSync(); err != nil {
-		errs = append(errs, fmt.Errorf("save failed: %v", err))
-	}
-	g.mu.RUnlock()
-	// clear the port mapping (no effect if UPnP not supported)
-	g.mu.RLock()
-	g.clearPort(g.myAddr.Port())
-	g.mu.RUnlock()
-
-	return build.JoinErrors(errs, "; ")
+	defer g.mu.RUnlock()
+	return g.saveSync()
 }
 
 // New returns an initialized Gateway.
@@ -137,7 +123,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		g.save()
 	}
 
-	// Create listener and set address.
+	// Create the listener which will listen for new connections from peers.
 	threadedListenClosedChan := make(chan struct{})
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
@@ -151,7 +137,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		}
 		<-threadedListenClosedChan
 	})
-
+	// Set the address and port of the gateway.
 	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
 	if err != nil {
 		return nil, err
@@ -160,8 +146,8 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		// TODO: This needs a docstring.
 		g.myAddr = modules.NetAddress(g.listener.Addr().String())
 	}
-
-	g.log.Println("INFO: gateway created, started logging")
+	// Spawn the peer connection listener.
+	go g.threadedListen(threadedListenClosedChan)
 
 	// Forward the RPC port, if possible.
 	go g.threadedForwardPort(g.port)
@@ -173,9 +159,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	go g.threadedPeerManager()
 	go g.threadedNodeManager()
 
-	// Spawn the primary listener.
-	go g.threadedListen(threadedListenClosedChan)
-
+	g.log.Println("INFO: gateway created, started logging")
 	return
 }
 

@@ -109,15 +109,22 @@ func (g *Gateway) threadedForwardPort(port string) {
 	}
 
 	g.log.Println("INFO: successfully forwarded port", port)
+
+	// Establish port-clearing at shutdown.
+	g.threads.AfterStop(func() {
+		g.managedClearPort(g.myAddr.Port())
+	})
 }
 
-// clearPort removes a port mapping from the router.
-func (g *Gateway) clearPort(port string) {
+// managedClearPort removes a port mapping from the router.
+func (g *Gateway) managedClearPort(port string) {
 	if build.Release == "testing" {
 		return
 	}
 
-	//d, err := upnp.Load("http://192.168.1.1:5000/Public_UPNP_gatedesc.xml")
+	// TODO: Figure out what's with the commented out code below.
+	//
+	// d, err := upnp.Load("http://192.168.1.1:5000/Public_UPNP_gatedesc.xml")
 	d, err := upnp.Discover()
 	if err != nil {
 		return
