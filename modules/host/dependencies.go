@@ -32,7 +32,7 @@ type (
 	dependencies interface {
 		// disrupt can be inserted in the code as a way to inject problems,
 		// such as a network call that take 10 minutes or a disk write that
-		// never completes. distrupt will return true if the disruption is
+		// never completes. disrupt will return true if the disruption is
 		// forcibly triggered. In production, disrupt will always return false.
 		disrupt(string) bool
 

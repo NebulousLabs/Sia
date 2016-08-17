@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// blockingPortForward is a depedency set that causes the host port froward
+// blockingPortForward is a dependency set that causes the host port forward
 // call at startup to block for 10 seconds, simulating the amount of blocking
 // that can occur in production.
 //
@@ -26,7 +26,7 @@ func (blockingPortForward) disrupt(s string) bool {
 
 	// Block during port forwarding.
 	if s == "managedForwardPort" {
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 3)
 	}
 	return false
 }
@@ -53,7 +53,7 @@ func TestPortForwardBlocking(t *testing.T) {
 	// The trailing sleep is needed to catch the previously existing error
 	// where the host was not shutting down correctly. Currently, the extra
 	// sleep does nothing, but in the regression a logging panic would occur.
-	time.Sleep(time.Second * 12)
+	time.Sleep(time.Second * 4)
 }
 
 /*

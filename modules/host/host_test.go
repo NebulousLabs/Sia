@@ -420,8 +420,8 @@ func TestSetAndGetInternalSettings(t *testing.T) {
 		t.Error("settings retrieval did not return updated value")
 	}
 
-	// Set ht.host to 'h' so that the 'ht.Close()' method will close everything
-	// cleanly.
+	// Set ht.host to 'rebootHost' so that the 'ht.Close()' method will close
+	// everything cleanly.
 	ht.host = rebootHost
 }
 
