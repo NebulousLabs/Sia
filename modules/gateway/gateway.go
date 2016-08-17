@@ -123,7 +123,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Create the listener which will listen for new connections from peers.
-	threadedListenClosedChan := make(chan struct{})
+	permanentListenClosedChan := make(chan struct{})
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
@@ -134,7 +134,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		if err != nil {
 			g.log.Println("WARN: closing the listener failed:", err)
 		}
-		<-threadedListenClosedChan
+		<-permanentListenClosedChan
 	})
 	// Set the address and port of the gateway.
 	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
@@ -146,7 +146,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		g.myAddr = modules.NetAddress(g.listener.Addr().String())
 	}
 	// Spawn the peer connection listener.
-	go g.threadedListen(threadedListenClosedChan)
+	go g.permanentListen(permanentListenClosedChan)
 
 	// Spawn the peer manager and provide tools for ensuring clean shutdown.
 	peerManagerClosedChan := make(chan struct{})
