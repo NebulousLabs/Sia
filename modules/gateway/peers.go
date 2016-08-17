@@ -576,7 +576,7 @@ func (g *Gateway) threadedPeerManager(closedChan chan struct{}) {
 		if err != nil {
 			select {
 			case <-time.After(time.Second * 20):
-			case g.threads.StopChan():
+			case <-g.threads.StopChan():
 				// Interrupt the thread if the shutdown signal is issued.
 				return
 			}
@@ -586,13 +586,13 @@ func (g *Gateway) threadedPeerManager(closedChan chan struct{}) {
 		// Try connecting to that peer in a goroutine.
 		go func() {
 			if err := g.threads.Add(); err != nil {
-				return err
+				return
 			}
 			defer g.threads.Done()
 
 			err := g.managedConnect(addr)
 			if err != nil {
-				g.log.Debugln("WARN: automatic connect failed:", connectErr)
+				g.log.Debugln("WARN: automatic connect failed:", err)
 			}
 		}()
 

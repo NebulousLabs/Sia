@@ -57,7 +57,7 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	// g.nodes will need to be added.
 	r, err := crypto.RandIntn(len(g.nodes))
 	if err != nil {
-		return err
+		return "", err
 	}
 	for node := range g.nodes {
 		if r <= 0 {
