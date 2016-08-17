@@ -6,7 +6,7 @@ import (
 
 // TestApiClient tests that the API client connects to the server tester and
 // can call and decode routes correctly.
-func TestApiClient(t *testing.T) {
+func TestIntegrationApiClient(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -27,7 +27,7 @@ func TestApiClient(t *testing.T) {
 // TestAuthenticatedApiClient tests that the API client connects to an
 // authenticated server tester and can call and decode routes correctly, using
 // the correct password.
-func TestAuthenticatedApiClient(t *testing.T) {
+func TestIntegrationAuthenticatedApiClient(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
