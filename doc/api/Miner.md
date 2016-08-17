@@ -84,10 +84,12 @@ possible nonces result in a header with a hash less than the target, call
 root. The above process can then be repeated for the new block header.
 
 The other fields can generally be ignored. The parent block ID field is the
-hash of the parent block's header. The timestamp is the time at which the block
-was mined. The merkle root is the merkle root of a merkle tree consisting of
-the timestamp, the miner outputs (one leaf per payout), and the transactions
-(one leaf per transaction).
+hash of the parent block's header. Modifying this field will result in an
+orphan block. The timestamp is the time at which the block was mined and is set
+by the Sia Daemon. Modifying this field can result in invalid block. The merkle
+root is the merkle root of a merkle tree consisting of the timestamp, the miner
+outputs (one leaf per payout), and the transactions (one leaf per transaction).
+Modifying this field will result in an invalid block.
 
 | Field           | Byte range within response | Byte range within header |
 | --------------- | -------------------------- | ------------------------ |
@@ -106,17 +108,6 @@ tttttttttttttttttttttttttttttttt (target)
                                                                 nnnnnnnn (nonce)
                                                                         ssssssss (timestamp)
                                                                                 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm (merkle root)
-```
-
-```
-                                                                                                                                                                                                         1                   1
-                     1                   2                   3                   4                   5                   6                   7                   8                   9                   0                   1
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-| Target                                                        | Header                                                                                                                                                        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                                                               | Parent block ID                                                 | Nonce         | Timestamp     | Merkle root                                                 |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
 #### /miner/header [POST]
