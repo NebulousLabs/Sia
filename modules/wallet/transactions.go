@@ -21,7 +21,7 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	defer w.mu.Unlock()
 
 	w.db.View(func(tx *bolt.Tx) error {
-		return dbForEachProcessedTransaction(tx, func(pt modules.ProcessedTransaction) {
+		return dbForEachProcessedTransaction(tx, func(_ types.TransactionID, pt modules.ProcessedTransaction) {
 			relevant := false
 			for _, input := range pt.Inputs {
 				relevant = relevant || input.RelatedAddress == uh
@@ -93,7 +93,7 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	}
 
 	err = w.db.View(func(tx *bolt.Tx) error {
-		return dbForEachProcessedTransaction(tx, func(pt modules.ProcessedTransaction) {
+		return dbForEachProcessedTransaction(tx, func(_ types.TransactionID, pt modules.ProcessedTransaction) {
 			if startHeight <= pt.ConfirmationHeight && pt.ConfirmationHeight <= endHeight {
 				pts = append(pts, pt)
 			}
