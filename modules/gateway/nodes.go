@@ -35,6 +35,7 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 	return nil
 }
 
+// removeNode will remove a node from the gateway.
 func (g *Gateway) removeNode(addr modules.NetAddress) error {
 	if _, exists := g.nodes[addr]; !exists {
 		return errors.New("no record of that node")
@@ -43,15 +44,26 @@ func (g *Gateway) removeNode(addr modules.NetAddress) error {
 	return nil
 }
 
+// randomNode returns a random node from the gateway. An error can be returned
 func (g *Gateway) randomNode() (modules.NetAddress, error) {
-	if len(g.nodes) > 0 {
-		r, _ := crypto.RandIntn(len(g.nodes))
-		for node := range g.nodes {
-			if r <= 0 {
-				return node, nil
-			}
-			r--
+	if len(g.nodes) == 0 {
+		return "", errNoPeers
+	}
+
+	// Select a random peer. Note that the algorithm below is roughly linear in
+	// the number of nodes known by the gateway, and this number can approach
+	// every node on the network. If the network gets large, this algorithm
+	// will either need to be refactored, or more likely a cap on the size of
+	// g.nodes will need to be added.
+	r, err := crypto.RandIntn(len(g.nodes))
+	if err != nil {
+		return err
+	}
+	for node := range g.nodes {
+		if r <= 0 {
+			return node, nil
 		}
+		r--
 	}
 
 	return "", errNoPeers
