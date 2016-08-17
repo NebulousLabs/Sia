@@ -64,21 +64,34 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 // revertHistory reverts any transaction history that was destroyed by reverted
 // blocks in the consensus change.
+// TODO: add test
 func (w *Wallet) revertHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 	for _, block := range cc.RevertedBlocks {
-		// Remove the miner payout transaction if applicable.
-		for _, mp := range block.MinerPayouts {
-			if w.isWalletAddress(mp.UnlockHash) {
-				if err := dbDeleteProcessedTransaction(tx, types.TransactionID(block.ID())); err != nil {
+		// Remove any transactions that have been reverted.
+		for i := len(block.Transactions) - 1; i >= 0; i-- {
+			// If the transaction is relevant to the wallet, it will be the
+			// most recent transaction appended to w.processedTransactions.
+			// Relevance can be determined just by looking at the last element
+			// of w.processedTransactions.
+			txid := block.Transactions[i].ID()
+			pt, err := dbGetLastProcessedTransaction(tx)
+			if err != nil {
+				break // bucket is empty
+			}
+			if txid == pt.TransactionID {
+				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
 					return err
 				}
 			}
 		}
-		// Remove any transactions that have been reverted.
-		for _, txn := range block.Transactions {
-			// NOTE: delete does not return an error if txn does not exist
-			if err := dbDeleteProcessedTransaction(tx, txn.ID()); err != nil {
-				return err
+
+		// Remove the miner payout transaction if applicable.
+		for _, mp := range block.MinerPayouts {
+			if w.isWalletAddress(mp.UnlockHash) {
+				if err := dbDeleteLastProcessedTransaction(tx); err != nil {
+					return err
+				}
+				break
 			}
 		}
 		w.consensusSetHeight--
@@ -116,7 +129,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 					Value:          mp.Value,
 				})
 			}
-			err := dbPutProcessedTransaction(tx, minerPT.TransactionID, minerPT)
+			err := dbAppendProcessedTransaction(tx, minerPT)
 			if err != nil {
 				return fmt.Errorf("could not put processed miner transaction: %v", err)
 			}
@@ -228,7 +241,7 @@ func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 				})
 			}
 
-			err := dbPutProcessedTransaction(tx, pt.TransactionID, pt)
+			err := dbAppendProcessedTransaction(tx, pt)
 			if err != nil {
 				return fmt.Errorf("could not put processed transaction: %v", err)
 			}
