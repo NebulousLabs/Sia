@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"encoding/binary"
 	"reflect"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -23,9 +24,9 @@ var (
 	// types/transactions.go for an explanation. The wallet uses this mapping
 	// to determine the value of outputs in ProcessedTransactions.
 	bucketHistoricOutputs = []byte("bucketHistoricOutputs")
-	// bucketProcessedTransactions maps a TransactionID to a
-	// ProcessedTransaction. Only transactions relevant to the wallet are
-	// stored.
+	// bucketProcessedTransactions stores ProcessedTransactions in
+	// chronological order. Only transactions relevant to the wallet are
+	// stored. The key of this bucket is an autoincrementing integer.
 	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
 	// bucketSiacoinOutputs maps a SiacoinOutputID to its SiacoinOutput. Only
 	// outputs that the wallet controls are stored. The wallet uses these
@@ -108,20 +109,6 @@ func dbGetHistoricOutput(tx *bolt.Tx, id types.OutputID) (c types.Currency, err 
 	return
 }
 
-func dbPutProcessedTransaction(tx *bolt.Tx, id types.TransactionID, pt modules.ProcessedTransaction) error {
-	return dbPut(tx.Bucket(bucketProcessedTransactions), id, pt)
-}
-func dbGetProcessedTransaction(tx *bolt.Tx, id types.TransactionID) (pt modules.ProcessedTransaction, err error) {
-	err = dbGet(tx.Bucket(bucketProcessedTransactions), id, &pt)
-	return
-}
-func dbDeleteProcessedTransaction(tx *bolt.Tx, id types.TransactionID) error {
-	return dbDelete(tx.Bucket(bucketProcessedTransactions), id)
-}
-func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(types.TransactionID, modules.ProcessedTransaction)) error {
-	return dbForEach(tx.Bucket(bucketProcessedTransactions), fn)
-}
-
 func dbPutSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, output types.SiacoinOutput) error {
 	return dbPut(tx.Bucket(bucketSiacoinOutputs), id, output)
 }
@@ -159,4 +146,37 @@ func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight,
 }
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
+}
+
+// bucketProcessedTransactions works a little differently: the key is
+// meaningless, only used to order the transactions chronologically.
+
+func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) error {
+	b := tx.Bucket(bucketProcessedTransactions)
+	key, err := b.NextSequence()
+	if err != nil {
+		return err
+	}
+	// big-endian is used so that the keys are properly sorted
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, key)
+	return b.Put(keyBytes, encoding.Marshal(pt))
+}
+func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
+	_, val := tx.Bucket(bucketProcessedTransactions).Cursor().Last()
+	err = encoding.Unmarshal(val, &pt)
+	return
+}
+func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
+	// delete the last entry in the bucket. Note that we don't need to
+	// decrement the sequence integer; we only care that the next integer is
+	// larger than the previous one.
+	b := tx.Bucket(bucketProcessedTransactions)
+	key, _ := b.Cursor().Last()
+	return b.Delete(key)
+}
+func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(modules.ProcessedTransaction)) error {
+	return dbForEach(tx.Bucket(bucketProcessedTransactions), func(_ uint64, pt modules.ProcessedTransaction) {
+		fn(pt)
+	})
 }

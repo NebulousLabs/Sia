@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -20,8 +21,8 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	w.db.View(func(tx *bolt.Tx) error {
-		return dbForEachProcessedTransaction(tx, func(_ types.TransactionID, pt modules.ProcessedTransaction) {
+	err := w.db.View(func(tx *bolt.Tx) error {
+		return dbForEachProcessedTransaction(tx, func(pt modules.ProcessedTransaction) {
 			relevant := false
 			for _, input := range pt.Inputs {
 				relevant = relevant || input.RelatedAddress == uh
@@ -34,6 +35,9 @@ func (w *Wallet) AddressTransactions(uh types.UnlockHash) (pts []modules.Process
 			}
 		})
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	return pts
 }
@@ -74,12 +78,21 @@ func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransac
 	defer w.mu.Unlock()
 
 	var pt modules.ProcessedTransaction
-	err := w.db.View(func(tx *bolt.Tx) error {
-		var err error
-		pt, err = dbGetProcessedTransaction(tx, txid)
-		return err
+	found := false
+	w.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(bucketProcessedTransactions).Cursor()
+		for key, val := c.First(); key != nil; key, val = c.Next() {
+			if err := encoding.Unmarshal(val, &pt); err != nil {
+				return err
+			}
+			if pt.TransactionID == txid {
+				found = true
+				break
+			}
+		}
+		return nil
 	})
-	return pt, err == nil
+	return pt, found
 }
 
 // Transactions returns all transactions relevant to the wallet that were
@@ -93,11 +106,23 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []m
 	}
 
 	err = w.db.View(func(tx *bolt.Tx) error {
-		return dbForEachProcessedTransaction(tx, func(_ types.TransactionID, pt modules.ProcessedTransaction) {
-			if startHeight <= pt.ConfirmationHeight && pt.ConfirmationHeight <= endHeight {
+		c := tx.Bucket(bucketProcessedTransactions).Cursor()
+		for key, val := c.First(); key != nil; key, val = c.Next() {
+			var pt modules.ProcessedTransaction
+			if err := encoding.Unmarshal(val, &pt); err != nil {
+				return err
+			}
+			if pt.ConfirmationHeight < startHeight {
+				continue
+			} else if pt.ConfirmationHeight > endHeight {
+				// transactions are stored in chronological order, so we can
+				// break as soon as we are above endHeight
+				break
+			} else {
 				pts = append(pts, pt)
 			}
-		})
+		}
+		return nil
 	})
 	return
 }
