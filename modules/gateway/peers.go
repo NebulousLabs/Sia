@@ -442,14 +442,9 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 	return nil
 }
 
-// Connect establishes a persistent connection to a peer, and adds it to the
-// Gateway's peer list.
-func (g *Gateway) Connect(addr modules.NetAddress) error {
-	if err := g.threads.Add(); err != nil {
-		return err
-	}
-	defer g.threads.Done()
-
+// managedConnect establishes a persistent connection to a peer, and adds it to
+// the Gateway's peer list.
+func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	if addr == g.Address() {
 		return errors.New("can't connect to our own address")
 	}
@@ -509,6 +504,16 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	return nil
 }
 
+// Connect establishes a persistent connection to a peer, and adds it to the
+// Gateway's peer list.
+func (g *Gateway) Connect(addr modules.NetAddress) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+	return g.managedConnect(addr)
+}
+
 // Disconnect terminates a connection to a peer and removes it from the
 // Gateway's peer list. The peer's address remains in the node list.
 func (g *Gateway) Disconnect(addr modules.NetAddress) error {
@@ -536,52 +541,68 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 
 // threadedPeerManager tries to keep the Gateway well-connected. As long as
 // the Gateway is not well-connected, it tries to connect to random nodes.
-func (g *Gateway) threadedPeerManager() {
-	if g.threads.Add() != nil {
-		return
-	}
-	defer g.threads.Done()
+func (g *Gateway) threadedPeerManager(closedChan chan struct{}) {
+	// Send a signal upon shutdown.
+	defer close(closedChan)
 
 	for {
-		// If we are well-connected, sleep in increments of five minutes until
-		// we are no longer well-connected.
-		g.mu.RLock()
+		// Determine the number of outbound peers.
 		numOutboundPeers := 0
+		g.mu.RLock()
 		for _, p := range g.peers {
 			if !p.Inbound {
 				numOutboundPeers++
 			}
 		}
-		addr, err := g.randomNode()
 		g.mu.RUnlock()
+		// If the gateway is well connected, sleep for 5 minutes and then check
+		// again.
 		if numOutboundPeers >= modules.WellConnectedThreshold {
 			select {
 			case <-time.After(5 * time.Minute):
 			case <-g.threads.StopChan():
+				// Interrupt the thread if the shutdown signal is issued.
 				return
 			}
 			continue
 		}
 
-		// Try to connect to a random node. Instead of blocking on Connect, we
-		// spawn a goroutine and sleep for five seconds. This allows us to
-		// continue making connections if the node is unresponsive.
-		if err == nil {
-			go func() {
-				if g.threads.Add() != nil {
-					return
-				}
-				defer g.threads.Done()
-
-				connectErr := g.Connect(addr)
-				if connectErr != nil {
-					g.log.Debugln("WARN: automatic connect failed:", connectErr)
-				}
-			}()
+		// Fetch a random peer.
+		g.mu.RLock()
+		addr, err := g.randomNode()
+		g.mu.RUnlock()
+		// If there was an error, log the error and then wait a while before
+		// trying again.
+		if err != nil {
+			select {
+			case <-time.After(time.Second * 20):
+			case g.threads.StopChan():
+				// Interrupt the thread if the shutdown signal is issued.
+				return
+			}
+			continue
 		}
+
+		// Try connecting to that peer in a goroutine.
+		go func() {
+			if err := g.threads.Add(); err != nil {
+				return err
+			}
+			defer g.threads.Done()
+
+			err := g.managedConnect(addr)
+			if err != nil {
+				g.log.Debugln("WARN: automatic connect failed:", connectErr)
+			}
+		}()
+
+		// Wait a bit before trying the next peer. The peer connections are
+		// non-blocking, so they should be spaced out to avoid spinning up an
+		// uncontrolled number of threads and therefore peer connections.
 		select {
 		case <-time.After(5 * time.Second):
 		case <-g.threads.StopChan():
+			// Interrupt the thread if the shutdown signal is issued.
 			return
 		}
 	}

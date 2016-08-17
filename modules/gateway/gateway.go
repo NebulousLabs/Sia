@@ -148,9 +148,15 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Spawn the peer connection listener.
 	go g.threadedListen(threadedListenClosedChan)
 
+	// Spwan the peer manager and provide tools for ensuring clean shutdown.
+	peerManagerClosedChan := make(chan struct{})
+	g.threads.OnStop(func() {
+		<-peerManagerClosedChan
+	})
+	go g.threadedPeerManager(peerManagerClosedChan)
+
 	go g.threadedForwardPort(g.port)
 	go g.threadedLearnHostname()
-	go g.threadedPeerManager()
 	go g.threadedNodeManager()
 
 	g.log.Println("INFO: gateway created, started logging")
