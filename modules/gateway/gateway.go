@@ -70,10 +70,12 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	g = &Gateway{
-		handlers:   make(map[rpcID]modules.RPCFunc),
-		initRPCs:   make(map[string]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]*peer),
-		nodes:      make(map[modules.NetAddress]struct{}),
+		handlers: make(map[rpcID]modules.RPCFunc),
+		initRPCs: make(map[string]modules.RPCFunc),
+
+		peers: make(map[modules.NetAddress]*peer),
+		nodes: make(map[modules.NetAddress]struct{}),
+
 		persistDir: persistDir,
 	}
 
