@@ -1,0 +1,60 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+)
+
+// Client holds fields to make requests to a Sia API.
+type Client struct {
+	address  string
+	password string
+}
+
+// NewClient creates a new api.Client using the provided address and password.
+// If password is not the empty string, HTTP basic authentication will be used
+// to communicate with the API.
+func NewClient(address string, password string) *Client {
+	return &Client{
+		address:  address,
+		password: password,
+	}
+}
+
+// Get requests the resource at `resource` and decodes it into `obj`, returning an
+// error if requesting or decoding the resource fails.  A non-2xx status code
+// constitutes a request failure.
+func (c *Client) Get(resource string, obj interface{}) error {
+	url := "http://" + c.address + resource
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Sia-Agent")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	// Decode the body as an Error and return this error if the status code is
+	// not 2xx.
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		var apiErr Error
+		err = json.NewDecoder(res.Body).Decode(&apiErr)
+		if err != nil {
+			return err
+		}
+		return apiErr
+	}
+
+	if res.StatusCode == http.StatusNoContent {
+		return Error{"expecting a response, but API returned status code 204 No Content"}
+	}
+
+	err = json.NewDecoder(res.Body).Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
+}
