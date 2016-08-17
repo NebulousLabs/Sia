@@ -130,6 +130,10 @@ func TestBlankStorageObligation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = ht.host.tg.Flush()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Load the storage obligation from the database, see if it updated
 	// correctly.
 	err = ht.host.db.View(func(tx *bolt.Tx) error {
@@ -152,6 +156,10 @@ func TestBlankStorageObligation(t *testing.T) {
 	// host should fail and give up by deleting the storage obligation.
 	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer*2+1; i++ {
 		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = ht.host.tg.Flush()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -653,6 +661,10 @@ func TestAutoRevisionSubmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	ht.host.managedUnlockStorageObligation(so.id())
+	err = ht.host.tg.Flush()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Unlike the other tests, this test does not submit the file contract
 	// revision to the transaction pool for the host, the host is expected to
 	// do it automatically.
@@ -660,6 +672,10 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	// Mine until the host submits a storage proof.
 	for i := types.BlockHeight(0); i <= revisionSubmissionBuffer+2+resubmissionTimeout; i++ {
 		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = ht.host.tg.Flush()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -701,6 +717,10 @@ func TestAutoRevisionSubmission(t *testing.T) {
 	// host will delete the file entirely.
 	for i := 0; i <= int(defaultWindowSize); i++ {
 		_, err := ht.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = ht.host.tg.Flush()
 		if err != nil {
 			t.Fatal(err)
 		}

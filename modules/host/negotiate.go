@@ -167,14 +167,14 @@ func createRevisionSignature(fcr types.FileContractRevision, renterSig types.Tra
 // collateral, and then try submitting the file contract to the transaction
 // pool. If there is no error, the completed transaction set will be returned
 // to the caller.
-func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, renterPK crypto.PublicKey, renterSignatures []types.TransactionSignature, renterRevisionSignature types.TransactionSignature, initialSectorRoots []crypto.Hash, hostCollateral, hostInitialRevenue, hostInitialRisk types.Currency) ([]types.TransactionSignature, types.TransactionSignature, error) {
+func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, renterPK crypto.PublicKey, renterSignatures []types.TransactionSignature, renterRevisionSignature types.TransactionSignature, initialSectorRoots []crypto.Hash, hostCollateral, hostInitialRevenue, hostInitialRisk types.Currency) ([]types.TransactionSignature, types.TransactionSignature, types.FileContractID, error) {
 	for _, sig := range renterSignatures {
 		builder.AddTransactionSignature(sig)
 	}
 	fullTxnSet, err := builder.Sign(true)
 	if err != nil {
 		builder.Drop()
-		return nil, types.TransactionSignature{}, err
+		return nil, types.TransactionSignature{}, types.FileContractID{}, err
 	}
 
 	// Verify that the signature for the revision from the renter is correct.
@@ -211,7 +211,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// returning an error if the renter provided an incorrect signature.
 	revisionTransaction, err := createRevisionSignature(noOpRevision, renterRevisionSignature, hostSK, blockHeight)
 	if err != nil {
-		return nil, types.TransactionSignature{}, err
+		return nil, types.TransactionSignature{}, types.FileContractID{}, err
 	}
 
 	// Create and add the storage obligation for this file contract.
@@ -231,17 +231,20 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	// Get a lock on the storage obligation.
 	lockErr := h.managedTryLockStorageObligation(so.id())
 	if lockErr != nil {
-		return nil, types.TransactionSignature{}, lockErr
+		build.Critical("failed to get a lock on a brand new storage obligation")
+		return nil, types.TransactionSignature{}, types.FileContractID{}, lockErr
 	}
+	defer func() {
+		if err != nil {
+			h.managedUnlockStorageObligation(so.id())
+		}
+	}()
 
 	// addStorageObligation will submit the transaction to the transaction
 	// pool, and will only do so if there was not some error in creating the
 	// storage obligation. If the transaction pool returns a consensus
 	// conflict, wait 30 seconds and try again.
 	err = func() error {
-		// Unlock the storage obligation when finished.
-		defer h.managedUnlockStorageObligation(so.id())
-
 		// Try adding the storage obligation. If there's an error, wait a few
 		// seconds and try again. Eventually time out. It should be noted that
 		// the storage obligation locking is both crappy and incomplete, and
@@ -271,7 +274,7 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 		}
 	}()
 	if err != nil {
-		return nil, types.TransactionSignature{}, err
+		return nil, types.TransactionSignature{}, types.FileContractID{}, err
 	}
 
 	// Get the host's transaction signatures from the builder.
@@ -280,5 +283,5 @@ func (h *Host) managedFinalizeContract(builder modules.TransactionBuilder, rente
 	for _, sigIndex := range txnSigIndices {
 		hostTxnSignatures = append(hostTxnSignatures, fullTxn.TransactionSignatures[sigIndex])
 	}
-	return hostTxnSignatures, revisionTransaction.TransactionSignatures[1], nil
+	return hostTxnSignatures, revisionTransaction.TransactionSignatures[1], so.id(), nil
 }
