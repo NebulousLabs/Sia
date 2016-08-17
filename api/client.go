@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 )
 
 // Client holds fields to make requests to a Sia API.
@@ -40,6 +42,10 @@ func (c *Client) Get(resource string, obj interface{}) error {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode == http.StatusNotFound {
+		return errors.New("API call not recognized: " + resource)
+	}
+
 	// Decode the body as an Error and return this error if the status code is
 	// not 2xx.
 	if res.StatusCode < 200 || res.StatusCode > 299 {
@@ -59,5 +65,40 @@ func (c *Client) Get(resource string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// POST makes a POST request to the resource at `resource`, using `data` as the
+// request body.
+func (c *Client) Post(resource string, data string) error {
+	url := "http://" + c.address + resource
+	req, err := http.NewRequest("POST", url, strings.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Sia-Agent")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if c.password != "" {
+		req.SetBasicAuth("", c.password)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusNotFound {
+		return errors.New("API call not recognized: " + resource)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		var apiErr Error
+		err = json.NewDecoder(res.Body).Decode(&apiErr)
+		if err != nil {
+			return err
+		}
+		return apiErr
+	}
+
 	return nil
 }
