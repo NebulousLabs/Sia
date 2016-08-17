@@ -137,7 +137,7 @@ var (
 			return 250
 		}
 		if build.Release == "testing" {
-			return 10
+			return 100
 		}
 		panic("unrecognized release constant in host - logAllLimit")
 	}()
@@ -153,7 +153,7 @@ var (
 			return 2500
 		}
 		if build.Release == "testing" {
-			return 50
+			return 500
 		}
 		panic("unrecognized release constant in host - logAllLimit")
 	}()
