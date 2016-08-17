@@ -26,25 +26,22 @@ type Gateway struct {
 	port     string
 
 	// handlers are the RPCs that the Gateway can handle.
-	handlers map[rpcID]modules.RPCFunc
+	//
 	// initRPCs are the RPCs that the Gateway calls upon connecting to a peer.
+	handlers map[rpcID]modules.RPCFunc
 	initRPCs map[string]modules.RPCFunc
 
-	// peers are the nodes we are currently connected to.
+	// peers are the nodes that the gateway is currently connected to.
+	//
+	// nodes is the set of all known nodes (i.e. potential peers).
 	peers map[modules.NetAddress]*peer
-
-	// nodes is the set of all known nodes (i.e. potential peers) on the
-	// network.
 	nodes map[modules.NetAddress]struct{}
 
-	// threads is used to signal the Gateway's goroutines to shut down and to wait
-	// for all goroutines to exit before returning from Close().
-	threads siasync.ThreadGroup
-
+	// Utilities.
+	log        *persist.Logger
+	mu         sync.RWMutex
 	persistDir string
-
-	log *persist.Logger
-	mu  sync.RWMutex
+	threads    siasync.ThreadGroup
 }
 
 // Address returns the NetAddress of the Gateway.
@@ -149,13 +146,8 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Spawn the peer connection listener.
 	go g.threadedListen(threadedListenClosedChan)
 
-	// Forward the RPC port, if possible.
 	go g.threadedForwardPort(g.port)
-	// Learn our external IP.
 	go g.threadedLearnHostname()
-
-	// Spawn the peer and node managers. These will attempt to keep the peer
-	// and node lists healthy.
 	go g.threadedPeerManager()
 	go g.threadedNodeManager()
 
