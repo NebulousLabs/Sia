@@ -111,8 +111,8 @@ func (b Block) ID() BlockID {
 }
 
 // MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
-// tree are composed of the Timestamp, the miner outputs (one leaf per
-// payout), and the transactions (one leaf per transaction).
+// tree are composed of the miner outputs (one leaf per payout), and the
+// transactions (one leaf per transaction).
 func (b Block) MerkleRoot() crypto.Hash {
 	tree := crypto.NewTree()
 	for _, payout := range b.MinerPayouts {
