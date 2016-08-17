@@ -57,7 +57,7 @@ func (c *Client) Get(resource string, obj interface{}) error {
 		return apiErr
 	}
 
-	if res.StatusCode != http.StatusNoContent {
+	if res.StatusCode != http.StatusNoContent && obj != nil {
 		return json.NewDecoder(res.Body).Decode(obj)
 	}
 	return nil
@@ -95,7 +95,7 @@ func (c *Client) Post(resource string, data string, obj interface{}) error {
 		return apiErr
 	}
 
-	if res.StatusCode != http.StatusNoContent {
+	if res.StatusCode != http.StatusNoContent && obj != nil {
 		return json.NewDecoder(res.Body).Decode(&obj)
 	}
 	return nil
