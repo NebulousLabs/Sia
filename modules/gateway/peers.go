@@ -14,11 +14,17 @@ import (
 )
 
 const (
-	// the gateway will not accept inbound connections above this threshold
+	// fullyConnectedThreshold defines the number of peers that the gateway can
+	// have before it stops accepting inbound connections.
 	fullyConnectedThreshold = 128
 
-	// the gateway will ask for more addresses below this threshold
-	minNodeListLen = 100
+	// pruneNodeListLen defines the number of nodes that the gateway must have
+	// to be pruning nodes from the node list.
+	pruneNodeListLen = 50
+
+	// minNodeListLen defines the number of nodes that the gateway must have in
+	// the node list before it will stop asking peers for more nodes.
+	minNodeListLen = 200
 
 	// minAcceptableVersion is the version below which the gateway will refuse to
 	// connect to peers and reject connection attempts.
@@ -539,9 +545,9 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	return nil
 }
 
-// threadedPeerManager tries to keep the Gateway well-connected. As long as
+// permanentPeerManager tries to keep the Gateway well-connected. As long as
 // the Gateway is not well-connected, it tries to connect to random nodes.
-func (g *Gateway) threadedPeerManager(closedChan chan struct{}) {
+func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 	// Send a signal upon shutdown.
 	defer close(closedChan)
 

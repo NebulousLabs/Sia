@@ -653,6 +653,8 @@ func TestDisconnect(t *testing.T) {
 		if err != nil {
 			t.Fatal("accept failed:", err)
 		}
+		// TODO: What's with the commented out line below?
+		//
 		// conn.Close()
 	}()
 	// skip standard connection protocol

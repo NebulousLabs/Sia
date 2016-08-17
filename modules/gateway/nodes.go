@@ -102,20 +102,92 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	return nil
 }
 
-// threadedNodeManager tries to keep the Gateway's node list healthy. As long
+// permanentNodePurger is a thread that runs throughout the lifetime of the
+// gateway, purging unconnectable nodes from the node list in a sustainable
+// way.
+func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
+	defer close(closeChan)
+
+	for {
+		// Start by sleeping for 10 minutes. This means that no nodes will be
+		// purged for the first 10 minutes that Sia is running, and that any
+		// failures to get nodes will be met by 10 minutes of waiting.
+		//
+		// At most one node will be contacted every 10 minutes. This minimizes
+		// the total amount of keepalive traffic on the network.
+		select {
+		case <-time.After(10 * time.Minute):
+		case <-g.threads.StopChan():
+			// The gateway is shutting down, close out the thread.
+			return
+		}
+
+		// Get a random node for scanning.
+		g.mu.RLock()
+		numNodes := len(g.nodes)
+		node, err := g.randomNode()
+		g.mu.RUnlock()
+		if err != nil {
+			// Most likely the error indicates that there are no nodes in the
+			// node list. Wait until the next iteration to try again.
+			continue
+		}
+		if numNodes < pruneNodeListLen {
+			// There are not enough nodes in the gateway - pruning more is
+			// probably a bad idea, and may affect the user's ability to
+			// connect to the network in the future.
+			continue
+		}
+
+		// Try connecting to the random node. If the node is not reachable,
+		// remove them from the node list. Make sure that the dial is stopped
+		// early if the gateway is shutting down.
+		cancelDialChan := make(chan struct{})
+		dialDoneChan := make(chan struct{})
+		defer close(dialDoneChan)
+		dialer := &net.Dialer{
+			Timeout: dialTimeout,
+			Cancel:  cancelDialChan,
+		}
+		go func() {
+			select {
+			case <-cancelDialChan:
+			case <-g.threads.StopChan():
+				close(cancelDialChan)
+			}
+		}()
+		conn, err := dialer.Dial("tcp", string(node))
+		if err != nil {
+			g.mu.Lock()
+			g.removeNode(node)
+			g.save()
+			g.mu.Unlock()
+			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
+		}
+		// If connection succeeds, supply an unacceptable version so that we
+		// will not be added as a peer.
+		//
+		// NOTE: this is a somewhat clunky way of specifying that you didn't
+		// actually want a connection.
+		encoding.WriteObject(conn, "0.0.0")
+		conn.Close()
+	}
+}
+
+// permanentNodeManager tries to keep the Gateway's node list healthy. As long
 // as the Gateway has fewer than minNodeListSize nodes, it asks a random peer
 // for more nodes. It also continually pings nodes in order to establish their
 // connectivity. Unresponsive nodes are aggressively removed.
-func (g *Gateway) threadedNodeManager() {
-	if g.threads.Add() != nil {
-		return
-	}
-	defer g.threads.Done()
+func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
+	defer close(closeChan)
 
 	for {
+		// Wait 5 seconds so that a controlled number of peer requests are made
+		// to nodes in the node list.
 		select {
 		case <-time.After(5 * time.Second):
 		case <-g.threads.StopChan():
+			// Gateway is shutting down, close the thread.
 			return
 		}
 
@@ -124,46 +196,32 @@ func (g *Gateway) threadedNodeManager() {
 		peer, err := g.randomPeer()
 		g.mu.RUnlock()
 		if err != nil {
-			// can't do much until we have peers
+			// Most commonly the error indicates that there are no peers yet.
+			// Waiting through the next iteration gives the gateway time to
+			// bootstrap.
 			continue
 		}
 
+		// Determine whether there are a satisfactory number of nodes in the
+		// nodelist. If there are not, use the random peer from earlier to
+		// expand the node list.
 		if numNodes < minNodeListLen {
-			err := g.RPC(peer, "ShareNodes", g.requestNodes)
+			// TODO: should this be done in a go func? It's a blocking
+			// function.
+			err := g.managedRPC(peer, "ShareNodes", g.requestNodes)
 			if err != nil {
 				g.log.Debugf("WARN: RPC ShareNodes failed on peer %q: %v", peer, err)
 				continue
 			}
-		}
-
-		// find an untested node to check
-		g.mu.RLock()
-		node, err := g.randomNode()
-		g.mu.RUnlock()
-		if err != nil {
-			continue
-		}
-
-		// try to connect
-		conn, err := net.DialTimeout("tcp", string(node), dialTimeout)
-		if err != nil {
-			g.mu.Lock()
-			g.removeNode(node)
-			g.save()
-			g.mu.Unlock()
-			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
-			continue
-		}
-		// if connection succeeds, supply an unacceptable version to ensure
-		// they won't try to add us as a peer
-		encoding.WriteObject(conn, "0.0.0")
-		conn.Close()
-		// sleep for an extra 10 minutes after success; we don't want to spam
-		// connectable nodes
-		select {
-		case <-time.After(10 * time.Minute):
-		case <-g.threads.StopChan():
-			return
+		} else {
+			// There are enough peers in the gateway, no need to check for more
+			// every 5 seconds. Wait a while before checking again.
+			select {
+			case <-time.After(5 * time.Minute):
+			case <-g.threads.StopChan():
+				// Gateway is shutting down, close the thread.
+				return
+			}
 		}
 	}
 }
