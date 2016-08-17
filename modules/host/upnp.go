@@ -16,31 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// myExternalIP discovers the host's external IP by querying a centralized
-// service, http://myexternalip.com.
-func myExternalIP() (string, error) {
-	// timeout after 10 seconds
-	client := http.Client{Timeout: time.Duration(10 * time.Second)}
-	resp, err := client.Get("http://myexternalip.com/raw")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		errResp, _ := ioutil.ReadAll(resp.Body)
-		return "", errors.New(string(errResp))
-	}
-	buf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 64))
-	if err != nil {
-		return "", err
-	}
-	if len(buf) == 0 {
-		return "", errors.New("myexternalip.com returned a 0 length IP address")
-	}
-	// trim newline
-	return strings.TrimSpace(string(buf)), nil
-}
-
 // managedLearnHostname discovers the external IP of the Host. If the host's
 // net address is blank and the host's auto address appears to have changed,
 // the host will make an announcement on the blockchain.
@@ -107,6 +82,21 @@ func (h *Host) managedLearnHostname() {
 
 // managedForwardPort adds a port mapping to the router.
 func (h *Host) managedForwardPort() error {
+	if build.Release == "testing" {
+		// Add a blocking placeholder where testing is able to mock behaviors
+		// such as a port forward action that blocks for 10 seconds before
+		// completing.
+		if h.dependencies.disrupt("managedForwardPort") {
+			return nil
+		}
+
+		// Port forwarding functions are frequently unavailable during testing,
+		// and the long blocking can be highly disruptive. Under normal
+		// scenarios, return without complaint, and without running the
+		// port-forward logic.
+		return nil
+	}
+
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
 	h.mu.RLock()
@@ -115,9 +105,6 @@ func (h *Host) managedForwardPort() error {
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
-	}
-	if build.Release == "testing" {
-		return nil
 	}
 
 	d, err := upnp.Discover()
@@ -135,6 +122,14 @@ func (h *Host) managedForwardPort() error {
 
 // managedClearPort removes a port mapping from the router.
 func (h *Host) managedClearPort() error {
+	if build.Release == "testing" {
+		// Allow testing to force an error to be returned here.
+		if h.dependencies.disrupt("managedClearPort return error") {
+			return errors.New("Mocked managedClearPortErr")
+		}
+		return nil
+	}
+
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
 	h.mu.RLock()
@@ -143,9 +138,6 @@ func (h *Host) managedClearPort() error {
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
-	}
-	if build.Release == "testing" {
-		return nil
 	}
 
 	d, err := upnp.Discover()
@@ -159,4 +151,29 @@ func (h *Host) managedClearPort() error {
 
 	h.log.Println("INFO: successfully unforwarded port", port)
 	return nil
+}
+
+// myExternalIP discovers the host's external IP by querying a centralized
+// service, http://myexternalip.com.
+func myExternalIP() (string, error) {
+	// timeout after 10 seconds
+	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	resp, err := client.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		return "", errors.New(string(errResp))
+	}
+	buf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 64))
+	if err != nil {
+		return "", err
+	}
+	if len(buf) == 0 {
+		return "", errors.New("myexternalip.com returned a 0 length IP address")
+	}
+	// trim newline
+	return strings.TrimSpace(string(buf)), nil
 }

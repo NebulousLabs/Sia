@@ -30,6 +30,12 @@ var (
 type (
 	// dependencies defines all of the dependencies of the Host.
 	dependencies interface {
+		// disrupt can be inserted in the code as a way to inject problems,
+		// such as a network call that take 10 minutes or a disk write that
+		// never completes. disrupt will return true if the disruption is
+		// forcibly triggered. In production, disrupt will always return false.
+		disrupt(string) bool
+
 		// listen gives the host the ability to receive incoming connections.
 		listen(string, string) (net.Listener, error)
 
@@ -70,6 +76,12 @@ type (
 	// dependencies using full featured libraries.
 	productionDependencies struct{}
 )
+
+// disrupt will always return false, but can be over-written during testing to
+// trigger disruptions.
+func (productionDependencies) disrupt(string) bool {
+	return false
+}
 
 // listen gives the host the ability to receive incoming connections.
 func (productionDependencies) listen(s1, s2 string) (net.Listener, error) {

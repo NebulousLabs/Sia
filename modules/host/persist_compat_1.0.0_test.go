@@ -67,4 +67,8 @@ func TestHostPersistCompat100(t *testing.T) {
 		t.Error("unlock hash loaded incorrectly")
 	}
 	ht.host.mu.Unlock()
+
+	// Set ht.host to 'h' so that the 'ht.Close()' method will close everything
+	// cleanly.
+	ht.host = h
 }

@@ -176,4 +176,8 @@ func TestIntegrationAutoRescan(t *testing.T) {
 	if oldChange != h.recentChange || oldHeight != h.blockHeight {
 		t.Error("consensus tracking variables were not reset correctly after rescan")
 	}
+
+	// Set ht.host to 'h' so that the 'ht.Close()' method will close everything
+	// cleanly.
+	ht.host = h
 }
