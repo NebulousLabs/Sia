@@ -64,8 +64,6 @@ func (g *Gateway) Close() error {
 	// Unregister RPCs. Not strictly necessary for clean shutdown in this specific
 	// case, as the handlers should only contain references to the gateway itself,
 	// but do it anyways as an example for other modules to follow.
-	g.UnregisterRPC("ShareNodes")
-	g.UnregisterConnectCall("ShareNodes")
 	// save the latest gateway state
 	g.mu.RLock()
 	if err := g.saveSync(); err != nil {
@@ -76,11 +74,6 @@ func (g *Gateway) Close() error {
 	g.mu.RLock()
 	g.clearPort(g.myAddr.Port())
 	g.mu.RUnlock()
-	// Close the logger. The logger should be the last thing to shut down so that
-	// all other objects have access to logging while closing.
-	if err := g.log.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
-	}
 
 	return build.JoinErrors(errs, "; ")
 }
@@ -106,10 +99,23 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return nil, err
 	}
+	// Establish the closing of the logger.
+	g.threads.AfterStop(func() {
+		if err := g.log.Close(); err != nil {
+			// The logger may or may not be working here, so use a println
+			// instead.
+			fmt.Println("Failed to close the gateway logger:", err)
+		}
+	})
 
 	// Register RPCs.
 	g.RegisterRPC("ShareNodes", g.shareNodes)
 	g.RegisterConnectCall("ShareNodes", g.requestNodes)
+	// Establish the de-registration of the RPCs.
+	g.threads.OnStop(func() {
+		g.UnregisterRPC("ShareNodes")
+		g.UnregisterConnectCall("ShareNodes")
+	})
 
 	// Load the old node list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
@@ -118,6 +124,9 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Add the bootstrap peers to the node list.
+	//
+	// TODO: the bootstrap peers should not be added to the node list if
+	// --no-bootstrap is specified.
 	if build.Release == "standard" {
 		for _, addr := range modules.BootstrapPeers {
 			err := g.addNode(addr)
@@ -148,6 +157,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		return nil, err
 	}
 	if build.Release == "testing" {
+		// TODO: This needs a docstring.
 		g.myAddr = modules.NetAddress(g.listener.Addr().String())
 	}
 
