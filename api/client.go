@@ -57,20 +57,15 @@ func (c *Client) Get(resource string, obj interface{}) error {
 		return apiErr
 	}
 
-	if res.StatusCode == http.StatusNoContent {
-		return Error{"expecting a response, but API returned status code 204 No Content"}
-	}
-
-	err = json.NewDecoder(res.Body).Decode(obj)
-	if err != nil {
-		return err
+	if res.StatusCode != http.StatusNoContent {
+		return json.NewDecoder(res.Body).Decode(obj)
 	}
 	return nil
 }
 
 // POST makes a POST request to the resource at `resource`, using `data` as the
-// request body.
-func (c *Client) Post(resource string, data string) error {
+// request body.  The response, if provided, will be decoded into `obj`.
+func (c *Client) Post(resource string, data string, obj interface{}) error {
 	url := "http://" + c.address + resource
 	req, err := http.NewRequest("POST", url, strings.NewReader(data))
 	if err != nil {
@@ -100,5 +95,8 @@ func (c *Client) Post(resource string, data string) error {
 		return apiErr
 	}
 
+	if res.StatusCode != http.StatusNoContent {
+		return json.NewDecoder(res.Body).Decode(&obj)
+	}
 	return nil
 }
