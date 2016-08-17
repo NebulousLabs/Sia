@@ -64,15 +64,12 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 // revertHistory reverts any transaction history that was destroyed by reverted
 // blocks in the consensus change.
-// TODO: add test
 func (w *Wallet) revertHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
 	for _, block := range cc.RevertedBlocks {
 		// Remove any transactions that have been reverted.
 		for i := len(block.Transactions) - 1; i >= 0; i-- {
 			// If the transaction is relevant to the wallet, it will be the
-			// most recent transaction appended to w.processedTransactions.
-			// Relevance can be determined just by looking at the last element
-			// of w.processedTransactions.
+			// most recent transaction in bucketProcessedTransactions.
 			txid := block.Transactions[i].ID()
 			pt, err := dbGetLastProcessedTransaction(tx)
 			if err != nil {
