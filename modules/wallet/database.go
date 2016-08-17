@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"reflect"
+
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -40,6 +42,27 @@ func dbGet(b *bolt.Bucket, key, val interface{}) error {
 // dbDelete is a helper function for deleting a marshalled key/value pair.
 func dbDelete(b *bolt.Bucket, key interface{}) error {
 	return b.Delete(encoding.Marshal(key))
+}
+
+// dbForEach is a helper function for iterating over a bucket and calling fn
+// on each entry. fn must be a function with two parameters.
+func dbForEach(b *bolt.Bucket, fn interface{}) error {
+	// check function type
+	fnVal, fnTyp := reflect.ValueOf(fn), reflect.TypeOf(fn)
+	if fnTyp.Kind() != reflect.Func || fnTyp.NumIn() != 2 {
+		panic("bad fn type: needed func(a, b), got " + fnTyp.String())
+	}
+
+	return b.ForEach(func(keyBytes, valBytes []byte) error {
+		key, val := reflect.New(fnTyp.In(0)), reflect.New(fnTyp.In(1))
+		if err := encoding.Unmarshal(keyBytes, key.Interface()); err != nil {
+			return err
+		} else if err := encoding.Unmarshal(valBytes, val.Interface()); err != nil {
+			return err
+		}
+		fnVal.Call([]reflect.Value{key.Elem(), val.Elem()})
+		return nil
+	})
 }
 
 // dbPutHistoricClaimStart stores the number of siafunds corresponding to the
