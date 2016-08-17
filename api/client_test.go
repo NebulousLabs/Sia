@@ -16,7 +16,7 @@ func TestApiClient(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	c := NewClient("localhost:9980", "")
+	c := NewClient(st.server.listener.Addr().String(), "")
 	var gatewayInfo GatewayGET
 	err = c.Get("/gateway", &gatewayInfo)
 	if err != nil {
@@ -38,14 +38,14 @@ func TestAuthenticatedApiClient(t *testing.T) {
 	}
 	defer st.server.Close()
 
-	c := NewClient("localhost:9980", "")
-	var gatewayInfo GatewayGET
-	err = c.Get("/gateway", &gatewayInfo)
+	c := NewClient(st.server.listener.Addr().String(), "")
+	var walletAddress WalletAddressGET
+	err = c.Get("/wallet/address", &walletAddress)
 	if err == nil {
 		t.Fatal("api.Client did not return an error when requesting an authenticated resource without a password")
 	}
-	c = NewClient("localhost:9980", testpass)
-	err = c.Get("/gateway", &gatewayInfo)
+	c = NewClient(st.server.listener.Addr().String(), testpass)
+	err = c.Get("/wallet/address", &walletAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
