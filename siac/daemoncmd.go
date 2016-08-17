@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/api"
-
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +29,11 @@ var (
 	}
 )
 
+type updateInfo struct {
+	Available bool   `json:"available"`
+	Version   string `json:"version"`
+}
+
 // stopcmd is the handler for the command `siac stop`.
 // Stops the daemon.
 func stopcmd() {
@@ -42,7 +45,7 @@ func stopcmd() {
 }
 
 func updatecmd() {
-	var update api.UpdateInfo
+	var update updateInfo
 	err := getAPI("/daemon/update", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
@@ -59,11 +62,10 @@ func updatecmd() {
 		return
 	}
 	fmt.Printf("Updated to version %s! Restart siad now.\n", update.Version)
-
 }
 
 func updatecheckcmd() {
-	var update api.UpdateInfo
+	var update updateInfo
 	err := getAPI("/daemon/update", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)

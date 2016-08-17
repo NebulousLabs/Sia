@@ -36,10 +36,10 @@ func TestReloading(t *testing.T) {
 	// to a new folder, and then the modules are pointed at the new folders
 	// during calls to 'New')
 	st, err := createServerTester("TestReloading")
+	height := st.server.api.cs.Height()
 	if err != nil {
 		t.Fatal(err)
 	}
-	height := st.server.cs.Height()
 	err = st.server.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestReloading(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rst.server.Close()
-	if rst.server.cs.Height() != height {
+	if height != rst.server.api.cs.Height() {
 		t.Error("server heights do not match")
 	}
 

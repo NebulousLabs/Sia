@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -92,7 +94,8 @@ func processConfig(config Config) (Config, error) {
 	return config, nil
 }
 
-// startDaemonCmd uses the config parameters to start siad.
+// startDaemon uses the config parameters to initialize Sia modules and start
+// siad.
 func startDaemon(config Config) (err error) {
 	// Prompt user for API password.
 	if config.Siad.AuthenticateAPI {
@@ -115,7 +118,19 @@ func startDaemon(config Config) (err error) {
 	fmt.Println("Loading...")
 	loadStart := time.Now()
 
-	// Create all of the modules.
+	// Create the server and start serving daemon routes immediately.
+	fmt.Printf("(0/%d) Loading siad...\n", len(config.Siad.Modules))
+	srv, err := NewServer(config.Siad.APIaddr, config.Siad.RequiredUserAgent, config.APIPassword)
+	if err != nil {
+		return err
+	}
+
+	servErrs := make(chan error)
+	go func() {
+		servErrs <- srv.Serve()
+	}()
+
+	// Initialize the Sia modules
 	i := 0
 	var g modules.Gateway
 	if strings.Contains(config.Siad.Modules, "g") {
@@ -125,6 +140,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer g.Close()
 	}
 	var cs modules.ConsensusSet
 	if strings.Contains(config.Siad.Modules, "c") {
@@ -134,6 +150,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer cs.Close()
 	}
 	var e modules.Explorer
 	if strings.Contains(config.Siad.Modules, "e") {
@@ -143,6 +160,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer e.Close()
 	}
 	var tpool modules.TransactionPool
 	if strings.Contains(config.Siad.Modules, "t") {
@@ -152,6 +170,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer tpool.Close()
 	}
 	var w modules.Wallet
 	if strings.Contains(config.Siad.Modules, "w") {
@@ -161,6 +180,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer w.Close()
 	}
 	var m modules.Miner
 	if strings.Contains(config.Siad.Modules, "m") {
@@ -170,6 +190,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer m.Close()
 	}
 	var h modules.Host
 	if strings.Contains(config.Siad.Modules, "h") {
@@ -179,6 +200,7 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer h.Close()
 	}
 	var r modules.Renter
 	if strings.Contains(config.Siad.Modules, "r") {
@@ -188,24 +210,8 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
+		defer r.Close()
 	}
-	srv, err := api.NewServer(
-		config.Siad.APIaddr,
-		config.Siad.RequiredUserAgent,
-		config.APIPassword,
-		cs,
-		e,
-		g,
-		h,
-		m,
-		r,
-		tpool,
-		w,
-	)
-	if err != nil {
-		return err
-	}
-
 	// Bootstrap to the network.
 	if !config.Siad.NoBootstrap && g != nil {
 		// connect to 3 random bootstrap nodes
@@ -218,15 +224,41 @@ func startDaemon(config Config) (err error) {
 		}
 	}
 
+	// Create the Sia API
+	a := api.New(
+		config.Siad.RequiredUserAgent,
+		config.APIPassword,
+		cs,
+		e,
+		g,
+		h,
+		m,
+		r,
+		tpool,
+		w,
+	)
+
+	// connect the API to the server
+	srv.mux.Handle("/", a)
+
+	// stop the server if a kill signal is caught
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, os.Kill)
+	go func() {
+		<-sigChan
+		fmt.Println("\rCaught stop signal, quitting...")
+		srv.Close()
+	}()
+
 	// Print a 'startup complete' message.
 	startupTime := time.Since(loadStart)
 	fmt.Println("Finished loading in", startupTime.Seconds(), "seconds")
 
-	// Start serving api requests.
-	err = srv.Serve()
+	err = <-servErrs
 	if err != nil {
-		return err
+		build.Critical(err)
 	}
+
 	return nil
 }
 
