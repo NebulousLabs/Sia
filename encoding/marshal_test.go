@@ -401,3 +401,24 @@ func BenchmarkDecode(b *testing.B) {
 	}
 	b.SetBytes(numBytes)
 }
+
+// i5-4670K, 2059112: 44 MB/s
+func BenchmarkMarshalAll(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = MarshalAll(testStructs...)
+	}
+	b.SetBytes(int64(len(bytes.Join(testEncodings, nil))))
+}
+
+// i5-4670K, 2059112: 36 MB/s
+func BenchmarkUnmarshalAll(b *testing.B) {
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}, &test6{}}
+	structBytes := bytes.Join(testEncodings, nil)
+	for i := 0; i < b.N; i++ {
+		err := UnmarshalAll(structBytes, emptyStructs...)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.SetBytes(int64(len(structBytes)))
+}

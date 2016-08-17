@@ -41,14 +41,7 @@ func NewHash() hash.Hash {
 // HashAll takes a set of objects as input, encodes them all using the encoding
 // package, and then hashes the result.
 func HashAll(objs ...interface{}) Hash {
-	// Ideally we would just write HashBytes(encoding.MarshalAll(objs)).
-	// Unfortunately, you can't pass 'objs' to MarshalAll without losing its
-	// type information; MarshalAll would just see interface{}s.
-	var b []byte
-	for _, obj := range objs {
-		b = append(b, encoding.Marshal(obj)...)
-	}
-	return HashBytes(b)
+	return HashBytes(encoding.MarshalAll(objs...))
 }
 
 // HashBytes takes a byte slice and returns the result.
