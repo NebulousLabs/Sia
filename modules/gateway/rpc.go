@@ -10,8 +10,11 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// rpcID is an 8-byte signature that is added to all RPCs to tell the gatway
+// what to do with the RPC.
 type rpcID [8]byte
 
+// String returns a string representation of an rpcID.
 func (id rpcID) String() string {
 	for i := range id {
 		if id[i] == 0 {
