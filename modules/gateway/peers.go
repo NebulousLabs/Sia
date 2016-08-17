@@ -493,7 +493,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 			}
 			defer g.threads.Done()
 
-			err := g.RPC(addr, name, fn)
+			err := g.managedRPC(addr, name, fn)
 			if err != nil {
 				g.log.Debugf("INFO: RPC %q on peer %q failed: %v", name, addr, err)
 			}
