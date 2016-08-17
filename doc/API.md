@@ -629,84 +629,71 @@ any particular order, and the order may change in subsequent calls.
 Miner
 -----
 
-Queries:
+| Route                              | HTTP verb |
+| ---------------------------------- | --------- |
+| [/miner](#miner-get)               | GET       |
+| [/miner/start](#minerstart-get)    | GET       |
+| [/miner/stop](#minerstop-get)      | GET       |
+| [/miner/header](#minerheader-get)  | GET       |
+| [/miner/header](#minerheader-post) | POST      |
 
-* /miner        [GET]
-* /miner/start  [GET]
-* /miner/stop   [GET]
-* /miner/header [GET]
-* /miner/header [POST]
+For examples and detailed descriptions of request and response parameters,
+refer to [Miner.md](/doc/api/Miner.md).
 
 #### /miner [GET]
 
-Function: Return the status of the miner.
+returns the status of the miner.
 
-Parameters: none
-
-Response:
-```
-struct {
-	blocksmined      int
-	cpuhashrate      int
-	cpumining        bool
-	staleblocksmined int
+###### JSON Response [(with comments)](/doc/api/Miner.md#json-response)
+```javascript
+{
+  "blocksmined":      9001,
+  "cpuhashrate":      1337,
+  "cpumining":        false,
+  "staleblocksmined": 0,
 }
 ```
-'cpumining' indicates whether the cpu miner is active or not.
-
-'cpuhashrate' indicates how fast the cpu is hashing, in hashes per second.
-
-'blocksmined' indicates how many blocks have been mined, this value is remembered after restarting.
-
-'staleblocksmined' indicates how many stale blocks have been mined, this value is remembered after restarting.
 
 #### /miner/start [GET]
 
-Function: Starts a single threaded cpu miner. Does nothing if the cpu miner is
-already running.
+starts a single threaded cpu miner. Does nothing if the cpu miner is already
+running.
 
-Parameters: none
-
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /miner/stop [GET]
 
-Function: Stops the cpu miner. Does nothing if the cpu miner is not running.
+stops the cpu miner. Does nothing if the cpu miner is not running.
 
-Parameters: none
-
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /miner/header [GET]
 
-Function: Provide a block header that is ready to be grinded on for work.
+provides a block header that is ready to be grinded on for work.
 
-Parameters: none
+###### Byte Response
 
-Response:
-```
-[]byte
-```
-The response is a byte array containing a target followed by a block header
-followed by a block. The target is the first 32 bytes. The block header is the
-following 80 bytes, and the nonce is bytes 32-39 (inclusive) of the header
-(bytes 64-71 of the whole array).
-
-Layout:
-
-0-31: target
-
-32-111: header
+For efficiency the header for work is returned as a raw byte encoding of the
+header, rather than encoded to JSON. Refer to
+[Miner.md#byte-response](/doc/api/Miner.md#byte-response) for a detailed
+description of the byte encoding.
 
 #### /miner/header [POST]
 
-Function: Submit a header that has passed the POW.
+submits a header that has passed the POW.
 
-Parameters:
-```
-input []byte
-```
-The input byte array should be 80 bytes that form the solved block header. *Unlike most API calls, it should be written directly to the request body, not as a query parameter.*
+###### Request Body Bytes
+
+For efficiency headers are submitted as raw byte encodings of the header in the
+body of the request, rather than as a query string parameter or path parameter.
+The request body should contain only the 80 bytes of the encoded header. The
+encoding is the same encoding used in `/miner/header [GET]` endpoint. Refer to
+[Miner.md#byte-response](/doc/api/Miner.md#byte-response) for a detailed
+description of the byte encoding.
 
 Renter
 ------
