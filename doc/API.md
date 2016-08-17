@@ -235,27 +235,27 @@ standard success or error response. See
 Host
 ----
 
-Queries:
+| Route                                                                                 | HTTP verb |
+| ------------------------------------------------------------------------------------- | --------- |
+| [/host](#host-get)                                                                    | GET       |
+| [/host](#host-post)                                                                   | POST      |
+| [/host/announce](#hostannounce-post)                                                  | POST      |
+| [/host/delete/___:filecontractid___](#hostdeletefilecontractid-post)                  | POST      |
+| [/host/storage](#hoststorage-get)                                                     | GET       |
+| [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
+| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
+| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
+| [/host/storage/sectors/delete/___:merkleroot___](#hoststoragesectorsdeletemerkleroot) | POST      |
 
-* /host                                     [GET]
-* /host                                     [POST]
-* /host/announce                            [POST]
-* /host/delete/{filecontractid}             [POST]
-* /host/storage                             [GET]
-* /host/storage/folders/add                 [POST]
-* /host/storage/folders/remove              [POST]
-* /host/storage/folders/resize              [POST]
-* /host/storage/sectors/delete/{merkleroot} [POST]
-
-[Full Description](api/Host.md)
+For examples and detailed descriptions of request and response parameters,
+refer to [Host.md](/doc/api/Host.md).
 
 #### /host [GET]
 
-Function: Fetches status information about the host.
+fetches status information about the host.
 
-Parameters: none
-
-Response:
+// TODO: convert to example JSON response and add units.
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response)
 ```go
 struct {
 	externalsettings {
@@ -334,10 +334,10 @@ struct {
 
 #### /host [POST]
 
-Function: Configures hosting parameters. All parameters are optional;
-unspecified parameters will be left unchanged.
+configures hosting parameters. All parameters are optional; unspecified
+parameters will be left unchanged.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters)
 ```
 acceptingcontracts   bool                        // Optional
 maxdownloadbatchsize uint64                      // Optional
@@ -356,19 +356,23 @@ minstorageprice           types.Currency (string) // Optional
 minuploadbandwidthprice   types.Currency (string) // Optional
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/announce [POST]
 
-Function: The host will announce itself to the network as a source of storage.
-Generally only needs to be called once.
+Announces the host to the network as a source of storage. Generally only needs
+to be called once.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-1)
 ```
 netaddress string // Optional
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/storage [GET]
 

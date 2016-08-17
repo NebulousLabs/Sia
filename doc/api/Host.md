@@ -1,20 +1,43 @@
 Host API
 --------
 
-Queries:
+This document contains detailed descriptions of the host's API routes. For an
+overview of the host's API routes, see [API.md#host](/doc/API.md#host).  For an
+overview of all API routes, see [API.md](/doc/API.md)
 
-* /host                         [GET]
-* /host                         [POST]
-* /host/announce                [POST]
-* /host/delete/{filecontractid} [POST]
+There may be functional API calls which are not documented. These are not
+guaranteed to be supported beyond the current release, and should not be used
+in production.
+
+Overview
+--------
+
+The host provides storage from local disks to the network. The host negotiates
+file contracts with remote renters to earn money for storing other users'
+files. The host's endpoints expose methods for viewing and modifying host
+settings, announcing to the network, and managing how files are stored on disk.
+
+Index
+-----
+
+| Route                                                                                 | HTTP verb |
+| ------------------------------------------------------------------------------------- | --------- |
+| [/host](#host-get)                                                                    | GET       |
+| [/host](#host-post)                                                                   | POST      |
+| [/host/announce](#hostannounce-post)                                                  | POST      |
+| [/host/delete/___:filecontractid___](#hostdeletefilecontractid-post)                  | POST      |
+| [/host/storage](#hoststorage-get)                                                     | GET       |
+| [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
+| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
+| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
+| [/host/storage/sectors/delete/___:merkleroot___](#hoststoragesectorsdeletemerkleroot) | POST      |
 
 #### /host [GET]
 
-Function: Fetches status information about the host.
+fetches status information about the host.
 
-Parameters: none
-
-Response:
+// TODO: convert to example JSON response and add units.
+###### JSON Response
 ```go
 struct {
 	// The settings that get displayed to untrusted nodes querying the host's
@@ -344,10 +367,10 @@ struct {
 
 #### /host [POST]
 
-Function: Configures hosting parameters. All parameters are optional;
-unspecified parameters will be left unchanged.
+configures hosting parameters. All parameters are optional; unspecified
+parameters will be left unchanged.
 
-Parameters:
+###### Query String Parameters
 ```
 // When set to true, the host will accept new file contracts if the
 // terms are reasonable. When set to false, the host will not accept new
@@ -435,18 +458,22 @@ minstorageprice types.Currency (string) // Optional
 minuploadbandwidthprice types.Currency (string) // Optional
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/announce [POST]
 
-Function: The host will announce itself to the network as a source of storage.
-Generally only needs to be called once.
+Announce the host to the network as a source of storage. Generally only needs
+to be called once.
 
-Parameters:
+###### Query String Parameters
 ```
 // The address to be announced. If no address is provided, the automatically
 // discovered address will be used instead.
 netaddress string // Optional
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
