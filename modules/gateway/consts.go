@@ -18,7 +18,18 @@ const (
 var (
 	// maxSharedNodes defines the number of nodes that will be shared between
 	// peers when they are expanding their node lists.
-	maxSharedNodes uint64 = 10
+	maxSharedNodes = func() uint64 {
+		switch build.Release {
+		case "dev":
+			return 5
+		case "standard":
+			return 10
+		case "testing":
+			return 3
+		default:
+			panic("unrecognized build.Release in healthyNodeListLen")
+		}
+	}()
 
 	// nodePurgeDelay defines the amount of time that is waited between each
 	// iteration of the node purge loop.
