@@ -215,7 +215,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 	}
 	defer g.threads.Done()
 
-	g.log.Printf("INFO: broadcasting RPC %q to %v peers", name, len(peers))
+	g.log.Debugf("INFO: broadcasting RPC %q to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
