@@ -10,11 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-const (
-	maxSharedNodes = 10
-	minPeers       = 3
-)
-
 var (
 	errNodeExists = errors.New("node already added")
 	errOurAddress = errors.New("can't add our own address")
@@ -75,7 +70,7 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 	g.mu.RLock()
 	var nodes []modules.NetAddress
 	for node := range g.nodes {
-		if len(nodes) == maxSharedNodes {
+		if uint64(len(nodes)) == maxSharedNodes {
 			break
 		}
 		nodes = append(nodes, node)
@@ -116,7 +111,7 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// At most one node will be contacted every 10 minutes. This minimizes
 		// the total amount of keepalive traffic on the network.
 		select {
-		case <-time.After(10 * time.Minute):
+		case <-time.After(nodePurgeDelay):
 		case <-g.threads.StopChan():
 			// The gateway is shutting down, close out the thread.
 			return
@@ -182,9 +177,9 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 }
 
 // permanentNodeManager tries to keep the Gateway's node list healthy. As long
-// as the Gateway has fewer than minNodeListSize nodes, it asks a random peer
-// for more nodes. It also continually pings nodes in order to establish their
-// connectivity. Unresponsive nodes are aggressively removed.
+// as the Gateway has fewer than healthyNodeListLen nodes, it asks a random
+// peer for more nodes. It also continually pings nodes in order to establish
+// their connectivity. Unresponsive nodes are aggressively removed.
 func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 	defer close(closeChan)
 
@@ -212,7 +207,7 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 		// Determine whether there are a satisfactory number of nodes in the
 		// nodelist. If there are not, use the random peer from earlier to
 		// expand the node list.
-		if numNodes < minNodeListLen {
+		if numNodes < healthyNodeListLen {
 			// TODO: should this be done in a go func? It's a blocking
 			// function.
 			err := g.managedRPC(peer, "ShareNodes", g.requestNodes)
@@ -224,7 +219,7 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 			// There are enough peers in the gateway, no need to check for more
 			// every 5 seconds. Wait a while before checking again.
 			select {
-			case <-time.After(5 * time.Minute):
+			case <-time.After(wellConnectedDelay):
 			case <-g.threads.StopChan():
 				// Gateway is shutting down, close the thread.
 				return

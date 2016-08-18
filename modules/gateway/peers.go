@@ -13,57 +13,7 @@ import (
 	"github.com/NebulousLabs/muxado"
 )
 
-const (
-	// fullyConnectedThreshold defines the number of peers that the gateway can
-	// have before it stops accepting inbound connections.
-	fullyConnectedThreshold = 128
-
-	// pruneNodeListLen defines the number of nodes that the gateway must have
-	// to be pruning nodes from the node list.
-	pruneNodeListLen = 50
-
-	// minNodeListLen defines the number of nodes that the gateway must have in
-	// the node list before it will stop asking peers for more nodes.
-	minNodeListLen = 200
-
-	// minAcceptableVersion is the version below which the gateway will refuse to
-	// connect to peers and reject connection attempts.
-	//
-	// Reject peers < v0.4.0 as the previous version is v0.3.3 which is
-	// pre-hardfork.
-	minAcceptableVersion = "0.4.0"
-)
-
-var (
-	// The gateway will sleep this long between incoming connections.
-	acceptInterval = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 3 * time.Second
-		case "standard":
-			return 3 * time.Second
-		case "testing":
-			return 10 * time.Millisecond
-		default:
-			panic("unrecognized build.Release")
-		}
-	}()
-	// the gateway will abort a connection attempt after this long
-	dialTimeout = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 2 * time.Minute
-		case "standard":
-			return 2 * time.Minute
-		case "testing":
-			return 2 * time.Second
-		default:
-			panic("unrecognized build.Release")
-		}
-	}()
-
-	errPeerRejectedConn = errors.New("peer rejected connection")
-)
+var errPeerRejectedConn = errors.New("peer rejected connection")
 
 // insufficientVersionError indicates a peer's version is insufficient.
 type insufficientVersionError string
@@ -586,7 +536,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		g.mu.RUnlock()
 		// If the gateway is well connected, sleep for 5 minutes and then check
 		// again.
-		if numOutboundPeers >= modules.WellConnectedThreshold {
+		if numOutboundPeers >= wellConnectedThreshold {
 			select {
 			case <-time.After(5 * time.Minute):
 			case <-g.threads.StopChan():
@@ -604,7 +554,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// trying again.
 		if err != nil {
 			select {
-			case <-time.After(time.Second * 20):
+			case <-time.After(noPeersDelay):
 			case <-g.threads.StopChan():
 				// Interrupt the thread if the shutdown signal is issued.
 				return

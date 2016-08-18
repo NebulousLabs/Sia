@@ -189,7 +189,7 @@ func TestShareNodes(t *testing.T) {
 	}
 
 	// sharing should be capped at maxSharedNodes
-	for i := 1; i < maxSharedNodes+11; i++ {
+	for i := 1; i < int(maxSharedNodes)+11; i++ {
 		g2.mu.Lock()
 		err := g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
 		g2.mu.Unlock()
@@ -203,7 +203,7 @@ func TestShareNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(nodes) != maxSharedNodes {
+	if uint64(len(nodes)) != maxSharedNodes {
 		t.Fatalf("gateway gave wrong number of nodes: expected %v, got %v", maxSharedNodes, len(nodes))
 	}
 }

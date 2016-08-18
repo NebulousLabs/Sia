@@ -675,10 +675,13 @@ func TestDisconnect(t *testing.T) {
 	}
 }
 
+// TestPeerManager checks that the peer manager is properly spacing out peer
+// connection requests.
 func TestPeerManager(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	g1 := newTestingGateway("TestPeerManager1", t)
 	defer g1.Close()
@@ -694,7 +697,7 @@ func TestPeerManager(t *testing.T) {
 	g1.mu.Unlock()
 
 	// when peerManager wakes up, it should connect to g2.
-	time.Sleep(21 * time.Second)
+	time.Sleep(time.Second + noPeersDelay)
 
 	g1.mu.RLock()
 	defer g1.mu.RUnlock()
