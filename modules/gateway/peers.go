@@ -177,22 +177,6 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	}
 	defer g.threads.Done()
 
-	// Establish code that will terminate the connection early in the event of
-	// gateway shutdown.
-	connectionSuccessChan := make(chan struct{})
-	go func() {
-		select {
-		case <-connectionSuccessChan:
-			// After the connection is successful, alternate code is in place
-			// to close the connection. Do nothing.
-		case <-g.threads.StopChan():
-			// The gateway is shutting down, but the connection has not
-			// finished forming. Interrupt the connection formation so the
-			// gateway can shut down quickly.
-			conn.Close()
-		}
-	}()
-
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Debugf("INFO: %v wants to connect", addr)
 
