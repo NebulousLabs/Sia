@@ -177,6 +177,22 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 	}
 	defer g.threads.Done()
 
+	// Establish code that will terminate the connection early in the event of
+	// gateway shutdown.
+	connectionSuccessChan := make(chan struct{})
+	go func() {
+		select {
+		case <-connectionSuccessChan:
+			// After the connection is successful, alternate code is in place
+			// to close the connection. Do nothing.
+		case <-g.threads.StopChan():
+			// The gateway is shutting down, but the connection has not
+			// finished forming. Interrupt the connection formation so the
+			// gateway can shut down quickly.
+			conn.Close()
+		}
+	}()
+
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Debugf("INFO: %v wants to connect", addr)
 
@@ -452,6 +468,7 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 // managedConnect establishes a persistent connection to a peer, and adds it to
 // the Gateway's peer list.
 func (g *Gateway) managedConnect(addr modules.NetAddress) error {
+	// Perform verification on the input address.
 	if addr == g.Address() {
 		return errors.New("can't connect to our own address")
 	}
@@ -461,7 +478,6 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address")
 	}
-
 	g.mu.RLock()
 	_, exists := g.peers[addr]
 	g.mu.RUnlock()
@@ -469,26 +485,48 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return errors.New("peer already added")
 	}
 
-	conn, err := net.DialTimeout("tcp", string(addr), dialTimeout)
-	if err != nil {
-		return err
-	}
-	remoteVersion, err := connectVersionHandshake(conn, build.Version)
-	if err != nil {
-		conn.Close()
-		return err
-	}
+	// Dial the peer, providing a means to interrupt the dial if a gateway
+	// shutdown call is made early.
+	err := func() error {
+		cancelDialChan := make(chan struct{})
+		dialDoneChan := make(chan struct{})
+		defer close(dialDoneChan)
+		dialer := &net.Dialer{
+			Timeout: dialTimeout,
+			Cancel:  cancelDialChan,
+		}
+		go func() {
+			select {
+			case <-dialDoneChan:
+			case <-g.threads.StopChan():
+				close(cancelDialChan)
+			}
+		}()
+		conn, err := dialer.Dial("tcp", string(addr))
+		if err != nil {
+			return err
+		}
 
-	if build.VersionCmp(remoteVersion, "1.0.0") < 0 {
-		err = g.managedConnectOldPeer(conn, remoteVersion, addr)
-	} else {
-		err = g.managedConnectNewPeer(conn, remoteVersion, addr)
-	}
+		// Perform peer initialization.
+		remoteVersion, err := connectVersionHandshake(conn, build.Version)
+		if err != nil {
+			conn.Close()
+			return err
+		}
+		if build.VersionCmp(remoteVersion, "1.0.0") < 0 {
+			err = g.managedConnectOldPeer(conn, remoteVersion, addr)
+		} else {
+			err = g.managedConnectNewPeer(conn, remoteVersion, addr)
+		}
+		if err != nil {
+			conn.Close()
+			return err
+		}
+		return nil
+	}()
 	if err != nil {
-		conn.Close()
 		return err
 	}
-
 	g.log.Debugln("INFO: connected to new peer", addr)
 
 	// call initRPCs
