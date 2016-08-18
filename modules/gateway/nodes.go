@@ -218,7 +218,7 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 				continue
 			}
 		} else {
-			// There are enough peers in the gateway, no need to check for more
+			// There are enough nodes in the gateway, no need to check for more
 			// every 5 seconds. Wait a while before checking again.
 			select {
 			case <-time.After(wellConnectedDelay):

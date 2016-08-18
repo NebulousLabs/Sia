@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 
 const dummyNode = "111.111.111.111:1111"
 
+// TestAddNode tries adding a node to the gateway using the unexported addNode
+// function. Edge case trials are also performed.
 func TestAddNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -40,6 +43,7 @@ func TestAddNode(t *testing.T) {
 	}
 }
 
+// TestRemoveNode tries remiving a node from the gateway.
 func TestRemoveNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -60,6 +64,8 @@ func TestRemoveNode(t *testing.T) {
 	}
 }
 
+// TestRandomNode tries pulling random nodes from the gateway using
+// g.randomNode() under a variety of conditions.
 func TestRandomNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -136,6 +142,8 @@ func TestRandomNode(t *testing.T) {
 	}
 }
 
+// TestShareNodes checks that two gateways will share nodes with eachother
+// following the desired sharing strategy.
 func TestShareNodes(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -240,5 +248,99 @@ func TestNodesAreSharedOnConnect(t *testing.T) {
 	defer g3.mu.Unlock()
 	if _, ok := g3.nodes[g2.Address()]; !ok {
 		t.Fatal("node was not relayed:", g3.nodes)
+	}
+}
+
+// TestPruneNodeThreshold checks that gateways will not purge nodes if they are
+// below the purge threshold, even if those nodes are offline.
+func TestPruneNodeThreshold(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// The next part of the test expects the pruneNodeListLen to be at least
+	// 'maxSharedNodes * 2 + 2 in size.
+	if uint64(pruneNodeListLen) < (maxSharedNodes*2)+2 {
+		t.Fatal("Constants do not match test, please either adjust the constants or refactor this test", maxSharedNodes, pruneNodeListLen)
+	}
+
+	// Create and connect pruneNodeListLen gateways.
+	var gs []*Gateway
+	for i := 0; i < pruneNodeListLen; i++ {
+		gname := "TestPruneNodeThreshold" + strconv.Itoa(i)
+		gs = append(gs, newTestingGateway(gname, t))
+
+		// Connect this gateway to the previous gateway.
+		if i != 0 {
+			err := gs[i].Connect(gs[i-1].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Spin until all gateways have a nearly full node list.
+	success := false
+	for i := 0; i < 80; i++ {
+		success = true
+		for _, g := range gs {
+			g.mu.RLock()
+			gNodeLen := len(g.nodes)
+			g.mu.RUnlock()
+			if gNodeLen < pruneNodeListLen-2 {
+				success = false
+				break
+			}
+		}
+		if !success {
+			time.Sleep(time.Second * 1)
+		}
+	}
+	if !success {
+		t.Fatal("peers are not sharing nodes with eachother")
+	}
+
+	// Gateway node lists have been filled out. Take a bunch of gateways
+	// offline and verify that they do not start pruning eachother.
+	var wg sync.WaitGroup
+	for i := 2; i < len(gs); i++ {
+		wg.Add(1)
+		go func(i int) {
+			err := gs[i].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// Wait for 5 iterations of the node purge loop. Then verify that the
+	// remaining gateways have not been purging nodes.
+	time.Sleep(nodePurgeDelay * 5)
+
+	// Check that the remaining gateways have not purged any nodes.
+	gs[0].mu.RLock()
+	gs0Nodes := len(gs[0].nodes)
+	gs[0].mu.RUnlock()
+	gs[1].mu.RLock()
+	gs1Nodes := len(gs[1].nodes)
+	gs[1].mu.RUnlock()
+	if gs0Nodes < pruneNodeListLen-2 {
+		t.Error("gateway seems to be pruning nodes below purge threshold")
+	}
+	if gs1Nodes < pruneNodeListLen-2 {
+		t.Error("gateway seems to be pruning nodes below purge threshold")
+	}
+
+	// Close the remaining gateways.
+	err := gs[0].Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gs[1].Close()
+	if err != nil {
+		t.Error(err)
 	}
 }

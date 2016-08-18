@@ -40,7 +40,7 @@ var (
 		case "standard":
 			return 10 * time.Minute
 		case "testing":
-			return 2 * time.Second
+			return 1 * time.Second
 		default:
 			panic("unrecognized build.Release in nodePurgeDelay")
 		}
@@ -135,7 +135,7 @@ var (
 		case "standard":
 			return 5 * time.Minute
 		case "testing":
-			return 5 * time.Second
+			return 2 * time.Second
 		default:
 			panic("unrecognized build.Release in wellConnectedDelay")
 		}

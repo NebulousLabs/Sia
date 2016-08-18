@@ -483,41 +483,6 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	return nil
 }
 
-// Connect establishes a persistent connection to a peer, and adds it to the
-// Gateway's peer list.
-func (g *Gateway) Connect(addr modules.NetAddress) error {
-	if err := g.threads.Add(); err != nil {
-		return err
-	}
-	defer g.threads.Done()
-	return g.managedConnect(addr)
-}
-
-// Disconnect terminates a connection to a peer and removes it from the
-// Gateway's peer list. The peer's address remains in the node list.
-func (g *Gateway) Disconnect(addr modules.NetAddress) error {
-	if err := g.threads.Add(); err != nil {
-		return err
-	}
-	defer g.threads.Done()
-
-	g.mu.RLock()
-	p, exists := g.peers[addr]
-	g.mu.RUnlock()
-	if !exists {
-		return errors.New("not connected to that node")
-	}
-	g.mu.Lock()
-	delete(g.peers, addr)
-	g.mu.Unlock()
-	if err := p.sess.Close(); err != nil {
-		return err
-	}
-
-	g.log.Println("INFO: disconnected from peer", addr)
-	return nil
-}
-
 // permanentPeerManager tries to keep the Gateway well-connected. As long as
 // the Gateway is not well-connected, it tries to connect to random nodes.
 func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
@@ -585,6 +550,41 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			return
 		}
 	}
+}
+
+// Connect establishes a persistent connection to a peer, and adds it to the
+// Gateway's peer list.
+func (g *Gateway) Connect(addr modules.NetAddress) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+	return g.managedConnect(addr)
+}
+
+// Disconnect terminates a connection to a peer and removes it from the
+// Gateway's peer list. The peer's address remains in the node list.
+func (g *Gateway) Disconnect(addr modules.NetAddress) error {
+	if err := g.threads.Add(); err != nil {
+		return err
+	}
+	defer g.threads.Done()
+
+	g.mu.RLock()
+	p, exists := g.peers[addr]
+	g.mu.RUnlock()
+	if !exists {
+		return errors.New("not connected to that node")
+	}
+	g.mu.Lock()
+	delete(g.peers, addr)
+	g.mu.Unlock()
+	if err := p.sess.Close(); err != nil {
+		return err
+	}
+
+	g.log.Println("INFO: disconnected from peer", addr)
+	return nil
 }
 
 // Peers returns the addresses currently connected to the Gateway.
