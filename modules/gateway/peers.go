@@ -534,11 +534,11 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			}
 		}
 		g.mu.RUnlock()
-		// If the gateway is well connected, sleep for 5 minutes and then check
+		// If the gateway is well connected, sleep for a while and then try
 		// again.
 		if numOutboundPeers >= wellConnectedThreshold {
 			select {
-			case <-time.After(5 * time.Minute):
+			case <-time.After(wellConnectedDelay):
 			case <-g.threads.StopChan():
 				// Interrupt the thread if the shutdown signal is issued.
 				return
@@ -579,7 +579,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// non-blocking, so they should be spaced out to avoid spinning up an
 		// uncontrolled number of threads and therefore peer connections.
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(acquiringPeersDelay):
 		case <-g.threads.StopChan():
 			// Interrupt the thread if the shutdown signal is issued.
 			return

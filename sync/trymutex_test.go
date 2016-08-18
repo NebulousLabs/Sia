@@ -27,6 +27,10 @@ func TestTryMutexBasicMutex(t *testing.T) {
 // TestTryMutexConcurrentLocking checks that doing lots of concurrent locks is
 // handled as expected.
 func TestTryMutexConcurrentLocking(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Try executing multiple additions concurrently.
 	var tm TryMutex
 	var data int
@@ -73,6 +77,10 @@ func TestTryMutexBasicTryLock(t *testing.T) {
 // TestTryMutexConcurrentTries attempts to grab locks from many threads, giving
 // the race detector a chance to detect any issues.
 func TestTryMutexConncurrentTries(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Try executing multiple additions concurrently.
 	var tm TryMutex
 	var data int
@@ -97,6 +105,10 @@ func TestTryMutexConncurrentTries(t *testing.T) {
 // TestTryMutexTimed checks that a timed lock will correctly time out if it
 // cannot grab a lock.
 func TestTryMutexTimed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	var tm TryMutex
 	tm.Lock()
 
@@ -122,6 +134,10 @@ func TestTryMutexTimed(t *testing.T) {
 // TestTryMutexTimedConcurrent checks that a timed lock will correctly time out
 // if it cannot grab a lock.
 func TestTryMutexTimedConcurrent(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	var tm TryMutex
 
 	// Engage a lock and launch a gothread to wait for a lock, fail, and then

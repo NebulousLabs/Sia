@@ -193,6 +193,9 @@ func TestThreadGroupStop(t *testing.T) {
 
 // TestThreadGroupConcurrentAdd tests that Add can be called concurrently with Stop.
 func TestThreadGroupConcurrentAdd(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	var tg ThreadGroup
 	for i := 0; i < 10; i++ {
 		go func() {
@@ -251,6 +254,9 @@ func TestThreadGroupOnce(t *testing.T) {
 // TestThreadGroupOnStop tests that Stop calls functions registered with
 // OnStop.
 func TestThreadGroupOnStop(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)

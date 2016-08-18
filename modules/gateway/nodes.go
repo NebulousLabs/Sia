@@ -142,10 +142,6 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 			cancelDialChan := make(chan struct{})
 			dialDoneChan := make(chan struct{})
 			defer close(dialDoneChan)
-			dialer := &net.Dialer{
-				Timeout: dialTimeout,
-				Cancel:  cancelDialChan,
-			}
 			go func() {
 				select {
 				case <-dialDoneChan:
@@ -153,6 +149,10 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 					close(cancelDialChan)
 				}
 			}()
+			dialer := &net.Dialer{
+				Timeout: dialTimeout,
+				Cancel:  cancelDialChan,
+			}
 			conn, err = dialer.Dial("tcp", string(node))
 			if err != nil {
 				// NOTE: an error may be returned if the dial is cancelled
@@ -164,15 +164,17 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 				g.save()
 				g.mu.Unlock()
 				g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
+				return
 			}
+
+			// If connection succeeds, supply an unacceptable version so that we
+			// will not be added as a peer.
+			//
+			// NOTE: this is a somewhat clunky way of specifying that you didn't
+			// actually want a connection.
+			encoding.WriteObject(conn, "0.0.0")
+			conn.Close()
 		}()
-		// If connection succeeds, supply an unacceptable version so that we
-		// will not be added as a peer.
-		//
-		// NOTE: this is a somewhat clunky way of specifying that you didn't
-		// actually want a connection.
-		encoding.WriteObject(conn, "0.0.0")
-		conn.Close()
 	}
 }
 

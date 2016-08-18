@@ -67,6 +67,22 @@ var (
 )
 
 var (
+	// acquiringPeersDelay defines the amount of time that is waited between
+	// iterations of the peer acquisition loop if the gateway is actively
+	// forming new connections with peers.
+	acquiringPeersDelay = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 3 * time.Minute
+		case "standard":
+			return 5 * time.Second
+		case "testing":
+			return 1 * time.Second
+		default:
+			panic("unrecognized build.Release in wellConnectedDelay")
+		}
+	}()
+
 	// fullyConnectedThreshold defines the number of peers that the gateway can
 	// have before it stops accepting inbound connections.
 	fullyConnectedThreshold = func() int {
@@ -83,7 +99,8 @@ var (
 	}()
 
 	// noPeersDelay defines the amount of time that is waited between
-	// iterations of the peer formation loop if the gateway is well connected.
+	// iterations of the peer acquisition loop if the gateway does not have
+	// enough nodes.
 	noPeersDelay = func() time.Duration {
 		switch build.Release {
 		case "dev":
@@ -98,7 +115,8 @@ var (
 	}()
 
 	// wellConnectedDelay defines the amount of time that is waited between
-	// iterations of the peer formation loop if the gateway is well connected.
+	// iterations of the peer acquisition loop if the gateway is well
+	// connected.
 	wellConnectedDelay = func() time.Duration {
 		switch build.Release {
 		case "dev":
