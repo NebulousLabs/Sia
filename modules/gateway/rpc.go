@@ -225,7 +225,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}, peers []modules.Peer) 
 				case <-g.threads.StopChan():
 					return
 				}
-				err := g.RPC(addr, name, fn)
+				err := g.managedRPC(addr, name, fn)
 				if err != nil {
 					g.log.Debugf("WARN: broadcasting RPC %q to peer %q failed twice: %v", name, addr, err)
 				}
