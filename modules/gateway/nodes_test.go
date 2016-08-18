@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -278,11 +279,31 @@ func TestPruneNodeThreshold(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		// To help speed the test up, also connect this gateway to the peer two
+		// back.
+		if i > 1 {
+			err := gs[i].Connect(gs[i-2].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// To help speed the test up, also connect this gateway to a random
+		// previous peer.
+		if i > 2 {
+			choice, err := crypto.RandIntn(i - 2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = gs[i].Connect(gs[choice].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 
 	// Spin until all gateways have a nearly full node list.
 	success := false
-	for i := 0; i < 80; i++ {
+	for i := 0; i < 50; i++ {
 		success = true
 		for _, g := range gs {
 			g.mu.RLock()
@@ -332,6 +353,122 @@ func TestPruneNodeThreshold(t *testing.T) {
 	}
 	if gs1Nodes < pruneNodeListLen-2 {
 		t.Error("gateway seems to be pruning nodes below purge threshold")
+	}
+
+	// Close the remaining gateways.
+	err := gs[0].Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gs[1].Close()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// TestHealthyNodeListPruning checks that gateways will purge nodes if they are at
+// a healthy node threshold and the nodes are offline.
+func TestHealthyNodeListPruning(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create and connect healthyNodeListLen*2 gateways.
+	var gs []*Gateway
+	for i := 0; i < healthyNodeListLen*2; i++ {
+		gname := "TestHealthyNodeListPruning" + strconv.Itoa(i)
+		gs = append(gs, newTestingGateway(gname, t))
+
+		// Connect this gateway to the previous gateway.
+		if i != 0 {
+			err := gs[i].Connect(gs[i-1].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// To help speed the test up, also connect this gateway to the peer two
+		// back.
+		if i > 1 {
+			err := gs[i].Connect(gs[i-2].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// To help speed the test up, also connect this gateway to a random
+		// previous peer.
+		if i > 2 {
+			choice, err := crypto.RandIntn(i - 2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = gs[i].Connect(gs[choice].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Spin until all gateways have a nearly full node list.
+	success := false
+	for i := 0; i < 80; i++ {
+		success = true
+		for _, g := range gs {
+			g.mu.RLock()
+			gNodeLen := len(g.nodes)
+			g.mu.RUnlock()
+			if gNodeLen < healthyNodeListLen {
+				success = false
+				break
+			}
+		}
+		if !success {
+			time.Sleep(time.Second * 1)
+		}
+	}
+	if !success {
+		t.Fatal("peers are not sharing nodes with eachother")
+	}
+
+	// Gateway node lists have been filled out. Take a bunch of gateways
+	// offline and verify that the remaining gateways begin pruning their
+	// nodelist.
+	var wg sync.WaitGroup
+	for i := 2; i < len(gs); i++ {
+		wg.Add(1)
+		go func(i int) {
+			err := gs[i].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// Wait for enough iterations of the node purge loop that over-pruning is
+	// possible. (Over-pruning does not need to be guaranteed, causing this
+	// test to fail once in a while is sufficient.)
+	time.Sleep(nodePurgeDelay * time.Duration(healthyNodeListLen-pruneNodeListLen) * 2)
+
+	// Check that the remaining gateways have pruned nodes.
+	gs[0].mu.RLock()
+	gs0Nodes := len(gs[0].nodes)
+	gs[0].mu.RUnlock()
+	gs[1].mu.RLock()
+	gs1Nodes := len(gs[1].nodes)
+	gs[1].mu.RUnlock()
+	if gs0Nodes >= healthyNodeListLen-1 {
+		t.Error("gateway is not pruning nodes")
+	}
+	if gs1Nodes >= healthyNodeListLen-1 {
+		t.Error("gateway is not pruning nodes")
+	}
+	if gs0Nodes < pruneNodeListLen {
+		t.Error("gateway is pruning too many nodes", gs0Nodes, pruneNodeListLen)
+	}
+	if gs1Nodes < pruneNodeListLen {
+		t.Error("gateway is pruning too many nodes", gs1Nodes, pruneNodeListLen)
 	}
 
 	// Close the remaining gateways.

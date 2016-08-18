@@ -16,6 +16,21 @@ const (
 )
 
 var (
+	// healthyNodeListLen defines the number of nodes that the gateway must
+	// have in the node list before it will stop asking peers for more nodes.
+	healthyNodeListLen = func() int {
+		switch build.Release {
+		case "dev":
+			return 30
+		case "standard":
+			return 200
+		case "testing":
+			return 15
+		default:
+			panic("unrecognized build.Release in healthyNodeListLen")
+		}
+	}()
+
 	// maxSharedNodes defines the number of nodes that will be shared between
 	// peers when they are expanding their node lists.
 	maxSharedNodes = func() uint64 {
@@ -40,24 +55,24 @@ var (
 		case "standard":
 			return 10 * time.Minute
 		case "testing":
-			return 1 * time.Second
+			return 500 * time.Millisecond
 		default:
 			panic("unrecognized build.Release in nodePurgeDelay")
 		}
 	}()
 
-	// healthyNodeListLen defines the number of nodes that the gateway must
-	// have in the node list before it will stop asking peers for more nodes.
-	healthyNodeListLen = func() int {
+	// nodeListDelay defines the amount of time that is waited between each
+	// iteration of the node list loop.
+	nodeListDelay = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 30
+			return 3 * time.Second
 		case "standard":
-			return 200
+			return 5 * time.Second
 		case "testing":
-			return 15
+			return 500 * time.Millisecond
 		default:
-			panic("unrecognized build.Release in healthyNodeListLen")
+			panic("unrecognized build.Release in nodePurgeDelay")
 		}
 	}()
 
@@ -88,7 +103,7 @@ var (
 		case "standard":
 			return 5 * time.Second
 		case "testing":
-			return 1 * time.Second
+			return 500 * time.Millisecond
 		default:
 			panic("unrecognized build.Release in wellConnectedDelay")
 		}
@@ -135,7 +150,7 @@ var (
 		case "standard":
 			return 5 * time.Minute
 		case "testing":
-			return 2 * time.Second
+			return 3 * time.Second
 		default:
 			panic("unrecognized build.Release in wellConnectedDelay")
 		}

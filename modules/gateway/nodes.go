@@ -127,7 +127,7 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 			// node list. Wait until the next iteration to try again.
 			continue
 		}
-		if numNodes < pruneNodeListLen {
+		if numNodes <= pruneNodeListLen {
 			// There are not enough nodes in the gateway - pruning more is
 			// probably a bad idea, and may affect the user's ability to
 			// connect to the network in the future.
@@ -186,10 +186,10 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 	defer close(closeChan)
 
 	for {
-		// Wait 5 seconds so that a controlled number of peer requests are made
-		// to nodes in the node list.
+		// Wait 5 seconds so that a controlled number of node requests are made
+		// to peers.
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(nodeListDelay):
 		case <-g.threads.StopChan():
 			// Gateway is shutting down, close the thread.
 			return
