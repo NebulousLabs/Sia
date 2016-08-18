@@ -142,28 +142,35 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// Try connecting to the random node. If the node is not reachable,
 		// remove them from the node list. Make sure that the dial is stopped
 		// early if the gateway is shutting down.
-		cancelDialChan := make(chan struct{})
-		dialDoneChan := make(chan struct{})
-		defer close(dialDoneChan)
-		dialer := &net.Dialer{
-			Timeout: dialTimeout,
-			Cancel:  cancelDialChan,
-		}
-		go func() {
-			select {
-			case <-cancelDialChan:
-			case <-g.threads.StopChan():
-				close(cancelDialChan)
+		var conn net.Conn
+		func() {
+			cancelDialChan := make(chan struct{})
+			dialDoneChan := make(chan struct{})
+			defer close(dialDoneChan)
+			dialer := &net.Dialer{
+				Timeout: dialTimeout,
+				Cancel:  cancelDialChan,
+			}
+			go func() {
+				select {
+				case <-dialDoneChan:
+				case <-g.threads.StopChan():
+					close(cancelDialChan)
+				}
+			}()
+			conn, err = dialer.Dial("tcp", string(node))
+			if err != nil {
+				// NOTE: an error may be returned if the dial is cancelled
+				// partway through, which would cause the node to be pruned
+				// even though it may be a good node. Because nodes are
+				// plentiful, that's not a huge problem.
+				g.mu.Lock()
+				g.removeNode(node)
+				g.save()
+				g.mu.Unlock()
+				g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
 			}
 		}()
-		conn, err := dialer.Dial("tcp", string(node))
-		if err != nil {
-			g.mu.Lock()
-			g.removeNode(node)
-			g.save()
-			g.mu.Unlock()
-			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
-		}
 		// If connection succeeds, supply an unacceptable version so that we
 		// will not be added as a peer.
 		//
