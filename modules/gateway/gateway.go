@@ -31,11 +31,24 @@ type Gateway struct {
 	handlers map[rpcID]modules.RPCFunc
 	initRPCs map[string]modules.RPCFunc
 
+	// nodes is the set of all known nodes (i.e. potential peers).
+	//
 	// peers are the nodes that the gateway is currently connected to.
 	//
-	// nodes is the set of all known nodes (i.e. potential peers).
-	peers map[modules.NetAddress]*peer
-	nodes map[modules.NetAddress]struct{}
+	// peerTG is a special thread group for tracking peer connections, and will
+	// block shutdown until all peer connections have been closed out. The peer
+	// connections are put in a separate TG because of their unique
+	// requirements - they have the potential to live for the lifetime of the
+	// program, but also the potential to close early. Calling threads.OnStop
+	// for each peer could create a huge backlog of functions that do nothing
+	// (because most of the peers disconnected prior to shutdown). And they
+	// can't call threads.Add because they are potentially very long running
+	// and would block any threads.Flush() calls. So a second threadgroup is
+	// added which handles clean-shutdown for the peers, without blocking
+	// threads.Flush() calls.
+	nodes  map[modules.NetAddress]struct{}
+	peers  map[modules.NetAddress]*peer
+	peerTG siasync.ThreadGroup
 
 	// Utilities.
 	log        *persist.Logger
@@ -90,6 +103,15 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 			// The logger may or may not be working here, so use a println
 			// instead.
 			fmt.Println("Failed to close the gateway logger:", err)
+		}
+	})
+
+	// Establish that the peerTG must complete shutdown before the primary
+	// thread group completes shutdown.
+	g.threads.OnStop(func() {
+		err = g.peerTG.Stop()
+		if err != nil {
+			g.log.Println("ERROR: peerTG experienced errors while shutting down:", err)
 		}
 	})
 

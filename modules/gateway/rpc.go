@@ -117,21 +117,34 @@ func (g *Gateway) UnregisterConnectCall(name string) {
 // threadedListenPeer listens for new streams on a peer connection and serves them via
 // threadedHandleConn.
 func (g *Gateway) threadedListenPeer(p *peer) {
-	// Disconnect from the peer on gateway.Close or when the peer disconnects,
-	// whichever comes first.
-	peerCloseChan := make(chan struct{})
-	defer close(peerCloseChan)
-	// We register the goroutine with the ThreadGroup as it acquires a lock, which
-	// may take some time.
-	if g.threads.Add() != nil {
+	// threadedListenPeer registers to the peerTG instead of the primary thread
+	// group because peer connections can be lifetime in length, but can also
+	// be short-lived. The fact that they can be lifetime means that they can't
+	// call threads.Add as they will block calls to threads.Flush. The fact
+	// that they can be short-lived means that threads.OnStop is not a good
+	// tool for closing out the threads. Instead, they register to peerTG,
+	// which is cleanly closed upon gateway shutdown but will not block any
+	// calls to threads.Flush()
+	if g.peerTG.Add() != nil {
 		return
 	}
+	defer g.peerTG.Done()
+
+	// Spin up a goroutine to listen for a shutdown signal from both the peer
+	// and from the gateway. In the event of either, close the muxado session.
+	connClosedChan := make(chan struct{})
+	peerCloseChan := make(chan struct{})
 	go func() {
-		defer g.threads.Done()
+		// Signal that the muxado session has been successfully closed, and
+		// that this goroutine has terminated.
+		defer close(connClosedChan)
+
+		// Listen for a stop signal.
 		select {
 		case <-g.threads.StopChan():
 		case <-peerCloseChan:
 		}
+
 		// Can't call Disconnect because it could return sync.ErrStopped.
 		g.mu.Lock()
 		delete(g.peers, p.NetAddress)
@@ -141,28 +154,27 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 		}
 	}()
 
-	if g.threads.Add() != nil {
-		return
-	}
-	defer g.threads.Done()
-
 	for {
 		conn, err := p.accept()
 		if err != nil {
-			g.log.Println("WARN: lost connection to peer", p.NetAddress)
-			return
+			g.log.Debugln("Peer connection closed:", p.NetAddress)
+			break
 		}
 
 		// it is the handler's responsibility to close the connection
 		go g.threadedHandleConn(conn)
 	}
+	// Signal that the goroutine can shutdown.
+	close(peerCloseChan)
+	// Wait for confirmation that the goroutine has shut down before returning
+	// and releasing the threadgroup registration.
+	<-connClosedChan
 }
 
 // threadedHandleConn reads header data from a connection, then routes it to the
 // appropriate handler for further processing.
 func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer conn.Close()
-
 	if g.threads.Add() != nil {
 		return
 	}
