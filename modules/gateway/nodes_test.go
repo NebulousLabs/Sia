@@ -279,26 +279,6 @@ func TestPruneNodeThreshold(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		// To help speed the test up, also connect this gateway to the peer two
-		// back.
-		if i > 1 {
-			err := gs[i].Connect(gs[i-2].myAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		// To help speed the test up, also connect this gateway to a random
-		// previous peer.
-		if i > 2 {
-			choice, err := crypto.RandIntn(i - 2)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = gs[i].Connect(gs[choice].myAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
 	}
 
 	// Spin until all gateways have a nearly full node list.
@@ -449,7 +429,7 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	// Wait for enough iterations of the node purge loop that over-pruning is
 	// possible. (Over-pruning does not need to be guaranteed, causing this
 	// test to fail once in a while is sufficient.)
-	time.Sleep(nodePurgeDelay * time.Duration(healthyNodeListLen-pruneNodeListLen) * 2)
+	time.Sleep(nodePurgeDelay * time.Duration(healthyNodeListLen-pruneNodeListLen) * 4)
 
 	// Check that the remaining gateways have pruned nodes.
 	gs[0].mu.RLock()
@@ -458,11 +438,11 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	gs[1].mu.RLock()
 	gs1Nodes := len(gs[1].nodes)
 	gs[1].mu.RUnlock()
-	if gs0Nodes >= healthyNodeListLen-1 {
-		t.Error("gateway is not pruning nodes")
+	if gs0Nodes >= healthyNodeListLen-2 {
+		t.Error("gateway is not pruning nodes", healthyNodeListLen, gs0Nodes)
 	}
-	if gs1Nodes >= healthyNodeListLen-1 {
-		t.Error("gateway is not pruning nodes")
+	if gs1Nodes >= healthyNodeListLen-2 {
+		t.Error("gateway is not pruning nodes", healthyNodeListLen, gs1Nodes)
 	}
 	if gs0Nodes < pruneNodeListLen {
 		t.Error("gateway is pruning too many nodes", gs0Nodes, pruneNodeListLen)
