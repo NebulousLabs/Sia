@@ -53,7 +53,9 @@ returns the current settings along with metrics on the renter's spending.
       // Duration of contracts formed, in number of blocks.
       "period": 6048, // blocks
 
-      // TODO: write a description for this field.
+      // If the current blockheight + the renew window >= the height the
+      // contract is scheduled to end, the contract is renewed automatically.
+      // Is always nonzero.
       "renewwindow": 3024 // blocks
     }
   },
@@ -87,10 +89,10 @@ modify settings that control the renter's behavior.
 ###### Query String Parameters
 ```
 // Number of hastings allocated for file contracts in the given period.
-funds // (optional) hastings
+funds // hastings
 
-// Duration of contracts formed.
-period // (optional) block height
+// Duration of contracts formed. Must be nonzero.
+period // block height
 ```
 
 ###### Response
@@ -117,11 +119,12 @@ returns all contracts that have been formed by the renter.
       // Address of the host the file contract was formed with.
       "netaddress": "12.34.56.78:9",
 
-      // TODO: ??? remaining funds? initial funds?
+      // Remaining funds left for the renter to spend on uploads & downloads.
       "renterfunds": "1234", // hastings
 
-      // Size of the file contract. TODO: elaborate.
-      "size": 1024 // bytes TODO: is this the right unit?
+      // Size of the file contract, which is typically equal to the number of
+      // bytes that have been uploaded to the host.
+      "size": 8192 // bytes
     }
   ]
 }
@@ -149,7 +152,7 @@ lists all files in the download queue.
       "received": 4096, // bytes
 
       // Time at which the download was initiated.
-      "starttime": "2009-11-10T23:00:00Z" // RFC 3339 time TODO: why is this not a types.Timestamp?
+      "starttime": "2009-11-10T23:00:00Z" // RFC 3339 time
     }   
   ]
 }
@@ -215,8 +218,8 @@ standard success or error response. See
 
 #### /renter/download/___*siapath___ [GET]
 
-// TODO: does this call still block until the file has been downloaded?
-downloads a file to the local filesystem.
+downloads a file to the local filesystem. The call will block until the file
+has been downloaded.
 
 ###### Path Parameters
 ```

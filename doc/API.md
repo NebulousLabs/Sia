@@ -646,9 +646,8 @@ modify settings that control the renter's behavior.
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters)
 ```
-funds  // (optional) hastings
-hosts  // (optional)
-period // (optional) block height
+funds  // hastings
+period // block height
 ```
 
 ###### Response
@@ -669,7 +668,7 @@ returns all contracts that have been formed by the renter.
       "id":          "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       "netaddress":  "12.34.56.78:9",
       "renterfunds": "1234", // hastings
-      "size":        8192    // bytes TODO: is this the right unit?
+      "size":        8192    // bytes
     }
   ]
 }
@@ -685,10 +684,10 @@ lists all files in the download queue.
   "downloads": [
     {
       "siapath":     "foo/bar.txt",
-      "destination": "/home/users/alice",
+      "destination": "/home/users/alice/bar.txt",
       "filesize":    8192,                  // bytes
       "received":    4096,                  // bytes
-      "starttime":   "2009-11-10T23:00:00Z" // RFC 3339 time TODO: why is this not a types.Timestamp?
+      "starttime":   "2009-11-10T23:00:00Z" // RFC 3339 time
     }
   ]
 }
@@ -731,8 +730,8 @@ standard success or error response. See
 
 #### /renter/download/___*siapath___ [GET]
 
-// TODO: does this call still block until the file has been downloaded?
-downloads a file to the local filesystem.
+downloads a file to the local filesystem. The call will block until the file
+has been downloaded.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
 ```
