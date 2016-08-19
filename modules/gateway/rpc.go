@@ -11,7 +11,7 @@ import (
 )
 
 // rpcID is an 8-byte signature that is added to all RPCs to tell the gatway
-// what to do with the RPC.
+// what to do with the RPC. Empty elements of rpcID will be encoded as spaces.
 type rpcID [8]byte
 
 // String returns a string representation of an rpcID.

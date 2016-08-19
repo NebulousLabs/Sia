@@ -163,10 +163,10 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if build.Release == "testing" {
-		// TODO: This needs a docstring.
-		g.myAddr = modules.NetAddress(g.listener.Addr().String())
-	}
+	// Set myAddr equal to the address returned by the listener. It will be
+	// overwritten by threadedLearnHostname later on.
+	g.myAddr = modules.NetAddress(g.listener.Addr().String())
+
 	// Spawn the peer connection listener.
 	go g.permanentListen(permanentListenClosedChan)
 

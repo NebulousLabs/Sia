@@ -40,6 +40,7 @@ func (g *Gateway) removeNode(addr modules.NetAddress) error {
 }
 
 // randomNode returns a random node from the gateway. An error can be returned
+// if there are no nodes in the node list.
 func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	if len(g.nodes) == 0 {
 		return "", errNoPeers
@@ -60,7 +61,6 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 		}
 		r--
 	}
-
 	return "", errNoPeers
 }
 

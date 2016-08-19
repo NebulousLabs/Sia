@@ -17,7 +17,12 @@ import (
 func newTestingGateway(name string, t *testing.T) *Gateway {
 	g, err := New("localhost:0", build.TempDir("gateway", name))
 	if err != nil {
-		t.Fatal(err)
+		// TODO: the proper thing to do here is to return an error and not even
+		// take a `testing.T` as an arguement. Calling t.Fatal is insufficient
+		// because we aren't sure whether or not this function was called in
+		// the main goroutine of the test, which is required if the test is
+		// going to fail properly.
+		panic(err)
 	}
 	return g
 }
@@ -170,14 +175,14 @@ func TestParallelClose(t *testing.T) {
 	go func() {
 		err := g1.Connect(g2.myAddr)
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		wg.Done()
 	}()
 	go func() {
 		err := g2.Connect(g3.myAddr)
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		wg.Done()
 	}()
@@ -188,21 +193,21 @@ func TestParallelClose(t *testing.T) {
 	go func() {
 		err := g1.Close()
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		wg.Done()
 	}()
 	go func() {
 		err := g2.Close()
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		wg.Done()
 	}()
 	go func() {
 		err := g3.Close()
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		wg.Done()
 	}()

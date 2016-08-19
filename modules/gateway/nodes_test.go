@@ -310,7 +310,7 @@ func TestPruneNodeThreshold(t *testing.T) {
 		go func(i int) {
 			err := gs[i].Close()
 			if err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 			wg.Done()
 		}(i)
@@ -419,7 +419,7 @@ func TestHealthyNodeListPruning(t *testing.T) {
 		go func(i int) {
 			err := gs[i].Close()
 			if err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 			wg.Done()
 		}(i)

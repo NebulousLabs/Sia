@@ -113,7 +113,7 @@ func (g *Gateway) threadedForwardPort(port string) {
 
 	// Establish port-clearing at shutdown.
 	g.threads.AfterStop(func() {
-		g.managedClearPort(g.myAddr.Port())
+		g.managedClearPort(port)
 	})
 }
 
@@ -123,9 +123,6 @@ func (g *Gateway) managedClearPort(port string) {
 		return
 	}
 
-	// TODO: Figure out what's with the commented out code below.
-	//
-	// d, err := upnp.Load("http://192.168.1.1:5000/Public_UPNP_gatedesc.xml")
 	d, err := upnp.Discover()
 	if err != nil {
 		return

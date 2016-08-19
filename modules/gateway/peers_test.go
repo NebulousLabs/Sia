@@ -651,11 +651,8 @@ func TestDisconnect(t *testing.T) {
 	go func() {
 		_, err := l.Accept()
 		if err != nil {
-			t.Fatal("accept failed:", err)
+			panic(err)
 		}
-		// TODO: What's with the commented out line below?
-		//
-		// conn.Close()
 	}()
 	// skip standard connection protocol
 	conn, err := net.Dial("tcp", l.Addr().String())
