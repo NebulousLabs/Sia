@@ -429,7 +429,7 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	// Wait for enough iterations of the node purge loop that over-pruning is
 	// possible. (Over-pruning does not need to be guaranteed, causing this
 	// test to fail once in a while is sufficient.)
-	time.Sleep(nodePurgeDelay * time.Duration(healthyNodeListLen-pruneNodeListLen) * 4)
+	time.Sleep(nodePurgeDelay * time.Duration(healthyNodeListLen-pruneNodeListLen) * 8)
 
 	// Check that the remaining gateways have pruned nodes.
 	gs[0].mu.RLock()
@@ -438,10 +438,10 @@ func TestHealthyNodeListPruning(t *testing.T) {
 	gs[1].mu.RLock()
 	gs1Nodes := len(gs[1].nodes)
 	gs[1].mu.RUnlock()
-	if gs0Nodes >= healthyNodeListLen-2 {
+	if gs0Nodes >= healthyNodeListLen-1 {
 		t.Error("gateway is not pruning nodes", healthyNodeListLen, gs0Nodes)
 	}
-	if gs1Nodes >= healthyNodeListLen-2 {
+	if gs1Nodes >= healthyNodeListLen-1 {
 		t.Error("gateway is not pruning nodes", healthyNodeListLen, gs1Nodes)
 	}
 	if gs0Nodes < pruneNodeListLen {

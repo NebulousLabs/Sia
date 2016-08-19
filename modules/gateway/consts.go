@@ -165,7 +165,7 @@ var (
 		case "standard":
 			return 8
 		case "testing":
-			return 3
+			return 4
 		default:
 			panic("unrecognized build.Release in wellConnectedThreshold")
 		}

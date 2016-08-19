@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/muxado"
 )
@@ -19,10 +21,13 @@ type dummyConn struct {
 // muxado uses these methods when sending its GoAway signal
 func (dc *dummyConn) Write(p []byte) (int, error) { return len(p), nil }
 
+// Close is a no-op to satisfy the Conn interface.
 func (dc *dummyConn) Close() error { return nil }
 
+// SetWriteDeadline is a no-op to satisfy the Conn interface.
 func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
 
+// TestAddPeer tries adding a peer to the gateway.
 func TestAddPeer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -43,6 +48,8 @@ func TestAddPeer(t *testing.T) {
 	}
 }
 
+// TestRandomInbountPeer checks that randomInboundPeer returns the correct
+// peer.
 func TestRandomInboundPeer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -73,6 +80,7 @@ func TestRandomInboundPeer(t *testing.T) {
 	}
 }
 
+// TestListen is a general test probling the connection listener.
 func TestListen(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -186,6 +194,8 @@ func TestListen(t *testing.T) {
 	}
 }
 
+// TestConnect verifies that connecting peers will add peer relationships to
+// the gateway, and that certain edge cases are properly handled.
 func TestConnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -631,6 +641,8 @@ func TestAcceptConnRejectsVersions(t *testing.T) {
 	}
 }
 
+// TestDisconnect checks that calls to gateway.Disconnect correctly disconnect
+// and remove peers from the gateway.
 func TestDisconnect(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -700,5 +712,125 @@ func TestPeerManager(t *testing.T) {
 	defer g1.mu.RUnlock()
 	if len(g1.peers) != 1 || g1.peers[g2.Address()] == nil {
 		t.Fatal("gateway did not connect to g2:", g1.peers)
+	}
+}
+
+// TestOverloadedBootstrap creates a bunch of gateways and connects all of them
+// to the first gateway, the bootstrap gateway. More gateways will be created
+// than is allowed by the bootstrap for the total number of connections. After
+// waiting, all peers should eventually get to the full number of outbound
+// peers.
+func TestOverloadedBootstrap(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create fullyConnectedThreshold*2 peers and connect them all to only the
+	// first node.
+	var gs []*Gateway
+	for i := 0; i < fullyConnectedThreshold*2; i++ {
+		gname := "TestOverloadedBootstrap" + strconv.Itoa(i)
+		gs = append(gs, newTestingGateway(gname, t))
+		// Connect this gateway to the first gateway.
+		if i == 0 {
+			continue
+		}
+		err := gs[i].Connect(gs[0].myAddr)
+		for j := 0; j < 100 && err != nil; j++ {
+			time.Sleep(time.Millisecond * 250)
+			err = gs[i].Connect(gs[0].myAddr)
+		}
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// Spin until all gateways have a complete number of outbound peers.
+	success := false
+	for i := 0; i < 100; i++ {
+		success = true
+		for _, g := range gs {
+			outboundPeers := 0
+			g.mu.RLock()
+			for _, p := range g.peers {
+				if !p.Inbound {
+					outboundPeers++
+				}
+			}
+			g.mu.RUnlock()
+
+			if outboundPeers < wellConnectedThreshold {
+				success = false
+				break
+			}
+		}
+		if !success {
+			time.Sleep(time.Second)
+		}
+	}
+	if !success {
+		t.Fatal("after 100 seconds not all gateways able to become well connected")
+	}
+
+	// Randomly close many of the peers. For many peers, this should put them
+	// below the well connected threshold, but there are still enough nodes on
+	// the network that no partitions should occur.
+	var newGS []*Gateway
+	perm, err := crypto.Perm(len(gs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reorder the gateways.
+	for _, i := range perm {
+		newGS = append(newGS, gs[i])
+	}
+	cutSize := len(newGS) / 4
+	// Close the first many of the now-randomly-sorted gateways.
+	for _, g := range newGS[:cutSize] {
+		err := g.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Set 'gs' equal to the remaining gateways.
+	gs = newGS[cutSize:]
+
+	// Spin until all gateways have a complete number of outbound peers. The
+	// test can fail if there are network partitions, however not a huge
+	// magnitude of nodes are being removed, and they all started with 4
+	// connections. A partition is unlikely.
+	success = false
+	for i := 0; i < 100; i++ {
+		success = true
+		for _, g := range gs {
+			outboundPeers := 0
+			g.mu.RLock()
+			for _, p := range g.peers {
+				if !p.Inbound {
+					outboundPeers++
+				}
+			}
+			g.mu.RUnlock()
+
+			if outboundPeers < wellConnectedThreshold {
+				success = false
+				break
+			}
+		}
+		if !success {
+			time.Sleep(time.Second)
+		}
+	}
+	if !success {
+		t.Fatal("after 100 seconds not all gateways able to become well connected")
+	}
+
+	// Close all remaining gateways.
+	for _, g := range gs {
+		err = g.Close()
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }
