@@ -191,11 +191,11 @@ var (
 	dialTimeout = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 45 * time.Second
+			return 20 * time.Second
 		case "standard":
 			return 2 * time.Minute
 		case "testing":
-			return 2 * time.Second
+			return 500 * time.Millisecond
 		default:
 			panic("unrecognized build.Release in dialTimeout")
 		}

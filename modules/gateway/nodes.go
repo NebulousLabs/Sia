@@ -137,7 +137,6 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// Try connecting to the random node. If the node is not reachable,
 		// remove them from the node list. Make sure that the dial is stopped
 		// early if the gateway is shutting down.
-		var conn net.Conn
 		func() {
 			cancelDialChan := make(chan struct{})
 			dialDoneChan := make(chan struct{})
@@ -153,7 +152,7 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 				Timeout: dialTimeout,
 				Cancel:  cancelDialChan,
 			}
-			conn, err = dialer.Dial("tcp", string(node))
+			conn, err := dialer.Dial("tcp", string(node))
 			if err != nil {
 				// NOTE: an error may be returned if the dial is cancelled
 				// partway through, which would cause the node to be pruned
