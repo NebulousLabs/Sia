@@ -476,3 +476,123 @@ netaddress string // Optional
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
+
+#### /host/storage [GET]
+
+gets a list of folders tracked by the host's storage manager.
+
+###### JSON Response
+```javascript
+{
+  "folders": [
+    {
+      // Absolute path to the storage folder on the local filesystem.
+      "path": "/home/foo/bar",
+
+      // Maximum capacity of the storage folder. The host will not store more
+      // than this many bytes in the folder. This capacity is not checked
+      // against the drive's remaining capacity. Therefore, you must manually
+      // ensure the disk has sufficient capacity for the folder at all times.
+      // Otherwise you risk losing renter's data and failing storage proofs.
+      "capacity": 50000000000, // bytes
+
+      // Unused capacity of the storage folder.
+      "capacityremaining": 100000, // bytes
+
+      // Number of failed disk read & write operations. A large number of
+      // failed reads or writes indicates a problem with the filesystem or
+      // drive's hardware.
+      "failedreads":  0,
+      "failedwrites": 1,
+
+      // Number of successful read & write operations.
+      "successfulreads":  2,
+      "successfulwrites": 3
+    }
+  ]
+}
+```
+
+#### /host/storage/folders/add [POST]
+
+adds a storage folder to the manager. The manager may not check that there is
+enough space available on-disk to support as much storage as requested
+
+###### Query String Parameters
+```
+// Local path on disk to the storage folder to add.
+path // Required
+
+// Initial capacity of the storage folder. This value isn't validated so it is
+// possible to set the capacity of the storage folder greater than the capacity
+// of the disk. Do not do this.
+size // bytes, Required
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /host/storage/folders/remove [POST]
+
+remove a storage folder from the manager. All storage on the folder will be
+moved to other storage folders, meaning that no data will be lost. If the
+manager is unable to save data, an error will be returned and the operation
+will be stopped.
+
+###### Query String Parameters
+```
+// Local path on disk to the storage folder to remove.
+path // Required
+
+// If `force` is true, the storage folder will be removed even if the data in
+// the storage folder cannot be moved to other storage folders, typically
+// because they don't have sufficient capacity. If `force` is true and the data
+// cannot be moved, data will be lost.
+force // bool, Optional, default is false
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /host/storage/folders/resize [POST]
+
+grows or shrink a storage folder in the manager. The manager may not check that
+there is enough space on-disk to support growing the storage folder, but should
+gracefully handle running out of space unexpectedly. When shrinking a storage
+folder, any data in the folder that needs to be moved will be placed into other
+storage folders, meaning that no data will be lost. If the manager is unable to
+migrate the data, an error will be returned and the operation will be stopped.
+
+###### Query String Parameters
+```
+// Local path on disk to the storage folder to resize.
+path // Required
+
+// Desired new size of the storage folder. This will be the new capacity of the
+// storage folder.
+newsize // bytes, Required
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /host/storage/sectors/delete/___*merkleroot___ [POST]
+
+deletes a sector, meaning that the manager will be unable to upload that sector
+and be unable to provide a storage proof on that sector. This endpoint is for
+removing the data entirely, and will remove instances of the sector appearing
+at all heights. The primary purpose is to comply with legal requests to remove
+data.
+
+###### Path Parameters
+```
+// Merkleroot of the sector to delete.
+:merkleroot 
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
