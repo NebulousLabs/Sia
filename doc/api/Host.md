@@ -25,7 +25,6 @@ Index
 | [/host](#host-get)                                                                    | GET       |
 | [/host](#host-post)                                                                   | POST      |
 | [/host/announce](#hostannounce-post)                                                  | POST      |
-| [/host/delete/___:filecontractid___](#hostdeletefilecontractid-post)                  | POST      |
 | [/host/storage](#hoststorage-get)                                                     | GET       |
 | [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
 | [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
