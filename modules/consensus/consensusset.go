@@ -8,7 +8,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -197,25 +196,7 @@ func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exis
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
-	err := cs.tg.Stop()
-	if err != nil {
-		return err
-	}
-
-	// Shouldn't be necessary when `Stop` call is complete, but currently
-	// `Stop` will not pause all ongoing processes, meaning a lock is needed
-	// during the rest of shutdown.
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
-	var errs []error
-	if err := cs.db.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("db.Close failed: %v", err))
-	}
-	if err := cs.log.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
-	}
-	return build.JoinErrors(errs, "; ")
+	return cs.tg.Stop()
 }
 
 // CurrentBlock returns the latest block in the heaviest known blockchain.
