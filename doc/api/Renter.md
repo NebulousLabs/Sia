@@ -101,11 +101,9 @@ standard success or error response. See
 
 #### /renter/contracts [GET]
 
-// TODO: is this description correct?
-returns all contracts that have been formed by the renter.
+returns active contracts. Expired contracts are not included.
 
 ###### JSON Response
-// TODO: are these field descriptions correct?
 ```javascript
 {
   "contracts": [
@@ -158,7 +156,7 @@ lists all files in the download queue.
 }
 ```
 
-#### /renter/files
+#### /renter/files [GET]
 
 lists the status of all files.
 
@@ -240,8 +238,8 @@ standard success or error response. See
 #### /renter/rename/___*siapath___ [POST]
 
 renames a file. Does not rename any downloads or source files, only renames the
-entry in the renter.
-// TODO: what happens if newsiapath already exists? What happens if siapath doesn't exist?
+entry in the renter. An error is returned if `siapath` does not exist or
+`newsiapath` already exists.
 
 ###### Path Parameters
 ```
