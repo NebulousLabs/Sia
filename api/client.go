@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 )
@@ -40,7 +42,12 @@ func (c *Client) Get(resource string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() {
+		// res.Body should always be fully read even when discarding its content,
+		// such that the underlying connection can be reused.
+		io.Copy(ioutil.Discard, res.Body)
+		res.Body.Close()
+	}()
 
 	if res.StatusCode == http.StatusNotFound {
 		return errors.New("API call not recognized: " + resource)
@@ -63,7 +70,7 @@ func (c *Client) Get(resource string, obj interface{}) error {
 	return nil
 }
 
-// POST makes a POST request to the resource at `resource`, using `data` as the
+// Post makes a POST request to the resource at `resource`, using `data` as the
 // request body.  The response, if provided, will be decoded into `obj`.
 func (c *Client) Post(resource string, data string, obj interface{}) error {
 	url := "http://" + c.address + resource
@@ -80,7 +87,12 @@ func (c *Client) Post(resource string, data string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() {
+		// res.Body should always be fully read even when discarding its content,
+		// such that the underlying connection can be reused.
+		io.Copy(ioutil.Discard, res.Body)
+		res.Body.Close()
+	}()
 
 	if res.StatusCode == http.StatusNotFound {
 		return errors.New("API call not recognized: " + resource)
