@@ -10,7 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/muxado"
 )
 
 const (
@@ -77,7 +76,7 @@ func (s invalidVersionError) Error() string {
 
 type peer struct {
 	modules.Peer
-	sess muxado.Session
+	sess streamSession
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
@@ -210,7 +209,7 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 			Inbound:    true,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Server(conn),
+		sess: newMuxadoV1Server(conn),
 	})
 
 	return nil
@@ -250,7 +249,7 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 			Inbound:    true,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Server(conn),
+		sess: newMuxadoV2Server(conn),
 	})
 
 	return nil
@@ -401,7 +400,7 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 			Inbound:    false,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Client(conn),
+		sess: newMuxadoV1Client(conn),
 	})
 	return nil
 }
@@ -437,7 +436,7 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 			Inbound:    false,
 			Version:    remoteVersion,
 		},
-		sess: muxado.Client(conn),
+		sess: newMuxadoV2Client(conn),
 	})
 	return nil
 }

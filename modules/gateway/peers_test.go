@@ -7,20 +7,17 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/muxado"
 )
 
 // dummyConn implements the net.Conn interface, but does not carry any actual
-// data. It is passed to muxado, because passing nil results in segfaults.
+// data.
 type dummyConn struct {
 	net.Conn
 }
 
-// muxado uses these methods when sending its GoAway signal
-func (dc *dummyConn) Write(p []byte) (int, error) { return len(p), nil }
-
-func (dc *dummyConn) Close() error { return nil }
-
+func (dc *dummyConn) Read(p []byte) (int, error)       { return len(p), nil }
+func (dc *dummyConn) Write(p []byte) (int, error)      { return len(p), nil }
+func (dc *dummyConn) Close() error                     { return nil }
 func (dc *dummyConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestAddPeer(t *testing.T) {
@@ -36,7 +33,7 @@ func TestAddPeer(t *testing.T) {
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newMuxadoV2Client(new(dummyConn)),
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -62,7 +59,7 @@ func TestRandomInboundPeer(t *testing.T) {
 			NetAddress: "foo.com:123",
 			Inbound:    true,
 		},
-		sess: muxado.Client(new(dummyConn)),
+		sess: newMuxadoV2Client(new(dummyConn)),
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -104,8 +101,8 @@ func TestListen(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
-	muxado.Client(conn).Close()
+	// a simple 'conn.Close' would not obey the muxer's disconnect protocol
+	newMuxadoV2Client(conn).Close()
 
 	// compliant connect with invalid port
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -134,8 +131,8 @@ func TestListen(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
-	muxado.Client(conn).Close()
+	// a simple 'conn.Close' would not obey the muxer's disconnect protocol
+	newMuxadoV2Client(conn).Close()
 
 	// compliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
@@ -163,7 +160,7 @@ func TestListen(t *testing.T) {
 		g.mu.RUnlock()
 	}
 
-	muxado.Client(conn).Close()
+	newMuxadoV2Client(conn).Close()
 
 	// g should remove the peer
 	for ok {
@@ -665,7 +662,7 @@ func TestDisconnect(t *testing.T) {
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
 		},
-		sess: muxado.Client(conn),
+		sess: newMuxadoV2Client(conn),
 	})
 	g.mu.Unlock()
 	if err := g.Disconnect("foo.com:123"); err != nil {
