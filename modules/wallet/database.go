@@ -1,21 +1,51 @@
 package wallet
 
 import (
+	"encoding/binary"
+	"reflect"
+
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
 	"github.com/NebulousLabs/bolt"
 )
 
 var (
+	// bucketHistoricClaimStarts maps a SiafundOutputID to the value of the
+	// siafund pool when the output was processed. It stores every such output
+	// in the blockchain. The wallet uses this mapping to determine the "claim
+	// start" value of siafund outputs in ProcessedTransactions.
 	bucketHistoricClaimStarts = []byte("bucketHistoricClaimStarts")
-	bucketHistoricOutputs     = []byte("bucketHistoricOutputs")
-	bucketSiacoinOutputs      = []byte("bucketSiacoinOutputs")
-	bucketSiafundOutputs      = []byte("bucketSiafundOutputs")
-	bucketSpentOutputs        = []byte("bucketSpentOutputs")
+	// bucketHistoricOutputs maps a generic OutputID to the number of siacoins
+	// the output contains. The output may be a siacoin or siafund output.
+	// Note that the siafund value here is not the same as the value in
+	// bucketHistoricClaimStarts; see the definition of SiafundOutput in
+	// types/transactions.go for an explanation. The wallet uses this mapping
+	// to determine the value of outputs in ProcessedTransactions.
+	bucketHistoricOutputs = []byte("bucketHistoricOutputs")
+	// bucketProcessedTransactions stores ProcessedTransactions in
+	// chronological order. Only transactions relevant to the wallet are
+	// stored. The key of this bucket is an autoincrementing integer.
+	bucketProcessedTransactions = []byte("bucketProcessedTransactions")
+	// bucketSiacoinOutputs maps a SiacoinOutputID to its SiacoinOutput. Only
+	// outputs that the wallet controls are stored. The wallet uses these
+	// outputs to fund transactions.
+	bucketSiacoinOutputs = []byte("bucketSiacoinOutputs")
+	// bucketSiacoinOutputs maps a SiafundOutputID to its SiafundOutput. Only
+	// outputs that the wallet controls are stored. The wallet uses these
+	// outputs to fund transactions.
+	bucketSiafundOutputs = []byte("bucketSiafundOutputs")
+	// bucketSpentOutputs maps an OutputID to the height at which it was
+	// spent. Only outputs spent by the wallet are stored. The wallet tracks
+	// these outputs so that it can reuse them if they are not confirmed on
+	// the blockchain.
+	bucketSpentOutputs = []byte("bucketSpentOutputs")
 
 	dbBuckets = [][]byte{
 		bucketHistoricClaimStarts,
 		bucketHistoricOutputs,
+		bucketProcessedTransactions,
 		bucketSiacoinOutputs,
 		bucketSiafundOutputs,
 		bucketSpentOutputs,
@@ -38,91 +68,115 @@ func dbDelete(b *bolt.Bucket, key interface{}) error {
 	return b.Delete(encoding.Marshal(key))
 }
 
-// dbPutHistoricClaimStart stores the number of siafunds corresponding to the
-// specified SiafundOutputID. The wallet builds a mapping of output -> value
-// so that it can determine the value of siafund outputs that were not created
-// by the wallet.
+// dbForEach is a helper function for iterating over a bucket and calling fn
+// on each entry. fn must be a function with two parameters. The key/value
+// bytes of each bucket entry will be unmarshalled into the types of fn's
+// parameters.
+func dbForEach(b *bolt.Bucket, fn interface{}) error {
+	// check function type
+	fnVal, fnTyp := reflect.ValueOf(fn), reflect.TypeOf(fn)
+	if fnTyp.Kind() != reflect.Func || fnTyp.NumIn() != 2 {
+		panic("bad fn type: needed func(key, val), got " + fnTyp.String())
+	}
+
+	return b.ForEach(func(keyBytes, valBytes []byte) error {
+		key, val := reflect.New(fnTyp.In(0)), reflect.New(fnTyp.In(1))
+		if err := encoding.Unmarshal(keyBytes, key.Interface()); err != nil {
+			return err
+		} else if err := encoding.Unmarshal(valBytes, val.Interface()); err != nil {
+			return err
+		}
+		fnVal.Call([]reflect.Value{key.Elem(), val.Elem()})
+		return nil
+	})
+}
+
+// Type-safe wrappers around the db helpers
+
 func dbPutHistoricClaimStart(tx *bolt.Tx, id types.SiafundOutputID, c types.Currency) error {
 	return dbPut(tx.Bucket(bucketHistoricClaimStarts), id, c)
 }
-
-// dbGetHistoricClaimStart retrieves the number of siafunds corresponding to
-// the specified SiafundOutputID. The wallet uses this mapping to determine
-// the value of siafund outputs that were not created by the wallet.
 func dbGetHistoricClaimStart(tx *bolt.Tx, id types.SiafundOutputID) (c types.Currency, err error) {
 	err = dbGet(tx.Bucket(bucketHistoricClaimStarts), id, &c)
 	return
 }
 
-// dbPutHistoricOutput stores the number of coins corresponding to the
-// specified OutputID. The wallet builds a mapping of output -> value so that
-// it can determine the value of outputs that were not created
-// by the wallet.
 func dbPutHistoricOutput(tx *bolt.Tx, id types.OutputID, c types.Currency) error {
 	return dbPut(tx.Bucket(bucketHistoricOutputs), id, c)
 }
-
-// dbGetHistoricOutput retrieves the number of coins corresponding to the
-// specified OutputID. The wallet uses this mapping to determine the value of
-// outputs that were not created by the wallet.
 func dbGetHistoricOutput(tx *bolt.Tx, id types.OutputID) (c types.Currency, err error) {
 	err = dbGet(tx.Bucket(bucketHistoricOutputs), id, &c)
 	return
 }
 
-// dbPutSiacoinOutput stores the output corresponding to the specified
-// SiacoinOutputID.
 func dbPutSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID, output types.SiacoinOutput) error {
 	return dbPut(tx.Bucket(bucketSiacoinOutputs), id, output)
 }
-
-// dbGetSiacoinOutput retrieves the output corresponding to the specified
-// SiacoinOutputID.
 func dbGetSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (output types.SiacoinOutput, err error) {
 	err = dbGet(tx.Bucket(bucketSiacoinOutputs), id, &output)
 	return
 }
-
-// dbDeleteSiacoinOutput deletes the output corresponding to the specified
-// SiacoinOutputID.
 func dbDeleteSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) error {
 	return dbDelete(tx.Bucket(bucketSiacoinOutputs), id)
 }
+func dbForEachSiacoinOutput(tx *bolt.Tx, fn func(types.SiacoinOutputID, types.SiacoinOutput)) error {
+	return dbForEach(tx.Bucket(bucketSiacoinOutputs), fn)
+}
 
-// dbPutSiafundOutput stores the output corresponding to the specified
-// SiafundOutputID.
 func dbPutSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID, output types.SiafundOutput) error {
 	return dbPut(tx.Bucket(bucketSiafundOutputs), id, output)
 }
-
-// dbGetSiafundOutput retrieves the output corresponding to the specified
-// SiafundOutputID.
 func dbGetSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) (output types.SiafundOutput, err error) {
 	err = dbGet(tx.Bucket(bucketSiafundOutputs), id, &output)
 	return
 }
-
-// dbDeleteSiafundOutput deletes the output corresponding to the specified
-// SiafundOutputID.
 func dbDeleteSiafundOutput(tx *bolt.Tx, id types.SiafundOutputID) error {
 	return dbDelete(tx.Bucket(bucketSiafundOutputs), id)
 }
+func dbForEachSiafundOutput(tx *bolt.Tx, fn func(types.SiafundOutputID, types.SiafundOutput)) error {
+	return dbForEach(tx.Bucket(bucketSiafundOutputs), fn)
+}
 
-// dbPutSpentOutput registers an output as being spent as of the specified
-// height.
 func dbPutSpentOutput(tx *bolt.Tx, id types.OutputID, height types.BlockHeight) error {
 	return dbPut(tx.Bucket(bucketSpentOutputs), id, height)
 }
-
-// dbGetSpentOutput retrieves the height at which the specified output was
-// spent.
 func dbGetSpentOutput(tx *bolt.Tx, id types.OutputID) (height types.BlockHeight, err error) {
 	err = dbGet(tx.Bucket(bucketSpentOutputs), id, &height)
 	return
 }
-
-// dbDeleteSpentOutput deletes the output corresponding to the specified
-// OutputID.
 func dbDeleteSpentOutput(tx *bolt.Tx, id types.OutputID) error {
 	return dbDelete(tx.Bucket(bucketSpentOutputs), id)
+}
+
+// bucketProcessedTransactions works a little differently: the key is
+// meaningless, only used to order the transactions chronologically.
+
+func dbAppendProcessedTransaction(tx *bolt.Tx, pt modules.ProcessedTransaction) error {
+	b := tx.Bucket(bucketProcessedTransactions)
+	key, err := b.NextSequence()
+	if err != nil {
+		return err
+	}
+	// big-endian is used so that the keys are properly sorted
+	keyBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(keyBytes, key)
+	return b.Put(keyBytes, encoding.Marshal(pt))
+}
+func dbGetLastProcessedTransaction(tx *bolt.Tx) (pt modules.ProcessedTransaction, err error) {
+	_, val := tx.Bucket(bucketProcessedTransactions).Cursor().Last()
+	err = encoding.Unmarshal(val, &pt)
+	return
+}
+func dbDeleteLastProcessedTransaction(tx *bolt.Tx) error {
+	// delete the last entry in the bucket. Note that we don't need to
+	// decrement the sequence integer; we only care that the next integer is
+	// larger than the previous one.
+	b := tx.Bucket(bucketProcessedTransactions)
+	key, _ := b.Cursor().Last()
+	return b.Delete(key)
+}
+func dbForEachProcessedTransaction(tx *bolt.Tx, fn func(modules.ProcessedTransaction)) error {
+	return dbForEach(tx.Bucket(bucketProcessedTransactions), func(_ uint64, pt modules.ProcessedTransaction) {
+		fn(pt)
+	})
 }
