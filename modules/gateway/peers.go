@@ -137,7 +137,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 
-	if build.VersionCmp(remoteVersion, "1.0.0") < 0 {
+	if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) < 0 {
 		err = g.managedAcceptConnOldPeer(conn, remoteVersion)
 	} else {
 		err = g.managedAcceptConnNewPeer(conn, remoteVersion)
@@ -432,7 +432,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		conn.Close()
 		return err
 	}
-	if build.VersionCmp(remoteVersion, "1.0.0") < 0 {
+	if build.VersionCmp(remoteVersion, handshakeUpgradeVersion) < 0 {
 		err = g.managedConnectOldPeer(conn, remoteVersion, addr)
 	} else {
 		err = g.managedConnectNewPeer(conn, remoteVersion, addr)

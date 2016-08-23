@@ -7,6 +7,10 @@ import (
 )
 
 const (
+	// handshakeUpgradeVersion is the version where the gateway handshake RPC
+	// was altered to include adiitional information transfer.
+	handshakeUpgradeVersion = "1.0.0"
+
 	// minAcceptableVersion is the version below which the gateway will refuse to
 	// connect to peers and reject connection attempts.
 	//
