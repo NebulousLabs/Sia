@@ -37,27 +37,16 @@ type (
 	}
 )
 
-// generateUnlockConditions provides the unlock conditions that would be
-// automatically generated from the input public key.
-func generateUnlockConditions(pk crypto.PublicKey) types.UnlockConditions {
-	return types.UnlockConditions{
-		PublicKeys: []types.SiaPublicKey{{
-			Algorithm: types.SignatureEd25519,
-			Key:       pk[:],
-		}},
-		SignaturesRequired: 1,
-	}
-}
-
-// generateSpendableKey creates the keys and unlock conditions a given index of a
-// seed.
+// generateSpendableKey creates the keys and unlock conditions for seed at a
+// given index.
 func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
-	// Generate the keys and unlock conditions.
-	entropy := crypto.HashAll(seed, index)
-	sk, pk := crypto.GenerateKeyPairDeterministic(entropy)
+	sk, pk := crypto.GenerateKeyPairDeterministic(crypto.HashAll(seed, index))
 	return spendableKey{
-		UnlockConditions: generateUnlockConditions(pk),
-		SecretKeys:       []crypto.SecretKey{sk},
+		UnlockConditions: types.UnlockConditions{
+			PublicKeys:         []types.SiaPublicKey{types.Ed25519PublicKey(pk)},
+			SignaturesRequired: 1,
+		},
+		SecretKeys: []crypto.SecretKey{sk},
 	}
 }
 

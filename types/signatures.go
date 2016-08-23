@@ -124,6 +124,15 @@ type (
 	}
 )
 
+// Ed25519PublicKey returns pk as a SiaPublicKey, denoting its algorithm as
+// Ed25519.
+func Ed25519PublicKey(pk crypto.PublicKey) SiaPublicKey {
+	return SiaPublicKey{
+		Algorithm: SignatureEd25519,
+		Key:       pk[:],
+	}
+}
+
 // UnlockHash calculates the root hash of a Merkle tree of the
 // UnlockConditions object. The leaves of this tree are formed by taking the
 // hash of the timelock, the hash of the public keys (one leaf each), and the

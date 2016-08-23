@@ -95,10 +95,7 @@ func (h *Host) establishDefaults() error {
 		return err
 	}
 	h.secretKey = sk
-	h.publicKey = types.SiaPublicKey{
-		Algorithm: types.SignatureEd25519,
-		Key:       pk[:],
-	}
+	h.publicKey = types.Ed25519PublicKey(pk)
 
 	// Subscribe to the consensus set.
 	err = h.initConsensusSubscription()
