@@ -179,7 +179,10 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 	// is to stop an attacker from preventing block broadcasts.
 	chainExtended := false
 	defer func() {
-		if chainExtended && cs.Synced() {
+		cs.mu.RLock()
+		synced := cs.synced
+		cs.mu.RUnlock()
+		if chainExtended && synced {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
 			currentBlock := cs.managedCurrentBlock()
@@ -250,10 +253,16 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
-	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
+	err = encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
 	if err != nil {
 		return err
 	}
@@ -348,9 +357,15 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 // rpcRelayBlock is an RPC that accepts a block from a peer.
 // COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Decode the block from the connection.
 	var b types.Block
-	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
+	err = encoding.ReadObject(conn, &b, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}
@@ -450,9 +465,15 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 
 // rpcSendBlk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Decode the block id from the connection.
 	var id types.BlockID
-	err := encoding.ReadObject(conn, &id, crypto.HashSize)
+	err = encoding.ReadObject(conn, &id, crypto.HashSize)
 	if err != nil {
 		return err
 	}
@@ -593,6 +614,11 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 
 // Synced returns true if the consensus set is synced with the network.
 func (cs *ConsensusSet) Synced() bool {
+	err := cs.tg.Add()
+	if err != nil {
+		return false
+	}
+	defer cs.tg.Done()
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 	return cs.synced
