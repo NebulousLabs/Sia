@@ -2,15 +2,19 @@ package gateway
 
 import (
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
 const dummyNode = "111.111.111.111:1111"
 
+// TestAddNode tries adding a node to the gateway using the unexported addNode
+// function. Edge case trials are also performed.
 func TestAddNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -40,6 +44,7 @@ func TestAddNode(t *testing.T) {
 	}
 }
 
+// TestRemoveNode tries remiving a node from the gateway.
 func TestRemoveNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -60,6 +65,8 @@ func TestRemoveNode(t *testing.T) {
 	}
 }
 
+// TestRandomNode tries pulling random nodes from the gateway using
+// g.randomNode() under a variety of conditions.
 func TestRandomNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -136,6 +143,8 @@ func TestRandomNode(t *testing.T) {
 	}
 }
 
+// TestShareNodes checks that two gateways will share nodes with eachother
+// following the desired sharing strategy.
 func TestShareNodes(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -189,7 +198,7 @@ func TestShareNodes(t *testing.T) {
 	}
 
 	// sharing should be capped at maxSharedNodes
-	for i := 1; i < maxSharedNodes+11; i++ {
+	for i := 1; i < int(maxSharedNodes)+11; i++ {
 		g2.mu.Lock()
 		err := g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
 		g2.mu.Unlock()
@@ -203,7 +212,7 @@ func TestShareNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(nodes) != maxSharedNodes {
+	if uint64(len(nodes)) != maxSharedNodes {
 		t.Fatalf("gateway gave wrong number of nodes: expected %v, got %v", maxSharedNodes, len(nodes))
 	}
 }
@@ -240,5 +249,215 @@ func TestNodesAreSharedOnConnect(t *testing.T) {
 	defer g3.mu.Unlock()
 	if _, ok := g3.nodes[g2.Address()]; !ok {
 		t.Fatal("node was not relayed:", g3.nodes)
+	}
+}
+
+// TestPruneNodeThreshold checks that gateways will not purge nodes if they are
+// below the purge threshold, even if those nodes are offline.
+func TestPruneNodeThreshold(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// The next part of the test expects the pruneNodeListLen to be at least
+	// 'maxSharedNodes * 2 + 2 in size.
+	if uint64(pruneNodeListLen) < (maxSharedNodes*2)+2 {
+		t.Fatal("Constants do not match test, please either adjust the constants or refactor this test", maxSharedNodes, pruneNodeListLen)
+	}
+
+	// Create and connect pruneNodeListLen gateways.
+	var gs []*Gateway
+	for i := 0; i < pruneNodeListLen; i++ {
+		gname := "TestPruneNodeThreshold" + strconv.Itoa(i)
+		gs = append(gs, newTestingGateway(gname, t))
+
+		// Connect this gateway to the previous gateway.
+		if i != 0 {
+			err := gs[i].Connect(gs[i-1].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Spin until all gateways have a nearly full node list.
+	success := false
+	for i := 0; i < 50; i++ {
+		success = true
+		for _, g := range gs {
+			g.mu.RLock()
+			gNodeLen := len(g.nodes)
+			g.mu.RUnlock()
+			if gNodeLen < pruneNodeListLen-2 {
+				success = false
+				break
+			}
+		}
+		if !success {
+			time.Sleep(time.Second * 1)
+		}
+	}
+	if !success {
+		t.Fatal("peers are not sharing nodes with eachother")
+	}
+
+	// Gateway node lists have been filled out. Take a bunch of gateways
+	// offline and verify that they do not start pruning eachother.
+	var wg sync.WaitGroup
+	for i := 2; i < len(gs); i++ {
+		wg.Add(1)
+		go func(i int) {
+			err := gs[i].Close()
+			if err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// Wait for 5 iterations of the node purge loop. Then verify that the
+	// remaining gateways have not been purging nodes.
+	time.Sleep(nodePurgeDelay * 5)
+
+	// Check that the remaining gateways have not purged any nodes.
+	gs[0].mu.RLock()
+	gs0Nodes := len(gs[0].nodes)
+	gs[0].mu.RUnlock()
+	gs[1].mu.RLock()
+	gs1Nodes := len(gs[1].nodes)
+	gs[1].mu.RUnlock()
+	if gs0Nodes < pruneNodeListLen-2 {
+		t.Error("gateway seems to be pruning nodes below purge threshold")
+	}
+	if gs1Nodes < pruneNodeListLen-2 {
+		t.Error("gateway seems to be pruning nodes below purge threshold")
+	}
+
+	// Close the remaining gateways.
+	err := gs[0].Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gs[1].Close()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// TestHealthyNodeListPruning checks that gateways will purge nodes if they are at
+// a healthy node threshold and the nodes are offline.
+func TestHealthyNodeListPruning(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create and connect healthyNodeListLen*2 gateways.
+	var gs []*Gateway
+	for i := 0; i < healthyNodeListLen*2; i++ {
+		gname := "TestHealthyNodeListPruning" + strconv.Itoa(i)
+		gs = append(gs, newTestingGateway(gname, t))
+
+		// Connect this gateway to the previous gateway.
+		if i != 0 {
+			err := gs[i].Connect(gs[i-1].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// To help speed the test up, also connect this gateway to the peer two
+		// back.
+		if i > 1 {
+			err := gs[i].Connect(gs[i-2].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		// To help speed the test up, also connect this gateway to a random
+		// previous peer.
+		if i > 2 {
+			choice, err := crypto.RandIntn(i - 2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = gs[i].Connect(gs[choice].myAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Spin until all gateways have a nearly full node list.
+	success := false
+	for i := 0; i < 80; i++ {
+		success = true
+		for _, g := range gs {
+			g.mu.RLock()
+			gNodeLen := len(g.nodes)
+			g.mu.RUnlock()
+			if gNodeLen < healthyNodeListLen {
+				success = false
+				break
+			}
+		}
+		if !success {
+			time.Sleep(time.Second * 1)
+		}
+	}
+	if !success {
+		t.Fatal("peers are not sharing nodes with eachother")
+	}
+
+	// Gateway node lists have been filled out. Take a bunch of gateways
+	// offline and verify that the remaining gateways begin pruning their
+	// nodelist.
+	var wg sync.WaitGroup
+	for i := 2; i < len(gs); i++ {
+		wg.Add(1)
+		go func(i int) {
+			err := gs[i].Close()
+			if err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// Wait for enough iterations of the node purge loop that over-pruning is
+	// possible. (Over-pruning does not need to be guaranteed, causing this
+	// test to fail once in a while is sufficient.)
+	time.Sleep(nodePurgeDelay * time.Duration(healthyNodeListLen-pruneNodeListLen) * 12)
+
+	// Check that the remaining gateways have pruned nodes.
+	gs[0].mu.RLock()
+	gs0Nodes := len(gs[0].nodes)
+	gs[0].mu.RUnlock()
+	gs[1].mu.RLock()
+	gs1Nodes := len(gs[1].nodes)
+	gs[1].mu.RUnlock()
+	if gs0Nodes >= healthyNodeListLen-1 {
+		t.Error("gateway is not pruning nodes", healthyNodeListLen, gs0Nodes)
+	}
+	if gs1Nodes >= healthyNodeListLen-1 {
+		t.Error("gateway is not pruning nodes", healthyNodeListLen, gs1Nodes)
+	}
+	if gs0Nodes < pruneNodeListLen {
+		t.Error("gateway is pruning too many nodes", gs0Nodes, pruneNodeListLen)
+	}
+	if gs1Nodes < pruneNodeListLen {
+		t.Error("gateway is pruning too many nodes", gs1Nodes, pruneNodeListLen)
+	}
+
+	// Close the remaining gateways.
+	err := gs[0].Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gs[1].Close()
+	if err != nil {
+		t.Error(err)
 	}
 }

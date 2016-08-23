@@ -26,25 +26,35 @@ type Gateway struct {
 	port     string
 
 	// handlers are the RPCs that the Gateway can handle.
-	handlers map[rpcID]modules.RPCFunc
+	//
 	// initRPCs are the RPCs that the Gateway calls upon connecting to a peer.
+	handlers map[rpcID]modules.RPCFunc
 	initRPCs map[string]modules.RPCFunc
 
-	// peers are the nodes we are currently connected to.
-	peers map[modules.NetAddress]*peer
+	// nodes is the set of all known nodes (i.e. potential peers).
+	//
+	// peers are the nodes that the gateway is currently connected to.
+	//
+	// peerTG is a special thread group for tracking peer connections, and will
+	// block shutdown until all peer connections have been closed out. The peer
+	// connections are put in a separate TG because of their unique
+	// requirements - they have the potential to live for the lifetime of the
+	// program, but also the potential to close early. Calling threads.OnStop
+	// for each peer could create a huge backlog of functions that do nothing
+	// (because most of the peers disconnected prior to shutdown). And they
+	// can't call threads.Add because they are potentially very long running
+	// and would block any threads.Flush() calls. So a second threadgroup is
+	// added which handles clean-shutdown for the peers, without blocking
+	// threads.Flush() calls.
+	nodes  map[modules.NetAddress]struct{}
+	peers  map[modules.NetAddress]*peer
+	peerTG siasync.ThreadGroup
 
-	// nodes is the set of all known nodes (i.e. potential peers) on the
-	// network.
-	nodes map[modules.NetAddress]struct{}
-
-	// threads is used to signal the Gateway's goroutines to shut down and to wait
-	// for all goroutines to exit before returning from Close().
-	threads siasync.ThreadGroup
-
+	// Utilities.
+	log        *persist.Logger
+	mu         sync.RWMutex
 	persistDir string
-
-	log *persist.Logger
-	mu  sync.RWMutex
+	threads    siasync.ThreadGroup
 }
 
 // Address returns the NetAddress of the Gateway.
@@ -59,30 +69,9 @@ func (g *Gateway) Close() error {
 	if err := g.threads.Stop(); err != nil {
 		return err
 	}
-
-	var errs []error
-	// Unregister RPCs. Not strictly necessary for clean shutdown in this specific
-	// case, as the handlers should only contain references to the gateway itself,
-	// but do it anyways as an example for other modules to follow.
-	g.UnregisterRPC("ShareNodes")
-	g.UnregisterConnectCall("ShareNodes")
-	// save the latest gateway state
 	g.mu.RLock()
-	if err := g.saveSync(); err != nil {
-		errs = append(errs, fmt.Errorf("save failed: %v", err))
-	}
-	g.mu.RUnlock()
-	// clear the port mapping (no effect if UPnP not supported)
-	g.mu.RLock()
-	g.clearPort(g.myAddr.Port())
-	g.mu.RUnlock()
-	// Close the logger. The logger should be the last thing to shut down so that
-	// all other objects have access to logging while closing.
-	if err := g.log.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("log.Close failed: %v", err))
-	}
-
-	return build.JoinErrors(errs, "; ")
+	defer g.mu.RUnlock()
+	return g.saveSync()
 }
 
 // New returns an initialized Gateway.
@@ -94,10 +83,12 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	g = &Gateway{
-		handlers:   make(map[rpcID]modules.RPCFunc),
-		initRPCs:   make(map[string]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]*peer),
-		nodes:      make(map[modules.NetAddress]struct{}),
+		handlers: make(map[rpcID]modules.RPCFunc),
+		initRPCs: make(map[string]modules.RPCFunc),
+
+		peers: make(map[modules.NetAddress]*peer),
+		nodes: make(map[modules.NetAddress]struct{}),
+
 		persistDir: persistDir,
 	}
 
@@ -106,10 +97,32 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return nil, err
 	}
+	// Establish the closing of the logger.
+	g.threads.AfterStop(func() {
+		if err := g.log.Close(); err != nil {
+			// The logger may or may not be working here, so use a println
+			// instead.
+			fmt.Println("Failed to close the gateway logger:", err)
+		}
+	})
+
+	// Establish that the peerTG must complete shutdown before the primary
+	// thread group completes shutdown.
+	g.threads.OnStop(func() {
+		err = g.peerTG.Stop()
+		if err != nil {
+			g.log.Println("ERROR: peerTG experienced errors while shutting down:", err)
+		}
+	})
 
 	// Register RPCs.
 	g.RegisterRPC("ShareNodes", g.shareNodes)
 	g.RegisterConnectCall("ShareNodes", g.requestNodes)
+	// Establish the de-registration of the RPCs.
+	g.threads.OnStop(func() {
+		g.UnregisterRPC("ShareNodes")
+		g.UnregisterConnectCall("ShareNodes")
+	})
 
 	// Load the old node list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
@@ -118,6 +131,9 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Add the bootstrap peers to the node list.
+	//
+	// TODO: the bootstrap peers should not be added to the node list if
+	// --no-bootstrap is specified.
 	if build.Release == "standard" {
 		for _, addr := range modules.BootstrapPeers {
 			err := g.addNode(addr)
@@ -128,8 +144,8 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		g.save()
 	}
 
-	// Create listener and set address.
-	threadedListenClosedChan := make(chan struct{})
+	// Create the listener which will listen for new connections from peers.
+	permanentListenClosedChan := make(chan struct{})
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
@@ -140,32 +156,46 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		if err != nil {
 			g.log.Println("WARN: closing the listener failed:", err)
 		}
-		<-threadedListenClosedChan
+		<-permanentListenClosedChan
 	})
-
+	// Set the address and port of the gateway.
 	_, g.port, err = net.SplitHostPort(g.listener.Addr().String())
 	if err != nil {
 		return nil, err
 	}
-	if build.Release == "testing" {
-		g.myAddr = modules.NetAddress(g.listener.Addr().String())
-	}
+	// Set myAddr equal to the address returned by the listener. It will be
+	// overwritten by threadedLearnHostname later on.
+	g.myAddr = modules.NetAddress(g.listener.Addr().String())
 
-	g.log.Println("INFO: gateway created, started logging")
+	// Spawn the peer connection listener.
+	go g.permanentListen(permanentListenClosedChan)
 
-	// Forward the RPC port, if possible.
+	// Spawn the peer manager and provide tools for ensuring clean shutdown.
+	peerManagerClosedChan := make(chan struct{})
+	g.threads.OnStop(func() {
+		<-peerManagerClosedChan
+	})
+	go g.permanentPeerManager(peerManagerClosedChan)
+
+	// Spawn the node manager and provide tools for ensuring clean shudown.
+	nodeManagerClosedChan := make(chan struct{})
+	g.threads.OnStop(func() {
+		<-nodeManagerClosedChan
+	})
+	go g.permanentNodeManager(nodeManagerClosedChan)
+
+	// Spawn the node purger and provide tools for ensuring clean shutdown.
+	nodePurgerClosedChan := make(chan struct{})
+	g.threads.OnStop(func() {
+		<-nodePurgerClosedChan
+	})
+	go g.permanentNodePurger(nodePurgerClosedChan)
+
+	// Spawn threads to take care of port forwarding and hostname discovery.
 	go g.threadedForwardPort(g.port)
-	// Learn our external IP.
 	go g.threadedLearnHostname()
 
-	// Spawn the peer and node managers. These will attempt to keep the peer
-	// and node lists healthy.
-	go g.threadedPeerManager()
-	go g.threadedNodeManager()
-
-	// Spawn the primary listener.
-	go g.threadedListen(threadedListenClosedChan)
-
+	g.log.Println("INFO: gateway created, started logging")
 	return
 }
 

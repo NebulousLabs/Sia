@@ -54,9 +54,8 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
-	var host string
-
 	// try UPnP first, then fallback to myexternalip.com
+	var host string
 	d, err := upnp.Discover()
 	if err == nil {
 		host, err = d.ExternalIP()
@@ -77,6 +76,8 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
+	// TODO: Is this safe? What happens to processes or nodes that have already
+	// request the IP address?
 	g.mu.Lock()
 	g.myAddr = addr
 	g.mu.Unlock()
@@ -109,15 +110,19 @@ func (g *Gateway) threadedForwardPort(port string) {
 	}
 
 	g.log.Println("INFO: successfully forwarded port", port)
+
+	// Establish port-clearing at shutdown.
+	g.threads.AfterStop(func() {
+		g.managedClearPort(port)
+	})
 }
 
-// clearPort removes a port mapping from the router.
-func (g *Gateway) clearPort(port string) {
+// managedClearPort removes a port mapping from the router.
+func (g *Gateway) managedClearPort(port string) {
 	if build.Release == "testing" {
 		return
 	}
 
-	//d, err := upnp.Load("http://192.168.1.1:5000/Public_UPNP_gatedesc.xml")
 	d, err := upnp.Discover()
 	if err != nil {
 		return
