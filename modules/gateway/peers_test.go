@@ -340,6 +340,9 @@ func TestUnitAcceptableVersion(t *testing.T) {
 // TestConnectRejectsInvalidAddrs tests that Connect only connects to valid IP
 // addresses.
 func TestConnectRejectsInvalidAddrs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	g := newTestingGateway("TestConnectRejectsInvalidAddrs", t)
 	defer g.Close()
 

@@ -9,6 +9,9 @@ import (
 // TestImmediateBlockFacts grabs the block facts object from the block explorer
 // at the current height and verifies that the data has been filled out.
 func TestImmediateBlockFacts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	et, err := createExplorerTester("TestImmediateBlockFacts")
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +33,9 @@ func TestImmediateBlockFacts(t *testing.T) {
 
 // TestBlock probes the Block function of the explorer.
 func TestBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	et, err := createExplorerTester("TestBlock")
 	if err != nil {
 		t.Fatal(err)

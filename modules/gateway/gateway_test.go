@@ -14,6 +14,10 @@ import (
 
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(name string, t *testing.T) *Gateway {
+	if testing.Short() {
+		panic("newTestingGateway called during short test")
+	}
+
 	g, err := New("localhost:0", build.TempDir("gateway", name))
 	if err != nil {
 		t.Fatal(err)
