@@ -132,12 +132,27 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 	}
 
 	go func() {
-		// Sync with the network. Don't sync if we are testing because typically we
-		// don't have any mock peers to synchronize with in testing.
-		// TODO: figure out a better way to conditionally do IBD. Otherwise this block will never be tested.
+		// Sync with the network. Don't sync if we are testing because
+		// typically we don't have any mock peers to synchronize with in
+		// testing.
 		if build.Release != "testing" {
-			cs.threadedInitialBlockchainDownload()
+			// A blocking operation which will grab a thread group. We are in a
+			// virgin goroutine right now, so calling the threaded function
+			// without a goroutine is okay.
+			err = cs.threadedInitialBlockchainDownload()
+			if err != nil {
+				return
+			}
 		}
+
+		// threadedInitialBlockchainDownload will release the threadgroup 'Add'
+		// it was holding, so another needs to be grabbed to finish off this
+		// goroutine.
+		err = cs.tg.Add()
+		if err != nil {
+			return
+		}
+		defer cs.tg.Done()
 
 		// Register RPCs
 		gateway.RegisterRPC("SendBlocks", cs.rpcSendBlocks)

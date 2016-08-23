@@ -83,6 +83,7 @@ var (
 		}
 	}()
 
+	errEarlyStop         = errors.New("initial blockchain download did not complete by the time shutdown was issued")
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
 
@@ -483,6 +484,13 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // checked to be the same. This can cause issues if you are connected to
 // outbound peers <= v0.5.1 that are stalled in IBD.
 func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+	stopChan := cs.tg.StopChan()
+
 	// The consensus set will not recognize IBD as complete until it has enough
 	// peers. After the deadline though, it will recognize the blochchain
 	// download as complete even with only one peer. This deadline is helpful
@@ -503,6 +511,13 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 			// manipulate.
 			if p.Inbound {
 				continue
+			}
+
+			// Check whether shutdown has started.
+			select {
+			case <-stopChan:
+				return errEarlyStop
+			default:
 			}
 
 			// Request blocks from the peer. The error returned will only be
@@ -547,6 +562,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 	}
 
 	cs.log.Printf("INFO: IBD done, synced with %v peers", numOutboundSynced)
+	return nil
 }
 
 // Synced returns true if the consensus set is synced with the network.
