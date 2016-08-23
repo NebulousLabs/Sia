@@ -241,7 +241,7 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
 		return err
 	}
 	defer cs.tg.Done()
-	return managedReceiveBlocks(conn)
+	return cs.managedReceiveBlocks(conn)
 }
 
 // rpcSendBlocks is the receiving end of the SendBlocks RPC. It returns a
@@ -404,7 +404,16 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	})
 	cs.mu.RUnlock()
 	if err == errOrphan {
-		// If the header is an orphan, try to find the parents.
+		// If the header is an orphan, try to find the parents. Call needs to
+		// be made in a separate goroutine as execution requires calling an
+		// exported gateway method - threadedRPCRelayHeader was likely called
+		// from an exported gateway function.
+		//
+		// NOTE: In general this is bad design. Rather than recycling other
+		// calls, the whole protocol should have been kept in a single RPC.
+		// Because it is not, we have to do weird threading to prevent
+		// deadlocks, and we also have to be concerned every time the code in
+		// managedReceiveBlocks is adjusted.
 		wg.Add(1)
 		go func() {
 			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
@@ -422,9 +431,15 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	// corresponding block. Call needs to be made in a separate goroutine
 	// because an exported call to the gateway is used, which is a deadlock
 	// risk given that rpcRelayHeader is called from the gateway.
+	//
+	// NOTE: In general this is bad design. Rather than recycling other calls,
+	// the whole protocol should have been kept in a single RPC. Because it is
+	// not, we have to do weird threading to prevent deadlocks, and we also
+	// have to be concerned every time the code in managedReceiveBlock is
+	// adjusted.
 	wg.Add(1)
 	go func() {
-		err = cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+		err = cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.managedReceiveBlock(h.ID()))
 		if err != nil {
 			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
 		}
@@ -435,7 +450,7 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 
 // rpcSendBlk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
-	// Decode the block id from the conneciton.
+	// Decode the block id from the connection.
 	var id types.BlockID
 	err := encoding.ReadObject(conn, &id, crypto.HashSize)
 	if err != nil {
@@ -464,12 +479,12 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	return nil
 }
 
-// threadedReceiveBlock takes a block id and returns an RPCFunc that requests that
+// managedReceiveBlock takes a block id and returns an RPCFunc that requests that
 // block and then calls AcceptBlock on it. The returned function should be used
 // as the calling end of the SendBlk RPC. Note that although the function
 // itself does not do any locking, it is still prefixed with "threaded" because
 // the function it returns calls the exported method AcceptBlock.
-func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
+func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 	return func(conn modules.PeerConn) error {
 		if err := encoding.WriteObject(conn, id); err != nil {
 			return err
