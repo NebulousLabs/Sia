@@ -203,10 +203,12 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 		numNodes := len(g.nodes)
 		peer, err := g.randomPeer()
 		g.mu.RUnlock()
-		if err != nil {
-			// Most commonly the error indicates that there are no peers yet.
-			// Waiting through the next iteration gives the gateway time to
-			// bootstrap.
+		if err == errNoPeers {
+			// errNoPeers is a common and expected error, there's no need to
+			// log it.
+			continue
+		} else if err != nil {
+			g.log.Println("ERROR: could not fetch a random peer:", err)
 			continue
 		}
 
