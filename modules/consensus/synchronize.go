@@ -484,13 +484,6 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // checked to be the same. This can cause issues if you are connected to
 // outbound peers <= v0.5.1 that are stalled in IBD.
 func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
-	err := cs.tg.Add()
-	if err != nil {
-		return err
-	}
-	defer cs.tg.Done()
-	stopChan := cs.tg.StopChan()
-
 	// The consensus set will not recognize IBD as complete until it has enough
 	// peers. After the deadline though, it will recognize the blochchain
 	// download as complete even with only one peer. This deadline is helpful
@@ -502,7 +495,6 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 	numOutboundSynced := 0
 	numOutboundNotSynced := 0
 	for {
-
 		numOutboundSynced = 0
 		numOutboundNotSynced = 0
 		for _, p := range cs.gateway.Peers() {
@@ -513,37 +505,45 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 				continue
 			}
 
-			// Check whether shutdown has started.
-			select {
-			case <-stopChan:
-				return errEarlyStop
-			default:
-			}
-
-			// Request blocks from the peer. The error returned will only be
-			// 'nil' if there are no more blocks to receive.
-			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
-			if err == nil {
-				numOutboundSynced++
-				continue
-			}
-			numOutboundNotSynced++
-			// TODO: Timeout errors returned by muxado do not conform to the net.Error
-			// interface and therefore we cannot check if the error is a timeout using
-			// the Timeout() method. Once muxado issue #14 is resolved change the below
-			// condition to:
-			//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
-			if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
-				cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
-				// Disconnect if there is an unexpected error (not a timeout). This
-				// includes errSendBlocksStalled.
-				//
-				// We disconnect so that these peers are removed from gateway.Peers() and
-				// do not prevent us from marking ourselves as fully synced.
-				err := cs.gateway.Disconnect(p.NetAddress)
+			// Put the rest of the iteration inside of a thread group.
+			err := func() error {
+				err := cs.tg.Add()
 				if err != nil {
-					cs.log.Printf("WARN: disconnecting from peer %v failed: %v", p.NetAddress, err)
+					return err
 				}
+				defer cs.tg.Done()
+
+				// Request blocks from the peer. The error returned will only be
+				// 'nil' if there are no more blocks to receive.
+				err = cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
+				if err == nil {
+					numOutboundSynced++
+					// In this case, 'return nil' is equivalent to skipping to
+					// the next iteration of the loop.
+					return nil
+				}
+				numOutboundNotSynced++
+				// TODO: Timeout errors returned by muxado do not conform to the net.Error
+				// interface and therefore we cannot check if the error is a timeout using
+				// the Timeout() method. Once muxado issue #14 is resolved change the below
+				// condition to:
+				//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
+				if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
+					cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
+					// Disconnect if there is an unexpected error (not a timeout). This
+					// includes errSendBlocksStalled.
+					//
+					// We disconnect so that these peers are removed from gateway.Peers() and
+					// do not prevent us from marking ourselves as fully synced.
+					err := cs.gateway.Disconnect(p.NetAddress)
+					if err != nil {
+						cs.log.Printf("WARN: disconnecting from peer %v failed: %v", p.NetAddress, err)
+					}
+				}
+				return nil
+			}()
+			if err != nil {
+				return err
 			}
 		}
 
@@ -553,7 +553,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 		//
 		// It is possible that our peers are malicous and will lie to us about
 		// being synced, which is why we take the majority after 10 minutes.
-		if numOutboundSynced >= minNumOutbound || (numOutboundSynced > numOutboundNotSynced && time.Now().After(deadline)) {
+		if numOutboundSynced > numOutboundNotSynced && (numOutboundSynced >= minNumOutbound || time.Now().After(deadline)) {
 			break
 		} else {
 			// Sleep so we don't hammer the network with SendBlock requests.
