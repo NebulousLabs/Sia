@@ -104,9 +104,9 @@ func (srv *Server) Close() error {
 		name string
 		c    io.Closer
 	}{
+		{"explorer", srv.api.explorer},
 		{"host", srv.api.host},
 		{"renter", srv.api.renter},
-		{"explorer", srv.api.explorer},
 		{"miner", srv.api.miner},
 		{"wallet", srv.api.wallet},
 		{"tpool", srv.api.tpool},
