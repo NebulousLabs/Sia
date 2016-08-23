@@ -594,12 +594,18 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 			}
 		}
 
-		// If we have minNumOutbound peers synced, we are done. Otherwise,
-		// don't say we are synced until we've been doing ibd for 10 minutes
-		// and we have strictly more synced peers than not synced peers.
+		// The consensus set is not considered synced until a majority of
+		// outbound peers say that we are synced. If less than 10 minutes have
+		// passed, a minimum of 'minNumOutbound' peers must say that we are
+		// synced, otherwise a 1 vs 0 majority is sufficient.
 		//
-		// It is possible that our peers are malicous and will lie to us about
-		// being synced, which is why we take the majority after 10 minutes.
+		// This scheme is used to prevent malicious peers from being able to
+		// barricade the sync'd status of the consensus set, and to make sure
+		// that consensus sets behind a firewall with only one peer
+		// (potentially a local peer) are still able to eventually conclude
+		// that they have syncrhonized. Miners and hosts will often have setups
+		// beind a firewall where there is a single node with many peers and
+		// then the rest of the nodes only have a few peers.
 		if numOutboundSynced > numOutboundNotSynced && (numOutboundSynced >= minNumOutbound || time.Now().After(deadline)) {
 			break
 		} else {
