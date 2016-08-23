@@ -129,8 +129,9 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 	return blockIDs
 }
 
-// threadedReceiveBlocks is the calling end of the SendBlocks RPC.
-func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
+// managedReceiveBlocks is the calling end of the SendBlocks RPC, without the
+// threadgroup wrapping.
+func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
 	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
@@ -231,6 +232,16 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 		}
 	}
 	return nil
+}
+
+// threadedReceiveBlocks is the calling end of the SendBlocks RPC.
+func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+	return managedReceiveBlocks(conn)
 }
 
 // rpcSendBlocks is the receiving end of the SendBlocks RPC. It returns a
@@ -351,7 +362,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
 		go func() {
-			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
+			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan block:", err)
 			}
@@ -396,7 +407,7 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 		// If the header is an orphan, try to find the parents.
 		wg.Add(1)
 		go func() {
-			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
+			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
@@ -515,7 +526,7 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
 
 				// Request blocks from the peer. The error returned will only be
 				// 'nil' if there are no more blocks to receive.
-				err = cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
+				err = cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.managedReceiveBlocks)
 				if err == nil {
 					numOutboundSynced++
 					// In this case, 'return nil' is equivalent to skipping to
