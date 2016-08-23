@@ -482,13 +482,21 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // The height and the block id of the remote peers' current blocks are not
 // checked to be the same. This can cause issues if you are connected to
 // outbound peers <= v0.5.1 that are stalled in IBD.
-func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
-	// Set the deadline 10 minutes in the future. After this deadline, we will say
-	// IBD is done as long as there is at least one outbound peer synced.
+func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
+	// The consensus set will not recognize IBD as complete until it has enough
+	// peers. After the deadline though, it will recognize the blochchain
+	// download as complete even with only one peer. This deadline is helpful
+	// to local-net setups, where a machine will frequently only have one peer
+	// (and that peer will be another machine on the same local network, but
+	// within the local network at least one peer is connected to the braod
+	// network).
 	deadline := time.Now().Add(minIBDWaitTime)
 	numOutboundSynced := 0
+	numOutboundNotSynced := 0
 	for {
+
 		numOutboundSynced = 0
+		numOutboundNotSynced = 0
 		for _, p := range cs.gateway.Peers() {
 			// We only sync on outbound peers at first to make IBD less susceptible to
 			// fast-mining and other attacks, as outbound peers are more difficult to
@@ -497,11 +505,14 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 				continue
 			}
 
+			// Request blocks from the peer. The error returned will only be
+			// 'nil' if there are no more blocks to receive.
 			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
 			if err == nil {
 				numOutboundSynced++
 				continue
 			}
+			numOutboundNotSynced++
 			// TODO: Timeout errors returned by muxado do not conform to the net.Error
 			// interface and therefore we cannot check if the error is a timeout using
 			// the Timeout() method. Once muxado issue #14 is resolved change the below
@@ -521,10 +532,13 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 			}
 		}
 
-		// If we have minNumOutbound peers synced, we are done. Otherwise, don't say
-		// we are synced until we've been doing ibd for 10 minutes and we are synced
-		// with at least one peer.
-		if numOutboundSynced >= minNumOutbound || (numOutboundSynced > 0 && time.Now().After(deadline)) {
+		// If we have minNumOutbound peers synced, we are done. Otherwise,
+		// don't say we are synced until we've been doing ibd for 10 minutes
+		// and we have strictly more synced peers than not synced peers.
+		//
+		// It is possible that our peers are malicous and will lie to us about
+		// being synced, which is why we take the majority after 10 minutes.
+		if numOutboundSynced >= minNumOutbound || (numOutboundSynced > numOutboundNotSynced && time.Now().After(deadline)) {
 			break
 		} else {
 			// Sleep so we don't hammer the network with SendBlock requests.
