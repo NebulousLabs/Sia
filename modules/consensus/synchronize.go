@@ -182,7 +182,7 @@ func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr e
 		if chainExtended && cs.Synced() {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
-			currentBlock := cs.CurrentBlock()
+			currentBlock := cs.managedCurrentBlock()
 			// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
 			var relayBlockPeers, relayHeaderPeers []modules.Peer
 			for _, p := range cs.gateway.Peers() {

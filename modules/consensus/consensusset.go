@@ -196,7 +196,7 @@ func (cs *ConsensusSet) BlockAtHeight(height types.BlockHeight) (block types.Blo
 
 // ChildTarget returns the target for the child of a block.
 func (cs *ConsensusSet) ChildTarget(id types.BlockID) (target types.Target, exists bool) {
-	// A call to a close database can cause undefined behavior.
+	// A call to a closed database can cause undefined behavior.
 	err := cs.tg.Add()
 	if err != nil {
 		return types.Target{}, false
@@ -220,9 +220,22 @@ func (cs *ConsensusSet) Close() error {
 	return cs.tg.Stop()
 }
 
+// managedCurrentBlock returns the latest block in the heaviest known blockchain.
+func (cs *ConsensusSet) managedCurrentBlock() (block types.Block) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	_ = cs.db.View(func(tx *bolt.Tx) error {
+		pb := currentProcessedBlock(tx)
+		block = pb.Block
+		return nil
+	})
+	return block
+}
+
 // CurrentBlock returns the latest block in the heaviest known blockchain.
 func (cs *ConsensusSet) CurrentBlock() (block types.Block) {
-	// A call to a close database can cause undefined behavior.
+	// A call to a closed database can cause undefined behavior.
 	err := cs.tg.Add()
 	if err != nil {
 		return types.Block{}
@@ -247,7 +260,7 @@ func (cs *ConsensusSet) Flush() error {
 
 // Height returns the height of the consensus set.
 func (cs *ConsensusSet) Height() (height types.BlockHeight) {
-	// A call to a close database can cause undefined behavior.
+	// A call to a closed database can cause undefined behavior.
 	err := cs.tg.Add()
 	if err != nil {
 		return 0
@@ -264,7 +277,7 @@ func (cs *ConsensusSet) Height() (height types.BlockHeight) {
 // InCurrentPath returns true if the block presented is in the current path,
 // false otherwise.
 func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
-	// A call to a close database can cause undefined behavior.
+	// A call to a closed database can cause undefined behavior.
 	err := cs.tg.Add()
 	if err != nil {
 		return false
@@ -291,7 +304,7 @@ func (cs *ConsensusSet) InCurrentPath(id types.BlockID) (inPath bool) {
 // MinimumValidChildTimestamp returns the earliest timestamp that the next block
 // can have in order for it to be considered valid.
 func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp types.Timestamp, exists bool) {
-	// A call to a close database can cause undefined behavior.
+	// A call to a closed database can cause undefined behavior.
 	err := cs.tg.Add()
 	if err != nil {
 		return 0, false
@@ -314,7 +327,7 @@ func (cs *ConsensusSet) MinimumValidChildTimestamp(id types.BlockID) (timestamp 
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
 func (cs *ConsensusSet) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
-	// A call to a close database can cause undefined behavior.
+	// A call to a closed database can cause undefined behavior.
 	err = cs.tg.Add()
 	if err != nil {
 		return 0, err
