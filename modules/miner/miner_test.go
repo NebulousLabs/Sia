@@ -98,6 +98,9 @@ func createMinerTester(name string) (*minerTester, error) {
 // TestIntegrationMiner creates a miner, mines a few blocks, and checks that
 // the wallet balance is updating as the blocks get mined.
 func TestIntegrationMiner(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	mt, err := createMinerTester("TestMiner")
 	if err != nil {
 		t.Fatal(err)
@@ -110,9 +113,6 @@ func TestIntegrationMiner(t *testing.T) {
 	}
 
 	// Mine a bunch of blocks.
-	if testing.Short() {
-		t.SkipNow()
-	}
 	for i := 0; i < 50; i++ {
 		b, _ := mt.miner.FindBlock()
 		err = mt.cs.AcceptBlock(b)

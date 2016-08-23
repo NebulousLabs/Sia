@@ -88,6 +88,9 @@ func postEncryptionTesting(m modules.TestMiner, w *Wallet, masterKey crypto.Twof
 // TestIntegrationPreEncryption checks that the wallet operates as expected
 // prior to encryption.
 func TestIntegrationPreEncryption(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	wt, err := createBlankWalletTester("TestIntegrationPreEncryption")
 	if err != nil {
 		t.Fatal(err)

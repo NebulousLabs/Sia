@@ -5,11 +5,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
+	siasync "github.com/NebulousLabs/Sia/sync"
 )
 
 // newTestingGateway returns a gateway read to use in a testing environment.
@@ -20,13 +21,18 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 
 	g, err := New("localhost:0", build.TempDir("gateway", name))
 	if err != nil {
-		t.Fatal(err)
+		// TODO: the proper thing to do here is to return an error and not even
+		// take a `testing.T` as an arguement. Calling t.Fatal is insufficient
+		// because we aren't sure whether or not this function was called in
+		// the main goroutine of the test, which is required if the test is
+		// going to fail properly.
+		panic(err)
 	}
 	return g
 }
 
 // TestExportedMethodsErrAfterClose tests that exported methods like Close and
-// Connect error with sync.ErrStopped after the gateway has been closed.
+// Connect error with siasync.ErrStopped after the gateway has been closed.
 func TestExportedMethodsErrAfterClose(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -36,11 +42,11 @@ func TestExportedMethodsErrAfterClose(t *testing.T) {
 	if err := g.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.Close(); err != sync.ErrStopped {
-		t.Fatalf("expected %q, got %q", sync.ErrStopped, err)
+	if err := g.Close(); err != siasync.ErrStopped {
+		t.Fatalf("expected %q, got %q", siasync.ErrStopped, err)
 	}
-	if err := g.Connect("localhost:1234"); err != sync.ErrStopped {
-		t.Fatalf("expected %q, got %q", sync.ErrStopped, err)
+	if err := g.Connect("localhost:1234"); err != siasync.ErrStopped {
+		t.Fatalf("expected %q, got %q", siasync.ErrStopped, err)
 	}
 }
 
@@ -103,6 +109,9 @@ func TestPeers(t *testing.T) {
 
 // TestNew checks that a call to New is effective.
 func TestNew(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	if _, err := New("", ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
@@ -136,4 +145,75 @@ func TestClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestParallelClose spins up 3 gateways, connects them all, and then closes
+// them in parallel. The goal of this test is to make it more vulnerable to any
+// potential nondeterministic failures.
+func TestParallelClose(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Spin up three gateways in parallel.
+	var g1, g2, g3 *Gateway
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		g1 = newTestingGateway("TestParallelClose - 1", t)
+		wg.Done()
+	}()
+	go func() {
+		g2 = newTestingGateway("TestParallelClose - 2", t)
+		wg.Done()
+	}()
+	go func() {
+		g3 = newTestingGateway("TestParallelClose - 3", t)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	// Connect g1 to g2, g2 to g3. They may connect to eachother further.
+	wg.Add(2)
+	go func() {
+		err := g1.Connect(g2.myAddr)
+		if err != nil {
+			panic(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		err := g2.Connect(g3.myAddr)
+		if err != nil {
+			panic(err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+
+	// Close all three gateways in parallel.
+	wg.Add(3)
+	go func() {
+		err := g1.Close()
+		if err != nil {
+			panic(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		err := g2.Close()
+		if err != nil {
+			panic(err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		err := g3.Close()
+		if err != nil {
+			panic(err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
 }
