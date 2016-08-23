@@ -140,45 +140,28 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		}
 
 		// Try connecting to the random node. If the node is not reachable,
-		// remove them from the node list. Make sure that the dial is stopped
-		// early if the gateway is shutting down.
-		func() {
-			cancelDialChan := make(chan struct{})
-			dialDoneChan := make(chan struct{})
-			defer close(dialDoneChan)
-			go func() {
-				select {
-				case <-dialDoneChan:
-				case <-g.threads.StopChan():
-					close(cancelDialChan)
-				}
-			}()
-			dialer := &net.Dialer{
-				Timeout: dialTimeout,
-				Cancel:  cancelDialChan,
-			}
-			conn, err := dialer.Dial("tcp", string(node))
-			if err != nil {
-				// NOTE: an error may be returned if the dial is cancelled
-				// partway through, which would cause the node to be pruned
-				// even though it may be a good node. Because nodes are
-				// plentiful, that's not a huge problem.
-				g.mu.Lock()
-				g.removeNode(node)
-				g.save()
-				g.mu.Unlock()
-				g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
-				return
-			}
+		// remove them from the node list.
+		conn, err := g.dial(node)
+		if err != nil {
+			// NOTE: an error may be returned if the dial is cancelled
+			// partway through, which would cause the node to be pruned
+			// even though it may be a good node. Because nodes are
+			// plentiful, that's not a huge problem.
+			g.mu.Lock()
+			g.removeNode(node)
+			g.save()
+			g.mu.Unlock()
+			g.log.Debugf("INFO: removing node %q because dialing it failed: %v", node, err)
+			continue
+		}
 
-			// If connection succeeds, supply an unacceptable version so that we
-			// will not be added as a peer.
-			//
-			// NOTE: this is a somewhat clunky way of specifying that you didn't
-			// actually want a connection.
-			encoding.WriteObject(conn, "0.0.0")
-			conn.Close()
-		}()
+		// If connection succeeds, supply an unacceptable version so that we
+		// will not be added as a peer.
+		//
+		// NOTE: this is a somewhat clunky way of specifying that you didn't
+		// actually want a connection.
+		encoding.WriteObject(conn, "0.0.0")
+		conn.Close()
 	}
 }
 

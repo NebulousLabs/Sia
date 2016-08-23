@@ -421,44 +421,24 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 
 	// Dial the peer, providing a means to interrupt the dial if a gateway
 	// shutdown call is made early.
-	err := func() error {
-		cancelDialChan := make(chan struct{})
-		dialDoneChan := make(chan struct{})
-		defer close(dialDoneChan)
-		dialer := &net.Dialer{
-			Timeout: dialTimeout,
-			Cancel:  cancelDialChan,
-		}
-		go func() {
-			select {
-			case <-dialDoneChan:
-			case <-g.threads.StopChan():
-				close(cancelDialChan)
-			}
-		}()
-		conn, err := dialer.Dial("tcp", string(addr))
-		if err != nil {
-			return err
-		}
-
-		// Perform peer initialization.
-		remoteVersion, err := connectVersionHandshake(conn, build.Version)
-		if err != nil {
-			conn.Close()
-			return err
-		}
-		if build.VersionCmp(remoteVersion, "1.0.0") < 0 {
-			err = g.managedConnectOldPeer(conn, remoteVersion, addr)
-		} else {
-			err = g.managedConnectNewPeer(conn, remoteVersion, addr)
-		}
-		if err != nil {
-			conn.Close()
-			return err
-		}
-		return nil
-	}()
+	conn, err := g.dial(addr)
 	if err != nil {
+		return err
+	}
+
+	// Perform peer initialization.
+	remoteVersion, err := connectVersionHandshake(conn, build.Version)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	if build.VersionCmp(remoteVersion, "1.0.0") < 0 {
+		err = g.managedConnectOldPeer(conn, remoteVersion, addr)
+	} else {
+		err = g.managedConnectNewPeer(conn, remoteVersion, addr)
+	}
+	if err != nil {
+		conn.Close()
 		return err
 	}
 	g.log.Debugln("INFO: connected to new peer", addr)
