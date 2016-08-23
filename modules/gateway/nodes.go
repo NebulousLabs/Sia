@@ -12,6 +12,7 @@ import (
 
 var (
 	errNodeExists = errors.New("node already added")
+	errNoNodes    = errors.New("no nodes in the node list")
 	errOurAddress = errors.New("can't add our own address")
 )
 
@@ -122,9 +123,13 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		numNodes := len(g.nodes)
 		node, err := g.randomNode()
 		g.mu.RUnlock()
-		if err != nil {
-			// Most likely the error indicates that there are no nodes in the
-			// node list. Wait until the next iteration to try again.
+		if err == errNoNodes {
+			// errNoNodes is a common error that will be resovled by the
+			// bootstrap process.
+			continue
+		} else if err != nil {
+			// Unusual error, create a logging statement.
+			g.log.Println("ERROR: could not pick a random node for uptime check:", err)
 			continue
 		}
 		if numNodes <= pruneNodeListLen {
