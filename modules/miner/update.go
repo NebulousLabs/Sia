@@ -35,27 +35,11 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			m.persist.Height = 0
 		}
 	}
-	// Sanity check - if the most recent block in the miner is the same as the
-	// most recent block in the consensus set, then the height of the consensus
-	// set and the height of the miner should be the same.
-	if cc.Synced {
-		if m.persist.Height != m.cs.Height() {
-			m.log.Critical("Miner has a height mismatch: expecting ", m.cs.Height(), " but got ", m.persist.Height, ". Recent update had ", len(cc.RevertedBlocks), " reverted blocks, and ", len(cc.AppliedBlocks), " applied blocks.")
-			m.persist.Height = m.cs.Height()
-		}
-	}
 
 	// Update the unsolved block.
-	var exists1, exists2 bool
 	m.persist.UnsolvedBlock.ParentID = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
-	m.persist.Target, exists1 = m.cs.ChildTarget(m.persist.UnsolvedBlock.ParentID)
-	m.persist.UnsolvedBlock.Timestamp, exists2 = m.cs.MinimumValidChildTimestamp(m.persist.UnsolvedBlock.ParentID)
-	if !exists1 {
-		m.log.Critical("miner was unable to find parent id of an unsolved block in the consensus set")
-	}
-	if !exists2 {
-		m.log.Critical("miner was unable to find child timestamp of an unsovled block in the consensus set")
-	}
+	m.persist.Target = cc.ChildTarget
+	m.persist.UnsolvedBlock.Timestamp = cc.MinimumValidChildTimestamp
 
 	// There is a new parent block, the source block should be updated to keep
 	// the stale rate as low as possible.

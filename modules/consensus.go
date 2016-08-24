@@ -111,6 +111,15 @@ type (
 		// consensus set in the recent change.
 		SiafundPoolDiffs []SiafundPoolDiff
 
+		// ChildTarget defines the target of any block that would be the child
+		// of the block most recently appended to the consensus set.
+		ChildTarget types.Target
+
+		// MinimumValidChildTimestamp defines the minimum allowed timestamp for
+		// any block that is the child of the block most recently appended to
+		// the consensus set.
+		MinimumValidChildTimestamp types.Timestamp
+
 		// Synced indicates whether or not the ConsensusSet is synced with its
 		// peers.
 		Synced bool
