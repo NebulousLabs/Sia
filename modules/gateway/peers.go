@@ -13,7 +13,10 @@ import (
 	"github.com/NebulousLabs/muxado"
 )
 
-var errPeerRejectedConn = errors.New("peer rejected connection")
+var (
+	errPeerExists       = errors.New("already connected to this peer")
+	errPeerRejectedConn = errors.New("peer rejected connection")
+)
 
 // insufficientVersionError indicates a peer's version is insufficient.
 type insufficientVersionError string
@@ -198,12 +201,11 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 	}
 
 	err = g.addNode(remoteAddr)
-	if err != nil && err != errNodeExists {
-		return fmt.Errorf("error adding node %q: %v", remoteAddr, err)
-	}
-	err = g.save()
 	if err != nil {
-		return fmt.Errorf("error saving node list: %v", err)
+		err = g.save()
+		if err != nil {
+			g.log.Printf("error saving node list: %v\n", err)
+		}
 	}
 
 	g.acceptPeer(&peer{
@@ -214,7 +216,6 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 		},
 		sess: muxado.Server(conn),
 	})
-
 	return nil
 }
 
@@ -372,12 +373,11 @@ func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, rem
 	defer g.mu.Unlock()
 
 	err := g.addNode(remoteAddr)
-	if err != nil && err != errNodeExists {
-		return err
-	}
-	err = g.save()
 	if err != nil {
-		return fmt.Errorf("error saving node list: %v", err)
+		err = g.save()
+		if err != nil {
+			g.log.Printf("error saving node list: %v\n", err)
+		}
 	}
 
 	g.addPeer(&peer{
@@ -408,12 +408,11 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 	defer g.mu.Unlock()
 
 	err = g.addNode(remoteAddr)
-	if err != nil && err != errNodeExists {
-		return err
-	}
-	err = g.save()
 	if err != nil {
-		return fmt.Errorf("error saving node list: %v", err)
+		err = g.save()
+		if err != nil {
+			g.log.Printf("error saving node list: %v\n", err)
+		}
 	}
 
 	g.addPeer(&peer{
@@ -447,7 +446,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	_, exists := g.peers[addr]
 	g.mu.RUnlock()
 	if exists {
-		return errors.New("peer already added")
+		return errPeerExists
 	}
 
 	// Dial the peer, providing a means to interrupt the dial if a gateway
@@ -522,7 +521,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			continue
 		}
 
-		// Fetch a random peer.
+		// Fetch a random node.
 		g.mu.RLock()
 		addr, err := g.randomNode()
 		g.mu.RUnlock()
@@ -550,7 +549,22 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 			defer g.threads.Done()
 
 			err := g.managedConnect(addr)
-			if err != nil {
+			if err == errPeerExists {
+				// This peer is already connected to us. Safety around the
+				// oubound peers relates to the fact that we have picked out
+				// the outbound peers instead of allow the attacker to pick out
+				// the peers for us. Because we have made the selection, it is
+				// okay to set the peer as an outbound peer.
+				g.mu.Lock()
+				p, exists := g.peers[addr]
+				if exists {
+					// Have to check it exists because we released the lock, a
+					// race condition could mean that the peer was disconnected
+					// before this code block was reached.
+					p.Inbound = false
+				}
+				g.mu.Unlock()
+			} else if err != nil {
 				g.log.Debugln("WARN: automatic connect failed:", err)
 			}
 		}()
