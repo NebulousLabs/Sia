@@ -253,81 +253,79 @@ refer to [Host.md](/doc/api/Host.md).
 
 fetches status information about the host.
 
-// TODO: convert to example JSON response and add units.
 ###### JSON Response [(with comments)](/doc/api/Host.md#json-response)
-```go
-struct {
-	externalsettings {
-		acceptingcontracts   bool
-		maxdownloadbatchsize uint64
-		maxduration          types.BlockHeight (uint64)
-		maxrevisebatchsize   uint64
-		netaddress           modules.NetAddress (string)
-		remainingstorage     uint64
-		sectorsize           uint64
-		totalstorage         uint64
-		unlockhash           types.UnlockHash (string)
-		windowsize           types.BlockHeight (uint64)
+```javascript
+{
+  "externalsettings": {
+    "acceptingcontracts":   true,
+    "maxdownloadbatchsize": 17825792, // bytes
+    "maxduration":          25920,    // blocks
+    "maxrevisebatchsize":   17825792, // bytes
+    "netaddress":           "123.456.789.0:9982",
+    "remainingstorage":     35000000000, // bytes
+    "sectorsize":           4194304,     // bytes
+    "totalstorage":         35000000000, // bytes
+    "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+    "windowsize":           144, // blocks
 
-		collateral    types.Currency (string)
-		maxcollateral types.Currency (string)
+    "collateral":    "57870370370",                     // hastings / byte / block
+    "maxcollateral": "100000000000000000000000000000",  // hastings
 
-		contractprice          types.Currency (string)
-		downloadbandwidthprice types.Currency (string)
-		storageprice           types.Currency (string)
-		uploadbandwidthprice   types.Currency (string)
+    "contractprice":          "30000000000000000000000000", // hastings
+    "downloadbandwidthprice": "250000000000000",            // hastings / byte
+    "storageprice":           "231481481481",               // hastings / byte / block
+    "uploadbandwidthprice":   "100000000000000",            // hastings / byte
 
-		revisionnumber uint64
-		version        string
-	}
+    "revisionnumber": 0,
+    "version":        "1.0.0"
+  },
 
-	financialmetrics {
-		contractcompensation          types.Currency (string)
-		potentialcontractcompensation types.Currency (string)
+  "financialmetrics": {
+    "contractcount":                 2,
+    "contractcompensation":          "123", // hastings
+    "potentialcontractcompensation": "123", // hastings
 
-		lockedstoragecollateral types.Currency (string)
-		lostrevenue             types.Currency (string)
-		loststoragecollateral   types.Currency (string)
-		potentialstoragerevenue types.Currency (string)
-		riskedstoragecollateral types.Currency (string)
-		storagerevenue          types.Currency (string)
-		transactionfeeexpenses  types.Currency (string)
+    "lockedstoragecollateral": "123", // hastings
+    "lostrevenue":             "123", // hastings
+    "loststoragecollateral":   "123", // hastings
+    "potentialstoragerevenue": "123", // hastings
+    "riskedstoragecollateral": "123", // hastings
+    "storagerevenue":          "123", // hastings
+    "transactionfeeexpenses":  "123", // hastings
 
-		downloadbandwidthrevenue          types.Currency (string)
-		potentialdownloadbandwidthrevenue types.Currency (string)
-		potentialuploadbandwidthrevenue   types.Currency (string)
-		uploadbandwidthrevenue            types.Currency (string)
-	}
+    "downloadbandwidthrevenue":          "123", // hastings
+    "potentialdownloadbandwidthrevenue": "123", // hastings
+    "potentialuploadbandwidthrevenue":   "123", // hastings
+    "uploadbandwidthrevenue":            "123"  // hastings
+  },
 
-	internalsettings {
-		acceptingcontracts   bool
-		maxdownloadbatchsize uint64
-		maxduration          types.BlockHeight (uint64)
-		maxrevisebatchsize   uint64
-		netaddress           modules.NetAddress (string)
-		windowsize           types.BlockHeight (uint64)
+  "internalsettings": {
+    "acceptingcontracts":   true,
+    "maxdownloadbatchsize": 17825792, // bytes
+    "maxduration":          25920,    // blocks
+    "maxrevisebatchsize":   17825792, // bytes
+    "netaddress":           "123.456.789.0:9982",
+    "windowsize":           144, // blocks
 
-		collateral       types.Currency (string)
-		collateralbudget types.Currency (string)
-		maxcollateral    types.Currency (string)
+    "collateral":       "57870370370",                     // hastings / byte / block
+    "collateralbudget": "2000000000000000000000000000000", // hastings
+    "maxcollateral":    "100000000000000000000000000000",  // hastings
 
-		mincontractprice          types.Currency (string)
-		mindownloadbandwidthprice types.Currency (string)
-		minstorageprice           types.Currency (string)
-		minuploadbandwidthprice   types.Currency (string)
-	}
+    "mincontractprice":          "30000000000000000000000000", // hastings
+    "mindownloadbandwidthprice": "250000000000000",            // hastings / byte
+    "minstorageprice":           "231481481481",               // hastings / byte / block
+    "minuploadbandwidthprice":   "100000000000000"             // hastings / byte
+  },
 
-	// Information about the network, specifically various ways in which
-	// renters have contacted the host.
-	networkmetrics {
-		downloadcalls     uint64
-		errorcalls        uint64
-		formcontractcalls uint64
-		renewcalls        uint64
-		revisecalls       uint64
-		settingscalls     uint64
-		unrecognizedcalls uint64
-	}
+  "networkmetrics": {
+    "downloadcalls":     0,
+    "errorcalls":        1,
+    "formcontractcalls": 2,
+    "renewcalls":        3,
+    "revisecalls":       4,
+    "settingscalls":     5,
+    "unrecognizedcalls": 6
+  }
 }
 ```
 
