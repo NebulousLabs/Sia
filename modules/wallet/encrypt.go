@@ -99,14 +99,6 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, erro
 		return modules.Seed{}, err
 	}
 
-	// Preload keys for the seed. The wallet preloads keys to prevent
-	// confusion for people using the same seed/wallet file in multiple
-	// places.
-	for i := uint64(0); i < modules.WalletSeedPreloadDepth; i++ {
-		spendableKey := generateSpendableKey(seed, i)
-		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
-	}
-
 	// on future startups, this field will be set by w.initPersist
 	w.encrypted = true
 

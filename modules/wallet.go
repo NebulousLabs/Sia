@@ -21,10 +21,6 @@ const (
 	// PublicKeysPerSeed define the number of public keys that get pregenerated
 	// for a seed at startup when searching for balances in the blockchain.
 	PublicKeysPerSeed = 2500
-
-	// WalletSeedPreloadDepth is the number of addresses that get automatically
-	// loaded by the wallet at startup.
-	WalletSeedPreloadDepth = 25
 )
 
 var (
