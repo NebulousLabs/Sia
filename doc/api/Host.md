@@ -326,19 +326,19 @@ parameters will be left unchanged.
 // When set to true, the host will accept new file contracts if the
 // terms are reasonable. When set to false, the host will not accept new
 // file contracts at all.
-acceptingcontracts bool // Optional
+acceptingcontracts // Optional, true / false
 
 // The maximum size of a single download request from a renter. Each
 // download request has multiple round trips of communication that
 // exchange money. Larger batch sizes mean fewer round trips, but more
 // financial risk for the host - the renter can get a free batch when
 // downloading by refusing to provide a signature.
-maxdownloadbatchsize uint64 // Optional
+maxdownloadbatchsize // Optional, bytes
 
 // The maximum duration of a file contract that the host will accept.
 // The storage proof window must end before the current height +
 // maxduration.
-maxduration types.BlockHeight (uint64) // Optional
+maxduration // Optional, blocks
 
 // The maximum size of a single batch of file contract revisions. The
 // renter can perform DoS attacks on the host by uploading a batch of
@@ -346,36 +346,30 @@ maxduration types.BlockHeight (uint64) // Optional
 // host can reduce this exposure by limiting the batch size. Larger
 // batch sizes allow for higher throughput as there is significant
 // communication overhead associated with performing a batch upload.
-maxrevisebatchsize uint64 // Optional
+maxrevisebatchsize // Optional, bytes
 
 // The IP address or hostname (including port) that the host should be
 // contacted at. If left blank, the host will automatically figure out
 // its ip address and use that. If given, the host will use the address
 // given.
-netaddress modules.NetAddress (string) // Optional
+netaddress // Optional
 
 // The storage proof window is the number of blocks that the host has
 // to get a storage proof onto the blockchain. The window size is the
 // minimum size of window that the host will accept in a file contract.
-windowsize types.BlockHeight (uint64) // Optional
+windowsize // Optional, blocks
 
 // The maximum amount of money that the host will put up as collateral
 // per byte per block of storage that is contracted by the renter.
-//
-// The unit is hastings per byte per block.
-collateral types.Currency (string) // Optional
+collateral // Optional, hastings / byte / block
 
 // The total amount of money that the host will allocate to collateral
 // across all file contracts.
-//
-// The unit is hastings.
-collateralbudget types.Currency (string) // Optional
+collateralbudget // Optional, hastings
 
 // The maximum amount of collateral that the host will put into a
 // single file contract.
-//
-// The unit is hastings.
-maxcollateral types.Currency (string) // Optional
+maxcollateral // Optional, hastings
 
 // The minimum price that the host will demand from a renter when
 // forming a contract. Typically this price is to cover transaction
@@ -383,30 +377,22 @@ maxcollateral types.Currency (string) // Optional
 // be used if the host has a low amount of collateral. The price is a
 // minimum because the host may automatically adjust the price upwards
 // in times of high demand.
-//
-// The unit is hastings..
-mincontractprice types.Currency (string) // Optional
+mincontractprice // Optional, hastings
 
 // The minimum price that the host will demand from a renter when the
 // renter is downloading data. If the host is saturated, the host may
 // increase the price from the minimum.
-//
-// The unit is hastings per byte.
-mindownloadbandwidthprice types.Currency (string) // Optional
+mindownloadbandwidthprice // Optional, hastings / byte
 
 // The minimum price that the host will demand when storing data for
 // extended periods of time. If the host is low on space, the price of
 // storage may be set higher than the minimum.
-//
-// The unit is hastings per byte per block.
-minstorageprice types.Currency (string) // Optional
+minstorageprice // Optional, hastings / byte / block
 
 // The minimum price that the host will demand from a renter when the
 // renter is uploading data. If the host is saturated, the host may
 // increase the price from the minimum.
-//
-// The unit is hastings per byte.
-minuploadbandwidthprice types.Currency (string) // Optional
+minuploadbandwidthprice // Optional, hastings / byte
 ```
 
 ###### Response

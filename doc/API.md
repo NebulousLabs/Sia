@@ -336,21 +336,21 @@ parameters will be left unchanged.
 
 ###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters)
 ```
-acceptingcontracts   bool                        // Optional
-maxdownloadbatchsize uint64                      // Optional
-maxduration          types.BlockHeight (uint64)  // Optional
-maxrevisebatchsize   uint64                      // Optional
-netaddress           modules.NetAddress (string) // Optional
-windowsize           types.BlockHeight (uint64)  // Optional
+acceptingcontracts   // Optional, true / false
+maxdownloadbatchsize // Optional, bytes
+maxduration          // Optional, blocks
+maxrevisebatchsize   // Optional, bytes
+netaddress           // Optional
+windowsize           // Optional, blocks
 
-collateral       types.Currency (string) // Optional
-collateralbudget types.Currency (string) // Optional
-maxcollateral    types.Currency (string) // Optional
+collateral       // Optional, hastings / byte / block
+collateralbudget // Optional, hastings
+maxcollateral    // Optional, hastings
 
-mincontractprice          types.Currency (string) // Optional
-mindownloadbandwidthprice types.Currency (string) // Optional
-minstorageprice           types.Currency (string) // Optional
-minuploadbandwidthprice   types.Currency (string) // Optional
+mincontractprice          // Optional, hastings
+mindownloadbandwidthprice // Optional, hastings / byte
+minstorageprice           // Optional, hastings / byte / block
+minuploadbandwidthprice   // Optional, hastings / byte
 ```
 
 ###### Response
