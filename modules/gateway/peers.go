@@ -76,21 +76,26 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 
 // randomInboundPeer returns a random peer that initiated its connection.
 func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
-	if len(g.peers) > 0 {
-		r, _ := crypto.RandIntn(len(g.peers))
-		for addr, p := range g.peers {
-			// only select inbound peers
-			if !p.Inbound {
-				continue
-			}
-			if r <= 0 {
-				return addr, nil
-			}
-			r--
+	// Get the list of inbound peers.
+	addrs := []modules.NetAddress
+	for addr, peer := range g.peers {
+		if !p.Inbound {
+			continue
 		}
+		addrs = append(addrs, addr)
+	}
+	if len(addrs) == 0 {
+		return "", errNoPeers
 	}
 
-	return "", errNoPeers
+	// Of the remaining options, select one at random.
+	r, err := crypto.RandIntn(len(addrs))
+	if err != nil {
+		// TODO: This is not a developer bug, and 'Critical' is for
+		// developer bugs.
+		g.log.Critical(err)
+	}
+	return addrs[r], nil
 }
 
 // permanentListen handles incoming connection requests. If the connection is
