@@ -601,253 +601,188 @@ description of the byte encoding.
 Renter
 ------
 
-Queries:
+| Route                                                         | HTTP verb |
+| ------------------------------------------------------------- | --------- |
+| [/renter](#renter-get)                                        | GET       |
+| [/renter](#renter-post)                                       | POST      |
+| [/renter/contracts](#rentercontracts-get)                     | GET       |
+| [/renter/downloads](#renterdownloads-get)                     | GET       |
+| [/renter/files](#renterfiles-get)                             | GET       |
+| [/renter/delete/___*siapath___](#renterdeletesiapath-post)    | POST      |
+| [/renter/download/___*siapath___](#renterdownloadsiapath-get) | GET       |
+| [/renter/rename/___*siapath___](#renterrenamesiapath-post)    | POST      |
+| [/renter/upload/___*siapath___](#renteruploadsiapath-post)    | POST      |
 
-* /renter/allowance          [GET]
-* /renter/allowance          [POST]
-* /renter/downloads          [GET]
-* /renter/files              [GET]
-* /renter/load               [POST]
-* /renter/loadascii          [POST]
-* /renter/share              [GET]
-* /renter/shareascii         [GET]
-* /renter/delete/{siapath}   [POST]
-* /renter/download/{siapath} [GET]
-* /renter/rename/{siapath}   [POST]
-* /renter/upload/{siapath}   [POST]
+For examples and detailed descriptions of request and response parameters,
+refer to [Renter.md](/doc/api/Renter.md).
 
-#### /renter/allowance [GET]
+#### /renter [GET]
 
-Function: Returns the current contract allowance.
+returns the current settings along with metrics on the renter's spending.
 
-Parameters: none
-
-Response:
-```
-struct {
-	funds  types.Currency    (string)
-	hosts  uint64
-	period types.BlockHeight (uint64)
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response)
+```javascript
+{
+  "settings": {
+    "allowance": {
+      "funds":       "1234", // hastings
+      "hosts":       24,
+      "period":      6048, // blocks
+      "renewwindow": 3024  // blocks
+    }
+  },
+  "financialmetrics": {
+    "contractspending": "1234", // hastings
+    "downloadspending": "5678", // hastings
+    "storagespending":  "1234", // hastings
+    "uploadspending":   "5678"  // hastings
+  }
 }
 ```
-'funds' is the number of hastings allocated for file contracts in the given
-period.
 
-'hosts' is the number of hosts that contracts will be formed with.
+#### /renter [POST]
 
-'period' is the duration of contracts formed.
+modify settings that control the renter's behavior.
 
-#### /renter/allowance [POST]
-
-Function: Sets the contract allowance.
-
-Parameters: none
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters)
 ```
-funds  types.Currency    (string)
-hosts  uint64
-period types.BlockHeight (uint64)
+funds  // hastings
+period // block height
 ```
-'funds' is the number of hastings allocated for file contracts in the given
-period.
 
-'hosts' is the number of hosts that contracts will be formed with.
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
-'period' is the duration of contracts formed.
+#### /renter/contracts [GET]
 
-Response: standard
+returns active contracts. Expired contracts are not included.
+
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-1)
+```javascript
+{
+  "contracts": [
+    {
+      "endheight":   50000, // block height
+      "id":          "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "netaddress":  "12.34.56.78:9",
+      "renterfunds": "1234", // hastings
+      "size":        8192    // bytes
+    }
+  ]
+}
+```
 
 #### /renter/downloads [GET]
 
-Function: Lists all files in the download queue.
+lists all files in the download queue.
 
-Parameters: none
-
-Response:
-```
-struct {
-	downloads []struct {
-		siapath     string
-		destination string
-		filesize    uint64
-		received    uint64
-		starttime   Time (string)
-	}
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-2)
+```javascript
+{
+  "downloads": [
+    {
+      "siapath":     "foo/bar.txt",
+      "destination": "/home/users/alice/bar.txt",
+      "filesize":    8192,                  // bytes
+      "received":    4096,                  // bytes
+      "starttime":   "2009-11-10T23:00:00Z" // RFC 3339 time
+    }
+  ]
 }
 ```
-'siapath' is the siapath given to the file when it was uploaded.
 
-'destination' is the path that the file will be downloaded to.
+#### /renter/files [GET]
 
-'filesize' is the size of the file being downloaded.
+lists the status of all files.
 
-'received' is the number of bytes downloaded thus far.
-
-'starttime' is the time at which the download was initiated.
-
-#### /renter/files
-
-Function: Lists the status of all files.
-
-Parameters: none
-
-Response:
-```
-struct {
-	files []struct {
-		siapath        string
-		filesize       uint64
-		available      bool
-		renewing       bool
-		uploadprogress float64
-		expiration     types.BlockHeight (uint64)
-	}
+###### JSON Response [(with comments)](/doc/api/Renter.md#json-response-3)
+```javascript
+{
+  "files": [
+    {
+      "siapath":        "foo/bar.txt",
+      "filesize":       8192, // bytes
+      "available":      true,
+      "renewing":       true,
+      "redundancy":     5,
+      "uploadprogress": 100, // percent
+      "expiration":     60000
+    }
+  ]
 }
 ```
-'siapath' is the location of the file in the renter.
 
-'filesize' is the size of the file in bytes.
+#### /renter/delete/___*siapath___ [POST]
 
-'available' indicates whether or not the file can be downloaded immediately.
+deletes a renter file entry. Does not delete any downloads or original files,
+only the entry in the renter.
 
-'renewing' indicates whether or not the file's contracts will be renewed
-automatically by the renter.
-
-'uploadprogress' is the current upload percentage of the file, including
-redundancy. In general, files will be available for download before
-uploadprogress == 100.
-
-'expiration' is the block height at which the file ceases availability.
-
-#### /renter/load [POST]
-
-Function: Load a .sia file into the renter.
-
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
 ```
-source string
+:siapath
 ```
-'source' is the location on disk of the .sia file being loaded.
 
-Response:
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/download/___*siapath___ [GET]
+
+downloads a file to the local filesystem. The call will block until the file
+has been downloaded.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
 ```
-struct {
-	filesadded []string
-}
+:siapath
 ```
-'filesadded' is an array of renter locations of the files contained in the
-.sia file.
 
-
-#### /renter/loadascii [POST]
-
-Function: Load a .sia file into the renter.
-
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-1)
 ```
-asciisia string
+destination
 ```
-'asciisia' is the ASCII-encoded .sia file that is being loaded.
 
-Response:
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
+
+#### /renter/rename/___*siapath___ [POST]
+
+renames a file. Does not rename any downloads or source files, only renames the
+entry in the renter. An error is returned if `siapath` does not exist or
+`newsiapath` already exists.
+
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-2)
 ```
-struct {
-	filesadded []string
-}
+:siapath
 ```
-See /renter/load for a description of 'filesadded'
 
-#### /renter/share [GET]
-
-Function: Create a .sia file that can be shared with other people.
-
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
 ```
-siapaths    []string
-destination string
+newsiapath
 ```
-'siapaths' is an array of the renter paths to be shared. It is comma-delimited.
 
-'destination' is the path of the .sia file to be created. It must end in
-'.sia'.
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
-Response: standard.
+#### /renter/upload/___*siapath___ [POST]
 
-#### /renter/shareascii [GET]
+uploads a file to the network from the local filesystem.
 
-Function: Create an ASCII .sia file that can be shared with other people.
-
-Parameters:
+###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-3)
 ```
-siapaths []string
+siapath
 ```
-'siapaths' is an array of the nicknames to be shared. It is comma-delimited.
 
-Response:
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
 ```
-struct {
-	asciisia string
-}
+source
 ```
-'asciisia' is the ASCII-encoded .sia file.
 
-#### /renter/delete/{siapath} [POST]
-
-Function: Deletes a renter file entry. Does not delete any downloads or
-original files, only the entry in the renter.
-
-Parameters:
-```
-siapath string
-```
-'siapath' is the location of the file in the renter.
-
-Response: standard
-
-#### /renter/download/{siapath} [GET]
-
-Function: Downloads a file. The call will block until the download completes.
-
-Parameters:
-```
-siapath     string
-destination string
-```
-'siapath' is the location of the file in the renter.
-
-'destination' is the location on disk that the file will be downloaded to.
-
-Response: standard
-
-#### /renter/rename/{siapath} [POST]
-
-Function: Rename a file. Does not rename any downloads or source files, only
-renames the entry in the renter.
-
-Parameters:
-```
-siapath     string
-newsiapath  string
-```
-'siapath' is the current location of the file in the renter.
-
-'newsiapath' is the new location of the file in the renter.
-
-Response: standard.
-
-#### /renter/upload/{siapath} [POST]
-
-Function: Uploads a file.
-
-Parameters:
-```
-siapath  string
-source   string
-```
-'siapath' is the location where the file will reside in the renter.
-
-'source' is the location on disk of the file being uploaded.
-
-Response: standard.
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 
 Wallet
@@ -909,7 +844,7 @@ encryptionpassword
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/address [GET]
 
@@ -952,7 +887,7 @@ destination
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/init [POST]
 
@@ -990,7 +925,7 @@ seed
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/seeds [GET]
 
@@ -1077,7 +1012,7 @@ keyfiles
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/lock [POST]
 
@@ -1088,7 +1023,7 @@ available.
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
 
 #### /wallet/transaction/___:id___ [GET]
 
@@ -1188,4 +1123,4 @@ encryptionpassword
 
 ###### Response
 standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+[#standard-responses](#standard-responses).
