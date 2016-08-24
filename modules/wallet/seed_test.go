@@ -102,10 +102,9 @@ func TestLoadSeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(allSeeds) != 1 {
-		t.Error("AllSeeds should be returning the primary seed.")
-	}
-	if allSeeds[0] != seed {
-		t.Error("AllSeeds returned the wrong seed")
+		t.Fatal("AllSeeds should be returning the primary seed.")
+	} else if allSeeds[0] != seed {
+		t.Fatal("AllSeeds returned the wrong seed")
 	}
 	wt.wallet.Close()
 
@@ -138,7 +137,7 @@ func TestLoadSeed(t *testing.T) {
 	if len(allSeeds) != 2 {
 		t.Error("AllSeeds should be returning the primary seed with the recovery seed.")
 	}
-	if !bytes.Equal(allSeeds[0][:], newSeed[:]) {
+	if allSeeds[0] != newSeed {
 		t.Error("AllSeeds returned the wrong seed")
 	}
 	if !bytes.Equal(allSeeds[1][:], seed[:]) {

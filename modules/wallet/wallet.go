@@ -43,14 +43,16 @@ type spendableKey struct {
 // Wallet is an object that tracks balances, creates keys and addresses,
 // manages building and sending transactions.
 type Wallet struct {
-	// unlocked indicates whether the wallet is currently storing secret keys
-	// in memory. subscribed indicates whether the wallet has subscribed to the
-	// consensus set yet - the wallet is unable to subscribe to the consensus
-	// set until it has been unlocked for the first time. The primary seed is
-	// used to generate new addresses for the wallet.
+	// encrypted indicates whether the wallet has been encrypted (i.e.
+	// initialized). unlocked indicates whether the wallet is currently
+	// storing secret keys in memory. subscribed indicates whether the wallet
+	// has subscribed to the consensus set yet - the wallet is unable to
+	// subscribe to the consensus set until it has been unlocked for the first
+	// time. The primary seed is used to generate new addresses for the
+	// wallet.
+	encrypted   bool
 	unlocked    bool
 	subscribed  bool
-	persist     walletPersist
 	primarySeed modules.Seed
 
 	// The wallet's dependencies. The items 'consensusSetHeight' and
