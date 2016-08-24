@@ -190,11 +190,7 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	if err != nil {
 		return nil, err
 	}
-	e, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
-	if err != nil {
-		return nil, err
-	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, e, g, h, m, r, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", "", cs, nil, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +203,6 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 		miner:     m,
 		renter:    r,
 		tpool:     tp,
-		explorer:  e,
 		wallet:    w,
 		walletKey: key,
 
@@ -275,11 +270,7 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 	if err != nil {
 		return nil, err
 	}
-	e, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
-	if err != nil {
-		return nil, err
-	}
-	srv, err := NewServer("localhost:0", "Sia-Agent", requiredPassword, cs, e, g, h, m, r, tp, w)
+	srv, err := NewServer("localhost:0", "Sia-Agent", requiredPassword, cs, nil, g, h, m, r, tp, w)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +283,6 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 		miner:     m,
 		renter:    r,
 		tpool:     tp,
-		explorer:  e,
 		wallet:    w,
 		walletKey: key,
 
