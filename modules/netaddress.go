@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"bytes"
 	"errors"
 	"net"
 	"strconv"
@@ -55,6 +56,58 @@ func (na NetAddress) IsLoopback() bool {
 		return true
 	}
 	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return true
+	}
+	return false
+}
+
+// IsPrivate returns true if the input IP address belongs to a private address
+// range (non-loopback) such as 192.168.x.x
+func (na NetAddress) IsPrivate() bool {
+	// If it's loopback, it doesn't count. Checking this first allows us to
+	// check for a non-IP address hostname without hitting any edge cases.
+	if na.IsLoopback() {
+		return false
+	}
+
+	// Grab the IP address of the net address. If there is an error parsing,
+	// return false, as it's not a private ip address range.
+	ip := net.ParseIP(na.Host())
+	if ip == nil {
+		return false
+	}
+	ip16 := ip.To16()
+
+	// Get the ranges of the private IP addresses.
+	range1Low := net.ParseIP("10.0.0.0").To16()
+	range1High := net.ParseIP("10.255.255.255").To16()
+	range2Low := net.ParseIP("172.16.0.0").To16()
+	range2High := net.ParseIP("172.31.255.255").To16()
+	range3Low := net.ParseIP("192.168.0.0").To16()
+	range3High := net.ParseIP("192.168.255.255").To16()
+	range4Low := net.ParseIP("fd00:0000:0000:0000:0000:0000:0000:0000")
+	range4High := net.ParseIP("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+
+	// Sanity check - all values should be non-nil.
+	if ip16 == nil ||
+		range1Low == nil || range1High == nil ||
+		range2Low == nil || range2High == nil ||
+		range3Low == nil || range3High == nil ||
+		range4Low == nil || range4High == nil {
+		panic("invalid range")
+	}
+
+	// Return true if ip16 falls between any of the above defined ranges.
+	if bytes.Compare(range1Low, ip16) <= 0 && bytes.Compare(range1High, ip16) <= 0 {
+		return true
+	}
+	if bytes.Compare(range2Low, ip16) <= 0 && bytes.Compare(range2High, ip16) <= 0 {
+		return true
+	}
+	if bytes.Compare(range3Low, ip16) <= 0 && bytes.Compare(range3High, ip16) <= 0 {
+		return true
+	}
+	if bytes.Compare(range4Low, ip16) <= 0 && bytes.Compare(range4High, ip16) <= 0 {
 		return true
 	}
 	return false
