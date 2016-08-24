@@ -74,6 +74,19 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 		if uint64(len(nodes)) == maxSharedNodes {
 			break
 		}
+
+		// Don't share local peers with remote peers. That means that if 'node'
+		// is loopback, it will only be shared if the remote peer is also
+		// loopback. And if 'node' is private, it will only be shared if the
+		// remote peer is either the loopback or is also private.
+		remoteNA := modules.NetAddress(conn.RemoteAddr().String())
+		if node.IsLoopback() && !remoteNA.IsLoopback() {
+			continue
+		}
+		if node.IsLocal() && !remoteNA.IsLocal() {
+			continue
+		}
+
 		nodes = append(nodes, node)
 	}
 	g.mu.RUnlock()
