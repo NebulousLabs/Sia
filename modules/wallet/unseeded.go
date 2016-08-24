@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -51,37 +50,36 @@ type savedKey033x struct {
 	Visible          bool
 }
 
-// initUnseededKeys loads all of the unseeded keys into the wallet after the
-// wallet gets unlocked.
-func (w *Wallet) initUnseededKeys(masterKey crypto.TwofishKey) error {
-	for _, uk := range w.persist.UnseededKeys {
-		// Verify that the decryption key is correct.
-		encKey := uidEncryptionKey(masterKey, uk.UID)
-		expectedDecryptedVerification := make([]byte, crypto.EntropySize)
-		decryptedVerification, err := encKey.DecryptBytes(uk.EncryptionVerification)
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(expectedDecryptedVerification, decryptedVerification) {
-			return modules.ErrBadEncryptionKey
-		}
-
-		// Decrypt the spendable key and add it to the wallet.
-		encodedKey, err := encKey.DecryptBytes(uk.SpendableKey)
-		if err != nil {
-			return err
-		}
-		var sk spendableKey
-		err = encoding.Unmarshal(encodedKey, &sk)
-		if err != nil {
-			return err
-		}
-		w.keys[sk.UnlockConditions.UnlockHash()] = sk
+// decryptSpendableKeyFile decrypts a spendableKeyFile, returning a
+// spendableKey.
+func decryptSpendableKeyFile(masterKey crypto.TwofishKey, uk spendableKeyFile) (sk spendableKey, err error) {
+	// Verify that the decryption key is correct.
+	encKey := uidEncryptionKey(masterKey, uk.UID)
+	expectedDecryptedVerification := make([]byte, encryptionVerificationLen)
+	decryptedVerification, err := encKey.DecryptBytes(uk.EncryptionVerification)
+	if err != nil {
+		return
 	}
-	return nil
+	if !bytes.Equal(expectedDecryptedVerification, decryptedVerification) {
+		err = modules.ErrBadEncryptionKey
+		return
+	}
+
+	// Decrypt the spendable key and add it to the wallet.
+	encodedKey, err := encKey.DecryptBytes(uk.SpendableKey)
+	if err != nil {
+		return
+	}
+	err = encoding.Unmarshal(encodedKey, &sk)
+	return
 }
 
-// loadSpendableKey loads a spendable key into the wallet's persist structure.
+// integrateSpendableKey loads a spendableKey into the wallet.
+func (w *Wallet) integrateSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) {
+	w.keys[sk.UnlockConditions.UnlockHash()] = sk
+}
+
+// loadSpendableKey loads a spendable key into the wallet database.
 func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) error {
 	// Duplication is detected by looking at the set of unlock conditions. If
 	// the wallet is locked, correct deduplication is uncertain.
@@ -115,11 +113,17 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 	if err != nil {
 		return err
 	}
-	w.persist.UnseededKeys = append(w.persist.UnseededKeys, skf)
+	return w.db.Update(func(tx *bolt.Tx) error {
+		err := checkMasterKey(tx, masterKey)
+		if err != nil {
+			return err
+		}
+		return tx.Bucket(bucketSpendableKeyFiles).Put(skf.UID[:], encoding.Marshal(skf))
+	})
+
 	// w.keys[sk.UnlockConditions.UnlockHash()] = sk -> aids with duplicate
 	// detection, but causes db inconsistency. Rescanning is probably the
 	// solution.
-	return nil
 }
 
 // loadSiagKeys loads a set of siag keyfiles into the wallet, so that the
@@ -168,11 +172,7 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	if err != nil {
 		return err
 	}
-	err = w.saveSettingsSync()
-	if err != nil {
-		return err
-	}
-	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+".json"))
+	return nil
 }
 
 // LoadSiagKeys loads a set of siag-generated keys into the wallet.
@@ -183,10 +183,6 @@ func (w *Wallet) LoadSiagKeys(masterKey crypto.TwofishKey, keyfiles []string) er
 	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	err := w.checkMasterKey(masterKey)
-	if err != nil {
-		return err
-	}
 	return w.loadSiagKeys(masterKey, keyfiles)
 }
 
@@ -199,13 +195,9 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	err := w.checkMasterKey(masterKey)
-	if err != nil {
-		return err
-	}
 
 	var savedKeys []savedKey033x
-	err = encoding.ReadFile(filepath033x, &savedKeys)
+	err := encoding.ReadFile(filepath033x, &savedKeys)
 	if err != nil {
 		return err
 	}
@@ -223,12 +215,8 @@ func (w *Wallet) Load033xWallet(masterKey crypto.TwofishKey, filepath033x string
 			seedsLoaded++
 		}
 	}
-	err = w.saveSettingsSync()
-	if err != nil {
-		return err
-	}
 	if seedsLoaded == 0 {
 		return errAllDuplicates
 	}
-	return w.createBackup(filepath.Join(w.persistDir, "Sia Wallet Encrypted Backup - "+persist.RandomSuffix()+".json"))
+	return nil
 }
