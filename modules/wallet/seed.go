@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"bytes"
 	"crypto/rand"
 	"errors"
 
@@ -51,8 +50,7 @@ func createSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) (seedFile, e
 		return seedFile{}, err
 	}
 	sek := uidEncryptionKey(masterKey, sf.UID)
-	plaintextVerification := make([]byte, encryptionVerificationLen)
-	sf.EncryptionVerification, err = sek.EncryptBytes(plaintextVerification)
+	sf.EncryptionVerification, err = sek.EncryptBytes(verificationPlaintext)
 	if err != nil {
 		return seedFile{}, err
 	}
@@ -67,13 +65,9 @@ func createSeedFile(masterKey crypto.TwofishKey, seed modules.Seed) (seedFile, e
 func decryptSeedFile(masterKey crypto.TwofishKey, sf seedFile) (seed modules.Seed, err error) {
 	// Verify that the provided master key is the correct key.
 	decryptionKey := uidEncryptionKey(masterKey, sf.UID)
-	expectedDecryptedVerification := make([]byte, encryptionVerificationLen)
-	decryptedVerification, err := decryptionKey.DecryptBytes(sf.EncryptionVerification)
+	err = verifyEncryption(decryptionKey, sf.EncryptionVerification)
 	if err != nil {
 		return modules.Seed{}, err
-	}
-	if !bytes.Equal(expectedDecryptedVerification, decryptedVerification) {
-		return modules.Seed{}, modules.ErrBadEncryptionKey
 	}
 
 	// Decrypt and return the seed.

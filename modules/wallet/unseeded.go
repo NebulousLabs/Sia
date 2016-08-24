@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"bytes"
 	"crypto/rand"
 	"errors"
 
@@ -54,19 +53,14 @@ type savedKey033x struct {
 // spendableKey.
 func decryptSpendableKeyFile(masterKey crypto.TwofishKey, uk spendableKeyFile) (sk spendableKey, err error) {
 	// Verify that the decryption key is correct.
-	encKey := uidEncryptionKey(masterKey, uk.UID)
-	expectedDecryptedVerification := make([]byte, encryptionVerificationLen)
-	decryptedVerification, err := encKey.DecryptBytes(uk.EncryptionVerification)
+	decryptionKey := uidEncryptionKey(masterKey, uk.UID)
+	err = verifyEncryption(decryptionKey, uk.EncryptionVerification)
 	if err != nil {
-		return
-	}
-	if !bytes.Equal(expectedDecryptedVerification, decryptedVerification) {
-		err = modules.ErrBadEncryptionKey
 		return
 	}
 
 	// Decrypt the spendable key and add it to the wallet.
-	encodedKey, err := encKey.DecryptBytes(uk.SpendableKey)
+	encodedKey, err := decryptionKey.DecryptBytes(uk.SpendableKey)
 	if err != nil {
 		return
 	}
@@ -102,8 +96,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.TwofishKey, sk spendableKey) 
 		return err
 	}
 	encryptionKey := uidEncryptionKey(masterKey, skf.UID)
-	plaintextVerification := make([]byte, encryptionVerificationLen)
-	skf.EncryptionVerification, err = encryptionKey.EncryptBytes(plaintextVerification)
+	skf.EncryptionVerification, err = encryptionKey.EncryptBytes(verificationPlaintext)
 	if err != nil {
 		return err
 	}
