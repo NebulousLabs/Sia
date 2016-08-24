@@ -221,30 +221,48 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 // acceptPeer makes room for the peer if necessary by kicking out existing
 // peers, then adds the peer to the peer list.
 func (g *Gateway) acceptPeer(p *peer) {
-	// If we are already fully connected, kick out an old peer to make room
-	// for the new one. Importantly, prioritize kicking a peer with the same
-	// IP as the connecting peer. This protects against Sybil attacks.
-	if len(g.peers) >= fullyConnectedThreshold {
-		// first choose a random peer, preferably inbound. If have only
-		// outbound peers, we'll wind up kicking an outbound peer; but
-		// subsequent inbound connections will kick each other instead of
-		// continuing to replace outbound peers.
-		kick, err := g.randomInboundPeer()
-		if err != nil {
-			kick, _ = g.randomPeer()
-		}
-		// if another peer shares this IP, choose that one instead
-		for addr := range g.peers {
-			if addr.Host() == p.NetAddress.Host() {
-				kick = addr
-				break
-			}
-		}
-		g.peers[kick].sess.Close()
-		delete(g.peers, kick)
-		g.log.Printf("INFO: disconnected from %v to make room for %v", kick, p.NetAddress)
+	// If we are not fully connected, add the peer without kicking any out.
+	if len(g.peers) < fullyConnectedThreshold {
+		g.addPeer(p)
+		return
 	}
 
+	// Select a peer to kick. Outbound peers and local peers are not
+	// available to be kicked.
+	addrs := []modules.NetAddress
+	for addr, peer := range g.peers {
+		// Do not kick outbound peers  or local peers.
+		if !p.Inbound {
+			continue
+		}
+		if addr.IsLoopback() || addr.IsPrivate() {
+			continue
+		}
+
+		// Prefer kicking a peer with the same hostname.
+		if addr.Host() == replacement.NetAddress.Host() {
+			addrs = []modules.NetAddress{addr}
+			break
+		}
+		addrs = append(addrs, addr)
+	}
+	if len(addrs) == 0 {
+		// There is nobody suitable to kick, therefore do not kick anyone.
+		g.addPeer(p)
+		return
+	}
+
+	// Of the remaining options, select one at random.
+	r, err := crypto.RandIntn(len(addrs))
+	if err != nil {
+		// TODO: This is not a developer bug, and 'Critical' is for
+		// developer bugs.
+		g.log.Critical(err)
+	}
+	kick := addrs[r]
+	g.peers[kick].sess.Close()
+	delete(g.peers, kick)
+	g.log.Println("INFO: disconnected from %v to make room for %v", kick, p.NetAddress)
 	g.addPeer(p)
 }
 
