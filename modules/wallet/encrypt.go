@@ -17,6 +17,12 @@ var (
 	errAlreadyUnlocked   = errors.New("wallet has already been unlocked")
 	errReencrypt         = errors.New("wallet is already encrypted, cannot encrypt again")
 	errUnencryptedWallet = errors.New("wallet has not been encrypted yet")
+
+	// verificationPlaintext is the plaintext used to verify encryption keys.
+	// By storing the corresponding ciphertext for a given key, we can later
+	// verify that a key is correct by using it to decrypt the ciphertext and
+	// comparing the result to verificationPlaintext.
+	verificationPlaintext = make([]byte, 32)
 )
 
 // uidEncryptionKey creates an encryption key that is used to decrypt a
@@ -25,20 +31,24 @@ func uidEncryptionKey(masterKey crypto.TwofishKey, uid uniqueID) crypto.TwofishK
 	return crypto.TwofishKey(crypto.HashAll(masterKey, uid))
 }
 
-// checkMasterKey verifies that the master key is correct.
-func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
-	uk := uidEncryptionKey(masterKey, dbGetWalletUID(tx))
-	encryptedVerification := tx.Bucket(bucketWallet).Get(keyEncryptionVerification)
-	verification, err := uk.DecryptBytes(encryptedVerification)
+// verifyEncryption verifies that key properly decrypts the ciphertext to a
+// preset plaintext.
+func verifyEncryption(key crypto.TwofishKey, encrypted crypto.Ciphertext) error {
+	verification, err := key.DecryptBytes(encrypted)
 	if err != nil {
-		// Most of the time, the failure is an authentication failure.
 		return modules.ErrBadEncryptionKey
 	}
-	expected := make([]byte, encryptionVerificationLen)
-	if !bytes.Equal(expected, verification) {
+	if !bytes.Equal(verificationPlaintext, verification) {
 		return modules.ErrBadEncryptionKey
 	}
 	return nil
+}
+
+// checkMasterKey verifies that the masterKey is the key used to encrypt the wallet.
+func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
+	uk := uidEncryptionKey(masterKey, dbGetWalletUID(tx))
+	encryptedVerification := tx.Bucket(bucketWallet).Get(keyEncryptionVerification)
+	return verifyEncryption(uk, encryptedVerification)
 }
 
 // initEncryption checks that the provided encryption key is the valid
@@ -84,8 +94,7 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, erro
 		// Establish the encryption verification using the masterKey. After this
 		// point, the wallet is encrypted.
 		uk := uidEncryptionKey(masterKey, dbGetWalletUID(tx))
-		encryptionBase := make([]byte, encryptionVerificationLen)
-		verification, err := uk.EncryptBytes(encryptionBase)
+		verification, err := uk.EncryptBytes(verificationPlaintext)
 		if err != nil {
 			return err
 		}

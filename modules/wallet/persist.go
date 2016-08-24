@@ -17,8 +17,6 @@ import (
 const (
 	logFile = modules.WalletDir + ".log"
 	dbFile  = modules.WalletDir + ".db"
-
-	encryptionVerificationLen = 32
 )
 
 var (
