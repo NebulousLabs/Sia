@@ -77,9 +77,9 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 // randomInboundPeer returns a random peer that initiated its connection.
 func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	// Get the list of inbound peers.
-	addrs := []modules.NetAddress
+	var addrs []modules.NetAddress
 	for addr, peer := range g.peers {
-		if !p.Inbound {
+		if !peer.Inbound {
 			continue
 		}
 		addrs = append(addrs, addr)
@@ -229,18 +229,23 @@ func (g *Gateway) acceptPeer(p *peer) {
 
 	// Select a peer to kick. Outbound peers and local peers are not
 	// available to be kicked.
-	addrs := []modules.NetAddress
-	for addr, peer := range g.peers {
+	var addrs []modules.NetAddress
+	for addr := range g.peers {
 		// Do not kick outbound peers  or local peers.
 		if !p.Inbound {
 			continue
 		}
 		if addr.IsLocal() {
+			// TODO: This peer may not actually be local if they are
+			// misconfigured. The peer adding process does not check that a
+			// peer is local upon adding them. Surely there is a simple way to
+			// verify this. (yeah... just have a field for it, and confirm upon
+			// adding).
 			continue
 		}
 
 		// Prefer kicking a peer with the same hostname.
-		if addr.Host() == replacement.NetAddress.Host() {
+		if addr.Host() == p.NetAddress.Host() {
 			addrs = []modules.NetAddress{addr}
 			break
 		}
@@ -262,7 +267,7 @@ func (g *Gateway) acceptPeer(p *peer) {
 	kick := addrs[r]
 	g.peers[kick].sess.Close()
 	delete(g.peers, kick)
-	g.log.Println("INFO: disconnected from %v to make room for %v", kick, p.NetAddress)
+	g.log.Printf("INFO: disconnected from %v to make room for %v\n", kick, p.NetAddress)
 	g.addPeer(p)
 }
 
@@ -427,12 +432,12 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	// Perform verification on the input address.
 	g.mu.RLock()
-	gaddr := g.addr
+	gaddr := g.myAddr
 	g.mu.RUnlock()
 	if addr == gaddr {
 		return errors.New("can't connect to our own address")
 	}
-	if err := remoteAddr.IsStdValid(); err != nil {
+	if err := addr.IsStdValid(); err != nil {
 		return errors.New("can't connect to invalid address")
 	}
 	if net.ParseIP(addr.Host()) == nil {
@@ -527,7 +532,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// Also wait a while and try again if there is at least one outbound
 		// peer and the selected peer is local. We do not want all of our
 		// outbound peers to be local peers.
-		if err != nil || (numOutboundPeers > 0 && addr.IsLocal()) {
+		if err != nil || (numOutboundPeers > 0 && addr.IsLocal() && build.Release != "testing") {
 			select {
 			case <-time.After(noPeersDelay):
 			case <-g.threads.StopChan():

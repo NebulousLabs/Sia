@@ -99,6 +99,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength); err != nil {
 		return err
 	}
+
 	g.mu.Lock()
 	for _, node := range nodes {
 		err := g.addNode(node)
