@@ -22,7 +22,7 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 		return errOurAddress
 	} else if _, exists := g.nodes[addr]; exists {
 		return errNodeExists
-	} else if addr.IsValid() != nil {
+	} else if addr.IsStdValid() != nil {
 		return errors.New("address is not valid: " + string(addr))
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address: " + string(addr))

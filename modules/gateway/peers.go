@@ -282,7 +282,7 @@ func acceptConnPortHandshake(conn net.Conn) (remoteAddr modules.NetAddress, err 
 		return "", fmt.Errorf("could not read remote peer's port: %v", err)
 	}
 	remoteAddr = modules.NetAddress(net.JoinHostPort(host, dialbackPort))
-	if err := remoteAddr.IsValid(); err != nil {
+	if err := remoteAddr.IsStdValid(); err != nil {
 		return "", fmt.Errorf("peer's address (%v) is invalid: %v", remoteAddr, err)
 	}
 	// Sanity check to ensure that appending the port string to the host didn't
@@ -426,10 +426,13 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 // the Gateway's peer list.
 func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 	// Perform verification on the input address.
-	if addr == g.Address() {
+	g.mu.RLock()
+	gaddr := g.addr
+	g.mu.RUnlock()
+	if addr == gaddr {
 		return errors.New("can't connect to our own address")
 	}
-	if err := addr.IsValid(); err != nil {
+	if err := remoteAddr.IsStdValid(); err != nil {
 		return errors.New("can't connect to invalid address")
 	}
 	if net.ParseIP(addr.Host()) == nil {
