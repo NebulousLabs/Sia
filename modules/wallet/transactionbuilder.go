@@ -173,10 +173,11 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 
 		// Create and add the output that will be used to fund the standard
 		// transaction.
-		parentUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+		parentUnlockConditions, err := tb.wallet.nextPrimarySeedAddress(tx)
 		if err != nil {
 			return err
 		}
+
 		exactOutput := types.SiacoinOutput{
 			Value:      amount,
 			UnlockHash: parentUnlockConditions.UnlockHash(),
@@ -185,7 +186,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 
 		// Create a refund output if needed.
 		if amount.Cmp(fund) != 0 {
-			refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+			refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress(tx)
 			if err != nil {
 				return err
 			}
@@ -277,7 +278,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 			}
 
 			// Add a siafund input for this output.
-			parentClaimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+			parentClaimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress(tx)
 			if err != nil {
 				return err
 			}
@@ -305,7 +306,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 
 		// Create and add the output that will be used to fund the standard
 		// transaction.
-		parentUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+		parentUnlockConditions, err := tb.wallet.nextPrimarySeedAddress(tx)
 		if err != nil {
 			return err
 		}
@@ -317,7 +318,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 
 		// Create a refund output if needed.
 		if amount.Cmp(fund) != 0 {
-			refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+			refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress(tx)
 			if err != nil {
 				return err
 			}
@@ -337,7 +338,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 		}
 
 		// Add the exact output.
-		claimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
+		claimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress(tx)
 		if err != nil {
 			return err
 		}
