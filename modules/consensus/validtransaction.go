@@ -319,6 +319,11 @@ func validTransaction(tx *bolt.Tx, t types.Transaction) error {
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
+	err := cs.tg.Add()
+	if err != nil {
+		return modules.ConsensusChange{}, err
+	}
+	defer cs.tg.Done()
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
@@ -334,7 +339,7 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	// manually manage the tx instead of using 'Update', but that has safety
 	// concerns and is more difficult to implement correctly.
 	errSuccess := errors.New("success")
-	err := cs.db.Update(func(tx *bolt.Tx) error {
+	err = cs.db.Update(func(tx *bolt.Tx) error {
 		diffHolder.Height = blockHeight(tx)
 		for _, txn := range txns {
 			err := validTransaction(tx, txn)

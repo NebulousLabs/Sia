@@ -96,32 +96,3 @@ func TestIntegrationBlockHeightReorg(t *testing.T) {
 		t.Fatal("mt1 and mt3 should have the same current block")
 	}
 }
-
-// TestMinerHeightForcefulMismatch checks that the miner, when not running in
-// debug mode, does forceful self-correcting for height calculation.
-func TestMinerHeightForcefulMismatch(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	mt, err := createMinerTester("TestMinerHeightForcefulMismatch")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := mt.miner.FindBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// A panic should be triggered when AcceptBlock is called on the miner.
-	mt.miner.persist.Height--
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expecting a panic upon adding a block")
-		}
-	}()
-	err = mt.cs.AcceptBlock(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-}

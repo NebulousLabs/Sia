@@ -83,6 +83,7 @@ var (
 		}
 	}()
 
+	errEarlyStop         = errors.New("initial blockchain download did not complete by the time shutdown was issued")
 	errSendBlocksStalled = errors.New("SendBlocks RPC timed and never received any blocks")
 )
 
@@ -128,8 +129,9 @@ func blockHistory(tx *bolt.Tx) (blockIDs [32]types.BlockID) {
 	return blockIDs
 }
 
-// threadedReceiveBlocks is the calling end of the SendBlocks RPC.
-func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
+// managedReceiveBlocks is the calling end of the SendBlocks RPC, without the
+// threadgroup wrapping.
+func (cs *ConsensusSet) managedReceiveBlocks(conn modules.PeerConn) (returnErr error) {
 	// Set a deadline after which SendBlocks will timeout. During IBD, esepcially,
 	// SendBlocks will timeout. This is by design so that IBD switches peers to
 	// prevent any one peer from stalling IBD.
@@ -177,10 +179,13 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 	// is to stop an attacker from preventing block broadcasts.
 	chainExtended := false
 	defer func() {
-		if chainExtended && cs.Synced() {
+		cs.mu.RLock()
+		synced := cs.synced
+		cs.mu.RUnlock()
+		if chainExtended && synced {
 			// The last block received will be the current block since
 			// managedAcceptBlock only returns nil if a block extends the longest chain.
-			currentBlock := cs.CurrentBlock()
+			currentBlock := cs.managedCurrentBlock()
 			// COMPATv0.5.1 - broadcast the block to all peers <= v0.5.1 and block header to all peers > v0.5.1
 			var relayBlockPeers, relayHeaderPeers []modules.Peer
 			for _, p := range cs.gateway.Peers() {
@@ -232,16 +237,32 @@ func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) (returnErr 
 	return nil
 }
 
+// threadedReceiveBlocks is the calling end of the SendBlocks RPC.
+func (cs *ConsensusSet) threadedReceiveBlocks(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+	return cs.managedReceiveBlocks(conn)
+}
+
 // rpcSendBlocks is the receiving end of the SendBlocks RPC. It returns a
 // sequential set of blocks based on the 32 input block IDs. The most recent
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Read a list of blocks known to the requester and find the most recent
 	// block from the current path.
 	var knownBlocks [32]types.BlockID
-	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
+	err = encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
 	if err != nil {
 		return err
 	}
@@ -336,9 +357,15 @@ func (cs *ConsensusSet) rpcSendBlocks(conn modules.PeerConn) error {
 // rpcRelayBlock is an RPC that accepts a block from a peer.
 // COMPATv0.5.1
 func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
 	// Decode the block from the connection.
 	var b types.Block
-	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
+	err = encoding.ReadObject(conn, &b, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}
@@ -350,7 +377,7 @@ func (cs *ConsensusSet) rpcRelayBlock(conn modules.PeerConn) error {
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
 		go func() {
-			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
+			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan block:", err)
 			}
@@ -392,10 +419,19 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	})
 	cs.mu.RUnlock()
 	if err == errOrphan {
-		// If the header is an orphan, try to find the parents.
+		// If the header is an orphan, try to find the parents. Call needs to
+		// be made in a separate goroutine as execution requires calling an
+		// exported gateway method - threadedRPCRelayHeader was likely called
+		// from an exported gateway function.
+		//
+		// NOTE: In general this is bad design. Rather than recycling other
+		// calls, the whole protocol should have been kept in a single RPC.
+		// Because it is not, we have to do weird threading to prevent
+		// deadlocks, and we also have to be concerned every time the code in
+		// managedReceiveBlocks is adjusted.
 		wg.Add(1)
 		go func() {
-			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.threadedReceiveBlocks)
+			err := cs.gateway.RPC(conn.RPCAddr(), "SendBlocks", cs.managedReceiveBlocks)
 			if err != nil {
 				cs.log.Debugln("WARN: failed to get parents of orphan header:", err)
 			}
@@ -410,9 +446,15 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 	// corresponding block. Call needs to be made in a separate goroutine
 	// because an exported call to the gateway is used, which is a deadlock
 	// risk given that rpcRelayHeader is called from the gateway.
+	//
+	// NOTE: In general this is bad design. Rather than recycling other calls,
+	// the whole protocol should have been kept in a single RPC. Because it is
+	// not, we have to do weird threading to prevent deadlocks, and we also
+	// have to be concerned every time the code in managedReceiveBlock is
+	// adjusted.
 	wg.Add(1)
 	go func() {
-		err = cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.threadedReceiveBlock(h.ID()))
+		err = cs.gateway.RPC(conn.RPCAddr(), "SendBlk", cs.managedReceiveBlock(h.ID()))
 		if err != nil {
 			cs.log.Debugln("WARN: failed to get header's corresponding block:", err)
 		}
@@ -423,9 +465,15 @@ func (cs *ConsensusSet) threadedRPCRelayHeader(conn modules.PeerConn) error {
 
 // rpcSendBlk is an RPC that sends the requested block to the requesting peer.
 func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
-	// Decode the block id from the conneciton.
+	err := cs.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cs.tg.Done()
+
+	// Decode the block id from the connection.
 	var id types.BlockID
-	err := encoding.ReadObject(conn, &id, crypto.HashSize)
+	err = encoding.ReadObject(conn, &id, crypto.HashSize)
 	if err != nil {
 		return err
 	}
@@ -452,12 +500,12 @@ func (cs *ConsensusSet) rpcSendBlk(conn modules.PeerConn) error {
 	return nil
 }
 
-// threadedReceiveBlock takes a block id and returns an RPCFunc that requests that
+// managedReceiveBlock takes a block id and returns an RPCFunc that requests that
 // block and then calls AcceptBlock on it. The returned function should be used
 // as the calling end of the SendBlk RPC. Note that although the function
 // itself does not do any locking, it is still prefixed with "threaded" because
 // the function it returns calls the exported method AcceptBlock.
-func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
+func (cs *ConsensusSet) managedReceiveBlock(id types.BlockID) modules.RPCFunc {
 	return func(conn modules.PeerConn) error {
 		if err := encoding.WriteObject(conn, id); err != nil {
 			return err
@@ -482,13 +530,20 @@ func (cs *ConsensusSet) threadedReceiveBlock(id types.BlockID) modules.RPCFunc {
 // The height and the block id of the remote peers' current blocks are not
 // checked to be the same. This can cause issues if you are connected to
 // outbound peers <= v0.5.1 that are stalled in IBD.
-func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
-	// Set the deadline 10 minutes in the future. After this deadline, we will say
-	// IBD is done as long as there is at least one outbound peer synced.
+func (cs *ConsensusSet) threadedInitialBlockchainDownload() error {
+	// The consensus set will not recognize IBD as complete until it has enough
+	// peers. After the deadline though, it will recognize the blochchain
+	// download as complete even with only one peer. This deadline is helpful
+	// to local-net setups, where a machine will frequently only have one peer
+	// (and that peer will be another machine on the same local network, but
+	// within the local network at least one peer is connected to the braod
+	// network).
 	deadline := time.Now().Add(minIBDWaitTime)
 	numOutboundSynced := 0
+	numOutboundNotSynced := 0
 	for {
 		numOutboundSynced = 0
+		numOutboundNotSynced = 0
 		for _, p := range cs.gateway.Peers() {
 			// We only sync on outbound peers at first to make IBD less susceptible to
 			// fast-mining and other attacks, as outbound peers are more difficult to
@@ -497,34 +552,61 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 				continue
 			}
 
-			err := cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.threadedReceiveBlocks)
-			if err == nil {
-				numOutboundSynced++
-				continue
-			}
-			// TODO: Timeout errors returned by muxado do not conform to the net.Error
-			// interface and therefore we cannot check if the error is a timeout using
-			// the Timeout() method. Once muxado issue #14 is resolved change the below
-			// condition to:
-			//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
-			if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
-				cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
-				// Disconnect if there is an unexpected error (not a timeout). This
-				// includes errSendBlocksStalled.
-				//
-				// We disconnect so that these peers are removed from gateway.Peers() and
-				// do not prevent us from marking ourselves as fully synced.
-				err := cs.gateway.Disconnect(p.NetAddress)
+			// Put the rest of the iteration inside of a thread group.
+			err := func() error {
+				err := cs.tg.Add()
 				if err != nil {
-					cs.log.Printf("WARN: disconnecting from peer %v failed: %v", p.NetAddress, err)
+					return err
 				}
+				defer cs.tg.Done()
+
+				// Request blocks from the peer. The error returned will only be
+				// 'nil' if there are no more blocks to receive.
+				err = cs.gateway.RPC(p.NetAddress, "SendBlocks", cs.managedReceiveBlocks)
+				if err == nil {
+					numOutboundSynced++
+					// In this case, 'return nil' is equivalent to skipping to
+					// the next iteration of the loop.
+					return nil
+				}
+				numOutboundNotSynced++
+				// TODO: Timeout errors returned by muxado do not conform to the net.Error
+				// interface and therefore we cannot check if the error is a timeout using
+				// the Timeout() method. Once muxado issue #14 is resolved change the below
+				// condition to:
+				//     if netErr, ok := returnErr.(net.Error); !ok || !netErr.Timeout() { ... }
+				if err.Error() != "Read timeout" && err.Error() != "Write timeout" {
+					cs.log.Printf("WARN: disconnecting from peer %v because IBD failed: %v", p.NetAddress, err)
+					// Disconnect if there is an unexpected error (not a timeout). This
+					// includes errSendBlocksStalled.
+					//
+					// We disconnect so that these peers are removed from gateway.Peers() and
+					// do not prevent us from marking ourselves as fully synced.
+					err := cs.gateway.Disconnect(p.NetAddress)
+					if err != nil {
+						cs.log.Printf("WARN: disconnecting from peer %v failed: %v", p.NetAddress, err)
+					}
+				}
+				return nil
+			}()
+			if err != nil {
+				return err
 			}
 		}
 
-		// If we have minNumOutbound peers synced, we are done. Otherwise, don't say
-		// we are synced until we've been doing ibd for 10 minutes and we are synced
-		// with at least one peer.
-		if numOutboundSynced >= minNumOutbound || (numOutboundSynced > 0 && time.Now().After(deadline)) {
+		// The consensus set is not considered synced until a majority of
+		// outbound peers say that we are synced. If less than 10 minutes have
+		// passed, a minimum of 'minNumOutbound' peers must say that we are
+		// synced, otherwise a 1 vs 0 majority is sufficient.
+		//
+		// This scheme is used to prevent malicious peers from being able to
+		// barricade the sync'd status of the consensus set, and to make sure
+		// that consensus sets behind a firewall with only one peer
+		// (potentially a local peer) are still able to eventually conclude
+		// that they have syncrhonized. Miners and hosts will often have setups
+		// beind a firewall where there is a single node with many peers and
+		// then the rest of the nodes only have a few peers.
+		if numOutboundSynced > numOutboundNotSynced && (numOutboundSynced >= minNumOutbound || time.Now().After(deadline)) {
 			break
 		} else {
 			// Sleep so we don't hammer the network with SendBlock requests.
@@ -533,10 +615,16 @@ func (cs *ConsensusSet) threadedInitialBlockchainDownload() {
 	}
 
 	cs.log.Printf("INFO: IBD done, synced with %v peers", numOutboundSynced)
+	return nil
 }
 
 // Synced returns true if the consensus set is synced with the network.
 func (cs *ConsensusSet) Synced() bool {
+	err := cs.tg.Add()
+	if err != nil {
+		return false
+	}
+	defer cs.tg.Done()
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 	return cs.synced

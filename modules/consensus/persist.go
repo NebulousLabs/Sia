@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -67,6 +68,14 @@ func (cs *ConsensusSet) initPersist() error {
 	if err != nil {
 		return err
 	}
+	// Set up closing the logger.
+	cs.tg.AfterStop(func() {
+		err := cs.log.Close()
+		if err != nil {
+			// State of the logger is unknown, a println will suffice.
+			fmt.Println("Error shutting down consensus set logger:", err)
+		}
+	})
 
 	// Try to load an existing database from disk - a new one will be created
 	// if one does not exist.
@@ -74,5 +83,12 @@ func (cs *ConsensusSet) initPersist() error {
 	if err != nil {
 		return err
 	}
+	// Set up the closing of the database.
+	cs.tg.AfterStop(func() {
+		err := cs.db.Close()
+		if err != nil {
+			cs.log.Println("ERROR: Unable to close consensus set database at shutdown:", err)
+		}
+	})
 	return nil
 }

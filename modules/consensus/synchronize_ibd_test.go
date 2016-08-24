@@ -262,6 +262,9 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 	// Do IBD.
 	localCS.threadedInitialBlockchainDownload()
 	// Check that localCS disconnected from peers that errored but did not time out during SendBlocks.
+	if len(localCS.gateway.Peers()) != 6 {
+		t.Error("threadedInitialBlockchainDownload disconnected from peers that timedout or didn't error", len(localCS.gateway.Peers()))
+	}
 	for _, p := range localCS.gateway.Peers() {
 		err = mg.rpcErrs[p.NetAddress]
 		if err == nil {
@@ -270,10 +273,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 			continue
 		}
-		t.Fatalf("threadedInitialBlockchainDownload didn't disconnect from a peer that returned '%v'", err)
-	}
-	if len(localCS.gateway.Peers()) != 6 {
-		t.Error("threadedInitialBlockchainDownload disconnected from peers that timedout or didn't error")
+		t.Fatalf("threadedInitialBlockchainDownload didn't disconnect from a peer that returned '%v', %v", err, p.NetAddress)
 	}
 }
 
@@ -378,43 +378,27 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
+		t.Fatal("threadedInitialBlockchainDownload finished with 1 synced peer and 1 non-synced peer")
 	case <-time.After(minIBDWaitTime + ibdLoopDelay):
-		t.Fatal("threadedInitialBlockchainDownload never finished with 1 synced peer")
 	}
 
-	// Test when there are >= minNumOutbound peers, but < minNumOutbound peers are synced.
-	gatewayTimesouts := make([]modules.Gateway, minNumOutbound-1)
-	for i := 0; i < len(gatewayTimesouts); i++ {
-		tmpG, err := gateway.New("localhost:0", filepath.Join(testdir, fmt.Sprintf("remote - timesout %v", i), modules.GatewayDir))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer tmpG.Close()
-		mg.mu.Lock()
-		mg.rpcErrs[tmpG.Address()] = mockNetError{
-			error:   errors.New("Write timeout"),
-			timeout: true,
-		}
-		mg.mu.Unlock()
-		gatewayTimesouts[i] = tmpG
-		err = cs.gateway.Connect(gatewayTimesouts[i].Address())
-		if err != nil {
-			t.Fatal(err)
-		}
+	// Test when there is 2 peers that are synced and one that is not synced.
+	gatewayNoTimeout2, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
 	}
-	go func() {
-		cs.threadedInitialBlockchainDownload()
-		doneChan <- struct{}{}
-	}()
-	select {
-	case <-doneChan:
-		t.Fatal("threadedInitialBlockchainDownload finished before minIBDWaitTime")
-	case <-time.After(minIBDWaitTime):
+	defer gatewayNoTimeout2.Close()
+	mg.mu.Lock()
+	mg.rpcErrs[gatewayNoTimeout2.Address()] = nil
+	mg.mu.Unlock()
+	err = cs.gateway.Connect(gatewayNoTimeout2.Address())
+	if err != nil {
+		t.Fatal(err)
 	}
 	select {
 	case <-doneChan:
 	case <-time.After(minIBDWaitTime + ibdLoopDelay):
-		t.Fatal("threadedInitialBlockchainDownload didn't finish after minIBDWaitTime")
+		t.Fatal("threadedInitialBlockchainDownload never finished with 2 synced peers and 1 non-synced peer")
 	}
 
 	// Test when there are >= minNumOutbound peers and >= minNumOutbound peers are synced.

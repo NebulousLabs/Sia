@@ -32,6 +32,10 @@ type explorerTester struct {
 
 // createExplorerTester creates a tester object for the explorer module.
 func createExplorerTester(name string) (*explorerTester, error) {
+	if testing.Short() {
+		panic("createExplorerTester called when in a short test")
+	}
+
 	// Create and assemble the dependencies.
 	testdir := build.TempDir(modules.ExplorerDir, name)
 	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))

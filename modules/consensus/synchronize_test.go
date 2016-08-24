@@ -879,7 +879,7 @@ func TestThreadedReceiveBlock(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		managedReceiveFN := cst.cs.threadedReceiveBlock(tt.id)
+		managedReceiveFN := cst.cs.managedReceiveBlock(tt.id)
 		go tt.fn()
 		err := managedReceiveFN(tt.conn)
 		if err != tt.errWant {
@@ -919,12 +919,12 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Test that cst1 doesn't accept a block it's already seen (the genesis block).
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(types.GenesisID))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.managedReceiveBlock(types.GenesisID))
 	if err != modules.ErrBlockKnown {
 		t.Errorf("cst1 should reject known blocks: expected error '%v', got '%v'", modules.ErrBlockKnown, err)
 	}
 	// Test that cst2 errors when it doesn't recognize the requested block.
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(types.BlockID{}))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.managedReceiveBlock(types.BlockID{}))
 	if err != io.EOF {
 		t.Errorf("cst2 shouldn't return a block it doesn't recognize: expected error '%v', got '%v'", io.EOF, err)
 	}
@@ -938,7 +938,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(block.ID()))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.managedReceiveBlock(block.ID()))
 	if err != nil {
 		t.Errorf("cst1 should accept a block that extends its longest chain: expected nil error, got '%v'", err)
 	}
@@ -952,7 +952,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst2.cs.gateway.RPC(cst1.cs.gateway.Address(), "SendBlk", cst2.cs.threadedReceiveBlock(block.ID()))
+	err = cst2.cs.gateway.RPC(cst1.cs.gateway.Address(), "SendBlk", cst2.cs.managedReceiveBlock(block.ID()))
 	if err != nil {
 		t.Errorf("cst2 should accept a block that extends its longest chain: expected nil error, got '%v'", err)
 	}
@@ -974,7 +974,7 @@ func TestIntegrationSendBlkRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.threadedReceiveBlock(block.ID()))
+	err = cst1.cs.gateway.RPC(cst2.cs.gateway.Address(), "SendBlk", cst1.cs.managedReceiveBlock(block.ID()))
 	if err != errOrphan {
 		t.Errorf("cst1 should not accept an orphan block: expected error '%v', got '%v'", errOrphan, err)
 	}
