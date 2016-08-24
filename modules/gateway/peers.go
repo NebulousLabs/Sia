@@ -235,7 +235,7 @@ func (g *Gateway) acceptPeer(p *peer) {
 		if !p.Inbound {
 			continue
 		}
-		if addr.IsLoopback() || addr.IsPrivate() {
+		if addr.IsLocal() {
 			continue
 		}
 
@@ -524,7 +524,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// Also wait a while and try again if there is at least one outbound
 		// peer and the selected peer is local. We do not want all of our
 		// outbound peers to be local peers.
-		if err != nil || (numOutboundPeers > 0 && (addr.IsLoopback() || addr.IsPrivate())) {
+		if err != nil || (numOutboundPeers > 0 && addr.IsLocal()) {
 			select {
 			case <-time.After(noPeersDelay):
 			case <-g.threads.StopChan():

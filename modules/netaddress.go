@@ -61,13 +61,12 @@ func (na NetAddress) IsLoopback() bool {
 	return false
 }
 
-// IsPrivate returns true if the input IP address belongs to a private address
-// range (non-loopback) such as 192.168.x.x
-func (na NetAddress) IsPrivate() bool {
-	// If it's loopback, it doesn't count. Checking this first allows us to
-	// check for a non-IP address hostname without hitting any edge cases.
+// IsLocal returns true if the input IP address belongs to a local address
+// range such as 192.168.x.x or 127.x.x.x
+func (na NetAddress) IsLocal() bool {
+	// Loopback counts as private.
 	if na.IsLoopback() {
-		return false
+		return true
 	}
 
 	// Grab the IP address of the net address. If there is an error parsing,
