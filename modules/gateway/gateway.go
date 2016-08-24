@@ -75,14 +75,14 @@ func (g *Gateway) Close() error {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, persistDir string) (g *Gateway, err error) {
+func New(addr string, persistDir string) (*Gateway, error) {
 	// Create the directory if it doesn't exist.
-	err = os.MkdirAll(persistDir, 0700)
+	err := os.MkdirAll(persistDir, 0700)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	g = &Gateway{
+	g := &Gateway{
 		handlers: make(map[rpcID]modules.RPCFunc),
 		initRPCs: make(map[string]modules.RPCFunc),
 
@@ -148,7 +148,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	permanentListenClosedChan := make(chan struct{})
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
-		return
+		return nil, err
 	}
 	// Automatically close the listener when g.threads.Stop() is called.
 	g.threads.OnStop(func() {
@@ -196,7 +196,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	go g.threadedLearnHostname()
 
 	g.log.Println("INFO: gateway created, started logging")
-	return
+	return g, nil
 }
 
 // enforce that Gateway satisfies the modules.Gateway interface
