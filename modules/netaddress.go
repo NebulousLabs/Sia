@@ -112,18 +112,30 @@ func (na NetAddress) IsLocal() bool {
 	return false
 }
 
-// IsValid returns an error if the NetAddress is invalid. A valid NetAddress
+// IsValid is an extension to IsStdValid that also forbids the loopback
+// address. IsValid is being phased out in favor of allowing the loopback
+// address but verifying through other means that the connection is not to
+// yourself (which is the original reason that the loopback address was
+// banned).
+func (na NetAddress) IsValid() error {
+	// Check the loopback address.
+	if na.IsLoopback() && build.Release != "testing" {
+		return errors.New("host is a loopback address")
+	}
+	return na.IsStdValid()
+}
+
+// IsStdValid returns an error if the NetAddress is invalid. A valid NetAddress
 // is of the form "host:port", such that "host" is either a valid IPv4/IPv6
 // address or a valid hostname, and "port" is an integer in the range
-// [1,65535]. Furthermore, "host" may not be a loopback address (except during
-// testing). Valid IPv4 addresses, IPv6 addresses, and hostnames are detailed
+// [1,65535]. Valid IPv4 addresses, IPv6 addresses, and hostnames are detailed
 // in RFCs 791, 2460, and 952, respectively.
-func (na NetAddress) IsValid() error {
+func (na NetAddress) IsStdValid() error {
+	// Verify the port number.
 	host, port, err := net.SplitHostPort(string(na))
 	if err != nil {
 		return err
 	}
-
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return errors.New("port is not an integer")
@@ -131,13 +143,10 @@ func (na NetAddress) IsValid() error {
 		return errors.New("port is invalid")
 	}
 
-	// This check must come after the valid port check so that a host such as
-	// "localhost:badport" will fail.
+	// Loopback addresses don't always pass the requirements below, and
+	// therefore must be checked separately.
 	if na.IsLoopback() {
-		if build.Release == "testing" {
-			return nil
-		}
-		return errors.New("host is a loopback address")
+		return nil
 	}
 
 	// First try to parse host as an IP address; if that fails, assume it is a
