@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	errOutOfBounds      = errors.New("requesting transactions at unknown confirmation heights")
-	errNoHistoryForAddr = errors.New("no history found for provided address")
+	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
 )
 
 // AddressTransactions returns all of the wallet transactions associated with a
