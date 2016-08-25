@@ -97,14 +97,17 @@ func (w *Wallet) Transaction(txid types.TransactionID) (modules.ProcessedTransac
 // Transactions returns all transactions relevant to the wallet that were
 // confirmed in the range [startHeight, endHeight].
 func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (pts []modules.ProcessedTransaction, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if startHeight > w.consensusSetHeight || startHeight > endHeight {
-		return nil, errOutOfBounds
-	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 
 	err = w.db.View(func(tx *bolt.Tx) error {
+		height, err := dbGetConsensusHeight(tx)
+		if err != nil {
+			return err
+		} else if startHeight > height || startHeight > endHeight {
+			return errOutOfBounds
+		}
+
 		c := tx.Bucket(bucketProcessedTransactions).Cursor()
 		for key, val := c.First(); key != nil; key, val = c.Next() {
 			var pt modules.ProcessedTransaction
