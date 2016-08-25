@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -29,6 +30,39 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 	}
 	g.nodes[addr] = struct{}{}
 	return nil
+}
+
+// managedAddUntrustedNode adds an address to the set of nodes on the network, but
+// first verifies that there is a reachable node at the provided address.
+func (g *Gateway) managedAddUntrustedNode(addr modules.NetAddress) error {
+	// Performing the ping during testing does not work.
+	if build.Release == "testing" {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return g.addNode(addr)
+	}
+
+	// Ping the untrusted node to see whether or not there's acutally a
+	// reachable node at the provided address.
+	conn, err := g.dial(addr)
+	if err != nil {
+		return err
+	}
+	// If connection succeeds, supply an unacceptable version so that we
+	// will not be added as a peer.
+	//
+	// NOTE: this is a somewhat clunky way of specifying that you didn't
+	// actually want a connection.
+	encoding.WriteObject(conn, "0.0.0")
+	conn.Close()
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	err = g.addNode(addr)
+	if err != nil {
+		return err
+	}
+	return g.save()
 }
 
 // removeNode will remove a node from the gateway.

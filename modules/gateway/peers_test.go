@@ -773,6 +773,17 @@ func TestOverloadedBootstrap(t *testing.T) {
 		}
 	}
 	if !success {
+		for i, g := range gs {
+			outboundPeers := 0
+			g.mu.RLock()
+			for _, p := range g.peers {
+				if !p.Inbound {
+					outboundPeers++
+				}
+			}
+			g.mu.RUnlock()
+			t.Log("Gateway", i, ":", outboundPeers)
+		}
 		t.Fatal("after 100 seconds not all gateways able to become well connected")
 	}
 

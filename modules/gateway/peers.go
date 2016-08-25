@@ -192,30 +192,33 @@ func (g *Gateway) managedAcceptConnNewPeer(conn net.Conn, remoteVersion string) 
 		return err
 	}
 
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	err = func() error {
+		g.mu.Lock()
+		defer g.mu.Unlock()
 
-	// Don't accept a connection from a peer we're already connected to.
-	if _, exists := g.peers[remoteAddr]; exists {
-		return fmt.Errorf("already connected to a peer on that address: %v", remoteAddr)
-	}
-
-	err = g.addNode(remoteAddr)
-	if err != nil {
-		err = g.save()
-		if err != nil {
-			g.log.Printf("error saving node list: %v\n", err)
+		// Don't accept a connection from a peer we're already connected to.
+		if _, exists := g.peers[remoteAddr]; exists {
+			return fmt.Errorf("already connected to a peer on that address: %v", remoteAddr)
 		}
+
+		// Accept the peer.
+		g.acceptPeer(&peer{
+			Peer: modules.Peer{
+				NetAddress: remoteAddr,
+				Inbound:    true,
+				Version:    remoteVersion,
+			},
+			sess: muxado.Server(conn),
+		})
+		return nil
+	}()
+	if err != nil {
+		return err
 	}
 
-	g.acceptPeer(&peer{
-		Peer: modules.Peer{
-			NetAddress: remoteAddr,
-			Inbound:    true,
-			Version:    remoteVersion,
-		},
-		sess: muxado.Server(conn),
-	})
+	// Ignore the error from adding the untrusted node, does not matter either
+	// way.
+	g.managedAddUntrustedNode(remoteAddr)
 	return nil
 }
 
@@ -369,17 +372,11 @@ func acceptConnVersionHandshake(conn net.Conn, version string) (remoteVersion st
 // managedConnectOldPeer connects to peers < v1.0.0. The peer is added as a
 // node and a peer. The peer is only added if a nil error is returned.
 func (g *Gateway) managedConnectOldPeer(conn net.Conn, remoteVersion string, remoteAddr modules.NetAddress) error {
+	// Attempt to add the peer to the node list. Ignore any errors.
+	g.managedAddUntrustedNode(remoteAddr)
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
-
-	err := g.addNode(remoteAddr)
-	if err != nil {
-		err = g.save()
-		if err != nil {
-			g.log.Printf("error saving node list: %v\n", err)
-		}
-	}
-
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: remoteAddr,
@@ -404,17 +401,11 @@ func (g *Gateway) managedConnectNewPeer(conn net.Conn, remoteVersion string, rem
 		return err
 	}
 
+	// Attempt to add the peer to the node list. Ignore any errors.
+	g.managedAddUntrustedNode(remoteAddr)
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
-
-	err = g.addNode(remoteAddr)
-	if err != nil {
-		err = g.save()
-		if err != nil {
-			g.log.Printf("error saving node list: %v\n", err)
-		}
-	}
-
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: remoteAddr,
