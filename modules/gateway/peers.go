@@ -77,12 +77,12 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 	return "", errNoPeers
 }
 
-// randomInboundPeer returns a random peer that initiated its connection.
-func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
-	// Get the list of inbound peers.
+// randomOutboundPeer returns a random outbound peer.
+func (g *Gateway) randomOutboundPeer() (modules.NetAddress, error) {
+	// Get the list of outbound peers.
 	var addrs []modules.NetAddress
 	for addr, peer := range g.peers {
-		if !peer.Inbound {
+		if peer.Inbound {
 			continue
 		}
 		addrs = append(addrs, addr)

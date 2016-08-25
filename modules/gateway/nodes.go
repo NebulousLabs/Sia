@@ -232,7 +232,7 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 
 		g.mu.RLock()
 		numNodes := len(g.nodes)
-		peer, err := g.randomPeer()
+		peer, err := g.randomOutboundPeer()
 		g.mu.RUnlock()
 		if err == errNoPeers {
 			// errNoPeers is a common and expected error, there's no need to
@@ -247,8 +247,6 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 		// nodelist. If there are not, use the random peer from earlier to
 		// expand the node list.
 		if numNodes < healthyNodeListLen {
-			// TODO: should this be done in a go func? It's a blocking
-			// function.
 			err := g.managedRPC(peer, "ShareNodes", g.requestNodes)
 			if err != nil {
 				g.log.Debugf("WARN: RPC ShareNodes failed on peer %q: %v", peer, err)
