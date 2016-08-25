@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 	"github.com/NebulousLabs/bolt"
 )
 
@@ -240,7 +241,12 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 					println("Rescanning consensus set...")
 					for range time.Tick(time.Second * 3) {
 						w.mu.RLock()
-						height := w.consensusSetHeight
+						var height types.BlockHeight
+						w.db.View(func(tx *bolt.Tx) error {
+							var err error
+							height, err = dbGetConsensusHeight(tx)
+							return err
+						})
 						done := w.subscribed
 						w.mu.RUnlock()
 						if done {
@@ -251,10 +257,17 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 					}
 				}()
 			}
-			// NOTE: it is not necessary to start another db transaction to reset
-			// the last ConsensusChangeID entry: ConsensusSetSubscribe will do
-			// that for us by overwriting the entry in each call to
-			// ProcessConsensusChange.
+			// set the db entries for consensus change and consensus height
+			err = w.db.Update(func(tx *bolt.Tx) error {
+				err := dbPutConsensusChangeID(tx, modules.ConsensusChangeBeginning)
+				if err != nil {
+					return err
+				}
+				return dbPutConsensusHeight(tx, 0)
+			})
+			if err != nil {
+				return errors.New("failed to reset db during rescan: " + err.Error())
+			}
 			err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 		}
 		if err != nil {
