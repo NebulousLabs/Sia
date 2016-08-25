@@ -87,15 +87,6 @@ func (na NetAddress) IsLocal() bool {
 	range4Low := net.ParseIP("fd00:0000:0000:0000:0000:0000:0000:0000")
 	range4High := net.ParseIP("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
 
-	// Sanity check - all values should be non-nil.
-	if ip16 == nil ||
-		range1Low == nil || range1High == nil ||
-		range2Low == nil || range2High == nil ||
-		range3Low == nil || range3High == nil ||
-		range4Low == nil || range4High == nil {
-		panic("invalid range")
-	}
-
 	// Return true if ip16 falls between any of the above defined ranges.
 	if bytes.Compare(range1Low, ip16) <= 0 && bytes.Compare(ip16, range1High) <= 0 {
 		return true
