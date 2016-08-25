@@ -64,8 +64,8 @@ func (w *Wallet) updateConfirmedSet(tx *bolt.Tx, cc modules.ConsensusChange) err
 
 // revertHistory reverts any transaction history that was destroyed by reverted
 // blocks in the consensus change.
-func (w *Wallet) revertHistory(tx *bolt.Tx, cc modules.ConsensusChange) error {
-	for _, block := range cc.RevertedBlocks {
+func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
+	for _, block := range reverted {
 		// Remove any transactions that have been reverted.
 		for i := len(block.Transactions) - 1; i >= 0; i-- {
 			// If the transaction is relevant to the wallet, it will be the
@@ -264,10 +264,14 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 		if err := w.updateConfirmedSet(tx, cc); err != nil {
 			return err
 		}
-		if err := w.revertHistory(tx, cc); err != nil {
+		if err := w.revertHistory(tx, cc.RevertedBlocks); err != nil {
 			return err
 		}
-		return w.applyHistory(tx, cc.AppliedBlocks)
+		if err := w.applyHistory(tx, cc.AppliedBlocks); err != nil {
+			return err
+		}
+		// update the ConsensusChangeID
+		return dbPutConsensusChangeID(tx, cc.ID)
 	})
 	if err != nil {
 		w.log.Println("ERROR: failed to add consensus change:", err)
