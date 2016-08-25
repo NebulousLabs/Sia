@@ -529,7 +529,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// outbound peers to be local peers.
 		if err != nil || (numOutboundPeers > 0 && addr.IsLocal() && build.Release != "testing") {
 			select {
-			case <-time.After(noPeersDelay):
+			case <-time.After(noNodesDelay):
 			case <-g.threads.StopChan():
 				// Interrupt the thread if the shutdown signal is issued.
 				return
@@ -551,6 +551,13 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 				// the outbound peers instead of allow the attacker to pick out
 				// the peers for us. Because we have made the selection, it is
 				// okay to set the peer as an outbound peer.
+				//
+				// The nodelist size check ensures that an attacker can't flood
+				// a new node with a bunch of inbound requests. Doing so would
+				// result in a nodelist that's entirely full of attacker nodes.
+				// There's not much we can do about that anyway, but at least
+				// we can hold off making attacker nodes 'outbound' peers until
+				// our nodelist has had time to fill up naturally.
 				g.mu.Lock()
 				p, exists := g.peers[addr]
 				if exists {

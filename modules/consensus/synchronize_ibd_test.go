@@ -324,7 +324,8 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	case <-time.After(minIBDWaitTime + ibdLoopDelay):
 	}
 
-	// Test when there are only inbound peers.
+	// Test when there are only inbound peers. Wrap the peers in a function so
+	// that they are closed when the test is finished.
 	inboundCSTs := make([]*consensusSetTester, 8)
 	for i := 0; i < len(inboundCSTs); i++ {
 		inboundCST, err := blankConsensusSetTester(filepath.Join("TestInitialBlockchainDownloadDoneRules", fmt.Sprintf("remote - inbound %v", i)))
@@ -332,7 +333,6 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer inboundCST.Close()
-
 		inboundCST.cs.gateway.Connect(cs.gateway.Address())
 	}
 	select {

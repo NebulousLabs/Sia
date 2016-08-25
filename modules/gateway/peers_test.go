@@ -709,7 +709,7 @@ func TestPeerManager(t *testing.T) {
 	g1.mu.Unlock()
 
 	// when peerManager wakes up, it should connect to g2.
-	time.Sleep(time.Second + noPeersDelay)
+	time.Sleep(time.Second + noNodesDelay)
 
 	g1.mu.RLock()
 	defer g1.mu.RUnlock()
