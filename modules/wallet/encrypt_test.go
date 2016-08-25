@@ -44,7 +44,7 @@ func postEncryptionTesting(m modules.TestMiner, w *Wallet, masterKey crypto.Twof
 		}
 	}
 	siacoinBal, _, _ := w.ConfirmedBalance()
-	if siacoinBal.Cmp(types.NewCurrency64(0)) <= 0 {
+	if siacoinBal.IsZero() {
 		panic("wallet balance reported as 0 after maturing some mined blocks")
 	}
 	err = w.Unlock(masterKey)
