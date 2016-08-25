@@ -69,6 +69,7 @@ var (
 	keyPrimarySeedFile        = []byte("keyPrimarySeedFile")
 	keyPrimarySeedProgress    = []byte("keyPrimarySeedProgress")
 	keyConsensusChange        = []byte("keyConsensusChange")
+	keyConsensusHeight        = []byte("keyConsensusHeight")
 )
 
 // dbPut is a helper function for storing a marshalled key/value pair.
@@ -208,10 +209,9 @@ func dbGetWalletUID(tx *bolt.Tx) (uid uniqueID) {
 
 // dbGetPrimarySeedProgress returns the number of keys generated from the
 // primary seed.
-func dbGetPrimarySeedProgress(tx *bolt.Tx) (uint64, error) {
-	var progress uint64
-	err := encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyPrimarySeedProgress), &progress)
-	return progress, err
+func dbGetPrimarySeedProgress(tx *bolt.Tx) (progress uint64, err error) {
+	err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyPrimarySeedProgress), &progress)
+	return
 }
 
 // dbIncrementPrimarySeedProgress increments the primary seed progress counter
@@ -235,4 +235,15 @@ func dbGetConsensusChangeID(tx *bolt.Tx) (cc modules.ConsensusChangeID) {
 // dbPutConsensusChangeID stores the ID of the last ConsensusChange processed by the wallet.
 func dbPutConsensusChangeID(tx *bolt.Tx, cc modules.ConsensusChangeID) error {
 	return tx.Bucket(bucketWallet).Put(keyConsensusChange, cc[:])
+}
+
+// dbGetConsensusHeight returns the height that the wallet has scanned to.
+func dbGetConsensusHeight(tx *bolt.Tx) (height types.BlockHeight, err error) {
+	err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyConsensusHeight), &height)
+	return
+}
+
+// dbPutConsensusHeight stores the height that the wallet has scanned to.
+func dbPutConsensusHeight(tx *bolt.Tx, height types.BlockHeight) error {
+	return tx.Bucket(bucketWallet).Put(keyConsensusHeight, encoding.Marshal(height))
 }
