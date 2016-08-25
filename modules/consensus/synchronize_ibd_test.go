@@ -318,6 +318,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		cs.threadedInitialBlockchainDownload()
 		doneChan <- struct{}{}
 	}()
+	defer close(doneChan)
 	select {
 	case <-doneChan:
 		t.Error("threadedInitialBlockchainDownload finished with 0 synced peers")
@@ -326,22 +327,35 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 
 	// Test when there are only inbound peers. Wrap the peers in a function so
 	// that they are closed when the test is finished.
-	inboundCSTs := make([]*consensusSetTester, 8)
-	for i := 0; i < len(inboundCSTs); i++ {
-		inboundCST, err := blankConsensusSetTester(filepath.Join("TestInitialBlockchainDownloadDoneRules", fmt.Sprintf("remote - inbound %v", i)))
-		if err != nil {
-			t.Fatal(err)
+	func() {
+		inboundCSTs := make([]*consensusSetTester, 8)
+		for i := 0; i < len(inboundCSTs); i++ {
+			inboundCST, err := blankConsensusSetTester(filepath.Join("TestInitialBlockchainDownloadDoneRules", fmt.Sprintf("remote - inbound %v", i)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer inboundCST.Close()
+			inboundCST.cs.gateway.Connect(cs.gateway.Address())
 		}
-		defer inboundCST.Close()
-		inboundCST.cs.gateway.Connect(cs.gateway.Address())
-	}
-	select {
-	case <-doneChan:
-		t.Error("threadedInitialBlockchainDownload finished with only inbound peers")
-	case <-time.After(minIBDWaitTime + ibdLoopDelay):
-	}
+		<-doneChan
+		peers := cs.gateway.Peers()
+		outbound := false
+		for _, p := range peers {
+			if !p.Inbound {
+				outbound = true
+				break
+			}
+		}
+		if !outbound {
+			t.Error("threadedInitialBlockchainDownload finished with only inbound peers")
+		}
+	}()
 
-	// Test when there is 1 peer that isn't synced.
+	// Test when there is 1 outbound peer that isn't synced.
+	go func() {
+		cs.threadedInitialBlockchainDownload()
+		doneChan <- struct{}{}
+	}()
 	gatewayTimesout, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - timesout", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -397,7 +411,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 	select {
 	case <-doneChan:
-	case <-time.After(minIBDWaitTime + ibdLoopDelay):
+	case <-time.After(minIBDWaitTime + ibdLoopDelay*2):
 		t.Fatal("threadedInitialBlockchainDownload never finished with 2 synced peers and 1 non-synced peer")
 	}
 
