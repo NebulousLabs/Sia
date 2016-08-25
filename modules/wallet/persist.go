@@ -56,6 +56,10 @@ func (w *Wallet) openDB(filename string) (err error) {
 			}
 			tx.Bucket(bucketWallet).Put(keyUID, uid)
 		}
+		// if the consensus height is nil, set it to zero
+		if tx.Bucket(bucketWallet).Get(keyConsensusHeight) == nil {
+			dbPutConsensusHeight(tx, 0)
+		}
 		// check whether wallet is encrypted
 		w.encrypted = tx.Bucket(bucketWallet).Get(keyEncryptionVerification) != nil
 		return nil

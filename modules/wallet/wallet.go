@@ -55,14 +55,13 @@ type Wallet struct {
 	subscribed  bool
 	primarySeed modules.Seed
 
-	// The wallet's dependencies. The items 'consensusSetHeight' and
-	// 'siafundPool' are tracked separately from the consensus set to minimize
-	// the number of queries that the wallet needs to make to the consensus
-	// set; queries to the consensus set are very slow.
-	cs                 modules.ConsensusSet
-	tpool              modules.TransactionPool
-	consensusSetHeight types.BlockHeight
-	siafundPool        types.Currency
+	// The wallet's dependencies. siafundPool is tracked separately from the
+	// consensus set to minimize the number of queries that the wallet needs
+	// to make to the consensus set; queries to the consensus set are very
+	// slow.
+	cs          modules.ConsensusSet
+	tpool       modules.TransactionPool
+	siafundPool types.Currency
 
 	// The following set of fields are responsible for tracking the confirmed
 	// outputs, and for being able to spend them. The seeds are used to derive
