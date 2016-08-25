@@ -128,7 +128,8 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 		return errUnencryptedWallet
 	}
 
-	// Load the SeedFiles and UnseededKeyFiles into memory.
+	// Load db objects into memory.
+	var lastChange modules.ConsensusChangeID
 	var primarySeedFile seedFile
 	var primarySeedProgress uint64
 	var auxiliarySeedFiles []seedFile
@@ -139,6 +140,9 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 		if err != nil {
 			return err
 		}
+
+		// lastChange
+		lastChange = dbGetConsensusChangeID(tx)
 
 		// primarySeedFile + primarySeedProgress
 		err = encoding.Unmarshal(tx.Bucket(bucketWallet).Get(keyPrimarySeedFile), &primarySeedFile)
@@ -227,24 +231,32 @@ func (w *Wallet) managedUnlock(masterKey crypto.TwofishKey) error {
 	subscribed := w.subscribed
 	w.mu.RUnlock()
 	if !subscribed {
-		// During rescan, print height every 3 seconds.
-		if build.Release != "testing" {
-			go func() {
-				println("Rescanning consensus set...")
-				for range time.Tick(time.Second * 3) {
-					w.mu.RLock()
-					height := w.consensusSetHeight
-					done := w.subscribed
-					w.mu.RUnlock()
-					if done {
-						println("\nDone!")
-						break
+		err = w.cs.ConsensusSetSubscribe(w, lastChange)
+		if err == modules.ErrInvalidConsensusChangeID {
+			// something went wrong; resubscribe from the beginning and spawn a
+			// goroutine to display rescan progress
+			if build.Release != "testing" {
+				go func() {
+					println("Rescanning consensus set...")
+					for range time.Tick(time.Second * 3) {
+						w.mu.RLock()
+						height := w.consensusSetHeight
+						done := w.subscribed
+						w.mu.RUnlock()
+						if done {
+							println("\nDone!")
+							break
+						}
+						print("\rScanned to height ", height, "...")
 					}
-					print("\rScanned to height ", height, "...")
-				}
-			}()
+				}()
+			}
+			// NOTE: it is not necessary to start another db transaction to reset
+			// the last ConsensusChangeID entry: ConsensusSetSubscribe will do
+			// that for us by overwriting the entry in each call to
+			// ProcessConsensusChange.
+			err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 		}
-		err = w.cs.ConsensusSetSubscribe(w, modules.ConsensusChangeBeginning)
 		if err != nil {
 			return errors.New("wallet subscription failed: " + err.Error())
 		}
@@ -322,8 +334,9 @@ func (w *Wallet) Lock() error {
 	}
 	w.log.Println("INFO: Locking wallet.")
 
-	// Wipe all of the seeds and secret keys, they will be replaced upon
-	// calling 'Unlock' again.
+	// Wipe all of the seeds and secret keys. They will be replaced upon
+	// calling 'Unlock' again. Note that since the public keys are not wiped,
+	// we can continue processing blocks.
 	w.wipeSecrets()
 	w.unlocked = false
 	return nil

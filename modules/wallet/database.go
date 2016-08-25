@@ -68,6 +68,7 @@ var (
 	keyEncryptionVerification = []byte("keyEncryptionVerification")
 	keyPrimarySeedFile        = []byte("keyPrimarySeedFile")
 	keyPrimarySeedProgress    = []byte("keyPrimarySeedProgress")
+	keyConsensusChange        = []byte("keyConsensusChange")
 )
 
 // dbPut is a helper function for storing a marshalled key/value pair.
@@ -223,4 +224,15 @@ func dbIncrementPrimarySeedProgress(tx *bolt.Tx) (uint64, error) {
 	}
 	err = tx.Bucket(bucketWallet).Put(keyPrimarySeedProgress, encoding.Marshal(progress+1))
 	return progress, err
+}
+
+// dbGetConsensusChangeID returns the ID of the last ConsensusChange processed by the wallet.
+func dbGetConsensusChangeID(tx *bolt.Tx) (cc modules.ConsensusChangeID) {
+	copy(cc[:], tx.Bucket(bucketWallet).Get(keyConsensusChange))
+	return
+}
+
+// dbPutConsensusChangeID stores the ID of the last ConsensusChange processed by the wallet.
+func dbPutConsensusChangeID(tx *bolt.Tx, cc modules.ConsensusChangeID) error {
+	return tx.Bucket(bucketWallet).Put(keyConsensusChange, cc[:])
 }
