@@ -97,16 +97,16 @@ func (na NetAddress) IsLocal() bool {
 	}
 
 	// Return true if ip16 falls between any of the above defined ranges.
-	if bytes.Compare(range1Low, ip16) <= 0 && bytes.Compare(range1High, ip16) <= 0 {
+	if bytes.Compare(range1Low, ip16) <= 0 && bytes.Compare(ip16, range1High) <= 0 {
 		return true
 	}
-	if bytes.Compare(range2Low, ip16) <= 0 && bytes.Compare(range2High, ip16) <= 0 {
+	if bytes.Compare(range2Low, ip16) <= 0 && bytes.Compare(ip16, range2High) <= 0 {
 		return true
 	}
-	if bytes.Compare(range3Low, ip16) <= 0 && bytes.Compare(range3High, ip16) <= 0 {
+	if bytes.Compare(range3Low, ip16) <= 0 && bytes.Compare(ip16, range3High) <= 0 {
 		return true
 	}
-	if bytes.Compare(range4Low, ip16) <= 0 && bytes.Compare(range4High, ip16) <= 0 {
+	if bytes.Compare(range4Low, ip16) <= 0 && bytes.Compare(ip16, range4High) <= 0 {
 		return true
 	}
 	return false
