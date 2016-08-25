@@ -62,21 +62,6 @@ func (g *Gateway) addPeer(p *peer) {
 	go g.threadedListenPeer(p)
 }
 
-// randomPeer returns a random peer from the gateway's peer list.
-func (g *Gateway) randomPeer() (modules.NetAddress, error) {
-	if len(g.peers) > 0 {
-		r, _ := crypto.RandIntn(len(g.peers))
-		for addr := range g.peers {
-			if r <= 0 {
-				return addr, nil
-			}
-			r--
-		}
-	}
-
-	return "", errNoPeers
-}
-
 // randomOutboundPeer returns a random outbound peer.
 func (g *Gateway) randomOutboundPeer() (modules.NetAddress, error) {
 	// Get the list of outbound peers.
