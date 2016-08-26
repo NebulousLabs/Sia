@@ -154,10 +154,13 @@ func (g *Gateway) managedAcceptConnOldPeer(conn net.Conn, remoteVersion string) 
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	// Old peers are unable to give us a dialback port, so we can't verify
+	// whether or not they are local peers.
 	g.acceptPeer(&peer{
 		Peer: modules.Peer{
-			NetAddress: addr,
 			Inbound:    true,
+			Local:      false,
+			NetAddress: addr,
 			Version:    remoteVersion,
 		},
 		sess: muxado.Server(conn),
@@ -219,10 +222,7 @@ func (g *Gateway) acceptPeer(p *peer) {
 	var addrs []modules.NetAddress
 	for addr := range g.peers {
 		// Do not kick outbound peers or local peers.
-		if !p.Inbound {
-			continue
-		}
-		if p.Local {
+		if !p.Inbound || p.Local {
 			continue
 		}
 

@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"bytes"
 	"errors"
 	"net"
 	"strconv"
@@ -75,30 +74,20 @@ func (na NetAddress) IsLocal() bool {
 	if ip == nil {
 		return false
 	}
-	ip16 := ip.To16()
 
-	// Get the ranges of the private IP addresses.
-	range1Low := net.ParseIP("10.0.0.0").To16()
-	range1High := net.ParseIP("10.255.255.255").To16()
-	range2Low := net.ParseIP("172.16.0.0").To16()
-	range2High := net.ParseIP("172.31.255.255").To16()
-	range3Low := net.ParseIP("192.168.0.0").To16()
-	range3High := net.ParseIP("192.168.255.255").To16()
-	range4Low := net.ParseIP("fd00:0000:0000:0000:0000:0000:0000:0000")
-	range4High := net.ParseIP("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
-
-	// Return true if ip16 falls between any of the above defined ranges.
-	if bytes.Compare(range1Low, ip16) <= 0 && bytes.Compare(ip16, range1High) <= 0 {
-		return true
+	// Determine whether or not the ip is in a CIDR that is considered to be
+	// local.
+	localCIDRs := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"fd00::/8",
 	}
-	if bytes.Compare(range2Low, ip16) <= 0 && bytes.Compare(ip16, range2High) <= 0 {
-		return true
-	}
-	if bytes.Compare(range3Low, ip16) <= 0 && bytes.Compare(ip16, range3High) <= 0 {
-		return true
-	}
-	if bytes.Compare(range4Low, ip16) <= 0 && bytes.Compare(ip16, range4High) <= 0 {
-		return true
+	for _, cidr := range localCIDRs {
+		_, ipnet, _ := net.ParseCIDR(cidr)
+		if ipnet.Contains(ip) {
+			return true
+		}
 	}
 	return false
 }
