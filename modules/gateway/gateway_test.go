@@ -21,11 +21,6 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 
 	g, err := New("localhost:0", false, build.TempDir("gateway", name))
 	if err != nil {
-		// TODO: the proper thing to do here is to return an error and not even
-		// take a `testing.T` as an arguement. Calling t.Fatal is insufficient
-		// because we aren't sure whether or not this function was called in
-		// the main goroutine of the test, which is required if the test is
-		// going to fail properly.
 		panic(err)
 	}
 	return g

@@ -76,8 +76,6 @@ func (g *Gateway) threadedLearnHostname() {
 		return
 	}
 
-	// TODO: Is this safe? What happens to processes or nodes that have already
-	// request the IP address?
 	g.mu.Lock()
 	g.myAddr = addr
 	g.mu.Unlock()
