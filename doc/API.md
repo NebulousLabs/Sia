@@ -235,148 +235,147 @@ standard success or error response. See
 Host
 ----
 
-Queries:
+| Route                                                                                 | HTTP verb |
+| ------------------------------------------------------------------------------------- | --------- |
+| [/host](#host-get)                                                                    | GET       |
+| [/host](#host-post)                                                                   | POST      |
+| [/host/announce](#hostannounce-post)                                                  | POST      |
+| [/host/storage](#hoststorage-get)                                                     | GET       |
+| [/host/storage/folders/add](#hoststoragefoldersadd-post)                              | POST      |
+| [/host/storage/folders/remove](#hoststoragefoldersremove-post)                        | POST      |
+| [/host/storage/folders/resize](#hoststoragefoldersresize-post)                        | POST      |
+| [/host/storage/sectors/delete/___:merkleroot___](#hoststoragesectorsdeletemerkleroot) | POST      |
 
-* /host                                     [GET]
-* /host                                     [POST]
-* /host/announce                            [POST]
-* /host/delete/{filecontractid}             [POST]
-* /host/storage                             [GET]
-* /host/storage/folders/add                 [POST]
-* /host/storage/folders/remove              [POST]
-* /host/storage/folders/resize              [POST]
-* /host/storage/sectors/delete/{merkleroot} [POST]
-
-[Full Description](api/Host.md)
+For examples and detailed descriptions of request and response parameters,
+refer to [Host.md](/doc/api/Host.md).
 
 #### /host [GET]
 
-Function: Fetches status information about the host.
+fetches status information about the host.
 
-Parameters: none
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response)
+```javascript
+{
+  "externalsettings": {
+    "acceptingcontracts":   true,
+    "maxdownloadbatchsize": 17825792, // bytes
+    "maxduration":          25920,    // blocks
+    "maxrevisebatchsize":   17825792, // bytes
+    "netaddress":           "123.456.789.0:9982",
+    "remainingstorage":     35000000000, // bytes
+    "sectorsize":           4194304,     // bytes
+    "totalstorage":         35000000000, // bytes
+    "unlockhash":           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+    "windowsize":           144, // blocks
 
-Response:
-```go
-struct {
-	externalsettings {
-		acceptingcontracts   bool
-		maxdownloadbatchsize uint64
-		maxduration          types.BlockHeight (uint64)
-		maxrevisebatchsize   uint64
-		netaddress           modules.NetAddress (string)
-		remainingstorage     uint64
-		sectorsize           uint64
-		totalstorage         uint64
-		unlockhash           types.UnlockHash (string)
-		windowsize           types.BlockHeight (uint64)
+    "collateral":    "57870370370",                     // hastings / byte / block
+    "maxcollateral": "100000000000000000000000000000",  // hastings
 
-		collateral    types.Currency (string)
-		maxcollateral types.Currency (string)
+    "contractprice":          "30000000000000000000000000", // hastings
+    "downloadbandwidthprice": "250000000000000",            // hastings / byte
+    "storageprice":           "231481481481",               // hastings / byte / block
+    "uploadbandwidthprice":   "100000000000000",            // hastings / byte
 
-		contractprice          types.Currency (string)
-		downloadbandwidthprice types.Currency (string)
-		storageprice           types.Currency (string)
-		uploadbandwidthprice   types.Currency (string)
+    "revisionnumber": 0,
+    "version":        "1.0.0"
+  },
 
-		revisionnumber uint64
-		version        string
-	}
+  "financialmetrics": {
+    "contractcount":                 2,
+    "contractcompensation":          "123", // hastings
+    "potentialcontractcompensation": "123", // hastings
 
-	financialmetrics {
-		contractcompensation          types.Currency (string)
-		potentialcontractcompensation types.Currency (string)
+    "lockedstoragecollateral": "123", // hastings
+    "lostrevenue":             "123", // hastings
+    "loststoragecollateral":   "123", // hastings
+    "potentialstoragerevenue": "123", // hastings
+    "riskedstoragecollateral": "123", // hastings
+    "storagerevenue":          "123", // hastings
+    "transactionfeeexpenses":  "123", // hastings
 
-		lockedstoragecollateral types.Currency (string)
-		lostrevenue             types.Currency (string)
-		loststoragecollateral   types.Currency (string)
-		potentialstoragerevenue types.Currency (string)
-		riskedstoragecollateral types.Currency (string)
-		storagerevenue          types.Currency (string)
-		transactionfeeexpenses  types.Currency (string)
+    "downloadbandwidthrevenue":          "123", // hastings
+    "potentialdownloadbandwidthrevenue": "123", // hastings
+    "potentialuploadbandwidthrevenue":   "123", // hastings
+    "uploadbandwidthrevenue":            "123"  // hastings
+  },
 
-		downloadbandwidthrevenue          types.Currency (string)
-		potentialdownloadbandwidthrevenue types.Currency (string)
-		potentialuploadbandwidthrevenue   types.Currency (string)
-		uploadbandwidthrevenue            types.Currency (string)
-	}
+  "internalsettings": {
+    "acceptingcontracts":   true,
+    "maxdownloadbatchsize": 17825792, // bytes
+    "maxduration":          25920,    // blocks
+    "maxrevisebatchsize":   17825792, // bytes
+    "netaddress":           "123.456.789.0:9982",
+    "windowsize":           144, // blocks
 
-	internalsettings {
-		acceptingcontracts   bool
-		maxdownloadbatchsize uint64
-		maxduration          types.BlockHeight (uint64)
-		maxrevisebatchsize   uint64
-		netaddress           modules.NetAddress (string)
-		windowsize           types.BlockHeight (uint64)
+    "collateral":       "57870370370",                     // hastings / byte / block
+    "collateralbudget": "2000000000000000000000000000000", // hastings
+    "maxcollateral":    "100000000000000000000000000000",  // hastings
 
-		collateral       types.Currency (string)
-		collateralbudget types.Currency (string)
-		maxcollateral    types.Currency (string)
+    "mincontractprice":          "30000000000000000000000000", // hastings
+    "mindownloadbandwidthprice": "250000000000000",            // hastings / byte
+    "minstorageprice":           "231481481481",               // hastings / byte / block
+    "minuploadbandwidthprice":   "100000000000000"             // hastings / byte
+  },
 
-		mincontractprice          types.Currency (string)
-		mindownloadbandwidthprice types.Currency (string)
-		minstorageprice           types.Currency (string)
-		minuploadbandwidthprice   types.Currency (string)
-	}
-
-	// Information about the network, specifically various ways in which
-	// renters have contacted the host.
-	networkmetrics {
-		downloadcalls     uint64
-		errorcalls        uint64
-		formcontractcalls uint64
-		renewcalls        uint64
-		revisecalls       uint64
-		settingscalls     uint64
-		unrecognizedcalls uint64
-	}
+  "networkmetrics": {
+    "downloadcalls":     0,
+    "errorcalls":        1,
+    "formcontractcalls": 2,
+    "renewcalls":        3,
+    "revisecalls":       4,
+    "settingscalls":     5,
+    "unrecognizedcalls": 6
+  }
 }
 ```
 
 #### /host [POST]
 
-Function: Configures hosting parameters. All parameters are optional;
-unspecified parameters will be left unchanged.
+configures hosting parameters. All parameters are optional; unspecified
+parameters will be left unchanged.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters)
 ```
-acceptingcontracts   bool                        // Optional
-maxdownloadbatchsize uint64                      // Optional
-maxduration          types.BlockHeight (uint64)  // Optional
-maxrevisebatchsize   uint64                      // Optional
-netaddress           modules.NetAddress (string) // Optional
-windowsize           types.BlockHeight (uint64)  // Optional
+acceptingcontracts   // Optional, true / false
+maxdownloadbatchsize // Optional, bytes
+maxduration          // Optional, blocks
+maxrevisebatchsize   // Optional, bytes
+netaddress           // Optional
+windowsize           // Optional, blocks
 
-collateral       types.Currency (string) // Optional
-collateralbudget types.Currency (string) // Optional
-maxcollateral    types.Currency (string) // Optional
+collateral       // Optional, hastings / byte / block
+collateralbudget // Optional, hastings
+maxcollateral    // Optional, hastings
 
-mincontractprice          types.Currency (string) // Optional
-mindownloadbandwidthprice types.Currency (string) // Optional
-minstorageprice           types.Currency (string) // Optional
-minuploadbandwidthprice   types.Currency (string) // Optional
+mincontractprice          // Optional, hastings
+mindownloadbandwidthprice // Optional, hastings / byte
+minstorageprice           // Optional, hastings / byte / block
+minuploadbandwidthprice   // Optional, hastings / byte
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/announce [POST]
 
-Function: The host will announce itself to the network as a source of storage.
-Generally only needs to be called once.
+Announces the host to the network as a source of storage. Generally only needs
+to be called once.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-1)
 ```
 netaddress string // Optional
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/storage [GET]
 
-Function: Get a list of folders tracked by the host's storage manager.
+gets a list of folders tracked by the host's storage manager.
 
-Parameters: none
-
-Response:
+###### JSON Response [(with comments)](/doc/api/Host.md#json-response-1)
 ```javascript
 {
   "folders": [
@@ -385,9 +384,9 @@ Response:
       "capacity":          50000000000,     // bytes
       "capacityremaining": 100000,          // bytes
 
-      "failedreads": 0,
-      "failedwrites": 1,
-      "successfulreads": 2,
+      "failedreads":      0,
+      "failedwrites":     1,
+      "successfulreads":  2,
       "successfulwrites": 3
     }
   ]
@@ -396,64 +395,71 @@ Response:
 
 #### /host/storage/folders/add [POST]
 
-Function: Add a storage folder to the manager. The manager may not check that
-there is enough space available on-disk to support as much storage as requested
+adds a storage folder to the manager. The manager may not check that there is
+enough space available on-disk to support as much storage as requested
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-2)
 ```
 path // Required
 size // bytes, Required
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/storage/folders/remove [POST]
 
-Function: Remove a storage folder from the manager. All storage on the folder
-will be moved to other storage folders, meaning that no data will be lost. If
-the manager is unable to save data, an error will be returned and the operation
+remove a storage folder from the manager. All storage on the folder will be
+moved to other storage folders, meaning that no data will be lost. If the
+manager is unable to save data, an error will be returned and the operation
 will be stopped.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-3)
 ```
 path  // Required
 force // bool, Optional, default is false
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /host/storage/folders/resize [POST]
 
-Function: Grow or shrink a storage folder in the manager. The manager may not
-check that there is enough space on-disk to support growing the storage folder,
-but should gracefully handle running out of space unexpectedly. When shrinking
-a storage folder, any data in the folder that needs to be moved will be placed
-into other storage folders, meaning that no data will be lost. If the manager
-is unable to migrate the data, an error will be returned and the operation will
-be stopped.
+grows or shrink a storage folder in the manager. The manager may not check that
+there is enough space on-disk to support growing the storage folder, but should
+gracefully handle running out of space unexpectedly. When shrinking a storage
+folder, any data in the folder that needs to be moved will be placed into other
+storage folders, meaning that no data will be lost. If the manager is unable to
+migrate the data, an error will be returned and the operation will be stopped.
 
-Parameters:
+###### Query String Parameters [(with comments)](/doc/api/Host.md#query-string-parameters-4)
 ```
 path    // Required
 newsize // bytes, Required
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
-#### /host/storage/sectors/delete/{merkleroot} [POST]
+#### /host/storage/sectors/delete/___*merkleroot___ [POST]
 
-Function: Deletes a sector, meaning that the manager will be unable to upload
-that sector and be unable to provide a storage proof on that sector.
-DeleteSector is for removing the data entirely, and will remove instances of
-the sector appearing at all heights. The primary purpose of DeleteSector is to
-comply with legal requests to remove data.
+deletes a sector, meaning that the manager will be unable to upload that sector
+and be unable to provide a storage proof on that sector. This endpoint is for
+removing the data entirely, and will remove instances of the sector appearing
+at all heights. The primary purpose is to comply with legal requests to remove
+data.
 
-Path Parameters
+###### Path Parameters [(with comments)](/doc/api/Host.md#path-parameters)
 ```
-{merkleroot} // Required
+:merkleroot
 ```
 
-Response: standard
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 
 Host DB
