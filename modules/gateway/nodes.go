@@ -102,12 +102,11 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 // shareNodes is the receiving end of the ShareNodes RPC. It writes up to 10
 // randomly selected nodes to the caller.
 func (g *Gateway) shareNodes(conn modules.PeerConn) error {
-	// Set a deadline on the connection.
 	conn.SetDeadline(time.Now().Add(connStdDeadline))
 
 	// Assemble a list of nodes to send to the peer.
 	var nodes []modules.NetAddress
-	func () {
+	func() {
 		g.mu.RLock()
 		defer g.mu.RUnlock()
 
@@ -115,7 +114,7 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 		// through.
 		gnodes := make([]modules.NetAddress, len(g.nodes))
 		for node := range g.nodes {
-			gnodes = append(node)
+			gnodes = append(gnodes, node)
 		}
 		perm, err := crypto.Perm(len(g.nodes))
 		if err != nil {
@@ -150,6 +149,8 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 
 // requestNodes is the calling end of the ShareNodes RPC.
 func (g *Gateway) requestNodes(conn modules.PeerConn) error {
+	conn.SetDeadline(time.Now().Add(connStdDeadline))
+
 	var nodes []modules.NetAddress
 	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength); err != nil {
 		return err
@@ -162,7 +163,10 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 			g.log.Printf("WARN: peer '%v' sent the invalid addr '%v'", conn.RPCAddr(), node)
 		}
 	}
-	g.save()
+	err := g.save()
+	if err != nil {
+		g.log.Println("WARN: failed to save nodelist after requesting nodes:", err)
+	}
 	g.mu.Unlock()
 	return nil
 }
