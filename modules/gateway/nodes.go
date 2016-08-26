@@ -102,28 +102,49 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 // shareNodes is the receiving end of the ShareNodes RPC. It writes up to 10
 // randomly selected nodes to the caller.
 func (g *Gateway) shareNodes(conn modules.PeerConn) error {
-	g.mu.RLock()
+	// Set a deadline on the connection.
+	conn.SetDeadline(time.Now().Add(connStdDeadline))
+
+	// Assemble a list of nodes to send to the peer.
 	var nodes []modules.NetAddress
-	for node := range g.nodes {
-		if uint64(len(nodes)) == maxSharedNodes {
-			break
+	func () {
+		g.mu.RLock()
+		defer g.mu.RUnlock()
+
+		// Create a random permutation of nodes from the gateway to iterate
+		// through.
+		gnodes := make([]modules.NetAddress, len(g.nodes))
+		for node := range g.nodes {
+			gnodes = append(node)
+		}
+		perm, err := crypto.Perm(len(g.nodes))
+		if err != nil {
+			g.log.Severe("Unable to get random permutation for sharing nodes")
 		}
 
-		// Don't share local peers with remote peers. That means that if 'node'
-		// is loopback, it will only be shared if the remote peer is also
-		// loopback. And if 'node' is private, it will only be shared if the
-		// remote peer is either the loopback or is also private.
+		// Iterate through the random permutation of nodes and select the
+		// desirable ones.
 		remoteNA := modules.NetAddress(conn.RemoteAddr().String())
-		if node.IsLoopback() && !remoteNA.IsLoopback() {
-			continue
-		}
-		if node.IsLocal() && !remoteNA.IsLocal() {
-			continue
-		}
+		for _, i := range perm {
+			if uint64(len(nodes)) == maxSharedNodes {
+				break
+			}
 
-		nodes = append(nodes, node)
-	}
-	g.mu.RUnlock()
+			// Don't share local peers with remote peers. That means that if 'node'
+			// is loopback, it will only be shared if the remote peer is also
+			// loopback. And if 'node' is private, it will only be shared if the
+			// remote peer is either the loopback or is also private.
+			node := gnodes[i]
+			if node.IsLoopback() && !remoteNA.IsLoopback() {
+				continue
+			}
+			if node.IsLocal() && !remoteNA.IsLocal() {
+				continue
+			}
+
+			nodes = append(nodes, node)
+		}
+	}()
 	return encoding.WriteObject(conn, nodes)
 }
 
