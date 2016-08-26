@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -26,5 +27,10 @@ func (g *Gateway) dial(addr modules.NetAddress) (net.Conn, error) {
 		Timeout: dialTimeout,
 		Cancel:  g.threads.StopChan(),
 	}
-	return dialer.Dial("tcp", string(addr))
+	conn, err := dialer.Dial("tcp", string(addr))
+	if err != nil {
+		return nil, err
+	}
+	conn.SetDeadline(time.Now().Add(connStdDeadline))
+	return conn, nil
 }
