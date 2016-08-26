@@ -442,3 +442,46 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		t.Fatal("threadedInitialBlockchainDownload didn't finish in less than minIBDWaitTime")
 	}
 }
+
+// TestGenesisBlockSync is a regression test that checks what happens when two
+// consensus sets with only the genesis block are connected. They should
+// determine that they are sync'd, however previously they would not sync to
+// eachother as they would report EOF instead of performing correct block
+// exchange.
+func TestGenesisBlockSync(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create two consensus sets that have zero blocks each (except for the
+	// genesis block).
+	cst1, err := blankConsensusSetTester("TestGenesisBlockSync1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst2, err := blankConsensusSetTester("TestGenesisBlockSync2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Connect them.
+	err = cst1.gateway.Connect(cst2.gateway.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Block until both report that they are sync'd.
+	for i := 0; i < 100; i++ {
+		time.Sleep(time.Millisecond * 100)
+		if cst1.cs.Synced() && cst2.cs.Synced() {
+			break
+		}
+	}
+	if !cst1.cs.Synced() || !cst2.cs.Synced() {
+		t.Error("Consensus sets did not synchronize to eachother", cst1.cs.Synced(), cst2.cs.Synced())
+	}
+
+	time.Sleep(time.Second * 12)
+	if len(cst1.gateway.Peers()) == 0 {
+		t.Error("disconnection occured!")
+	}
+}
