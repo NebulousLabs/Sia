@@ -387,7 +387,6 @@ func walletunlockcmd() {
 	if err != nil {
 		die("Reading password failed:", err)
 	}
-	fmt.Println("Unlocking the wallet. This may take several minutes...")
 	qs := fmt.Sprintf("encryptionpassword=%s&dictonary=%s", password, "english")
 	err = post("/wallet/unlock", qs)
 	if err != nil {
