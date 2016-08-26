@@ -212,17 +212,6 @@ func startDaemon(config Config) (err error) {
 		}
 		defer r.Close()
 	}
-	// Bootstrap to the network.
-	if !config.Siad.NoBootstrap && g != nil {
-		// connect to 3 random bootstrap nodes
-		perm, err := crypto.Perm(len(modules.BootstrapPeers))
-		if err != nil {
-			return err
-		}
-		for _, i := range perm[:3] {
-			go g.Connect(modules.BootstrapPeers[i])
-		}
-	}
 
 	// Create the Sia API
 	a := api.New(
