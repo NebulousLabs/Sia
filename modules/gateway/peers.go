@@ -79,9 +79,7 @@ func (g *Gateway) randomOutboundPeer() (modules.NetAddress, error) {
 	// Of the remaining options, select one at random.
 	r, err := crypto.RandIntn(len(addrs))
 	if err != nil {
-		// TODO: This is not a developer bug, and 'Critical' is for
-		// developer bugs.
-		g.log.Critical(err)
+		g.log.Severe("Random number generation failure:", err)
 	}
 	return addrs[r], nil
 }
@@ -242,9 +240,7 @@ func (g *Gateway) acceptPeer(p *peer) {
 	// Of the remaining options, select one at random.
 	r, err := crypto.RandIntn(len(addrs))
 	if err != nil {
-		// TODO: This is not a developer bug, and 'Critical' is for
-		// developer bugs.
-		g.log.Critical(err)
+		g.log.Severe("random number generation failure:", err)
 	}
 	kick := addrs[r]
 	g.peers[kick].sess.Close()

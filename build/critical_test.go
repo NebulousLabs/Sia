@@ -32,3 +32,32 @@ func TestCriticalVariadic(t *testing.T) {
 	}()
 	Critical(k0, k1, k2, k3)
 }
+
+// TestSevere checks that a panic is called in debug mode.
+func TestSevere(t *testing.T) {
+	k0 := "severe test killstring"
+	killstring := "Severe error: severe test killstring\n"
+	defer func() {
+		r := recover()
+		if r != killstring {
+			t.Error("panic did not work:", r, killstring)
+		}
+	}()
+	Severe(k0)
+}
+
+// TestSevereVariadic checks that a panic is called in debug mode.
+func TestSevereVariadic(t *testing.T) {
+	k0 := "variadic"
+	k1 := "severe"
+	k2 := "test"
+	k3 := "killstring"
+	killstring := "Severe error: variadic severe test killstring\n"
+	defer func() {
+		r := recover()
+		if r != killstring {
+			t.Error("panic did not work:", r, killstring)
+		}
+	}()
+	Severe(k0, k1, k2, k3)
+}
