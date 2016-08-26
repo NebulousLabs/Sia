@@ -114,11 +114,11 @@ func blankMockHostTester(d dependencies, name string) (*hostTester, error) {
 	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the modules.
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}

@@ -216,7 +216,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 	}
 
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDisconnects")
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +225,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 		Gateway: g,
 		rpcErrs: make(map[modules.NetAddress]error),
 	}
-	localCS, err := New(&mg, filepath.Join(testdir, "local", modules.ConsensusDir))
+	localCS, err := New(&mg, false, filepath.Join(testdir, "local", modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestInitialBlockchainDownloadDisconnects(t *testing.T) {
 		nil, nil, nil, nil, nil,
 	}
 	for i, rpcErr := range rpcErrs {
-		g, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - "+strconv.Itoa(i), modules.GatewayDir))
+		g, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - "+strconv.Itoa(i), modules.GatewayDir))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -296,7 +296,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	minIBDWaitTime = 1 * time.Second
 
 	testdir := build.TempDir(modules.ConsensusDir, "TestInitialBlockchainDownloadDoneRules")
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, "local", modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, "local", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		Gateway: g,
 		rpcErrs: make(map[modules.NetAddress]error),
 	}
-	cs, err := New(&mg, filepath.Join(testdir, "local", modules.ConsensusDir))
+	cs, err := New(&mg, false, filepath.Join(testdir, "local", modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 		cs.threadedInitialBlockchainDownload()
 		doneChan <- struct{}{}
 	}()
-	gatewayTimesout, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - timesout", modules.GatewayDir))
+	gatewayTimesout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - timesout", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 
 	// Test when there is 1 peer that is synced and one that is not synced.
-	gatewayNoTimeout, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	gatewayNoTimeout, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +397,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	}
 
 	// Test when there is 2 peers that are synced and one that is not synced.
-	gatewayNoTimeout2, err := gateway.New("localhost:0", filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
+	gatewayNoTimeout2, err := gateway.New("localhost:0", false, filepath.Join(testdir, "remote - no timeout", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestInitialBlockchainDownloadDoneRules(t *testing.T) {
 	// Test when there are >= minNumOutbound peers and >= minNumOutbound peers are synced.
 	gatewayNoTimeouts := make([]modules.Gateway, minNumOutbound-1)
 	for i := 0; i < len(gatewayNoTimeouts); i++ {
-		tmpG, err := gateway.New("localhost:0", filepath.Join(testdir, fmt.Sprintf("remote - no timeout %v", i), modules.GatewayDir))
+		tmpG, err := gateway.New("localhost:0", false, filepath.Join(testdir, fmt.Sprintf("remote - no timeout %v", i), modules.GatewayDir))
 		if err != nil {
 			t.Fatal(err)
 		}

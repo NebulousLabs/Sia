@@ -12,7 +12,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/explorer"
@@ -136,7 +135,7 @@ func startDaemon(config Config) (err error) {
 	if strings.Contains(config.Siad.Modules, "g") {
 		i++
 		fmt.Printf("(%d/%d) Loading gateway...\n", i, len(config.Siad.Modules))
-		g, err = gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
+		g, err = gateway.New(config.Siad.RPCaddr, !config.Siad.NoBootstrap, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
 		if err != nil {
 			return err
 		}
@@ -146,7 +145,7 @@ func startDaemon(config Config) (err error) {
 	if strings.Contains(config.Siad.Modules, "c") {
 		i++
 		fmt.Printf("(%d/%d) Loading consensus...\n", i, len(config.Siad.Modules))
-		cs, err = consensus.New(g, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+		cs, err = consensus.New(g, !config.Siad.NoBootstrap, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
 		if err != nil {
 			return err
 		}

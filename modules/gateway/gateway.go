@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
@@ -75,7 +74,7 @@ func (g *Gateway) Close() error {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, persistDir string) (*Gateway, error) {
+func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	// Create the directory if it doesn't exist.
 	err := os.MkdirAll(persistDir, 0700)
 	if err != nil {
@@ -131,17 +130,13 @@ func New(addr string, persistDir string) (*Gateway, error) {
 	}
 
 	// Add the bootstrap peers to the node list.
-	//
-	// TODO: the bootstrap peers should not be added to the node list if
-	// --no-bootstrap is specified.
-	if build.Release == "standard" {
+	if bootstrap {
 		for _, addr := range modules.BootstrapPeers {
 			err := g.addNode(addr)
 			if err != nil && err != errNodeExists {
 				g.log.Printf("WARN: failed to add the bootstrap node '%v': %v", addr, err)
 			}
 		}
-		g.save()
 	}
 
 	// Create the listener which will listen for new connections from peers.

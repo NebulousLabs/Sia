@@ -25,11 +25,11 @@ func TestIntegrationWalletGETEncrypted(t *testing.T) {
 
 	// Check a wallet that has never been encrypted.
 	testdir := build.TempDir("api", "TestIntegrationWalletGETEncrypted")
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal("Failed to create consensus set:", err)
 	}
@@ -90,11 +90,11 @@ func TestIntegrationWalletBlankEncrypt(t *testing.T) {
 	}
 	// Create a server object without encrypting or unlocking the wallet.
 	testdir := build.TempDir("api", "TestIntegrationWalletBlankEncrypt")
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
