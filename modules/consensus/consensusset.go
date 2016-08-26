@@ -9,7 +9,6 @@ package consensus
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -87,7 +86,7 @@ type ConsensusSet struct {
 // New returns a new ConsensusSet, containing at least the genesis block. If
 // there is an existing block database present in the persist directory, it
 // will be loaded.
-func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
+func New(gateway modules.Gateway, bootstrap bool, persistDir string) (*ConsensusSet, error) {
 	// Check for nil dependencies.
 	if gateway == nil {
 		return nil, errNilGateway
@@ -135,7 +134,7 @@ func New(gateway modules.Gateway, persistDir string) (*ConsensusSet, error) {
 		// Sync with the network. Don't sync if we are testing because
 		// typically we don't have any mock peers to synchronize with in
 		// testing.
-		if build.Release != "testing" {
+		if bootstrap {
 			// We are in a virgin goroutine right now, so calling the threaded
 			// function without a goroutine is okay.
 			err = cs.threadedInitialBlockchainDownload()

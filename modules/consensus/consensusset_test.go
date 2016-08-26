@@ -96,11 +96,11 @@ func blankConsensusSetTester(name string) (*consensusSetTester, error) {
 	testdir := build.TempDir(modules.ConsensusDir, name)
 
 	// Create modules.
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func TestNilInputs(t *testing.T) {
 	}
 	t.Parallel()
 	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")
-	_, err := New(nil, testdir)
+	_, err := New(nil, false, testdir)
 	if err != errNilGateway {
 		t.Fatal(err)
 	}
@@ -193,11 +193,11 @@ func TestDatabaseClosing(t *testing.T) {
 	testdir := build.TempDir(modules.ConsensusDir, "TestClosing")
 
 	// Create the gateway.
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, err := New(g, testdir)
+	cs, err := New(g, false, testdir)
 	if err != nil {
 		t.Fatal(err)
 	}

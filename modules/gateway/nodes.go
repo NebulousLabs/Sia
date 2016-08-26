@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -22,13 +23,46 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 		return errOurAddress
 	} else if _, exists := g.nodes[addr]; exists {
 		return errNodeExists
-	} else if addr.IsValid() != nil {
+	} else if addr.IsStdValid() != nil {
 		return errors.New("address is not valid: " + string(addr))
 	} else if net.ParseIP(addr.Host()) == nil {
 		return errors.New("address must be an IP address: " + string(addr))
 	}
 	g.nodes[addr] = struct{}{}
 	return nil
+}
+
+// managedAddUntrustedNode adds an address to the set of nodes on the network, but
+// first verifies that there is a reachable node at the provided address.
+func (g *Gateway) managedAddUntrustedNode(addr modules.NetAddress) error {
+	// Performing the ping during testing does not work.
+	if build.Release == "testing" {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return g.addNode(addr)
+	}
+
+	// Ping the untrusted node to see whether or not there's acutally a
+	// reachable node at the provided address.
+	conn, err := g.dial(addr)
+	if err != nil {
+		return err
+	}
+	// If connection succeeds, supply an unacceptable version so that we
+	// will not be added as a peer.
+	//
+	// NOTE: this is a somewhat clunky way of specifying that you didn't
+	// actually want a connection.
+	encoding.WriteObject(conn, "0.0.0")
+	conn.Close()
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	err = g.addNode(addr)
+	if err != nil {
+		return err
+	}
+	return g.save()
 }
 
 // removeNode will remove a node from the gateway.
@@ -74,6 +108,19 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 		if uint64(len(nodes)) == maxSharedNodes {
 			break
 		}
+
+		// Don't share local peers with remote peers. That means that if 'node'
+		// is loopback, it will only be shared if the remote peer is also
+		// loopback. And if 'node' is private, it will only be shared if the
+		// remote peer is either the loopback or is also private.
+		remoteNA := modules.NetAddress(conn.RemoteAddr().String())
+		if node.IsLoopback() && !remoteNA.IsLoopback() {
+			continue
+		}
+		if node.IsLocal() && !remoteNA.IsLocal() {
+			continue
+		}
+
 		nodes = append(nodes, node)
 	}
 	g.mu.RUnlock()
@@ -86,6 +133,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*modules.MaxEncodedNetAddressLength); err != nil {
 		return err
 	}
+
 	g.mu.Lock()
 	for _, node := range nodes {
 		err := g.addNode(node)
@@ -184,7 +232,7 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 
 		g.mu.RLock()
 		numNodes := len(g.nodes)
-		peer, err := g.randomPeer()
+		peer, err := g.randomOutboundPeer()
 		g.mu.RUnlock()
 		if err == errNoPeers {
 			// errNoPeers is a common and expected error, there's no need to
@@ -199,8 +247,6 @@ func (g *Gateway) permanentNodeManager(closeChan chan struct{}) {
 		// nodelist. If there are not, use the random peer from earlier to
 		// expand the node list.
 		if numNodes < healthyNodeListLen {
-			// TODO: should this be done in a go func? It's a blocking
-			// function.
 			err := g.managedRPC(peer, "ShareNodes", g.requestNodes)
 			if err != nil {
 				g.log.Debugf("WARN: RPC ShareNodes failed on peer %q: %v", peer, err)

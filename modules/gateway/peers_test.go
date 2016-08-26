@@ -48,9 +48,9 @@ func TestAddPeer(t *testing.T) {
 	}
 }
 
-// TestRandomInbountPeer checks that randomInboundPeer returns the correct
+// TestRandomInbountPeer checks that randomOutboundPeer returns the correct
 // peer.
-func TestRandomInboundPeer(t *testing.T) {
+func TestRandomOutboundPeer(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -59,7 +59,7 @@ func TestRandomInboundPeer(t *testing.T) {
 	defer g.Close()
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	_, err := g.randomInboundPeer()
+	_, err := g.randomOutboundPeer()
 	if err != errNoPeers {
 		t.Fatal("expected errNoPeers, got", err)
 	}
@@ -67,14 +67,14 @@ func TestRandomInboundPeer(t *testing.T) {
 	g.addPeer(&peer{
 		Peer: modules.Peer{
 			NetAddress: "foo.com:123",
-			Inbound:    true,
+			Inbound:    false,
 		},
 		sess: muxado.Client(new(dummyConn)),
 	})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
 	}
-	addr, err := g.randomInboundPeer()
+	addr, err := g.randomOutboundPeer()
 	if err != nil || addr != "foo.com:123" {
 		t.Fatal("gateway did not select random peer")
 	}
@@ -709,7 +709,7 @@ func TestPeerManager(t *testing.T) {
 	g1.mu.Unlock()
 
 	// when peerManager wakes up, it should connect to g2.
-	time.Sleep(time.Second + noPeersDelay)
+	time.Sleep(time.Second + noNodesDelay)
 
 	g1.mu.RLock()
 	defer g1.mu.RUnlock()
@@ -773,6 +773,17 @@ func TestOverloadedBootstrap(t *testing.T) {
 		}
 	}
 	if !success {
+		for i, g := range gs {
+			outboundPeers := 0
+			g.mu.RLock()
+			for _, p := range g.peers {
+				if !p.Inbound {
+					outboundPeers++
+				}
+			}
+			g.mu.RUnlock()
+			t.Log("Gateway", i, ":", outboundPeers)
+		}
 		t.Fatal("after 100 seconds not all gateways able to become well connected")
 	}
 

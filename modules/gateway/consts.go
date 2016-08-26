@@ -97,6 +97,27 @@ var (
 )
 
 var (
+	// The gateway will sleep this long between incoming connections. For
+	// attack reasons, the acceptInterval should be longer than the
+	// nodeListDelay. Right at startup, a node is vulnerable to being flooded
+	// by Sybil attackers. The node's best defense is to wait until it has
+	// filled out its nodelist somewhat from the bootstrap nodes. An attacker
+	// needs to completely dominate the nodelist and the peerlist to be
+	// successful, so just a few honest nodes from requests to the bootstraps
+	// should be enough to fend from most attacks.
+	acceptInterval = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 3 * time.Second
+		case "standard":
+			return 6 * time.Second
+		case "testing":
+			return 100 * time.Millisecond
+		default:
+			panic("unrecognized build.Release in acceptInterval")
+		}
+	}()
+
 	// acquiringPeersDelay defines the amount of time that is waited between
 	// iterations of the peer acquisition loop if the gateway is actively
 	// forming new connections with peers.
@@ -128,10 +149,10 @@ var (
 		}
 	}()
 
-	// noPeersDelay defines the amount of time that is waited between
-	// iterations of the peer acquisition loop if the gateway does not have
-	// enough nodes.
-	noPeersDelay = func() time.Duration {
+	// noNodesDelay defines the amount of time that is waited between
+	// iterations of the peer acquisition loop if the gateway does not have any
+	// nodes in the nodelist.
+	noNodesDelay = func() time.Duration {
 		switch build.Release {
 		case "dev":
 			return 10 * time.Second
@@ -140,7 +161,7 @@ var (
 		case "testing":
 			return 3 * time.Second
 		default:
-			panic("unrecognized build.Release in noPeersDelay")
+			panic("unrecognized build.Release in noNodesDelay")
 		}
 	}()
 
@@ -177,20 +198,6 @@ var (
 )
 
 var (
-	// The gateway will sleep this long between incoming connections.
-	acceptInterval = func() time.Duration {
-		switch build.Release {
-		case "dev":
-			return 3 * time.Second
-		case "standard":
-			return 3 * time.Second
-		case "testing":
-			return 10 * time.Millisecond
-		default:
-			panic("unrecognized build.Release in acceptInterval")
-		}
-	}()
-
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = func() time.Duration {
 		switch build.Release {

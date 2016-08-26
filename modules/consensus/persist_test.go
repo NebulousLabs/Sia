@@ -27,12 +27,12 @@ func TestSaveLoad(t *testing.T) {
 
 	// Reassigning this will lose subscribers and such, but we
 	// just want to call load and get a hash
-	g, err := gateway.New("localhost:0", build.TempDir(modules.ConsensusDir, "TestSaveLoad", modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, build.TempDir(modules.ConsensusDir, "TestSaveLoad", modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 	d := filepath.Join(build.SiaTestingDir, modules.ConsensusDir, "TestSaveLoad", modules.ConsensusDir)
-	cst.cs, err = New(g, d)
+	cst.cs, err = New(g, false, d)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -141,9 +141,6 @@ func TestIsLoopback(t *testing.T) {
 		query           NetAddress
 		desiredResponse bool
 	}{
-		// Networks such as 10.0.0.x have been omitted from testing - behavior
-		// for these networks is currently undefined.
-
 		// Localhost tests.
 		{"localhost", false},
 		{"localhost:1234", true},
@@ -152,6 +149,40 @@ func TestIsLoopback(t *testing.T) {
 		{"::1", false},
 		{"[::1]:7124", true},
 
+		// Local network tests.
+		{"10.0.0.0", false},
+		{"10.0.0.0:1234", false},
+		{"10.2.2.5", false},
+		{"10.2.2.5:16432", false},
+		{"10.255.255.255", false},
+		{"10.255.255.255:16432", false},
+		{"172.16.0.0", false},
+		{"172.16.0.0:1234", false},
+		{"172.26.2.5", false},
+		{"172.26.2.5:16432", false},
+		{"172.31.255.255", false},
+		{"172.31.255.255:16432", false},
+		{"192.168.0.0", false},
+		{"192.168.0.0:1234", false},
+		{"192.168.2.5", false},
+		{"192.168.2.5:16432", false},
+		{"192.168.255.255", false},
+		{"192.168.255.255:16432", false},
+		{"1234:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[1234:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+		{"fc00:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fc00:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+		{"fd00:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fd00:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+		{"fd30:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fd30:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+		{"fd00:0000:0030:0000:0000:0000:0000:0000", false},
+		{"[fd00:0000:0030:0000:0000:0000:0000:0000]:1234", false},
+		{"fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false},
+		{"[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:1234", false},
+		{"fe00:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fe00:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+
 		// Unspecified address tests.
 		{"0.0.0.0:1234", false},
 		{"[::]:1234", false},
@@ -159,8 +190,16 @@ func TestIsLoopback(t *testing.T) {
 		// Public name tests.
 		{"hn.com", false},
 		{"hn.com:8811", false},
+		{"2.34.45.64", false},
+		{"2.34.45.64:7777", false},
 		{"12.34.45.64", false},
 		{"12.34.45.64:7777", false},
+		{"122.34.45.64", false},
+		{"122.34.45.64:7777", false},
+		{"197.34.45.64", false},
+		{"197.34.45.64:7777", false},
+		{"222.34.45.64", false},
+		{"222.34.45.64:7777", false},
 
 		// Garbage name tests.
 		{"", false},
@@ -191,6 +230,90 @@ func TestIsValid(t *testing.T) {
 		na := NetAddress(addr)
 		if err := na.IsValid(); err == nil {
 			t.Errorf("IsValid returned nil for an invalid NetAddress %q: %v", addr, err)
+		}
+	}
+}
+
+// TestIsLocal checks that the correct values are returned for all local IP
+// addresses.
+func TestIsLocal(t *testing.T) {
+	t.Parallel()
+
+	testSet := []struct {
+		query           NetAddress
+		desiredResponse bool
+	}{
+		// Localhost tests.
+		{"localhost", false},
+		{"localhost:1234", true},
+		{"127.0.0.1", false},
+		{"127.0.0.1:6723", true},
+		{"::1", false},
+		{"[::1]:7124", true},
+
+		// Local network tests.
+		{"10.0.0.0", false},
+		{"10.0.0.0:1234", true},
+		{"10.2.2.5", false},
+		{"10.2.2.5:16432", true},
+		{"10.255.255.255", false},
+		{"10.255.255.255:16432", true},
+		{"172.16.0.0", false},
+		{"172.16.0.0:1234", true},
+		{"172.26.2.5", false},
+		{"172.26.2.5:16432", true},
+		{"172.31.255.255", false},
+		{"172.31.255.255:16432", true},
+		{"192.168.0.0", false},
+		{"192.168.0.0:1234", true},
+		{"192.168.2.5", false},
+		{"192.168.2.5:16432", true},
+		{"192.168.255.255", false},
+		{"192.168.255.255:16432", true},
+		{"1234:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[1234:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+		{"fc00:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fc00:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+		{"fd00:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fd00:0000:0000:0000:0000:0000:0000:0000]:1234", true},
+		{"fd30:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fd30:0000:0000:0000:0000:0000:0000:0000]:1234", true},
+		{"fd00:0000:0030:0000:0000:0000:0000:0000", false},
+		{"[fd00:0000:0030:0000:0000:0000:0000:0000]:1234", true},
+		{"fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false},
+		{"[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:1234", true},
+		{"fe00:0000:0000:0000:0000:0000:0000:0000", false},
+		{"[fe00:0000:0000:0000:0000:0000:0000:0000]:1234", false},
+
+		// Unspecified address tests.
+		{"0.0.0.0:1234", false},
+		{"[::]:1234", false},
+
+		// Public name tests.
+		{"hn.com", false},
+		{"hn.com:8811", false},
+		{"2.34.45.64", false},
+		{"2.34.45.64:7777", false},
+		{"12.34.45.64", false},
+		{"12.34.45.64:7777", false},
+		{"122.34.45.64", false},
+		{"122.34.45.64:7777", false},
+		{"197.34.45.64", false},
+		{"197.34.45.64:7777", false},
+		{"222.34.45.64", false},
+		{"222.34.45.64:7777", false},
+
+		// Garbage name tests.
+		{"", false},
+		{"garbage", false},
+		{"garbage:6432", false},
+		{"garbage:6146:616", false},
+		{"::1:4646", false},
+		{"[::1]", false},
+	}
+	for _, test := range testSet {
+		if test.query.IsLocal() != test.desiredResponse {
+			t.Error("test failed:", test, test.query.IsLocal())
 		}
 	}
 }

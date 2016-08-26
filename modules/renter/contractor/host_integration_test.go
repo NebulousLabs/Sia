@@ -109,11 +109,11 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	testdir := build.TempDir("contractor", name)
 
 	// create miner
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, nil, nil, err
 	}

@@ -33,11 +33,11 @@ type walletTester struct {
 func createWalletTester(name string) (*walletTester, error) {
 	// Create the modules
 	testdir := build.TempDir(modules.WalletDir, name)
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +96,11 @@ func createWalletTester(name string) (*walletTester, error) {
 func createBlankWalletTester(name string) (*walletTester, error) {
 	// Create the modules
 	testdir := build.TempDir(modules.WalletDir, name)
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +147,11 @@ func (wt *walletTester) closeWt() {
 // TestNilInputs tries starting the wallet using nil inputs.
 func TestNilInputs(t *testing.T) {
 	testdir := build.TempDir(modules.WalletDir, "TestNilInputs")
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,11 +204,11 @@ func TestCloseWallet(t *testing.T) {
 		t.Skip()
 	}
 	testdir := build.TempDir(modules.WalletDir, "TestCloseWallet")
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,7 +19,7 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 		panic("newTestingGateway called during short test")
 	}
 
-	g, err := New("localhost:0", build.TempDir("gateway", name))
+	g, err := New("localhost:0", false, build.TempDir("gateway", name))
 	if err != nil {
 		// TODO: the proper thing to do here is to return an error and not even
 		// take a `testing.T` as an arguement. Calling t.Fatal is insufficient
@@ -112,13 +112,13 @@ func TestNew(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	if _, err := New("", ""); err == nil {
+	if _, err := New("", false, ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
-	if _, err := New("localhost:0", ""); err == nil {
+	if _, err := New("localhost:0", false, ""); err == nil {
 		t.Fatal("expecting persistDir error, got nil")
 	}
-	if g, err := New("foo", build.TempDir("gateway", "TestNew1")); err == nil {
+	if g, err := New("foo", false, build.TempDir("gateway", "TestNew1")); err == nil {
 		t.Fatal("expecting listener error, got nil", g.myAddr)
 	}
 	// create corrupted nodes.json
@@ -128,7 +128,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatal("couldn't create corrupted file:", err)
 	}
-	if _, err := New("localhost:0", dir); err == nil {
+	if _, err := New("localhost:0", false, dir); err == nil {
 		t.Fatal("expected load error, got nil")
 	}
 }

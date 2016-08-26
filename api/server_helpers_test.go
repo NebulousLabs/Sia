@@ -152,11 +152,11 @@ func assembleServerTester(key crypto.TwofishKey, testdir string) (*serverTester,
 	}
 
 	// Create the modules.
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
@@ -232,11 +232,11 @@ func assembleAuthenticatedServerTester(requiredPassword string, key crypto.Twofi
 	}
 
 	// Create the modules.
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
@@ -312,11 +312,11 @@ func assembleExplorerServerTester(testdir string) (*serverTester, error) {
 	}
 
 	// Create the modules.
-	g, err := gateway.New("localhost:0", filepath.Join(testdir, modules.GatewayDir))
+	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	cs, err := consensus.New(g, false, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}

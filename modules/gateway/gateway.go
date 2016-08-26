@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
@@ -75,14 +74,14 @@ func (g *Gateway) Close() error {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, persistDir string) (g *Gateway, err error) {
+func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 	// Create the directory if it doesn't exist.
-	err = os.MkdirAll(persistDir, 0700)
+	err := os.MkdirAll(persistDir, 0700)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	g = &Gateway{
+	g := &Gateway{
 		handlers: make(map[rpcID]modules.RPCFunc),
 		initRPCs: make(map[string]modules.RPCFunc),
 
@@ -131,24 +130,20 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	}
 
 	// Add the bootstrap peers to the node list.
-	//
-	// TODO: the bootstrap peers should not be added to the node list if
-	// --no-bootstrap is specified.
-	if build.Release == "standard" {
+	if bootstrap {
 		for _, addr := range modules.BootstrapPeers {
 			err := g.addNode(addr)
 			if err != nil && err != errNodeExists {
 				g.log.Printf("WARN: failed to add the bootstrap node '%v': %v", addr, err)
 			}
 		}
-		g.save()
 	}
 
 	// Create the listener which will listen for new connections from peers.
 	permanentListenClosedChan := make(chan struct{})
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
-		return
+		return nil, err
 	}
 	// Automatically close the listener when g.threads.Stop() is called.
 	g.threads.OnStop(func() {
@@ -196,7 +191,7 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	go g.threadedLearnHostname()
 
 	g.log.Println("INFO: gateway created, started logging")
-	return
+	return g, nil
 }
 
 // enforce that Gateway satisfies the modules.Gateway interface
