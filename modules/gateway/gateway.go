@@ -1,4 +1,4 @@
-// package gateway connects a Sia node to the Sia flood network. The flood
+// Package gateway connects a Sia node to the Sia flood network. The flood
 // network is used to propagate blocks and transactions. The gateway is the
 // primary avenue that a node uses to hear about transactions and blocks, and
 // is the primary avenue used to tell the network about blocks that you have
