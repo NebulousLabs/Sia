@@ -2,6 +2,8 @@ package modules
 
 import (
 	"net"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 const (
@@ -17,15 +19,26 @@ var (
 	// bootstrap point. While the bootstrap point could be a central service,
 	// it can also be a list of peers that are known to be stable. We have
 	// chosen to hardcode known-stable peers.
-	BootstrapPeers = []NetAddress{
-		"23.239.14.98:9981",
-		"87.98.216.46:9981",
-		"45.79.132.35:9981",
-		"68.55.10.144:9981",
-		"109.206.33.225:9981",
-		"79.51.183.132:9981",
-		"176.9.59.110:9981",
-	}
+	BootstrapPeers = func() []NetAddress {
+		switch build.Release {
+		case "dev":
+			return nil
+		case "standard":
+			return []NetAddress{
+				"23.239.14.98:9981",
+				"87.98.216.46:9981",
+				"45.79.132.35:9981",
+				"68.55.10.144:9981",
+				"109.206.33.225:9981",
+				"79.51.183.132:9981",
+				"176.9.59.110:9981",
+			}
+		case "testing":
+			return nil
+		default:
+			panic("unrecognized build.Release constant in BootstrapPeers")
+		}
+	}()
 )
 
 type (
