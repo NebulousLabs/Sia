@@ -112,7 +112,7 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 
 		// Create a random permutation of nodes from the gateway to iterate
 		// through.
-		gnodes := make([]modules.NetAddress, len(g.nodes))
+		gnodes := make([]modules.NetAddress, 0, len(g.nodes))
 		for node := range g.nodes {
 			gnodes = append(gnodes, node)
 		}
@@ -125,10 +125,6 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 		// desirable ones.
 		remoteNA := modules.NetAddress(conn.RemoteAddr().String())
 		for _, i := range perm {
-			if uint64(len(nodes)) == maxSharedNodes {
-				break
-			}
-
 			// Don't share local peers with remote peers. That means that if 'node'
 			// is loopback, it will only be shared if the remote peer is also
 			// loopback. And if 'node' is private, it will only be shared if the
@@ -142,6 +138,9 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 			}
 
 			nodes = append(nodes, node)
+			if uint64(len(nodes)) == maxSharedNodes {
+				break
+			}
 		}
 	}()
 	return encoding.WriteObject(conn, nodes)

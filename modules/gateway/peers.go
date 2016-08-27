@@ -117,6 +117,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 	defer g.threads.Done()
+	conn.SetDeadline(time.Now().Add(connStdDeadline))
 
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Debugf("INFO: %v wants to connect", addr)
@@ -138,6 +139,8 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		conn.Close()
 		return
 	}
+	// Handshake successful, remove the deadline.
+	conn.SetDeadline(time.Time{})
 
 	g.log.Debugf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
@@ -426,8 +429,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return errPeerExists
 	}
 
-	// Dial the peer, providing a means to interrupt the dial if a gateway
-	// shutdown call is made early.
+	// Dial the peer and perform peer initialization.
 	conn, err := g.dial(addr)
 	if err != nil {
 		return err
@@ -449,6 +451,10 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return err
 	}
 	g.log.Debugln("INFO: connected to new peer", addr)
+
+	// Connection successful, clear the timeout as to maintain a persistent
+	// connection to this peer.
+	conn.SetDeadline(time.Time{})
 
 	// call initRPCs
 	g.mu.RLock()

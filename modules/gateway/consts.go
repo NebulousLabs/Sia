@@ -203,11 +203,11 @@ var (
 	connStdDeadline = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 60 * time.Second
+			return 2 * time.Minute
 		case "standard":
 			return 5 * time.Minute
 		case "testing":
-			return 500 * time.Millisecond
+			return 30 * time.Second
 		default:
 			panic("unrecognized build.Release in connStdDeadline")
 		}
