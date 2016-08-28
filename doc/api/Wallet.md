@@ -359,10 +359,10 @@ standard success or error response. See
 
 gets the transaction associated with a specific transaction id.
 
-###### Path Parameters:
+###### Path Parameters
 ```
 // ID of the transaction being requested.
-id string
+:id
 ```
 
 ###### JSON Response
@@ -489,7 +489,7 @@ returns all of the transactions related to a specific address.
 ###### Path Parameters
 ```
 // Unlock hash (i.e. wallet address) whose transactions are being requested.
-addr
+:addr
 ```
 
 ###### JSON Response
