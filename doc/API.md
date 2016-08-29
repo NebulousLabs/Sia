@@ -179,11 +179,11 @@ returns information about the consensus set, such as the current block height.
 Gateway
 -------
 
-| Route                                                                         | HTTP verb |
-| ----------------------------------------------------------------------------- | --------- |
-| [/gateway](#gateway-get-example)                                              | GET       |
-| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post-example)       | POST      |
-| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post-example) | POST      |
+| Route                                                                              | HTTP verb |
+| ---------------------------------------------------------------------------------- | --------- |
+| [/gateway](#gateway-get-example)                                                   | GET       |
+| [/gateway/connect/___:netaddress___](#gatewayconnectnetaddress-post-example)       | POST      |
+| [/gateway/disconnect/___:netaddress___](#gatewaydisconnectnetaddress-post-example) | POST      |
 
 For examples and detailed descriptions of request and response parameters,
 refer to [Gateway.md](/doc/api/Gateway.md).
@@ -204,7 +204,7 @@ returns information about the gateway, including the list of connected peers.
 }
 ```
 
-#### /gateway/connect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
+#### /gateway/connect/___:netaddress___ [POST] [(example)](/doc/api/Gateway.md#connecting-to-a-peer)
 
 connects the gateway to a peer. The peer is added to the node list if it is not
 already present. The node list is the list of all nodes the gateway knows
@@ -212,20 +212,20 @@ about, but is not necessarily connected to.
 
 ###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters)
 ```
-{netaddress}
+:netaddress
 ```
 
 ###### Response
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /gateway/disconnect/{netaddress} [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
+#### /gateway/disconnect/___:netaddress___ [POST] [(example)](/doc/api/Gateway.md#disconnecting-from-a-peer)
 
 disconnects the gateway from a peer. The peer remains in the node list.
 
 ###### Path Parameters [(with comments)](/doc/api/Gateway.md#path-parameters-1)
 ```
-{netaddress}
+:netaddress
 ```
 
 ###### Response
@@ -444,7 +444,7 @@ newsize // bytes, Required
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
-#### /host/storage/sectors/delete/___*merkleroot___ [POST]
+#### /host/storage/sectors/delete/___:merkleroot___ [POST]
 
 deletes a sector, meaning that the manager will be unable to upload that sector
 and be unable to provide a storage proof on that sector. This endpoint is for
@@ -726,7 +726,7 @@ only the entry in the renter.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
 ```
-:siapath
+*siapath
 ```
 
 ###### Response
@@ -740,7 +740,7 @@ has been downloaded.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-1)
 ```
-:siapath
+*siapath
 ```
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-1)
@@ -760,7 +760,7 @@ entry in the renter. An error is returned if `siapath` does not exist or
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-2)
 ```
-:siapath
+*siapath
 ```
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
@@ -778,7 +778,7 @@ uploads a file to the network from the local filesystem.
 
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters-3)
 ```
-siapath
+*siapath
 ```
 
 ###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
@@ -1037,7 +1037,7 @@ gets the transaction associated with a specific transaction id.
 
 ###### Path Parameters [(with comments)](/doc/api/Wallet.md#path-parameters)
 ```
-id
+:id
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-7)
@@ -1103,7 +1103,7 @@ returns all of the transactions related to a specific address.
 
 ###### Path Parameters [(with comments)](/doc/api/Wallet.md#path-parameters-1)
 ```
-addr
+:addr
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-9)

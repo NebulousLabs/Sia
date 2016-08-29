@@ -207,7 +207,7 @@ only the entry in the renter.
 ###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
 ```
 // Location of the file in the renter on the network.
-siapath
+*siapath
 ```
 
 ###### Response
@@ -222,7 +222,7 @@ has been downloaded.
 ###### Path Parameters
 ```
 // Location of the file in the renter on the network.
-:siapath     
+*siapath     
 ```
 
 ###### Query String Parameters
@@ -244,7 +244,7 @@ entry in the renter. An error is returned if `siapath` does not exist or
 ###### Path Parameters
 ```
 // Current location of the file in the renter on the network.
-:siapath     
+*siapath     
 ```
 
 ###### Query String Parameters
@@ -264,7 +264,7 @@ uploads a file to the network from the local filesystem.
 ###### Path Parameters
 ```
 // Location where the file will reside in the renter on the network.
-siapath
+*siapath
 ```
 
 ###### Query String Parameters

@@ -22,11 +22,11 @@ peers on its own.
 Index
 -----
 
-| Route                                                                         | HTTP verb | Examples                                                |
-| ----------------------------------------------------------------------------- | --------- | ------------------------------------------------------- |
-| [/gateway](#gateway-get-example)                                              | GET       | [Gateway info](#gateway-info)                           |
-| [/gateway/connect/{netaddress}](#gatewayconnectnetaddress-post-example)       | POST      | [Connecting to a peer](#connecting-to-a-peer)           |
-| [/gateway/disconnect/{netaddress}](#gatewaydisconnectnetaddress-post-example) | POST      | [Disconnecting from a peer](#disconnecting-from-a-peer) |
+| Route                                                                              | HTTP verb | Examples                                                |
+| ---------------------------------------------------------------------------------- | --------- | ------------------------------------------------------- |
+| [/gateway](#gateway-get-example)                                                   | GET       | [Gateway info](#gateway-info)                           |
+| [/gateway/connect/___:netaddress___](#gatewayconnectnetaddress-post-example)       | POST      | [Connecting to a peer](#connecting-to-a-peer)           |
+| [/gateway/disconnect/___:netaddress___](#gatewaydisconnectnetaddress-post-example) | POST      | [Disconnecting from a peer](#disconnecting-from-a-peer) |
 
 #### /gateway [GET] [(example)](#gateway-info)
 
@@ -72,7 +72,7 @@ about, but is not necessarily connected to.
 //
 // Example IPV4 address: 123.456.789.0:123
 // Example IPV6 address: [123::456]:789
-{netaddress}
+:netaddress
 ```
 
 ###### Response
@@ -93,7 +93,7 @@ connecting to the peer in the future.
 //
 // Example IPV4 address: 123.456.789.0:123
 // Example IPV6 address: [123::456]:789
-{netaddress}
+:netaddress
 ```
 
 ###### Response
