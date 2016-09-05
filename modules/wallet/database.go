@@ -214,16 +214,9 @@ func dbGetPrimarySeedProgress(tx *bolt.Tx) (progress uint64, err error) {
 	return
 }
 
-// dbIncrementPrimarySeedProgress increments the primary seed progress counter
-// and returns the pre-increment value. It should be called whenever a new key
-// is generated from the seed.
-func dbIncrementPrimarySeedProgress(tx *bolt.Tx) (uint64, error) {
-	progress, err := dbGetPrimarySeedProgress(tx)
-	if err != nil {
-		return 0, err
-	}
-	err = tx.Bucket(bucketWallet).Put(keyPrimarySeedProgress, encoding.Marshal(progress+1))
-	return progress, err
+// dbPutPrimarySeedProgress sets the primary seed progress counter.
+func dbPutPrimarySeedProgress(tx *bolt.Tx, progress uint64) error {
+	return tx.Bucket(bucketWallet).Put(keyPrimarySeedProgress, encoding.Marshal(progress))
 }
 
 // dbGetConsensusChangeID returns the ID of the last ConsensusChange processed by the wallet.
