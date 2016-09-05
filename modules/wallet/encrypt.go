@@ -52,28 +52,13 @@ func checkMasterKey(tx *bolt.Tx, masterKey crypto.TwofishKey) error {
 	return verifyEncryption(uk, encryptedVerification)
 }
 
-// initEncryption checks that the provided encryption key is the valid
-// encryption key for the wallet. If encryption has not yet been established
-// for the wallet, an encryption key is created.
-func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) (modules.Seed, error) {
-	// Create a random seed.
-	var seed modules.Seed
-	_, err := rand.Read(seed[:])
-	if err != nil {
-		return modules.Seed{}, err
-	}
-
-	err = w.db.Update(func(tx *bolt.Tx) error {
+// initEncryption initializes and encrypts the primary SeedFile.
+func (w *Wallet) initEncryption(masterKey crypto.TwofishKey, seed modules.Seed) (modules.Seed, error) {
+	err := w.db.Update(func(tx *bolt.Tx) error {
 		wb := tx.Bucket(bucketWallet)
 		// Check if the wallet encryption key has already been set.
 		if wb.Get(keyEncryptionVerification) != nil {
 			return errReencrypt
-		}
-
-		// If the input key is blank, use the hash of the seed to create the
-		// master key. Otherwise, use the input key.
-		if masterKey == (crypto.TwofishKey{}) {
-			masterKey = crypto.TwofishKey(crypto.HashObject(seed))
 		}
 
 		// create a seedFile for the seed
@@ -311,15 +296,14 @@ func (w *Wallet) Encrypted() bool {
 	return w.encrypted
 }
 
-// Encrypt will encrypt the wallet using the input key. Upon encryption, a
-// primary seed will be created for the wallet (no seed exists prior to this
-// point). If the key is blank, then the hash of the seed that is generated
-// will be used as the key. The wallet will still be locked after encryption.
+// Encrypt will create a primary seed for the wallet and encrypt it using
+// masterKey. If masterKey is blank, then the hash of the primary seed will be
+// used instead. The wallet will still be locked after Encrypt is called.
 //
 // Encrypt can only be called once throughout the life of the wallet, and will
 // return an error on subsequent calls (even after restarting the wallet). To
-// reset the wallet, the wallet files must be moved to a different directory or
-// deleted.
+// reset the wallet, the wallet files must be moved to a different directory
+// or deleted.
 func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	if err := w.tg.Add(); err != nil {
 		return modules.Seed{}, err
@@ -327,7 +311,47 @@ func (w *Wallet) Encrypt(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	defer w.tg.Done()
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.initEncryption(masterKey)
+
+	// Create a random seed.
+	var seed modules.Seed
+	_, err := rand.Read(seed[:])
+	if err != nil {
+		return modules.Seed{}, err
+	}
+
+	// If masterKey is blank, use the hash of the seed.
+	if masterKey == (crypto.TwofishKey{}) {
+		masterKey = crypto.TwofishKey(crypto.HashObject(seed))
+	}
+
+	return w.initEncryption(masterKey, seed)
+}
+
+// InitFromSeed functions like Init, but using a specified seed. Unlike Init,
+// the blockchain will be scanned to determine the seed's progress. For this
+// reason, InitFromSeed should not be called until the blockchain is fully
+// synced.
+func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
+	if err := w.tg.Add(); err != nil {
+		return err
+	}
+	defer w.tg.Done()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if _, err := w.initEncryption(masterKey, seed); err != nil {
+		return err
+	}
+
+	// estimate the primarySeedProgress by scanning the blockchain
+	s := newSeedScanner(seed)
+	if err := s.scan(w.cs); err != nil {
+		return err
+	}
+	progress := s.largestIndexSeen + 10000 // add 10000 to be safe
+	// set primarySeedProgress
+	return w.db.Update(func(tx *bolt.Tx) error {
+		return dbPutPrimarySeedProgress(tx, uint64(progress))
+	})
 }
 
 // Unlocked indicates whether the wallet is locked or unlocked.
