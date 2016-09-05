@@ -3,6 +3,8 @@ package wallet
 import (
 	"crypto/rand"
 	"errors"
+	"runtime"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -40,6 +42,27 @@ func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 		},
 		SecretKeys: []crypto.SecretKey{sk},
 	}
+}
+
+// generateKeys generates n keys from seed, starting from index start.
+func generateKeys(seed modules.Seed, start, n uint64) []spendableKey {
+	// generate in parallel, one goroutine per core.
+	keys := make([]spendableKey, n)
+	var wg sync.WaitGroup
+	wg.Add(runtime.NumCPU())
+	for cpu := 0; cpu < runtime.NumCPU(); cpu++ {
+		go func(start uint64) {
+			defer wg.Done()
+			for i := start; i < n; i += uint64(runtime.NumCPU()) {
+				// NOTE: don't bother trying to optimize this; profiling shows
+				// that ed25519 key generation consumes far more CPU time than
+				// encoding or hashing.
+				keys[i] = generateSpendableKey(seed, i)
+			}
+		}(start + uint64(cpu))
+	}
+	wg.Wait()
+	return keys
 }
 
 // createSeedFile creates and encrypts a seedFile.
@@ -82,9 +105,8 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf seedFile) (seed modules.See
 // integrateSeed generates n spendableKeys from the seed and loads them into
 // the wallet.
 func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
-	for i := uint64(0); i < n; i++ {
-		spendableKey := generateSpendableKey(seed, i)
-		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
+	for _, sk := range generateKeys(seed, 0, n) {
+		w.keys[sk.UnlockConditions.UnlockHash()] = sk
 	}
 }
 
