@@ -138,8 +138,11 @@ func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockConditions, er
 	}
 
 	// Fetch and increment the seed progress.
-	progress, err := dbIncrementPrimarySeedProgress(tx)
+	progress, err := dbGetPrimarySeedProgress(tx)
 	if err != nil {
+		return types.UnlockConditions{}, err
+	}
+	if err = dbPutPrimarySeedProgress(tx, progress+1); err != nil {
 		return types.UnlockConditions{}, err
 	}
 	// Integrate the next key into the wallet, and return the unlock
