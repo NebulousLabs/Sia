@@ -92,11 +92,6 @@ package gateway
 // that the gateway uses, short of modifying the source code. A method for
 // manipulating the bootstrap node list (before startup) is desired.
 //
-// TODO: There is insufficient testing around sending the gateway nil and empty
-// values when communicating. For the raw connections, we should probably set
-// up some fuzzing. For the specific RPCs, we should try passing unexpected
-// values over the wire.
-//
 // TODO: Gateway hostname discovery currently has significant centralization,
 // namely the fallback is a single third-party website that can easily form any
 // response it wants. Instead, multiple TLS-protected third party websites
