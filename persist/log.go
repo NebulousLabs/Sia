@@ -18,8 +18,20 @@ type Logger struct {
 	w io.Writer
 }
 
-// Critical logs a message with a CRITICAL prefix. If debug mode is enabled,
-// it will also write the message to os.Stderr and panic.
+// Close logs a shutdown message and closes the Logger's underlying io.Writer,
+// if it is also an io.Closer.
+func (l *Logger) Close() error {
+	l.Output(2, "SHUTDOWN: Logging has terminated.")
+	if c, ok := l.w.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
+}
+
+// Critical logs a message with a CRITICAL prefix that guides the user to the
+// Sia github tracker. If debug mode is enabled, it will also write the message
+// to os.Stderr and panic. Critical should only be called if there has been a
+// developer error, otherwise Severe should be called.
 func (l *Logger) Critical(v ...interface{}) {
 	l.Output(2, "CRITICAL: "+fmt.Sprintln(v...))
 	build.Critical(v...)
@@ -49,14 +61,14 @@ func (l *Logger) Debugln(v ...interface{}) {
 	}
 }
 
-// Close logs a shutdown message and closes the Logger's underlying io.Writer,
-// if it is also an io.Closer.
-func (l *Logger) Close() error {
-	l.Output(2, "SHUTDOWN: Logging has terminated.")
-	if c, ok := l.w.(io.Closer); ok {
-		return c.Close()
-	}
-	return nil
+// Severe logs a message with a SEVERE prefix. If debug mode is enabled, it
+// will also write the message to os.Stderr and panic. Severe should be called
+// if there is a severe problem with the user's machine or setup that should be
+// addressed ASAP but does not necessarily require that the machine crash or
+// exit.
+func (l *Logger) Severe(v ...interface{}) {
+	l.Output(2, "SEVERE: "+fmt.Sprintln(v...))
+	build.Severe(v...)
 }
 
 // NewLogger returns a logger that can be closed. Calls should not be made to

@@ -79,9 +79,7 @@ func (g *Gateway) randomOutboundPeer() (modules.NetAddress, error) {
 	// Of the remaining options, select one at random.
 	r, err := crypto.RandIntn(len(addrs))
 	if err != nil {
-		// TODO: This is not a developer bug, and 'Critical' is for
-		// developer bugs.
-		g.log.Critical(err)
+		g.log.Severe("Random number generation failure:", err)
 	}
 	return addrs[r], nil
 }
@@ -119,6 +117,7 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		return
 	}
 	defer g.threads.Done()
+	conn.SetDeadline(time.Now().Add(connStdDeadline))
 
 	addr := modules.NetAddress(conn.RemoteAddr().String())
 	g.log.Debugf("INFO: %v wants to connect", addr)
@@ -140,6 +139,8 @@ func (g *Gateway) threadedAcceptConn(conn net.Conn) {
 		conn.Close()
 		return
 	}
+	// Handshake successful, remove the deadline.
+	conn.SetDeadline(time.Time{})
 
 	g.log.Debugf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
@@ -242,9 +243,7 @@ func (g *Gateway) acceptPeer(p *peer) {
 	// Of the remaining options, select one at random.
 	r, err := crypto.RandIntn(len(addrs))
 	if err != nil {
-		// TODO: This is not a developer bug, and 'Critical' is for
-		// developer bugs.
-		g.log.Critical(err)
+		g.log.Severe("random number generation failure:", err)
 	}
 	kick := addrs[r]
 	g.peers[kick].sess.Close()
@@ -430,8 +429,7 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return errPeerExists
 	}
 
-	// Dial the peer, providing a means to interrupt the dial if a gateway
-	// shutdown call is made early.
+	// Dial the peer and perform peer initialization.
 	conn, err := g.dial(addr)
 	if err != nil {
 		return err
@@ -453,6 +451,10 @@ func (g *Gateway) managedConnect(addr modules.NetAddress) error {
 		return err
 	}
 	g.log.Debugln("INFO: connected to new peer", addr)
+
+	// Connection successful, clear the timeout as to maintain a persistent
+	// connection to this peer.
+	conn.SetDeadline(time.Time{})
 
 	// call initRPCs
 	g.mu.RLock()

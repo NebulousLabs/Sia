@@ -198,6 +198,21 @@ var (
 )
 
 var (
+	// connStdDeadline defines the standard deadline that should be used for
+	// all temporary connections to the gateway.
+	connStdDeadline = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 2 * time.Minute
+		case "standard":
+			return 5 * time.Minute
+		case "testing":
+			return 30 * time.Second
+		default:
+			panic("unrecognized build.Release in connStdDeadline")
+		}
+	}()
+
 	// the gateway will abort a connection attempt after this long
 	dialTimeout = func() time.Duration {
 		switch build.Release {
