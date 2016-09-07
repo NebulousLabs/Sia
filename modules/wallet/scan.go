@@ -8,9 +8,8 @@ import (
 )
 
 const (
-	numInitialKeys    = 250e3
-	maxScanKeys       = 10e6
-	keyIndexThreshold = numInitialKeys / 5
+	numInitialKeys = 1e6
+	maxScanKeys    = 100e6
 )
 
 var errMaxKeys = fmt.Errorf("refused to generate more than %v keys from seed", maxScanKeys)
@@ -79,16 +78,18 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 // generated to find all the addresses.
 func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	// generate a bunch of keys and scan the blockchain looking for them. If
-	// none of the last keyIndexThreshold keys are found, we are done;
-	// otherwise, generate more keys and try again (bounded by a sane
-	// default).
+	// none of the keys are found, we are done; otherwise, generate more keys
+	// and try again (bounded by a sane default).
+	//
+	// NOTE: since scanning is very slow, we aim to only scan once, which
+	// means generating many keys.
 	var numKeys uint64 = numInitialKeys
 	for len(s.keys) < maxScanKeys {
 		s.generateKeys(numKeys)
 		if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
-		if s.largestIndexSeen < uint64(len(s.keys)-keyIndexThreshold) {
+		if s.largestIndexSeen < uint64(len(s.keys))/2 {
 			cs.Unsubscribe(s)
 			return nil
 		}
