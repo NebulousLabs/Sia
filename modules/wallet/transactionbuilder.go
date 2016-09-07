@@ -49,7 +49,7 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 		// Search for the matching secret key to the public key.
 		for j := range spendKey.SecretKeys {
 			pubKey := spendKey.SecretKeys[j].PublicKey()
-			if bytes.Compare(siaPubKey.Key, pubKey[:]) != 0 {
+			if !bytes.Equal(siaPubKey.Key, pubKey[:]) {
 				continue
 			}
 
