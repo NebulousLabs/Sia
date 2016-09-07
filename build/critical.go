@@ -7,7 +7,7 @@ import (
 )
 
 // Critical should be called if a sanity check has failed, indicating developer
-// error. Severe is called with an extended message guiding the user to the
+// error. Critical is called with an extended message guiding the user to the
 // issue tracker on Github. If the program does not panic, the call stack for
 // the running goroutine is printed to help determine the error.
 func Critical(v ...interface{}) {
@@ -19,11 +19,11 @@ func Critical(v ...interface{}) {
 	debug.PrintStack()
 }
 
-// Severe will print a message to os.Stderr unless DEBUG has been set, in which
-// case panic will be called instead. Severe should be called in situations
-// which indicate significant problems for the user (such as disk failure or
-// random number generation failure), but where crashing is not strictly
-// required to preserve integrity.
+// Severe will print a message to os.Stderr. If DEBUG has been set panic will
+// be called as well. Severe should be called in situations which indicate
+// significant problems for the user (such as disk failure or random number
+// generation failure), but where crashing is not strictly required to preserve
+// integrity.
 func Severe(v ...interface{}) {
 	s := "Severe error: " + fmt.Sprintln(v...)
 	os.Stderr.WriteString(s)

@@ -28,20 +28,20 @@ package gateway
 //
 // The gateway defends itself from these attacks by minimizing the amount of
 // control that an attacker has over the node list and peer list. The first
-// major defense is that the gateway maintais 8 'outbound' relationships, which
-// means that the gateway created those relationships instead of an attacker.
-// If a node forms a connection to you, that node is called 'inbound', and
-// because it may be an attacker node, it is not trusted. Outbound nodes can
-// also be attacker nodes, but they are less likely to be attacker nodes
-// because you chose them, instead of them choosing you.
+// major defense is that the gateway maintains 8 'outbound' relationships,
+// which means that the gateway created those relationships instead of an
+// attacker. If a node forms a connection to you, that node is called
+// 'inbound', and because it may be an attacker node, it is not trusted.
+// Outbound nodes can also be attacker nodes, but they are less likely to be
+// attacker nodes because you chose them, instead of them choosing you.
 //
 // If the gateway forms too many connections, the gateway will allow incoming
 // connections by kicking an existing peer. But, to limit the amount of control
 // that an attacker may have, only inbound peers are selected to be kicked.
 // Furthermore, to increase the difficulty of attack, if a new inbound
 // connection shares the same IP address as an existing connection, the shared
-// connection is the connection that gets dropped (unless that connection is an
-// inbound connection).
+// connection is the connection that gets dropped (unless that connection is a
+// local or outbound connection).
 //
 // Nodes are added to a peerlist in two methods. The first method is that a
 // gateway will ask its outbound peers for a list of nodes. If the node list is
