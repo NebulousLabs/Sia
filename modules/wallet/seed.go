@@ -244,9 +244,9 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 
 // SweepSeed scans the blockchain for outputs generated from seed and create a
 // transaction that transfers them to the wallet. Note that this incurs a
-// transaction fee.
+// transaction fee. It returns the total value of the outputs, minus the fee.
 // TODO: support SiafundOutputs too
-func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (swept types.Currency, err error) {
+func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payout types.Currency, err error) {
 	if err = w.tg.Add(); err != nil {
 		return
 	}
@@ -278,6 +278,7 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (swep
 	// construct a transaction that spends the outputs
 	// TODO: this may result in transactions that are too large.
 	var txn types.Transaction
+	var swept types.Currency // total value of swept outputs
 	for _, output := range s.siacoinOutputs {
 		// discard 'dust' outputs, i.e. those that cost more in txn fees than
 		// they are worth
@@ -303,8 +304,9 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (swep
 
 	// add the recipient output, equal to the sum of the inputs minus the
 	// transaction fee
+	payout = swept.Sub(estFee)
 	txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
-		Value:      swept.Sub(estFee),
+		Value:      payout,
 		UnlockHash: uc.UnlockHash(),
 	})
 
