@@ -26,7 +26,9 @@ type seedScanner struct {
 	seed             modules.Seed
 	keys             map[types.UnlockHash]uint64 // map address to seed index
 	siacoinOutputs   map[types.SiacoinOutputID]scannedSiacoinOutput
+	minerOutputs     map[types.BlockHeight][]scannedSiacoinOutput
 	largestIndexSeen uint64 // largest index that has appeared in the blockchain
+	blockheight      types.BlockHeight
 }
 
 func (s *seedScanner) isSeedAddress(uh types.UnlockHash) bool {
@@ -43,18 +45,28 @@ func (s *seedScanner) generateKeys(n uint64) {
 }
 
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
+	s.blockheight -= types.BlockHeight(len(cc.RevertedBlocks))
 	// update outputs
 	for _, block := range cc.AppliedBlocks {
+		s.blockheight++
+		// when a miner payout matures, move it from minerOutputs to
+		// siacoinOutputs
+		if matured, exists := s.minerOutputs[s.blockheight]; exists {
+			for _, maturedOutput := range matured {
+				s.siacoinOutputs[maturedOutput.id] = maturedOutput
+			}
+			delete(s.minerOutputs, s.blockheight)
+		}
 		for i, mp := range block.MinerPayouts {
-			// if a seed miner output is found, add it to the output set
-			// TODO: these outputs can only be spent after a maturity delay
+			// if a seed miner output is found, add it to the delayed output
+			// set
 			if index, exists := s.keys[mp.UnlockHash]; exists {
-				id := types.SiacoinOutputID(block.MinerPayoutID(uint64(i)))
-				s.siacoinOutputs[id] = scannedSiacoinOutput{
-					id:        id,
+				maturityHeight := s.blockheight + types.MaturityDelay
+				s.minerOutputs[maturityHeight] = append(s.minerOutputs[maturityHeight], scannedSiacoinOutput{
+					id:        types.SiacoinOutputID(block.MinerPayoutID(uint64(i))),
 					value:     mp.Value,
 					seedIndex: index,
-				}
+				})
 			}
 		}
 		for _, txn := range block.Transactions {
@@ -149,5 +161,6 @@ func newSeedScanner(seed modules.Seed) *seedScanner {
 		seed:           seed,
 		keys:           make(map[types.UnlockHash]uint64),
 		siacoinOutputs: make(map[types.SiacoinOutputID]scannedSiacoinOutput),
+		minerOutputs:   make(map[types.BlockHeight][]scannedSiacoinOutput),
 	}
 }
