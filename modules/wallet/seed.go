@@ -289,7 +289,7 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 		// construct an input for the output
 		sk := generateSpendableKey(seed, output.seedIndex)
 		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
-			ParentID:         output.id,
+			ParentID:         types.SiacoinOutputID(output.id),
 			UnlockConditions: sk.UnlockConditions, // TODO: check timelock, etc.
 		})
 		// add a signature for the input
