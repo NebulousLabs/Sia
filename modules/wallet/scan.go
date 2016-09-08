@@ -57,14 +57,13 @@ type seedScanner struct {
 	blockheight      types.BlockHeight
 }
 
-func (s *seedScanner) isSeedAddress(uh types.UnlockHash) bool {
-	_, exists := s.keys[uh]
-	return exists
+func (s *seedScanner) numKeys() uint64 {
+	return uint64(len(s.keys))
 }
 
 // generateKeys generates n additional keys from the seedScanner's seed.
 func (s *seedScanner) generateKeys(n uint64) {
-	initialProgress := uint64(len(s.keys))
+	initialProgress := s.numKeys()
 	for i, k := range generateKeys(s.seed, initialProgress, n) {
 		s.keys[k.UnlockConditions.UnlockHash()] = initialProgress + uint64(i)
 	}
@@ -163,20 +162,20 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	// NOTE: since scanning is very slow, we aim to only scan once, which
 	// means generating many keys.
 	var numKeys uint64 = numInitialKeys
-	for uint64(len(s.keys)) < maxScanKeys {
+	for s.numKeys() < maxScanKeys {
 		s.generateKeys(numKeys)
 		if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 			return err
 		}
-		if s.largestIndexSeen < uint64(len(s.keys))/2 {
+		if s.largestIndexSeen < s.numKeys()/2 {
 			cs.Unsubscribe(s)
 			return nil
 		}
 		// double number of keys generated each iteration, capping so that we
 		// do not exceed maxScanKeys
 		numKeys *= 2
-		if numKeys > maxScanKeys-uint64(len(s.keys)) {
-			numKeys = maxScanKeys - uint64(len(s.keys))
+		if numKeys > maxScanKeys-s.numKeys() {
+			numKeys = maxScanKeys - s.numKeys()
 		}
 	}
 	cs.Unsubscribe(s)
