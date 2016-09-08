@@ -40,8 +40,8 @@ var maxScanKeys = func() uint64 {
 
 var errMaxKeys = fmt.Errorf("refused to generate more than %v keys from seed", maxScanKeys)
 
-type scannedSiacoinOutput struct {
-	id        types.SiacoinOutputID
+type scannedOutput struct {
+	id        types.OutputID
 	value     types.Currency
 	seedIndex uint64
 }
@@ -51,8 +51,8 @@ type scannedSiacoinOutput struct {
 type seedScanner struct {
 	seed             modules.Seed
 	keys             map[types.UnlockHash]uint64 // map address to seed index
-	siacoinOutputs   map[types.SiacoinOutputID]scannedSiacoinOutput
-	minerOutputs     map[types.BlockHeight][]scannedSiacoinOutput
+	siacoinOutputs   map[types.OutputID]scannedOutput
+	minerOutputs     map[types.BlockHeight][]scannedOutput
 	largestIndexSeen uint64 // largest index that has appeared in the blockchain
 	blockheight      types.BlockHeight
 }
@@ -88,8 +88,8 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// set
 			if index, exists := s.keys[mp.UnlockHash]; exists {
 				maturityHeight := s.blockheight + types.MaturityDelay
-				s.minerOutputs[maturityHeight] = append(s.minerOutputs[maturityHeight], scannedSiacoinOutput{
-					id:        types.SiacoinOutputID(block.MinerPayoutID(uint64(i))),
+				s.minerOutputs[maturityHeight] = append(s.minerOutputs[maturityHeight], scannedOutput{
+					id:        types.OutputID(block.MinerPayoutID(uint64(i))),
 					value:     mp.Value,
 					seedIndex: index,
 				})
@@ -99,8 +99,8 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			for i, sco := range txn.SiacoinOutputs {
 				// if a seed output is found, add it to the output set
 				if index, exists := s.keys[sco.UnlockHash]; exists {
-					id := txn.SiacoinOutputID(uint64(i))
-					s.siacoinOutputs[id] = scannedSiacoinOutput{
+					id := types.OutputID(txn.SiacoinOutputID(uint64(i)))
+					s.siacoinOutputs[id] = scannedOutput{
 						id:        id,
 						value:     sco.Value,
 						seedIndex: index,
@@ -109,8 +109,9 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			for _, sci := range txn.SiacoinInputs {
 				// if a seed output is spent, remove it from the output set
-				if _, exists := s.siacoinOutputs[sci.ParentID]; exists {
-					delete(s.siacoinOutputs, sci.ParentID)
+				id := types.OutputID(sci.ParentID)
+				if _, exists := s.siacoinOutputs[id]; exists {
+					delete(s.siacoinOutputs, id)
 				}
 			}
 		}
@@ -186,7 +187,7 @@ func newSeedScanner(seed modules.Seed) *seedScanner {
 	return &seedScanner{
 		seed:           seed,
 		keys:           make(map[types.UnlockHash]uint64),
-		siacoinOutputs: make(map[types.SiacoinOutputID]scannedSiacoinOutput),
-		minerOutputs:   make(map[types.BlockHeight][]scannedSiacoinOutput),
+		siacoinOutputs: make(map[types.OutputID]scannedOutput),
+		minerOutputs:   make(map[types.BlockHeight][]scannedOutput),
 	}
 }
