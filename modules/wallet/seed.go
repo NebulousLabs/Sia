@@ -241,3 +241,81 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	defer w.mu.Unlock()
 	return w.loadSeed(masterKey, seed)
 }
+
+// SweepSeed scans the blockchain for outputs generated from seed and create a
+// transaction that transfers them to the wallet. Note that this incurs a
+// transaction fee.
+// TODO: support SiafundOutputs too
+func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (swept types.Currency, err error) {
+	if err = w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
+	// get an address to spend into
+	var uc types.UnlockConditions
+	err = w.db.Update(func(tx *bolt.Tx) error {
+		var err error
+		uc, err = w.nextPrimarySeedAddress(tx)
+		return err
+	})
+	if err != nil {
+		return
+	}
+
+	// construct a transaction that will spend the outputs and fund its
+	// transaction fee
+	// TODO: split across multiple txns if neceessary
+	_, maxFee := w.tpool.FeeEstimation()
+	feePerOutput := maxFee.Mul64(200) // fee is hastings per byte; output+signature is approx. 200 bytes (?)
+
+	// scan blockchain for outputs
+	s := newSeedScanner(seed)
+	if err = s.scan(w.cs); err != nil {
+		return
+	}
+
+	// construct a transaction that spends the outputs
+	// TODO: this may result in transactions that are too large.
+	var txn types.Transaction
+	for _, output := range s.siacoinOutputs {
+		// discard 'dust' outputs, i.e. those that cost more in txn fees than
+		// they are worth
+		if output.value.Cmp(feePerOutput) <= 0 {
+			continue
+		}
+
+		// construct an input for the output
+		sk := generateSpendableKey(seed, output.seedIndex)
+		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
+			ParentID:         output.id,
+			UnlockConditions: sk.UnlockConditions, // TODO: check timelock, etc.
+		})
+		// add a signature for the input
+		swept = swept.Add(output.value)
+	}
+
+	estFee := maxFee.Mul64(3000) // TODO: calculate a better estimate
+	if estFee.Cmp(swept) >= 0 {
+		return types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
+	}
+	txn.MinerFees = append(txn.MinerFees, estFee)
+
+	// add the recipient output, equal to the sum of the inputs minus the
+	// transaction fee
+	txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
+		Value:      swept.Sub(estFee),
+		UnlockHash: uc.UnlockHash(),
+	})
+
+	// add signatures
+	for _, output := range s.siacoinOutputs {
+		sk := generateSpendableKey(seed, output.seedIndex)
+		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
+	}
+
+	// submit the transaction
+	txnSet := []types.Transaction{txn}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	return
+}
