@@ -14,12 +14,19 @@ const (
 
 var errMaxKeys = fmt.Errorf("refused to generate more than %v keys from seed", maxScanKeys)
 
+type scannedSiacoinOutput struct {
+	id        types.SiacoinOutputID
+	value     types.Currency
+	seedIndex uint64
+}
+
 // A seedScanner scans the blockchain for addresses that belong to a given
 // seed.
 type seedScanner struct {
 	seed             modules.Seed
 	keys             map[types.UnlockHash]uint64 // map address to seed index
-	largestIndexSeen uint64                      // largest index that has appeared in the blockchain
+	siacoinOutputs   map[types.SiacoinOutputID]scannedSiacoinOutput
+	largestIndexSeen uint64 // largest index that has appeared in the blockchain
 }
 
 func (s *seedScanner) isSeedAddress(uh types.UnlockHash) bool {
@@ -36,6 +43,42 @@ func (s *seedScanner) generateKeys(n uint64) {
 }
 
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
+	// update outputs
+	for _, block := range cc.AppliedBlocks {
+		for i, mp := range block.MinerPayouts {
+			// if a seed miner output is found, add it to the output set
+			// TODO: these outputs can only be spent after a maturity delay
+			if index, exists := s.keys[mp.UnlockHash]; exists {
+				id := types.SiacoinOutputID(block.MinerPayoutID(uint64(i)))
+				s.siacoinOutputs[id] = scannedSiacoinOutput{
+					id:        id,
+					value:     mp.Value,
+					seedIndex: index,
+				}
+			}
+		}
+		for _, txn := range block.Transactions {
+			for i, sco := range txn.SiacoinOutputs {
+				// if a seed output is found, add it to the output set
+				if index, exists := s.keys[sco.UnlockHash]; exists {
+					id := txn.SiacoinOutputID(uint64(i))
+					s.siacoinOutputs[id] = scannedSiacoinOutput{
+						id:        id,
+						value:     sco.Value,
+						seedIndex: index,
+					}
+				}
+			}
+			for _, sci := range txn.SiacoinInputs {
+				// if a seed output is spent, remove it from the output set
+				if _, exists := s.siacoinOutputs[sci.ParentID]; exists {
+					delete(s.siacoinOutputs, sci.ParentID)
+				}
+			}
+		}
+	}
+
+	// update largestIndexSeen
 	var addrs []types.UnlockHash
 	for _, diff := range cc.SiacoinOutputDiffs {
 		addrs = append(addrs, diff.SiacoinOutput.UnlockHash)
@@ -43,7 +86,6 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, diff := range cc.SiafundOutputDiffs {
 		addrs = append(addrs, diff.SiafundOutput.UnlockHash)
 	}
-
 	for _, block := range cc.AppliedBlocks {
 		for _, mp := range block.MinerPayouts {
 			addrs = append(addrs, mp.UnlockHash)
@@ -63,8 +105,6 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 		}
 	}
-
-	// update largestIndexSeen
 	for _, addr := range addrs {
 		index, exists := s.keys[addr]
 		if exists && index > s.largestIndexSeen {
@@ -106,7 +146,8 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 
 func newSeedScanner(seed modules.Seed) *seedScanner {
 	return &seedScanner{
-		seed: seed,
-		keys: make(map[types.UnlockHash]uint64),
+		seed:           seed,
+		keys:           make(map[types.UnlockHash]uint64),
+		siacoinOutputs: make(map[types.SiacoinOutputID]scannedSiacoinOutput),
 	}
 }
