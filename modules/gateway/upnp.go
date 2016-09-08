@@ -96,7 +96,7 @@ func (g *Gateway) threadedForwardPort(port string) {
 
 	d, err := upnp.Discover()
 	if err != nil {
-		g.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found", port)
+		g.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found: %v", port, err)
 		return
 	}
 

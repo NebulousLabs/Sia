@@ -80,7 +80,7 @@ func (h *Host) initNetworking(address string) (err error) {
 		}
 		defer h.tg.Done()
 
-		err = h.managedForwardPort()
+		err = h.managedForwardPort(port)
 		if err != nil {
 			h.log.Println("ERROR: failed to forward port:", err)
 		}
