@@ -106,7 +106,7 @@ func (h *Host) managedForwardPort(port string) error {
 
 	d, err := upnp.Discover()
 	if err != nil {
-		h.log.Printf("WARN: could not automatically forward port %s: no UPnP-enabled devices found: %v", port, err)
+		h.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
 		return err
 	}
 	err = d.Forward(uint16(portInt), "Sia Host")
