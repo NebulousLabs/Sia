@@ -263,14 +263,11 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 		return
 	}
 
-	// construct a transaction that will spend the outputs and fund its
-	// transaction fee
-	// TODO: split across multiple txns if neceessary
-	_, maxFee := w.tpool.FeeEstimation()
-	feePerOutput := maxFee.Mul64(350) // fee is hastings per byte; output+signature is approx. 350 bytes
-
-	// scan blockchain for outputs
+	// scan blockchain for outputs, filtering out 'dust' (outputs that cost
+	// more in fees than they are worth)
 	s := newSeedScanner(seed)
+	_, maxFee := w.tpool.FeeEstimation()
+	s.dustThreshold = maxFee.Mul64(350) // fee is per byte; output+signature is approx. 350 bytes
 	if err = s.scan(w.cs); err != nil {
 		return
 	}
@@ -280,13 +277,6 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 	var txn types.Transaction
 	var swept types.Currency // total value of swept outputs
 	for _, output := range s.siacoinOutputs {
-		// discard 'dust' outputs, i.e. those that cost more in txn fees than
-		// they are worth
-		// TODO: consider having the scanner filter these
-		if output.value.Cmp(feePerOutput) <= 0 {
-			continue
-		}
-
 		// construct an input for the output
 		sk := generateSpendableKey(seed, output.seedIndex)
 		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
@@ -314,10 +304,6 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 
 	// add signatures
 	for _, output := range s.siacoinOutputs {
-		// skip dust outputs
-		if output.value.Cmp(feePerOutput) <= 0 {
-			continue
-		}
 		sk := generateSpendableKey(seed, output.seedIndex)
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 	}
