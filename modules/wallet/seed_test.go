@@ -209,6 +209,17 @@ func TestSweepSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// send money to ourselves, so that we sweep a real output (instead of
+	// just a miner payout)
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.miner.AddBlock()
 
 	// create a blank wallet
 	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestSweepSeed1"), modules.WalletDir)

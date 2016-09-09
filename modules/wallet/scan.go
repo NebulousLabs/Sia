@@ -106,6 +106,8 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 					}
 				}
 			}
+			// TODO: should this be done in a separate txn loop? This would be
+			// mandatory if txn0 can spend an output created in txn1
 			for _, sci := range txn.SiacoinInputs {
 				// if a seed output is spent, remove it from the output set
 				id := types.OutputID(sci.ParentID)
