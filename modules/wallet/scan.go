@@ -49,12 +49,13 @@ type scannedOutput struct {
 // A seedScanner scans the blockchain for addresses that belong to a given
 // seed.
 type seedScanner struct {
-	seed             modules.Seed
-	keys             map[types.UnlockHash]uint64 // map address to seed index
-	siacoinOutputs   map[types.OutputID]scannedOutput
-	minerOutputs     map[types.BlockHeight][]scannedOutput
-	largestIndexSeen uint64 // largest index that has appeared in the blockchain
 	blockheight      types.BlockHeight
+	dustThreshold    types.Currency              // minimum value of outputs to be included
+	keys             map[types.UnlockHash]uint64 // map address to seed index
+	largestIndexSeen uint64                      // largest index that has appeared in the blockchain
+	minerOutputs     map[types.BlockHeight][]scannedOutput
+	seed             modules.Seed
+	siacoinOutputs   map[types.OutputID]scannedOutput
 }
 
 func (s *seedScanner) numKeys() uint64 {
@@ -85,7 +86,7 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 		for i, mp := range block.MinerPayouts {
 			// if a seed miner output is found, add it to the delayed output
 			// set
-			if index, exists := s.keys[mp.UnlockHash]; exists {
+			if index, exists := s.keys[mp.UnlockHash]; exists && mp.Value.Cmp(s.dustThreshold) > 0 {
 				maturityHeight := s.blockheight + types.MaturityDelay
 				s.minerOutputs[maturityHeight] = append(s.minerOutputs[maturityHeight], scannedOutput{
 					id:        types.OutputID(block.MinerPayoutID(uint64(i))),
@@ -97,7 +98,7 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 		for _, txn := range block.Transactions {
 			for i, sco := range txn.SiacoinOutputs {
 				// if a seed output is found, add it to the output set
-				if index, exists := s.keys[sco.UnlockHash]; exists {
+				if index, exists := s.keys[sco.UnlockHash]; exists && sco.Value.Cmp(s.dustThreshold) > 0 {
 					id := types.OutputID(txn.SiacoinOutputID(uint64(i)))
 					s.siacoinOutputs[id] = scannedOutput{
 						id:        id,
