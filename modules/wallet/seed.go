@@ -282,6 +282,7 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 	for _, output := range s.siacoinOutputs {
 		// discard 'dust' outputs, i.e. those that cost more in txn fees than
 		// they are worth
+		// TODO: consider having the scanner filter these
 		if output.value.Cmp(feePerOutput) <= 0 {
 			continue
 		}
@@ -312,6 +313,10 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 
 	// add signatures
 	for _, output := range s.siacoinOutputs {
+		// skip dust outputs
+		if output.value.Cmp(feePerOutput) <= 0 {
+			continue
+		}
 		sk := generateSpendableKey(seed, output.seedIndex)
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 	}
