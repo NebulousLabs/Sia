@@ -336,6 +336,11 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 		return err
 	}
 	defer w.tg.Done()
+
+	if !w.cs.Synced() {
+		return errors.New("cannot init from seed until blockchain is synced")
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if _, err := w.initEncryption(masterKey, seed); err != nil {
