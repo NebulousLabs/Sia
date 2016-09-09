@@ -267,7 +267,7 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 	// transaction fee
 	// TODO: split across multiple txns if neceessary
 	_, maxFee := w.tpool.FeeEstimation()
-	feePerOutput := maxFee.Mul64(200) // fee is hastings per byte; output+signature is approx. 200 bytes (?)
+	feePerOutput := maxFee.Mul64(350) // fee is hastings per byte; output+signature is approx. 350 bytes
 
 	// scan blockchain for outputs
 	s := newSeedScanner(seed)
@@ -297,7 +297,8 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 		swept = swept.Add(output.value)
 	}
 
-	estFee := maxFee.Mul64(3000) // TODO: calculate a better estimate
+	estTxnSize := len(s.siacoinOutputs) * 350 // since we use maxFee, lowballing is ok
+	estFee := maxFee.Mul64(uint64(estTxnSize))
 	if estFee.Cmp(swept) >= 0 {
 		return types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
 	}
