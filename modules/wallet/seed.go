@@ -252,6 +252,10 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 	}
 	defer w.tg.Done()
 
+	if !w.cs.Synced() {
+		return types.Currency{}, errors.New("cannot sweep until blockchain is synced")
+	}
+
 	// get an address to spend into
 	var uc types.UnlockConditions
 	err = w.db.Update(func(tx *bolt.Tx) error {
