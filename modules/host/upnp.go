@@ -81,7 +81,7 @@ func (h *Host) managedLearnHostname() {
 }
 
 // managedForwardPort adds a port mapping to the router.
-func (h *Host) managedForwardPort() error {
+func (h *Host) managedForwardPort(port string) error {
 	if build.Release == "testing" {
 		// Add a blocking placeholder where testing is able to mock behaviors
 		// such as a port forward action that blocks for 10 seconds before
@@ -99,9 +99,6 @@ func (h *Host) managedForwardPort() error {
 
 	// If the port is invalid, there is no need to perform any of the other
 	// tasks.
-	h.mu.RLock()
-	port := h.port
-	h.mu.RUnlock()
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
 		return err
@@ -109,10 +106,12 @@ func (h *Host) managedForwardPort() error {
 
 	d, err := upnp.Discover()
 	if err != nil {
+		h.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
 		return err
 	}
 	err = d.Forward(uint16(portInt), "Sia Host")
 	if err != nil {
+		h.log.Printf("WARN: could not automatically forward port %s: %v", port, err)
 		return err
 	}
 
