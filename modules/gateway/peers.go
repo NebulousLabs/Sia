@@ -514,7 +514,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// Also wait a while and try again if there is at least one outbound
 		// peer and the selected peer is local. We do not want all of our
 		// outbound peers to be local peers.
-		if err != nil || (numOutboundPeers > 0 && addr.IsLocal() && build.Release != "testing") {
+		if err != nil || (numOutboundPeers >= maxLocalOutboundPeers && addr.IsLocal() && build.Release != "testing") {
 			select {
 			case <-time.After(noNodesDelay):
 			case <-g.threads.StopChan():

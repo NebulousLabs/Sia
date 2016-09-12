@@ -109,6 +109,30 @@ package gateway
 // demonstrated which have been able to confuse nodes by manipulating messages
 // from their peers. Encryption + authentication would have made the attack
 // more difficult.
+//
+// TODO: The gateway does an unofficial ping in two places within nodes.go.
+// These unofficial pings can be found by searching for the string "0.0.0". To
+// perform the unofficial ping, the gateway connects to a peer and writes its
+// version as 0.0.0. When the connection completes and the handshake passes,
+// the gateway writes its version as '0.0.0', causing the other node to reject
+// the connection and disconnect. The gateway then can tell that the node on
+// the other end of the line is a Sia gateway, without having to add that node
+// as a peer. A better solution to this hack is to just add an RPC for the ping
+// function. Rollout will of course have to be gradual, as new nodes and old
+// nodes need to be able to successfully ping eachother until a sufficient
+// portion of the network has upgraded to the new code.
+//
+// TODO: The gateway, when connecting to a peer, currently has no way of
+// recognizing whether that peer is itself or not. Because of this, the gateway
+// does occasionally try to connect to itself, especially if it has a really
+// small node list. This can cause problems, especially during testing, if the
+// gateway is intentionally limiting the number of local outbount peers that it
+// has. For that reason, the 'permanentPeerManager' will allow the gateway to
+// add local peers as outbound peers all the way up to 3 total connections. The
+// gateway needs a proper way to recognize if it is trying to connect itself
+// (sending a nonce when performing the version handshake, for example). Once
+// that has been implemented, maxLocalOutobundPeers can be reduced to 2 or 1
+// (probably 2).
 
 import (
 	"errors"
