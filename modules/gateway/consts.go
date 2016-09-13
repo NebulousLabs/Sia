@@ -133,7 +133,7 @@ var (
 	acquiringPeersDelay = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 3 * time.Minute
+			return 3 * time.Second
 		case "standard":
 			return 5 * time.Second
 		case "testing":
