@@ -93,6 +93,7 @@ func (g *Gateway) permanentListen(closeChan chan struct{}) {
 	for {
 		conn, err := g.listener.Accept()
 		if err != nil {
+			g.log.Debugln("[PL] Closing permanentListen:", err)
 			return
 		}
 

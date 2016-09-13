@@ -158,7 +158,7 @@ func (g *Gateway) threadedListenPeer(p *peer) {
 	for {
 		conn, err := p.accept()
 		if err != nil {
-			g.log.Debugln("Peer connection closed:", p.NetAddress)
+			g.log.Debugf("Peer connection with %v closed: %v\n", p.NetAddress, err)
 			break
 		}
 
