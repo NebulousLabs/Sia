@@ -42,6 +42,7 @@ type peer struct {
 func (p *peer) open() (modules.PeerConn, error) {
 	conn, err := p.sess.Open()
 	if err != nil {
+		g.log.Debugln("[SESS] Unable to open muxado session:", err)
 		return nil, err
 	}
 	return &peerConn{conn, p.NetAddress}, nil
@@ -93,6 +94,7 @@ func (g *Gateway) permanentListen(closeChan chan struct{}) {
 	for {
 		conn, err := g.listener.Accept()
 		if err != nil {
+			g.log.Debugln("[PL] Closing permanentListen:", err)
 			return
 		}
 
@@ -483,6 +485,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 	defer close(closedChan)
 
 	for {
+		g.log.Debugln("[PPM] PPM loop head reached.")
 		// Determine the number of outbound peers.
 		numOutboundPeers := 0
 		g.mu.RLock()
@@ -508,6 +511,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		g.mu.RLock()
 		addr, err := g.randomNode()
 		g.mu.RUnlock()
+		g.log.Debugln("[PPM] Gateway does not have enough peers, attempting to acquire a new one:", addr)
 		// If there was an error, log the error and then wait a while before
 		// trying again.
 		//
@@ -515,6 +519,7 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 		// peer and the selected peer is local. We do not want all of our
 		// outbound peers to be local peers.
 		if err != nil || (numOutboundPeers >= maxLocalOutboundPeers && addr.IsLocal() && build.Release != "testing") {
+			g.log.Debugln("[PPM] Unable to acquire selected peer:", err)
 			select {
 			case <-time.After(noNodesDelay):
 			case <-g.threads.StopChan():
@@ -530,8 +535,11 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 				return
 			}
 			defer g.threads.Done()
+			defer g.log.Debugln("[PPM] managedConnect thread has terminated")
 
+			g.log.Debugln("[PPM] [GMC] Attempting connection.")
 			err := g.managedConnect(addr)
+			g.log.Debugln("[PPM] [GMC] Attempted managedConnect:", err)
 			if err == errPeerExists {
 				// This peer is already connected to us. Safety around the
 				// oubound peers relates to the fact that we have picked out
@@ -552,10 +560,12 @@ func (g *Gateway) permanentPeerManager(closedChan chan struct{}) {
 					// race condition could mean that the peer was disconnected
 					// before this code block was reached.
 					p.Inbound = false
+				} else {
+					g.log.Debugln("[PPM] [GMC] errPeerExists was returned, but by the time the peer was to be set to 'outbound', it no longer existed.")
 				}
 				g.mu.Unlock()
 			} else if err != nil {
-				g.log.Debugln("WARN: automatic connect failed:", err)
+				g.log.Debugln("[PPM] [GMC] WARN: automatic connect failed:", err)
 			}
 		}()
 
