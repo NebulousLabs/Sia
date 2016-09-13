@@ -5,6 +5,10 @@
 // mined or about transactions that you have created.
 package gateway
 
+import (
+	"time"
+)
+
 // For the user to be securely connected to the network, the user must be
 // connected to at least one node which will send them all of the blocks. An
 // attacker can trick the user into thinking that a different blockchain is the
@@ -188,6 +192,18 @@ type Gateway struct {
 	mu         sync.RWMutex
 	persistDir string
 	threads    siasync.ThreadGroup
+}
+
+// managedSleep will sleep for the given period of time. If the full time
+// elapses, 'false' is returned. If the sleep is interrupted for shutdown,
+// 'true' is returned.
+func (g *Gateway) managedSleep(t time.Duration) (completed bool) {
+	select {
+	case <-time.After(t):
+		return true
+	case <-g.threads.StopChan():
+		return false
+	}
 }
 
 // Address returns the NetAddress of the Gateway.

@@ -158,6 +158,21 @@ var (
 		}
 	}()
 
+	// maxConcurrentOutboundPeerRequests defines the maximum number of peer
+	// connections that the gateway will try to form concurrently.
+	maxConcurrentOutboundPeerRequests = func() int {
+		switch build.Release {
+		case "dev":
+			return 2
+		case "standard":
+			return 3
+		case "testing":
+			return 2
+		default:
+			panic("unrecognized build.Release in maxConcurrentOutboundPeerRequests")
+		}
+	}()
+
 	// noNodesDelay defines the amount of time that is waited between
 	// iterations of the peer acquisition loop if the gateway does not have any
 	// nodes in the nodelist.
@@ -171,6 +186,25 @@ var (
 			return 3 * time.Second
 		default:
 			panic("unrecognized build.Release in noNodesDelay")
+		}
+	}()
+
+	// unwawntedLocalPeerDelay defines the amount of time that is waited
+	// between iterations of the permanentPeerManager if the gateway has at
+	// least a few outbound peers, but is not well connected, and the recently
+	// selected peer was a local peer. The wait is mostly to prevent the
+	// gateway from hogging the CPU in the event that all peers are local
+	// peers.
+	unwantedLocalPeerDelay = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 1 * time.Second
+		case "standard":
+			return 2 * time.Second
+		case "testing":
+			return 100 * time.Millisecond
+		default:
+			panic("unrecognized build.Release in unwawntedLocalPeerDelay")
 		}
 	}()
 
