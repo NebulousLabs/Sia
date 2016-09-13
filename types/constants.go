@@ -50,12 +50,12 @@ func init() {
 		// can coordinate their actions over a the developer testnets, but fast
 		// enough that there isn't much time wasted on waiting for things to
 		// happen.
-		BlockFrequency = 6                       // 6 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
+		BlockFrequency = 12                      // 12 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
 		MaturityDelay = 10                       // 60 seconds before a delayed output matures.
 		GenesisTimestamp = Timestamp(1424139000) // Change as necessary.
-		RootTarget = Target{0, 0, 20}            // Standard developer CPUs will be able to mine blocks with the race library activated.
+		RootTarget = Target{0, 0, 10}            // Standard developer CPUs will be able to mine blocks with the race library activated.
 
-		TargetWindow = 40                        // Difficulty is adjusted based on prior 40 blocks.
+		TargetWindow = 20                        // Difficulty is adjusted based on prior 20 blocks.
 		MaxAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
 		MaxAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
 		FutureThreshold = 2 * 60                 // 2 minutes.
