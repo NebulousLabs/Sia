@@ -19,7 +19,7 @@ After downloading, you can find the Sia source code in
 $GOPATH/src/github.com/NebulousLabs/Sia. To build the release binary, run
 `make release-std` from this directory. To build the release binary with a
 (slow) race detector and an array of debugging asserts, run `make release`. To
-build the developer binary (which has a different gensis block, faster block
+build the developer binary (which has a different genesis block, faster block
 times, and a few other tweaks), just run `make`.
 
 If you intend to contribute to Sia, you should start by forking the project on
@@ -30,7 +30,7 @@ pull request on GitHub.
 
 If you see an error like the one below, it means that you either forgot to run
 `make dependencies`, or you cloned the project into a path that the go tool
-does not recognize (usually the wrong path, or sym links were somehow
+does not recognize (usually the wrong path, or symbolic links were somehow
 involved).
 
 ```
@@ -77,7 +77,7 @@ than what you would expect to remember from an 'Intro to Data Structures' class
 should have an explanation about what the concept it is and why it was picked
 over other potential choices.
 
-Code that exists purely to be compatibile with previous versions of the
+Code that exists purely to be compatible with previous versions of the
 software should be tagged with a 'COMPATvX.X.X' comment. Examples below.
 
 ```go
@@ -110,7 +110,7 @@ Data structures should never have shortened names. 'FileContract.mr' is
 confusing to anyone who has not used the data structure extensively. The code
 should be accessible to people who are unfamiliar with the codebase. One
 exception is for the variable called 'mu', which is short for 'mutex'. This
-exception is made because 'mu' appears in many datastructures.
+exception is made because 'mu' appears in many data structures.
 
 When calling functions with obscure parameters, named variables should be used
 to indicate what the parameters do. For example, 'm := NewMiner(1)' is
@@ -160,7 +160,7 @@ breaking should have a comment.
 
 Non-exported functions should not do any locking, unless they have a special
 prefix to the name (explained below). The responsibility for thread-safety
-comes from the exported funcitons which call the non-exported functions.
+comes from the exported functions which call the non-exported functions.
 Maintaining this convention minimizes developer overhead when working with
 complex objects.
 
@@ -234,6 +234,6 @@ In general, testing that uses exclusively exported functions to achieve full
 coverage is preferred. These types of tests seem to find more bugs and trigger
 more asserts.
 
-Any testing provided by a third party which is both maintainable and resonably
+Any testing provided by a third party which is both maintainable and reasonably
 quick will be accepted. There is little downside to more testing, even when the
-testing is largely redudnant.
+testing is largely redundant.
