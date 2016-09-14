@@ -19,7 +19,7 @@ Notes:
 - **Do not bind or expose the API to a non-loopback address unless you are
   aware of the possible dangers.**
 
-Example GET curl call: 
+Example GET curl call:
 ```
 curl -A "Sia-Agent" "localhost:9980/wallet/transactions?startheight=1&endheight=250"
 ```
@@ -72,7 +72,7 @@ Units
 Unless otherwise specified, all parameters should be specified in their
 smallest possible unit. For example, size should always be specified in bytes
 and SiaCoins should be specified in hastings. JSON values returned by the API
-will also use the smallest possible unit, unelss otherwise specified.
+will also use the smallest possible unit, unless otherwise specified.
 
 If a numbers is returned as a string in JSON, it should be treated as an
 arbitrary-precision number (bignum), and it should be parsed with your
