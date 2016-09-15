@@ -54,6 +54,14 @@ func (g *Gateway) managedAddUntrustedNode(addr modules.NetAddress) error {
 	// NOTE: this is a somewhat clunky way of specifying that you didn't
 	// actually want a connection.
 	encoding.WriteObject(conn, "0.0.0")
+	var reject string
+	err = encoding.ReadObject(conn, &reject, build.MaxEncodedVersionLength)
+	if err != nil {
+		g.log.Debugln("ERROR: version handshake ping terminated unexpectedly:", err)
+	}
+	if reject != "reject" {
+		g.log.Debugln("WARN: peer does not seem to have correctly rejected our ping:", reject)
+	}
 	conn.Close()
 
 	g.mu.Lock()
@@ -210,6 +218,14 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 			// connect to the network in the future.
 			continue
 		}
+		// Check whether this node is already a peer. If so, no need to dial
+		// them.
+		g.mu.RLock()
+		_, exists := g.peers[node]
+		g.mu.RUnlock()
+		if exists {
+			continue
+		}
 
 		// Try connecting to the random node. If the node is not reachable,
 		// remove them from the node list.
@@ -233,6 +249,14 @@ func (g *Gateway) permanentNodePurger(closeChan chan struct{}) {
 		// NOTE: this is a somewhat clunky way of specifying that you didn't
 		// actually want a connection.
 		encoding.WriteObject(conn, "0.0.0")
+		var reject string
+		err = encoding.ReadObject(conn, &reject, build.MaxEncodedVersionLength)
+		if err != nil {
+			g.log.Debugln("ERROR: version handshake ping terminated unexpectedly:", err)
+		}
+		if reject != "reject" {
+			g.log.Debugln("WARN: peer does not seem to have correctly rejected our ping:", reject)
+		}
 		conn.Close()
 	}
 }

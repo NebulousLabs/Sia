@@ -11,6 +11,15 @@ const (
 	// was altered to include adiitional information transfer.
 	handshakeUpgradeVersion = "1.0.0"
 
+	// maxLocalOutbound is currently set to 3, meaning the gateway will not
+	// consider a local node to be an outbound peer if the gateway already has
+	// 3 outbound peers. Three is currently needed to handle situations where
+	// the gateway is at high risk of connecting to itself (such as a low
+	// number of total peers, especially such as in a testing environment).
+	// Once the gateway has a proper way to figure out that it's trying to
+	// connect to itself, this number can be reduced.
+	maxLocalOutboundPeers = 3
+
 	// minAcceptableVersion is the version below which the gateway will refuse to
 	// connect to peers and reject connection attempts.
 	//
@@ -124,7 +133,7 @@ var (
 	acquiringPeersDelay = func() time.Duration {
 		switch build.Release {
 		case "dev":
-			return 3 * time.Minute
+			return 3 * time.Second
 		case "standard":
 			return 5 * time.Second
 		case "testing":
@@ -149,6 +158,21 @@ var (
 		}
 	}()
 
+	// maxConcurrentOutboundPeerRequests defines the maximum number of peer
+	// connections that the gateway will try to form concurrently.
+	maxConcurrentOutboundPeerRequests = func() int {
+		switch build.Release {
+		case "dev":
+			return 2
+		case "standard":
+			return 3
+		case "testing":
+			return 2
+		default:
+			panic("unrecognized build.Release in maxConcurrentOutboundPeerRequests")
+		}
+	}()
+
 	// noNodesDelay defines the amount of time that is waited between
 	// iterations of the peer acquisition loop if the gateway does not have any
 	// nodes in the nodelist.
@@ -162,6 +186,25 @@ var (
 			return 3 * time.Second
 		default:
 			panic("unrecognized build.Release in noNodesDelay")
+		}
+	}()
+
+	// unwawntedLocalPeerDelay defines the amount of time that is waited
+	// between iterations of the permanentPeerManager if the gateway has at
+	// least a few outbound peers, but is not well connected, and the recently
+	// selected peer was a local peer. The wait is mostly to prevent the
+	// gateway from hogging the CPU in the event that all peers are local
+	// peers.
+	unwantedLocalPeerDelay = func() time.Duration {
+		switch build.Release {
+		case "dev":
+			return 1 * time.Second
+		case "standard":
+			return 2 * time.Second
+		case "testing":
+			return 100 * time.Millisecond
+		default:
+			panic("unrecognized build.Release in unwawntedLocalPeerDelay")
 		}
 	}()
 
