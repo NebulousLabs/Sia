@@ -24,13 +24,13 @@ func (pc peerConn) RPCAddr() modules.NetAddress {
 // communication protocol.
 func (g *Gateway) dial(addr modules.NetAddress) (net.Conn, error) {
 	dialer := &net.Dialer{
-		Cancel:   g.threads.StopChan(),
-		Deadline: time.Now().Add(connStdDeadline),
-		Timeout:  dialTimeout,
+		Cancel:  g.threads.StopChan(),
+		Timeout: dialTimeout,
 	}
 	conn, err := dialer.Dial("tcp", string(addr))
 	if err != nil {
 		return nil, err
 	}
+	conn.SetDeadline(time.Now().Add(connStdDeadline))
 	return conn, nil
 }
