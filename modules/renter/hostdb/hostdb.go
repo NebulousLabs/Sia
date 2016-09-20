@@ -62,7 +62,9 @@ type HostDB struct {
 	// the scanPool is a set of hosts that need to be scanned. There are a
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan.
+	scanList []*hostEntry
 	scanPool chan *hostEntry
+	scanWait bool
 
 	// closeChan is used to shutdown the scanning threads.
 	closeChan chan struct{}
@@ -143,6 +145,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 	}
 	hdb.threadGroup.Add(1)
 	go hdb.threadedScan()
+
 	return hdb, nil
 }
 

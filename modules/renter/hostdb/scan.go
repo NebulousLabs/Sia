@@ -32,7 +32,7 @@ const (
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
-	scanningThreads = 25
+	scanningThreads = 5
 )
 
 // Reliability is a measure of a host's uptime.
@@ -47,8 +47,42 @@ var (
 // The gofunc is created inside of this function to eliminate the burden of
 // needing to remember to call 'go addHostToScanPool'.
 func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
+	select {
+	case hdb.scanPool <- entry:
+		// Success - nothing more to do.
+		return
+	default:
+	}
+
+	// Failed to add host entry to the scan pool. Add it to a waitlist, then
+	// check if any thread is currently emptying the waitlist. If not, spawn a
+	// thread to empty the waitlist.
+	hdb.scanList = append(hdb.scanList, entry)
+	if hdb.scanWait {
+		// Another thread is emptying the scan list, nothing to worry about.
+		return
+	}
+
+	// Nobody is emptying the scan list, volunteer.
+	hdb.scanWait = true
 	go func() {
-		hdb.scanPool <- entry
+		for {
+			hdb.mu.Lock()
+			if len(hdb.scanList) == 0 {
+				// Scan list is empty, can exit. Let the world know that nobody
+				// is emptying the scan list anymore.
+				hdb.mu.Unlock()
+				hdb.scanWait = false
+				return
+			}
+			// Get the next host, shrink the scan list.
+			entry := hdb.scanList[0]
+			hdb.scanList = hdb.scanList[1:]
+			hdb.mu.Unlock()
+
+			// Block while we wait for an opening in the scan pool.
+			hdb.scanPool <- entry
+		}
 	}()
 }
 
