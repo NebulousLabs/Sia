@@ -187,9 +187,11 @@ func (hdb *HostDB) threadedProbeHosts() {
 		hdb.mu.RUnlock()
 		hdb.log.Debugln("Scanning", netAddr, fmt.Sprintf("%x", pubKey.Key))
 		var settings modules.HostExternalSettings
+		connFail := false
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(netAddr, hostRequestTimeout)
 			if err != nil {
+				connFail = true
 				return err
 			}
 			defer conn.Close()
@@ -202,7 +204,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 		if err != nil {
-			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed", err)
+			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed, status:", connFail, "error:", err)
 		} else {
 			hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
 		}
