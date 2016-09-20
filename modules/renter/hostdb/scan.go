@@ -7,6 +7,7 @@ package hostdb
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -54,6 +55,8 @@ func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
 // decrementReliability reduces the reliability of a node, moving it out of the
 // set of active hosts or deleting it entirely if necessary.
 func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
+	hdb.log.Debugln("reliability decrement issued for", addr)
+
 	// Look up the entry and decrement the reliability.
 	entry, exists := hdb.allHosts[addr]
 	if !exists {
@@ -67,6 +70,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// database.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
+		hdb.log.Debugln("host is being pulled from list of active hosts", addr)
 		node.removeNode()
 		delete(hdb.activeHosts, entry.NetAddress)
 	}
@@ -74,6 +78,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// If the reliability has fallen to 0, remove the host from the
 	// database entirely.
 	if entry.Reliability.IsZero() {
+		hdb.log.Debugln("host is being dropped from hostdb", addr)
 		delete(hdb.allHosts, addr)
 	}
 }
@@ -146,7 +151,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 		netAddr := hostEntry.NetAddress
 		pubKey := hostEntry.PublicKey
 		hdb.mu.RUnlock()
-		hdb.log.Debugln("Scanning", netAddr, pubKey)
+		hdb.log.Debugln("Scanning", netAddr, fmt.Sprintf("%x", pubKey.Key))
 		var settings modules.HostExternalSettings
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(netAddr, hostRequestTimeout)

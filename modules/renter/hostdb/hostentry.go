@@ -22,6 +22,8 @@ type hostEntry struct {
 //
 // TODO: Function should return an error.
 func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
+	hdb.log.Debugln("Insert call issed for", host.NetAddress)
+
 	// Remove garbage hosts and local hosts (but allow local hosts in testing).
 	if err := host.NetAddress.IsValid(); err != nil {
 		hdb.log.Printf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
@@ -47,6 +49,8 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
+	hdb.log.Debugln("Remove call issued for", addr)
+
 	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
