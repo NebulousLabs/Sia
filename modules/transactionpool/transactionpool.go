@@ -2,9 +2,11 @@ package transactionpool
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/demotemutex"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -102,9 +104,12 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 	if err != nil {
 		return nil, err
 	}
+	if build.DEBUG && build.Release != "testing" {
+		fmt.Println("\tTransaction Pool: persist initialization complete")
+	}
 
 	// Register RPCs
-	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
+	go g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
 
 	return tp, nil
 }
