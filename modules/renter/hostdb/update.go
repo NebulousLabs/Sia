@@ -1,6 +1,9 @@
 package hostdb
 
 import (
+	"fmt"
+
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -34,9 +37,33 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	if hdb.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisID {
-		hdb.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-		hdb.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	// Update the hostdb's understanding of the block height.
+	for _, block := range cc.RevertedBlocks {
+		// Only doing the block check if the height is above zero saves hashing
+		// and saves a nontrivial amount of time during IBD.
+		if hdb.blockHeight > 0 || block.ID() != types.GenesisID {
+			hdb.blockHeight--
+		} else if hdb.blockHeight != 0 {
+			// Sanity check - if the current block is the genesis block, the
+			// miner height should be set to zero.
+			hdb.log.Critical("Miner has detected a genesis block, but the height of the miner is set to ", hdb.blockHeight)
+			hdb.blockHeight = 0
+		}
+	}
+	for _, block := range cc.AppliedBlocks {
+		// Only doing the block check if the height is above zero saves hashing
+		// and saves a nontrivial amount of time during IBD.
+		if hdb.blockHeight > 0 || block.ID() != types.GenesisID {
+			hdb.blockHeight++
+		} else if hdb.blockHeight != 0 {
+			// Sanity check - if the current block is the genesis block, the
+			// miner height should be set to zero.
+			hdb.log.Critical("Miner has detected a genesis block, but the height of the miner is set to ", hdb.blockHeight)
+			hdb.blockHeight = 0
+		}
+	}
+	if build.Release != "testing" && !cc.Synced && hdb.blockHeight%1000 == 0 {
+		fmt.Println("\rHostdb Updating - Height:", hdb.blockHeight)
 	}
 
 	// Add hosts announced in blocks that were applied.
