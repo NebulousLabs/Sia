@@ -23,11 +23,11 @@ const (
 	minScanSleep     = 1 * time.Hour
 
 	maxActiveHosts              = 500
-	inactiveHostCheckupQuantity = 250
+	inactiveHostCheckupQuantity = 2000
 
 	maxSettingsLen = 2e3
 
-	hostRequestTimeout = 5 * time.Second
+	hostRequestTimeout = 60 * time.Second
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
@@ -110,6 +110,9 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	if exists {
 		existingNode.removeNode()
 		delete(hdb.activeHosts, entry.NetAddress)
+	} else if len(hdb.activeHosts) > maxActiveHosts {
+		// We already have the maximum number of active hosts, do not add more.
+		return
 	}
 
 	// Update the host settings, reliability, and weight. The old NetAddress
@@ -117,13 +120,14 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
-	entry.Weight = calculateHostWeight(*entry)
 	entry.Online = true
+	entry.Weight = calculateHostWeight(*entry)
+	hdb.insertNode(entry)
 
-	// If 'maxActiveHosts' has not been reached, add the host to the
-	// activeHosts tree.
-	if _, exists := hdb.activeHosts[entry.NetAddress]; exists || len(hdb.activeHosts) < maxActiveHosts {
-		hdb.insertNode(entry)
+	// Sanity check - the node should be in the hostdb now.
+	_, exists = hdb.activeHosts[entry.NetAddress]
+	if !exists {
+		hdb.log.Critical("Host was not added to the list of active hosts after the entry was updated.")
 	}
 	hdb.save()
 }
