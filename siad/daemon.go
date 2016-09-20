@@ -139,7 +139,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer g.Close()
+		defer func() {
+			fmt.Println("Closing gateway...")
+			err := g.Close()
+			if err != nil {
+				fmt.Println("Error during gateway shutdown:", err)
+			}
+		}()
 	}
 	var cs modules.ConsensusSet
 	if strings.Contains(config.Siad.Modules, "c") {
@@ -149,7 +155,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer cs.Close()
+		defer func() {
+			fmt.Println("Closing consensus set...")
+			err := cs.Close()
+			if err != nil {
+				fmt.Println("Error during consensus set shutdown:", err)
+			}
+		}()
 	}
 	var e modules.Explorer
 	if strings.Contains(config.Siad.Modules, "e") {
@@ -159,7 +171,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer e.Close()
+		defer func() {
+			fmt.Println("Closing explorer...")
+			err := e.Close()
+			if err != nil {
+				fmt.Println("Error during explorer shutdown:", err)
+			}
+		}()
 	}
 	var tpool modules.TransactionPool
 	if strings.Contains(config.Siad.Modules, "t") {
@@ -169,7 +187,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer tpool.Close()
+		defer func() {
+			fmt.Println("Closing transaction pool...")
+			err := tpool.Close()
+			if err != nil {
+				fmt.Println("Error during transaction pool shutdown:", err)
+			}
+		}()
 	}
 	var w modules.Wallet
 	if strings.Contains(config.Siad.Modules, "w") {
@@ -179,7 +203,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer w.Close()
+		defer func() {
+			fmt.Println("Closing wallet...")
+			err := w.Close()
+			if err != nil {
+				fmt.Println("Error during wallet shutdown:", err)
+			}
+		}()
 	}
 	var m modules.Miner
 	if strings.Contains(config.Siad.Modules, "m") {
@@ -189,7 +219,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer m.Close()
+		defer func() {
+			fmt.Println("Closing miner...")
+			err := m.Close()
+			if err != nil {
+				fmt.Println("Error during miner shutdown:", err)
+			}
+		}()
 	}
 	var h modules.Host
 	if strings.Contains(config.Siad.Modules, "h") {
@@ -199,7 +235,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer h.Close()
+		defer func() {
+			fmt.Println("Closing host...")
+			err := h.Close()
+			if err != nil {
+				fmt.Println("Error during host shutdown:", err)
+			}
+		}()
 	}
 	var r modules.Renter
 	if strings.Contains(config.Siad.Modules, "r") {
@@ -209,7 +251,13 @@ func startDaemon(config Config) (err error) {
 		if err != nil {
 			return err
 		}
-		defer r.Close()
+		defer func() {
+			fmt.Println("Closing renter...")
+			err := r.Close()
+			if err != nil {
+				fmt.Println("Error during renter shutdown:", err)
+			}
+		}()
 	}
 
 	// Create the Sia API
