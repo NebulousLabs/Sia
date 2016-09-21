@@ -93,13 +93,15 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 		}
 
 		// decrement the consensus height
-		consensusHeight, err := dbGetConsensusHeight(tx)
-		if err != nil {
-			return err
-		}
-		err = dbPutConsensusHeight(tx, consensusHeight-1)
-		if err != nil {
-			return err
+		if block.ID() != types.GenesisID {
+			consensusHeight, err := dbGetConsensusHeight(tx)
+			if err != nil {
+				return err
+			}
+			err = dbPutConsensusHeight(tx, consensusHeight-1)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -109,15 +111,17 @@ func (w *Wallet) revertHistory(tx *bolt.Tx, reverted []types.Block) error {
 // applied blocks.
 func (w *Wallet) applyHistory(tx *bolt.Tx, applied []types.Block) error {
 	for _, block := range applied {
-		// increment the consensus height
 		consensusHeight, err := dbGetConsensusHeight(tx)
 		if err != nil {
 			return err
 		}
-		consensusHeight++
-		err = dbPutConsensusHeight(tx, consensusHeight)
-		if err != nil {
-			return err
+		// increment the consensus height
+		if block.ID() != types.GenesisID {
+			consensusHeight++
+			err = dbPutConsensusHeight(tx, consensusHeight)
+			if err != nil {
+				return err
+			}
 		}
 
 		relevant := false
