@@ -51,12 +51,12 @@ func generateKeys(seed modules.Seed, start, n uint64) []spendableKey {
 	var wg sync.WaitGroup
 	wg.Add(runtime.NumCPU())
 	for cpu := 0; cpu < runtime.NumCPU(); cpu++ {
-		go func(start uint64) {
+		go func(offset uint64) {
 			defer wg.Done()
-			for i := start; i < n; i += uint64(runtime.NumCPU()) {
-				// NOTE: don't bother trying to optimize this; profiling shows
-				// that ed25519 key generation consumes far more CPU time than
-				// encoding or hashing.
+			for i := offset; i < n; i += uint64(runtime.NumCPU()) {
+				// NOTE: don't bother trying to optimize generateSpendableKey;
+				// profiling shows that ed25519 key generation consumes far
+				// more CPU time than encoding or hashing.
 				keys[i] = generateSpendableKey(seed, i)
 			}
 		}(start + uint64(cpu))
@@ -246,7 +246,7 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 // transaction that transfers them to the wallet. Note that this incurs a
 // transaction fee. It returns the total value of the outputs, minus the fee.
 // TODO: support SiafundOutputs too
-func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payout types.Currency, err error) {
+func (w *Wallet) SweepSeed(seed modules.Seed) (payout types.Currency, err error) {
 	if err = w.tg.Add(); err != nil {
 		return
 	}
@@ -271,7 +271,8 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 	// more in fees than they are worth)
 	s := newSeedScanner(seed)
 	_, maxFee := w.tpool.FeeEstimation()
-	s.dustThreshold = maxFee.Mul64(350) // fee is per byte; output+signature is approx. 350 bytes
+	const outputSize = 350 // approx. size in bytes of an output and accompanying signature
+	s.dustThreshold = maxFee.Mul64(outputSize)
 	if err = s.scan(w.cs); err != nil {
 		return
 	}
@@ -291,7 +292,10 @@ func (w *Wallet) SweepSeed(masterKey crypto.TwofishKey, seed modules.Seed) (payo
 		swept = swept.Add(output.value)
 	}
 
-	estTxnSize := len(s.siacoinOutputs) * 350 // since we use maxFee, lowballing is ok
+	// estimate the transaction size. NOTE: this equation doesn't account for
+	// other fields in the transaction, but since we are multiplying by
+	// maxFee, lowballing is ok
+	estTxnSize := len(s.siacoinOutputs) * outputSize
 	estFee := maxFee.Mul64(uint64(estTxnSize))
 	if estFee.Cmp(swept) >= 0 {
 		return types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")

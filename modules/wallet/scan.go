@@ -70,6 +70,8 @@ func (s *seedScanner) generateKeys(n uint64) {
 	}
 }
 
+// ProcessConsensusChange scans the blockchain for information relevant to the
+// seedScanner.
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	s.blockheight -= types.BlockHeight(len(cc.RevertedBlocks))
 	// update outputs
@@ -119,7 +121,7 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 
-	// update largestIndexSeen
+	// update s.largestIndexSeen
 	var addrs []types.UnlockHash
 	for _, diff := range cc.SiacoinOutputDiffs {
 		addrs = append(addrs, diff.SiacoinOutput.UnlockHash)
@@ -154,8 +156,8 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 }
 
-// scan subscribes d to cs and scans the blockchain for addresses that belong
-// to d's seed. If scan returns errMaximumKeys, additional keys may need to be
+// scan subscribes s to cs and scans the blockchain for addresses that belong
+// to s's seed. If scan returns errMaxKeys, additional keys may need to be
 // generated to find all the addresses.
 func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	// generate a bunch of keys and scan the blockchain looking for them. If

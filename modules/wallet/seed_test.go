@@ -242,7 +242,7 @@ func TestSweepSeed(t *testing.T) {
 	}
 
 	// sweep the seed of the first wallet into the second
-	swept, err := w.SweepSeed(crypto.TwofishKey{}, seed)
+	swept, err := w.SweepSeed(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
