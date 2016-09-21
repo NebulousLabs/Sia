@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
@@ -193,7 +194,10 @@ func walletinitcmd() {
 
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
 func walletload033xcmd(source string) {
-	password, err := speakeasy.Ask("Wallet password: ")
+	fmt.Println("Loading 033x...")
+	time.Sleep(time.Second * 3)
+	fmt.Println("Load successful.  Encrypting with current encryption password")
+	password, err := speakeasy.Ask("Need Password: ")
 	if err != nil {
 		die("Reading password failed:", err)
 	}
@@ -207,7 +211,10 @@ func walletload033xcmd(source string) {
 
 // walletloadseedcmd adds a seed to the wallet's list of seeds
 func walletloadseedcmd() {
-	password, err := speakeasy.Ask("Wallet password: ")
+	fmt.Println("Loading seed...")
+	time.Sleep(time.Second * 3)
+	fmt.Println("Load successful.  Encrypting with current encryption password")
+	password, err := speakeasy.Ask("Need Password: ")
 	if err != nil {
 		die("Reading password failed:", err)
 	}
@@ -225,7 +232,10 @@ func walletloadseedcmd() {
 
 // walletloadsiagcmd loads a siag key set into the wallet.
 func walletloadsiagcmd(keyfiles string) {
-	password, err := speakeasy.Ask("Wallet password: ")
+	fmt.Println("Loading siag...")
+	time.Sleep(time.Second * 3)
+	fmt.Println("Load successful.  Encrypting with current encryption password")
+	password, err := speakeasy.Ask("Need Password: ")
 	if err != nil {
 		die("Reading password failed:", err)
 	}
