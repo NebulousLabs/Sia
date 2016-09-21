@@ -67,8 +67,8 @@ func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 // Host returns the HostSettings associated with the specified NetAddress. If
 // no matching host is found, Host returns false.
 func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	entry, ok := hdb.allHosts[addr]
 	if !ok || entry == nil {
 		return modules.HostDBEntry{}, false

@@ -22,6 +22,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -43,8 +44,10 @@ type HostDB struct {
 	// dependencies
 	dialer  dialer
 	log     *persist.Logger
+	mu      sync.RWMutex
 	persist persister
 	sleeper sleeper
+	tg      siasync.ThreadGroup
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -74,8 +77,6 @@ type HostDB struct {
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
-
-	mu sync.RWMutex
 }
 
 // New returns a new HostDB.
@@ -151,6 +152,7 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 
 // Close closes the hostdb, terminating its scanning threads
 func (hdb *HostDB) Close() error {
+	hdb.tg.Stop()
 	close(hdb.scanPool)
 	close(hdb.closeChan)
 	// wait for threads to exit

@@ -47,16 +47,8 @@ var (
 // The gofunc is created inside of this function to eliminate the burden of
 // needing to remember to call 'go addHostToScanPool'.
 func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
-	select {
-	case hdb.scanPool <- entry:
-		// Success - nothing more to do.
-		return
-	default:
-	}
-
-	// Failed to add host entry to the scan pool. Add it to a waitlist, then
-	// check if any thread is currently emptying the waitlist. If not, spawn a
-	// thread to empty the waitlist.
+	// Add the entry to a waitlist, then check if any thread is currently
+	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
 	hdb.scanList = append(hdb.scanList, entry)
 	if hdb.scanWait {
 		// Another thread is emptying the scan list, nothing to worry about.
@@ -66,13 +58,18 @@ func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
 	// Nobody is emptying the scan list, volunteer.
 	hdb.scanWait = true
 	go func() {
+		if hdb.tg.Add() != nil {
+			return
+		}
+		defer hdb.tg.Done()
+
 		for {
 			hdb.mu.Lock()
 			if len(hdb.scanList) == 0 {
 				// Scan list is empty, can exit. Let the world know that nobody
 				// is emptying the scan list anymore.
-				hdb.mu.Unlock()
 				hdb.scanWait = false
+				hdb.mu.Unlock()
 				return
 			}
 			// Get the next host, shrink the scan list.
@@ -81,7 +78,13 @@ func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
 			hdb.mu.Unlock()
 
 			// Block while we wait for an opening in the scan pool.
-			hdb.scanPool <- entry
+			select {
+			case hdb.scanPool <- entry:
+				// iterate again
+			case <-hdb.tg.StopChan():
+				// quit
+				return
+			}
 		}
 	}()
 }
