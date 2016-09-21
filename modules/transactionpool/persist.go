@@ -2,11 +2,9 @@ package transactionpool
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
@@ -55,9 +53,6 @@ func (tp *TransactionPool) initPersist() error {
 	}
 
 	// Open the database file.
-	if build.DEBUG && build.Release != "testing" {
-		fmt.Println("\tTransaction Pool: opening database")
-	}
 	tp.db, err = persist.OpenDatabase(dbMetadata, filepath.Join(tp.persistDir, dbFilename))
 	if err != nil {
 		return err
@@ -90,16 +85,10 @@ func (tp *TransactionPool) initPersist() error {
 	}
 
 	// Subscribe to the consensus set using the most recent consensus change.
-	if build.DEBUG && build.Release != "testing" {
-		fmt.Println("\tTransaction Pool: subscribing to the consensus set")
-	}
 	err = tp.consensusSet.ConsensusSetSubscribe(tp, cc)
 	if err == modules.ErrInvalidConsensusChangeID {
 		// Reset and rescan because the consensus set does not recognize the
 		// provided consensus change id.
-		if build.DEBUG && build.Release != "testing" {
-			fmt.Println("\tTransaction Pool: subscription failed, resetting and resubscribing")
-		}
 		resetErr := tp.db.Update(func(tx *bolt.Tx) error {
 			return tp.resetDB(tx)
 		})

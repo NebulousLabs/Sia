@@ -42,8 +42,8 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 			hdb.blockHeight--
 		} else if hdb.blockHeight != 0 {
 			// Sanity check - if the current block is the genesis block, the
-			// miner height should be set to zero.
-			hdb.log.Critical("Miner has detected a genesis block, but the height of the miner is set to ", hdb.blockHeight)
+			// hostdb height should be set to zero.
+			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdb is set to ", hdb.blockHeight)
 			hdb.blockHeight = 0
 		}
 	}
@@ -54,8 +54,8 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 			hdb.blockHeight++
 		} else if hdb.blockHeight != 0 {
 			// Sanity check - if the current block is the genesis block, the
-			// miner height should be set to zero.
-			hdb.log.Critical("Miner has detected a genesis block, but the height of the miner is set to ", hdb.blockHeight)
+			// hostdb height should be set to zero.
+			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdbhostdb  is set to ", hdb.blockHeight)
 			hdb.blockHeight = 0
 		}
 	}
