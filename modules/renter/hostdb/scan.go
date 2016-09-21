@@ -41,10 +41,10 @@ var (
 	UnreachablePenalty = types.NewCurrency64(1)
 )
 
-// addHostToScanPool creates a gofunc that adds a host to the scan pool. If the
-// scan pool is currently full, the blocking gofunc will not cause a deadlock.
-// The gofunc is created inside of this function to eliminate the burden of
-// needing to remember to call 'go addHostToScanPool'.
+// scanHostEntry will add a host entry to the list of entries waiting to be
+// scanned. If there is no thread that is currently walking through the scan
+// list, one will be created and it will persist until shutdown or until the
+// scan list is empty.
 func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
 	// Add the entry to a waitlist, then check if any thread is currently
 	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
