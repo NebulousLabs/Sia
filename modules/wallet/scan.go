@@ -159,8 +159,9 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 // generated to find all the addresses.
 func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	// generate a bunch of keys and scan the blockchain looking for them. If
-	// none of the keys are found, we are done; otherwise, generate more keys
-	// and try again (bounded by a sane default).
+	// none of the 'upper' half of the generated keys are found, we are done;
+	// otherwise, generate more keys and try again (bounded by a sane
+	// default).
 	//
 	// NOTE: since scanning is very slow, we aim to only scan once, which
 	// means generating many keys.
@@ -174,9 +175,9 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 			cs.Unsubscribe(s)
 			return nil
 		}
-		// double number of keys generated each iteration, capping so that we
+		// quadruple number of keys generated each iteration, capping so that we
 		// do not exceed maxScanKeys
-		numKeys *= 2
+		numKeys *= 4
 		if numKeys > maxScanKeys-s.numKeys() {
 			numKeys = maxScanKeys - s.numKeys()
 		}
