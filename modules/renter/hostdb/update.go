@@ -1,9 +1,6 @@
 package hostdb
 
 import (
-	"fmt"
-
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )

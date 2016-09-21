@@ -7,7 +7,6 @@ package hostdb
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -21,10 +20,10 @@ import (
 const (
 	defaultScanSleep = 1*time.Hour + 37*time.Minute
 	maxScanSleep     = 4 * time.Hour
-	minScanSleep     = 1 * time.Hour
+	minScanSleep     = 1*time.Hour + 20*time.Minute
 
 	maxActiveHosts              = 500
-	inactiveHostCheckupQuantity = 2000
+	inactiveHostCheckupQuantity = 1000
 
 	maxSettingsLen = 2e3
 

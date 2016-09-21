@@ -359,7 +359,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 func TestSiaPublicKeyString(t *testing.T) {
 	spk := SiaPublicKey{
 		Algorithm: SignatureEd25519,
-		Key: make([]byte, 32),
+		Key:       make([]byte, 32),
 	}
 
 	if spk.String() != "ed25519:0000000000000000000000000000000000000000000000000000000000000000" {

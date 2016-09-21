@@ -395,5 +395,5 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 // compact during logging. The key type prefix and lack of a checksum help to
 // separate it from a sia address.
 func (spk *SiaPublicKey) String() string {
-	return spk.Algorithm.String()+":"+fmt.Sprintf("%x", spk.Key)
+	return spk.Algorithm.String() + ":" + fmt.Sprintf("%x", spk.Key)
 }
