@@ -28,11 +28,11 @@ const (
 
 	maxSettingsLen = 2e3
 
-	hostRequestTimeout = 60 * time.Second
+	hostRequestTimeout = 30 * time.Second
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
-	scanningThreads = 5
+	scanningThreads = 12
 )
 
 // Reliability is a measure of a host's uptime.
@@ -185,13 +185,11 @@ func (hdb *HostDB) threadedProbeHosts() {
 		netAddr := hostEntry.NetAddress
 		pubKey := hostEntry.PublicKey
 		hdb.mu.RUnlock()
-		hdb.log.Debugln("Scanning", netAddr, fmt.Sprintf("%x", pubKey.Key))
+		hdb.log.Debugln("Scanning", netAddr, pubKey)
 		var settings modules.HostExternalSettings
-		connFail := false
 		err := func() error {
 			conn, err := hdb.dialer.DialTimeout(netAddr, hostRequestTimeout)
 			if err != nil {
-				connFail = true
 				return err
 			}
 			defer conn.Close()
@@ -204,7 +202,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 		if err != nil {
-			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed, status:", connFail, "error:", err)
+			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed:", err)
 		} else {
 			hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
 		}

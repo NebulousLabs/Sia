@@ -62,14 +62,11 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 			hdb.blockHeight = 0
 		}
 	}
-	if build.Release != "testing" && !cc.Synced && hdb.blockHeight%1000 == 0 {
-		fmt.Println("\rHostdb Updating - Height:", hdb.blockHeight)
-	}
 
 	// Add hosts announced in blocks that were applied.
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
-			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey.Key)
+			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey)
 			hdb.insertHost(host)
 		}
 	}
@@ -77,6 +74,6 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	hdb.lastChange = cc.ID
 	err := hdb.save()
 	if err != nil {
-		hdb.log.Println(err)
+		hdb.log.Println("Error saving hostdb:", err)
 	}
 }
