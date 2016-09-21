@@ -55,11 +55,12 @@ func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
 	}
 
 	// Nobody is emptying the scan list, volunteer.
+	if hdb.tg.Add() != nil {
+		// Hostdb is shutting down, don't spin up another thread.
+		return
+	}
 	hdb.scanWait = true
 	go func() {
-		if hdb.tg.Add() != nil {
-			return
-		}
 		defer hdb.tg.Done()
 
 		for {
