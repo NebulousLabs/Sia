@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -164,8 +165,11 @@ func newTestingTrio(name string) (modules.Host, *Contractor, modules.TestMiner, 
 	m.AddBlock()
 
 	// wait for hostdb to scan host
-	for i := 0; i < 500 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
-		time.Sleep(time.Millisecond)
+	for i := 0; i < 100 && len(c.hdb.RandomHosts(1, nil)) == 0; i++ {
+		time.Sleep(time.Millisecond * 50)
+	}
+	if len(c.hdb.RandomHosts(1, nil)) == 0 {
+		return nil, nil, nil, errors.New("host did not make it into the contractor hostdb in time")
 	}
 
 	return h, c, m, nil
