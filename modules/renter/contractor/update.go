@@ -23,8 +23,10 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// delete expired contracts
 	var expired []types.FileContractID
 	for id, contract := range c.contracts {
-		// TODO: offset this by some sort of confirmation height?
 		if c.blockHeight > contract.EndHeight() {
+			// No need to wait for extra confirmations - any processes which
+			// depend on this contract should have taken care of any issues
+			// already.
 			expired = append(expired, id)
 		}
 	}
@@ -36,7 +38,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	c.lastChange = cc.ID
 	err := c.save()
 	if err != nil {
-		c.log.Println(err)
+		c.log.Println("Unable to save while processing a consensus change:", err)
 	}
 	c.mu.Unlock()
 
@@ -46,7 +48,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		// renew any contracts that have entered the renew window
 		err := c.managedRenewContracts()
 		if err != nil {
-			c.log.Debugln("WARN: failed to renew contracts:", err)
+			c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
 		}
 
 		// if we don't have enough contracts, form new ones
@@ -56,12 +58,12 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		numSectors, err := maxSectors(a, c.hdb)
 		c.mu.RUnlock()
 		if err != nil {
-			c.log.Debugln("ERROR: couldn't calculate numSectors:", err)
+			c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)
 			return
 		}
 		err = c.managedFormAllowanceContracts(remaining, numSectors, a)
 		if err != nil {
-			c.log.Debugln("WARN: failed to form contracts:", err)
+			c.log.Debugln("WARN: failed to form contracts after processing a consensus change:", err)
 		}
 	}
 }
