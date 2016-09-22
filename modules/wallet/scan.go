@@ -40,6 +40,8 @@ var maxScanKeys = func() uint64 {
 
 var errMaxKeys = fmt.Errorf("refused to generate more than %v keys from seed", maxScanKeys)
 
+// A scannedOutput is an output found in the blockchain that was generated
+// from a given seed.
 type scannedOutput struct {
 	id        types.OutputID
 	value     types.Currency
@@ -49,13 +51,11 @@ type scannedOutput struct {
 // A seedScanner scans the blockchain for addresses that belong to a given
 // seed.
 type seedScanner struct {
-	blockheight      types.BlockHeight
 	dustThreshold    types.Currency              // minimum value of outputs to be included
 	keys             map[types.UnlockHash]uint64 // map address to seed index
 	largestIndexSeen uint64                      // largest index that has appeared in the blockchain
-	minerOutputs     map[types.BlockHeight][]scannedOutput
 	seed             modules.Seed
-	siacoinOutputs   map[types.OutputID]scannedOutput
+	siacoinOutputs   map[types.SiacoinOutputID]scannedOutput
 }
 
 func (s *seedScanner) numKeys() uint64 {
@@ -73,84 +73,33 @@ func (s *seedScanner) generateKeys(n uint64) {
 // ProcessConsensusChange scans the blockchain for information relevant to the
 // seedScanner.
 func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
-	s.blockheight -= types.BlockHeight(len(cc.RevertedBlocks))
 	// update outputs
-	for _, block := range cc.AppliedBlocks {
-		s.blockheight++
-		// when a miner payout matures, move it from minerOutputs to
-		// siacoinOutputs
-		if matured, exists := s.minerOutputs[s.blockheight]; exists {
-			for _, maturedOutput := range matured {
-				s.siacoinOutputs[maturedOutput.id] = maturedOutput
-			}
-			delete(s.minerOutputs, s.blockheight)
-		}
-		for i, mp := range block.MinerPayouts {
-			// if a seed miner output is found, add it to the delayed output
-			// set
-			if index, exists := s.keys[mp.UnlockHash]; exists && mp.Value.Cmp(s.dustThreshold) > 0 {
-				maturityHeight := s.blockheight + types.MaturityDelay
-				s.minerOutputs[maturityHeight] = append(s.minerOutputs[maturityHeight], scannedOutput{
-					id:        types.OutputID(block.MinerPayoutID(uint64(i))),
-					value:     mp.Value,
+	for _, diff := range cc.SiacoinOutputDiffs {
+		if diff.Direction == modules.DiffApply {
+			if index, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists && diff.SiacoinOutput.Value.Cmp(s.dustThreshold) > 0 {
+				s.siacoinOutputs[diff.ID] = scannedOutput{
+					id:        types.OutputID(diff.ID),
+					value:     diff.SiacoinOutput.Value,
 					seedIndex: index,
-				})
-			}
-		}
-		for _, txn := range block.Transactions {
-			for i, sco := range txn.SiacoinOutputs {
-				// if a seed output is found, add it to the output set
-				if index, exists := s.keys[sco.UnlockHash]; exists && sco.Value.Cmp(s.dustThreshold) > 0 {
-					id := types.OutputID(txn.SiacoinOutputID(uint64(i)))
-					s.siacoinOutputs[id] = scannedOutput{
-						id:        id,
-						value:     sco.Value,
-						seedIndex: index,
-					}
 				}
 			}
-			// TODO: should this be done in a separate txn loop? This would be
-			// mandatory if txn0 can spend an output created in txn1
-			for _, sci := range txn.SiacoinInputs {
-				// if a seed output is spent, remove it from the output set
-				id := types.OutputID(sci.ParentID)
-				if _, exists := s.siacoinOutputs[id]; exists {
-					delete(s.siacoinOutputs, id)
-				}
+		} else if diff.Direction == modules.DiffRevert {
+			// NOTE: DiffRevert means the output was either spent or was in a
+			// block that was reverted.
+			if _, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists {
+				delete(s.siacoinOutputs, diff.ID)
 			}
 		}
 	}
 
 	// update s.largestIndexSeen
-	var addrs []types.UnlockHash
 	for _, diff := range cc.SiacoinOutputDiffs {
-		addrs = append(addrs, diff.SiacoinOutput.UnlockHash)
+		if index, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists && index > s.largestIndexSeen {
+			s.largestIndexSeen = index
+		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		addrs = append(addrs, diff.SiafundOutput.UnlockHash)
-	}
-	for _, block := range cc.AppliedBlocks {
-		for _, mp := range block.MinerPayouts {
-			addrs = append(addrs, mp.UnlockHash)
-		}
-		for _, txn := range block.Transactions {
-			for _, sci := range txn.SiacoinInputs {
-				addrs = append(addrs, sci.UnlockConditions.UnlockHash())
-			}
-			for _, sco := range txn.SiacoinOutputs {
-				addrs = append(addrs, sco.UnlockHash)
-			}
-			for _, sfi := range txn.SiafundInputs {
-				addrs = append(addrs, sfi.UnlockConditions.UnlockHash())
-			}
-			for _, sfo := range txn.SiafundOutputs {
-				addrs = append(addrs, sfo.UnlockHash)
-			}
-		}
-	}
-	for _, addr := range addrs {
-		index, exists := s.keys[addr]
-		if exists && index > s.largestIndexSeen {
+		if index, exists := s.keys[diff.SiafundOutput.UnlockHash]; exists && index > s.largestIndexSeen {
 			s.largestIndexSeen = index
 		}
 	}
@@ -188,11 +137,11 @@ func (s *seedScanner) scan(cs modules.ConsensusSet) error {
 	return errMaxKeys
 }
 
+// newSeedScanner returns a new seedScanner.
 func newSeedScanner(seed modules.Seed) *seedScanner {
 	return &seedScanner{
 		seed:           seed,
 		keys:           make(map[types.UnlockHash]uint64),
-		siacoinOutputs: make(map[types.OutputID]scannedOutput),
-		minerOutputs:   make(map[types.BlockHeight][]scannedOutput),
+		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
 	}
 }
