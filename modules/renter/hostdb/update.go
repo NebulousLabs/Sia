@@ -34,15 +34,36 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 
-	if hdb.blockHeight != 0 || cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID() != types.GenesisID {
-		hdb.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-		hdb.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	// Update the hostdb's understanding of the block height.
+	for _, block := range cc.RevertedBlocks {
+		// Only doing the block check if the height is above zero saves hashing
+		// and saves a nontrivial amount of time during IBD.
+		if hdb.blockHeight > 0 || block.ID() != types.GenesisID {
+			hdb.blockHeight--
+		} else if hdb.blockHeight != 0 {
+			// Sanity check - if the current block is the genesis block, the
+			// hostdb height should be set to zero.
+			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdb is set to ", hdb.blockHeight)
+			hdb.blockHeight = 0
+		}
+	}
+	for _, block := range cc.AppliedBlocks {
+		// Only doing the block check if the height is above zero saves hashing
+		// and saves a nontrivial amount of time during IBD.
+		if hdb.blockHeight > 0 || block.ID() != types.GenesisID {
+			hdb.blockHeight++
+		} else if hdb.blockHeight != 0 {
+			// Sanity check - if the current block is the genesis block, the
+			// hostdb height should be set to zero.
+			hdb.log.Critical("Hostdb has detected a genesis block, but the height of the hostdbhostdb  is set to ", hdb.blockHeight)
+			hdb.blockHeight = 0
+		}
 	}
 
 	// Add hosts announced in blocks that were applied.
 	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
-			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey.Key)
+			hdb.log.Debugln("Found a host in a host announcement:", host.NetAddress, host.PublicKey)
 			hdb.insertHost(host)
 		}
 	}
@@ -50,6 +71,6 @@ func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	hdb.lastChange = cc.ID
 	err := hdb.save()
 	if err != nil {
-		hdb.log.Println(err)
+		hdb.log.Println("Error saving hostdb:", err)
 	}
 }

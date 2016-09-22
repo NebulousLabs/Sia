@@ -22,6 +22,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -43,8 +44,10 @@ type HostDB struct {
 	// dependencies
 	dialer  dialer
 	log     *persist.Logger
+	mu      sync.RWMutex
 	persist persister
 	sleeper sleeper
+	tg      siasync.ThreadGroup
 
 	// The hostTree is the root node of the tree that organizes hosts by
 	// weight. The tree is necessary for selecting weighted hosts at
@@ -62,7 +65,9 @@ type HostDB struct {
 	// the scanPool is a set of hosts that need to be scanned. There are a
 	// handful of goroutines constantly waiting on the channel for hosts to
 	// scan.
+	scanList []*hostEntry
 	scanPool chan *hostEntry
+	scanWait bool
 
 	// closeChan is used to shutdown the scanning threads.
 	closeChan chan struct{}
@@ -72,8 +77,6 @@ type HostDB struct {
 
 	blockHeight types.BlockHeight
 	lastChange  modules.ConsensusChangeID
-
-	mu sync.RWMutex
 }
 
 // New returns a new HostDB.
@@ -143,11 +146,13 @@ func newHostDB(cs consensusSet, d dialer, s sleeper, p persister, l *persist.Log
 	}
 	hdb.threadGroup.Add(1)
 	go hdb.threadedScan()
+
 	return hdb, nil
 }
 
 // Close closes the hostdb, terminating its scanning threads
 func (hdb *HostDB) Close() error {
+	hdb.tg.Stop()
 	close(hdb.scanPool)
 	close(hdb.closeChan)
 	// wait for threads to exit

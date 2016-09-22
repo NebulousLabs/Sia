@@ -8,6 +8,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -388,4 +389,11 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	}
 
 	return nil
+}
+
+// String defines how to print a SiaPublicKey - hex is used to keep things
+// compact during logging. The key type prefix and lack of a checksum help to
+// separate it from a sia address.
+func (spk *SiaPublicKey) String() string {
+	return spk.Algorithm.String() + ":" + fmt.Sprintf("%x", spk.Key)
 }

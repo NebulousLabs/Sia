@@ -24,7 +24,7 @@ type hostEntry struct {
 func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 	// Remove garbage hosts and local hosts (but allow local hosts in testing).
 	if err := host.NetAddress.IsValid(); err != nil {
-		hdb.log.Printf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
+		hdb.log.Debugf("WARN: host '%v' has an invalid NetAddress: %v", host.NetAddress, err)
 		return
 	}
 	// Don't do anything if we've already seen this host and the public key is
@@ -63,8 +63,8 @@ func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 // Host returns the HostSettings associated with the specified NetAddress. If
 // no matching host is found, Host returns false.
 func (hdb *HostDB) Host(addr modules.NetAddress) (modules.HostDBEntry, bool) {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	entry, ok := hdb.allHosts[addr]
 	if !ok || entry == nil {
 		return modules.HostDBEntry{}, false

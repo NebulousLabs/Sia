@@ -11,6 +11,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Update the miner's understanding of the block height.
 	for _, block := range cc.RevertedBlocks {
 		// Only doing the block check if the height is above zero saves hashing
 		// and saves a nontrivial amount of time during IBD.

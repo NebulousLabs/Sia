@@ -40,7 +40,7 @@ func maxSectors(a modules.Allowance, hdb hostDB) (uint64, error) {
 	}
 	hosts := hdb.RandomHosts(nRandomHosts, nil)
 	if len(hosts) < int(a.Hosts) {
-		return 0, fmt.Errorf("not enough hosts in hostdb, needed %v but got %v", len(hosts), int(a.Hosts))
+		return 0, fmt.Errorf("not enough hosts in hostdb for sector calculation, got %v but needed %v", len(hosts), int(a.Hosts))
 	}
 
 	// Calculate cost of storing 1 sector per host for the allowance period.
@@ -125,7 +125,7 @@ func (c *Contractor) managedFormContracts(n int, numSectors uint64, endHeight ty
 	c.mu.RUnlock()
 	hosts := c.hdb.RandomHosts(nRandomHosts, exclude)
 	if len(hosts) < n {
-		return nil, fmt.Errorf("not enough hosts in hostdb, needed %v but got %v", len(hosts), n)
+		return nil, fmt.Errorf("not enough hosts in hostdb for contract formation, got %v but needed %v", len(hosts), n)
 	}
 
 	var contracts []modules.RenterContract

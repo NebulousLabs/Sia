@@ -353,3 +353,16 @@ func TestTransactionValidSignatures(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestSiaPublicKeyString does a quick check to verify that the String method
+// on the SiaPublicKey is producing the expected output.
+func TestSiaPublicKeyString(t *testing.T) {
+	spk := SiaPublicKey{
+		Algorithm: SignatureEd25519,
+		Key:       make([]byte, 32),
+	}
+
+	if spk.String() != "ed25519:0000000000000000000000000000000000000000000000000000000000000000" {
+		t.Error("got wrong value for spk.String():", spk.String())
+	}
+}

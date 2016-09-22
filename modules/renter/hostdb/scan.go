@@ -20,18 +20,18 @@ import (
 const (
 	defaultScanSleep = 1*time.Hour + 37*time.Minute
 	maxScanSleep     = 4 * time.Hour
-	minScanSleep     = 1 * time.Hour
+	minScanSleep     = 1*time.Hour + 20*time.Minute
 
 	maxActiveHosts              = 500
-	inactiveHostCheckupQuantity = 250
+	inactiveHostCheckupQuantity = 1000
 
 	maxSettingsLen = 2e3
 
-	hostRequestTimeout = 5 * time.Second
+	hostRequestTimeout = 30 * time.Second
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
-	scanningThreads = 25
+	scanningThreads = 12
 )
 
 // Reliability is a measure of a host's uptime.
@@ -41,19 +41,59 @@ var (
 	UnreachablePenalty = types.NewCurrency64(1)
 )
 
-// addHostToScanPool creates a gofunc that adds a host to the scan pool. If the
-// scan pool is currently full, the blocking gofunc will not cause a deadlock.
-// The gofunc is created inside of this function to eliminate the burden of
-// needing to remember to call 'go addHostToScanPool'.
+// scanHostEntry will add a host entry to the list of entries waiting to be
+// scanned. If there is no thread that is currently walking through the scan
+// list, one will be created and it will persist until shutdown or until the
+// scan list is empty.
 func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
+	// Add the entry to a waitlist, then check if any thread is currently
+	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
+	hdb.scanList = append(hdb.scanList, entry)
+	if hdb.scanWait {
+		// Another thread is emptying the scan list, nothing to worry about.
+		return
+	}
+
+	// Nobody is emptying the scan list, volunteer.
+	if hdb.tg.Add() != nil {
+		// Hostdb is shutting down, don't spin up another thread.
+		return
+	}
+	hdb.scanWait = true
 	go func() {
-		hdb.scanPool <- entry
+		defer hdb.tg.Done()
+
+		for {
+			hdb.mu.Lock()
+			if len(hdb.scanList) == 0 {
+				// Scan list is empty, can exit. Let the world know that nobody
+				// is emptying the scan list anymore.
+				hdb.scanWait = false
+				hdb.mu.Unlock()
+				return
+			}
+			// Get the next host, shrink the scan list.
+			entry := hdb.scanList[0]
+			hdb.scanList = hdb.scanList[1:]
+			hdb.mu.Unlock()
+
+			// Block while we wait for an opening in the scan pool.
+			select {
+			case hdb.scanPool <- entry:
+				// iterate again
+			case <-hdb.tg.StopChan():
+				// quit
+				return
+			}
+		}
 	}()
 }
 
 // decrementReliability reduces the reliability of a node, moving it out of the
 // set of active hosts or deleting it entirely if necessary.
 func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
+	hdb.log.Debugln("reliability decrement issued for", addr)
+
 	// Look up the entry and decrement the reliability.
 	entry, exists := hdb.allHosts[addr]
 	if !exists {
@@ -67,6 +107,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// database.
 	node, exists := hdb.activeHosts[addr]
 	if exists {
+		hdb.log.Debugln("host is being pulled from list of active hosts", addr)
 		node.removeNode()
 		delete(hdb.activeHosts, entry.NetAddress)
 	}
@@ -74,6 +115,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	// If the reliability has fallen to 0, remove the host from the
 	// database entirely.
 	if entry.Reliability.IsZero() {
+		hdb.log.Debugln("host is being dropped from hostdb", addr)
 		delete(hdb.allHosts, addr)
 	}
 }
@@ -110,6 +152,9 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	if exists {
 		existingNode.removeNode()
 		delete(hdb.activeHosts, entry.NetAddress)
+	} else if len(hdb.activeHosts) > maxActiveHosts {
+		// We already have the maximum number of active hosts, do not add more.
+		return
 	}
 
 	// Update the host settings, reliability, and weight. The old NetAddress
@@ -117,13 +162,14 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	newSettings.NetAddress = entry.HostExternalSettings.NetAddress
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
-	entry.Weight = calculateHostWeight(*entry)
 	entry.Online = true
+	entry.Weight = calculateHostWeight(*entry)
+	hdb.insertNode(entry)
 
-	// If 'maxActiveHosts' has not been reached, add the host to the
-	// activeHosts tree.
-	if _, exists := hdb.activeHosts[entry.NetAddress]; exists || len(hdb.activeHosts) < maxActiveHosts {
-		hdb.insertNode(entry)
+	// Sanity check - the node should be in the hostdb now.
+	_, exists = hdb.activeHosts[entry.NetAddress]
+	if !exists {
+		hdb.log.Critical("Host was not added to the list of active hosts after the entry was updated.")
 	}
 	hdb.save()
 }
@@ -159,7 +205,7 @@ func (hdb *HostDB) threadedProbeHosts() {
 			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
 		}()
 		if err != nil {
-			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed", err)
+			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed:", err)
 		} else {
 			hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
 		}

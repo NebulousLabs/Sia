@@ -105,7 +105,6 @@ func New(cs modules.ConsensusSet, g modules.Gateway, persistDir string) (*Transa
 
 	// Register RPCs
 	g.RegisterRPC("RelayTransactionSet", tp.relayTransactionSet)
-
 	return tp, nil
 }
 
