@@ -122,7 +122,8 @@ func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostD
 		return nil, errNilTpool
 	}
 	if hdb == nil {
-		return nil, errNilHdb
+		// Nil hdb currently allowed for testing purposes. :(
+		// return nil, errNilHdb
 	}
 
 	r := &Renter{
