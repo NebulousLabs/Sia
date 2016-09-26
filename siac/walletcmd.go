@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/bgentry/speakeasy"
 	"github.com/spf13/cobra"
@@ -62,7 +61,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 	}
 
 	walletLoad033xCmd = &cobra.Command{
-		Use:   "033x [filepath]",
+		Use:   "033x",
 		Short: "Load a v0.3.3.x wallet",
 		Long:  "Load a v0.3.3.x wallet into the current wallet",
 		Run:   wrap(walletload033xcmd),
@@ -193,11 +192,11 @@ func walletinitcmd() {
 }
 
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
-func walletload033xcmd(source string) {
-	fmt.Println("Loading 033x...")
-	time.Sleep(time.Second * 3)
-	fmt.Println("Load successful.  Encrypting with current encryption password")
-	password, err := speakeasy.Ask("Need Password: ")
+func walletload033xcmd() {
+	fmt.Print("Enter 033x Location: ")
+	var source string
+	fmt.Scanln(&source)
+	password, err := speakeasy.Ask("Current Password: ")
 	if err != nil {
 		die("Reading password failed:", err)
 	}
@@ -211,16 +210,13 @@ func walletload033xcmd(source string) {
 
 // walletloadseedcmd adds a seed to the wallet's list of seeds
 func walletloadseedcmd() {
-	fmt.Println("Loading seed...")
-	time.Sleep(time.Second * 3)
-	fmt.Println("Load successful.  Encrypting with current encryption password")
-	password, err := speakeasy.Ask("Need Password: ")
-	if err != nil {
-		die("Reading password failed:", err)
-	}
 	seed, err := speakeasy.Ask("New Seed: ")
 	if err != nil {
 		die("Reading seed failed:", err)
+	}
+	password, err := speakeasy.Ask("Current Password: ")
+	if err != nil {
+		die("Reading password failed:", err)
 	}
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
 	err = post("/wallet/seed", qs)
@@ -231,11 +227,11 @@ func walletloadseedcmd() {
 }
 
 // walletloadsiagcmd loads a siag key set into the wallet.
-func walletloadsiagcmd(keyfiles string) {
-	fmt.Println("Loading siag...")
-	time.Sleep(time.Second * 3)
-	fmt.Println("Load successful.  Encrypting with current encryption password")
-	password, err := speakeasy.Ask("Need Password: ")
+func walletloadsiagcmd() {
+	fmt.Print("Enter Siag Location: ")
+	var keyfiles string
+	fmt.Scanln(&keyfiles)
+	password, err := speakeasy.Ask("Current Password: ")
 	if err != nil {
 		die("Reading password failed:", err)
 	}
