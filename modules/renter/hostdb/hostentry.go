@@ -42,7 +42,7 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 
 	// Add the host to the scan queue. If the scan is successful, the host
 	// will be placed in activeHosts.
-	hdb.scanHostEntry(h)
+	hdb.queueHostEntry(h)
 }
 
 // Remove deletes an entry from the hostdb.

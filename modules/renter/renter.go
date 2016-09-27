@@ -1,12 +1,20 @@
 package renter
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	errNilCS    = errors.New("cannot create renter with nil consensus set")
+	errNilTpool = errors.New("cannot create renter with nil transaction pool")
+	errNilHdb   = errors.New("cannot create renter with nil hostdb")
 )
 
 // A hostDB is a database of hosts that the renter can use for figuring out who
@@ -91,7 +99,7 @@ type Renter struct {
 	mu *sync.RWMutex
 }
 
-// New returns an empty renter.
+// New returns an initialized renter.
 func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.TransactionPool, persistDir string) (*Renter, error) {
 	hdb, err := hostdb.New(cs, persistDir)
 	if err != nil {
@@ -105,7 +113,19 @@ func New(cs modules.ConsensusSet, wallet modules.Wallet, tpool modules.Transacti
 	return newRenter(cs, tpool, hdb, hc, persistDir)
 }
 
+// newRenter initializes a renter and returns it.
 func newRenter(cs modules.ConsensusSet, tpool modules.TransactionPool, hdb hostDB, hc hostContractor, persistDir string) (*Renter, error) {
+	if cs == nil {
+		return nil, errNilCS
+	}
+	if tpool == nil {
+		return nil, errNilTpool
+	}
+	if hdb == nil {
+		// Nil hdb currently allowed for testing purposes. :(
+		// return nil, errNilHdb
+	}
+
 	r := &Renter{
 		cs:             cs,
 		hostDB:         hdb,

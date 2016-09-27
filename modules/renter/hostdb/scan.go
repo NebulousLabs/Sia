@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"math/big"
+	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -27,11 +28,12 @@ const (
 
 	maxSettingsLen = 2e3
 
-	hostRequestTimeout = 30 * time.Second
+	hostRequestTimeout = 60 * time.Second
+	hostScanDeadline   = 60 * time.Second
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
-	scanningThreads = 12
+	scanningThreads = 50
 )
 
 // Reliability is a measure of a host's uptime.
@@ -41,11 +43,11 @@ var (
 	UnreachablePenalty = types.NewCurrency64(1)
 )
 
-// scanHostEntry will add a host entry to the list of entries waiting to be
+// queueHostEntry will add a host entry to the list of entries waiting to be
 // scanned. If there is no thread that is currently walking through the scan
 // list, one will be created and it will persist until shutdown or until the
 // scan list is empty.
-func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
+func (hdb *HostDB) queueHostEntry(entry *hostEntry) {
 	// Add the entry to a waitlist, then check if any thread is currently
 	// emptying the waitlist. If not, spawn a thread to empty the waitlist.
 	hdb.scanList = append(hdb.scanList, entry)
@@ -174,51 +176,85 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	hdb.save()
 }
 
+// managedScanHost will connect to a host and grab the settings, verifying
+// uptime and updating to the host's preferences.
+func (hdb *HostDB) managedScanHost(hostEntry *hostEntry) {
+	// Request settings from the queued host entry.
+	//
+	// A readlock is necessary when viewing the elements of the host entry.
+	hdb.mu.RLock()
+	netAddr := hostEntry.NetAddress
+	pubKey := hostEntry.PublicKey
+	hdb.mu.RUnlock()
+	hdb.log.Debugln("Scanning", netAddr, pubKey)
+	var settings modules.HostExternalSettings
+	err := func() error {
+		dialer := &net.Dialer{
+			Cancel:  hdb.tg.StopChan(),
+			Timeout: hostRequestTimeout,
+		}
+		conn, err := dialer.Dial("tcp", string(netAddr))
+		if err != nil {
+			return err
+		}
+		connCloseChan := make(chan struct{})
+		go func() {
+			select {
+			case <-hdb.tg.StopChan():
+			case <-connCloseChan:
+			}
+			conn.Close()
+		}()
+		defer close(connCloseChan)
+		conn.SetDeadline(time.Now().Add(hostScanDeadline))
+
+		err = encoding.WriteObject(conn, modules.RPCSettings)
+		if err != nil {
+			return err
+		}
+		var pubkey crypto.PublicKey
+		copy(pubkey[:], pubKey.Key)
+		return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
+	}()
+	if err != nil {
+		hdb.log.Debugln("Scanning", netAddr, pubKey, "failed:", err)
+	} else {
+		hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
+	}
+
+	// Update the host tree to have a new entry.
+	hdb.managedUpdateEntry(hostEntry, settings, err)
+}
+
 // threadedProbeHosts tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
 func (hdb *HostDB) threadedProbeHosts() {
-	defer hdb.threadGroup.Done()
-	for hostEntry := range hdb.scanPool {
-		// Request settings from the queued host entry.
-		// TODO: use dialer.Cancel to shutdown quickly
-		//
-		// A readlock is necessary when viewing the elements of the host entry.
-		hdb.mu.RLock()
-		netAddr := hostEntry.NetAddress
-		pubKey := hostEntry.PublicKey
-		hdb.mu.RUnlock()
-		hdb.log.Debugln("Scanning", netAddr, pubKey)
-		var settings modules.HostExternalSettings
-		err := func() error {
-			conn, err := hdb.dialer.DialTimeout(netAddr, hostRequestTimeout)
-			if err != nil {
-				return err
-			}
-			defer conn.Close()
-			err = encoding.WriteObject(conn, modules.RPCSettings)
-			if err != nil {
-				return err
-			}
-			var pubkey crypto.PublicKey
-			copy(pubkey[:], pubKey.Key)
-			return crypto.ReadSignedObject(conn, &settings, maxSettingsLen, pubkey)
-		}()
-		if err != nil {
-			hdb.log.Debugln("Scanning", netAddr, pubKey, "failed:", err)
-		} else {
-			hdb.log.Debugln("Scanning", netAddr, pubKey, "succeeded")
-		}
+	err := hdb.tg.Add()
+	if err != nil {
+		return
+	}
+	defer hdb.tg.Done()
 
-		// Update the host tree to have a new entry.
-		hdb.managedUpdateEntry(hostEntry, settings, err)
+	for {
+		select {
+		case <-hdb.tg.StopChan():
+			return
+		case hostEntry := <-hdb.scanPool:
+			hdb.managedScanHost(hostEntry)
+		}
 	}
 }
 
 // threadedScan is an ongoing function which will query the full set of hosts
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
-	defer hdb.threadGroup.Done()
+	err := hdb.tg.Add()
+	if err != nil {
+		return
+	}
+	defer hdb.tg.Done()
+
 	for {
 		// Determine who to scan. At most 'maxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
@@ -229,7 +265,7 @@ func (hdb *HostDB) threadedScan() {
 
 			// Scan all active hosts.
 			for _, host := range hdb.activeHosts {
-				hdb.scanHostEntry(host.hostEntry)
+				hdb.queueHostEntry(host.hostEntry)
 			}
 
 			// Assemble all of the inactive hosts into a single array.
@@ -250,7 +286,7 @@ func (hdb *HostDB) threadedScan() {
 
 			// Scan each host.
 			for i := 0; i < len(hostOrder) && i < inactiveHostCheckupQuantity; i++ {
-				hdb.scanHostEntry(entries[hostOrder[i]])
+				hdb.queueHostEntry(entries[hostOrder[i]])
 			}
 		}()
 
@@ -268,9 +304,9 @@ func (hdb *HostDB) threadedScan() {
 			randSleep = defaultBig.Sub(defaultBig, minBig)
 		}
 
+		// Sleep until it's time for the next scan cycle.
 		select {
-		// awaken and exit if hostdb is closing
-		case <-hdb.closeChan:
+		case <-hdb.tg.StopChan():
 			return
 		case <-time.After(time.Duration(randSleep.Int64()) + minScanSleep):
 		}
