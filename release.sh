@@ -14,6 +14,11 @@ if [ ! -f $keyfile ]; then
     echo "Key file not found: $keyfile"
     exit 1
 fi
+keysum=$(sha256sum $keyfile | cut -c -64)
+if [ $keysum != "735320b4698010500d230c487e970e12776e88f33ad777ab380a493691dadb1b" ]; then
+    echo "Wrong key file: checksum does not match developer key file."
+    exit 1
+fi
 
 for os in darwin linux windows; do
 	echo Packaging ${os}...
