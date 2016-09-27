@@ -25,7 +25,6 @@ dependencies:
 	# Developer Dependencies
 	go install -race std
 	go get -u github.com/golang/lint/golint
-	go get -u github.com/laher/goxc
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
@@ -63,13 +62,6 @@ release-race:
 	go install -race -tags='debug profile' $(pkgs)
 release-std:
 	go install $(pkgs)
-
-# xc builds and packages release binaries for all systems by using goxc.
-# Cross Compile - makes binaries for windows, linux, and mac, 64 bit only.
-xc: dependencies test test-long
-	goxc -arch="amd64" -bc="darwin linux windows" -d=release \
-	     -pv=v1.0.1 -include=LICENSE,README.md,doc/API.md \
-	     -tasks-=archive,rmbin,deb,deb-dev,deb-source,go-test -n=Sia
 
 # clean removes all directories that get automatically created during
 # development.
