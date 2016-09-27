@@ -14,7 +14,7 @@ if [ ! -f $keyfile ]; then
     echo "Key file not found: $keyfile"
     exit 1
 fi
-keysum=$(sha256sum $keyfile | cut -c -64)
+keysum=$(shasum -a 256 $keyfile | cut -c -64)
 if [ $keysum != "735320b4698010500d230c487e970e12776e88f33ad777ab380a493691dadb1b" ]; then
     echo "Wrong key file: checksum does not match developer key file."
     exit 1
@@ -23,8 +23,7 @@ fi
 for os in darwin linux windows; do
 	echo Packaging ${os}...
 	# create workspace
-	root=$(pwd)
-	folder=$root/release/Sia-$version-$os-amd64
+	folder=release/Sia-$version-$os-amd64
 	rm -rf $folder
 	mkdir -p $folder
 	# compile and sign binaries
@@ -37,7 +36,7 @@ for os in darwin linux windows; do
 		openssl dgst -sha256 -sign $keyfile -out $folder/${bin}.sig $folder/$bin
 	done
 	# add other artifacts
-	cp -r $root/doc $root/LICENSE $root/README.md $folder
+	cp -r doc LICENSE README.md $folder
 	# zip
 	zip -rq release/Sia-$version-$os-amd64.zip $folder
 done
