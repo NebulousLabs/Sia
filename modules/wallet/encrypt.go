@@ -341,6 +341,11 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 		return errors.New("cannot init from seed until blockchain is synced")
 	}
 
+	// If masterKey is blank, use the hash of the seed.
+	if masterKey == (crypto.TwofishKey{}) {
+		masterKey = crypto.TwofishKey(crypto.HashObject(seed))
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if _, err := w.initEncryption(masterKey, seed); err != nil {
