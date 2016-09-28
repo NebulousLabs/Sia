@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -245,5 +246,44 @@ func TestLock(t *testing.T) {
 	siacoinBalance3, _, _ := wt.wallet.ConfirmedBalance()
 	if siacoinBalance3.Cmp(siacoinBalance2) <= 0 {
 		t.Error("balance should increase after a block was mined")
+	}
+}
+
+// TestInitFromSeed tests creating a wallet from a preexisting seed.
+func TestInitFromSeed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester("TestInitFromSeed0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	seed, _, err := wt.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origBal, _, _ := wt.wallet.ConfirmedBalance()
+
+	// create a blank wallet
+	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestInitFromSeed1"), modules.WalletDir)
+	w, err := New(wt.cs, wt.tpool, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.InitFromSeed(crypto.TwofishKey{}, seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(seed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// starting balance should match the original wallet
+	newBal, _, _ := w.ConfirmedBalance()
+	if newBal.Cmp(origBal) != 0 {
+		t.Log(w.UnconfirmedBalance())
+		t.Fatalf("wallet should have correct balance after loading seed: wanted %v, got %v", origBal, newBal)
 	}
 }
