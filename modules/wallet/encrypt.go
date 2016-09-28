@@ -358,7 +358,11 @@ func (w *Wallet) InitFromSeed(masterKey crypto.TwofishKey, seed modules.Seed) er
 	if err := s.scan(w.cs); err != nil {
 		return err
 	}
-	progress := s.largestIndexSeen + (s.largestIndexSeen / 10) // add 10% to be safe
+	// NOTE: each time the wallet generates a key for index n, it sets its
+	// progress to n+1, so the progress should be the largest index seen + 1.
+	// We also add 10% as a buffer because there is little reason not to.
+	progress := s.largestIndexSeen + 1
+	progress += progress / 10
 	// set primarySeedProgress
 	return w.db.Update(func(tx *bolt.Tx) error {
 		return dbPutPrimarySeedProgress(tx, uint64(progress))
