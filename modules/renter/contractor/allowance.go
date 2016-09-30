@@ -60,7 +60,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 
 	// check that allowance is sufficient to store at least one sector
-	numSectors, err := maxSectors(a, c.hdb)
+	numSectors, err := maxSectors(a, c.hdb, c.tpool)
 	if err != nil {
 		return err
 	} else if numSectors == 0 {
