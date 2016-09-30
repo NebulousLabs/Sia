@@ -28,14 +28,6 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 		endHeight = contract.EndHeight()
 		break
 	}
-	// sanity check: all contracts should have same EndHeight
-	if build.DEBUG {
-		for _, contract := range c.contracts {
-			if contract.EndHeight() != endHeight {
-				build.Critical("all contracts should have EndHeight", endHeight, "-- got", contract.EndHeight())
-			}
-		}
-	}
 	return endHeight
 }
 
