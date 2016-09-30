@@ -61,7 +61,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 	}
 
 	walletLoad033xCmd = &cobra.Command{
-		Use:   "033x",
+		Use:   "033x [filepath]",
 		Short: "Load a v0.3.3.x wallet",
 		Long:  "Load a v0.3.3.x wallet into the current wallet",
 		Run:   wrap(walletload033xcmd),
@@ -75,11 +75,11 @@ By default the wallet encryption / unlock password is the same as the generated 
 	}
 
 	walletLoadSiagCmd = &cobra.Command{
-		Use:   `siag [filepaths]`,
-		Short: "Load a siag keyset into the wallet",
-		Long: `Load a set of siag keys into the wallet - typically used for siafunds.
-Example: 'siac wallet load siag key1.siakey,key2.siakey'`,
-		Run: wrap(walletloadsiagcmd),
+		Use:     `siag [filepath,...]`,
+		Short:   "Load siag key(s) into the wallet",
+		Long:    "Load siag key(s) into the wallet - typically used for siafunds.",
+		Example: "siac wallet load siag key1.siakey,key2.siakey",
+		Run:     wrap(walletloadsiagcmd),
 	}
 
 	walletLockCmd = &cobra.Command{
