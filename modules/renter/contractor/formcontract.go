@@ -60,7 +60,7 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 	_, feeEstimation := tp.FeeEstimation()
 	costForTxnFees := types.NewCurrency64(estimatedFileContractTransactionSize).Mul(feeEstimation).Mul64(a.Hosts)
 	// Check for potential divide by zero
-	if a.Funds.Cmp(costForTxnFees.Add(costForContracts)) < 0 {
+	if a.Funds.Cmp(costForTxnFees.Add(costForContracts)) <= 0 {
 		return 0, errors.New("allowance is not large enough to cover the fees associated with creating file contracts")
 	}
 	sectorFunds := a.Funds.Sub(costForTxnFees).Sub(costForContracts)
@@ -68,7 +68,7 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 	// Divide total funds by cost per sector.
 	numSectors, err := sectorFunds.Div(costPerSector).Uint64()
 	if err != nil {
-		return 0, errors.New("error when totaling number of sectors that can be bought with an allowance: "+err.Error())
+		return 0, errors.New("error when totaling number of sectors that can be bought with an allowance: " + err.Error())
 	}
 	return numSectors, nil
 }
