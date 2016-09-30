@@ -1,12 +1,16 @@
 #!/bin/bash
 set -e
 
-# version and private key are supplied as arguments
+# version and keys are supplied as arguments
 version="$1"
 keyfile="$2"
+pubkeyfile="$3" # optional
 if [[ -z $version || -z $keyfile ]]; then
 	echo "Usage: $0 VERSION KEYFILE"
 	exit 1
+fi
+if [[ -z $pubkeyfile ]]; then
+	echo "Warning: no public keyfile supplied. Binaries will not be verified."
 fi
 
 # check for keyfile before proceeding
@@ -34,6 +38,11 @@ for os in darwin linux windows; do
 		fi
 		GOOS=${os} go build -o $folder/$bin ./$pkg
 		openssl dgst -sha256 -sign $keyfile -out $folder/${bin}.sig $folder/$bin
+		# verify signature
+		if [[ -n $pubkeyfile ]]; then
+			openssl dgst -sha256 -verify $pubkeyfile -signature $folder/${bin}.sig $folder/$bin
+		fi
+
 	done
 	# add other artifacts
 	cp -r doc LICENSE README.md $folder
