@@ -3,6 +3,7 @@ package contractor
 import (
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -108,16 +109,20 @@ func TestIntegrationAutoRenew(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// wait for goroutine in ProcessConsensusChange to finish
+	time.Sleep(100 * time.Millisecond)
+	c.editLock.Lock()
+	c.editLock.Unlock()
 
 	// check renewed contract
 	contract = c.Contracts()[0]
 	if contract.FileContract.FileMerkleRoot != root {
-		t.Fatal(contract.FileContract.FileMerkleRoot)
+		t.Fatal("wrong merkle root:", contract.FileContract.FileMerkleRoot)
 	} else if contract.FileContract.FileSize != modules.SectorSize {
-		t.Fatal(contract.FileContract.FileSize)
+		t.Fatal("wrong file size:", contract.FileContract.FileSize)
 	} else if contract.FileContract.RevisionNumber != 0 {
-		t.Fatal(contract.FileContract.RevisionNumber)
+		t.Fatal("wrong revision number:", contract.FileContract.RevisionNumber)
 	} else if contract.FileContract.WindowStart != c.blockHeight+c.allowance.Period {
-		t.Fatal(contract.FileContract.WindowStart)
+		t.Fatal("wrong window start:", contract.FileContract.WindowStart)
 	}
 }

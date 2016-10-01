@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -48,6 +49,10 @@ type Contractor struct {
 	financialMetrics modules.RenterFinancialMetrics
 
 	mu sync.RWMutex
+
+	// in addition to mu, a separate lock enforces that multiple goroutines
+	// won't try to simultaneously edit the contract set.
+	editLock siasync.TryMutex
 }
 
 // Allowance returns the current allowance.
