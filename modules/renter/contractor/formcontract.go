@@ -22,7 +22,7 @@ var (
 
 	// ErrInsufficientAllowance indicates that the renter's allowance is less
 	// than the amount necessary to store at least one sector
-	ErrInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
+	ErrInsufficientAllowance = errors.New("allowance is not large enough to cover fees of contract creation")
 	errTooExpensive          = errors.New("host price was too high")
 )
 
@@ -61,7 +61,7 @@ func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, er
 	costForTxnFees := types.NewCurrency64(estimatedFileContractTransactionSize).Mul(feeEstimation).Mul64(a.Hosts)
 	// Check for potential divide by zero
 	if a.Funds.Cmp(costForTxnFees.Add(costForContracts)) <= 0 {
-		return 0, errors.New("allowance is not large enough to cover the fees associated with creating file contracts")
+		return 0, ErrInsufficientAllowance
 	}
 	sectorFunds := a.Funds.Sub(costForTxnFees).Sub(costForContracts)
 
