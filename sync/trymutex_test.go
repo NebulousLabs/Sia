@@ -117,11 +117,12 @@ func TestTryMutexTimed(t *testing.T) {
 		t.Error("was able to grab a locked lock")
 	}
 
-	if time.Now().Sub(startTime) < time.Millisecond*500 {
-		t.Error("lock did not wait the correct amount of time before timing out")
+	wait := time.Now().Sub(startTime)
+	if wait < time.Millisecond*450 {
+		t.Error("lock did not wait the correct amount of time before timing out", wait)
 	}
-	if time.Now().Sub(startTime) > time.Millisecond*750 {
-		t.Error("lock waited too long before timing out")
+	if wait > time.Millisecond*700 {
+		t.Error("lock waited too long before timing out", wait)
 	}
 
 	tm.Unlock()
@@ -149,11 +150,12 @@ func TestTryMutexTimedConcurrent(t *testing.T) {
 			t.Error("was able to grab a locked lock")
 		}
 
-		if time.Now().Sub(startTime) < time.Millisecond*500 {
-			t.Error("lock did not wait the correct amount of time before timing out")
+		wait := time.Now().Sub(startTime)
+		if wait < time.Millisecond*450 {
+			t.Error("lock did not wait the correct amount of time before timing out:", wait)
 		}
-		if time.Now().Sub(startTime) > time.Millisecond*750 {
-			t.Error("lock waited too long before timing out")
+		if wait > time.Millisecond*700 {
+			t.Error("lock waited too long before timing out", wait)
 		}
 
 		tm.Unlock()

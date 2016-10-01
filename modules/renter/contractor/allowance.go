@@ -28,14 +28,6 @@ func (c *Contractor) contractEndHeight() types.BlockHeight {
 		endHeight = contract.EndHeight()
 		break
 	}
-	// sanity check: all contracts should have same EndHeight
-	if build.DEBUG {
-		for _, contract := range c.contracts {
-			if contract.EndHeight() != endHeight {
-				build.Critical("all contracts should have EndHeight", endHeight, "-- got", contract.EndHeight())
-			}
-		}
-	}
 	return endHeight
 }
 
@@ -68,7 +60,7 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	}
 
 	// check that allowance is sufficient to store at least one sector
-	numSectors, err := maxSectors(a, c.hdb)
+	numSectors, err := maxSectors(a, c.hdb, c.tpool)
 	if err != nil {
 		return err
 	} else if numSectors == 0 {

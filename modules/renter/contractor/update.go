@@ -55,7 +55,7 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 		c.mu.RLock()
 		a := c.allowance
 		remaining := int(a.Hosts) - len(c.contracts)
-		numSectors, err := maxSectors(a, c.hdb)
+		numSectors, err := maxSectors(a, c.hdb, c.tpool)
 		c.mu.RUnlock()
 		if err != nil {
 			c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)

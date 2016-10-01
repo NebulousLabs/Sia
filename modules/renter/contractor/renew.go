@@ -73,7 +73,7 @@ func (c *Contractor) managedRenewContracts() error {
 
 	c.mu.RLock()
 	endHeight := c.blockHeight + c.allowance.Period
-	numSectors, err := maxSectors(c.allowance, c.hdb)
+	numSectors, err := maxSectors(c.allowance, c.hdb, c.tpool)
 	c.mu.RUnlock()
 	if err != nil {
 		return err

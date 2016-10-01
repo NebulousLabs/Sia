@@ -69,8 +69,8 @@ func TestThreadGroupWait(t *testing.T) {
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatal(err)
-	} else if elapsed < time.Second {
-		t.Fatal("Stop did not wait for goroutines")
+	} else if elapsed < time.Millisecond*950 {
+		t.Fatal("Stop did not wait for goroutines:", elapsed)
 	}
 }
 

@@ -22,40 +22,53 @@ var (
 
 	// ErrInsufficientAllowance indicates that the renter's allowance is less
 	// than the amount necessary to store at least one sector
-	ErrInsufficientAllowance = errors.New("allowance is not large enough to perform contract creation")
+	ErrInsufficientAllowance = errors.New("allowance is not large enough to cover fees of contract creation")
 	errTooExpensive          = errors.New("host price was too high")
 )
 
 // maxSectors is the estimated maximum number of sectors that the allowance
 // can support.
-func maxSectors(a modules.Allowance, hdb hostDB) (uint64, error) {
-	if a.Hosts == 0 || a.Period == 0 {
+func maxSectors(a modules.Allowance, hdb hostDB, tp transactionPool) (uint64, error) {
+	if a.Hosts <= 0 || a.Period <= 0 {
 		return 0, errors.New("invalid allowance")
 	}
 
 	// Sample at least 10 hosts.
 	nRandomHosts := int(a.Hosts)
-	if nRandomHosts < 10 {
-		nRandomHosts = 10
+	if nRandomHosts < minHostsForEstimations {
+		nRandomHosts = minHostsForEstimations
 	}
 	hosts := hdb.RandomHosts(nRandomHosts, nil)
 	if len(hosts) < int(a.Hosts) {
 		return 0, fmt.Errorf("not enough hosts in hostdb for sector calculation, got %v but needed %v", len(hosts), int(a.Hosts))
 	}
 
-	// Calculate cost of storing 1 sector per host for the allowance period.
-	var sum types.Currency
+	// Calculate cost of creating contracts with each host, and the cost of
+	// storing sectors on each host.
+	var sectorSum types.Currency
+	var contractCostSum types.Currency
 	for _, h := range hosts {
-		sum = sum.Add(h.StoragePrice)
+		sectorSum = sectorSum.Add(h.StoragePrice)
+		contractCostSum = contractCostSum.Add(h.ContractPrice)
 	}
-	averagePrice := sum.Div64(uint64(len(hosts)))
-	costPerSector := averagePrice.Mul64(a.Hosts).Mul64(modules.SectorSize).Mul64(uint64(a.Period))
+	averageSectorPrice := sectorSum.Div64(uint64(len(hosts)))
+	averageContractPrice := contractCostSum.Div64(uint64(len(hosts)))
+	costPerSector := averageSectorPrice.Mul64(a.Hosts).Mul64(modules.SectorSize).Mul64(uint64(a.Period))
+	costForContracts := averageContractPrice.Mul64(a.Hosts)
+
+	// Subtract fees for creating the file contracts from the allowance.
+	_, feeEstimation := tp.FeeEstimation()
+	costForTxnFees := types.NewCurrency64(estimatedFileContractTransactionSize).Mul(feeEstimation).Mul64(a.Hosts)
+	// Check for potential divide by zero
+	if a.Funds.Cmp(costForTxnFees.Add(costForContracts)) <= 0 {
+		return 0, ErrInsufficientAllowance
+	}
+	sectorFunds := a.Funds.Sub(costForTxnFees).Sub(costForContracts)
 
 	// Divide total funds by cost per sector.
-	numSectors, err := a.Funds.Div(costPerSector).Uint64()
+	numSectors, err := sectorFunds.Div(costPerSector).Uint64()
 	if err != nil {
-		// if there was an overflow, something is definitely wrong
-		return 0, errors.New("allowance can fund suspiciously large number of sectors")
+		return 0, errors.New("error when totaling number of sectors that can be bought with an allowance: " + err.Error())
 	}
 	return numSectors, nil
 }
