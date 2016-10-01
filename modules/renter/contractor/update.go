@@ -43,27 +43,37 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	c.mu.Unlock()
 
 	// only attempt contract formation/renewal if we are synced
-	// (harmless otherwise, since hosts will reject our renewal attempts, but very slow)
+	// (harmless if not synced, since hosts will reject our renewal attempts,
+	// (but very slow)
 	if cc.Synced {
-		// renew any contracts that have entered the renew window
-		err := c.managedRenewContracts()
-		if err != nil {
-			c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
-		}
+		go func() {
+			// only one goroutine should be editing contracts at a time
+			if !c.editLock.TryLock() {
+				return
+			}
+			defer c.editLock.Unlock()
 
-		// if we don't have enough contracts, form new ones
-		c.mu.RLock()
-		a := c.allowance
-		remaining := int(a.Hosts) - len(c.contracts)
-		numSectors, err := maxSectors(a, c.hdb, c.tpool)
-		c.mu.RUnlock()
-		if err != nil {
-			c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)
-			return
-		}
-		err = c.managedFormAllowanceContracts(remaining, numSectors, a)
-		if err != nil {
-			c.log.Debugln("WARN: failed to form contracts after processing a consensus change:", err)
-		}
+			// renew any contracts that have entered the renew window
+			err := c.managedRenewContracts()
+			if err != nil {
+				println(err.Error())
+				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
+			}
+
+			// if we don't have enough contracts, form new ones
+			c.mu.RLock()
+			a := c.allowance
+			remaining := int(a.Hosts) - len(c.contracts)
+			numSectors, err := maxSectors(a, c.hdb, c.tpool)
+			c.mu.RUnlock()
+			if err != nil {
+				c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)
+				return
+			}
+			err = c.managedFormAllowanceContracts(remaining, numSectors, a)
+			if err != nil {
+				c.log.Debugln("WARN: failed to form contracts after processing a consensus change:", err)
+			}
+		}()
 	}
 }
