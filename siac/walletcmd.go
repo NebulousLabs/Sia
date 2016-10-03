@@ -75,11 +75,11 @@ By default the wallet encryption / unlock password is the same as the generated 
 	}
 
 	walletLoadSiagCmd = &cobra.Command{
-		Use:   `siag [filepaths]`,
-		Short: "Load a siag keyset into the wallet",
-		Long: `Load a set of siag keys into the wallet - typically used for siafunds.
-Example: 'siac wallet load siag key1.siakey,key2.siakey'`,
-		Run: wrap(walletloadsiagcmd),
+		Use:     `siag [filepath,...]`,
+		Short:   "Load siag key(s) into the wallet",
+		Long:    "Load siag key(s) into the wallet - typically used for siafunds.",
+		Example: "siac wallet load siag key1.siakey,key2.siakey",
+		Run:     wrap(walletloadsiagcmd),
 	}
 
 	walletLockCmd = &cobra.Command{
@@ -145,6 +145,8 @@ Run 'wallet send --help' to see a list of available units.`,
 	}
 )
 
+const askPasswordText = "We need to encrypt the new data using the current wallet password, please provide: "
+
 // walletaddresscmd fetches a new address from the wallet that will be able to
 // receive coins.
 func walletaddresscmd() {
@@ -193,7 +195,7 @@ func walletinitcmd() {
 
 // walletload033xcmd loads a v0.3.3.x wallet into the current wallet.
 func walletload033xcmd(source string) {
-	password, err := speakeasy.Ask("Wallet password: ")
+	password, err := speakeasy.Ask(askPasswordText)
 	if err != nil {
 		die("Reading password failed:", err)
 	}
@@ -207,13 +209,13 @@ func walletload033xcmd(source string) {
 
 // walletloadseedcmd adds a seed to the wallet's list of seeds
 func walletloadseedcmd() {
-	password, err := speakeasy.Ask("Wallet password: ")
-	if err != nil {
-		die("Reading password failed:", err)
-	}
-	seed, err := speakeasy.Ask("New Seed: ")
+	seed, err := speakeasy.Ask("New seed: ")
 	if err != nil {
 		die("Reading seed failed:", err)
+	}
+	password, err := speakeasy.Ask(askPasswordText)
+	if err != nil {
+		die("Reading password failed:", err)
 	}
 	qs := fmt.Sprintf("encryptionpassword=%s&seed=%s&dictionary=%s", password, seed, "english")
 	err = post("/wallet/seed", qs)
@@ -225,7 +227,7 @@ func walletloadseedcmd() {
 
 // walletloadsiagcmd loads a siag key set into the wallet.
 func walletloadsiagcmd(keyfiles string) {
-	password, err := speakeasy.Ask("Wallet password: ")
+	password, err := speakeasy.Ask(askPasswordText)
 	if err != nil {
 		die("Reading password failed:", err)
 	}
