@@ -47,5 +47,8 @@ for os in darwin linux windows; do
 	# add other artifacts
 	cp -r doc LICENSE README.md $folder
 	# zip
-	zip -rq release/Sia-$version-$os-amd64.zip $folder
+	(
+		cd release
+		zip -rq Sia-$version-$os-amd64.zip Sia-$version-$os-amd64
+	)
 done
