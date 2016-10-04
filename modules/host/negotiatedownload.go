@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -157,22 +158,42 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 		return errLateRevision
 	}
 
-	// The new revenue comes out of the renter's valid outputs.
-	if paymentRevision.NewValidProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
-		return errHighRenterValidOutput
+	// Determine the amount that was transfered from the renter.
+	if paymentRevision.NewValidProofOutputs[0].Value.Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
+		return extendErr("renter increased its valid proof output: ", errHighRenterValidOutput)
 	}
-	// The new revenue goes into the host's valid outputs.
-	if existingRevision.NewValidProofOutputs[1].Value.Add(expectedTransfer).Cmp(paymentRevision.NewValidProofOutputs[1].Value) < 0 {
-		return errLowHostValidOutput
+	fromRenter := existingRevision.NewValidProofOutputs[0].Value.Sub(paymentRevision.NewValidProofOutputs[0].Value)
+	// Verify that enough money was transfered.
+	if fromRenter.Cmp(expectedTransfer) < 0 {
+		s := fmt.Sprintf("expected at least %v to be exchanged, but %v was exchanged: ", expectedTransfer, fromRenter)
+		return extendErr(s, errHighRenterValidOutput)
 	}
-	// The new revenue comes out of the renter's missed outputs.
-	if paymentRevision.NewMissedProofOutputs[0].Value.Add(expectedTransfer).Cmp(existingRevision.NewMissedProofOutputs[0].Value) > 0 {
-		return errHighRenterMissedOutput
+
+	// Determine the amount of money that was transfered to the host.
+	if existingRevision.NewValidProofOutputs[1].Value.Cmp(paymentRevision.NewValidProofOutputs[1].Value) > 0 {
+		return extendErr("host valid proof output was decreased: ", errLowHostValidOutput)
 	}
-	// The new revenue goes into the void outputs.
-	if existingRevision.NewMissedProofOutputs[2].Value.Add(expectedTransfer).Cmp(paymentRevision.NewMissedProofOutputs[2].Value) < 0 {
-		return errLowVoidOutput
+	toHost := paymentRevision.NewValidProofOutputs[1].Value.Sub(existingRevision.NewValidProofOutputs[1].Value)
+	// Verify that enough money was transfered.
+	if toHost.Cmp(fromRenter) != 0 {
+		s := fmt.Sprintf("expected exactly %v to be transfered to the host, but %v was transfered: ", fromRenter, toHost)
+		return extendErr(s, errLowHostValidOutput)
 	}
+
+	// If the renter's valid proof output is larger than the renter's missed
+	// proof output, the renter has incentive to see the host fail. Make sure
+	// that this incentive is not present.
+	if paymentRevision.NewValidProofOutputs[0].Value.Cmp(paymentRevision.NewMissedProofOutputs[0].Value) > 0 {
+		return extendErr("renter has incentive to see host fail: ", errHighRenterMissedOutput)
+	}
+
+	// Check that the host is not going to be posting collateral.
+	if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) < 0 {
+		collateral := existingRevision.NewMissedProofOutputs[1].Value.Sub(paymentRevision.NewMissedProofOutputs[1].Value)
+		s := fmt.Sprintf("host not expecting to post any collateral, but contract has host posting %v collateral: ", collateral)
+		return extendErr(s, errLowHostMissedOutput)
+	}
+
 	// Check that the revision count has increased.
 	if paymentRevision.NewRevisionNumber <= existingRevision.NewRevisionNumber {
 		return errBadRevisionNumber

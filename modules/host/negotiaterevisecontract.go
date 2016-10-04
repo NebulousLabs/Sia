@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -133,7 +134,7 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 			}
 		}
 		newRevenue := storageRevenue.Add(bandwidthRevenue)
-		return extendErr("unable to verify revision: ", verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral))
+		return extendErr("unable to verify updated contract: ", verifyRevision(*so, revision, blockHeight, newRevenue, newCollateral))
 	}()
 	if err != nil {
 		modules.WriteNegotiationRejection(conn, err) // Error is ignored so that the error type can be preserved in extendErr.
@@ -221,7 +222,7 @@ func (h *Host) managedRPCReviseContract(conn net.Conn) error {
 
 // verifyRevision checks that the revision pays the host correctly, and that
 // the revision does not attempt any malicious or unexpected changes.
-func verifyRevision(so storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, newRevenue, newCollateral types.Currency) error {
+func verifyRevision(so storageObligation, revision types.FileContractRevision, blockHeight types.BlockHeight, expectedExchange, expectedCollateral types.Currency) error {
 	// Check that the revision is well-formed.
 	if len(revision.NewValidProofOutputs) != 2 || len(revision.NewMissedProofOutputs) != 3 {
 		return errBadContractOutputCounts
@@ -258,21 +259,49 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 		return errBadUnlockHash
 	}
 
-	// The new revenue comes out of the renter's valid outputs.
-	if revision.NewValidProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
-		return errHighRenterValidOutput
+	// Determine the amount that was transfered from the renter.
+	if revision.NewValidProofOutputs[0].Value.Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
+		return extendErr("renter increased its valid proof output: ", errHighRenterValidOutput)
 	}
-	// The new revenue goes into the host's valid outputs.
-	if oldFCR.NewValidProofOutputs[1].Value.Add(newRevenue).Cmp(revision.NewValidProofOutputs[1].Value) < 0 {
-		return errLowHostValidOutput
+	fromRenter := oldFCR.NewValidProofOutputs[0].Value.Sub(revision.NewValidProofOutputs[0].Value)
+	// Verify that enough money was transfered.
+	if fromRenter.Cmp(expectedExchange) < 0 {
+		s := fmt.Sprintf("expected at least %v to be exchanged, but %v was exchanged: ", expectedExchange, fromRenter)
+		return extendErr(s, errHighRenterValidOutput)
 	}
-	// The new revenue comes out of the renter's missed outputs.
-	if revision.NewMissedProofOutputs[0].Value.Add(newRevenue).Cmp(oldFCR.NewMissedProofOutputs[0].Value) > 0 {
-		return errHighRenterMissedOutput
+
+	// Determine the amount of money that was transfered to the host.
+	if oldFCR.NewValidProofOutputs[1].Value.Cmp(revision.NewValidProofOutputs[1].Value) > 0 {
+		return extendErr("host valid proof output was decreased: ", errLowHostValidOutput)
 	}
-	// The new collateral comes out of the host's missed outputs.
-	if revision.NewMissedProofOutputs[1].Value.Add(newCollateral).Cmp(oldFCR.NewMissedProofOutputs[1].Value) < 0 {
-		return errLowHostMissedOutput
+	toHost := revision.NewValidProofOutputs[1].Value.Sub(oldFCR.NewValidProofOutputs[1].Value)
+	// Verify that enough money was transfered.
+	if toHost.Cmp(fromRenter) != 0 {
+		s := fmt.Sprintf("expected exactly %v to be transfered to the host, but %v was transfered: ", fromRenter, toHost)
+		return extendErr(s, errLowHostValidOutput)
+	}
+
+	// If the renter's valid proof output is larger than the renter's missed
+	// proof output, the renter has incentive to see the host fail. Make sure
+	// that this incentive is not present.
+	if revision.NewValidProofOutputs[0].Value.Cmp(revision.NewMissedProofOutputs[0].Value) > 0 {
+		return extendErr("renter has incentive to see host fail: ", errHighRenterMissedOutput)
+	}
+
+	// Check that the host is not going to be posting more collateral than is
+	// expected. If the new misesd output is greater than the old one, the host
+	// is actually posting negative collateral, which is fine.
+	if revision.NewMissedProofOutputs[1].Value.Cmp(oldFCR.NewMissedProofOutputs[1].Value) <= 0 {
+		collateral := oldFCR.NewMissedProofOutputs[1].Value.Sub(revision.NewMissedProofOutputs[1].Value)
+		if collateral.Cmp(expectedCollateral) > 0 {
+			s := fmt.Sprintf("host expected to post at most %v collateral, but contract has host posting %v: ", expectedCollateral, collateral)
+			return extendErr(s, errLowHostMissedOutput)
+		}
+	}
+
+	// Check that the revision count has increased.
+	if revision.NewRevisionNumber <= oldFCR.NewRevisionNumber {
+		return errBadRevisionNumber
 	}
 
 	// The Merkle root is checked last because it is the most expensive check.
