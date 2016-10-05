@@ -35,7 +35,9 @@ func (h *Host) managedDownloadIteration(conn net.Conn, so *storageObligation) er
 
 	// The renter will either accept or reject the host's settings.
 	err = modules.ReadNegotiationAcceptance(conn)
-	if err != nil {
+	if err == modules.ErrStopResponse {
+		return err // managedRPCDownload will catch this and exit gracefully
+	} else if err != nil {
 		return extendErr("renter rejected host settings: ", ErrorCommunication(err.Error()))
 	}
 
@@ -158,25 +160,25 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 		return errLateRevision
 	}
 
-	// Determine the amount that was transfered from the renter.
+	// Determine the amount that was transferred from the renter.
 	if paymentRevision.NewValidProofOutputs[0].Value.Cmp(existingRevision.NewValidProofOutputs[0].Value) > 0 {
 		return extendErr("renter increased its valid proof output: ", errHighRenterValidOutput)
 	}
 	fromRenter := existingRevision.NewValidProofOutputs[0].Value.Sub(paymentRevision.NewValidProofOutputs[0].Value)
-	// Verify that enough money was transfered.
+	// Verify that enough money was transferred.
 	if fromRenter.Cmp(expectedTransfer) < 0 {
 		s := fmt.Sprintf("expected at least %v to be exchanged, but %v was exchanged: ", expectedTransfer, fromRenter)
 		return extendErr(s, errHighRenterValidOutput)
 	}
 
-	// Determine the amount of money that was transfered to the host.
+	// Determine the amount of money that was transferred to the host.
 	if existingRevision.NewValidProofOutputs[1].Value.Cmp(paymentRevision.NewValidProofOutputs[1].Value) > 0 {
 		return extendErr("host valid proof output was decreased: ", errLowHostValidOutput)
 	}
 	toHost := paymentRevision.NewValidProofOutputs[1].Value.Sub(existingRevision.NewValidProofOutputs[1].Value)
-	// Verify that enough money was transfered.
+	// Verify that enough money was transferred.
 	if toHost.Cmp(fromRenter) != 0 {
-		s := fmt.Sprintf("expected exactly %v to be transfered to the host, but %v was transfered: ", fromRenter, toHost)
+		s := fmt.Sprintf("expected exactly %v to be transferred to the host, but %v was transferred: ", fromRenter, toHost)
 		return extendErr(s, errLowHostValidOutput)
 	}
 

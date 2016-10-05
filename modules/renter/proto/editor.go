@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -119,6 +120,13 @@ func (he *Editor) Upload(data []byte) (modules.RenterContract, crypto.Hash, erro
 	sectorCollateral := he.host.Collateral.Mul(blockBytes)
 	if he.contract.LastRevision.NewMissedProofOutputs[1].Value.Cmp(sectorCollateral) < 0 {
 		return modules.RenterContract{}, crypto.Hash{}, errors.New("contract has insufficient collateral to support upload")
+	}
+	// to mitigate small errors (e.g. differing block heights), fudge the
+	// price and collateral by 0.2%. This is only applied to hosts above
+	// v1.0.1; older hosts use stricter math.
+	if build.VersionCmp(he.host.Version, "1.0.1") > 0 {
+		sectorPrice = sectorPrice.MulFloat(1.002)
+		sectorCollateral = sectorCollateral.MulFloat(0.998)
 	}
 
 	// calculate the new Merkle root

@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -18,19 +19,29 @@ var (
 
 	// defaultDataPieces is the number of data pieces per erasure-coded chunk
 	defaultDataPieces = func() int {
-		if build.Release == "testing" {
+		switch build.Release {
+		case "dev":
+			return 1
+		case "standard":
+			return 4
+		case "testing":
 			return 1
 		}
-		return 4
+		panic("undefined defaultDataPieces")
 	}()
 
 	// defaultParityPieces is the number of parity pieces per erasure-coded
 	// chunk
 	defaultParityPieces = func() int {
-		if build.Release == "testing" {
+		switch build.Release {
+		case "dev":
+			return 1
+		case "standard":
+			return 20
+		case "testing":
 			return 8
 		}
-		return 20
+		panic("undefined defaultParityPieces")
 	}()
 )
 
@@ -65,8 +76,8 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Check that we have contracts to upload to. We need at least (data +
 	// parity/2) contracts; since NumPieces = data + parity, we arrive at the
 	// expression below.
-	if len(r.hostContractor.Contracts()) < (up.ErasureCode.NumPieces()+up.ErasureCode.MinPieces())/2 && build.Release != "testing" {
-		return errInsufficientContracts
+	if nContracts := len(r.hostContractor.Contracts()); nContracts < (up.ErasureCode.NumPieces()+up.ErasureCode.MinPieces())/2 && build.Release != "testing" {
+		return fmt.Errorf("not enough contracts to upload file: got %v, needed %v", nContracts, (up.ErasureCode.NumPieces()+up.ErasureCode.MinPieces())/2)
 	}
 
 	// Create file object.

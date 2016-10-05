@@ -170,7 +170,7 @@ var (
 	// renter and the host.
 	SectorSize = func() uint64 {
 		if build.Release == "dev" {
-			return 1 << 20 // 1 MiB
+			return 1 << 18 // 256 KiB
 		}
 		if build.Release == "standard" {
 			return 1 << 22 // 4 MiB
