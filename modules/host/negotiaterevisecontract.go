@@ -30,8 +30,10 @@ func (h *Host) managedRevisionIteration(conn net.Conn, so *storageObligation, fi
 	// transaction. It may also return a stop response to indicate that it
 	// wishes to terminate the revision loop.
 	err = modules.ReadNegotiationAcceptance(conn)
-	if err != nil {
-		return extendErr("renter rejected settings: ", err)
+	if err == modules.ErrStopResponse {
+		return err // managedRPCReviseContract will catch this and exit gracefully
+	} else if err != nil {
+		return extendErr("renter rejected host settings: ", ErrorCommunication(err.Error()))
 	}
 
 	// Read some variables from the host for use later in the function.
@@ -259,25 +261,25 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 		return errBadUnlockHash
 	}
 
-	// Determine the amount that was transfered from the renter.
+	// Determine the amount that was transferred from the renter.
 	if revision.NewValidProofOutputs[0].Value.Cmp(oldFCR.NewValidProofOutputs[0].Value) > 0 {
 		return extendErr("renter increased its valid proof output: ", errHighRenterValidOutput)
 	}
 	fromRenter := oldFCR.NewValidProofOutputs[0].Value.Sub(revision.NewValidProofOutputs[0].Value)
-	// Verify that enough money was transfered.
+	// Verify that enough money was transferred.
 	if fromRenter.Cmp(expectedExchange) < 0 {
 		s := fmt.Sprintf("expected at least %v to be exchanged, but %v was exchanged: ", expectedExchange, fromRenter)
 		return extendErr(s, errHighRenterValidOutput)
 	}
 
-	// Determine the amount of money that was transfered to the host.
+	// Determine the amount of money that was transferred to the host.
 	if oldFCR.NewValidProofOutputs[1].Value.Cmp(revision.NewValidProofOutputs[1].Value) > 0 {
 		return extendErr("host valid proof output was decreased: ", errLowHostValidOutput)
 	}
 	toHost := revision.NewValidProofOutputs[1].Value.Sub(oldFCR.NewValidProofOutputs[1].Value)
-	// Verify that enough money was transfered.
+	// Verify that enough money was transferred.
 	if toHost.Cmp(fromRenter) != 0 {
-		s := fmt.Sprintf("expected exactly %v to be transfered to the host, but %v was transfered: ", fromRenter, toHost)
+		s := fmt.Sprintf("expected exactly %v to be transferred to the host, but %v was transferred: ", fromRenter, toHost)
 		return extendErr(s, errLowHostValidOutput)
 	}
 
