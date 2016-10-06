@@ -44,7 +44,8 @@ type Contractor struct {
 	cachedRevisions map[types.FileContractID]cachedRevision
 	contracts       map[types.FileContractID]modules.RenterContract
 	lastChange      modules.ConsensusChangeID
-	renewHeight     types.BlockHeight // height at which to renew contracts
+	renewHeight     types.BlockHeight             // height at which to renew contracts
+	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
 	financialMetrics modules.RenterFinancialMetrics
 
@@ -132,6 +133,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 
 		cachedRevisions: make(map[types.FileContractID]cachedRevision),
 		contracts:       make(map[types.FileContractID]modules.RenterContract),
+		revising:        make(map[types.FileContractID]bool),
 	}
 
 	// Load the prior persistence structures.
