@@ -189,46 +189,31 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
-	// Look up the most recent contract for each host.
-	// NOTE: this assumes that only one contract is made with each host.
-	var contractPieces []struct {
-		contract modules.RenterContract
-		pieces   []pieceData
-	}
+	// copy file contracts
 	file.mu.RLock()
-	for _, fc := range file.contracts {
-		rc, ok := r.hostContractor.Contract(fc.IP)
-		if ok {
-			contractPieces = append(contractPieces, struct {
-				contract modules.RenterContract
-				pieces   []pieceData
-			}{rc, fc.Pieces})
-		}
+	contracts := make([]fileContract, 0, len(file.contracts))
+	for _, c := range file.contracts {
+		contracts = append(contracts, c)
 	}
 	file.mu.RUnlock()
-	r.log.Debugf("Starting Download, found %v contracts\n", len(contractPieces))
-
-	if len(contractPieces) == 0 {
-		return errors.New("no record of that file's contracts")
-	} else if len(contractPieces) < file.erasureCode.MinPieces() {
-		return fmt.Errorf("not enough contracts: needed %v, found %v", file.erasureCode.MinPieces(), len(contractPieces))
-	}
 
 	// Initiate connections to each host.
 	var hosts []fetcher
 	var errs []string
-	for _, cp := range contractPieces {
-		// TODO: connect in parallel
-		d, err := r.hostContractor.Downloader(cp.contract)
+	for _, c := range file.contracts {
+		d, err := r.hostContractor.Downloader(c.ID)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("\t%v: %v", cp.contract.NetAddress, err))
+			errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
 			continue
 		}
 		defer d.Close()
-		hosts = append(hosts, newHostFetcher(d, cp.pieces, file.masterKey))
+		hosts = append(hosts, newHostFetcher(d, c.Pieces, file.masterKey))
+	}
+	if len(hosts) == 0 {
+		return errors.New("no record of that file's contracts")
 	}
 	if len(hosts) < file.erasureCode.MinPieces() {
-		return errors.New("Could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
+		return errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
 	}
 
 	// Check that this host set is sufficient to download the file.

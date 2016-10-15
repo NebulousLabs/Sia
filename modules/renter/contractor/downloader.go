@@ -2,9 +2,9 @@ package contractor
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -23,18 +23,23 @@ type Downloader interface {
 }
 
 // A hostDownloader retrieves sectors by calling the download RPC on a host.
-// It implements the Downloader interface. hostDownloaders are NOT thread-
-// safe; calls to Sector must be serialized.
+// It implements the Downloader interface. hostDownloaders are safe for use by
+// multiple goroutines.
 type hostDownloader struct {
-	downloader *proto.Downloader
-	contractor *Contractor
+	clients    int // safe to Close when 0
 	contractID types.FileContractID
+	contractor *Contractor
+	downloader *proto.Downloader
+	mu         sync.Mutex
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
 func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+
 	oldSpending := hd.downloader.DownloadSpending
 	contract, sector, err := hd.downloader.Sector(root)
 	if err != nil {
@@ -54,27 +59,44 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 // Close cleanly terminates the download loop with the host and closes the
 // connection.
 func (hd *hostDownloader) Close() error {
-	// release revising lock
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+	// Close is a no-op unless there is only one goroutine using the
+	// hostDownloader
+	hd.clients--
+	if hd.clients > 0 {
+		return nil
+	}
 	hd.contractor.mu.Lock()
+	delete(hd.contractor.downloaders, hd.contractID)
 	delete(hd.contractor.revising, hd.contractID)
 	hd.contractor.mu.Unlock()
 	return hd.downloader.Close()
 }
 
-// Downloader initiates the download request loop with a host, and returns a
-// Downloader.
-func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, error) {
+// Downloader returns a Downloader object that can be used to download sectors
+// from a host.
+func (c *Contractor) Downloader(id types.FileContractID) (Downloader, error) {
 	c.mu.RLock()
+	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
+	contract, haveContract := c.contracts[id]
 	c.mu.RUnlock()
-	if height > contract.EndHeight() {
+	host, haveHost := c.hdb.Host(contract.NetAddress)
+
+	if haveDownloader {
+		// increment number of clients
+		cachedDownloader.mu.Lock()
+		cachedDownloader.clients++
+		cachedDownloader.mu.Unlock()
+		return cachedDownloader, nil
+	} else if !haveContract {
+		return nil, errors.New("no record of that contract")
+	} else if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
-	}
-	host, ok := c.hdb.Host(contract.NetAddress)
-	if !ok {
+	} else if !haveHost {
 		return nil, errors.New("no record of that host")
-	}
-	if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
+	} else if host.DownloadBandwidthPrice.Cmp(maxDownloadPrice) > 0 {
 		return nil, errTooExpensive
 	}
 
@@ -117,9 +139,16 @@ func (c *Contractor) Downloader(contract modules.RenterContract) (Downloader, er
 	// (the existing revision will be overwritten when SaveFn is called)
 	d.SaveFn = c.saveRevision(contract.ID)
 
-	return &hostDownloader{
+	// cache downloader
+	hd := &hostDownloader{
 		downloader: d,
 		contractor: c,
 		contractID: contract.ID,
-	}, nil
+		clients:    1,
+	}
+	c.mu.Lock()
+	c.downloaders[contract.ID] = hd
+	c.mu.Unlock()
+
+	return hd, nil
 }
