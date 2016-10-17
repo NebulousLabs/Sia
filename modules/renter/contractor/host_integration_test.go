@@ -791,6 +791,13 @@ func TestDownloaderCaching(t *testing.T) {
 	// still using it
 	d2.Close()
 
+	c.mu.RLock()
+	_, ok = c.downloaders[contract.ID]
+	c.mu.RUnlock()
+	if !ok {
+		t.Fatal("expected downloader to still be present")
+	}
+
 	// create another downloader
 	d3, err := c.Downloader(contract.ID)
 	if err != nil {
@@ -805,6 +812,13 @@ func TestDownloaderCaching(t *testing.T) {
 	// close both downloaders
 	d1.Close()
 	d2.Close()
+
+	c.mu.RLock()
+	_, ok = c.downloaders[contract.ID]
+	c.mu.RUnlock()
+	if ok {
+		t.Fatal("did not expect downloader to still be present")
+	}
 
 	// create another downloader
 	d4, err := c.Downloader(contract.ID)
