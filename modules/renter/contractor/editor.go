@@ -130,7 +130,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 
 // Editor initiates the contract revision process with a host, and returns
 // an Editor.
-func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
+func (c *Contractor) Editor(contract modules.RenterContract) (_ Editor, err error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
@@ -160,11 +160,15 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 	}
 	c.revising[contract.ID] = true
 	c.mu.Unlock()
-	releaseLock := func() {
-		c.mu.Lock()
-		delete(c.revising, contract.ID)
-		c.mu.Unlock()
-	}
+
+	// release lock early if function returns an error
+	defer func() {
+		if err != nil {
+			c.mu.Lock()
+			delete(c.revising, contract.ID)
+			c.mu.Unlock()
+		}
+	}()
 
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
@@ -176,7 +180,6 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 		if !ok {
 			// nothing we can do; return original error
 			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
-			releaseLock()
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
@@ -185,7 +188,6 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 		e, err = proto.NewEditor(host, contract, height)
 	}
 	if err != nil {
-		releaseLock()
 		return nil, err
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
