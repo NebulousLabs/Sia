@@ -3,6 +3,7 @@ package hostdb
 import (
 	"math/big"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -11,6 +12,21 @@ var (
 	// weight to 10^150 to give ourselves lots of precision when determing the
 	// weight of a host
 	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(150), nil))
+
+	// requiredStorage indicates the amount of storage that the host must be
+	// offering in order to be considered a valuable/worthwhile host.
+	requiredStorage = func() uint64 {
+		switch build.Release {
+		case "dev":
+			return 1e6
+		case "standard":
+			return 1e9
+		case "testing":
+			return 1e3
+		default:
+			panic("incorrect/missing value for requiredStorage constant")
+		}
+	}()
 )
 
 // calculateHostWeight returns the weight of a host according to the settings of
@@ -45,6 +61,29 @@ func calculateHostWeight(entry hostEntry) (weight types.Currency) {
 		// To avoid a divide-by-zero error, this operation is only performed on
 		// non-zero prices.
 		weight = baseWeight.Div(totalPrice).Div(totalPrice).Div(totalPrice).Div(totalPrice).Div(totalPrice)
+	}
+
+	// Enact penalties if the host does not have very much storage remaining.
+	if entry.RemainingStorage < 200*requiredStorage {
+		weight = weight.Div64(2) // 2x total penalty
+	}
+	if entry.RemainingStorage < 100*requiredStorage {
+		weight = weight.Div64(3) // 6x total penalty
+	}
+	if entry.RemainingStorage < 50*requiredStorage {
+		weight = weight.Div64(4) // 24x total penalty
+	}
+	if entry.RemainingStorage < 25*requiredStorage {
+		weight = weight.Div64(5) // 95x total penalty
+	}
+	if entry.RemainingStorage < 10*requiredStorage {
+		weight = weight.Div64(6) // 570x total penalty
+	}
+	if entry.RemainingStorage < 5*requiredStorage {
+		weight = weight.Div64(10) // 5700x total penalty
+	}
+	if entry.RemainingStorage < requiredStorage {
+		weight = types.NewCurrency64(1) // Wortheless host.
 	}
 
 	// Account for collateral. Collateral has a somewhat complicated
