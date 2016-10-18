@@ -830,4 +830,5 @@ func TestDownloaderCaching(t *testing.T) {
 	if d4 == d1 {
 		t.Fatal("downloader should not have been cached after all clients were closed")
 	}
+	d4.Close()
 }

@@ -223,9 +223,21 @@ func (r *Renter) threadedRepairLoop() {
 			continue
 		}
 
+		// if the downloading flag is set, abort early. Otherwise, set the
+		// uploading flag.
+		id := r.mu.Lock()
+		downloading := r.downloading
+		if !downloading {
+			r.uploading = true
+		}
+		r.mu.Unlock(id)
+		if downloading {
+			continue
+		}
+
 		// make copy of repair set under lock
 		repairing := make(map[string]trackedFile)
-		id := r.mu.RLock()
+		id = r.mu.RLock()
 		for name, meta := range r.tracking {
 			repairing[name] = meta
 		}
@@ -237,6 +249,11 @@ func (r *Renter) threadedRepairLoop() {
 			r.threadedRepairFile(name, meta, pool)
 		}
 		pool.Close() // heh
+
+		// unset uploading flag
+		id = r.mu.Lock()
+		r.uploading = false
+		r.mu.Unlock(id)
 	}
 }
 
@@ -317,6 +334,14 @@ func (r *Renter) repairChunks(f *file, handle io.ReaderAt, chunks map[uint64][]u
 			// If saving failed for this chunk, it will probably fail for the
 			// next chunk as well. Better to try again on the next cycle.
 			r.log.Printf("failed to save repaired file %v: %v", f.name, err)
+			return
+		}
+
+		// check for download interruption
+		id := r.mu.RLock()
+		downloading := r.downloading
+		r.mu.RUnlock(id)
+		if downloading {
 			return
 		}
 	}

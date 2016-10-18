@@ -182,9 +182,9 @@ func (f *file) newDownload(hosts []fetcher, destination string) *download {
 // specified.
 func (r *Renter) Download(path, destination string) error {
 	// Lookup the file associated with the nickname.
-	lockID := r.mu.Lock()
+	lockID := r.mu.RLock()
 	file, exists := r.files[path]
-	r.mu.Unlock(lockID)
+	r.mu.RUnlock(lockID)
 	if !exists {
 		return errors.New("no file with that path")
 	}
@@ -196,6 +196,31 @@ func (r *Renter) Download(path, destination string) error {
 		contracts = append(contracts, c)
 	}
 	file.mu.RUnlock()
+	if len(contracts) == 0 {
+		return errors.New("no record of that file's contracts")
+	}
+
+	// interrupt upload loop
+	lockID = r.mu.Lock()
+	r.downloading = true
+	uploading := r.uploading
+	r.mu.Unlock(lockID)
+	// wait up to 15 minutes for upload loop to exit
+	timeout := time.Now().Add(15 * time.Minute)
+	for uploading && time.Now().Before(timeout) {
+		time.Sleep(time.Second)
+		lockID = r.mu.RLock()
+		uploading = r.uploading
+		r.mu.RUnlock(lockID)
+	}
+	if uploading {
+		return errors.New("timed out waiting for uploads to finish")
+	}
+	defer func() {
+		lockID = r.mu.Lock()
+		r.downloading = false
+		r.mu.Unlock(lockID)
+	}()
 
 	// Initiate connections to each host.
 	var hosts []fetcher
@@ -208,9 +233,6 @@ func (r *Renter) Download(path, destination string) error {
 		}
 		defer d.Close()
 		hosts = append(hosts, newHostFetcher(d, c.Pieces, file.masterKey))
-	}
-	if len(hosts) == 0 {
-		return errors.New("no record of that file's contracts")
 	}
 	if len(hosts) < file.erasureCode.MinPieces() {
 		return errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))

@@ -92,6 +92,8 @@ type Renter struct {
 	files         map[string]*file
 	tracking      map[string]trackedFile // map from nickname to metadata
 	downloadQueue []*download
+	uploading     bool
+	downloading   bool
 
 	// constants
 	persistDir string
