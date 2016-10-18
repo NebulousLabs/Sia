@@ -743,6 +743,9 @@ func TestResync(t *testing.T) {
 	editor.Close()
 }
 
+// TestDownloaderCaching tests that downloaders are properly cached by the
+// contractor. When two downloaders are requested for the same contract, only
+// one underlying downloader should be created.
 func TestDownloaderCaching(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
