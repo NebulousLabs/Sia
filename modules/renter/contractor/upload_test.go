@@ -27,7 +27,8 @@ func TestEditor(t *testing.T) {
 		hosts: make(map[modules.NetAddress]modules.HostDBEntry),
 	}
 	c := &Contractor{
-		hdb: hdb,
+		hdb:      hdb,
+		revising: make(map[types.FileContractID]bool),
 	}
 
 	// empty contract

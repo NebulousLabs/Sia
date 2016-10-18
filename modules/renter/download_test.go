@@ -150,7 +150,7 @@ func (dc *downloadContractor) Contract(modules.NetAddress) (modules.RenterContra
 }
 
 // Downloader increments dc.downloaders and returns a generic error.
-func (dc *downloadContractor) Downloader(modules.RenterContract) (contractor.Downloader, error) {
+func (dc *downloadContractor) Downloader(types.FileContractID) (contractor.Downloader, error) {
 	dc.downloaders++
 	return nil, errInsufficientContracts
 }

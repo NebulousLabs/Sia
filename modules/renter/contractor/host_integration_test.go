@@ -186,6 +186,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -216,6 +217,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -260,6 +262,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -292,8 +295,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// download the data
-	contract = c.contracts[contract.ID]
-	downloader, err := c.Downloader(contract)
+	downloader, err := c.Downloader(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,6 +324,7 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -381,6 +384,7 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -437,6 +441,7 @@ func TestIntegrationModify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -501,6 +506,7 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -539,6 +545,9 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// check renewed contract
 	if contract.FileContract.FileMerkleRoot != root {
@@ -556,7 +565,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// download the renewed contract
-	downloader, err := c.Downloader(contract)
+	downloader, err := c.Downloader(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -618,6 +627,7 @@ func TestResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	// get the host's entry from the db
 	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
@@ -650,8 +660,7 @@ func TestResync(t *testing.T) {
 	}
 
 	// download the data
-	contract = c.contracts[contract.ID]
-	downloader, err := c.Downloader(contract)
+	downloader, err := c.Downloader(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -677,12 +686,8 @@ func TestResync(t *testing.T) {
 	delete(c.cachedRevisions, contract.ID)
 	c.mu.Unlock()
 
-	// Editor and Downloader should fail with the bad contract
+	// Editor should fail with the bad contract
 	_, err = c.Editor(badContract)
-	if !proto.IsRevisionMismatch(err) {
-		t.Fatal("expected revision mismatch, got", err)
-	}
-	_, err = c.Downloader(badContract)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
@@ -700,7 +705,7 @@ func TestResync(t *testing.T) {
 	}
 	editor.Close()
 
-	downloader, err = c.Downloader(badContract)
+	downloader, err = c.Downloader(badContract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -715,12 +720,8 @@ func TestResync(t *testing.T) {
 	delete(c.cachedRevisions, contract.ID)
 	c.mu.Unlock()
 
-	// Editor and Downloader should fail with the bad contract
+	// Editor should fail with the bad contract
 	_, err = c.Editor(badContract)
-	if !proto.IsRevisionMismatch(err) {
-		t.Fatal("expected revision mismatch, got", err)
-	}
-	_, err = c.Downloader(badContract)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
@@ -740,4 +741,97 @@ func TestResync(t *testing.T) {
 		t.Fatal(err)
 	}
 	editor.Close()
+}
+
+// TestDownloaderCaching tests that downloaders are properly cached by the
+// contractor. When two downloaders are requested for the same contract, only
+// one underlying downloader should be created.
+func TestDownloaderCaching(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestDownloaderCaching")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+
+	// create a downloader
+	d1, err := c.Downloader(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create another downloader
+	d2, err := c.Downloader(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// downloaders should match
+	if d1 != d2 {
+		t.Fatal("downloader was not cached")
+	}
+
+	// close one of the downloaders; it should not fully close, since d1 is
+	// still using it
+	d2.Close()
+
+	c.mu.RLock()
+	_, ok = c.downloaders[contract.ID]
+	c.mu.RUnlock()
+	if !ok {
+		t.Fatal("expected downloader to still be present")
+	}
+
+	// create another downloader
+	d3, err := c.Downloader(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// downloaders should match
+	if d3 != d1 {
+		t.Fatal("closing one client should not fully close the downloader")
+	}
+
+	// close both downloaders
+	d1.Close()
+	d2.Close()
+
+	c.mu.RLock()
+	_, ok = c.downloaders[contract.ID]
+	c.mu.RUnlock()
+	if ok {
+		t.Fatal("did not expect downloader to still be present")
+	}
+
+	// create another downloader
+	d4, err := c.Downloader(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// downloaders should match
+	if d4 == d1 {
+		t.Fatal("downloader should not have been cached after all clients were closed")
+	}
+	d4.Close()
 }

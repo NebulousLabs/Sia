@@ -63,9 +63,9 @@ type hostContractor interface {
 	// FinancialMetrics returns the financial metrics of the contractor.
 	FinancialMetrics() modules.RenterFinancialMetrics
 
-	// Downloader creates a Downloader from the specified contract, allowing
-	// the retrieval of sectors.
-	Downloader(modules.RenterContract) (contractor.Downloader, error)
+	// Downloader creates a Downloader from the specified contract ID,
+	// allowing the retrieval of sectors.
+	Downloader(types.FileContractID) (contractor.Downloader, error)
 }
 
 // A trackedFile contains metadata about files being tracked by the Renter.
@@ -92,6 +92,8 @@ type Renter struct {
 	files         map[string]*file
 	tracking      map[string]trackedFile // map from nickname to metadata
 	downloadQueue []*download
+	uploading     bool
+	downloading   bool
 
 	// constants
 	persistDir string

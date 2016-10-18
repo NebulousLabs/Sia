@@ -63,7 +63,13 @@ func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.EndHeig
 
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
-func (he *hostEditor) Close() error { return he.editor.Close() }
+func (he *hostEditor) Close() error {
+	// release revising lock
+	he.contractor.mu.Lock()
+	delete(he.contractor.revising, he.contract.ID)
+	he.contractor.mu.Unlock()
+	return he.editor.Close()
+}
 
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
@@ -124,7 +130,7 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 
 // Editor initiates the contract revision process with a host, and returns
 // an Editor.
-func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
+func (c *Contractor) Editor(contract modules.RenterContract) (_ Editor, err error) {
 	c.mu.RLock()
 	height := c.blockHeight
 	c.mu.RUnlock()
@@ -145,6 +151,25 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 		}
 	}
 
+	// acquire revising lock
+	c.mu.Lock()
+	alreadyRevising := c.revising[contract.ID]
+	if alreadyRevising {
+		c.mu.Unlock()
+		return nil, errors.New("already revising that contract")
+	}
+	c.revising[contract.ID] = true
+	c.mu.Unlock()
+
+	// release lock early if function returns an error
+	defer func() {
+		if err != nil {
+			c.mu.Lock()
+			delete(c.revising, contract.ID)
+			c.mu.Unlock()
+		}
+	}()
+
 	// create editor
 	e, err := proto.NewEditor(host, contract, height)
 	if proto.IsRevisionMismatch(err) {
@@ -154,6 +179,7 @@ func (c *Contractor) Editor(contract modules.RenterContract) (Editor, error) {
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
+			c.log.Printf("wanted to recover contract %v with host %v, but no revision was cached", contract.ID, contract.NetAddress)
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
