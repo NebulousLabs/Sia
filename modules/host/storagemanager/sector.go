@@ -190,8 +190,11 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 		emptiestFolder, emptiestIndex := emptiestStorageFolder(potentialFolders)
 		for emptiestFolder != nil {
 			sectorPath := filepath.Join(sm.persistDir, emptiestFolder.uidString(), string(sectorKey))
-			err := sm.dependencies.writeFile(sectorPath, sectorData, 0700)
+			err := sm.dependencies.writeFile(sectorPath, sectorData, 0400)
 			if err != nil {
+				// Log the error.
+				sm.log.Println("Unable to accept sector", err, "into folder", emptiestFolder.uidString())
+
 				// Indicate to the user that the storage folder is having write
 				// trouble.
 				emptiestFolder.FailedWrites++

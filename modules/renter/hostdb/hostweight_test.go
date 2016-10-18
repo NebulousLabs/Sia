@@ -8,6 +8,7 @@ import (
 
 func calculateWeightFromUInt64Price(price uint64) (weight types.Currency) {
 	var entry hostEntry
+	entry.RemainingStorage = 250e3
 	entry.StoragePrice = types.NewCurrency64(price)
 	return calculateHostWeight(entry)
 }
