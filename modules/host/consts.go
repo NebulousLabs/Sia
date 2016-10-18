@@ -45,7 +45,7 @@ var (
 	// keep the data even if the price of siacoin fluctuates, the price of raw
 	// storage fluctuates, or the host realizes that there is unexpected
 	// opportunity cost in being a host.
-	defaultCollateral = types.SiacoinPrecision.Mul64(250).Div(modules.BlockBytesPerMonthTerabyte) // 250 SC / TB / Month
+	defaultCollateral = types.SiacoinPrecision.Mul64(500).Div(modules.BlockBytesPerMonthTerabyte) // 500 SC / TB / Month
 
 	// defaultCollateralBudget defines the maximum number of siacoins that the
 	// host is going to allocate towards collateral. The number has been chosen
@@ -57,7 +57,7 @@ var (
 	// with the host. The default is set to 30 siacoins, which the file
 	// contract revision can have 15 siacoins put towards it, and the storage
 	// proof can have 15 siacoins put towards it.
-	defaultContractPrice = types.SiacoinPrecision.Mul64(30) // 30 siacoins
+	defaultContractPrice = types.SiacoinPrecision.Mul64(20) // 20 siacoins
 
 	// defaultDownloadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 10 siacoins per gigabyte, because
@@ -94,7 +94,7 @@ var (
 	// defaultStoragePrice defines the starting price for hosts selling
 	// storage. We try to match a number that is both reasonably profitable and
 	// reasonably competitive.
-	defaultStoragePrice = types.SiacoinPrecision.Mul64(1e3).Div(modules.BlockBytesPerMonthTerabyte) // 1k SC / TB / Month
+	defaultStoragePrice = types.SiacoinPrecision.Mul64(500).Div(modules.BlockBytesPerMonthTerabyte) // 500 SC / TB / Month
 
 	// defaultUploadBandwidthPrice defines the default price of upload
 	// bandwidth. The default is set to 1 siacoin per GB, because the host is
@@ -102,7 +102,7 @@ var (
 	// the host is typically only downloading data if it is planning to store
 	// the data, meaning that the host serves to profit from accepting the
 	// data.
-	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(100).Div(modules.BytesPerTerabyte) // 100 SC / TB
+	defaultUploadBandwidthPrice = types.SiacoinPrecision.Mul64(10).Div(modules.BytesPerTerabyte) // 10 SC / TB
 
 	// defaultWindowSize is the size of the proof of storage window requested
 	// by the host. The host will not delete any obligations until the window
@@ -196,10 +196,10 @@ var (
 	// accept any more revisions once inside the submission buffer.
 	revisionSubmissionBuffer = func() types.BlockHeight {
 		if build.Release == "dev" {
-			return 20 // About 2 minutes
+			return 20 // About 4 minutes
 		}
 		if build.Release == "standard" {
-			return 288 // 2 days.
+			return 144 // 1 day.
 		}
 		if build.Release == "testing" {
 			return 4
