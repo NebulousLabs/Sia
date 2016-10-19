@@ -204,7 +204,7 @@ lists the status of all files.
 deletes a renter file entry. Does not delete any downloads or original files,
 only the entry in the renter.
 
-###### Path Parameters [(with comments)](/doc/api/Renter.md#path-parameters)
+###### Path Parameters
 ```
 // Location of the file in the renter on the network.
 *siapath
