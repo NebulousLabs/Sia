@@ -1,6 +1,7 @@
 package host
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -183,10 +184,21 @@ func (h *Host) load() error {
 	}
 	h.unlockHash = p.UnlockHash
 
-	// Get the number of storage obligations by looking at the storage
-	// obligation database.
+	// Get the contract count by observing all of the incomplete storage
+	// obligations in the database.
 	err = h.db.View(func(tx *bolt.Tx) error {
-		h.financialMetrics.ContractCount = uint64(tx.Bucket(bucketStorageObligations).Stats().KeyN)
+		cursor := tx.Bucket(bucketStorageObligations).Cursor()
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			// Decode the storage obligation.
+			var so storageObligation
+			err := json.Unmarshal(v, &so)
+			if err != nil {
+				return err
+			}
+			if so.ObligationStatus == obligationUnresolved {
+				h.financialMetrics.ContractCount++
+			}
+		}
 		return nil
 	})
 	if err != nil {
