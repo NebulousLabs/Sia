@@ -59,10 +59,10 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 func (c *Contractor) managedRenewContracts() error {
 	c.mu.RLock()
 	// Renew contracts when they enter the renew window.
-	var renewSet []modules.RenterContract
+	var renewSet []types.FileContractID
 	for _, contract := range c.contracts {
 		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
-			renewSet = append(renewSet, contract)
+			renewSet = append(renewSet, contract.ID)
 		}
 	}
 	c.mu.RUnlock()
@@ -81,9 +81,47 @@ func (c *Contractor) managedRenewContracts() error {
 		return errors.New("allowance is too small")
 	}
 
+	// invalidate all active editors/downloaders for the contracts we want to
+	// renew
+	// TODO: parallelize, since we need to wait for each revision to complete
+	c.mu.Lock()
+	var oldContracts []modules.RenterContract
+	for _, id := range renewSet {
+		if e, ok := c.editors[id]; ok {
+			e.invalidate()
+			delete(c.editors, id)
+		}
+		if d, ok := c.downloaders[id]; ok {
+			d.invalidate()
+			delete(c.downloaders, id)
+		}
+		// now that any revisions have finished, grab the latest version of
+		// the contract
+		contract, ok := c.contracts[id]
+		if !ok {
+			c.log.Printf("WARN: no record of contract previously added to the renew set (ID: %v)", id)
+		} else {
+			oldContracts = append(oldContracts, contract)
+		}
+		// mark the contract as being revised, so new editors/downloaders will
+		// not grab it
+		// TODO: this is slightly hackish; a separate 'renewing' map might be better
+		c.revising[id] = true
+	}
+	c.mu.Unlock()
+
+	// after we finish renewing, unset the 'revising' flag on each contract
+	defer func() {
+		c.mu.Lock()
+		for _, id := range renewSet {
+			delete(c.revising, id)
+		}
+		c.mu.Unlock()
+	}()
+
 	// map old ID to new contract, for easy replacement later
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	for _, contract := range renewSet {
+	for _, contract := range oldContracts {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
 			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)

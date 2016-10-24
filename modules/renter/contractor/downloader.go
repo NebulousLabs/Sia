@@ -9,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var errInvalidDownloader = errors.New("downloader has been invalidated because its contract is being renewed")
+
 // An Downloader retrieves sectors from with a host. It requests one sector at
 // a time, and revises the file contract to transfer money to the host
 // proportional to the data retrieved.
@@ -30,7 +32,21 @@ type hostDownloader struct {
 	contractID types.FileContractID
 	contractor *Contractor
 	downloader *proto.Downloader
+	invalid    bool // set by contractor if contract is queued for renewal
 	mu         sync.Mutex
+}
+
+// invalidate sets the invalid flag and closes the underlying
+// proto.Downloader. Once invalidate returns, the hostDownloader is guaranteed
+// to not further revise its contract. This is used during contract renewal to
+// prevent a Downloader from revising a contract mid-renewal. invalidate does
+// NOT delete the cache entry in the contractor, nor does it unset the
+// 'revising' flag -- these are left to the caller.
+func (hd *hostDownloader) invalidate() {
+	hd.mu.Lock()
+	hd.invalid = true
+	hd.downloader.Close()
+	hd.mu.Unlock()
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -39,6 +55,9 @@ type hostDownloader struct {
 func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	hd.mu.Lock()
 	defer hd.mu.Unlock()
+	if hd.invalid {
+		return nil, errInvalidDownloader
+	}
 
 	oldSpending := hd.downloader.DownloadSpending
 	contract, sector, err := hd.downloader.Sector(root)
@@ -61,10 +80,11 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 func (hd *hostDownloader) Close() error {
 	hd.mu.Lock()
 	defer hd.mu.Unlock()
-	// Close is a no-op unless there is only one goroutine using the
-	// hostDownloader
 	hd.clients--
-	if hd.clients > 0 {
+	// if invalid flag has been set, the hostDownloader has already been
+	// closed by invalidate(), so no further action is required. Close is also
+	// a no-op if there are other clients still using the hostDownloader.
+	if hd.invalid || hd.clients > 0 {
 		return nil
 	}
 	hd.contractor.mu.Lock()

@@ -14,6 +14,8 @@ import (
 // the contractor will cap host's MaxCollateral setting to this value
 var maxUploadCollateral = types.SiacoinPrecision.Mul64(1e3).Div(modules.BlockBytesPerMonthTerabyte) // 1k SC / TB / Month
 
+var errInvalidEditor = errors.New("editor has been invalidated because its contract is being renewed")
+
 // An Editor modifies a Contract by communicating with a host. It uses the
 // contract revision protocol to send modification requests to the host.
 // Editors are the means by which the renter uploads data to hosts.
@@ -51,7 +53,21 @@ type hostEditor struct {
 	contract   modules.RenterContract
 	contractor *Contractor
 	editor     *proto.Editor
+	invalid    bool // set by contractor if contract is queued for renewal
 	mu         sync.Mutex
+}
+
+// invalidate sets the invalid flag and closes the underlying proto.Editor.
+// Once invalidate returns, the hostEditor is guaranteed to not further revise
+// its contract. This is used during contract renewal to prevent an Editor
+// from revising a contract mid-renewal. invalidate does NOT delete the cache
+// entry in the contractor, nor does it unset the 'revising' flag -- these are
+// left to the caller.
+func (he *hostEditor) invalidate() {
+	he.mu.Lock()
+	he.invalid = true
+	he.editor.Close()
+	he.mu.Unlock()
 }
 
 // Address returns the NetAddress of the host.
@@ -69,10 +85,11 @@ func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.EndHeig
 func (he *hostEditor) Close() error {
 	he.mu.Lock()
 	defer he.mu.Unlock()
-	// Close is a no-op unless there is only one goroutine using the
-	// hostEditor
 	he.clients--
-	if he.clients > 0 {
+	// if invalid flag has been set, the hostEditor has already been closed by
+	// invalidate(), so no further action is required. Close is also a no-op
+	// if there are other clients still using the hostEditor.
+	if he.invalid || he.clients > 0 {
 		return nil
 	}
 	he.contractor.mu.Lock()
@@ -86,6 +103,9 @@ func (he *hostEditor) Close() error {
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 	he.mu.Lock()
 	defer he.mu.Unlock()
+	if he.invalid {
+		return crypto.Hash{}, errInvalidEditor
+	}
 
 	oldUploadSpending := he.editor.UploadSpending
 	oldStorageSpending := he.editor.StorageSpending
@@ -111,6 +131,9 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 func (he *hostEditor) Delete(root crypto.Hash) error {
 	he.mu.Lock()
 	defer he.mu.Unlock()
+	if he.invalid {
+		return errInvalidEditor
+	}
 
 	contract, err := he.editor.Delete(root)
 	if err != nil {
@@ -130,6 +153,9 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
 	he.mu.Lock()
 	defer he.mu.Unlock()
+	if he.invalid {
+		return errInvalidEditor
+	}
 
 	oldUploadSpending := he.editor.UploadSpending
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
