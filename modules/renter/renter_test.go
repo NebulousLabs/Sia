@@ -181,9 +181,9 @@ func (stubContractor) Allowance() modules.Allowance         { return modules.All
 func (stubContractor) Contract(modules.NetAddress) (modules.RenterContract, bool) {
 	return modules.RenterContract{}, false
 }
-func (stubContractor) Contracts() []modules.RenterContract                      { return nil }
-func (stubContractor) FinancialMetrics() (m modules.RenterFinancialMetrics)     { return }
-func (stubContractor) Editor(modules.RenterContract) (contractor.Editor, error) { return nil, nil }
-func (stubContractor) Downloader(modules.RenterContract) (contractor.Downloader, error) {
+func (stubContractor) Contracts() []modules.RenterContract                    { return nil }
+func (stubContractor) FinancialMetrics() (m modules.RenterFinancialMetrics)   { return }
+func (stubContractor) Editor(types.FileContractID) (contractor.Editor, error) { return nil, nil }
+func (stubContractor) Downloader(types.FileContractID) (contractor.Downloader, error) {
 	return nil, nil
 }

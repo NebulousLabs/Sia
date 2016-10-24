@@ -75,7 +75,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 	contract := c.Contracts()[0]
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

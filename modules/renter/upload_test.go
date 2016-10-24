@@ -33,7 +33,7 @@ func (uc *uploadDownloadContractor) Contracts() []modules.RenterContract {
 
 // Editor simply returns the uploadDownloadContractor, since it also implements the
 // Editor interface.
-func (uc *uploadDownloadContractor) Editor(modules.RenterContract) (contractor.Editor, error) {
+func (uc *uploadDownloadContractor) Editor(types.FileContractID) (contractor.Editor, error) {
 	return uc, nil
 }
 

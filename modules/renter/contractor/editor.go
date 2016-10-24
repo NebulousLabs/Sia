@@ -2,6 +2,7 @@ package contractor
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -43,12 +44,14 @@ type Editor interface {
 }
 
 // A hostEditor modifies a Contract by calling the revise RPC on a host. It
-// implements the Editor interface. hostEditors are NOT thread-safe; calls to
-// Upload must happen in serial.
+// implements the Editor interface. hostEditors are safe for use by
+// multiple goroutines.
 type hostEditor struct {
-	editor     *proto.Editor
+	clients    int // safe to Close when 0
 	contract   modules.RenterContract
 	contractor *Contractor
+	editor     *proto.Editor
+	mu         sync.Mutex
 }
 
 // Address returns the NetAddress of the host.
@@ -64,8 +67,16 @@ func (he *hostEditor) EndHeight() types.BlockHeight { return he.contract.EndHeig
 // Close cleanly terminates the revision loop with the host and closes the
 // connection.
 func (he *hostEditor) Close() error {
-	// release revising lock
+	he.mu.Lock()
+	defer he.mu.Unlock()
+	// Close is a no-op unless there is only one goroutine using the
+	// hostEditor
+	he.clients--
+	if he.clients > 0 {
+		return nil
+	}
 	he.contractor.mu.Lock()
+	delete(he.contractor.editors, he.contract.ID)
 	delete(he.contractor.revising, he.contract.ID)
 	he.contractor.mu.Unlock()
 	return he.editor.Close()
@@ -73,6 +84,9 @@ func (he *hostEditor) Close() error {
 
 // Upload negotiates a revision that adds a sector to a file contract.
 func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
+	he.mu.Lock()
+	defer he.mu.Unlock()
+
 	oldUploadSpending := he.editor.UploadSpending
 	oldStorageSpending := he.editor.StorageSpending
 	contract, sectorRoot, err := he.editor.Upload(data)
@@ -95,6 +109,9 @@ func (he *hostEditor) Upload(data []byte) (crypto.Hash, error) {
 
 // Delete negotiates a revision that removes a sector from a file contract.
 func (he *hostEditor) Delete(root crypto.Hash) error {
+	he.mu.Lock()
+	defer he.mu.Unlock()
+
 	contract, err := he.editor.Delete(root)
 	if err != nil {
 		return err
@@ -111,6 +128,9 @@ func (he *hostEditor) Delete(root crypto.Hash) error {
 
 // Modify negotiates a revision that edits a sector in a file contract.
 func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newData []byte) error {
+	he.mu.Lock()
+	defer he.mu.Unlock()
+
 	oldUploadSpending := he.editor.UploadSpending
 	contract, err := he.editor.Modify(oldRoot, newRoot, offset, newData)
 	if err != nil {
@@ -128,24 +148,34 @@ func (he *hostEditor) Modify(oldRoot, newRoot crypto.Hash, offset uint64, newDat
 	return nil
 }
 
-// Editor initiates the contract revision process with a host, and returns
-// an Editor.
-func (c *Contractor) Editor(contract modules.RenterContract) (_ Editor, err error) {
+// Editor returns a Editor object that can be used to upload, modify, and
+// delete sectors on a host.
+func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	c.mu.RLock()
+	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
+	contract, haveContract := c.contracts[id]
 	c.mu.RUnlock()
-	if height > contract.EndHeight() {
+
+	if haveEditor {
+		// increment number of clients and return
+		cachedEditor.mu.Lock()
+		cachedEditor.clients++
+		cachedEditor.mu.Unlock()
+		return cachedEditor, nil
+	}
+
+	host, haveHost := c.hdb.Host(contract.NetAddress)
+	if !haveContract {
+		return nil, errors.New("no record of that contract")
+	} else if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
-	}
-	host, ok := c.hdb.Host(contract.NetAddress)
-	if !ok {
+	} else if !haveHost {
 		return nil, errors.New("no record of that host")
-	}
-	if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
+	} else if host.StoragePrice.Cmp(maxStoragePrice) > 0 {
 		return nil, errTooExpensive
-	}
-	// cap host.Collateral on new hosts
-	if build.VersionCmp(host.Version, "0.6.0") > 0 {
+	} else if build.VersionCmp(host.Version, "0.6.0") > 0 {
+		// COMPATv0.6.0: don't cap host.Collateral on old hosts
 		if host.Collateral.Cmp(maxUploadCollateral) > 0 {
 			host.Collateral = maxUploadCollateral
 		}
@@ -194,9 +224,16 @@ func (c *Contractor) Editor(contract modules.RenterContract) (_ Editor, err erro
 	// (the existing revision will be overwritten when SaveFn is called)
 	e.SaveFn = c.saveRevision(contract.ID)
 
-	return &hostEditor{
-		editor:     e,
+	// cache editor
+	he := &hostEditor{
+		clients:    1,
 		contract:   contract,
 		contractor: c,
-	}, nil
+		editor:     e,
+	}
+	c.mu.Lock()
+	c.editors[contract.ID] = he
+	c.mu.Unlock()
+
+	return he, nil
 }
