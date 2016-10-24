@@ -11,7 +11,7 @@ const (
 	// TransactionSizeLimit defines the size of the largest transaction that
 	// will be accepted by the transaction pool according to the IsStandard
 	// rules.
-	TransactionSizeLimit = 16e3
+	TransactionSizeLimit = 32e3
 
 	// TransactionSetSizeLimit defines the largest set of dependent unconfirmed
 	// transactions that will be accepted by the transaction pool.
