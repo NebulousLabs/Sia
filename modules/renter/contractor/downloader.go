@@ -76,21 +76,23 @@ func (hd *hostDownloader) Close() error {
 
 // Downloader returns a Downloader object that can be used to download sectors
 // from a host.
-func (c *Contractor) Downloader(id types.FileContractID) (Downloader, error) {
+func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err error) {
 	c.mu.RLock()
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
 	c.mu.RUnlock()
-	host, haveHost := c.hdb.Host(contract.NetAddress)
 
 	if haveDownloader {
-		// increment number of clients
+		// increment number of clients and return
 		cachedDownloader.mu.Lock()
 		cachedDownloader.clients++
 		cachedDownloader.mu.Unlock()
 		return cachedDownloader, nil
-	} else if !haveContract {
+	}
+
+	host, haveHost := c.hdb.Host(contract.NetAddress)
+	if !haveContract {
 		return nil, errors.New("no record of that contract")
 	} else if height > contract.EndHeight() {
 		return nil, errors.New("contract has already ended")
@@ -109,11 +111,15 @@ func (c *Contractor) Downloader(id types.FileContractID) (Downloader, error) {
 	}
 	c.revising[contract.ID] = true
 	c.mu.Unlock()
-	releaseLock := func() {
-		c.mu.Lock()
-		delete(c.revising, contract.ID)
-		c.mu.Unlock()
-	}
+
+	// release lock early if function returns an error
+	defer func() {
+		if err != nil {
+			c.mu.Lock()
+			delete(c.revising, contract.ID)
+			c.mu.Unlock()
+		}
+	}()
 
 	// create downloader
 	d, err := proto.NewDownloader(host, contract)
@@ -124,7 +130,6 @@ func (c *Contractor) Downloader(id types.FileContractID) (Downloader, error) {
 		c.mu.RUnlock()
 		if !ok {
 			// nothing we can do; return original error
-			releaseLock()
 			return nil, err
 		}
 		c.log.Printf("host %v has different revision for %v; retrying with cached revision", contract.NetAddress, contract.ID)
@@ -132,7 +137,6 @@ func (c *Contractor) Downloader(id types.FileContractID) (Downloader, error) {
 		d, err = proto.NewDownloader(host, contract)
 	}
 	if err != nil {
-		releaseLock()
 		return nil, err
 	}
 	// supply a SaveFn that saves the revision to the contractor's persist
@@ -141,10 +145,10 @@ func (c *Contractor) Downloader(id types.FileContractID) (Downloader, error) {
 
 	// cache downloader
 	hd := &hostDownloader{
-		downloader: d,
-		contractor: c,
-		contractID: contract.ID,
 		clients:    1,
+		contractID: contract.ID,
+		contractor: c,
+		downloader: d,
 	}
 	c.mu.Lock()
 	c.downloaders[contract.ID] = hd
