@@ -32,7 +32,7 @@ func (p *hostPool) add(contract modules.RenterContract) (contractor.Editor, erro
 			return h, nil
 		}
 	}
-	hu, err := p.hostContractor.Editor(contract)
+	hu, err := p.hostContractor.Editor(contract.ID)
 	if err != nil {
 		p.blacklist = append(p.blacklist, contract.NetAddress)
 		return nil, err

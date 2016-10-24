@@ -56,9 +56,9 @@ type hostContractor interface {
 	// Contracts returns the contracts formed by the contractor.
 	Contracts() []modules.RenterContract
 
-	// Editor creates an Editor from the specified contract, allowing it to be
-	// modified.
-	Editor(modules.RenterContract) (contractor.Editor, error)
+	// Editor creates an Editor from the specified contract ID, allowing the
+	// insertion, deletion, and modification of sectors.
+	Editor(types.FileContractID) (contractor.Editor, error)
 
 	// FinancialMetrics returns the financial metrics of the contractor.
 	FinancialMetrics() modules.RenterFinancialMetrics

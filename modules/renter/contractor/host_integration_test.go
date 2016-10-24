@@ -230,9 +230,12 @@ func TestIntegrationReviseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,9 +278,12 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,9 +343,12 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,10 +364,12 @@ func TestIntegrationDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	contract = c.contracts[contract.ID]
+	c.mu.Unlock()
 
 	// delete the sector
-	contract = c.contracts[contract.ID]
-	editor, err = c.Editor(contract)
+	editor, err = c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,9 +408,12 @@ func TestIntegrationInsertDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,9 +468,12 @@ func TestIntegrationModify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -479,8 +496,7 @@ func TestIntegrationModify(t *testing.T) {
 	offset, newData := uint64(10), []byte{1, 2, 3, 4, 5}
 	copy(data[offset:], newData)
 	newRoot := crypto.MerkleRoot(data)
-	contract = c.contracts[contract.ID]
-	editor, err = c.Editor(contract)
+	editor, err = c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,9 +535,12 @@ func TestIntegrationRenew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,9 +613,12 @@ func TestIntegrationRenew(t *testing.T) {
 	if len(contract.MerkleRoots) != len(oldContract.MerkleRoots) {
 		t.Fatal(len(contract.MerkleRoots), len(oldContract.MerkleRoots))
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err = c.Editor(contract)
+	editor, err = c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -615,15 +637,15 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 }
 
-// TestResync tests that the contractor can resync with a host after being
-// interrupted during contract revision.
-func TestResync(t *testing.T) {
+// TestIntegrationResync tests that the contractor can resync with a host
+// after being interrupted during contract revision.
+func TestIntegrationResync(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestResync")
+	h, c, _, err := newTestingTrio("TestIntegrationResync")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,9 +662,12 @@ func TestResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
 
 	// revise the contract
-	editor, err := c.Editor(contract)
+	editor, err := c.Editor(contract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -685,9 +710,12 @@ func TestResync(t *testing.T) {
 	c.mu.Lock()
 	delete(c.cachedRevisions, contract.ID)
 	c.mu.Unlock()
+	c.mu.Lock()
+	c.contracts[badContract.ID] = badContract
+	c.mu.Unlock()
 
 	// Editor should fail with the bad contract
-	_, err = c.Editor(badContract)
+	_, err = c.Editor(badContract.ID)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
@@ -699,7 +727,7 @@ func TestResync(t *testing.T) {
 	c.mu.Unlock()
 
 	// Editor and Downloader should now succeed after loading the cachedRevision
-	editor, err = c.Editor(badContract)
+	editor, err = c.Editor(badContract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,11 +745,12 @@ func TestResync(t *testing.T) {
 	badContract.MerkleRoots = nil // delete Merkle roots
 
 	c.mu.Lock()
+	c.contracts[badContract.ID] = badContract
 	delete(c.cachedRevisions, contract.ID)
 	c.mu.Unlock()
 
 	// Editor should fail with the bad contract
-	_, err = c.Editor(badContract)
+	_, err = c.Editor(badContract.ID)
 	if !proto.IsRevisionMismatch(err) {
 		t.Fatal("expected revision mismatch, got", err)
 	}
@@ -732,7 +761,7 @@ func TestResync(t *testing.T) {
 	c.mu.Unlock()
 
 	// should be able to upload after loading the cachedRevision
-	editor, err = c.Editor(badContract)
+	editor, err = c.Editor(badContract.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -743,16 +772,16 @@ func TestResync(t *testing.T) {
 	editor.Close()
 }
 
-// TestDownloaderCaching tests that downloaders are properly cached by the
-// contractor. When two downloaders are requested for the same contract, only
-// one underlying downloader should be created.
-func TestDownloaderCaching(t *testing.T) {
+// TestIntegrationDownloaderCaching tests that downloaders are properly cached
+// by the contractor. When two downloaders are requested for the same
+// contract, only one underlying downloader should be created.
+func TestIntegrationDownloaderCaching(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 	// create testing trio
-	h, c, _, err := newTestingTrio("TestDownloaderCaching")
+	h, c, _, err := newTestingTrio("TestIntegrationDownloaderCaching")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -832,6 +861,99 @@ func TestDownloaderCaching(t *testing.T) {
 	// downloaders should match
 	if d4 == d1 {
 		t.Fatal("downloader should not have been cached after all clients were closed")
+	}
+	d4.Close()
+}
+
+// TestIntegrationEditorCaching tests that editors are properly cached
+// by the contractor. When two editors are requested for the same
+// contract, only one underlying editor should be created.
+func TestIntegrationEditorCaching(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio("TestIntegrationEditorCaching")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.ExternalSettings().NetAddress)
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, 10, c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	c.contracts[contract.ID] = contract
+	c.mu.Unlock()
+
+	// create an editor
+	d1, err := c.Editor(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create another editor
+	d2, err := c.Editor(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// editors should match
+	if d1 != d2 {
+		t.Fatal("editor was not cached")
+	}
+
+	// close one of the editors; it should not fully close, since d1 is
+	// still using it
+	d2.Close()
+
+	c.mu.RLock()
+	_, ok = c.editors[contract.ID]
+	c.mu.RUnlock()
+	if !ok {
+		t.Fatal("expected editor to still be present")
+	}
+
+	// create another editor
+	d3, err := c.Editor(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// editors should match
+	if d3 != d1 {
+		t.Fatal("closing one client should not fully close the editor")
+	}
+
+	// close both editors
+	d1.Close()
+	d2.Close()
+
+	c.mu.RLock()
+	_, ok = c.editors[contract.ID]
+	c.mu.RUnlock()
+	if ok {
+		t.Fatal("did not expect editor to still be present")
+	}
+
+	// create another editor
+	d4, err := c.Editor(contract.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// editors should match
+	if d4 == d1 {
+		t.Fatal("editor should not have been cached after all clients were closed")
 	}
 	d4.Close()
 }

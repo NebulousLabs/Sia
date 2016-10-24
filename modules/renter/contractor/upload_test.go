@@ -27,19 +27,20 @@ func TestEditor(t *testing.T) {
 		hosts: make(map[modules.NetAddress]modules.HostDBEntry),
 	}
 	c := &Contractor{
-		hdb:      hdb,
-		revising: make(map[types.FileContractID]bool),
+		hdb:       hdb,
+		revising:  make(map[types.FileContractID]bool),
+		contracts: make(map[types.FileContractID]modules.RenterContract),
 	}
 
-	// empty contract
-	_, err := c.Editor(modules.RenterContract{})
+	// empty contract ID
+	_, err := c.Editor(types.FileContractID{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// expired contract
 	c.blockHeight = 3
-	_, err = c.Editor(modules.RenterContract{})
+	_, err = c.Editor(types.FileContractID{})
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -56,7 +57,9 @@ func TestEditor(t *testing.T) {
 	dbe.AcceptingContracts = true
 	dbe.StoragePrice = types.NewCurrency64(^uint64(0))
 	hdb.hosts["foo"] = dbe
-	_, err = c.Editor(modules.RenterContract{NetAddress: "foo"})
+	contract := modules.RenterContract{NetAddress: "foo"}
+	c.contracts[contract.ID] = contract
+	_, err = c.Editor(contract.ID)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
@@ -64,13 +67,13 @@ func TestEditor(t *testing.T) {
 	// invalid contract
 	dbe.StoragePrice = types.NewCurrency64(500)
 	hdb.hosts["bar"] = dbe
-	_, err = c.Editor(modules.RenterContract{NetAddress: "bar"})
+	_, err = c.Editor(contract.ID)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
 	// spent contract
-	contract := modules.RenterContract{
+	c.contracts[contract.ID] = modules.RenterContract{
 		NetAddress: "bar",
 		LastRevision: types.FileContractRevision{
 			NewValidProofOutputs: []types.SiacoinOutput{
@@ -79,7 +82,7 @@ func TestEditor(t *testing.T) {
 			},
 		},
 	}
-	_, err = c.Editor(contract)
+	_, err = c.Editor(contract.ID)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}

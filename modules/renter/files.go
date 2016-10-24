@@ -195,7 +195,7 @@ func (r *Renter) DeleteFile(nickname string) error {
 		}
 	}
 	for _, c := range contracts {
-		editor, err := r.hostContractor.Editor(c)
+		editor, err := r.hostContractor.Editor(c.ID)
 		if err != nil {
 			// TODO: what if the host isn't online?
 			continue
