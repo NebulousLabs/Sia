@@ -64,6 +64,7 @@ package host
 // TODO: update_test.go has commented out tests.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -77,6 +78,8 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/NebulousLabs/bolt"
 )
 
 const (
@@ -316,6 +319,68 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.
 // Close shuts down the host.
 func (h *Host) Close() error {
 	return h.tg.Stop()
+}
+
+// Contracts returns the list of storage contracts that the host is currently
+// engaged in.
+func (h *Host) Contracts() ([]modules.HostContract, error) {
+	// Iterate through the set of contracts stored in the obligation database
+	// and fill out the contract information.
+	var contracts []modules.HostContract
+	err := h.db.View(func(tx *bolt.Tx) error {
+		cursor := tx.Bucket(bucketStorageObligations).Cursor()
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			// Decode the storage obligation.
+			var so storageObligation
+			var hc modules.HostContract
+			err := json.Unmarshal(v, &so)
+			if err != nil {
+				return err
+			}
+
+			copy(hc.ID[:], k)
+			hc.SectorRootCount = uint64(len(so.SectorRoots))
+			hc.WindowStartHeight = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowStart
+			hc.WindowEndHeight = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowEnd
+
+			hc.ContractCost = so.ContractCost
+			hc.LockedCollateral = so.LockedCollateral
+			hc.DownloadRevenue = so.PotentialDownloadRevenue
+			hc.RiskedCollateral = so.RiskedCollateral
+			hc.StorageRevenue = so.PotentialStorageRevenue
+			hc.TransactionFeesPaid = so.TransactionFeesAdded
+			hc.UploadRevenue = so.PotentialUploadRevenue
+
+			hc.FileContractConfirmed = so.OriginConfirmed
+			hc.FileContractRevisionConfirmed = so.RevisionConfirmed
+			hc.StorageProofConfirmed = so.ProofConfirmed
+
+			switch so.ObligationStatus {
+			case obligationUnresolved:
+				hc.ContractUnresolved = true
+			case obligationRejected:
+				hc.ContractRejected = true
+			case obligationSucceeded:
+				hc.ContractSucceeded = true
+			case obligationFailed:
+				hc.ContractFailed = true
+			default:
+				h.log.Debugln("ERROR: storage obligation has unrecognized obligation status:", so.ObligationStatus)
+				hc.ContractFailed = true
+			}
+
+			// Sanity check.
+			if hc.StorageProofConfirmed != hc.ContractSucceeded {
+				h.log.Debugln("ERROR: contract resolution does not match the storage proof confirmation status", hc.StorageProofConfirmed, hc.ContractSucceeded)
+			}
+			contracts = append(contracts, hc)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return contracts, nil
 }
 
 // ExternalSettings returns the hosts external settings. These values cannot be
