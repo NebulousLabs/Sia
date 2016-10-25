@@ -46,6 +46,7 @@ type Contractor struct {
 	downloaders     map[types.FileContractID]*hostDownloader
 	editors         map[types.FileContractID]*hostEditor
 	lastChange      modules.ConsensusChangeID
+	renewedIDs      map[types.FileContractID]types.FileContractID
 	renewing        map[types.FileContractID]bool // prevent revising during renewal
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
@@ -94,6 +95,14 @@ func (c *Contractor) Contracts() (cs []modules.RenterContract) {
 	return
 }
 
+// resolveID returns the ID of the most recent renewal of id.
+func (c *Contractor) resolveID(id types.FileContractID) types.FileContractID {
+	if newID, ok := c.renewedIDs[id]; ok && newID != id {
+		return c.resolveID(newID)
+	}
+	return id
+}
+
 // New returns a new Contractor.
 func New(cs consensusSet, wallet walletShim, tpool transactionPool, hdb hostDB, persistDir string) (*Contractor, error) {
 	// Check for nil inputs.
@@ -137,6 +146,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		contracts:       make(map[types.FileContractID]modules.RenterContract),
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
+		renewedIDs:      make(map[types.FileContractID]types.FileContractID),
 		renewing:        make(map[types.FileContractID]bool),
 		revising:        make(map[types.FileContractID]bool),
 	}

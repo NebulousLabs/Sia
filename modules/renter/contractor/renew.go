@@ -145,6 +145,7 @@ func (c *Contractor) managedRenewContracts() error {
 	for id, contract := range newContracts {
 		delete(c.contracts, id)
 		c.contracts[contract.ID] = contract
+		c.renewedIDs[id] = contract.ID
 	}
 	err = c.saveSync()
 	c.mu.Unlock()
