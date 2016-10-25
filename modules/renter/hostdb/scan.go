@@ -165,7 +165,7 @@ func (hdb *HostDB) managedUpdateEntry(entry *hostEntry, newSettings modules.Host
 	entry.HostExternalSettings = newSettings
 	entry.Reliability = MaxReliability
 	entry.Online = true
-	entry.Weight = calculateHostWeight(*entry)
+	entry.Weight = calculateHostWeight(hdb.blockHeight, *entry)
 	hdb.insertNode(entry)
 
 	// Sanity check - the node should be in the hostdb now.

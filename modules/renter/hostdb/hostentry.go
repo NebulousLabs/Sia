@@ -11,6 +11,7 @@ import (
 type hostEntry struct {
 	modules.HostDBEntry
 
+	FirstSeen   types.BlockHeight
 	Weight      types.Currency
 	Reliability types.Currency
 	Online      bool
@@ -35,6 +36,7 @@ func (hdb *HostDB) insertHost(host modules.HostDBEntry) {
 
 	// Create hostEntry and add to allHosts.
 	h := &hostEntry{
+		FirstSeen:   hdb.blockHeight,
 		HostDBEntry: host,
 		Reliability: DefaultReliability,
 	}
