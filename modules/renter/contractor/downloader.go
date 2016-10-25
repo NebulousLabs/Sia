@@ -3,8 +3,10 @@ package contractor
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -28,12 +30,14 @@ type Downloader interface {
 // It implements the Downloader interface. hostDownloaders are safe for use by
 // multiple goroutines.
 type hostDownloader struct {
-	clients    int // safe to Close when 0
-	contractID types.FileContractID
-	contractor *Contractor
-	downloader *proto.Downloader
-	invalid    bool // true if invalidate has been called
-	mu         sync.Mutex
+	clients      int // safe to Close when 0
+	contractID   types.FileContractID
+	contractor   *Contractor
+	downloader   *proto.Downloader
+	hostSettings modules.HostExternalSettings
+	invalid      bool   // true if invalidate has been called
+	speed        uint64 // Bytes per second.
+	mu           sync.Mutex
 }
 
 // invalidate sets the invalid flag and closes the underlying
@@ -51,6 +55,14 @@ func (hd *hostDownloader) invalidate() {
 	hd.contractor.mu.Unlock()
 }
 
+// HostSettings returns the settings of the host that the downloader connects
+// to.
+func (hd *hostDownloader) HostSettings() modules.HostExternalSettings {
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+	return hd.hostSettings
+}
+
 // Sector retrieves the sector with the specified Merkle root, and revises
 // the underlying contract to pay the host proportionally to the data
 // retrieve.
@@ -61,11 +73,15 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 		return nil, errInvalidDownloader
 	}
 	oldSpending := hd.downloader.DownloadSpending
+	start := time.Now()
 	contract, sector, err := hd.downloader.Sector(root)
+	duration := time.Since(start)
 	if err != nil {
 		return nil, err
 	}
 	delta := hd.downloader.DownloadSpending.Sub(oldSpending)
+
+	hd.speed = uint64(duration.Seconds()) / modules.SectorSize
 
 	hd.contractor.mu.Lock()
 	hd.contractor.financialMetrics.DownloadSpending = hd.contractor.financialMetrics.DownloadSpending.Add(delta)
@@ -74,6 +90,14 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	hd.contractor.mu.Unlock()
 
 	return sector, nil
+}
+
+// Speed returns the most recent download speed of this host, in bytes per
+// second.
+func (hd *hostDownloader) Speed() uint64 {
+	hd.mu.Lock()
+	defer hd.mu.Unlock()
+	return hd.speed
 }
 
 // Close cleanly terminates the download loop with the host and closes the
@@ -170,10 +194,11 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 
 	// cache downloader
 	hd := &hostDownloader{
-		clients:    1,
-		contractID: contract.ID,
-		contractor: c,
-		downloader: d,
+		clients:      1,
+		contractID:   contract.ID,
+		contractor:   c,
+		downloader:   d,
+		hostSettings: host.HostExternalSettings,
 	}
 	c.mu.Lock()
 	c.downloaders[contract.ID] = hd
