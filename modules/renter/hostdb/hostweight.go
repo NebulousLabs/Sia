@@ -31,7 +31,7 @@ var (
 
 // calculateHostWeight returns the weight of a host according to the settings of
 // the host database entry. Currently, only the price is considered.
-func calculateHostWeight(entry hostEntry) (weight types.Currency) {
+func calculateHostWeight(currentHeight types.BlockHeight, entry hostEntry) (weight types.Currency) {
 	// Prices tiered as follows:
 	//    - the storage price is presented as 'per block per byte'
 	//    - the contract price is presented as a flat rate
@@ -80,10 +80,42 @@ func calculateHostWeight(entry hostEntry) (weight types.Currency) {
 		weight = weight.Div64(6) // 570x total penalty
 	}
 	if entry.RemainingStorage < 5*requiredStorage {
-		weight = weight.Div64(10) // 5700x total penalty
+		weight = weight.Div64(10) // 5,700x total penalty
 	}
 	if entry.RemainingStorage < requiredStorage {
-		weight = types.NewCurrency64(1) // Wortheless host.
+		weight = weight.Div64(100) // 570,000 total penalty
+	}
+
+	// Enact penalities for hosts running older versions.
+	if build.VersionCmp(entry.Version, "1.0.3") < 0 {
+		weight = weight.Div64(5) // 5x total penalty.
+	}
+	if build.VersionCmp(entry.Version, "1.0.0") < 0 {
+		weight = weight.Div64(10) // 50x total penalty.
+	}
+
+	// Enact penalities for newer hosts, as it's less certain that they will
+	// have reliable uptime.
+	if currentHeight >= entry.FirstSeen {
+		age := currentHeight - entry.FirstSeen
+		if age < 6000 {
+			weight = weight.Div64(2) // 2x total
+		}
+		if age < 4000 {
+			weight = weight.Div64(2) // 4x total
+		}
+		if age < 2000 {
+			weight = weight.Div64(4) // 16x total
+		}
+		if age < 1000 {
+			weight = weight.Div64(4) // 64x total
+		}
+		if age < 288 {
+			weight = weight.Div64(10) // 640x total
+		}
+	} else {
+		// Shouldn't happen, but the usecase is covered anyway.
+		weight = weight.Div64(1000) // Because something weird is happening, don't trust this host very much.
 	}
 
 	// Account for collateral. Collateral has a somewhat complicated

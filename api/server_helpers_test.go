@@ -541,7 +541,7 @@ func (st *serverTester) announceHost() error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < 20 && len(hosts.Hosts) == 0; i++ {
+	for i := 0; i < 50 && len(hosts.Hosts) == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 		err = st.getAPI("/hostdb/active", &hosts)
 		if err != nil {
