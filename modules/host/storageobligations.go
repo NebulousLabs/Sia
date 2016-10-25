@@ -338,16 +338,9 @@ func (h *Host) addStorageObligation(so storageObligation) error {
 		// file contract is being renewed, and that the sector should be
 		// re-added with a new expriation height. If there is an error at any
 		// point, all of the sectors should be removed.
-		for i, root := range so.SectorRoots {
-			err := h.AddSector(root, so.expiration(), nil)
+		if len(so.SectorRoots) != 0 {
+			err := h.AddSectorBatch(so.SectorRoots, so.expiration())
 			if err != nil {
-				// Remove all of the sectors that got added and return an error.
-				for j := 0; j < i; j++ {
-					removeErr := h.RemoveSector(so.SectorRoots[j], so.expiration())
-					if removeErr != nil {
-						h.log.Println(removeErr)
-					}
-				}
 				return err
 			}
 		}
