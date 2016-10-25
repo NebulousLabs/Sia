@@ -116,7 +116,7 @@ func TestErasureDownload(t *testing.T) {
 	// download data
 	d := newFile("foo", rsc, pieceSize, dataSize).newDownload(hosts, "")
 	buf := new(bytes.Buffer)
-	err = d.run(buf)
+	_, _, err, _ = d.run(0, 0, buf)
 	if err != nil {
 		t.Fatal(err)
 	}

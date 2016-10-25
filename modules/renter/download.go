@@ -119,18 +119,18 @@ func (d *download) getPiece(chunkIndex, pieceIndex uint64) []byte {
 }
 
 // run performs the actual download. It spawns one worker per host, and
-// instructs them to sequentially download chunks. It then writes the
-// recovered chunks to w.
-func (d *download) run(w io.Writer) error {
-	var received uint64
-	for i := uint64(0); received < d.fileSize; i++ {
+// instructs them to sequentially download chunks. It then writes the recovered
+// chunks to w. It returns its progress along with a bool indicating whether
+// another iteration should be used.
+func (d *download) run(chunkIndex uint64, received uint64, w io.Writer) (newChunkIndex uint64, newReceived uint64, err error, runAgain bool) {
+	for i := chunkIndex; received < d.fileSize; i++ {
 		// load pieces into chunk
 		chunk := make([][]byte, d.erasureCode.NumPieces())
 		left := d.erasureCode.MinPieces()
 		// pick hosts at random
 		chunkOrder, err := crypto.Perm(len(chunk))
 		if err != nil {
-			return err
+			return i, received, err, false
 		}
 		for _, j := range chunkOrder {
 			chunk[j] = d.getPiece(i, uint64(j))
@@ -143,7 +143,7 @@ func (d *download) run(w io.Writer) error {
 			}
 		}
 		if left != 0 {
-			return errInsufficientPieces
+			return i, received, errInsufficientPieces, true
 		}
 
 		// Write pieces to w. We always write chunkSize bytes unless this is
@@ -154,18 +154,18 @@ func (d *download) run(w io.Writer) error {
 		}
 		err = d.erasureCode.Recover(chunk, uint64(n), w)
 		if err != nil {
-			return err
+			return i, received, err, false
 		}
 		received += n
 		atomic.AddUint64(&d.received, n)
 	}
 
-	return nil
+	return 0, 0, nil, false
 }
 
 // newDownload initializes and returns a download object.
 func (f *file) newDownload(hosts []fetcher, destination string) *download {
-	return &download{
+	d := &download{
 		erasureCode: f.erasureCode,
 		chunkSize:   f.chunkSize(),
 		fileSize:    f.size,
@@ -176,6 +176,7 @@ func (f *file) newDownload(hosts []fetcher, destination string) *download {
 		siapath:     f.name,
 		destination: destination,
 	}
+	return d
 }
 
 // Download downloads a file, identified by its path, to the destination
@@ -189,60 +190,11 @@ func (r *Renter) Download(path, destination string) error {
 		return errors.New("no file with that path")
 	}
 
-	// copy file contracts
-	file.mu.RLock()
-	contracts := make([]fileContract, 0, len(file.contracts))
-	for _, c := range file.contracts {
-		contracts = append(contracts, c)
-	}
-	file.mu.RUnlock()
-	if len(contracts) == 0 {
-		return errors.New("no record of that file's contracts")
-	}
-
-	// interrupt upload loop
+	// Create the download object and add it to the queue.
+	d := file.newDownload([]fetcher{}, destination)
 	lockID = r.mu.Lock()
-	r.downloading = true
-	uploading := r.uploading
+	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)
-	// wait up to 15 minutes for upload loop to exit
-	timeout := time.Now().Add(15 * time.Minute)
-	for uploading && time.Now().Before(timeout) {
-		time.Sleep(time.Second)
-		lockID = r.mu.RLock()
-		uploading = r.uploading
-		r.mu.RUnlock(lockID)
-	}
-	if uploading {
-		return errors.New("timed out waiting for uploads to finish")
-	}
-	defer func() {
-		lockID = r.mu.Lock()
-		r.downloading = false
-		r.mu.Unlock(lockID)
-	}()
-
-	// Initiate connections to each host.
-	var hosts []fetcher
-	var errs []string
-	for _, c := range file.contracts {
-		d, err := r.hostContractor.Downloader(c.ID)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
-			continue
-		}
-		defer d.Close()
-		hosts = append(hosts, newHostFetcher(d, c.Pieces, file.masterKey))
-	}
-	if len(hosts) < file.erasureCode.MinPieces() {
-		return errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
-	}
-
-	// Check that this host set is sufficient to download the file.
-	err := checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
-	if err != nil {
-		return err
-	}
 
 	// Create file on disk with the correct permissions.
 	perm := os.FileMode(file.mode)
@@ -256,22 +208,90 @@ func (r *Renter) Download(path, destination string) error {
 	}
 	defer f.Close()
 
-	// Create the download object.
-	d := file.newDownload(hosts, destination)
+	// A loop that will iterate until the download is complete.
+	var chunkIndex, received uint64
+	var runAgain bool
+	var sleepSome bool
+	for {
+		runAgain = false
+		sleepSome = true
+		// copy file contracts
+		file.mu.RLock()
+		contracts := make([]fileContract, 0, len(file.contracts))
+		for _, c := range file.contracts {
+			contracts = append(contracts, c)
+		}
+		file.mu.RUnlock()
+		if len(contracts) < file.erasureCode.MinPieces() {
+			return fmt.Errorf("contracts could not be located for this file - file may not be recoverable - needed %v, got %v", file.erasureCode.MinPieces(), len(contracts))
+		}
 
-	// Add the download to the download queue.
-	lockID = r.mu.Lock()
-	r.downloadQueue = append(r.downloadQueue, d)
-	r.mu.Unlock(lockID)
+		// interrupt upload loop
+		lockID = r.mu.Lock()
+		r.downloading = true
+		uploading := r.uploading
+		r.mu.Unlock(lockID)
+		defer func() {
+			lockID = r.mu.Lock()
+			r.downloading = false
+			r.mu.Unlock(lockID)
+		}()
+		// wait up to 60 minutes for upload loop to exit
+		timeout := time.Now().Add(60 * time.Minute)
+		for uploading && time.Now().Before(timeout) {
+			time.Sleep(time.Second)
+			lockID = r.mu.RLock()
+			uploading = r.uploading
+			r.mu.RUnlock(lockID)
+		}
+		if uploading {
+			return errors.New("timed out waiting for uploads to finish")
+		}
 
-	// Perform download.
-	err = d.run(f)
-	if err != nil {
-		// File could not be downloaded; delete the copy on disk.
-		os.Remove(destination)
-		return err
+		// Grab a set of hosts and attempt a download.
+		err := func() error {
+			// Initiate connections to each host.
+			var hosts []fetcher
+			var errs []string
+			for _, c := range file.contracts {
+				d, err := r.hostContractor.Downloader(c.ID)
+				if err != nil {
+					errs = append(errs, fmt.Sprintf("\t%v: %v", c.IP, err))
+					continue
+				}
+				defer d.Close()
+				hosts = append(hosts, newHostFetcher(d, c.Pieces, file.masterKey))
+			}
+			if len(hosts) < file.erasureCode.MinPieces() {
+				return errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
+			}
+			// Check that this host set is sufficient to download the file.
+			err := checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
+			if err != nil {
+				return err
+			}
+			// Update the downloader with the new set of hosts.
+			d.hosts = hosts
+
+			// Perform download.
+			sleepSome = false
+			chunkIndex, received, err, runAgain = d.run(chunkIndex, received, f)
+			return err
+		}()
+		if err == nil {
+			// Download is complete!
+			break
+		}
+		if err != nil && !runAgain {
+			return err
+		}
+		if sleepSome {
+			// One of the more severe errors occurred, wait a bit before trying
+			// the download again.
+			time.Sleep(time.Second * 90)
+		}
+		// Continue to the next iteration
 	}
-
 	return nil
 }
 
