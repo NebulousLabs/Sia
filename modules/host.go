@@ -22,34 +22,34 @@ type (
 	// host has made with a renter.
 	HostContract struct {
 		// General contract facts.
-		ID                types.FileContractID
-		SectorRootCount   uint64 // May be larger than the number of sectors the host is storing due to virtual sectors.
-		WindowStartHeight types.BlockHeight
-		WindowEndHeight   types.BlockHeight
+		ID                types.FileContractID `json:"id"`
+		SectorRootCount   uint64               `json:"sectorrootcount"` // May be larger than the number of sectors the host is storing due to virtual sectors.
+		WindowStartHeight types.BlockHeight    `json:"windowstartheight"`
+		WindowEndHeight   types.BlockHeight    `json:"windowendheight"`
 
 		// Financial metrics for the contract. Revenue is not realized unless
 		// the contract succeeds. Risked collateral is lost if the contract
 		// fails. Locked collateral has been returned if the status is not
 		// 'Contract Unresolved'.
-		ContractCost        types.Currency
-		LockedCollateral    types.Currency
-		DownloadRevenue     types.Currency
-		RiskedCollateral    types.Currency
-		StorageRevenue      types.Currency
-		TransactionFeesPaid types.Currency
-		UploadRevenue       types.Currency
+		ContractCost        types.Currency `json:"contractcost"`
+		LockedCollateral    types.Currency `json:"lockedcollateral"`
+		DownloadRevenue     types.Currency `json:"downloadrevenue"`
+		RiskedCollateral    types.Currency `json:"riskedcollateral"`
+		StorageRevenue      types.Currency `json:"storagerevenue"`
+		TransactionFeesPaid types.Currency `json:"transactionfeespaid"`
+		UploadRevenue       types.Currency `json:"uploadrevenue"`
 
 		// The confirmation progression of the storage contract.
-		FileContractConfirmed         bool
-		FileContractRevisionConfirmed bool
-		StorageProofConfirmed         bool
+		FileContractConfirmed         bool `json:"filecontractconfirmed"`
+		FileContractRevisionConfirmed bool `json:"filecontractrevisionconfirmed"`
+		StorageProofConfirmed         bool `json:"storageproofconfirmed"`
 
 		// The ultimate status of the file contract. Only one will be set to
 		// true. Equivalent to an enum, but with stronger type safety.
-		ContractUnresolved bool // Usually means it's too early to submit a storage proof.
-		ContractRejected   bool // The host was unable to get the file contract confirmed on the blockchain.
-		ContractSucceeded  bool // The host successfully submitted a storage proof.
-		ContractFailed     bool // The host was unable to complete the file contract, and lost money.
+		ContractUnresolved bool `json:"contractunresolved"` // Usually means it's too early to submit a storage proof.
+		ContractRejected   bool `json:"contractrejected"`   // The host was unable to get the file contract confirmed on the blockchain.
+		ContractSucceeded  bool `json:"contractsucceeded"`  // The host successfully submitted a storage proof.
+		ContractFailed     bool `json:"contractfailed"`     // The host was unable to complete the file contract, and lost money.
 	}
 
 	// HostFinancialMetrics provides financial statistics for the host,

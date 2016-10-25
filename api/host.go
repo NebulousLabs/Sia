@@ -37,6 +37,10 @@ type (
 	StorageGET struct {
 		Folders []modules.StorageFolderMetadata `json:"folders"`
 	}
+
+	XcontractsGET struct {
+		Contracts []modules.HostContract `json:"contracts"`
+	}
 )
 
 // folderIndex determines the index of the storage folder with the provided
@@ -122,6 +126,20 @@ func (api *API) hostAnnounceHandler(w http.ResponseWriter, req *http.Request, _ 
 		return
 	}
 	WriteSuccess(w)
+}
+
+// hostXcontractsHandler is an experimental/volatile api endpoint. App
+// developers are strongly discouraged from using it, as it will change and it
+// will break your software.
+func (api *API) hostXcontractsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	contracts, err := api.host.Contracts()
+	if err != nil {
+		WriteError(w, Error{err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	WriteJSON(w, XcontractsGET{
+		Contracts: contracts,
+	})
 }
 
 // storageHandler returns a bunch of information about storage management on
