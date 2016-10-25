@@ -24,6 +24,7 @@ func (c *Contractor) persistData() contractorPersist {
 		BlockHeight:      c.blockHeight,
 		FinancialMetrics: c.financialMetrics,
 		LastChange:       c.lastChange,
+		RenewedIDs:       make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
 		data.CachedRevisions = append(data.CachedRevisions, rev)
