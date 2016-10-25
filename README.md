@@ -1,4 +1,4 @@
-Sia 1.0.1
+Sia 1.0.3
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -128,6 +128,13 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+October 2016:
+
+v1.0.3 (patch release)
+- Greatly improved renter stability
+- Smarter HostDB
+- Numerous minor bug fixes
 
 July 2016:
 
