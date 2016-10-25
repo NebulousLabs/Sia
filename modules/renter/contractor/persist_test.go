@@ -20,7 +20,8 @@ func (m memPersist) load(data *contractorPersist) error     { *data = contractor
 func TestSaveLoad(t *testing.T) {
 	// create contractor with mocked persist dependency
 	c := &Contractor{
-		contracts: make(map[types.FileContractID]modules.RenterContract),
+		contracts:  make(map[types.FileContractID]modules.RenterContract),
+		renewedIDs: make(map[types.FileContractID]types.FileContractID),
 	}
 	c.persist = new(memPersist)
 
@@ -30,6 +31,12 @@ func TestSaveLoad(t *testing.T) {
 		{1}: {NetAddress: "bar"},
 		{2}: {NetAddress: "baz"},
 	}
+	c.renewedIDs = map[types.FileContractID]types.FileContractID{
+		{0}: {1},
+		{1}: {2},
+		{2}: {3},
+	}
+
 	// save and reload
 	err := c.save()
 	if err != nil {
@@ -45,6 +52,12 @@ func TestSaveLoad(t *testing.T) {
 	_, ok2 := c.contracts[types.FileContractID{2}]
 	if !ok0 || !ok1 || !ok2 {
 		t.Fatal("contracts were not restored properly:", c.contracts)
+	}
+	_, ok0 = c.renewedIDs[types.FileContractID{0}]
+	_, ok1 = c.renewedIDs[types.FileContractID{1}]
+	_, ok2 = c.renewedIDs[types.FileContractID{2}]
+	if !ok0 || !ok1 || !ok2 {
+		t.Fatal("renewed IDs were not restored properly:", c.renewedIDs)
 	}
 
 	// use stdPersist instead of mock
@@ -66,5 +79,11 @@ func TestSaveLoad(t *testing.T) {
 	_, ok2 = c.contracts[types.FileContractID{2}]
 	if !ok0 || !ok1 || !ok2 {
 		t.Fatal("contracts were not restored properly:", c.contracts)
+	}
+	_, ok0 = c.renewedIDs[types.FileContractID{0}]
+	_, ok1 = c.renewedIDs[types.FileContractID{1}]
+	_, ok2 = c.renewedIDs[types.FileContractID{2}]
+	if !ok0 || !ok1 || !ok2 {
+		t.Fatal("renewed IDs were not restored properly:", c.renewedIDs)
 	}
 }

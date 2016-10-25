@@ -12,9 +12,9 @@ type contractorPersist struct {
 	BlockHeight      types.BlockHeight
 	CachedRevisions  []cachedRevision
 	Contracts        []modules.RenterContract
-	LastChange       modules.ConsensusChangeID
-	RenewHeight      types.BlockHeight
 	FinancialMetrics modules.RenterFinancialMetrics
+	LastChange       modules.ConsensusChangeID
+	RenewedIDs       map[string]string
 }
 
 // persistData returns the data in the Contractor that will be saved to disk.
@@ -22,15 +22,18 @@ func (c *Contractor) persistData() contractorPersist {
 	data := contractorPersist{
 		Allowance:        c.allowance,
 		BlockHeight:      c.blockHeight,
-		LastChange:       c.lastChange,
-		RenewHeight:      c.renewHeight,
 		FinancialMetrics: c.financialMetrics,
+		LastChange:       c.lastChange,
+		RenewedIDs:       make(map[string]string),
 	}
 	for _, rev := range c.cachedRevisions {
 		data.CachedRevisions = append(data.CachedRevisions, rev)
 	}
 	for _, contract := range c.contracts {
 		data.Contracts = append(data.Contracts, contract)
+	}
+	for oldID, newID := range c.renewedIDs {
+		data.RenewedIDs[oldID.String()] = newID.String()
 	}
 	return data
 }
@@ -50,9 +53,14 @@ func (c *Contractor) load() error {
 	for _, contract := range data.Contracts {
 		c.contracts[contract.ID] = contract
 	}
-	c.lastChange = data.LastChange
-	c.renewHeight = data.RenewHeight
 	c.financialMetrics = data.FinancialMetrics
+	c.lastChange = data.LastChange
+	for oldString, newString := range data.RenewedIDs {
+		var oldHash, newHash crypto.Hash
+		oldHash.LoadString(oldString)
+		newHash.LoadString(newString)
+		c.renewedIDs[types.FileContractID(oldHash)] = types.FileContractID(newHash)
+	}
 	return nil
 }
 
