@@ -742,7 +742,7 @@ func TestRenterRelativePathErrorDownload(t *testing.T) {
 
 	// This should fail.
 	downloadPath = filepath.Join(st.dir, "test1.dat")
-	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); err.Error() != "Download failed: no record of that file's contracts" {
+	if err = st.stdGetAPI("/renter/download/test?destination=" + downloadPath); !strings.Contains(err.Error(), "contract") {
 		t.Fatal(err)
 	}
 }
