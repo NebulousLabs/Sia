@@ -13,7 +13,6 @@ type contractorPersist struct {
 	CachedRevisions  []cachedRevision
 	Contracts        []modules.RenterContract
 	LastChange       modules.ConsensusChangeID
-	RenewHeight      types.BlockHeight
 	FinancialMetrics modules.RenterFinancialMetrics
 }
 
@@ -23,7 +22,6 @@ func (c *Contractor) persistData() contractorPersist {
 		Allowance:        c.allowance,
 		BlockHeight:      c.blockHeight,
 		LastChange:       c.lastChange,
-		RenewHeight:      c.renewHeight,
 		FinancialMetrics: c.financialMetrics,
 	}
 	for _, rev := range c.cachedRevisions {
@@ -51,7 +49,6 @@ func (c *Contractor) load() error {
 		c.contracts[contract.ID] = contract
 	}
 	c.lastChange = data.LastChange
-	c.renewHeight = data.RenewHeight
 	c.financialMetrics = data.FinancialMetrics
 	return nil
 }

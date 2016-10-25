@@ -46,7 +46,6 @@ type Contractor struct {
 	downloaders     map[types.FileContractID]*hostDownloader
 	editors         map[types.FileContractID]*hostEditor
 	lastChange      modules.ConsensusChangeID
-	renewHeight     types.BlockHeight             // height at which to renew contracts
 	renewing        map[types.FileContractID]bool // prevent revising during renewal
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
