@@ -90,7 +90,8 @@ func checkHosts(hosts []fetcher, minPieces int, numChunks uint64) error {
 type download struct {
 	// NOTE: received is the first field to ensure 64-bit alignment, which is
 	// required for atomic operations.
-	received uint64
+	received   uint64
+	chunkIndex uint64
 
 	startTime   time.Time
 	siapath     string
@@ -122,45 +123,43 @@ func (d *download) getPiece(chunkIndex, pieceIndex uint64) []byte {
 // instructs them to sequentially download chunks. It then writes the recovered
 // chunks to w. It returns its progress along with a bool indicating whether
 // another iteration should be used.
-func (d *download) run(chunkIndex uint64, received uint64, w io.Writer) (newChunkIndex uint64, newReceived uint64, err error, runAgain bool) {
-	for i := chunkIndex; received < d.fileSize; i++ {
+func (d *download) run(w io.Writer) error {
+	for ; d.received < d.fileSize; d.chunkIndex++ {
 		// load pieces into chunk
 		chunk := make([][]byte, d.erasureCode.NumPieces())
 		left := d.erasureCode.MinPieces()
 		// pick hosts at random
 		chunkOrder, err := crypto.Perm(len(chunk))
 		if err != nil {
-			return i, received, err, false
+			return err
 		}
 		for _, j := range chunkOrder {
-			chunk[j] = d.getPiece(i, uint64(j))
+			chunk[j] = d.getPiece(d.chunkIndex, uint64(j))
 			if chunk[j] != nil {
 				left--
-			} else {
 			}
 			if left == 0 {
 				break
 			}
 		}
 		if left != 0 {
-			return i, received, errInsufficientPieces, true
+			return errInsufficientPieces
 		}
 
 		// Write pieces to w. We always write chunkSize bytes unless this is
 		// the last chunk; in that case, we write the remainder.
 		n := d.chunkSize
-		if n > d.fileSize-received {
-			n = d.fileSize - received
+		if n > d.fileSize-d.received {
+			n = d.fileSize - d.received
 		}
 		err = d.erasureCode.Recover(chunk, uint64(n), w)
 		if err != nil {
-			return i, received, err, false
+			return err
 		}
-		received += n
 		atomic.AddUint64(&d.received, n)
 	}
 
-	return 0, 0, nil, false
+	return nil
 }
 
 // newDownload initializes and returns a download object.
@@ -172,6 +171,7 @@ func (f *file) newDownload(hosts []fetcher, destination string) *download {
 		hosts:       hosts,
 
 		startTime:   time.Now(),
+		chunkIndex:  0,
 		received:    0,
 		siapath:     f.name,
 		destination: destination,
@@ -209,12 +209,7 @@ func (r *Renter) Download(path, destination string) error {
 	defer f.Close()
 
 	// A loop that will iterate until the download is complete.
-	var chunkIndex, received uint64
-	var runAgain bool
-	var sleepSome bool
 	for {
-		runAgain = false
-		sleepSome = true
 		// copy file contracts
 		file.mu.RLock()
 		contracts := make([]fileContract, 0, len(file.contracts))
@@ -231,11 +226,11 @@ func (r *Renter) Download(path, destination string) error {
 		r.downloading = true
 		uploading := r.uploading
 		r.mu.Unlock(lockID)
-		defer func() {
+		resumeUploads := func() {
 			lockID = r.mu.Lock()
 			r.downloading = false
 			r.mu.Unlock(lockID)
-		}()
+		}
 		// wait up to 60 minutes for upload loop to exit
 		timeout := time.Now().Add(60 * time.Minute)
 		for uploading && time.Now().Before(timeout) {
@@ -245,11 +240,12 @@ func (r *Renter) Download(path, destination string) error {
 			r.mu.RUnlock(lockID)
 		}
 		if uploading {
+			resumeUploads()
 			return errors.New("timed out waiting for uploads to finish")
 		}
 
 		// Grab a set of hosts and attempt a download.
-		err := func() error {
+		done, err := func() (bool, error) {
 			// Initiate connections to each host.
 			var hosts []fetcher
 			var errs []string
@@ -263,34 +259,31 @@ func (r *Renter) Download(path, destination string) error {
 				hosts = append(hosts, newHostFetcher(d, c.Pieces, file.masterKey))
 			}
 			if len(hosts) < file.erasureCode.MinPieces() {
-				return errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
+				return false, errors.New("could not connect to enough hosts:\n" + strings.Join(errs, "\n"))
 			}
 			// Check that this host set is sufficient to download the file.
 			err := checkHosts(hosts, file.erasureCode.MinPieces(), file.numChunks())
 			if err != nil {
-				return err
+				return false, err
 			}
 			// Update the downloader with the new set of hosts.
 			d.hosts = hosts
 
 			// Perform download.
-			sleepSome = false
-			chunkIndex, received, err, runAgain = d.run(chunkIndex, received, f)
-			return err
+			err = d.run(f)
+			done := err == nil
+			return done, nil
 		}()
-		if err == nil {
+		if done {
 			// Download is complete!
+			resumeUploads()
 			break
-		}
-		if err != nil && !runAgain {
-			return err
-		}
-		if sleepSome {
+		} else if err != nil {
 			// One of the more severe errors occurred, wait a bit before trying
 			// the download again.
+			resumeUploads()
 			time.Sleep(time.Second * 90)
 		}
-		// Continue to the next iteration
 	}
 	return nil
 }
