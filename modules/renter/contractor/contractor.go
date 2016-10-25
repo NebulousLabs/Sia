@@ -47,6 +47,7 @@ type Contractor struct {
 	editors         map[types.FileContractID]*hostEditor
 	lastChange      modules.ConsensusChangeID
 	renewHeight     types.BlockHeight             // height at which to renew contracts
+	renewing        map[types.FileContractID]bool // prevent revising during renewal
 	revising        map[types.FileContractID]bool // prevent overlapping revisions
 
 	financialMetrics modules.RenterFinancialMetrics
@@ -137,6 +138,7 @@ func newContractor(cs consensusSet, w wallet, tp transactionPool, hdb hostDB, p 
 		contracts:       make(map[types.FileContractID]modules.RenterContract),
 		downloaders:     make(map[types.FileContractID]*hostDownloader),
 		editors:         make(map[types.FileContractID]*hostEditor),
+		renewing:        make(map[types.FileContractID]bool),
 		revising:        make(map[types.FileContractID]bool),
 	}
 

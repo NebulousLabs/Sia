@@ -53,21 +53,23 @@ type hostEditor struct {
 	contract   modules.RenterContract
 	contractor *Contractor
 	editor     *proto.Editor
-	invalid    bool // set by contractor if contract is queued for renewal
+	invalid    bool // true if invalidate has been called
 	mu         sync.Mutex
 }
 
 // invalidate sets the invalid flag and closes the underlying proto.Editor.
 // Once invalidate returns, the hostEditor is guaranteed to not further revise
 // its contract. This is used during contract renewal to prevent an Editor
-// from revising a contract mid-renewal. invalidate does NOT delete the cache
-// entry in the contractor, nor does it unset the 'revising' flag -- these are
-// left to the caller.
+// from revising a contract mid-renewal.
 func (he *hostEditor) invalidate() {
 	he.mu.Lock()
-	he.invalid = true
+	defer he.mu.Unlock()
 	he.editor.Close()
-	he.mu.Unlock()
+	he.invalid = true
+	he.contractor.mu.Lock()
+	delete(he.contractor.editors, he.contract.ID)
+	delete(he.contractor.revising, he.contract.ID)
+	he.contractor.mu.Unlock()
 }
 
 // Address returns the NetAddress of the host.
@@ -86,9 +88,8 @@ func (he *hostEditor) Close() error {
 	he.mu.Lock()
 	defer he.mu.Unlock()
 	he.clients--
-	// if invalid flag has been set, the hostEditor has already been closed by
-	// invalidate(), so no further action is required. Close is also a no-op
-	// if there are other clients still using the hostEditor.
+	// Close is a no-op if invalidate has been called, or if there are other
+	// clients still using the hostEditor.
 	if he.invalid || he.clients > 0 {
 		return nil
 	}
@@ -181,7 +182,12 @@ func (c *Contractor) Editor(id types.FileContractID) (_ Editor, err error) {
 	cachedEditor, haveEditor := c.editors[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
+	renewing := c.renewing[id]
 	c.mu.RUnlock()
+
+	if renewing {
+		return nil, errors.New("currently renewing that contract")
+	}
 
 	if haveEditor {
 		// increment number of clients and return

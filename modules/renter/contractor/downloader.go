@@ -32,21 +32,23 @@ type hostDownloader struct {
 	contractID types.FileContractID
 	contractor *Contractor
 	downloader *proto.Downloader
-	invalid    bool // set by contractor if contract is queued for renewal
+	invalid    bool // true if invalidate has been called
 	mu         sync.Mutex
 }
 
 // invalidate sets the invalid flag and closes the underlying
 // proto.Downloader. Once invalidate returns, the hostDownloader is guaranteed
 // to not further revise its contract. This is used during contract renewal to
-// prevent a Downloader from revising a contract mid-renewal. invalidate does
-// NOT delete the cache entry in the contractor, nor does it unset the
-// 'revising' flag -- these are left to the caller.
+// prevent a Downloader from revising a contract mid-renewal.
 func (hd *hostDownloader) invalidate() {
 	hd.mu.Lock()
-	hd.invalid = true
+	defer hd.mu.Unlock()
 	hd.downloader.Close()
-	hd.mu.Unlock()
+	hd.invalid = true
+	hd.contractor.mu.Lock()
+	delete(hd.contractor.downloaders, hd.contractID)
+	delete(hd.contractor.revising, hd.contractID)
+	hd.contractor.mu.Unlock()
 }
 
 // Sector retrieves the sector with the specified Merkle root, and revises
@@ -58,7 +60,6 @@ func (hd *hostDownloader) Sector(root crypto.Hash) ([]byte, error) {
 	if hd.invalid {
 		return nil, errInvalidDownloader
 	}
-
 	oldSpending := hd.downloader.DownloadSpending
 	contract, sector, err := hd.downloader.Sector(root)
 	if err != nil {
@@ -81,9 +82,8 @@ func (hd *hostDownloader) Close() error {
 	hd.mu.Lock()
 	defer hd.mu.Unlock()
 	hd.clients--
-	// if invalid flag has been set, the hostDownloader has already been
-	// closed by invalidate(), so no further action is required. Close is also
-	// a no-op if there are other clients still using the hostDownloader.
+	// Close is a no-op if invalidate has been called, or if there are other
+	// clients still using the hostDownloader.
 	if hd.invalid || hd.clients > 0 {
 		return nil
 	}
@@ -101,7 +101,12 @@ func (c *Contractor) Downloader(id types.FileContractID) (_ Downloader, err erro
 	cachedDownloader, haveDownloader := c.downloaders[id]
 	height := c.blockHeight
 	contract, haveContract := c.contracts[id]
+	renewing := c.renewing[id]
 	c.mu.RUnlock()
+
+	if renewing {
+		return nil, errors.New("currently renewing that contract")
+	}
 
 	if haveDownloader {
 		// increment number of clients and return

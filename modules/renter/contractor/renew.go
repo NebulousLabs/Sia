@@ -71,6 +71,8 @@ func (c *Contractor) managedRenewContracts() error {
 		return nil
 	}
 
+	c.log.Printf("renewing %v contracts", len(renewSet))
+
 	c.mu.RLock()
 	endHeight := c.blockHeight + c.allowance.Period
 	numSectors, err := maxSectors(c.allowance, c.hdb, c.tpool)
@@ -83,41 +85,45 @@ func (c *Contractor) managedRenewContracts() error {
 
 	// invalidate all active editors/downloaders for the contracts we want to
 	// renew
-	// TODO: parallelize, since we need to wait for each revision to complete
 	c.mu.Lock()
-	var oldContracts []modules.RenterContract
 	for _, id := range renewSet {
-		if e, ok := c.editors[id]; ok {
-			e.invalidate()
-			delete(c.editors, id)
-		}
-		if d, ok := c.downloaders[id]; ok {
-			d.invalidate()
-			delete(c.downloaders, id)
-		}
-		// now that any revisions have finished, grab the latest version of
-		// the contract
-		contract, ok := c.contracts[id]
-		if !ok {
-			c.log.Printf("WARN: no record of contract previously added to the renew set (ID: %v)", id)
-		} else {
-			oldContracts = append(oldContracts, contract)
-		}
-		// mark the contract as being revised, so new editors/downloaders will
-		// not grab it
-		// TODO: this is slightly hackish; a separate 'renewing' map might be better
-		c.revising[id] = true
+		c.renewing[id] = true
 	}
 	c.mu.Unlock()
 
-	// after we finish renewing, unset the 'revising' flag on each contract
+	// after we finish renewing, unset the 'renewing' flag on each contract
 	defer func() {
 		c.mu.Lock()
 		for _, id := range renewSet {
-			delete(c.revising, id)
+			delete(c.renewing, id)
 		}
 		c.mu.Unlock()
 	}()
+
+	// wait for all active editors and downloaders to finish, then grab the
+	// latest revision of each contract
+	var oldContracts []modules.RenterContract
+	for _, id := range renewSet {
+		c.mu.RLock()
+		e, eok := c.editors[id]
+		d, dok := c.downloaders[id]
+		c.mu.RUnlock()
+		if eok {
+			e.invalidate()
+		}
+		if dok {
+			d.invalidate()
+		}
+
+		c.mu.RLock()
+		contract, ok := c.contracts[id]
+		c.mu.RUnlock()
+		if !ok {
+			c.log.Printf("WARN: no record of contract previously added to the renew set (ID: %v)", id)
+			continue
+		}
+		oldContracts = append(oldContracts, contract)
+	}
 
 	// map old ID to new contract, for easy replacement later
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
