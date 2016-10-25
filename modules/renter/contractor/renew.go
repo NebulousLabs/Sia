@@ -59,10 +59,10 @@ func (c *Contractor) managedRenew(contract modules.RenterContract, numSectors ui
 func (c *Contractor) managedRenewContracts() error {
 	c.mu.RLock()
 	// Renew contracts when they enter the renew window.
-	var renewSet []modules.RenterContract
+	var renewSet []types.FileContractID
 	for _, contract := range c.contracts {
 		if c.blockHeight+c.allowance.RenewWindow >= contract.EndHeight() {
-			renewSet = append(renewSet, contract)
+			renewSet = append(renewSet, contract.ID)
 		}
 	}
 	c.mu.RUnlock()
@@ -70,6 +70,8 @@ func (c *Contractor) managedRenewContracts() error {
 		// nothing to do
 		return nil
 	}
+
+	c.log.Printf("renewing %v contracts", len(renewSet))
 
 	c.mu.RLock()
 	endHeight := c.blockHeight + c.allowance.Period
@@ -81,9 +83,51 @@ func (c *Contractor) managedRenewContracts() error {
 		return errors.New("allowance is too small")
 	}
 
+	// invalidate all active editors/downloaders for the contracts we want to
+	// renew
+	c.mu.Lock()
+	for _, id := range renewSet {
+		c.renewing[id] = true
+	}
+	c.mu.Unlock()
+
+	// after we finish renewing, unset the 'renewing' flag on each contract
+	defer func() {
+		c.mu.Lock()
+		for _, id := range renewSet {
+			delete(c.renewing, id)
+		}
+		c.mu.Unlock()
+	}()
+
+	// wait for all active editors and downloaders to finish, then grab the
+	// latest revision of each contract
+	var oldContracts []modules.RenterContract
+	for _, id := range renewSet {
+		c.mu.RLock()
+		e, eok := c.editors[id]
+		d, dok := c.downloaders[id]
+		c.mu.RUnlock()
+		if eok {
+			e.invalidate()
+		}
+		if dok {
+			d.invalidate()
+		}
+
+		c.mu.RLock()
+		contract, ok := c.contracts[id]
+		c.mu.RUnlock()
+		if !ok {
+			c.log.Printf("WARN: no record of contract previously added to the renew set (ID: %v)", id)
+			continue
+		}
+		oldContracts = append(oldContracts, contract)
+	}
+
 	// map old ID to new contract, for easy replacement later
 	newContracts := make(map[types.FileContractID]modules.RenterContract)
-	for _, contract := range renewSet {
+	for _, contract := range oldContracts {
 		newContract, err := c.managedRenew(contract, numSectors, endHeight)
 		if err != nil {
 			c.log.Printf("WARN: failed to renew contract with %v: %v", contract.NetAddress, err)

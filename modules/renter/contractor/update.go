@@ -56,7 +56,6 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// renew any contracts that have entered the renew window
 			err := c.managedRenewContracts()
 			if err != nil {
-				println(err.Error())
 				c.log.Debugln("WARN: failed to renew contracts after processing a consensus chage:", err)
 			}
 
@@ -64,8 +63,11 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 			c.mu.RLock()
 			a := c.allowance
 			remaining := int(a.Hosts) - len(c.contracts)
-			numSectors, err := maxSectors(a, c.hdb, c.tpool)
 			c.mu.RUnlock()
+			if remaining <= 0 {
+				return
+			}
+			numSectors, err := maxSectors(a, c.hdb, c.tpool)
 			if err != nil {
 				c.log.Debugln("ERROR: couldn't calculate maxSectors after processing a consensus change:", err)
 				return
