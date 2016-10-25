@@ -339,7 +339,7 @@ func (h *Host) Contracts() ([]modules.HostContract, error) {
 			}
 
 			copy(hc.ID[:], k)
-			hc.SectorRootCount = uint64(len(so.SectorRoots))
+			hc.SectorCount = uint64(len(so.SectorRoots))
 			hc.WindowStartHeight = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowStart
 			hc.WindowEndHeight = so.RevisionTransactionSet[len(so.RevisionTransactionSet)-1].FileContractRevisions[0].NewWindowEnd
 

@@ -116,10 +116,10 @@ sector may impact host revenue.`,
 	}
 
 	hostXcontractsCmd = &cobra.Command{
-		Use: "xcontracts",
+		Use:   "xcontracts",
 		Short: "Don't use this command in scripts.",
-		Long: "Don't use this command in scripts.",
-		Run: wrap(hostxcontractscmd),
+		Long:  "Don't use this command in scripts.",
+		Run:   wrap(hostxcontractscmd),
 	}
 )
 
@@ -433,7 +433,7 @@ func hostsectordeletecmd(root string) {
 }
 
 // hostxcontractscmd displays the contracts in the host.
-func hostxcontractscmd(root string) {
+func hostxcontractscmd() {
 	xcGET := new(api.HostXcontractsGET)
 	err := getAPI("/host/xcontracts", xcGET)
 	if err != nil {
@@ -446,6 +446,11 @@ func hostxcontractscmd(root string) {
 
 	for _, contract := range xcGET.Contracts {
 		fmt.Printf("Contract %v:\n", contract.ID)
-		fmt.Println(json.MarshalIndent(contract, "\t", "\t"))
+		jsonBytes, err := json.MarshalIndent(contract, "\t", "\t")
+		if err != nil {
+			die("Could not fetch the contracts", err)
+		}
+		fmt.Println("\t" + string(jsonBytes))
+		fmt.Println()
 	}
 }

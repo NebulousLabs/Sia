@@ -23,7 +23,7 @@ type (
 	HostContract struct {
 		// General contract facts.
 		ID                types.FileContractID `json:"id"`
-		SectorRootCount   uint64               `json:"sectorrootcount"` // May be larger than the number of sectors the host is storing due to virtual sectors.
+		SectorCount       uint64               `json:"sectorcount"` // May be larger than the number of sectors the host is storing due to virtual sectors.
 		WindowStartHeight types.BlockHeight    `json:"windowstartheight"`
 		WindowEndHeight   types.BlockHeight    `json:"windowendheight"`
 
