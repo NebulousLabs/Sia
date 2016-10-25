@@ -45,6 +45,13 @@ type (
 		// is expected to only store the data once.
 		AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error
 
+		// AddSectorBatch is a performance optimization over AddSector when
+		// adding a bunch of virtual sectors. It is necessary because otherwise
+		// potentially thousands or even tens-of-thousands of fsync calls would
+		// need to be made in serial, which would prevent renters from ever
+		// successfully renewing.
+		AddSectorBatch(sectorRoots []crypto.Hash, expiryHeight types.BlockHeight) error
+
 		// AddStorageFolder adds a storage folder to the manager. The manager
 		// may not check that there is enough space available on-disk to
 		// support as much storage as requested, though the manager should

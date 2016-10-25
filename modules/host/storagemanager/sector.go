@@ -74,6 +74,10 @@ var (
 	// hovering around 95% capacity and rarely over 98% or under 90% capacity.
 	errInsufficientStorageForSector = errors.New("not enough storage remaining to accept sector")
 
+	// errNonVirtualSectorInBatch is thrown if a batch-add for sectors has a
+	// physical sector in it.
+	errNonVirtualSectorInBatch = errors.New("sector added in batch which is not a virtual sector")
+
 	// errMaxVirtualSectors is returned when a sector cannot be added because
 	// the maximum number of virtual sectors for that sector id already exist.
 	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
@@ -231,6 +235,59 @@ func (sm *StorageManager) AddSector(sectorRoot crypto.Hash, expiryHeight types.B
 		// There is at least one disk that has room, but the write operation
 		// has failed.
 		return errDiskTrouble
+	})
+	if err != nil {
+		return err
+	}
+	return sm.save()
+}
+
+// AddSectorBatch will add a set of sectors to the host, correctly selecting
+// the storage folders in which the sectors belong. The sectors should all be
+// virtual sectors.
+func (sm *StorageManager) AddSectorBatch(sectorRoots []crypto.Hash, expiryHeight types.BlockHeight) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	err := sm.db.Update(func(tx *bolt.Tx) error {
+		for _, root := range sectorRoots {
+			// Verify that the sector is virtual.
+			sectorKey := sm.sectorID(root[:])
+			bsu := tx.Bucket(bucketSectorUsage)
+			usageBytes := bsu.Get(sectorKey)
+			var usage sectorUsage
+			if usageBytes == nil {
+				// usageBytes == nil means that this is a new sector, therefore not
+				// a virtual sector, and therefore incompatible with
+				// 'AddSectorBatch'.
+				return errNonVirtualSectorInBatch
+			}
+			err := json.Unmarshal(usageBytes, &usage)
+			if err != nil {
+				return err
+			}
+			// If the sector already has the maximum number of virtual sectors,
+			// return an error. The host handles virtual sectors differently
+			// from physical sectors and therefore needs to limit the number of
+			// times that the same data can be uploaded to the host. For
+			// renters that are properly using encryption and are using
+			// sane/reasonable file contract renewal practices, this limit will
+			// never be reached (sane behavior will cause 3-5 at an absolute
+			// maximum, but the limit is substantially higher).
+			if len(usage.Expiry) >= maximumVirtualSectors {
+				return errMaxVirtualSectors
+			}
+			usage.Expiry = append(usage.Expiry, expiryHeight)
+			usageBytes, err = json.Marshal(usage)
+			if err != nil {
+				return err
+			}
+			err = bsu.Put(sm.sectorID(root[:]), usageBytes)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return err
