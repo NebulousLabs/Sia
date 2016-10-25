@@ -38,7 +38,7 @@ type (
 		Folders []modules.StorageFolderMetadata `json:"folders"`
 	}
 
-	XcontractsGET struct {
+	HostXcontractsGET struct {
 		Contracts []modules.HostContract `json:"contracts"`
 	}
 )
@@ -137,7 +137,7 @@ func (api *API) hostXcontractsHandler(w http.ResponseWriter, req *http.Request, 
 		WriteError(w, Error{err.Error()}, http.StatusInternalServerError)
 		return
 	}
-	WriteJSON(w, XcontractsGET{
+	WriteJSON(w, HostXcontractsGET{
 		Contracts: contracts,
 	})
 }
