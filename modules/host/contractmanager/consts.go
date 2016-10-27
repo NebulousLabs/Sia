@@ -57,14 +57,14 @@ var (
 	// manager's settings to disk.
 	settingsMetadata = persist.Metadata{
 		Header:  "Sia Contract Manager",
-		Version: "1.0.2",
+		Version: "1.1.0",
 	}
 
 	// walMetadata is the header that is used when writing the write ahead log
 	// to disk, so that it may be identified at startup.
 	walMetadata = persist.Metadata{
 		Header:  "Sia Contract Manager WAL",
-		Version: "1.0.2",
+		Version: "1.1.0",
 	}
 )
 
@@ -76,6 +76,10 @@ var (
 			return 1 << 5
 		}
 		if build.Release == "standard" {
+			// The software performs better having a few large (LVM) storage
+			// folders than it does having many small storage folders. Larger
+			// hosts are likely to have RAID setups, which means their volumes
+			// are going to be huge anyway.
 			return 1 << 16
 		}
 		if build.Release == "testing" {
@@ -116,7 +120,11 @@ var (
 			return 1 << 3 // 32 MiB
 		}
 		if build.Release == "standard" {
-			return 1 << 12 // 32 GiB
+			// We are at a stage of Sia where we have plenty of hosts. It's
+			// time to start increasing the requirements to encourage hosts to
+			// be stable. It's problematic if hosts run out of space while
+			// multiple actively uploading renters are connecting to them.
+			return 1 << 15 // 256 GiB
 		}
 		if build.Release == "testing" {
 			return 1 << 3 // 32 KiB

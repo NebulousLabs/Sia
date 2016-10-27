@@ -1,8 +1,8 @@
 package contractmanager
 
-// TODO: Currently, we don't do any directory Sync'ing following COW
-// operations, that may be necessary to provide strong guarantees against data
-// corruption.
+// TODO: Currently, we don't do any directory syncs after atomic save-then-move
+// file operations, that may be necessary to provide strong guarantees against
+// data corruption.
 
 // TODO: The writeaheadlog is misusing log.Critical - it's using log.Critical
 // to indicate that there are severe problems with the host, but these are not
@@ -53,25 +53,17 @@ type ContractManager struct {
 	// The state of the contract manager is broken up into two separate
 	// categories. The first category is atomic state, and the second category
 	// is non-atomic state. Fields like the sector salt and storage folders are
-	// always saved to disk atomically using a copy-on-write technique. Sector
-	// location information and sector data are written directly to a large
-	// file, without using copy-on-write, which means that the writes are
-	// non-atomic.
+	// always saved to disk atomically. Sector location information and sector
+	// data are written directly to a large file, without using copy-on-write,
+	// which means that the writes are non-atomic.
 	//
-	// Each category of state must be treated differently. The non-atomic data
-	// is formatted very cleanly - every field on disk has an exact size, which
-	// means that the WAL can write idempotent commits that specify the exact
-	// location on disk where a write should happen to successfully execute an
-	// action. The atomic state contains fields with variable sizes, and
-	// therefore must be approached differently.
+	// Atomic writes can be handled using the write-then-rename technique for
+	// the files. This works for small fields that don't update frequently.
 	//
-	// The exact-location writing style of the disk can be mimiced by pulling
-	// all of the variable size state into memory, and then indexing it using
-	// explit key-value pairs.
-	//
-	// The in-progress updates in the WAL itself should all be idempotent, and
-	// constructed in a way such that they do not rely on any state at all to
-	// execute properly, as the current state may be inconsistent or unknown.
+	// Non-atomic data is managed by combining idempotency with a WAL. The WAL
+	// can specify 'write data X to file Y, offset Z', such that in the event
+	// of power loss, following those instructions again will always restore
+	// consistency.
 
 	// In-memory representation of the sector location lookups which are kept
 	// on disk. This representation is kept in-memory so that efficient
@@ -85,24 +77,31 @@ type ContractManager struct {
 	// be updated before commitments are made without losing durability,
 	// because the folderLocations object does not get saved to disk directly,
 	// instead its status is inferred entirely at startup.
+
+	// sectorSalt is a persistent security field that gets set the first time
+	// the contract manager is initiated and then never gets touched again.
+	// It's used to randomize the location on-disk that a sector gets stored,
+	// so that an adversary cannot maliciously add sectors to specific disks,
+	// or otherwise perform manipulations that may degrade performance.
+	//
+	// sectorLocations is a giant lookup table that keeps a mapping from every
+	// sector in the host to the location on-disk where it is stored. For
+	// performance information, see the BenchmarkSectorLocations docstring.
+	// sectorLocations is persisted on disk through a combination of the WAL
+	// and through metadata that is stored directly in each storage folder.
+	//
+	// The storageFolders fields stores information about each storage folder,
+	// including metadata about which sector slots are currently populated vs.
+	// which sector slots are available. For performance information, see
+	// BenchmarkStorageFolders.
 	sectorSalt      crypto.Hash
 	sectorLocations map[sectorID]sectorLocation
 	storageFolders  map[uint16]*storageFolder
 
-	// Utilities. The dependencies are package or filesystem dependencies, and
-	// are provided so that the dependencies can be mocked during testing. Sia
-	// is generally not a very mock-heavy project, but the ACID requirements of
-	// the contract manager mean that a lot of logic will only occur following
-	// a disk failure or some other unexpected failure, and in testing we need
-	// to be able to mock these failures.
+	// Utilities.
 	//
-	// The mutex protects all of the stateful fields of the contract manager,
-	// and should be used any time that one of the fields is being accessed or
-	// modified.
-	//
-	// The WAL is responsible for all of the mutation within the contract
-	// manager, and is generally the only one accessing the contract manager's
-	// mutex.
+	// The WAL helps orchestrate complex ACID transactions within the contract
+	// manager.
 	dependencies
 	log        *persist.Logger
 	persistDir string
@@ -110,8 +109,7 @@ type ContractManager struct {
 	wal        writeAheadLog
 }
 
-// Close will cleanly shutdown the contract manager, closing all resources and
-// goroutines that are in use, blocking until shutdown has completed.
+// Close will cleanly shutdown the contract manager.
 func (cm *ContractManager) Close() error {
 	return build.ExtendErr("error while stopping contract manager", cm.tg.Stop())
 }
@@ -126,18 +124,12 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		dependencies: dependencies,
 		persistDir:   persistDir,
 	}
-	// Because the wal and the cm each have eachother as objects in their
-	// structs, they really operate as a single larger object. When designing
-	// and implementing, I found it easier to reason about each when keeping
-	// their functions separate, though they rely heavily on eachother.
-	//
-	// The wal is used any time that the state of the cm is read or modified.
-	// The cm is just a record of how things currently look. A future refactor
-	// would probably combine the structs into a single object.
+	// The WAL and the contract manager have eachother in their structs,
+	// meaning they are effectively one larger object. I find them easier to
+	// reason about however by considering them as separate objects.
 	cm.wal.cm = cm
 
-	// If startup is unsuccessful, shutdown any resources that were
-	// successfully spun up.
+	// Perform clean shutdown of already-initialized features if startup fails.
 	var err error
 	defer func() {
 		if err != nil {
@@ -153,8 +145,7 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		return nil, build.ExtendErr("error while creating the persist directory for the contract manager", err)
 	}
 
-	// Initialize the logger. Logging should be initialized ASAP, because the
-	// rest of the initialization makes use of the logger.
+	// Logger is always the first thing initialized.
 	cm.log, err = dependencies.newLogger(filepath.Join(cm.persistDir, logFile))
 	if err != nil {
 		return nil, build.ExtendErr("error while creating the logger for the contract manager", err)
@@ -164,33 +155,29 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		err = build.ComposeErrors(cm.log.Close(), err)
 	})
 
-	// Load any state of the contract manager that gets saved atomically.
-	// Changes that were incompletely applied will not be represented as
-	// corruption, because the data is copied atomically. Instead, they will be
-	// represented as absent altogether. When the WAL is recovered, the absent
-	// changes will be reapplied.
+	// Load the atomic state of the contract manager. Unclean shutdown may have
+	// wiped out some changes that got made. Anything really important will be
+	// recovered when the WAL is loaded.
 	err = cm.loadAtomicPersistence()
 	if err != nil {
 		return nil, build.ExtendErr("error while loading contract manager atomic data", err)
 	}
 
-	// Allow the WAL to load. The WAL will check for an unclean shutdown, make
-	// any repairs necessary following the unclean shutdown, and then establish
-	// the sync loop and sync resources that are used to maintain ACID
-	// properties as the contact manager state is manipulated.
+	// Load the WAL, repairing any corruption caused by unclean shutdown.
 	err = cm.wal.load()
 	if err != nil {
 		return nil, build.ExtendErr("error while loading the WAL at startup", err)
 	}
+	// The contract manager should not be in a fully consistent state,
+	// containing all transactions, data, and updates that it has externally
+	// comitted to prior to the previous shutdown.
 
-	// Now that the contract manager has been brought back to a state of
-	// consistency, load the sector location data.
+	// The sector location data is loaded last. Any corruption that happened
+	// during unclean shutdown has already been fixed by the WAL.
 	cm.loadSectorLocations()
 
-	// Spin up the sync loop. Note that the sync loop needs to be created after
-	// the loading process is complete, otherwise there might be conflicts on
-	// the contract state, as commit() will be modifying the state and saving
-	// things to disk.
+	// Launch the sync loop that periodically flushes changes from the WAL to
+	// disk.
 	err = cm.wal.spawnSyncLoop()
 	if err != nil {
 		return nil, build.ExtendErr("error while spawning contract manager sync loop", err)
