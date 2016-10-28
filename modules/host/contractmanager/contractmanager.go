@@ -11,20 +11,9 @@ package contractmanager
 // DEBUG mode, which is why the logging statements are followed by a bunch of
 // panics. Extending the logger could clean up this code some.
 
-// TODO: There might be a smarter way to manage the sync interval. Some syncs
-// are going to take several seconds, and some are going to take almost no time
-// at all. The goal is to maximize throughput, but it's also important that the
-// host be responsive when accepting changes from the renter. Batched calls on
-// the renter side can improve throughput despite 1.5 second latencies
-// per-change, but that's basically requiring the renter to add code complexity
-// in order to achieve throughputs greater than 4 MiB every 1.5 seconds.
-//
-// It should be noted that if the renter is properly doing parallel uploads, a
-// throughput of 10+ mbps per host is pretty decent, even without batching.
-
 // TODO: In managedAddStorageFolder, fallocate can be used instead of
 // file.Write, which means that storage folders can be added substantially
-// faster. Windows and other non-linux systems will need to continue doing it
+/ faster. Windows and other non-linux systems will need to continue doing it
 // using the current implementation.
 
 // TODO: Some of the locking, especially with regards to ReadSector, could be
@@ -158,7 +147,7 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	// Load the atomic state of the contract manager. Unclean shutdown may have
 	// wiped out some changes that got made. Anything really important will be
 	// recovered when the WAL is loaded.
-	err = cm.loadAtomicPersistence()
+	err = cm.loadSettings()
 	if err != nil {
 		return nil, build.ExtendErr("error while loading contract manager atomic data", err)
 	}

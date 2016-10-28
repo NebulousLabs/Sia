@@ -13,6 +13,8 @@ import (
 )
 
 type (
+	// sectorAdd is an idempotent update to the sector metadata, indicating
+	// that a sector has been added or updated.
 	sectorAdd struct {
 		Count  uint16
 		Folder uint16
@@ -20,61 +22,64 @@ type (
 		Index  uint32
 	}
 
-	// stateChange defines a change to the state that has not yet been applied
-	// to the contract manager, but will be applied in a future commitment.
+	// stateChange defines an idempotent change to the state that has not yet
+	// been applied to the contract manager. The state change is a single
+	// transaction in the WAL.
 	//
 	// All changes in the stateChange object need to be idempotent, as it's
-	// possible that multiple corruptions or failures will result in the
-	// changes being committed to the state multiple times.
+	// possible that consecutive unclean shutdowns will result in changes being
+	// committed to the state multiple times.
 	stateChange struct {
-		// Fields related to adding a storage folder. When a storage folder is
-		// added, it first appears in the 'unfinished storage folder additions'
-		// field. A lot of I/O is incurred when adding a storage folder, and a
-		// WAL lock should not be held throughout the preparation operations.
-		// When the I/O is complete, the WAL is locked again and the unfinished
-		// storage folder is moved to the StorageFolderAdditions list.
+		// These fields relate to adding a storage folder. Adding a storage
+		// folder happens in several stages.
 		//
-		// When committing, only StorageFolderAdditions will be committed to
-		// the state. Some filtering is executed at commit time to determine
-		// which UnfinishedStorageFolderAdditions need to be preserved through
-		// to the next commit. Any unfinished storage folders which end up in
-		// the StorageFolderAdditions list will not need to be preserved. If
-		// there is an error during the I/O preperation, the storage folder
-		// will be cleaned up and added to the ErroredStorageFolderAdditions
-		// field, which also means that the storage folder does not need to be
-		// preserved.
-		ErroredStorageFolderAdditions []uint16
-		StorageFolderAdditions        []*storageFolder
-
-		AddedSectors []sectorAdd
-
-		// These fields all correspond to long-running actions in the WAL. The
-		// storage folder additions must be documented so that there are no
-		// conflicts when performing multiple actions in parallel, but they are
-		// not also processed at commit() time because preparation may not have
-		// completed when the commit loop fires. Instead, other actions will
-		// indicate that they have completed and that can be used to trigger
-		// cleanup.
+		// First the storage folder is added as an
+		// 'UnfinishedStorageFolderAddition', because there is large amount of
+		// I/O preprocessing that is performed when adding a storage folder.
+		// This I/O must be nonblocking and must resume in the event of unclean
+		// or early shutdown.
+		//
+		// When the preprocessing is complete, the storage folder is moved to a
+		// 'StorageFolderAddition', which can be safely applied to the contract
+		// manager but hasn't yet.
+		//
+		// ErroredStorageFolderAdditions are signals to the WAL that an
+		// unfinished storage folder addition has failed and can be cleared
+		// out. The WAL is append-only, which is why an error needs to be
+		// logged instead of just automatically clearning out the unfinished
+		// storage folder addition.
+		ErroredStorageFolderAdditions    []uint16
+		StorageFolderAdditions           []*storageFolder
 		UnfinishedStorageFolderAdditions []*storageFolder
+
+		// AddedSectors records the list of sectors that have been added to the
+		// contract manager since the last update.
+		AddedSectors []sectorAdd
 	}
 
 	// writeAheadLog coordinates ACID transactions which update the state of
-	// the contract manager. WAL should be the only entity that is accessing
-	// the contract manager's mutex.
+	// the contract manager. Consistency on a field is only guaranteed by
+	// looking it up through the WAL, and is not guaranteed by direct access.
 	writeAheadLog struct {
-		// The file is being constantly written to. Sync operations are very
-		// slow, but they are faster if most of the data has already had time
-		// to hit the disk. Rather than writing the entire WAL to disk every
-		// time there is a desired sync operation, the WAL is continuously
-		// writing to disk which should make the sync and commit operations a
-		// lot faster.
+		// The primary feature of the WAL is a file on disk that records all of
+		// the changes which have been proposed. The data is written to a temp
+		// file and then renamed atomically to a non-corrupt commitment of
+		// actions to be committed to the state. Data is written to the temp
+		// file continuously for performance reasons - when a Sync() ->
+		// Rename() occurs, most of the data will have already been flushed to
+		// disk, making the operation faster. The same is done with the
+		// settings file, which might be multiple MiB large for larger storage
+		// arrays.
 		//
-		// The syncChan lets external callers know when an operation that they
-		// have requested has been completed and successfully, consistently,
-		// and durably hit the disk. Multiple callers can be listening on the
-		// syncChan, so to send them all the same consistent message, the
-		// channel is closed every time a commit operation finishes. After the
-		// channel is closed, it is deleted and a new one is created.
+		// To further increase throughput, the WAL will batch as many
+		// operations as possible. These operations can happen concurrently,
+		// and will block until the contract manager can provide an ACID
+		// guarantee that the operation has completed. Syncing of multiple
+		// operations happens all at once, and the syncChan is used to signal
+		// that a sync operation has completed, providing ACID guarantees to
+		// any operation waiting on it. The mechanism of announcing is to close
+		// the syncChan, and then to create a new one for new operations to
+		// listen on.
 		//
 		// uncommittedChanges details a list of operations which have been
 		// suggested or queued to be made to the state, but are not yet
@@ -123,22 +128,14 @@ func writeWALMetadata(f *os.File) error {
 }
 
 // appendChange will add a change to the WAL, writing the details of the change
-// to the WAL file but not syncing - the syncing will occur during the sync and
-// commit operations that are orchestrated by the sync loop. Waiting to perform
-// the syncing provides a parallelism across multiple disks, and gives the
-// operating system time to optimize the operations that will be performed on
-// disk, greatly improving performance, especially for random writes.
+// to the WAL file but not syncing - syncing is orchestrated by the sync loop.
 //
-// Once a change is appended, it can only be revoked by appending another
-// change. If a long running operation such as the addition or removal of a
-// storage folder is occurring, they will need to use multiple types of
-// stateChange directives to ensure safety of the operation. An alternative
-// method would be to hold a lock on the WAL for the entirety of the operation,
-// but this would too greatly impact performance.
+// The WAL is append only, which means that changes can only be revoked by
+// appending an error. This is common for long running operations like adding a
+// storage folder.
 func (wal *writeAheadLog) appendChange(sc stateChange) error {
-	// Marshal the change and then write the change to the WAL file. Do not
-	// sync the WAL file, as this operation does not need to guarantee that the
-	// data hits the platter, the syncLoop will handle that piece.
+	// Marshal the change and then write the change to the WAL file. Syncing
+	// happens in the sync loop.
 	changeBytes, err := json.MarshalIndent(sc, "", "\t")
 	if err != nil {
 		return build.ExtendErr("could not marshal state change", err)
@@ -154,16 +151,14 @@ func (wal *writeAheadLog) appendChange(sc stateChange) error {
 	return nil
 }
 
-// applyChange will apply the provided change to the contract manager, updating
-// both the in-memory state and the on-disk state.
+// commitChange will commit the provided change to the contract manager,
+// updating both the in-memory state and the on-disk state.
 //
 // It should be noted that long running tasks are ignored during calls to
-// applyChange, because future changes may indicate that the long running task
-// has completed. Long running tasks are started and maintained by separate
-// threads, and in the event of power-loss, the long running changes will be
-// resumed or cleaned up following a full reloading and synchronization of the
-// existing changes.
-func (wal *writeAheadLog) applyChange(sc stateChange) {
+// commitChange, as they haven't completed and are being managed by a separate
+// thread. Upon completion, they will be converted into a different type of
+// commitment.
+func (wal *writeAheadLog) commitChange(sc stateChange) {
 	for _, sfa := range sc.StorageFolderAdditions {
 		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
 			wal.commitAddStorageFolder(sfa)
@@ -191,7 +186,8 @@ func (wal *writeAheadLog) createWALTmp() (err error) {
 }
 
 // recoverWAL will read a previous WAL and re-commit all of the changes inside,
-// restoring the program to consistency after an unclean shutdown.
+// restoring the program to consistency after an unclean shutdown. The tmp WAL
+// file needs to be open before this function is called.
 func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	// Read the WAL metadata to make sure that the version is correct.
 	decoder := json.NewDecoder(walFile)
@@ -201,9 +197,8 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	}
 
 	// Read changes from the WAL one at a time and load them back into memory.
-	// A full list of changes is kept so that long running changes can be
-	// processed properly - long running changes are dependent on changes that
-	// happen in the future.
+	// A full list of changes is kept so that modifications to long running
+	// changes can be parsed properly.
 	var sc stateChange
 	var scs []stateChange
 	for err == nil {
@@ -214,7 +209,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 			// will not be created until the sync loop is spawned. The sync
 			// loop spawner will make sure that the uncommitted changes are
 			// written to the tmp WAL file.
-			wal.applyChange(sc)
+			wal.commitChange(sc)
 			scs = append(scs, sc)
 		}
 	}
@@ -223,12 +218,9 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	}
 
 	// Do any cleanup regarding long-running unfinished tasks. Long running
-	// task cleanup cannot be handled in the 'applyChange' loop because future
+	// task cleanup cannot be handled in the 'commitChange' loop because future
 	// state changes may indicate that the long running task has actually been
 	// completed.
-	//
-	// These functions can assume that the tmp wal file is open, because it
-	// should have been created before WAL recovery started.
 	err = wal.cleanupUnfinishedStorageFolderAdditions(scs)
 	if err != nil {
 		return build.ExtendErr("error performing unfinished storage folder cleanup", err)
@@ -240,8 +232,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 // them and doing any necessary preprocessing. In the most common case (any
 // time the previous shutdown was clean), there will not be a WAL file.
 func (wal *writeAheadLog) load() error {
-	// Create the walTmpFile and write all of the remaining long running
-	// changes to it.
+	// Create the walTmpFile, which needs to be open before recovery can start.
 	err := wal.createWALTmp()
 	if err != nil {
 		return err
@@ -269,8 +260,8 @@ func (wal *writeAheadLog) load() error {
 	// WAL, which most likely means that there was a clean shutdown previously.
 	// No action needs to be taken regarding WAL recovery.
 
-	// Open up the settings tmp file and write to it. This will finish
-	// preparations and allow the sync loop to get started without hiccups.
+	// Create the tmp settings file and initialize the first write to it. This
+	// is necessary before kicking off the sync loop.
 	wal.fileSettingsTmp, err = os.Create(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 	if err != nil {
 		return build.ExtendErr("unable to prepare the settings temp file", err)

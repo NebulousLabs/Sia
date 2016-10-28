@@ -9,20 +9,21 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 )
 
-// syncResources will call Sync on all resources that the WAL has open, except
-// for the WAL temp file, which needs to be sync'd separately.
+// syncResources will call Sync on all resources that the WAL has open. The
+// storage folder files will be left open, as they are not updated atomically.
+// The settings file and WAL tmp files will be synced and closed, to perform an
+// atomic update to the files.
 func (wal *writeAheadLog) syncResources() {
-	// The syncing is done in parallel to ensure that the total amount of time
-	// consumed here is approximately equivalent to the cost of Syncing the
-	// slowest file, instead of waiting to sync some files until other files
-	// have finished syncing.
+	// Syncing occurs over multiple files and disks, and is done in parallel to
+	// minimize the amount of time that a lock is held over the contract
+	// manager.
 	var wg sync.WaitGroup
-	// Queue a thread to sync + copy-on-write the settings file.
+
+	// Sync the settings file.
 	wg.Add(1)
 	go func() {
 		tmpFilename := filepath.Join(wal.cm.persistDir, settingsFileTmp)
 		filename := filepath.Join(wal.cm.persistDir, settingsFile)
-		// Sync the settings file.
 		err := wal.fileSettingsTmp.Sync()
 		if err != nil {
 			wal.cm.log.Critical("ERROR: unable to sync the contract manager settings:", err)
@@ -32,7 +33,6 @@ func (wal *writeAheadLog) syncResources() {
 		if err != nil {
 			wal.cm.log.Println("unable to close the temporary contract manager settings file:", err)
 		}
-		// COW the settings file.
 		err = os.Rename(tmpFilename, filename)
 		if err != nil {
 			wal.cm.log.Critical("ERROR: unable to atomically copy the contract manager settings:", err)
@@ -40,7 +40,8 @@ func (wal *writeAheadLog) syncResources() {
 		}
 		wg.Done()
 	}()
-	// Queue threads to sync all of the storage folders.
+
+	// Sync all of the storage folders.
 	for _, sf := range wal.cm.storageFolders {
 		wg.Add(1)
 		go func(sf *storageFolder) {
@@ -52,8 +53,10 @@ func (wal *writeAheadLog) syncResources() {
 			wg.Done()
 		}(sf)
 	}
-	// Sync the temp WAL file, but DO NOT perform the copy-on-write - the COW
-	// must happen AFTER all other files have successfully Sync'd.
+
+	// Sync the temp WAL file, but do not perform the atmoic rename - the
+	// atomic rename must be guaranteed to happen after all of the other files
+	// have been synced.
 	wg.Add(1)
 	go func() {
 		err := wal.fileWALTmp.Sync()
@@ -69,7 +72,26 @@ func (wal *writeAheadLog) syncResources() {
 		}
 		wg.Done()
 	}()
+
+	// Wait for all of the sync calls to finish.
 	wg.Wait()
+
+	// Now that all the Sync calls have completed, rename the WAL tmp file to
+	// update the WAL.
+	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
+	walFileName := filepath.Join(wal.cm.persistDir, walFile)
+	err := os.Rename(walTmpName, walFileName)
+	if err != nil {
+		// Log that the host is having trouble saving the uncommitted changes.
+		// Crash if the list of uncommitted changes has grown very large.
+		wal.cm.log.Critical("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
+		panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
+	}
+
+	// Now that the WAL is sync'd and updated, any calls waiting on ACID
+	// guarantees can safely return.
+	close(wal.syncChan)
+	wal.syncChan = make(chan struct{})
 }
 
 // commit will take all of the changes that have been added to the WAL and
@@ -86,62 +108,35 @@ func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	//
 	// On the previous commit, a bunch of files were given operations to
-	// perform, but the operations were not synced. They have now had a second
-	// or so to do buffer + write, which means a Sync call here should take
+	// perform, but the operations were not synced. They have now had time to
+	// write the data to disk, which means a Sync call here should take
 	// significantly less time than it would have if Sync had been called right
-	// away. This is important to performance, as Sync must be called under
-	// lock.
+	// away. This is important to performance, as Sync holds a lock over the
+	// entire contract manager.
 	wal.syncResources()
 
-	// The WAL file writes to a temporary file, so that there is a guarantee
-	// that the actual WAL file will not ever be corrupted. Now that the tmp
-	// file is closed and synced, rename the tmp file. Renaming is an atomic
-	// action, meaning that the replacement to the WAL file is guaranteed not
-	// to be corrupt.
-	//
-	// Note that this rename MUST occur AFTER all of the Sync calls above have
-	// returned.
-	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-	walFileName := filepath.Join(wal.cm.persistDir, walFile)
-	err := os.Rename(walTmpName, walFileName)
-	if err != nil {
-		// Log that the host is having trouble saving the uncommitted changes.
-		// Crash if the list of uncommitted changes has grown very large.
-		wal.cm.log.Critical("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
-		panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
-	}
-	// Any module waiting for a synchronization has now had the changes
-	// permanently committed, as of the WAL COW operation. Signal that syncing
-	// is complete.
-	close(wal.syncChan)
-	wal.syncChan = make(chan struct{})
-
-	// Take all of the changes that have been queued in the WAL and apply them
-	// to the state. This will cause a lot of writing to the open files. These
-	// writes will be Sync'd at the start of the next call to commit().
+	// The previous changes have been sync'd, the new WAL has been created and
+	// saved, the changes in the new WAL file can be committed safely. (and
+	// recovered/repaired in the event of unclean shutdown).
 	for _, uc := range wal.uncommittedChanges {
-		wal.applyChange(uc)
+		wal.commitChange(uc)
 	}
 
 	// Use helper functions to extract all remaining unfinished long-running
 	// jobs from the WAL. Save these for later, when the WAL tmp file gets
-	// reopened (the remaining unfinished jobs need to be written to the tmp
-	// file to preserve their presence as understood by the WAL state).
+	// reopened.
 	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
+
 	// Set the list of uncommitted changes to nil, as everything has been
 	// applied and/or saved to be appended later.
 	wal.uncommittedChanges = nil
 
-	// In parallel, open up the WAL and write to it, and open up the settings
-	// file and write to it.
+	// Begin writing to the settings file.
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		// Begin writing to the settings file, but do not Sync. Syncing here
-		// can cause the function to block for a long time while holding the
-		// WAL lock. Instead, sync on the next iteration when this function has
-		// had over a second to commit the data to disk; the sync should be
-		// much faster.
+		// Begin writing to the settings file, which will be synced during the
+		// next iteration of the sync loop.
 		var err error
 		wal.fileSettingsTmp, err = os.Create(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 		if err != nil {
@@ -156,6 +151,8 @@ func (wal *writeAheadLog) commit() {
 		}
 		wg.Done()
 	}()
+
+	// Begin writing new changes to the WAL.
 	wg.Add(1)
 	go func() {
 		// Recreate the wal file so that it can receive new updates.
@@ -180,6 +177,8 @@ func (wal *writeAheadLog) commit() {
 		wg.Done()
 	}()
 	wg.Wait()
+
+	// Sync operation is complete.
 }
 
 // spawnSyncLoop prepares and establishes the loop which will be running in the
@@ -258,9 +257,7 @@ func (wal *writeAheadLog) threadedSyncLoop(threadsStopped chan struct{}, syncLoo
 			return
 		case <-time.After(syncInterval):
 			// Commit all of the changes in the WAL to disk, and then apply the
-			// changes. Measure how long it takes to apply the changes, and use
-			// that to steer the amount of time that should be waited to the
-			// next sync.
+			// changes.
 			wal.mu.Lock()
 			wal.commit()
 			wal.mu.Unlock()
