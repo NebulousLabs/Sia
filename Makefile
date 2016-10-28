@@ -75,7 +75,7 @@ test-v:
 test-long: clean fmt vet lint
 	go test -v -race -tags='testing debug' -timeout=500s $(pkgs) -run=$(run)
 bench: clean fmt
-	go test -tags='testing' -timeout=500s -run=XXX -bench=. $(pkgs)
+	go test -tags='testing' -timeout=500s -bench=$(run) $(pkgs)
 cover: clean
 	@mkdir -p cover/modules
 	@mkdir -p cover/modules/renter
