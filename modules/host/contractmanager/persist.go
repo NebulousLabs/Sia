@@ -33,10 +33,7 @@ func (cm *ContractManager) initSettings() error {
 	// initialization, the sector salt is never changed.
 
 	// Initialize the sector salt to a random value.
-	_, err := cm.dependencies.randRead(cm.sectorSalt[:])
-	if err != nil {
-		return build.ExtendErr("error creating salt for contract manager", err)
-	}
+	crypto.Read(cm.sectorSalt[:])
 
 	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
 	// with the new settings values.

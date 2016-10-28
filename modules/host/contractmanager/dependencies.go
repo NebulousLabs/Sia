@@ -1,7 +1,6 @@
 package contractmanager
 
 import (
-	"crypto/rand"
 	"errors"
 	"io"
 	"os"
@@ -37,8 +36,7 @@ type (
 		// returned will be higher, causing an idempotent action to be
 		// committed multiple times. If the action is truly idempotent,
 		// committing it multiple times should not cause any problems or
-		// changes. The function is created as a dependency so that it can be
-		// hijacked during testing to provide non-probabilistic outcomes.
+		// changes.
 		atLeastOne() uint64
 
 		// createFile gives the host the ability to create files on the
@@ -63,9 +61,6 @@ type (
 		// newLogger creates a logger that the host can use to log messages and
 		// write critical statements.
 		newLogger(string) (*persist.Logger, error)
-
-		// randRead fills the input bytes with random data.
-		randRead([]byte) (int, error)
 	}
 
 	// file implements all of the methods that can be called on an os.File.
@@ -134,9 +129,4 @@ func (productionDependencies) mkdirAll(s string, fm os.FileMode) error {
 // critical statements.
 func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
 	return persist.NewFileLogger(s)
-}
-
-// randRead fills the input bytes with random data.
-func (productionDependencies) randRead(b []byte) (int, error) {
-	return rand.Read(b)
 }
