@@ -4,21 +4,19 @@ package contractmanager
 // file operations, that may be necessary to provide strong guarantees against
 // data corruption.
 
-// TODO: The writeaheadlog is misusing log.Critical - it's using log.Critical
-// to indicate that there are severe problems with the host, but these are not
-// developer issues, they are likely disk issues. Instead of log.Critical,
-// there should be a log.Crash. The program should be crashing regardless of
-// DEBUG mode, which is why the logging statements are followed by a bunch of
-// panics. Extending the logger could clean up this code some.
-
 // TODO: In managedAddStorageFolder, fallocate can be used instead of
 // file.Write, which means that storage folders can be added substantially
-/ faster. Windows and other non-linux systems will need to continue doing it
+// faster. Windows and other non-linux systems will need to continue doing it
 // using the current implementation.
 
 // TODO: Some of the locking, especially with regards to ReadSector, could be
 // moved to a per-storage-folder basis instead of grabbing the WAL lock, which
 // blocks everything to access just a single resource.
+
+// TODO: Currently the long running storage folder operations are expected to
+// have their progress value's menaing determined by context, but that's really
+// only possible with the WAL, which external callers cannot view. Explicit
+// context should be added to the struct.
 
 import (
 	"path/filepath"
@@ -35,37 +33,12 @@ import (
 type ContractManager struct {
 	// The contract manager controls many resources which are spread across
 	// multiple files yet must all be consistent and durable. ACID properties
-	// have been achieved by using a write-ahead-logger (WAL). All operations
-	// that read or mutate the stateful fields of the contract manager must go
-	// through the WAL or inconsistency is risked.
-	//
-	// The state of the contract manager is broken up into two separate
-	// categories. The first category is atomic state, and the second category
-	// is non-atomic state. Fields like the sector salt and storage folders are
-	// always saved to disk atomically. Sector location information and sector
-	// data are written directly to a large file, without using copy-on-write,
-	// which means that the writes are non-atomic.
-	//
-	// Atomic writes can be handled using the write-then-rename technique for
-	// the files. This works for small fields that don't update frequently.
-	//
-	// Non-atomic data is managed by combining idempotency with a WAL. The WAL
-	// can specify 'write data X to file Y, offset Z', such that in the event
-	// of power loss, following those instructions again will always restore
-	// consistency.
-
-	// In-memory representation of the sector location lookups which are kept
-	// on disk. This representation is kept in-memory so that efficient
-	// constant-time-lookups can be used to figure out where sectors are stored
-	// on disk. This prevents I/O from being a significant bottleneck. 10TiB of
-	// data stored on the host will bloat the map to about 1.5GiB in size, and
-	// the map will be able to support millions of reads and writes per second.
-	//
-	// folderLocations contains a mapping from storage folder indexes to the
-	// on-disk location of that storage folder. The folderLocations object can
-	// be updated before commitments are made without losing durability,
-	// because the folderLocations object does not get saved to disk directly,
-	// instead its status is inferred entirely at startup.
+	// have been achieved by using a write-ahead-logger (WAL). The in-memory
+	// state represents currently uncommitted data, however reading from the
+	// uncommitted state does not threaten consistency. It is okay if the user
+	// sees uncommitted data, so long as other ACID operations do not return
+	// early. Any changes to the state must be documented in the WAL to prevent
+	// inconsistency.
 
 	// sectorSalt is a persistent security field that gets set the first time
 	// the contract manager is initiated and then never gets touched again.
@@ -88,9 +61,6 @@ type ContractManager struct {
 	storageFolders  map[uint16]*storageFolder
 
 	// Utilities.
-	//
-	// The WAL helps orchestrate complex ACID transactions within the contract
-	// manager.
 	dependencies
 	log        *persist.Logger
 	persistDir string

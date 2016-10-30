@@ -109,8 +109,9 @@ type storageFolder struct {
 }
 
 // emptiestStorageFolder takes a set of storage folders and returns the storage
-// folder with the lowest utilization by percentage. 'nil' is returned if there
-// are no storage folders provided with sufficient free space for a sector.
+// folder with the lowest utilization by percentage along with its index. 'nil'
+// and '-1' are returned if there are no storage folders provided with
+// sufficient free space for a sector.
 func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	enoughRoom := false
 	mostFree := float64(-1)
@@ -134,18 +135,18 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 // containing information about the storage folder and any operations currently
 // being executed on the storage folder.
 func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
-	// Because getting information on the storage folders requires looking at
-	// the state of the contract manager, we should go through the WAL.
-	return cm.wal.managedStorageFolderMetadata()
+	cm.wal.mu.Lock()
+	defer cm.wal.mu.Unlock()
+
+	// Go through the WAL so that information can be collected about folders
+	// being added, resized, and removed.
+	return cm.wal.storageFolderMetadata()
 }
 
-// managedStorageFolderMetadata will return a list of storage folders in the
-// host, each containing information about the storage folder and any
-// operations currently being executed on the storage folder.
-func (wal *writeAheadLog) managedStorageFolderMetadata() (smfs []modules.StorageFolderMetadata) {
-	wal.mu.Lock()
-	defer wal.mu.Unlock()
-
+// storageFolderMetadata will return a list of storage folders in the host,
+// each containing information about the storage folder and any operations
+// currently being executed on the storage folder.
+func (wal *writeAheadLog) storageFolderMetadata() (smfs []modules.StorageFolderMetadata) {
 	// Iterate over the storage folders that are in memory first, and then
 	// suppliment them with the storage folders that are not in memory.
 	for _, sf := range wal.cm.storageFolders {
@@ -185,138 +186,24 @@ func (wal *writeAheadLog) managedStorageFolderMetadata() (smfs []modules.Storage
 			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 		})
 	}
+
+	// TODO: Make adjustments for any storage folders that are currently being
+	// resized or removed.
+
 	return smfs
 }
 
-// storageFolder will return a list of storage folders that are accessible to
-// the contract manager. This list will exclude storage folders that are still
-// being added, are being resized, or are being removed.
-func (wal *writeAheadLog) storageFolders() (sfs []*storageFolder) {
-	// First copy the map, so that elements can be deleted from the new map
-	// without causing issues.
-	newMap := make(map[uint16]*storageFolder)
-	for i, sf := range wal.cm.storageFolders {
-		// TODO: Consider not adding a storage folder if the number of failures
-		// is above some threshold.
-
-		newMap[i] = sf
-	}
-
-	// TODO: Iterate through all of the storage folders that are being resized
-	// or removed, and delete them from newMap.
-
-	// Copy what remains of newMap into the array that gets returned.
-	for _, sf := range newMap {
+// storageFolderSlice returns the contract manager's storage folders map as a
+// slice.
+func (cm *ContractManager) storageFolderSlice() []*storageFolder {
+	sfs := make([]*storageFolder, 0)
+	for _, sf := range cm.storageFolders {
 		sfs = append(sfs, sf)
 	}
 	return sfs
 }
 
 /*
-// Though storage folders each contain a bunch of sectors, there is no mapping
-// from a storage folder to the sectors that it contains. Instead, one must
-// either look at the filesystem or go through the sector usage database.
-// There is a mapping from a sector to the storage folder that it is in, so a
-// list of sectors for each storage folder can be obtained, though the
-// operation is expensive. It is not recommended that you try to look at the
-// filesystem to see all of the sectors in a storage folder, because all of the
-// golang implementations that let you do this load the whole directory into
-// memory at once, and these directories may contain millions of sectors.
-//
-// Strict resource limits are maintained, to make sure that any user behavior
-// which would strain the host will return an error instead of cause the user
-// problems. The number of storage folders is capped, the allowed size for a
-// storage folder has a range, and anything else that might have a linear or
-// nonconstant effect on resource consumption is capped.
-//
-// Sectors are meant to be spread out across the storage folders as evenly as
-// possible, but this is done in a very passive way. When a storage folder is
-// added, sectors are not moved from the other storage folder to optimize for a
-// quick operation. When a storage folder is reduced in size, sectors are only
-// moved if there is not enough room on the remainder of the storage folder to
-// hold all of the sectors.
-//
-// Storage folders are identified by an ID. This ID is short (4 bytes) and is
-// randomly generated but is guaranteed not to conflict with any other storage
-// folder IDs (if a conflict is generated randomly, a new random folder is
-// chosen). A counter was rejected because storage folders can be removed and
-// added arbitrarily, and there should be a firm difference between accessing a
-// storage folder by index vs. accessing a storage folder by id.
-//
-// Storage folders statically track how much of their storage is unused.
-// Because there is no mapping from a storage folder to the sectors that it
-// contains, a static mapping must be manually maintained. While it would be
-// possible to track which sectors are in each storage folder by using nested
-// buckets in the sector usage database, the implementation cost is high, and
-// is perceived to be higher than the implementation cost of statically
-// tracking the amount of storage remaining. Also the introduction of nested
-// buckets relies on fancier, less used features in the boltdb dependency,
-// which carries a higher error risk.
-
-import (
-	"bytes"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-
-	"github.com/NebulousLabs/bolt"
-)
-
-var (
-	// errBadStorageFolderIndex is returned if a storage folder is requested
-	// that does not have the correct index.
-	errBadStorageFolderIndex = errors.New("no storage folder exists at that index")
-
-	// errIncompleteOffload is returned when the host is tasked with offloading
-	// sectors from a storage folder but is unable to offload the requested
-	// number - but is able to offload some of them.
-	errIncompleteOffload = errors.New("could not successfully offload specified number of sectors from storage folder")
-
-	// errInsufficientRemainingStorageForRemoval is returned if the remaining
-	// storage folders do not have enough space remaining to support being
-	// removed.
-	errInsufficientRemainingStorageForRemoval = errors.New("not enough storage remaining to support removal of disk")
-
-	// errInsufficientRemainingStorageForShrink is returned if the remaining
-	// storage folders do not have enough space remaining to support being
-	// reduced in size.
-	errInsufficientRemainingStorageForShrink = errors.New("not enough storage remaining to support shrinking of disk")
-
-	// errLargeStorageFolder is returned if a new storage folder or a resized
-	// storage folder would exceed the maximum allowed size.
-	errLargeStorageFolder = fmt.Errorf("maximum allowed size for a storage folder is %v bytes", maximumStorageFolderSize)
-
-	// errMaxStorageFolders indicates that the limit on the number of allowed
-	// storage folders has been reached.
-	errMaxStorageFolders = fmt.Errorf("host can only accept up to %v storage folders", maximumStorageFolders)
-
-	// errNoResize is returned if a new size is provided for a storage folder
-	// that is the same as the current size of the storage folder.
-	errNoResize = errors.New("storage folder selected for resize, but new size is same as current size")
-
-	// errRepeatFolder is returned if a storage folder is added which links to
-	// a path that is already in use by another storage folder. Only exact path
-	// matches will trigger the error.
-	errRepeatFolder = errors.New("selected path is already in use as a storage folder, please use 'resize'")
-
-	// errSmallStorageFolder is returned if a new storage folder is not large
-	// enough to meet the requirements for the minimum storage folder size.
-	errSmallStorageFolder = fmt.Errorf("minimum allowed size for a storage folder is %v bytes", minimumStorageFolderSize)
-
-	// errStorageFolderNotFolder is returned if a storage folder gets added
-	// that is not a folder.
-	errStorageFolderNotFolder = errors.New("must use an existing folder")
-
-	// errRelativePath is returned if a path must be absolute.
-	errRelativePath = errors.New("storage folder paths must be absolute")
-)
-
 // offloadStorageFolder takes sectors in a storage folder and moves them to
 // another storage folder.
 func (sm *StorageManager) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload uint64) error {
@@ -472,27 +359,6 @@ func (sm *StorageManager) offloadStorageFolder(offloadFolder *storageFolder, dat
 		return errIncompleteOffload
 	}
 	return nil
-}
-
-// storageFolder returns the storage folder in the host with the input uid. If
-// the storage folder is not found, nil is returned.
-func (sm *StorageManager) storageFolder(uid []byte) *storageFolder {
-	for _, sf := range sm.storageFolders {
-		if bytes.Equal(uid, sf.UID) {
-			return sf
-		}
-	}
-	return nil
-}
-
-// uidString returns the string value of the storage folder's UID. This string
-// maps to the filename of the symlink that is used to point to the folder that
-// holds all of the sector data contained by the storage folder.
-func (sf *storageFolder) uidString() string {
-	if len(sf.UID) != storageFolderUIDSize {
-		build.Critical("sector UID length is incorrect - perhaps the wrong version of Sia is being run?")
-	}
-	return hex.EncodeToString(sf.UID)
 }
 
 // ResetStorageFolderHealth will reset the read and write statistics for the

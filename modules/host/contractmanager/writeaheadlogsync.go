@@ -26,7 +26,7 @@ func (wal *writeAheadLog) syncResources() {
 		filename := filepath.Join(wal.cm.persistDir, settingsFile)
 		err := wal.fileSettingsTmp.Sync()
 		if err != nil {
-			wal.cm.log.Critical("ERROR: unable to sync the contract manager settings:", err)
+			wal.cm.log.Severe("ERROR: unable to sync the contract manager settings:", err)
 			panic("unable to sync contract manager settings, crashing to avoid data corruption")
 		}
 		err = wal.fileSettingsTmp.Close()
@@ -35,7 +35,7 @@ func (wal *writeAheadLog) syncResources() {
 		}
 		err = os.Rename(tmpFilename, filename)
 		if err != nil {
-			wal.cm.log.Critical("ERROR: unable to atomically copy the contract manager settings:", err)
+			wal.cm.log.Severe("ERROR: unable to atomically copy the contract manager settings:", err)
 			panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
 		}
 		wg.Done()
@@ -47,7 +47,7 @@ func (wal *writeAheadLog) syncResources() {
 		go func(sf *storageFolder) {
 			err := sf.file.Sync()
 			if err != nil {
-				wal.cm.log.Critical("ERROR: unable to sync a storage folder:", err)
+				wal.cm.log.Severe("ERROR: unable to sync a storage folder:", err)
 				panic("unable to sync a storage folder, creashing to avoid data corruption")
 			}
 			wg.Done()
@@ -61,7 +61,7 @@ func (wal *writeAheadLog) syncResources() {
 	go func() {
 		err := wal.fileWALTmp.Sync()
 		if err != nil {
-			wal.cm.log.Critical("Unable to sync the write-ahead-log:", err)
+			wal.cm.log.Severe("Unable to sync the write-ahead-log:", err)
 			panic("unable to sync the write-ahead-log, crashing to avoid data corrution")
 		}
 		err = wal.fileWALTmp.Close()
@@ -84,7 +84,7 @@ func (wal *writeAheadLog) syncResources() {
 	if err != nil {
 		// Log that the host is having trouble saving the uncommitted changes.
 		// Crash if the list of uncommitted changes has grown very large.
-		wal.cm.log.Critical("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
+		wal.cm.log.Severe("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
 		panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
 	}
 
@@ -115,13 +115,6 @@ func (wal *writeAheadLog) commit() {
 	// entire contract manager.
 	wal.syncResources()
 
-	// The previous changes have been sync'd, the new WAL has been created and
-	// saved, the changes in the new WAL file can be committed safely. (and
-	// recovered/repaired in the event of unclean shutdown).
-	for _, uc := range wal.uncommittedChanges {
-		wal.commitChange(uc)
-	}
-
 	// Use helper functions to extract all remaining unfinished long-running
 	// jobs from the WAL. Save these for later, when the WAL tmp file gets
 	// reopened.
@@ -140,13 +133,13 @@ func (wal *writeAheadLog) commit() {
 		var err error
 		wal.fileSettingsTmp, err = os.Create(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 		if err != nil {
-			wal.cm.log.Critical("Unable to open temporary settings file for writing:", err)
+			wal.cm.log.Severe("Unable to open temporary settings file for writing:", err)
 			panic("unable to open temporary settings file for writing, crashing to prevent data corruption")
 		}
 		ss := wal.cm.savedSettings()
 		err = persist.Save(settingsMetadata, ss, wal.fileSettingsTmp)
 		if err != nil {
-			wal.cm.log.Critical("writing to settings tmp file has failed:", err)
+			wal.cm.log.Severe("writing to settings tmp file has failed:", err)
 			panic("unable to write to temporary settings file, crashing to avoid data corruption")
 		}
 		wg.Done()
@@ -156,15 +149,17 @@ func (wal *writeAheadLog) commit() {
 	wg.Add(1)
 	go func() {
 		// Recreate the wal file so that it can receive new updates.
+		var err error
+		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 		wal.fileWALTmp, err = os.Create(walTmpName)
 		if err != nil {
-			wal.cm.log.Critical("ERROR: unable to create write-ahead-log:", err)
+			wal.cm.log.Severe("ERROR: unable to create write-ahead-log:", err)
 			panic("unable to create write-ahead-log in contract manager, crashing to avoid data loss")
 		}
 		// Write the metadata into the WAL.
-		err := writeWALMetadata(wal.fileWALTmp)
+		err = writeWALMetadata(wal.fileWALTmp)
 		if err != nil {
-			wal.cm.log.Critical("Unable to properly initialize WAL file, crashing to prevent corruption:", err)
+			wal.cm.log.Severe("Unable to properly initialize WAL file, crashing to prevent corruption:", err)
 			panic("Unable to properly initialize WAL file, crashing to prevent corruption.")
 		}
 		// Append all of the remaining long running uncommitted changes to the WAL.
@@ -177,8 +172,6 @@ func (wal *writeAheadLog) commit() {
 		wg.Done()
 	}()
 	wg.Wait()
-
-	// Sync operation is complete.
 }
 
 // spawnSyncLoop prepares and establishes the loop which will be running in the

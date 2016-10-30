@@ -10,6 +10,14 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+var (
+	// errNoFreeSectors is returned if there are no free sectors in the usage
+	// array fed to randFreeSector. This error should never be returned, as the
+	// contract manager should have sufficent internal consistency to know in
+	// advance that there are no free sectors.
+	errNoFreeSectors = errors.New("could not find a free sector in the usage array")
+)
+
 // mostSignificantBit returns the index of the most significant bit of an input
 // value.
 func mostSignificantBit(i uint64) uint64 {
@@ -42,7 +50,7 @@ func mostSignificantBit(i uint64) uint64 {
 // the usage array. If one is found, the bit will be flipped atomically in the
 // usage array to indicate that the sector is no longer available. The uint64
 // indicates the index of the sector within the usage array.
-func randFreeSector(usage []uint64) uint32 {
+func randFreeSector(usage []uint64) (uint32, error) {
 	// Pick a random starting location. Scanning the sector in a short amount
 	// of time requires starting from a random place.
 	start, err := crypto.RandIntn(len(usage))
@@ -68,7 +76,7 @@ func randFreeSector(usage []uint64) uint32 {
 		// If nothing was found even after scanning the front of the array,
 		// panic as this function should not be called with a full usage array.
 		if i == start {
-			panic("unable to find an empty sector in the usage array")
+			return 0, errNoFreeSectors
 		}
 	}
 
@@ -77,7 +85,7 @@ func randFreeSector(usage []uint64) uint32 {
 	// return the index of the sector that has been selected.
 	msb := mostSignificantBit(^usage[i])
 	usage[i] = usage[i] + (1 << msb)
-	return uint32((uint64(i) * 64) + msb)
+	return uint32((uint64(i) * 64) + msb), nil
 }
 
 // managedAddSector is a WAL operation to add a sector to the contract manager.
@@ -126,8 +134,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 
 			// Find a committed storage folder that has enough space to receive
 			// this sector.
-			sfs := wal.storageFolders()
-			sf, _ := emptiestStorageFolder(sfs)
+			sf, _ := emptiestStorageFolder(wal.cm.storageFolderSlice())
 			if sf == nil {
 				// None of the storage folders have enough room to house the
 				// sector.
@@ -136,7 +143,11 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 
 			// Find a location for the sector within the file using the Usage
 			// field.
-			sectorIndex := randFreeSector(sf.Usage)
+			sectorIndex, err := randFreeSector(sf.Usage)
+			if err != nil {
+				wal.cm.log.Critical("tried to grab a sector from a full storage folder")
+				return err
+			}
 
 			// Set the sectorAdd fields and update the sectorLocations map to
 			// reflect this new sector.
@@ -184,6 +195,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 		if err != nil {
 			return build.ExtendErr("failed to add a state change", err)
 		}
+		wal.commitAddSector(sa)
 
 		// Grab the synchronization channel so that we know when the sector add
 		// has completed.
@@ -202,6 +214,8 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 // commitAddSector will commit a sector that has been added to the WAL. The
 // commit should be idempotent, meaning if this function is run multiple times
 // on the same sector, there should be no issues.
+//
+// TODO: commitAddSector needs to update the usage.
 func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
 	sf := wal.cm.storageFolders[sa.Folder]
 

@@ -86,6 +86,6 @@ func BenchmarkStorageFolders(b *testing.B) {
 	// TODO: Re-write benchmark when 'delete sector' support has been added.
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = randFreeSector(usage)
+		randFreeSector(usage)
 	}
 }

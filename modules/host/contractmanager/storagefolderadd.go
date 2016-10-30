@@ -13,13 +13,11 @@ import (
 // findUnfinishedStorageFolderAdditions will scroll through a set of state
 // changes and figure out which of the unfinished storage folder additions are
 // still unfinished. If a storage folder addition has finished, it will be
-// discoverable through the presence of a storage folder addition object using
-// the same path, or through an errored storage folder addition object using
-// the same path. Putting the logic here keeps the WAL logic cleaner.
+// discoverable through the presence of a termination object later in the list
+// of state changes.
 func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
-	// Create a map containing a list of all unfinished storage folder
-	// additions identified by their path to the storage folder that is being
-	// added.
+	// Use a map to figure out what unfinished storage folders exist and use it
+	// to remove the ones that have terminated.
 	usfMap := make(map[uint16]*storageFolder)
 	for _, sc := range scs {
 		for _, sf := range sc.UnfinishedStorageFolderAdditions {
@@ -33,8 +31,7 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 		}
 	}
 
-	// Assemble all of the unfinished storage folder additions that still
-	// remain.
+	// Return the active unifinished storage folders as a slice.
 	var sfs []*storageFolder
 	for _, sf := range usfMap {
 		sfs = append(sfs, sf)
@@ -42,23 +39,16 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 	return sfs
 }
 
-// managedAddStorageFolder is a WAL operation to add a storage folder to the
-// contract manager. Some of the error checking has already been performed by
-// the parent function, contractmanager.AddStorageFolder. The parent function
-// performs checking that can be done without access to the state, and
-// writeAheadLog.managedAddStorageFolder will perform all checking that
-// requires access to the state.
+// managedAddStorageFolder will add a storage folder to the contract manager.
+// The parent fucntion, contractmanager.AddStorageFolder, has already performed
+// any error checking that can be performed without accessing the contract
+// manager state.
 //
 // managedAddStorageFolder can take a long time, as it writes a giant, zeroed
-// out file to disk covering the entire range of the storage folder. Having the
-// WAL locked throughout the whole operation is unacceptable, which means that
-// some additional management is needed to make sure that concurrent calls to
-// managedAddStorageFolder do not conflict or race. The WAL is adapted to
-// support long running operations which may eventually change the state, but
-// which also may eventually fail - three fields are then used. One to indicate
-// that process for adding a storage folder has begun, one to indicate that the
-// process for adding a storage folder has completed, and one to indicate that
-// the process for adding a storage folder has failed.
+// out file to disk covering the entire range of the storage folder, and
+// failure can occur late in the operation. The WAL is notified that a long
+// running operation is in progress, so that any changes to disk can be
+// reverted in the event of unclean shutdown.
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Precompute the total on-disk size of the storage folder. The storage
 	// folder needs to have modules.SectorSize available for each sector, plus
@@ -82,6 +72,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// number of storage folders are also counted, to make sure that the
 		// maximum number of storage folders allowed is not exceeded.
 		for _, csf := range wal.cm.storageFolders {
+			// The conflicting storage folder may e in the process of being
+			// removed, however we refuse to add a replacement storage folder
+			// until the existing one has been removed entirely.
 			if sf.Path == csf.Path {
 				return errRepeatFolder
 			}
@@ -98,18 +91,24 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 
 		// Count the number of uncommitted storage folders, and add it to the
 		// number of committed storage folders. This count should include all
-		// storage folders being resized or renewed as well.
+		// storage folders being resized or renewed as well. A map is used so
+		// that duplicates are handled gracefully, and so that a gap can be
+		// found that includes all of the uncommitted storage folders when
+		// scanning for an open index.
 		uniqueFolders := make(map[uint16]struct{})
 		for _, sf := range wal.cm.storageFolders {
 			uniqueFolders[sf.Index] = struct{}{}
 		}
 		for _, uc := range wal.uncommittedChanges {
-			// If the unfinished additions have completed, they may be
-			// duplicates with the storage folders tracked by the contract
-			// managers, which is why the map is used.
+			// Duplicates may appear if this unfinished storage folder addition
+			// has completed and had a completion added to the WAL in a later
+			// element of uc. Using a map handles this case gracefully.
 			for _, usfa := range uc.UnfinishedStorageFolderAdditions {
 				uniqueFolders[usfa.Index] = struct{}{}
 			}
+
+			// TODO: Account for storage folders being resized and removed as
+			// well.
 		}
 		if uint64(len(uniqueFolders)) > maximumStorageFolders {
 			return errMaxStorageFolders
@@ -127,25 +126,20 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		}
 		index = uint16(rand)
 		for iterator = 0; iterator < 65536; iterator++ {
-			_, exists := wal.cm.storageFolders[index]
+			// check the list of unique folders we created earlier.
+			_, exists := uniqueFolders[index]
 			if !exists {
 				break
 			}
 			index++
 		}
 		if iterator == 65536 {
-			wal.cm.log.Critical("Previous check indicated that there was room to add another storage folder, but folderLocations amp is full.")
+			wal.cm.log.Critical("Previous check indicated that there was room to add another storage folder, but folderLocations set is full.")
 			return errMaxStorageFolders
 		}
 		// Assign the empty index to the storage folder.
 		sf.Index = index
 
-		// Add the storage folder to the list of unfinished storage folder
-		// additions, so that no naming conflicts can appear while this storage
-		// folder is being processed.
-		wal.appendChange(stateChange{
-			UnfinishedStorageFolderAdditions: []*storageFolder{sf},
-		})
 		// Create the file that is used with the storage folder.
 		sf.file, err = wal.cm.dependencies.createFile(sectorHousingName)
 		if err != nil {
@@ -155,18 +149,23 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// folder.
 		atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 
-		// Grab a sync channel so that we know when the unfinished storage
-		// folder addition has been committed to the WAL. Sync chan must be
-		// grabbed inside the WAL lock.
+		// Add the storage folder to the list of unfinished storage folder
+		// additions. There should be no chance of error between this append
+		// operation and the completed commitment to the unfinished storage
+		// folder addition (signaled by `<-syncChan` a few lines down).
+		wal.appendChange(stateChange{
+			UnfinishedStorageFolderAdditions: []*storageFolder{sf},
+		})
+		// Grab the sync channel so we know when the unfinished storage folder
+		// addition has been committed to on disk.
 		syncChan = wal.syncChan
 		return nil
 	}()
 	if err != nil {
 		return err
 	}
-	// Don't start making files on disk until the unfinished addition has
-	// synced, otherwise they will not be cleaned up correctly following an
-	// unclean shutdown.
+	// Block until the commitment to the unfinished storage folder addition is
+	// complete.
 	<-syncChan
 
 	// If there's an error in the rest of the function, the storage folder
@@ -178,6 +177,8 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		if err != nil {
 			wal.mu.Lock()
 			defer wal.mu.Unlock()
+			// Signal in the WAL that the unfinished storage folder addition
+			// has failed.
 			err = build.ComposeErrors(err, wal.appendChange(stateChange{
 				ErroredStorageFolderAdditions: []uint16{sf.Index},
 			}))
@@ -217,33 +218,41 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// AddStorageFolder does not complete, simulating a power-failure while in
 	// the middle of adding a storage folder.
 	if wal.cm.dependencies.disrupt("incompleteAddStorageFolder") {
-		// An error is not returned, as this is simulating a power failure. I'm
-		// not certain this is the best thing to return here, but so far it has
-		// not caused issues while testing.
+		// Simulate a power failure here by returning 'nil' when there's
+		// actually more cleanup that needs to happen.
 		return nil
 	}
 
 	// All of the required setup for the storage folder is complete, add the
 	// directive to modify the contract manager state to the WAL, so that the
 	// operation can be fully integrated.
-	wal.mu.Lock()
-	wal.cm.storageFolders[sf.Index] = sf
-	err = wal.appendChange(stateChange{
-		StorageFolderAdditions: []*storageFolder{sf},
-	})
-	// Grab the sync lock and reset the progress values for the storage folder.
-	// The values are reset before the lock is released so that conflicting
-	// directives do not make overlapping atomic operations.
-	syncWait := wal.syncChan
-	atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
-	atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
-	wal.mu.Unlock()
+	err = func() error {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
+
+		// Set the progress to '0', as no operation is actively happening
+		// anymore.
+		atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
+		atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
+
+		// Add the new storage folder to the state, and to the WAL.
+		wal.cm.storageFolders[sf.Index] = sf
+		err = wal.appendChange(stateChange{
+			StorageFolderAdditions: []*storageFolder{sf},
+		})
+		if err != nil {
+			return build.ExtendErr("storage folder commitment assignment failed", err)
+		}
+		syncChan = wal.syncChan
+		return nil
+	}()
 	if err != nil {
-		return build.ExtendErr("storage folder commitment assignment failed", err)
+		return err
 	}
-	// Only return after the wallet has finished committing, which we can
-	// measure by watching the sync chan.
-	<-syncWait
+
+	// Wait to confirm the storage folder addition has completed until the WAL
+	// entry has synced.
+	<-syncChan
 	return nil
 }
 
@@ -279,28 +288,15 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 }
 
 // commitAddStorageFolder integrates a pending AddStorageFolder call into the
-// state. commitAddStorageFolder should only be called when finalizing an ACID
-// transaction, and only after the WAL has been synced to disk, to ensure that
-// the state change has been guaranteed even in the event of sudden power loss.
+// state. commitAddStorageFolder should only be called during WAL recovery.
 func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
-	// There is a chance that commitAddStorageFolder gets called multiple
-	// times. Especially at startup, that means that there may be an existing
-	// storage folder with a file handle already open. If the storage folder
-	// already exists, copy over the file handle, otherwise create a new file
-	// handle.
-	esf, exists := wal.cm.storageFolders[sf.Index]
-	if exists {
-		sf.file = esf.file
-		wal.cm.storageFolders[sf.Index] = sf
-	} else {
-		var err error
-		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
-		if err != nil {
-			sf.failedReads += 1
-			wal.cm.log.Println("Difficulties opening storage folder:", err)
-		}
-		wal.cm.storageFolders[sf.Index] = sf
+	var err error
+	sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
+	if err != nil {
+		sf.failedReads += 1
+		wal.cm.log.Println("Difficulties opening storage folder:", err)
 	}
+	wal.cm.storageFolders[sf.Index] = sf
 }
 
 // AddStorageFolder adds a storage folder to the contract manager.
@@ -310,11 +306,6 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 		return err
 	}
 	defer cm.tg.Done()
-
-	// Because the state of the contract manager depends on uncommitted changes
-	// that are in the WAL, the state of the contract manager should not be
-	// accessed at all inside of this function. Instead, the WAL should take
-	// care of all state-related error checking.
 
 	// Check that the storage folder being added meets the size requirements.
 	sectors := size / modules.SectorSize
@@ -346,5 +337,10 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 		Path:  path,
 		Usage: make([]uint64, size/modules.SectorSize/64),
 	}
-	return cm.wal.managedAddStorageFolder(newSF)
+	err = cm.wal.managedAddStorageFolder(newSF)
+	if err != nil {
+		cm.log.Println("Call to AddStorageFolder has failed:", err)
+		return err
+	}
+	return nil
 }

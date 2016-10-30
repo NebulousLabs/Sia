@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 // TestAddStorageFolder tries to add a storage folder to the contract manager,
@@ -632,24 +633,34 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
 	// skip the part where the changes are actually committed.
-	err = cmt.cm.wal.fileWALTmp.Sync()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cmt.cm.wal.fileWALTmp.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	walTmpName := filepath.Join(cmt.cm.persistDir, walFileTmp)
-	walFileName := filepath.Join(cmt.cm.persistDir, walFile)
-	err = os.Rename(walTmpName, walFileName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmt.cm.wal.fileWALTmp, err = os.Create(walTmpName)
-	if err != nil {
-		t.Fatal(err)
-	}
+	func() {
+		cmt.cm.wal.mu.Lock()
+		defer cmt.cm.wal.mu.Unlock()
+
+		tmpFilename := filepath.Join(cmt.cm.persistDir, settingsFileTmp)
+		filename := filepath.Join(cmt.cm.persistDir, settingsFile)
+		err = cmt.cm.wal.fileSettingsTmp.Sync()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cmt.cm.wal.fileSettingsTmp.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.Rename(tmpFilename, filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cmt.cm.wal.fileSettingsTmp, err = os.Create(filepath.Join(cmt.cm.persistDir, settingsFileTmp))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ss := cmt.cm.savedSettings()
+		err = persist.Save(settingsMetadata, ss, cmt.cm.wal.fileSettingsTmp)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Check that the storage folder has been added.
 	sfs := cmt.cm.StorageFolders()
@@ -753,31 +764,44 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
-	// skip the part where the changes are actually committed.
-	err = cmt.cm.wal.fileWALTmp.Sync()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cmt.cm.wal.fileWALTmp.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	walTmpName := filepath.Join(cmt.cm.persistDir, walFileTmp)
-	walFileName := filepath.Join(cmt.cm.persistDir, walFile)
-	err = os.Rename(walTmpName, walFileName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmt.cm.wal.fileWALTmp, err = os.Create(walTmpName)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Perform the sync cycle with the WAL (hijacked sync loop will not).
+	func() {
+		cmt.cm.wal.mu.Lock()
+		defer cmt.cm.wal.mu.Unlock()
+
+		tmpFilename := filepath.Join(cmt.cm.persistDir, settingsFileTmp)
+		filename := filepath.Join(cmt.cm.persistDir, settingsFile)
+		err = cmt.cm.wal.fileSettingsTmp.Sync()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cmt.cm.wal.fileSettingsTmp.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.Rename(tmpFilename, filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cmt.cm.wal.fileSettingsTmp, err = os.Create(filepath.Join(cmt.cm.persistDir, settingsFileTmp))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ss := cmt.cm.savedSettings()
+		err = persist.Save(settingsMetadata, ss, cmt.cm.wal.fileSettingsTmp)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Check that the storage folder has been added.
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported")
+	}
+	// But it should not be in the underlying storage folders array.
+	if len(cmt.cm.storageFolders) != 0 {
+		t.Fatal("storage folder added successfuly, despite efforts to cause failure")
 	}
 
 	// Close the contract manager and replace it with a new contract manager.
@@ -806,7 +830,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 		t.Error(err)
 	}
 	if len(files) != 0 {
-		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed.", len(files))
+		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed:", len(files))
 	}
 }
 

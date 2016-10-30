@@ -76,10 +76,6 @@ var (
 			return 1 << 5
 		}
 		if build.Release == "standard" {
-			// The software performs better having a few large (LVM) storage
-			// folders than it does having many small storage folders. Larger
-			// hosts are likely to have RAID setups, which means their volumes
-			// are going to be huge anyway.
 			return 1 << 16
 		}
 		if build.Release == "testing" {

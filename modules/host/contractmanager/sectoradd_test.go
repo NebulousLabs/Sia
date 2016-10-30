@@ -112,7 +112,7 @@ func TestAddSector(t *testing.T) {
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
-			t.Error("Sector location should only be reporting one sector", sl.count)
+			t.Error("Sector location should only be reporting one sector:", sl.count)
 		}
 		if sl.storageFolder != index {
 			t.Error("Sector location is being reported incorrectly - wrong storage folder", sl.storageFolder, index)

@@ -56,23 +56,13 @@ type (
 // sectorID returns the id that should be used when referring to a sector.
 // There are lots of sectors, and to minimize their footprint a reduced size
 // hash is used. Hashes are typically 256bits to provide collision resistance
-// against an attacker that is able to peform an obscene number of trials per
-// second on each of an obscene number of machines. Potential collisions for
-// sectors are limited because hosts have secret data that the attacker does
-// not know which is used to salt the transformation of a sector hash to a
-// sectorID. As a result, an attacker is limited in the number of times they
-// can try to cause a collision - one random shot every time they upload a
-// sector, and the attacker has limited ability to learn of the success of the
-// attempt. Uploads are very slow, even on fast machines there will be less
-// than 1000 per second. It is therefore safe to reduce the security from
-// 256bits to 96bits, which has a collision resistance of 2^48. A reasonable
-// upper bound for the number of sectors on a host is 2^32, corresponding with
-// 16PB of data.
-//
-// 12 bytes can be represented as a filepath using 16 base64 characters. This
-// keeps the filesize small and therefore limits the amount of load placed on
-// the filesystem when trying to manage hundreds of thousands or even tens of
-// millions of sectors in a single folder.
+// when an attacker can perform orders of magnitude more than a billion trials
+// per second. When attacking the host sector ids though, the attacker can only
+// do one trial per sector upload, and even then has minimal means to learn
+// whether or not a collision was successfully achieved. Hash length can safely
+// be reduced from 32 bytes to 12 bytes, which has a collision resistance of
+// 2^48. The host however is unlikely to be storing 2^48 sectors, which would
+// be an exabyte of data.
 func (cm *ContractManager) managedSectorID(sectorRoot crypto.Hash) (id sectorID) {
 	saltedRoot := crypto.HashAll(sectorRoot, cm.sectorSalt)
 	copy(id[:], saltedRoot[:])
@@ -91,7 +81,7 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 		return nil, errSectorNotFound
 	}
 
-	// Fetch the sector.
+	// Determine where on disk the sector lies.
 	sectorData := make([]byte, modules.SectorSize)
 	sf, exists := cm.storageFolders[sl.storageFolder]
 	if !exists {
@@ -100,6 +90,8 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	}
 	seekOffset := int64(len(sf.Usage)) * storageFolderGranularity * sectorMetadataDiskSize
 	seekOffset += int64(sl.index) * int64(modules.SectorSize)
+
+	// Seed and read.
 	_, err := sf.file.Seek(seekOffset, 0)
 	if err != nil {
 		sf.failedReads++
@@ -115,72 +107,6 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 }
 
 /*
-import (
-	"bytes"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"io/ioutil"
-	"path/filepath"
-
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/NebulousLabs/bolt"
-)
-
-// TODO: Make sure the host will not stutter if it needs to perform operations
-// on sectors that have been manually deleted.
-
-// sectorUsage indicates how a sector is being used. Each block height
-// represents a point at which a file contract using the sector expires. File
-// contracts that use the sector multiple times will have their block height
-// appear multiple times. This data allows the host to figure out what types of
-// discounts can be applied to data that is reusing sectors. This is primarily
-// useful for file contract renewals, and really shouldn't be used otherwise.
-//
-// The StorageFolder field indicates which storage folder is housing the
-// sector.
-type sectorUsage struct {
-	Corrupted     bool // If the corrupted flag is set, it means the sector is permanently unreachable.
-	Expiry        []types.BlockHeight
-	StorageFolder []byte
-}
-
-// ReadSector will pull a sector from disk into memory.
-func (sm *StorageManager) ReadSector(sectorRoot crypto.Hash) (sectorBytes []byte, err error) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	err = sm.db.View(func(tx *bolt.Tx) error {
-		bsu := tx.Bucket(bucketSectorUsage)
-		sectorKey := sm.sectorID(sectorRoot[:])
-		sectorUsageBytes := bsu.Get(sectorKey)
-		if sectorUsageBytes == nil {
-			return errSectorNotFound
-		}
-		var su sectorUsage
-		err = json.Unmarshal(sectorUsageBytes, &su)
-		if err != nil {
-			return err
-		}
-
-		sectorPath := filepath.Join(sm.persistDir, hex.EncodeToString(su.StorageFolder), string(sectorKey))
-		sectorBytes, err = ioutil.ReadFile(sectorPath)
-		sf := sm.storageFolder(su.StorageFolder)
-		if err != nil {
-			// Mark the read failure in the sector.
-			sf.FailedReads++
-			return err
-		}
-		sf.SuccessfulReads++
-		return nil
-	})
-	return
-}
-
 // RemoveSector will remove a sector from the host at the given expiry height.
 // If the provided sector does not have an expiration at the given height, an
 // error will be thrown.
