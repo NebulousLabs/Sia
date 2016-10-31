@@ -253,3 +253,13 @@ func TestSweepSeed(t *testing.T) {
 		t.Fatalf("wallet should have correct balance after sweeping seed: wanted %v, got %v", swept, incoming)
 	}
 }
+
+// TestGenerateKeys tests that the generateKeys function correctly generates a
+// key for every index specified.
+func TestGenerateKeys(t *testing.T) {
+	for i, k := range generateKeys(modules.Seed{}, 1000, 4000) {
+		if len(k.UnlockConditions.PublicKeys) == 0 {
+			t.Errorf("index %v was skipped", i)
+		}
+	}
+}
