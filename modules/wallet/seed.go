@@ -57,9 +57,9 @@ func generateKeys(seed modules.Seed, start, n uint64) []spendableKey {
 				// NOTE: don't bother trying to optimize generateSpendableKey;
 				// profiling shows that ed25519 key generation consumes far
 				// more CPU time than encoding or hashing.
-				keys[i] = generateSpendableKey(seed, i)
+				keys[i] = generateSpendableKey(seed, start+i)
 			}
-		}(start + uint64(cpu))
+		}(uint64(cpu))
 	}
 	wg.Wait()
 	return keys
