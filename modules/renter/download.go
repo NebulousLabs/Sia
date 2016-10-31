@@ -209,8 +209,8 @@ func (r *Renter) Download(path, destination string) error {
 	defer f.Close()
 
 	// A loop that will iterate until the download is complete.
-	// Downloads are canceled if they make no progress for 30 minutes.
-	progressDeadline := time.Now().Add(30 * time.Minute)
+	// Downloads are canceled if they make no progress for 120 minutes.
+	progressDeadline := time.Now().Add(120 * time.Minute)
 	for {
 		// copy file contracts
 		file.mu.RLock()
