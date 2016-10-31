@@ -15,7 +15,7 @@ const scanMultiplier = 4 // how many more keys to generate after each scan itera
 var numInitialKeys = func() uint64 {
 	switch build.Release {
 	case "dev":
-		return 1e4
+		return 10e3
 	case "standard":
 		return 1e6
 	case "testing":
@@ -34,7 +34,7 @@ var maxScanKeys = func() uint64 {
 	case "standard":
 		return 100e6
 	case "testing":
-		return 1e5
+		return 100e3
 	default:
 		panic("unrecognized build.Release")
 	}
