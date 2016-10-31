@@ -91,8 +91,8 @@ By default the wallet encryption / unlock password is the same as the generated 
 
 	walletSeedsCmd = &cobra.Command{
 		Use:   "seeds",
-		Short: "Retrieve information about your seeds",
-		Long:  "Retrieves the current seed, how many addresses are remaining, and the rest of your seeds from the wallet",
+		Short: "View information about your seeds",
+		Long:  "View your primary and auxiliary wallet seeds.",
 		Run:   wrap(walletseedscmd),
 	}
 
@@ -254,9 +254,9 @@ func walletseedscmd() {
 	if err != nil {
 		die("Error retrieving the current seed:", err)
 	}
-	fmt.Printf("Primary Seed: %s\n"+
-		"Addresses Remaining %d\n"+
-		"All Seeds:\n", seedInfo.PrimarySeed, seedInfo.AddressesRemaining)
+	fmt.Println("Primary Seed:")
+	fmt.Println(seedInfo.PrimarySeed)
+	fmt.Println("Auxilliary Seeds:")
 	for _, seed := range seedInfo.AllSeeds {
 		fmt.Println(seed)
 	}
