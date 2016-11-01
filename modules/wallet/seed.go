@@ -3,6 +3,8 @@ package wallet
 import (
 	"crypto/rand"
 	"errors"
+	"runtime"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -40,6 +42,27 @@ func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 		},
 		SecretKeys: []crypto.SecretKey{sk},
 	}
+}
+
+// generateKeys generates n keys from seed, starting from index start.
+func generateKeys(seed modules.Seed, start, n uint64) []spendableKey {
+	// generate in parallel, one goroutine per core.
+	keys := make([]spendableKey, n)
+	var wg sync.WaitGroup
+	wg.Add(runtime.NumCPU())
+	for cpu := 0; cpu < runtime.NumCPU(); cpu++ {
+		go func(offset uint64) {
+			defer wg.Done()
+			for i := offset; i < n; i += uint64(runtime.NumCPU()) {
+				// NOTE: don't bother trying to optimize generateSpendableKey;
+				// profiling shows that ed25519 key generation consumes far
+				// more CPU time than encoding or hashing.
+				keys[i] = generateSpendableKey(seed, start+i)
+			}
+		}(uint64(cpu))
+	}
+	wg.Wait()
+	return keys
 }
 
 // createSeedFile creates and encrypts a seedFile.
@@ -82,9 +105,8 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf seedFile) (seed modules.See
 // integrateSeed generates n spendableKeys from the seed and loads them into
 // the wallet.
 func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
-	for i := uint64(0); i < n; i++ {
-		spendableKey := generateSpendableKey(seed, i)
-		w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
+	for _, sk := range generateKeys(seed, 0, n) {
+		w.keys[sk.UnlockConditions.UnlockHash()] = sk
 	}
 }
 
@@ -138,8 +160,11 @@ func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockConditions, er
 	}
 
 	// Fetch and increment the seed progress.
-	progress, err := dbIncrementPrimarySeedProgress(tx)
+	progress, err := dbGetPrimarySeedProgress(tx)
 	if err != nil {
+		return types.UnlockConditions{}, err
+	}
+	if err = dbPutPrimarySeedProgress(tx, progress+1); err != nil {
 		return types.UnlockConditions{}, err
 	}
 	// Integrate the next key into the wallet, and return the unlock
@@ -215,4 +240,84 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.loadSeed(masterKey, seed)
+}
+
+// SweepSeed scans the blockchain for outputs generated from seed and create a
+// transaction that transfers them to the wallet. Note that this incurs a
+// transaction fee. It returns the total value of the outputs, minus the fee.
+// TODO: support SiafundOutputs too
+func (w *Wallet) SweepSeed(seed modules.Seed) (payout types.Currency, err error) {
+	if err = w.tg.Add(); err != nil {
+		return
+	}
+	defer w.tg.Done()
+
+	if !w.cs.Synced() {
+		return types.Currency{}, errors.New("cannot sweep until blockchain is synced")
+	}
+
+	// get an address to spend into
+	var uc types.UnlockConditions
+	err = w.db.Update(func(tx *bolt.Tx) error {
+		var err error
+		uc, err = w.nextPrimarySeedAddress(tx)
+		return err
+	})
+	if err != nil {
+		return
+	}
+
+	// scan blockchain for outputs, filtering out 'dust' (outputs that cost
+	// more in fees than they are worth)
+	s := newSeedScanner(seed)
+	_, maxFee := w.tpool.FeeEstimation()
+	const outputSize = 350 // approx. size in bytes of an output and accompanying signature
+	s.dustThreshold = maxFee.Mul64(outputSize)
+	if err = s.scan(w.cs); err != nil {
+		return
+	}
+
+	// construct a transaction that spends the outputs
+	// TODO: this may result in transactions that are too large.
+	var txn types.Transaction
+	var swept types.Currency // total value of swept outputs
+	for _, output := range s.siacoinOutputs {
+		// construct an input for the output
+		sk := generateSpendableKey(seed, output.seedIndex)
+		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
+			ParentID:         types.SiacoinOutputID(output.id),
+			UnlockConditions: sk.UnlockConditions, // TODO: check timelock, etc.
+		})
+		// add a signature for the input
+		swept = swept.Add(output.value)
+	}
+
+	// estimate the transaction size. NOTE: this equation doesn't account for
+	// other fields in the transaction, but since we are multiplying by
+	// maxFee, lowballing is ok
+	estTxnSize := len(s.siacoinOutputs) * outputSize
+	estFee := maxFee.Mul64(uint64(estTxnSize))
+	if estFee.Cmp(swept) >= 0 {
+		return types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
+	}
+	txn.MinerFees = append(txn.MinerFees, estFee)
+
+	// add the recipient output, equal to the sum of the inputs minus the
+	// transaction fee
+	payout = swept.Sub(estFee)
+	txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
+		Value:      payout,
+		UnlockHash: uc.UnlockHash(),
+	})
+
+	// add signatures
+	for _, output := range s.siacoinOutputs {
+		sk := generateSpendableKey(seed, output.seedIndex)
+		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
+	}
+
+	// submit the transaction
+	txnSet := []types.Transaction{txn}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	return
 }

@@ -192,3 +192,74 @@ func TestLoadSeed(t *testing.T) {
 	}
 	w2.Close()
 }
+
+// TestSweepSeed tests that sweeping a seed results in a transfer of its
+// outputs to the wallet.
+func TestSweepSeed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// create a wallet with some money
+	wt, err := createWalletTester("TestSweepSeed0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	seed, _, err := wt.wallet.PrimarySeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// send money to ourselves, so that we sweep a real output (instead of
+	// just a miner payout)
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.miner.AddBlock()
+
+	// create a blank wallet
+	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestSweepSeed1"), modules.WalletDir)
+	w, err := New(wt.cs, wt.tpool, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newSeed, err := w.Encrypt(crypto.TwofishKey{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(crypto.TwofishKey(crypto.HashObject(newSeed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// starting balance should be 0.
+	siacoinBal, _, _ := w.ConfirmedBalance()
+	if !siacoinBal.IsZero() {
+		t.Error("fresh wallet should not have a balance")
+	}
+
+	// sweep the seed of the first wallet into the second
+	swept, err := w.SweepSeed(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// new wallet should have exactly 'swept' coins
+	_, incoming := w.UnconfirmedBalance()
+	if incoming.Cmp(swept) != 0 {
+		t.Fatalf("wallet should have correct balance after sweeping seed: wanted %v, got %v", swept, incoming)
+	}
+}
+
+// TestGenerateKeys tests that the generateKeys function correctly generates a
+// key for every index specified.
+func TestGenerateKeys(t *testing.T) {
+	for i, k := range generateKeys(modules.Seed{}, 1000, 4000) {
+		if len(k.UnlockConditions.PublicKeys) == 0 {
+			t.Errorf("index %v was skipped", i)
+		}
+	}
+}
