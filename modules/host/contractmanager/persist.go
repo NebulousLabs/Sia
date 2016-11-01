@@ -102,7 +102,7 @@ func (cm *ContractManager) loadSectorLocations() {
 				// If the corresponding bit in the usage element is flipped,
 				// there is a real sector here. Otherwise, the data can be
 				// assumed to be garbage.
-				if usage&usageMask == usage {
+				if usage&usageMask == usageMask {
 					// There is valid sector metadata here. The next 14 bytes
 					// contain all information needed to piece together the
 					// full sector location information.
@@ -116,6 +116,7 @@ func (cm *ContractManager) loadSectorLocations() {
 					}
 					// Add the sector to the sector location map.
 					cm.sectorLocations[id] = sl
+					sf.sectors += 1
 				}
 
 				// Advance the read head, and then check the next bit of the

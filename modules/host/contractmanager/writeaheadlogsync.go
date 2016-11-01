@@ -22,6 +22,17 @@ func (wal *writeAheadLog) syncResources() {
 	// Sync the settings file.
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
+		// For testing, provide a place to interrupt the saving of the sync
+		// file. This makes it easy to simulate certain types of unclean
+		// shutdown.
+		if wal.cm.dependencies.disrupt("settingsSyncRename") {
+			// The current settings file that is being re-written will not be
+			// saved.
+			return
+		}
+
 		tmpFilename := filepath.Join(wal.cm.persistDir, settingsFileTmp)
 		filename := filepath.Join(wal.cm.persistDir, settingsFile)
 		err := wal.fileSettingsTmp.Sync()
@@ -38,19 +49,19 @@ func (wal *writeAheadLog) syncResources() {
 			wal.cm.log.Severe("ERROR: unable to atomically copy the contract manager settings:", err)
 			panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
 		}
-		wg.Done()
 	}()
 
 	// Sync all of the storage folders.
 	for _, sf := range wal.cm.storageFolders {
 		wg.Add(1)
 		go func(sf *storageFolder) {
+			defer wg.Done()
+
 			err := sf.file.Sync()
 			if err != nil {
 				wal.cm.log.Severe("ERROR: unable to sync a storage folder:", err)
 				panic("unable to sync a storage folder, creashing to avoid data corruption")
 			}
-			wg.Done()
 		}(sf)
 	}
 
@@ -59,6 +70,8 @@ func (wal *writeAheadLog) syncResources() {
 	// have been synced.
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		err := wal.fileWALTmp.Sync()
 		if err != nil {
 			wal.cm.log.Severe("Unable to sync the write-ahead-log:", err)
@@ -69,8 +82,8 @@ func (wal *writeAheadLog) syncResources() {
 			// Log that the host is having trouble saving the uncommitted changes.
 			// Crash if the list of uncommitted changes has grown very large.
 			wal.cm.log.Println("ERROR: could not close temporary write-ahead-log in contract manager:", err)
+			return
 		}
-		wg.Done()
 	}()
 
 	// Wait for all of the sync calls to finish.
@@ -80,7 +93,10 @@ func (wal *writeAheadLog) syncResources() {
 	// update the WAL.
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
-	err := os.Rename(walTmpName, walFileName)
+	var err error
+	if !wal.cm.dependencies.disrupt("walRename") {
+		err = os.Rename(walTmpName, walFileName)
+	}
 	if err != nil {
 		// Log that the host is having trouble saving the uncommitted changes.
 		// Crash if the list of uncommitted changes has grown very large.
@@ -128,6 +144,8 @@ func (wal *writeAheadLog) commit() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		// Begin writing to the settings file, which will be synced during the
 		// next iteration of the sync loop.
 		var err error
@@ -142,12 +160,13 @@ func (wal *writeAheadLog) commit() {
 			wal.cm.log.Severe("writing to settings tmp file has failed:", err)
 			panic("unable to write to temporary settings file, crashing to avoid data corruption")
 		}
-		wg.Done()
 	}()
 
 	// Begin writing new changes to the WAL.
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		// Recreate the wal file so that it can receive new updates.
 		var err error
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
@@ -169,7 +188,6 @@ func (wal *writeAheadLog) commit() {
 		if err != nil {
 			wal.cm.log.Println("ERROR: in-progress action lost due to disk failure:", err)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }

@@ -191,25 +191,25 @@ func TestAddStorageFolderConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() {
+		defer wg.Done()
 		err := cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
-		wg.Done()
 	}()
 	go func() {
+		defer wg.Done()
 		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
-		wg.Done()
 	}()
 	go func() {
+		defer wg.Done()
 		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 
@@ -338,18 +338,18 @@ func TestAddStorageFolderBlocking(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		err := cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
-		wg.Done()
 	}()
 	go func() {
+		defer wg.Done()
 		err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*storageFolderGranularity*8)
 		if err != nil {
 			t.Fatal(err)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 	close(d.blockLifted)
@@ -959,7 +959,7 @@ func TestAddStorageFolderReload(t *testing.T) {
 		t.Error("capacity reported by storage folder is not the capacity alloacted")
 	}
 	if sfs[0].CapacityRemaining != sfSize {
-		t.Error("capacity remaining reported by storage folder is not the capacity alloacted")
+		t.Error("capacity remaining reported by storage folder is not the capacity alloacted", sfs[0].Capacity, sfs[0].CapacityRemaining)
 	}
 	// Check that the storage folder as represented on disk has the correct
 	// size.

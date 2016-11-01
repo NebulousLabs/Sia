@@ -26,6 +26,8 @@ func BenchmarkSectorLocations(b *testing.B) {
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func(i int) {
+			defer wg.Done()
+
 			for j := i * 3e6; j < i*3e6+3e6; j++ {
 				crypto.Read(ids[j][:])
 				index, err := crypto.RandIntn(1 << 32)
@@ -44,7 +46,6 @@ func BenchmarkSectorLocations(b *testing.B) {
 				}
 				sectorLocations[j].count = uint16(count)
 			}
-			wg.Done()
 		}(i)
 	}
 	wg.Wait()

@@ -91,7 +91,7 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	seekOffset := int64(len(sf.Usage)) * storageFolderGranularity * sectorMetadataDiskSize
 	seekOffset += int64(sl.index) * int64(modules.SectorSize)
 
-	// Seed and read.
+	// Seek and read.
 	_, err := sf.file.Seek(seekOffset, 0)
 	if err != nil {
 		sf.failedReads++

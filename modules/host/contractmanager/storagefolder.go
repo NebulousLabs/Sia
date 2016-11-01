@@ -89,10 +89,9 @@ type storageFolder struct {
 	atomicProgressNumerator   uint64
 	atomicProgressDenominator uint64
 
-	Index   uint16
-	Path    string
-	Sectors uint64
-	Usage   []uint64
+	Index uint16
+	Path  string
+	Usage []uint64
 
 	// Not exporting these values means that they will not be saved between
 	// restarts of the contract manager. This is intentional, as it is expected
@@ -105,7 +104,8 @@ type storageFolder struct {
 	// An open file handle is kept so that writes can easily be made to the
 	// storage folder without needing to grab a new file handle. This also
 	// makes it easy to do delayed-syncing.
-	file file // type file is an interface implemented by os.File in production
+	file    file // type file is an interface implemented by os.File in production
+	sectors uint64
 }
 
 // emptiestStorageFolder takes a set of storage folders and returns the storage
@@ -118,7 +118,7 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	winningIndex := -1
 	for i, sf := range sfs {
 		totalCapacity := uint64(len(sf.Usage)) * 64
-		freeCapacity := float64(totalCapacity-sf.Sectors) / float64(totalCapacity)
+		freeCapacity := float64(totalCapacity-sf.sectors) / float64(totalCapacity)
 		if freeCapacity > 0 && freeCapacity > mostFree {
 			enoughRoom = true
 			mostFree = freeCapacity
@@ -153,7 +153,7 @@ func (wal *writeAheadLog) storageFolderMetadata() (smfs []modules.StorageFolderM
 		// Grab the non-computational data.
 		sfm := modules.StorageFolderMetadata{
 			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
-			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.Sectors) * modules.SectorSize,
+			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.sectors) * modules.SectorSize,
 			Path:              sf.Path,
 
 			FailedReads:      sf.failedReads,
