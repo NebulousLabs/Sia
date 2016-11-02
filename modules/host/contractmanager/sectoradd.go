@@ -113,7 +113,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 
 			// Fill out the sectorAdd object so that it can be added to the
 			// WAL.
-			sa.Count = location.count + 1
+			sa.Count = location.count
 			sa.Folder = location.storageFolder
 			sa.Index = location.index
 		} else {
