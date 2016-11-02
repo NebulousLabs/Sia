@@ -91,8 +91,8 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
 
-		// Create and fill out the sectorAdd object.
-		sa := sectorAdd{
+		// Create and fill out the sectorUpdate object.
+		su := sectorUpdate{
 			ID: id,
 		}
 
@@ -111,11 +111,11 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			location.count += 1
 			wal.cm.sectorLocations[id] = location
 
-			// Fill out the sectorAdd object so that it can be added to the
+			// Fill out the sectorUpdate object so that it can be added to the
 			// WAL.
-			sa.Count = location.count
-			sa.Folder = location.storageFolder
-			sa.Index = location.index
+			su.Count = location.count
+			su.Folder = location.storageFolder
+			su.Index = location.index
 		} else {
 			// Sanity check - data should have modules.SectorSize bytes.
 			if uint64(len(data)) != modules.SectorSize {
@@ -176,35 +176,21 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			usageElement = usageElement | (1 << bitIndex)
 			sf.Usage[sectorIndex/storageFolderGranularity] = usageElement
 
-			// Fill out the sectorAdd fields.
-			sa.Count = 1
-			sa.Folder = sf.Index
-			sa.Index = sectorIndex
+			// Fill out the sectorUpdate fields.
+			su.Count = 1
+			su.Folder = sf.Index
+			su.Index = sectorIndex
 		}
 
 		// Write the sector metadata to disk.
-		sf := wal.cm.storageFolders[sa.Folder]
-		writeData := make([]byte, sectorMetadataDiskSize)
-		copy(writeData, sa.ID[:])
-		binary.LittleEndian.PutUint16(writeData[12:], sa.Count)
-		_, err := sf.file.Seek(sectorMetadataDiskSize*int64(sa.Index), 0)
+		err := wal.writeSectorMetadata(su)
 		if err != nil {
-			wal.cm.log.Println("ERROR: unable to seek to sector metadata when adding sector")
-			sf.failedWrites += 1
-			return build.ExtendErr("unable to seek to sector metadata when adding sector", err)
+			return build.ExtendErr("unable to write sector metadata during addSector call", err)
 		}
-		_, err = sf.file.Write(writeData)
-		if err != nil {
-			wal.cm.log.Println("ERROR: unable to write sector metadata when adding sector")
-			sf.failedWrites += 1
-			return build.ExtendErr("unable to write sector metadata when adding sector", err)
-		}
-		// Writes were successful, update the storage folder stats.
-		sf.successfulWrites += 1
 
 		// Add a change to the WAL to commit this sector to the provided index.
 		err = wal.appendChange(stateChange{
-			AddedSectors: []sectorAdd{sa},
+			SectorUpdates: []sectorUpdate{su},
 		})
 		if err != nil {
 			return build.ExtendErr("failed to add a state change", err)
@@ -224,33 +210,54 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 	return nil
 }
 
-// commitAddSector will commit a sector that has been added to the WAL.
-func (wal *writeAheadLog) commitAddSector(sa sectorAdd) {
-	// Update the storage folder usage for this sector.
-	usageElement := wal.cm.storageFolders[sa.Folder].Usage[sa.Index/storageFolderGranularity]
-	bitIndex := sa.Index % storageFolderGranularity
-	usageElement = usageElement | (1 << bitIndex)
-	wal.cm.storageFolders[sa.Folder].Usage[sa.Index/storageFolderGranularity] = usageElement
+// commitUpdateSector will commit a sector update to the contract manager,
+// writing in metadata and usage info if the sector still exists, and deleting
+// the usage info if the sector does not exist. The update is idempotent.
+func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
+	// Grab the usage flag, as it will need to be updated.
+	usageElement := wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity]
+	bitIndex := su.Index % storageFolderGranularity
 
-	// Write the sector metadata to disk.
-	sf := wal.cm.storageFolders[sa.Folder]
+	// If the sector is being cleaned from disk, unset the usage flag. No need
+	// to update the metadata, the contractor now sees it as garbage data
+	// anyway.
+	if su.Count == 0 {
+		usageElement = usageElement & (^(1 << bitIndex))
+		wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+		return
+	}
+
+	// If the sector is not being purged, set the usage flag.
+	usageElement = usageElement | (1 << bitIndex)
+	wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+
+	// Write the updated sector metadata to disk. The sector itself will
+	// already have been written to disk and synced.
+	wal.writeSectorMetadata(su)
+}
+
+// writeSectorMetadata will take a sector update and write the related metadata
+// to disk.
+func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
+	sf := wal.cm.storageFolders[su.Folder]
 	writeData := make([]byte, sectorMetadataDiskSize)
-	copy(writeData, sa.ID[:])
-	binary.LittleEndian.PutUint16(writeData[12:], sa.Count)
-	_, err := sf.file.Seek(sectorMetadataDiskSize*int64(sa.Index), 0)
+	copy(writeData, su.ID[:])
+	binary.LittleEndian.PutUint16(writeData[12:], su.Count)
+	_, err := sf.file.Seek(sectorMetadataDiskSize*int64(su.Index), 0)
 	if err != nil {
 		wal.cm.log.Println("ERROR: unable to seek to sector metadata when adding sector")
 		sf.failedWrites += 1
-		return
+		return err
 	}
 	_, err = sf.file.Write(writeData)
 	if err != nil {
 		wal.cm.log.Println("ERROR: unable to write sector metadata when adding sector")
 		sf.failedWrites += 1
-		return
+		return err
 	}
 	// Writes were successful, update the storage folder stats.
 	sf.successfulWrites += 1
+	return nil
 }
 
 // AddSector will add a sector to the contract manager.

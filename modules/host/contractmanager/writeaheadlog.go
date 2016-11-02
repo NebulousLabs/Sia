@@ -13,9 +13,8 @@ import (
 )
 
 type (
-	// sectorAdd is an idempotent update to the sector metadata, indicating
-	// that a sector has been added or updated.
-	sectorAdd struct {
+	// sectorUpdate is an idempotent update to the sector metadata.
+	sectorUpdate struct {
 		Count  uint16
 		Folder uint16
 		ID     sectorID
@@ -52,9 +51,10 @@ type (
 		StorageFolderAdditions           []*storageFolder
 		UnfinishedStorageFolderAdditions []*storageFolder
 
-		// AddedSectors records the list of sectors that have been added to the
-		// contract manager since the last update.
-		AddedSectors []sectorAdd
+		// Updates to the sector metadata. Careful ordering of events ensures
+		// that a sector update will not make it into the synced WAL unless the
+		// sector data is already on-disk and synced.
+		SectorUpdates []sectorUpdate
 	}
 
 	// writeAheadLog coordinates ACID transactions which update the state of
@@ -164,9 +164,9 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 			wal.commitAddStorageFolder(sfa)
 		}
 	}
-	for _, as := range sc.AddedSectors {
+	for _, su := range sc.SectorUpdates {
 		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
-			wal.commitAddSector(as)
+			wal.commitUpdateSector(su)
 		}
 	}
 }
