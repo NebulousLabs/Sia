@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/spf13/cobra"
 )
 
@@ -27,11 +28,34 @@ var (
 		Long:  "Check for available updates.",
 		Run:   wrap(updatecheckcmd),
 	}
+
+	versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Long:  "Print version information.",
+		Run:   wrap(versioncmd),
+	}
 )
 
 type updateInfo struct {
 	Available bool   `json:"available"`
 	Version   string `json:"version"`
+}
+
+type daemonVersion struct {
+	Version string
+}
+
+// version prints the version of siac and siad.
+func versioncmd() {
+	var versioninfo daemonVersion
+	err := getAPI("/daemon/version", &versioninfo)
+	if err != nil {
+		fmt.Println("Could not get daemon version:", err)
+		return
+	}
+	fmt.Println("Sia Client v" + build.Version)
+	fmt.Println("Sia Daemon v" + versioninfo.Version)
 }
 
 // stopcmd is the handler for the command `siac stop`.

@@ -219,10 +219,6 @@ func die(args ...interface{}) {
 	os.Exit(exitCodeGeneral)
 }
 
-func version() {
-	println("Sia Client v" + build.Version)
-}
-
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
@@ -232,13 +228,7 @@ func main() {
 	}
 
 	// create command tree
-	root.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print version information",
-		Long:  "Print version information.",
-		Run:   wrap(version),
-	})
-
+	root.AddCommand(versionCmd)
 	root.AddCommand(stopCmd)
 
 	root.AddCommand(updateCmd)
