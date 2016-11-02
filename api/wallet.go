@@ -277,7 +277,7 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 	}
 
 	// Get the primary seed information.
-	primarySeed, _, err := api.wallet.PrimarySeed()
+	primarySeed, addrsRemaining, err := api.wallet.PrimarySeed()
 	if err != nil {
 		WriteError(w, Error{"error after call to /wallet/seeds: " + err.Error()}, http.StatusBadRequest)
 		return
@@ -305,7 +305,7 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 	}
 	WriteJSON(w, WalletSeedsGET{
 		PrimarySeed:        primarySeedStr,
-		AddressesRemaining: 1, // deprecated
+		AddressesRemaining: int(addrsRemaining),
 		AllSeeds:           allSeedsStrs,
 	})
 }

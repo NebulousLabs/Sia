@@ -184,7 +184,8 @@ func (w *Wallet) AllSeeds() ([]modules.Seed, error) {
 	return append([]modules.Seed{w.primarySeed}, w.seeds...), nil
 }
 
-// PrimarySeed returns the decrypted primary seed of the wallet.
+// PrimarySeed returns the decrypted primary seed of the wallet, as well as
+// the number of addresses that the seed can be safely used to generate.
 func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -204,7 +205,14 @@ func (w *Wallet) PrimarySeed() (modules.Seed, uint64, error) {
 		return modules.Seed{}, 0, err
 	}
 
-	return w.primarySeed, progress, nil
+	// addresses remaining is maxScanKeys-progress; generating more keys than
+	// that risks not being able to recover them when using SweepSeed or
+	// InitFromSeed.
+	remaining := maxScanKeys - progress
+	if progress > maxScanKeys {
+		remaining = 0
+	}
+	return w.primarySeed, remaining, nil
 }
 
 // NextAddress returns an unlock hash that is ready to receive siacoins or
