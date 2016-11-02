@@ -47,26 +47,26 @@ func TestPrimarySeed(t *testing.T) {
 	}
 
 	// Try getting an address, see that the seed advances correctly.
-	primarySeed, progress, err := wt.wallet.PrimarySeed()
+	primarySeed, remaining, err := wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(primarySeed[:], seed[:]) {
 		t.Error("PrimarySeed is returning a value inconsitent with the seed returned by Encrypt")
 	}
-	if progress != 0 {
-		t.Error("primary seed is returning the wrong progress")
+	if remaining != maxScanKeys {
+		t.Error("primary seed is returning the wrong number of remaining addresses")
 	}
 	_, err = wt.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, progress, err = wt.wallet.PrimarySeed()
+	_, remaining, err = wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if progress != 1 {
-		t.Error("primary seed is returning the wrong progress")
+	if remaining != maxScanKeys-1 {
+		t.Error("primary seed is returning the wrong number of remaining addresses")
 	}
 
 	// Lock then unlock the wallet and check the responses.
@@ -82,15 +82,15 @@ func TestPrimarySeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	primarySeed, progress, err = wt.wallet.PrimarySeed()
+	primarySeed, remaining, err = wt.wallet.PrimarySeed()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(primarySeed[:], seed[:]) {
 		t.Error("PrimarySeed is returning a value inconsitent with the seed returned by Encrypt")
 	}
-	if progress != 1 {
-		t.Error("progress reporting an unexpected value")
+	if remaining != maxScanKeys-1 {
+		t.Error("primary seed is returning the wrong number of remaining addresses")
 	}
 }
 
