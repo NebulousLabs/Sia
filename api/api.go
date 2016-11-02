@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 
 	"github.com/julienschmidt/httprouter"
@@ -264,8 +265,10 @@ func UnrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
 func WriteError(w http.ResponseWriter, err Error, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
-	if json.NewEncoder(w).Encode(err) != nil {
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
+	if encodeErr := json.NewEncoder(w).Encode(err); encodeErr != nil {
+		// Marshalling should only fail in the event of a developer error.
+		// Specifically, only non-marshallable types should cause an error here.
+		build.Critical("failed to encode API error response:", encodeErr)
 	}
 }
 
@@ -274,8 +277,10 @@ func WriteError(w http.ResponseWriter, err Error, code int) {
 // accordingly.
 func WriteJSON(w http.ResponseWriter, obj interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if json.NewEncoder(w).Encode(obj) != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	if err := json.NewEncoder(w).Encode(obj); err != nil {
+		// Marshalling should only fail in the event of a developer error.
+		// Specifically, only non-marshallable types should cause an error here.
+		build.Critical("failed to encode API response:", err)
 	}
 }
 
