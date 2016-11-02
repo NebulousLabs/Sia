@@ -84,6 +84,32 @@ func randFreeSector(usage []uint64) (uint32, error) {
 	return uint32((uint64(i) * 64) + msz), nil
 }
 
+// commitUpdateSector will commit a sector update to the contract manager,
+// writing in metadata and usage info if the sector still exists, and deleting
+// the usage info if the sector does not exist. The update is idempotent.
+func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
+	// Grab the usage flag, as it will need to be updated.
+	usageElement := wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity]
+	bitIndex := su.Index % storageFolderGranularity
+
+	// If the sector is being cleaned from disk, unset the usage flag. No need
+	// to update the metadata, the contractor now sees it as garbage data
+	// anyway.
+	if su.Count == 0 {
+		usageElement = usageElement & (^(1 << bitIndex))
+		wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+		return
+	}
+
+	// If the sector is not being purged, set the usage flag.
+	usageElement = usageElement | (1 << bitIndex)
+	wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+
+	// Write the updated sector metadata to disk. The sector itself will
+	// already have been written to disk and synced.
+	wal.writeSectorMetadata(su)
+}
+
 // managedAddSector is a WAL operation to add a sector to the contract manager.
 func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 	var syncChan chan struct{}
@@ -210,30 +236,142 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 	return nil
 }
 
-// commitUpdateSector will commit a sector update to the contract manager,
-// writing in metadata and usage info if the sector still exists, and deleting
-// the usage info if the sector does not exist. The update is idempotent.
-func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
-	// Grab the usage flag, as it will need to be updated.
-	usageElement := wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity]
-	bitIndex := su.Index % storageFolderGranularity
+// managedDeleteSector will delete a sector (physical) from the contract manager.
+func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
+	// Create and fill out the sectorUpdate object.
+	su := sectorUpdate{
+		ID: id,
+	}
+	var syncChan chan struct{}
+	err := func() error {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
 
-	// If the sector is being cleaned from disk, unset the usage flag. No need
-	// to update the metadata, the contractor now sees it as garbage data
-	// anyway.
-	if su.Count == 0 {
-		usageElement = usageElement & (^(1 << bitIndex))
-		wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
-		return
+		// Grab the number of virtual sectors that have been committed with
+		// this root.
+		location, exists := wal.cm.sectorLocations[id]
+		if !exists {
+			return errSectorNotFound
+		}
+		// Delete the sector from the sector locations map.
+		delete(wal.cm.sectorLocations, id)
+
+		// Fill out the sectorUpdate object so that it can be added to the
+		// WAL.
+		su.Count = 0 // This function is only being called if we want to set the count to zero.
+		su.Folder = location.storageFolder
+		su.Index = location.index
+
+		// Inform the WAL of the sector update.
+		err := wal.appendChange(stateChange{
+			SectorUpdates: []sectorUpdate{su},
+		})
+		if err != nil {
+			return build.ExtendErr("failed to add a state change", err)
+		}
+
+		// Grab the sync channel to know when the update has been durably
+		// committed.
+		syncChan = wal.syncChan
+		return nil
+	}()
+	if err != nil {
+		return build.ExtendErr("cannot delete sector:", err)
 	}
 
-	// If the sector is not being purged, set the usage flag.
-	usageElement = usageElement | (1 << bitIndex)
-	wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+	// Only return after the commitment has succeeded fully.
+	<-syncChan
 
-	// Write the updated sector metadata to disk. The sector itself will
-	// already have been written to disk and synced.
-	wal.writeSectorMetadata(su)
+	// Only update the usage after the sector delete has been committed to disk
+	// fully.
+	//
+	// The usage is not updated until after the commit has completed to prevent
+	// the actual sector data from being overwritten in the event of unclean
+	// shutdown.
+	wal.mu.Lock()
+	defer wal.mu.Unlock()
+	usageElement := wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity]
+	bitIndex := su.Index % storageFolderGranularity
+	usageElement = usageElement & (^(1 << bitIndex))
+	wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+	return nil
+}
+
+// managedRemoveSector will remove a sector (virtual or physical) from the
+// contract manager.
+func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
+	// Create and fill out the sectorUpdate object.
+	su := sectorUpdate{
+		ID: id,
+	}
+	var syncChan chan struct{}
+	err := func() error {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
+
+		// Grab the number of virtual sectors that have been committed with
+		// this root.
+		location, exists := wal.cm.sectorLocations[id]
+		if !exists {
+			return errSectorNotFound
+		}
+		location.count--
+
+		// Fill out the sectorUpdate object so that it can be added to the
+		// WAL.
+		su.Count = location.count
+		su.Folder = location.storageFolder
+		su.Index = location.index
+
+		// Inform the WAL of the sector update.
+		err := wal.appendChange(stateChange{
+			SectorUpdates: []sectorUpdate{su},
+		})
+		if err != nil {
+			return build.ExtendErr("failed to add a state change", err)
+		}
+
+		// Update the in memory representation of the sector (except the
+		// usage), and write the new metadata to disk if needed.
+		//
+		// The usage is not updated until after the commit has completed to
+		// prevent the actual sector data from being overwritten in the event
+		// of unclean shutdown.
+		if su.Count != 0 {
+			wal.cm.sectorLocations[id] = location
+			err = wal.writeSectorMetadata(su)
+			if err != nil {
+				return build.ExtendErr("failed to write sector metadata", err)
+			}
+		} else {
+			delete(wal.cm.sectorLocations, id)
+		}
+
+		// Grab the sync channel to know when the update has been durably
+		// committed.
+		syncChan = wal.syncChan
+		return nil
+	}()
+	if err != nil {
+		return build.ExtendErr("cannot remove sector:", err)
+	}
+	<-syncChan
+
+	// Only update the usage after the sector removal has been committed to
+	// disk entirely.
+	//
+	// The usage is not updated until after the commit has completed to prevent
+	// the actual sector data from being overwritten in the event of unclean
+	// shutdown.
+	if su.Count == 0 {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
+		usageElement := wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity]
+		bitIndex := su.Index % storageFolderGranularity
+		usageElement = usageElement & (^(1 << bitIndex))
+		wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+	}
+	return nil
 }
 
 // writeSectorMetadata will take a sector update and write the related metadata
@@ -263,4 +401,20 @@ func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
 // AddSector will add a sector to the contract manager.
 func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error {
 	return cm.wal.managedAddSector(cm.managedSectorID(root), sectorData)
+}
+
+// DeleteSector will delete a sector from the contract manager. If multiple
+// copies of the sector exist, all of them will be removed. This should only be
+// used to remove offensive data, as it will cause corruption in the contract
+// manager. This corruption puts the contract manager at risk of failing
+// storage proofs. If the amount of data removed is small, the risk is small.
+// This operation will not destabilize the contract manager.
+func (cm *ContractManager) DeleteSector(root crypto.Hash) error {
+	return cm.wal.managedDeleteSector(cm.managedSectorID(root))
+}
+
+// RemoveSector will remove a sector from the contract manager. If multiple
+// copies of the sector exist, only one will be removed.
+func (cm *ContractManager) RemoveSector(root crypto.Hash) error {
+	return cm.wal.managedRemoveSector(cm.managedSectorID(root))
 }
