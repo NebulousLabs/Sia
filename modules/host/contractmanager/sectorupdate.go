@@ -150,42 +150,59 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			}
 
 			// Find a committed storage folder that has enough space to receive
-			// this sector.
-			sf, _ := emptiestStorageFolder(wal.cm.storageFolderSlice())
-			if sf == nil {
-				// None of the storage folders have enough room to house the
-				// sector.
-				return errInsufficientStorageForSector
-			}
+			// this sector. Keep trying new storage folders if some return
+			// errors during disk operations.
+			storageFolders := wal.cm.storageFolderSlice()
+			sf := new(storageFolder)
+			var sectorIndex uint32
+			for {
+				sf, _ = emptiestStorageFolder(storageFolders)
+				if sf == nil {
+					// None of the storage folders have enough room to house the
+					// sector.
+					return errInsufficientStorageForSector
+				}
+				err := func() error {
+					// Find a location for the sector within the file using the Usage
+					// field.
+					var err error
+					sectorIndex, err = randFreeSector(sf.Usage)
+					if err != nil {
+						wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
+						return err
+					}
 
-			// Find a location for the sector within the file using the Usage
-			// field.
-			sectorIndex, err := randFreeSector(sf.Usage)
-			if err != nil {
-				wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
-				return err
-			}
-
-			// Write the new sector to disk. Any data existing in this location
-			// on disk is either garbage or is from a sector that has been
-			// removed through a successfully committed remove operation - no
-			// risk of corruption to write immediately.
-			//
-			// If the commitment to update the metadata fails, the host will
-			// never know that the sector existed on-disk and will treat it as
-			// garbage data - which does not threaten consistency.
-			lookupTableSize := len(sf.Usage) * storageFolderGranularity * sectorMetadataDiskSize
-			_, err = sf.file.Seek(int64(modules.SectorSize)*int64(sectorIndex)+int64(lookupTableSize), 0)
-			if err != nil {
-				wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
-				sf.failedWrites += 1
-				return errDiskTrouble
-			}
-			_, err = sf.file.Write(data)
-			if err != nil {
-				wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
-				sf.failedWrites += 1
-				return errDiskTrouble
+					// Write the new sector to disk. Any data existing in this location
+					// on disk is either garbage or is from a sector that has been
+					// removed through a successfully committed remove operation - no
+					// risk of corruption to write immediately.
+					//
+					// If the commitment to update the metadata fails, the host will
+					// never know that the sector existed on-disk and will treat it as
+					// garbage data - which does not threaten consistency.
+					lookupTableSize := len(sf.Usage) * storageFolderGranularity * sectorMetadataDiskSize
+					_, err = sf.file.Seek(int64(modules.SectorSize)*int64(sectorIndex)+int64(lookupTableSize), 0)
+					if err != nil {
+						wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
+						sf.failedWrites += 1
+						return errDiskTrouble
+					}
+					_, err = sf.file.Write(data)
+					if err != nil {
+						wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
+						sf.failedWrites += 1
+						return errDiskTrouble
+					}
+					return nil
+				}()
+				if err == nil {
+					// Sector added to a storage folder successfully.
+					break
+				}
+				// Sector not added to storage folder successfully, remove this
+				// stoage folder from the list of storage folders, and try the
+				// next one.
+				storageFolders = append(storageFolders[:sf.Index], storageFolders[sf.Index+1:]...)
 			}
 
 			// Update the state to reflect the new sector.
