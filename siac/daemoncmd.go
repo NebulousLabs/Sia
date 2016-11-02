@@ -48,13 +48,13 @@ type daemonVersion struct {
 
 // version prints the version of siac and siad.
 func versioncmd() {
+	fmt.Println("Sia Client v" + build.Version)
 	var versioninfo daemonVersion
 	err := getAPI("/daemon/version", &versioninfo)
 	if err != nil {
 		fmt.Println("Could not get daemon version:", err)
 		return
 	}
-	fmt.Println("Sia Client v" + build.Version)
 	fmt.Println("Sia Daemon v" + versioninfo.Version)
 }
 
