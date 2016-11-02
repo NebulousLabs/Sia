@@ -215,11 +215,9 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 		// should be zero.
 		<-syncLoopStopped // Wait for the sync loop to signal proper termination.
 
-		// Perform a final sync to make sure all open ended changes get to
-		// disk. This call is necessary because open-ended resources are not
-		// sync'd during a commit - instead their sync is delayed until the
-		// next call to commit() to maximize disk throughput and minimzie lock
-		// contention.
+		// Perform a final commit and sync before closing to make sure that all
+		// queued operations are able to get all the way to disk.
+		wal.commit()
 		wal.syncResources()
 
 		// Close the dangling commit resources.

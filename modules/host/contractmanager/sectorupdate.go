@@ -311,6 +311,7 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 	bitIndex := su.Index % storageFolderGranularity
 	usageElement = usageElement & (^(1 << bitIndex))
 	wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+	wal.cm.storageFolders[su.Folder].sectors--
 	return nil
 }
 
@@ -387,6 +388,7 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 		bitIndex := su.Index % storageFolderGranularity
 		usageElement = usageElement & (^(1 << bitIndex))
 		wal.cm.storageFolders[su.Folder].Usage[su.Index/storageFolderGranularity] = usageElement
+		wal.cm.storageFolders[su.Folder].sectors--
 	}
 	return nil
 }
