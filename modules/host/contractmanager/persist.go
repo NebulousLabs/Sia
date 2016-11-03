@@ -45,9 +45,9 @@ func (cm *ContractManager) loadSettings() error {
 
 	// Copy the saved settings into the contract manager.
 	cm.sectorSalt = ss.SectorSalt
-	for _, sf := range ss.StorageFolders {
-		cm.storageFolders[sf.Index] = &sf
-		sf.file, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
+	for i := range ss.StorageFolders {
+		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
+		ss.StorageFolders[i].file, err = os.OpenFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
 			return build.ExtendErr("error loading storage folder file handle", err)
 		}

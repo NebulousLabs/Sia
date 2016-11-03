@@ -1362,3 +1362,184 @@ func TestDeleteSectorVirtual(t *testing.T) {
 		t.Error("usage field does not seem to have been updated")
 	}
 }
+
+// TestSectorBalancing checks that the contract manager evenly balances sectors
+// between storage folders.
+func TestSectorBalancing(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	cmt, err := newContractManagerTester("TestSectorBalancing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder to the contract manager tester.
+	storageFolderDir := filepath.Join(cmt.persistDir, "storageFolderOne")
+	err = os.MkdirAll(storageFolderDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add a second storage folder.
+	storageFolderDir2 := filepath.Join(cmt.persistDir, "storageFolderTwo")
+	err = os.MkdirAll(storageFolderDir2, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderDir2, modules.SectorSize*64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add a third storage folder, twice as large.
+	storageFolderDir3 := filepath.Join(cmt.persistDir, "storageFolderThree")
+	err = os.MkdirAll(storageFolderDir3, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderDir3, modules.SectorSize*64*2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add 20 sectors.
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			root, data, err := randSector()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cmt.cm.AddSector(root, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Verify that that all 20 sectors were accepted, and that they have been
+	// distributed evenly between storage folders.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 3 {
+		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
+	}
+	if sfs[0].Capacity == sfs[0].CapacityRemaining+modules.SectorSize*10 {
+		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+		}
+		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
+		}
+	} else if sfs[1].Capacity == sfs[1].CapacityRemaining+modules.SectorSize*10 {
+		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		}
+		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
+		}
+	} else {
+		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		}
+		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+		}
+	}
+	// Break the rules slightly - make the test brittle by looking at the
+	// internals directly to determine that the sector got added to the right
+	// locations, and that the Usage information was updated correctly.
+	if len(cmt.cm.sectorLocations) != 20 {
+		t.Fatal("there should be one sector reported in the sectorLocations map")
+	}
+	if len(cmt.cm.storageFolders) != 3 {
+		t.Fatal("storage folder not being reported correctly")
+	}
+	// Check a storage folder at random, verify that the sectors are sane.
+	var index uint16
+	for _, sf := range cmt.cm.storageFolders {
+		index = sf.Index
+	}
+	for _, sl := range cmt.cm.sectorLocations {
+		if sl.storageFolder != index {
+			continue
+		}
+		if sl.count != 1 {
+			t.Error("Sector location should only be reporting one sector")
+		}
+		if sl.index > 64*2 {
+			t.Error("sector index within storage folder also being reported incorrectly")
+		}
+	}
+
+	// Try reloading the contract manager and see if all of the stateful checks
+	// still hold.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that that all 20 sectors were accepted, and that they have been
+	// distributed evenly between storage folders.
+	sfs = cmt.cm.StorageFolders()
+	if len(sfs) != 3 {
+		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
+	}
+	if sfs[0].Capacity == sfs[0].CapacityRemaining+modules.SectorSize*10 {
+		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+		}
+		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
+		}
+	} else if sfs[1].Capacity == sfs[1].CapacityRemaining+modules.SectorSize*10 {
+		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		}
+		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
+		}
+	} else {
+		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		}
+		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
+			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+		}
+	}
+	// Break the rules slightly - make the test brittle by looking at the
+	// internals directly to determine that the sector got added to the right
+	// locations, and that the Usage information was updated correctly.
+	if len(cmt.cm.sectorLocations) != 20 {
+		t.Fatal("there should be twenty sectors reported in the sectorLocations map:", len(cmt.cm.sectorLocations))
+	}
+	if len(cmt.cm.storageFolders) != 3 {
+		t.Fatal("storage folder not being reported correctly")
+	}
+	// Check a storage folder at random, verify that the sectors are sane.
+	for _, sf := range cmt.cm.storageFolders {
+		index = sf.Index
+	}
+	for _, sl := range cmt.cm.sectorLocations {
+		if sl.storageFolder != index {
+			continue
+		}
+		if sl.count != 1 {
+			t.Error("Sector location should only be reporting one sector")
+		}
+		if sl.index > 64*2 {
+			t.Error("sector index within storage folder also being reported incorrectly")
+		}
+	}
+}

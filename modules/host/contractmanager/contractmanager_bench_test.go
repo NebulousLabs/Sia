@@ -76,15 +76,12 @@ func BenchmarkStorageFolders(b *testing.B) {
 	// 375e3 usage elements.
 	usage := make([]uint64, 375e3)
 
-	// Fill the folder to ~95% capacity, which will degrade performance.
-	for i := 0; i < 22800e3; i++ {
+	// Fill the folder to ~99.99% capacity, which will degrade performance.
+	for i := 0; i < 23999e3; i++ {
 		randFreeSector(usage)
 	}
 
-	// Perform insertions and get a benchmark. Benchmark is slightly off, as
-	// performance degrades when the disk is closer to full.
-	//
-	// TODO: Re-write benchmark when 'delete sector' support has been added.
+	// Perform insertions and get a benchmark.
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		randFreeSector(usage)
