@@ -241,6 +241,9 @@ type blockedFile struct {
 // will signal when it has been called for the first time, so that the tester
 // knows the function has reached a blocking point.
 func (bf *blockedFile) Write(b []byte) (int, error) {
+	if !strings.Contains(bf.File.Name(), "storageFolderOne") || strings.Contains(bf.File.Name(), "siahostmetadata.dat") {
+		return bf.File.Write(b)
+	}
 	close(bf.writeCalled)
 	<-bf.blockLifted
 	return bf.File.Write(b)
@@ -273,7 +276,6 @@ func (d *dependencyBlockSFOne) createFile(s string) (file, error) {
 // the contract manager, blocking on the first one to make sure that the others
 // are still allowed to complete.
 func TestAddStorageFolderBlocking(t *testing.T) {
-	t.Skip("Test invalidated by recent switchup - dependencies need adjustment")
 	if testing.Short() {
 		t.SkipNow()
 	}
