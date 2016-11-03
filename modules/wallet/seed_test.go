@@ -242,15 +242,15 @@ func TestSweepSeed(t *testing.T) {
 	}
 
 	// sweep the seed of the first wallet into the second
-	swept, err := w.SweepSeed(seed)
+	sweptCoins, _, err := w.SweepSeed(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// new wallet should have exactly 'swept' coins
+	// new wallet should have exactly 'sweptCoins' coins
 	_, incoming := w.UnconfirmedBalance()
-	if incoming.Cmp(swept) != 0 {
-		t.Fatalf("wallet should have correct balance after sweeping seed: wanted %v, got %v", swept, incoming)
+	if incoming.Cmp(sweptCoins) != 0 {
+		t.Fatalf("wallet should have correct balance after sweeping seed: wanted %v, got %v", sweptCoins, incoming)
 	}
 }
 
