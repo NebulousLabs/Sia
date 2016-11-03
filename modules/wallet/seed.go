@@ -287,12 +287,12 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (payout types.Currency, err error)
 
 	// construct a transaction that spends the outputs
 	// TODO: this may result in transactions that are too large.
-	var txn types.Transaction
+	tb := w.StartTransaction()
 	var swept types.Currency // total value of swept outputs
 	for _, output := range s.siacoinOutputs {
 		// construct an input for the output
 		sk := generateSpendableKey(seed, output.seedIndex)
-		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
+		tb.AddSiacoinInput(types.SiacoinInput{
 			ParentID:         types.SiacoinOutputID(output.id),
 			UnlockConditions: sk.UnlockConditions, // TODO: check timelock, etc.
 		})
@@ -308,24 +308,25 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (payout types.Currency, err error)
 	if estFee.Cmp(swept) >= 0 {
 		return types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
 	}
-	txn.MinerFees = append(txn.MinerFees, estFee)
+	tb.AddMinerFee(estFee)
 
 	// add the recipient output, equal to the sum of the inputs minus the
 	// transaction fee
 	payout = swept.Sub(estFee)
-	txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
+	tb.AddSiacoinOutput(types.SiacoinOutput{
 		Value:      payout,
 		UnlockHash: uc.UnlockHash(),
 	})
 
-	// add signatures
+	// add signatures (manually, since tb doesn't have access to the signing key)
+	txn, parents := tb.View()
 	for _, output := range s.siacoinOutputs {
 		sk := generateSpendableKey(seed, output.seedIndex)
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 	}
 
 	// submit the transaction
-	txnSet := []types.Transaction{txn}
+	txnSet := append(parents, txn)
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	return
 }
