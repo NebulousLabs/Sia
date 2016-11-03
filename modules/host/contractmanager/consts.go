@@ -10,6 +10,10 @@ const (
 	// manager.
 	logFile = "contractmanager.log"
 
+	// metadataFile is the name of the file that stores all of the sector
+	// metadata associated with a storage folder.
+	metadataFile = "siahostmetadata.dat"
+
 	// settingsFile is the name of the file that is used to save the contract
 	// manager's settings.
 	settingsFile = "contractmanager.json"
@@ -21,8 +25,7 @@ const (
 	settingsFileTmp = "contractmanager.json_temp"
 
 	// sectorFile is the file that is placed inside of a storage folder to
-	// house all of the sectors and sector metadata associated with a storage
-	// folder.
+	// house all of the sectors associated with a storage folder.
 	sectorFile = "siahostdata.dat"
 
 	// walFile is the name of the file that is used to save the write ahead log

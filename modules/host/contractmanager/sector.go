@@ -88,16 +88,15 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 		cm.log.Critical("Unable to load storage folder despite having sector metadata")
 		return nil, errSectorNotFound
 	}
-	seekOffset := int64(len(sf.Usage)) * storageFolderGranularity * sectorMetadataDiskSize
-	seekOffset += int64(sl.index) * int64(modules.SectorSize)
+	seekOffset := int64(sl.index) * int64(modules.SectorSize)
 
 	// Seek and read.
-	_, err := sf.file.Seek(seekOffset, 0)
+	_, err := sf.sectorFile.Seek(seekOffset, 0)
 	if err != nil {
 		sf.failedReads++
 		return nil, build.ExtendErr("unable to seek within storage folder", err)
 	}
-	_, err = sf.file.Read(sectorData)
+	_, err = sf.sectorFile.Read(sectorData)
 	if err != nil {
 		sf.failedReads++
 		return nil, build.ExtendErr("unable to read within storage folder", err)

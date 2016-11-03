@@ -104,8 +104,9 @@ type storageFolder struct {
 	// An open file handle is kept so that writes can easily be made to the
 	// storage folder without needing to grab a new file handle. This also
 	// makes it easy to do delayed-syncing.
-	file    file // type file is an interface implemented by os.File in production
-	sectors uint64
+	metadataFile file
+	sectorFile   file
+	sectors      uint64
 }
 
 // emptiestStorageFolder takes a set of storage folders and returns the storage

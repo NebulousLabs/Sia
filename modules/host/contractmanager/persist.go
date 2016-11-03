@@ -46,10 +46,14 @@ func (cm *ContractManager) loadSettings() error {
 	// Copy the saved settings into the contract manager.
 	cm.sectorSalt = ss.SectorSalt
 	for i := range ss.StorageFolders {
-		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
-		ss.StorageFolders[i].file, err = os.OpenFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
+		ss.StorageFolders[i].sectorFile, err = os.OpenFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
-			return build.ExtendErr("error loading storage folder file handle", err)
+			return build.ExtendErr("error loading storage folder sector metadata file handle", err)
+		}
+		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
+		ss.StorageFolders[i].metadataFile, err = os.OpenFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
+		if err != nil {
+			return build.ExtendErr("error loading storage folder sector file handle", err)
 		}
 	}
 	return nil
@@ -70,13 +74,13 @@ func (cm *ContractManager) loadSectorLocations() {
 		// Seek to the beginning of the file and read the whole lookup table.
 		// In the event of an error, continue directly to the next storage
 		// folder.
-		_, err := sf.file.Seek(0, 0)
+		_, err := sf.metadataFile.Seek(0, 0)
 		if err != nil {
 			cm.log.Println("Error: difficulty seeking in storge folder file during startup", err)
 			sf.failedReads++
 			continue
 		}
-		_, err = sf.file.Read(sectorLookupBytes)
+		_, err = sf.metadataFile.Read(sectorLookupBytes)
 		if err != nil {
 			cm.log.Println("Error: difficulty reading from storge folder file during startup", err)
 			sf.failedReads++

@@ -53,11 +53,18 @@ func (wal *writeAheadLog) syncResources() {
 
 	// Sync all of the storage folders.
 	for _, sf := range wal.cm.storageFolders {
-		wg.Add(1)
+		wg.Add(2)
 		go func(sf *storageFolder) {
 			defer wg.Done()
-
-			err := sf.file.Sync()
+			err := sf.metadataFile.Sync()
+			if err != nil {
+				wal.cm.log.Severe("ERROR: unable to sync a storage folder:", err)
+				panic("unable to sync a storage folder, creashing to avoid data corruption")
+			}
+		}(sf)
+		go func(sf *storageFolder) {
+			defer wg.Done()
+			err := sf.sectorFile.Sync()
 			if err != nil {
 				wal.cm.log.Severe("ERROR: unable to sync a storage folder:", err)
 				panic("unable to sync a storage folder, creashing to avoid data corruption")
@@ -238,7 +245,11 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 			}
 		}
 		for _, sf := range wal.cm.storageFolders {
-			err = sf.file.Close()
+			err = sf.metadataFile.Close()
+			if err != nil {
+				wal.cm.log.Println("Error closing the storage folder file handle", err)
+			}
+			err = sf.sectorFile.Close()
 			if err != nil {
 				wal.cm.log.Println("Error closing the storage folder file handle", err)
 			}

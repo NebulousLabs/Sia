@@ -68,6 +68,7 @@ type (
 		io.Closer
 		io.Reader
 		io.Writer
+		Name() string
 		Seek(int64, int) (int64, error)
 		Sync() error
 	}

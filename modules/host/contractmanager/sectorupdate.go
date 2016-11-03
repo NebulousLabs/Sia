@@ -181,14 +181,13 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 					// If the commitment to update the metadata fails, the host will
 					// never know that the sector existed on-disk and will treat it as
 					// garbage data - which does not threaten consistency.
-					lookupTableSize := len(sf.Usage) * storageFolderGranularity * sectorMetadataDiskSize
-					_, err = sf.file.Seek(int64(modules.SectorSize)*int64(sectorIndex)+int64(lookupTableSize), 0)
+					_, err = sf.sectorFile.Seek(int64(modules.SectorSize)*int64(sectorIndex), 0)
 					if err != nil {
 						wal.cm.log.Println("ERROR: unable to seek to sector data when adding sector")
 						sf.failedWrites += 1
 						return errDiskTrouble
 					}
-					_, err = sf.file.Write(data)
+					_, err = sf.sectorFile.Write(data)
 					if err != nil {
 						wal.cm.log.Println("ERROR: unable to write sector data when adding sector")
 						sf.failedWrites += 1
@@ -401,13 +400,13 @@ func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
 	writeData := make([]byte, sectorMetadataDiskSize)
 	copy(writeData, su.ID[:])
 	binary.LittleEndian.PutUint16(writeData[12:], su.Count)
-	_, err := sf.file.Seek(sectorMetadataDiskSize*int64(su.Index), 0)
+	_, err := sf.metadataFile.Seek(sectorMetadataDiskSize*int64(su.Index), 0)
 	if err != nil {
 		wal.cm.log.Println("ERROR: unable to seek to sector metadata when adding sector")
 		sf.failedWrites += 1
 		return err
 	}
-	_, err = sf.file.Write(writeData)
+	_, err = sf.metadataFile.Write(writeData)
 	if err != nil {
 		wal.cm.log.Println("ERROR: unable to write sector metadata when adding sector")
 		sf.failedWrites += 1
