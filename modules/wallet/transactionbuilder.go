@@ -237,7 +237,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	})
 }
 
-// FundSiafunds will add a siafund input of exaclty 'amount' to the
+// FundSiafunds will add a siafund input of exactly 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siafund input will not be signed until 'Sign' is called
 // on the transaction builder.
@@ -541,11 +541,14 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 
 	// For each siacoin input in the transaction that we added, provide a
 	// signature.
-	tb.wallet.mu.Lock()
-	defer tb.wallet.mu.Unlock()
+	tb.wallet.mu.RLock()
+	defer tb.wallet.mu.RUnlock()
 	for _, inputIndex := range tb.siacoinInputs {
 		input := tb.transaction.SiacoinInputs[inputIndex]
-		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		if !ok {
+			return nil, errors.New("transaction builder added an input that it cannot sign")
+		}
 		newSigIndices, err := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		if err != nil {
 			return nil, err
@@ -555,7 +558,10 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 	}
 	for _, inputIndex := range tb.siafundInputs {
 		input := tb.transaction.SiafundInputs[inputIndex]
-		key := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		key, ok := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		if !ok {
+			return nil, errors.New("transaction builder added an input that it cannot sign")
+		}
 		newSigIndices, err := addSignatures(&tb.transaction, coveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		if err != nil {
 			return nil, err
