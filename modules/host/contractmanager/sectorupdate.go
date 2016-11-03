@@ -155,8 +155,9 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 			storageFolders := wal.cm.storageFolderSlice()
 			sf := new(storageFolder)
 			var sectorIndex uint32
+			var storageFolderIndex int
 			for {
-				sf, _ = emptiestStorageFolder(storageFolders)
+				sf, storageFolderIndex = emptiestStorageFolder(storageFolders)
 				if sf == nil {
 					// None of the storage folders have enough room to house the
 					// sector.
@@ -202,7 +203,7 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 				// Sector not added to storage folder successfully, remove this
 				// stoage folder from the list of storage folders, and try the
 				// next one.
-				storageFolders = append(storageFolders[:sf.Index], storageFolders[sf.Index+1:]...)
+				storageFolders = append(storageFolders[:storageFolderIndex], storageFolders[storageFolderIndex+1:]...)
 			}
 
 			// Update the state to reflect the new sector.
