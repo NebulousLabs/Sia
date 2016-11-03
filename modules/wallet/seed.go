@@ -313,7 +313,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	// estimate the transaction size and fee. NOTE: this equation doesn't
 	// account for other fields in the transaction, but since we are
 	// multiplying by maxFee, lowballing is ok
-	estTxnSize := len(s.siacoinOutputs) * outputSize
+	estTxnSize := (len(s.siacoinOutputs) + len(s.siafundOutputs)) * outputSize
 	estFee := maxFee.Mul64(uint64(estTxnSize))
 	tb.AddMinerFee(estFee)
 
@@ -376,6 +376,17 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		sk := generateSpendableKey(seed, sfo.seedIndex)
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk)
 	}
+	// if inputs were added by the transaction builder, sign those as well
+	w.mu.RLock()
+	for _, input := range txn.SiacoinInputs {
+		key, ok := w.keys[input.UnlockConditions.UnlockHash()]
+		if !ok {
+			w.mu.RUnlock()
+			return types.Currency{}, types.Currency{}, errors.New("transaction builder added an input that it cannot sign")
+		}
+		addSignatures(&txn, types.FullCoveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+	}
+	w.mu.RUnlock()
 
 	// submit the transaction
 	txnSet := append(parents, txn)
