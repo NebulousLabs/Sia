@@ -194,14 +194,14 @@ func TestLoadSeed(t *testing.T) {
 	w2.Close()
 }
 
-// TestSweepSeed tests that sweeping a seed results in a transfer of its
-// outputs to the wallet.
-func TestSweepSeed(t *testing.T) {
+// TestSweepSeedCoins tests that sweeping a seed results in the transfer of
+// its siacoin outputs to the wallet.
+func TestSweepSeedCoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	// create a wallet with some money
-	wt, err := createWalletTester("TestSweepSeed0")
+	wt, err := createWalletTester("TestSweepSeedCoins0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestSweepSeed(t *testing.T) {
 	wt.miner.AddBlock()
 
 	// create a blank wallet
-	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestSweepSeed1"), modules.WalletDir)
+	dir := filepath.Join(build.TempDir(modules.WalletDir, "TestSweepSeedCoins1"), modules.WalletDir)
 	w, err := New(wt.cs, wt.tpool, dir)
 	if err != nil {
 		t.Fatal(err)
@@ -255,6 +255,8 @@ func TestSweepSeed(t *testing.T) {
 	}
 }
 
+// TestSweepSeedFunds tests that sweeping a seed results in the transfer of
+// its siafund outputs to the wallet.
 func TestSweepSeedFunds(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
