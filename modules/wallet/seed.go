@@ -376,15 +376,15 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		sk := generateSpendableKey(seed, sfo.seedIndex)
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk)
 	}
-	// if inputs were added by the transaction builder, sign those as well
+	// Usually, all the inputs will come from swept outputs. However, there is
+	// an edge case in which inputs will be added from the wallet. To cover
+	// this case, we iterate through the SiacoinInputs and add a signature for
+	// any input that belongs to the wallet.
 	w.mu.RLock()
 	for _, input := range txn.SiacoinInputs {
-		key, ok := w.keys[input.UnlockConditions.UnlockHash()]
-		if !ok {
-			w.mu.RUnlock()
-			return types.Currency{}, types.Currency{}, errors.New("transaction builder added an input that it cannot sign")
+		if key, ok := w.keys[input.UnlockConditions.UnlockHash()]; ok {
+			addSignatures(&txn, types.FullCoveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 		}
-		addSignatures(&txn, types.FullCoveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
 	}
 	w.mu.RUnlock()
 
