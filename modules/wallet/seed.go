@@ -349,7 +349,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		})
 		err = tb.FundSiacoins(estFee)
 		if err != nil {
-			return types.Currency{}, types.Currency{}, err
+			return types.Currency{}, types.Currency{}, errors.New("couldn't pay transaction fee on swept funds: " + err.Error())
 		}
 
 	case !coins.IsZero() && !funds.IsZero():

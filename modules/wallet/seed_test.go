@@ -278,57 +278,65 @@ func TestSweepSeedFunds(t *testing.T) {
 	// wallet. This wallet should have a siafund balance.
 	//
 	// TODO: when proper seed loading is implemented, this will be unnecessary.
-	w, err := New(wt.cs, wt.tpool, wt.wallet.persistDir)
+	wt.wallet, err = New(wt.cs, wt.tpool, wt.wallet.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
 	// reset the changeID
-	resetChangeID(w)
-	err = w.Unlock(wt.walletMasterKey)
+	resetChangeID(wt.wallet)
+	err = wt.wallet.Unlock(wt.walletMasterKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, siafundBal, _ := w.ConfirmedBalance()
+	_, siafundBal, _ := wt.wallet.ConfirmedBalance()
 	if siafundBal.Cmp(types.NewCurrency64(2000)) != 0 {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
 	}
+	// need to reset the miner as well, since it depends on the wallet
+	wt.miner, err = miner.New(wt.cs, wt.tpool, wt.wallet, wt.wallet.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// Create a seed and generate an address to send money to.
+	// send funds to ourself a few times
+	for i := 0; i < 10; i++ {
+		uc, err := wt.wallet.NextAddress()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = wt.wallet.SendSiafunds(types.NewCurrency64(1), uc.UnlockHash())
+		if err != nil {
+			t.Fatal(err)
+		}
+		wt.addBlockNoPayout()
+	}
+	// send some funds to the void
+	_, err = wt.wallet.SendSiafunds(types.NewCurrency64(10), types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.addBlockNoPayout()
+
+	// Create a seed and generate an address to send funds to.
 	seed := modules.Seed{1, 2, 3}
 	sk := generateSpendableKey(seed, 1)
 
 	// Send some siafunds to the address.
-	_, err = w.SendSiafunds(types.NewCurrency64(12), sk.UnlockConditions.UnlockHash())
-	if err != nil {
-		t.Fatal(err)
-	}
-	m, err := miner.New(wt.cs, wt.tpool, w, w.persistDir)
+	_, err = wt.wallet.SendSiafunds(types.NewCurrency64(12), sk.UnlockConditions.UnlockHash())
 	if err != nil {
 		t.Fatal(err)
 	}
 	// mine blocks without earning payout until our balance is stable
 	for i := types.BlockHeight(0); i < types.MaturityDelay; i++ {
-		block, target, err := m.BlockForWork()
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range block.MinerPayouts {
-			block.MinerPayouts[i].UnlockHash = types.UnlockHash{}
-		}
-		solvedBlock, _ := m.SolveBlock(block, target)
-		err = wt.cs.AcceptBlock(solvedBlock)
-		if err != nil {
-			t.Fatal(err)
-		}
+		wt.addBlockNoPayout()
 	}
-	oldCoinBalance, siafundBal, _ := w.ConfirmedBalance()
-	if siafundBal.Cmp(types.NewCurrency64(1988)) != 0 {
-		t.Error("expecting balance of 1988 after sending siafunds to the void")
+	oldCoinBalance, siafundBal, _ := wt.wallet.ConfirmedBalance()
+	if expected := 2000 - 12 - 10; siafundBal.Cmp(types.NewCurrency64(uint64(expected))) != 0 {
+		t.Errorf("expecting balance of %v after sending siafunds to the seed, got %v", expected, siafundBal)
 	}
 
 	// Sweep the seed.
-	coins, funds, err := w.SweepSeed(seed)
+	coins, funds, err := wt.wallet.SweepSeed(seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,21 +347,10 @@ func TestSweepSeedFunds(t *testing.T) {
 		t.Errorf("expected to sweep %v funds, got %v", 12, funds)
 	}
 	// add a block without earning its payout
-	block, target, err := m.BlockForWork()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := range block.MinerPayouts {
-		block.MinerPayouts[i].UnlockHash = types.UnlockHash{}
-	}
-	solvedBlock, _ := m.SolveBlock(block, target)
-	err = wt.cs.AcceptBlock(solvedBlock)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wt.addBlockNoPayout()
 
 	// Wallet balance should have decreased to pay for the sweep transaction.
-	newCoinBalance, _, _ := w.ConfirmedBalance()
+	newCoinBalance, _, _ := wt.wallet.ConfirmedBalance()
 	if newCoinBalance.Cmp(oldCoinBalance) >= 0 {
 		t.Error("expecting balance to go down; instead, increased by", newCoinBalance.Sub(oldCoinBalance))
 	}
