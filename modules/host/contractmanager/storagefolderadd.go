@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -12,9 +13,7 @@ import (
 
 // findUnfinishedStorageFolderAdditions will scroll through a set of state
 // changes and figure out which of the unfinished storage folder additions are
-// still unfinished. If a storage folder addition has finished, it will be
-// discoverable through the presence of a termination object later in the list
-// of state changes.
+// still unfinished.
 func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 	// Use a map to figure out what unfinished storage folders exist and use it
 	// to remove the ones that have terminated.
@@ -50,16 +49,16 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 // running operation is in progress, so that any changes to disk can be
 // reverted in the event of unclean shutdown.
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
-	// Precompute the total on-disk size of the storage folder. The storage
-	// folder needs to have modules.SectorSize available for each sector, plus
-	// another sectorMetadataDiskSize bytes per sector to store a mapping from
-	// sector id to its location in the storage folder.
 	numSectors := uint64(len(sf.Usage)) * 64
 	sectorLookupSize := numSectors * sectorMetadataDiskSize
 	sectorHousingSize := numSectors * modules.SectorSize
 	totalSize := sectorLookupSize + sectorHousingSize
 	sectorLookupName := filepath.Join(sf.Path, metadataFile)
 	sectorHousingName := filepath.Join(sf.Path, sectorFile)
+
+	// Lock the storage folder for the duration of the function.
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
 
 	// Update the uncommitted state to include the storage folder, returning an
 	// error if any checks fail.
@@ -80,45 +79,15 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 				return errRepeatFolder
 			}
 		}
-		// Check the uncommitted changes for updates to the storage folders
-		// which alter the 'duplicate' status of this storage folder.
-		for _, uc := range wal.uncommittedChanges {
-			for _, usfa := range uc.UnfinishedStorageFolderAdditions {
-				if usfa.Path == sf.Path {
-					return errRepeatFolder
-				}
-			}
-		}
 
-		// Count the number of uncommitted storage folders, and add it to the
-		// number of committed storage folders. This count should include all
-		// storage folders being resized or renewed as well. A map is used so
-		// that duplicates are handled gracefully, and so that a gap can be
-		// found that includes all of the uncommitted storage folders when
-		// scanning for an open index.
-		uniqueFolders := make(map[uint16]struct{})
-		for _, sf := range wal.cm.storageFolders {
-			uniqueFolders[sf.Index] = struct{}{}
-		}
-		for _, uc := range wal.uncommittedChanges {
-			// Duplicates may appear if this unfinished storage folder addition
-			// has completed and had a completion added to the WAL in a later
-			// element of uc. Using a map handles this case gracefully.
-			for _, usfa := range uc.UnfinishedStorageFolderAdditions {
-				uniqueFolders[usfa.Index] = struct{}{}
-			}
-
-			// TODO: Account for storage folders being resized and removed as
-			// well.
-		}
-		if uint64(len(uniqueFolders)) > maximumStorageFolders {
+		// Check that there is room for another storage folder.
+		if uint64(len(wal.cm.storageFolders)) > maximumStorageFolders {
 			return errMaxStorageFolders
 		}
 
 		// Determine the index of the storage folder by scanning for an empty
 		// spot in the folderLocations map. A random starting place is chosen
-		// to keep good average and worst-case O-notation on the runtime for
-		// finding an available index.
+		// to keep good average and worst-case runtime.
 		var iterator int
 		var index uint16
 		rand, err := crypto.RandIntn(65536)
@@ -154,6 +123,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// folder.
 		atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 
+		// Add the storage folder to the list of storage folders.
+		wal.cm.storageFolders[index] = sf
+
 		// Add the storage folder to the list of unfinished storage folder
 		// additions. There should be no chance of error between this append
 		// operation and the completed commitment to the unfinished storage
@@ -182,20 +154,23 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		if err != nil {
 			wal.mu.Lock()
 			defer wal.mu.Unlock()
+
+			// Delete the storage folder from the storage folders map.
+			delete(wal.cm.storageFolders, sf.index)
+
+			// Remove the leftover files from the failed operation.
+			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
+			err = build.ComposeErrors(err, os.Remove(sectorHousingName))
+
 			// Signal in the WAL that the unfinished storage folder addition
 			// has failed.
 			err = build.ComposeErrors(err, wal.appendChange(stateChange{
 				ErroredStorageFolderAdditions: []uint16{sf.Index},
 			}))
-			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
-			err = build.ComposeErrors(err, os.Remove(sectorHousingName))
 		}
 	}()
 
-	// The WAL now contains a commitment to create the storage folder, but the
-	// storage folder still needs to be created. Open a file and write empty
-	// data across the whole file to reserve space on disk for sector
-	// activities.
+	// Allocate the files on disk for the storage folder.
 	writeCount := sectorHousingSize / 4e6
 	finalWriteSize := sectorHousingSize % 4e6
 	writeData := make([]byte, 4e6)
@@ -212,10 +187,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	if err != nil {
 		return build.ExtendErr("could not allocate sector data file", err)
 	}
-	err = sf.sectorFile.Sync()
-	if err != nil {
-		return build.ExtendErr("could not syncronize allocated sector data file", err)
-	}
 
 	// Write the metadata file.
 	writeData = make([]byte, sectorLookupSize)
@@ -223,69 +194,64 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	if err != nil {
 		return build.ExtendErr("could not allocate sector metadata file", err)
 	}
-	err = sf.metadataFile.Sync()
-	if err != nil {
-		return build.ExtendErr("could not syncronize allocated sector metadata file", err)
-	}
+
 	// The file creation process is essentially complete at this point, report
 	// complete progress.
 	atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
 
-	// Under certain testing scenarious, be disrupted at this point such that
-	// AddStorageFolder does not complete, simulating a power-failure while in
-	// the middle of adding a storage folder.
+	// Sync the files.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		err = sf.metadataFile.Sync()
+		if err != nil {
+			return build.ExtendErr("could not syncronize allocated sector metadata file", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		err = sf.sectorFile.Sync()
+		if err != nil {
+			return build.ExtendErr("could not syncronize allocated sector data file", err)
+		}
+	}()
+	wg.Wait()
+
+	// Simulate power failure at this point for some testing scenarios.
 	if wal.cm.dependencies.disrupt("incompleteAddStorageFolder") {
-		// Simulate a power failure here by returning 'nil' when there's
-		// actually more cleanup that needs to happen.
 		return nil
 	}
 
-	// All of the required setup for the storage folder is complete, add the
-	// directive to modify the contract manager state to the WAL, so that the
-	// operation can be fully integrated.
-	err = func() error {
-		wal.mu.Lock()
-		defer wal.mu.Unlock()
-
-		// Set the progress to '0', as no operation is actively happening
-		// anymore.
-		atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
-		atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
-
-		// Add the new storage folder to the state, and to the WAL.
-		wal.cm.storageFolders[sf.Index] = sf
-		err = wal.appendChange(stateChange{
-			StorageFolderAdditions: []*storageFolder{sf},
-		})
-		if err != nil {
-			return build.ExtendErr("storage folder commitment assignment failed", err)
-		}
-		syncChan = wal.syncChan
-		return nil
-	}()
+	// Storage folder addition has completed successfully, commit the addition
+	// through the WAL.
+	wal.mu.Lock()
+	wal.cm.storageFolders[sf.Index] = sf
+	err = wal.appendChange(stateChange{
+		StorageFolderAdditions: []*storageFolder{sf},
+	})
+	wal.mu.Unlock()
 	if err != nil {
-		return err
+		return build.ExtendErr("storage folder commitment assignment failed", err)
 	}
 
 	// Wait to confirm the storage folder addition has completed until the WAL
 	// entry has synced.
+	syncChan = wal.syncChan
 	<-syncChan
+
+	// Set the progress back to '0'.
+	atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
+	atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
 	return nil
 }
 
-// cleanupUnfinishedStorageFolderAdditions should only be called at startup.
-// Any unfinished storage folder additions from the previous run will be purged
-// from the disk.
+// cleanupUnfinishedStorageFolderAdditions will purge any unfinished storage
+// folder additions from the previous run.
 func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateChange) error {
-	// Some of the input unfinished storage folder additions may have
-	// completed. Fetch the set of storage folder additions which are
-	// incomplete.
 	sfs := findUnfinishedStorageFolderAdditions(scs)
 	for _, sf := range sfs {
-		// The storage folder addition was interrupted due to an unexpected
-		// error, and the change should be aborted. This can be completed by
-		// simply removing the file that was partially created to house the
-		// sectors that would have appeared in the storage folder.
+		// Remove any leftover files.
 		sectorLookupName := filepath.Join(sf.Path, metadataFile)
 		sectorHousingName := filepath.Join(sf.Path, sectorFile)
 		err := os.Remove(sectorLookupName)
@@ -296,6 +262,9 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 		if err != nil {
 			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
 		}
+
+		// Delete the storage folder from the storage folders map.
+		delete(wal.cm.storageFolders, sf.index)
 
 		// Append an error call to the changeset, indicating that the storage
 		// folder add was not completed successfully.
@@ -315,12 +284,10 @@ func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
 	var err error
 	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
-		sf.failedReads += 1
 		wal.cm.log.Println("Difficulties opening sector file for ", sf.Path, ":", err)
 	}
 	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
-		sf.failedReads += 1
 		wal.cm.log.Println("Difficulties opening sector metadata file for", sf.Path, ":", err)
 	}
 	wal.cm.storageFolders[sf.Index] = sf
@@ -363,6 +330,8 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 	newSF := &storageFolder{
 		Path:  path,
 		Usage: make([]uint64, size/modules.SectorSize/64),
+
+		queuedSectors: make(map[sectorID]uint32),
 	}
 	err = cm.wal.managedAddStorageFolder(newSF)
 	if err != nil {

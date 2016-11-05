@@ -715,7 +715,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 2 {
-			t.Error("Sector location should only be reporting one sector")
+			t.Error("Sector location should be reporting a count of 2 for this sector:", sl.count)
 		}
 		if sl.storageFolder != index {
 			t.Error("Sector location is being reported incorrectly - wrong storage folder")

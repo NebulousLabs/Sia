@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -11,11 +12,19 @@ import (
 )
 
 type (
+	// savedStorageFolder contains fields that are saved automatically to disk
+	// for each storage folder.
+	savedStorageFolder struct {
+		Index uint16
+		Path  string
+		Usage []uint64
+	}
+
 	// savedSettings contains fields that are saved atomically to disk inside
 	// of the contract manager directory, alongside the WAL and log.
 	savedSettings struct {
 		SectorSalt     crypto.Hash
-		StorageFolders []storageFolder
+		StorageFolders []savedStorageFolder
 	}
 )
 
@@ -46,24 +55,22 @@ func (cm *ContractManager) loadSettings() error {
 	// Copy the saved settings into the contract manager.
 	cm.sectorSalt = ss.SectorSalt
 	for i := range ss.StorageFolders {
-		ss.StorageFolders[i].sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
-		if err != nil {
-			return build.ExtendErr("error loading storage folder sector metadata file handle", err)
-		}
-		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
 		ss.StorageFolders[i].metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
 			return build.ExtendErr("error loading storage folder sector file handle", err)
 		}
+		ss.StorageFolders[i].sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
+		if err != nil {
+			return build.ExtendErr("error loading storage folder sector metadata file handle", err)
+		}
+		ss.StorageFolders[i].queuedSectors = make(map[sectorID]uint32)
+		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
 	}
 	return nil
 }
 
 // loadSectorLocations will read the metadata portion of each storage folder
-// file and load the sector location information into memory. Because the
-// sectorLocations data is not saved to disk atomically, this operation must
-// happen after the WAL has been loaded, as the WAL will repair any corruption
-// and restore any missing data.
+// file and load the sector location information into memory.
 func (cm *ContractManager) loadSectorLocations() {
 	// Each storage folder houses separate sector location data.
 	for _, sf := range cm.storageFolders {
@@ -71,10 +78,10 @@ func (cm *ContractManager) loadSectorLocations() {
 		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.Usage)*storageFolderGranularity)
 		if err != nil {
 			cm.log.Printf("Error: unable to read sector metadata for folder %v: %v\n", sf.Index, err)
-			sf.failedReads++
+			atomic.AddUint64(&sf.atomicFailedReads, 1)
 			continue
 		}
-		sf.successfulReads++
+		atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
 
 		// Iterate through the sectors that are in-use and read their storage
 		// locations into memory.
@@ -103,7 +110,22 @@ func (cm *ContractManager) savedSettings() savedSettings {
 		SectorSalt: cm.sectorSalt,
 	}
 	for _, sf := range cm.storageFolders {
-		ss.StorageFolders = append(ss.StorageFolders, *sf)
+		// Unset all of the usage bits in the storage folder for the queued sectors.
+		for _, sectorIndex := range sf.queuedSectors {
+			sf.clearUsage(sectorIndex)
+		}
+
+		// Copy over the storage folder.
+		ss.StorageFolders = append(ss.StorageFolders, savedStorageFolder{
+			Index: sf.index,
+			Path:  sf.path,
+			Usage: sf.usage,
+		})
+
+		// Re-set all of the usage bits for the queued sectors.
+		for _, sectorIndex := range sf.queuedSectors {
+			sf.setUsage(sectorIndex)
+		}
 	}
 	return ss
 }

@@ -4,6 +4,14 @@ package contractmanager
 // the sectors within the contract manager. Storage folders can be added,
 // resized, or removed.
 
+// TODO: Need to make sure that the sector count accounting (sf.sectors) in the
+// storage folder is accurate - it should probably align with the usage, though
+// setting and clearing the usage during idempotent actions could cause
+// problems. Idempotent actions though I believe only apply when doing
+// recovery. (that's how it should be designed at least)
+//
+// ergo, set + clear should modify the total number of sectors?
+
 import (
 	"errors"
 	"fmt"
@@ -12,6 +20,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 var (
@@ -70,6 +79,10 @@ var (
 	// that is not a folder.
 	errStorageFolderNotFolder = errors.New("must use an existing folder")
 
+	// errStorageFolderNotFound is returned if a storage folder cannot be
+	// found.
+	errStorageFolderNotFound = errors.New("could not find storage folder with that id")
+
 	// errRelativePath is returned if a path must be absolute.
 	errRelativePath = errors.New("storage folder paths must be absolute")
 )
@@ -83,75 +96,38 @@ type storageFolder struct {
 	// running action being performed on them. Determining which action is
 	// being performed can be determined using the context of the WAL state
 	// changes that are currently open.
-	//
-	// These fields are updated atomically to avoid race conditions and
-	// performance bottlenecks. The only body that should be modifying the
-	// fields is the one that is actively performing the long running
-	// operation.
-	//
-	// These values are not saved to disk when the WAL closes, loading from the
-	// WAL must accordingly take this into account.
-	//
-	// As always, atomic fields go at the top of the struct to preserve
-	// compatibility with 32bit machines.
 	atomicProgressNumerator   uint64
 	atomicProgressDenominator uint64
 
-	Index uint16
-	Path  string
-	Usage []uint64
+	// Disk statistics for this boot cycle.
+	atomicFailedReads      uint64
+	atomicFailedWrites     uint64
+	atomicSuccessfulReads  uint64
+	atomicSuccessfulWrites uint64
 
-	// Not exporting these values means that they will not be saved between
-	// restarts of the contract manager. This is intentional, as it is expected
-	// that these values will be more useful if they are reset every restart.
-	failedReads      uint64
-	failedWrites     uint64
-	successfulReads  uint64
-	successfulWrites uint64
+	// The index, path, and usage are all saved directly to disk.
+	index uint16
+	path  string
+	usage []uint64
+
+	// queuedSectors contains a list of sectors which have been queued to be
+	// added to the storage folder where the add has not yet completed.
+	//
+	// sectors is a running tally of the number of physical sectors in the
+	// storage folder.
+	queuedSectors map[sectorID]uint32
+	sectors       uint64
+
+	// mu needs to be RLocked to safetly write new sectors into the storage
+	// folder. mu needs to be Locked when the folder is being resized or
+	// manipulated.
+	mu sync.TryRWMutex
 
 	// An open file handle is kept so that writes can easily be made to the
 	// storage folder without needing to grab a new file handle. This also
 	// makes it easy to do delayed-syncing.
 	metadataFile file
 	sectorFile   file
-
-	// resizing indicates whether a storage folder remove or storage folder
-	// resize operation is underway. If it is underway, sector operations
-	// cannot be performed on sectors in this storage folder due to active
-	// background processes.
-	//
-	// sectors is a running tally of the number of physical sectors in the
-	// storage folder.
-	resizing bool
-	sectors  uint64
-}
-
-// emptiestStorageFolder takes a set of storage folders and returns the storage
-// folder with the lowest utilization by percentage along with its index. 'nil'
-// and '-1' are returned if there are no storage folders provided with
-// sufficient free space for a sector.
-func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
-	enoughRoom := false
-	mostFree := float64(-1)
-	winningIndex := -1
-	for i, sf := range sfs {
-		if sf.resizing {
-			// Ignore this storage folder because it's undergoing a resize
-			// operation.
-			continue
-		}
-		totalCapacity := uint64(len(sf.Usage)) * 64
-		freeCapacity := float64(totalCapacity-sf.sectors) / float64(totalCapacity)
-		if freeCapacity > 0 && freeCapacity > mostFree {
-			enoughRoom = true
-			mostFree = freeCapacity
-			winningIndex = i
-		}
-	}
-	if !enoughRoom {
-		return nil, -1
-	}
-	return sfs[winningIndex], winningIndex
 }
 
 // mostSignificantBit returns the index of the most significant bit of an input
@@ -237,66 +213,58 @@ func usageSectors(usage []uint64) (usageSectors []uint32) {
 	return usageSectors
 }
 
-// StorageFolders will return a list of storage folders in the host, each
-// containing information about the storage folder and any operations currently
-// being executed on the storage folder.
-func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
-	cm.wal.mu.Lock()
-	defer cm.wal.mu.Unlock()
+// vacancyStorageFolder takes a set of storage folders and returns a storage
+// folder with vacancy for a sector along with its index. 'nil' and '-1' are
+// returned if none of the storage folders are available to accept a sector.
+// The returned storage folder will be holding an RLock on its mutex.
+func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
+	enoughRoom := false
+	var winningIndex int
 
-	// Go through the WAL so that information can be collected about folders
-	// being added, resized, and removed.
-	return cm.wal.storageFolderMetadata()
+	// Go through the folders in random order.
+	ordering := crypto.Perm(len(sfs))
+	for _, index := range ordering {
+		sf := sfs[index]
+
+		// Skip past this storage folder if there is not enough room for at
+		// least one sector.
+		if sf.sectors >= len(sf.Usage)*storageFolderGranularity {
+			continue
+		}
+
+		// Skip past this storage folder if it's not available to receive new
+		// data.
+		if !sf.mu.TryRLock() {
+			continue
+		}
+
+		// Select this storage folder.
+		enoughRoom = true
+		winningIndex = i
+		break
+	}
+	if !enoughRoom {
+		return nil, -1
+	}
+	return sfs[winningIndex], winningIndex
 }
 
-// storageFolderMetadata will return a list of storage folders in the host,
-// each containing information about the storage folder and any operations
-// currently being executed on the storage folder.
-func (wal *writeAheadLog) storageFolderMetadata() (smfs []modules.StorageFolderMetadata) {
-	// Iterate over the storage folders that are in memory first, and then
-	// suppliment them with the storage folders that are not in memory.
-	for _, sf := range wal.cm.storageFolders {
-		// Grab the non-computational data.
-		sfm := modules.StorageFolderMetadata{
-			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
-			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.sectors) * modules.SectorSize,
-			Path:              sf.Path,
+// clearUsage will unset the usage bit at the provided sector index for this
+// storage folder.
+func (sf *storageFolder) clearUsage(sectorIndex uint32) {
+	usageElement := sf.Usage[sectorIndex/storageFolderGranularity]
+	bitIndex := sectorIndex % storageFolderGranularity
+	usageElement = usageElement & (^(1 << bitIndex))
+	sf.Usage[sectorIndex/storageFolderGranularity] = usageElement
+}
 
-			FailedReads:      sf.failedReads,
-			FailedWrites:     sf.failedWrites,
-			SuccessfulReads:  sf.successfulReads,
-			SuccessfulWrites: sf.successfulWrites,
-
-			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
-			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
-		}
-		// Add this storage folder to the list of storage folders.
-		smfs = append(smfs, sfm)
-	}
-
-	// Iterate through the uncommitted changes to the contract manager and find
-	// any storage folders which have been added but aren't in the actual state
-	// yet.
-	for _, sf := range findUnfinishedStorageFolderAdditions(wal.uncommittedChanges) {
-		smfs = append(smfs, modules.StorageFolderMetadata{
-			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
-			CapacityRemaining: modules.SectorSize * 64 * uint64(len(sf.Usage)),
-			Path:              sf.Path,
-
-			FailedReads:      sf.failedReads,
-			FailedWrites:     sf.failedWrites,
-			SuccessfulReads:  sf.successfulReads,
-			SuccessfulWrites: sf.successfulWrites,
-
-			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
-			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
-		})
-	}
-
-	// TODO: Make adjustments for any storage folders that are currently being
-	// resized or removed.
-
-	return smfs
+// setUsage will set the usage bit at the provided sector index for this
+// storage folder.
+func (sf *storageFolder) setUsage(sectorIndex uint32) {
+	usageElement := sf.Usage[sectorIndex/storageFolderGranularity]
+	bitIndex := sectorIndex % storageFolderGranularity
+	usageElement = usageElement | (1 << bitIndex)
+	sf.Usage[sectorIndex/storageFolderGranularity] = usageElement
 }
 
 // storageFolderSlice returns the contract manager's storage folders map as a
@@ -309,188 +277,55 @@ func (cm *ContractManager) storageFolderSlice() []*storageFolder {
 	return sfs
 }
 
-/*
-// offloadStorageFolder takes sectors in a storage folder and moves them to
-// another storage folder.
-func (sm *StorageManager) offloadStorageFolder(offloadFolder *storageFolder, dataToOffload uint64) error {
-	// The host is going to check every sector, using a different database tx
-	// for each sector. To be able to track progress, a starting point needs to
-	// be grabbed. This read grabs the starting point.
-	//
-	// It is expected that the host is under lock for the whole operation -
-	// this function should be the only function with access to the database.
-	var currentSectorID []byte
-	var currentSectorBytes []byte
-	err := sm.db.View(func(tx *bolt.Tx) error {
-		currentSectorID, currentSectorBytes = tx.Bucket(bucketSectorUsage).Cursor().First()
-		return nil
-	})
-	if err != nil {
-		return err
+// ResetStorageFolderHealth will reset the read and write statistics for the
+// input storage folder.
+func (cm *ContractManager) ResetStorageFolderHealth(index int) error {
+	cm.wal.mu.Lock()
+	defer cm.wal.mu.Unlock()
+
+	sf, exists := cm.storageFolders[index]
+	if !exists {
+		return errStorageFolderNotFound
 	}
-
-	// Create a list of available folders. As folders are filled up, this list
-	// will be pruned. Once all folders are full, the offload loop will quit
-	// and return with errIncompleteOffload.
-	availableFolders := make([]*storageFolder, 0)
-	for _, sf := range sm.storageFolders {
-		if sf == offloadFolder {
-			// The offload folder is not an available folder.
-			continue
-		}
-		if sf.SizeRemaining < modules.SectorSize {
-			// Folders that don't have enough room for a new sector are not
-			// available.
-			continue
-		}
-		availableFolders = append(availableFolders, sf)
-	}
-
-	// Go through the sectors one at a time. Sectors that are not a part of the
-	// provided storage folder are ignored. Sectors that are a part of the
-	// storage folder will be moved to a new storage folder. The loop will quit
-	// after 'dataToOffload' data has been moved from the storage folder.
-	dataOffloaded := uint64(0)
-	for currentSectorID != nil && dataOffloaded < dataToOffload && len(availableFolders) > 0 {
-		err = sm.db.Update(func(tx *bolt.Tx) error {
-			// Defer seeking to the next sector.
-			defer func() {
-				bsuc := tx.Bucket(bucketSectorUsage).Cursor()
-				bsuc.Seek(currentSectorID)
-				currentSectorID, currentSectorBytes = bsuc.Next()
-			}()
-
-			// Determine whether the sector needs to be moved.
-			var usage sectorUsage
-			err = json.Unmarshal(currentSectorBytes, &usage)
-			if err != nil {
-				return err
-			}
-			if !bytes.Equal(usage.StorageFolder, offloadFolder.UID) {
-				// The current sector is not in the offloading storage folder,
-				// try the next sector. Returning nil will advance to the next
-				// iteration of the loop.
-				return nil
-			}
-
-			// This sector is in the removal folder, and therefore needs to
-			// be moved to the next folder.
-			success := false
-			emptiestFolder, emptiestIndex := emptiestStorageFolder(availableFolders)
-			for emptiestFolder != nil {
-				oldSectorPath := filepath.Join(sm.persistDir, offloadFolder.uidString(), string(currentSectorID))
-				// Try reading the sector from disk.
-				sectorData, err := sm.dependencies.readFile(oldSectorPath)
-				if err != nil {
-					// Inidicate that the storage folder is having read
-					// troubles.
-					offloadFolder.FailedReads++
-
-					// Returning nil will move to the next sector. Though the
-					// current sector has failed to read, the host will keep
-					// trying future sectors in hopes of finishing the task.
-					return nil
-				}
-				// Indicate that the storage folder did a successful read.
-				offloadFolder.SuccessfulReads++
-
-				// Try writing the sector to the emptiest storage folder.
-				newSectorPath := filepath.Join(sm.persistDir, emptiestFolder.uidString(), string(currentSectorID))
-				err = sm.dependencies.writeFile(newSectorPath, sectorData, 0700)
-				if err != nil {
-					// Indicate that the storage folder is having write
-					// troubles.
-					emptiestFolder.FailedWrites++
-
-					// After the failed write, try removing any garbage that
-					// may have gotten left behind. The error is not checked,
-					// as it is known that the disk is having write troubles.
-					_ = sm.dependencies.removeFile(newSectorPath)
-
-					// Because the write failed, we should move on to the next
-					// storage folder, and remove the current storage folder
-					// from the list of available folders.
-					availableFolders = append(availableFolders[0:emptiestIndex], availableFolders[emptiestIndex+1:]...)
-
-					// Try the next folder.
-					emptiestFolder, emptiestIndex = emptiestStorageFolder(availableFolders)
-					continue
-				}
-				// Indicate that the storage folder is doing successful writes.
-				emptiestFolder.SuccessfulWrites++
-				err = sm.dependencies.removeFile(oldSectorPath)
-				if err != nil {
-					// Indicate that the storage folder is having write
-					// troubles.
-					offloadFolder.FailedWrites++
-				} else {
-					offloadFolder.SuccessfulWrites++
-				}
-
-				success = true
-				break
-			}
-			if !success {
-				// The sector failed to be written successfully, try moving to
-				// the next sector.
-				return nil
-			}
-
-			offloadFolder.SizeRemaining += modules.SectorSize
-			emptiestFolder.SizeRemaining -= modules.SectorSize
-			dataOffloaded += modules.SectorSize
-
-			// Update the sector usage database to reflect the file movement.
-			// Because this cannot be done atomically, recovery tools are
-			// required to deal with outlier cases where the swap is fine but
-			// the database update is not.
-			usage.StorageFolder = emptiestFolder.UID
-			newUsageBytes, err := json.Marshal(usage)
-			if err != nil {
-				return err
-			}
-			err = tx.Bucket(bucketSectorUsage).Put(currentSectorID, newUsageBytes)
-			if err != nil {
-				return err
-			}
-
-			// Seek to the next sector.
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-	}
-	if dataOffloaded < dataToOffload {
-		return errIncompleteOffload
-	}
+	atomic.StoreUint64(&sf.atomicFailedReads, 0)
+	atomic.StoreUint64(&sf.atomicFailedWrites, 0)
+	atomic.StoreUint64(&sf.atomicSuccessfulReads, 0)
+	aomtic.StoreUint64(&sf.atomicSuccessfulWrites, 0)
 	return nil
 }
 
-// ResetStorageFolderHealth will reset the read and write statistics for the
-// storage folder.
-func (sm *StorageManager) ResetStorageFolderHealth(index int) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	sm.resourceLock.RLock()
-	defer sm.resourceLock.RUnlock()
-	if sm.closed {
-		return errStorageManagerClosed
-	}
+// StorageFolders will return a list of storage folders in the host, each
+// containing information about the storage folder and any operations currently
+// being executed on the storage folder.
+func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
+	cm.wal.mu.Lock()
+	defer cm.wal.mu.Unlock()
 
-	// Check that the input is valid.
-	if index >= len(sm.storageFolders) {
-		return errBadStorageFolderIndex
-	}
+	// Iterate over the storage folders that are in memory first, and then
+	// suppliment them with the storage folders that are not in memory.
+	for _, sf := range wal.cm.storageFolders {
+		// Grab the non-computational data.
+		sfm := modules.StorageFolderMetadata{
+			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
+			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.sectors) * modules.SectorSize,
+			Index:             sf.index,
+			Path:              sf.path,
 
-	// Reset the storage statistics and save the host.
-	sm.storageFolders[index].FailedReads = 0
-	sm.storageFolders[index].FailedWrites = 0
-	sm.storageFolders[index].SuccessfulReads = 0
-	sm.storageFolders[index].SuccessfulWrites = 0
-	return sm.saveSync()
+			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
+			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
+		}
+		sfm.FailedReads = atomic.LoadUint64(&sf.atomicFailedReads)
+		sfm.FailedWrites = atomic.LoadUint64(&sf.atomicFailedWrites)
+		sfm.SuccessfulReads = atomic.LoadUint64(&sf.atomicSuccessfulReads)
+		sfm.SuccessfulWrites = atmoic.LoadUint64(&sf.atomicSuccessfulWrites)
+
+		// Add this storage folder to the list of storage folders.
+		smfs = append(smfs, sfm)
+	}
+	return smfs
 }
 
+/*
 // RemoveStorageFolder removes a storage folder from the host.
 func (sm *StorageManager) RemoveStorageFolder(removalIndex int, force bool) error {
 	sm.mu.Lock()

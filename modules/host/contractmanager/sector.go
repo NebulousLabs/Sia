@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"encoding/binary"
 	"errors"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -162,9 +163,9 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	// Read the sector.
 	sectorData, err := readSector(sf.sectorFile, sl.index)
 	if err != nil {
-		sf.failedWrites++
+		atomic.AddUint64(&sf.atomicFailedReads, 1)
 		return nil, build.ExtendErr("unable to fetch sector", err)
 	}
-	sf.successfulReads++
+	atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
 	return sectorData, nil
 }
