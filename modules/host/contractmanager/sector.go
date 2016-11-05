@@ -1,6 +1,7 @@
 package contractmanager
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -53,6 +54,78 @@ type (
 	}
 )
 
+// readSector will read the sector in the file, starting from the provided
+// location.
+func readSector(f file, sectorIndex uint32) ([]byte, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	b := make([]byte, modules.SectorSize)
+	_, err := f.Seek(int64(uint64(sectorIndex)*modules.SectorSize), 0)
+	if err != nil {
+		return nil, build.ExtendErr("unable to seek within storage folder", err)
+	}
+	_, err = f.Read(b)
+	if err != nil {
+		return nil, build.ExtendErr("unable to read within storage folder", err)
+	}
+	return b, nil
+}
+
+// readFullMetadata will read a full sector metadata file into memory.
+func readFullMetadata(f file, numSectors int) ([]byte, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	sectorLookupBytes := make([]byte, numSectors*sectorMetadataDiskSize)
+	_, err := f.Seek(0, 0)
+	if err != nil {
+		return nil, build.ExtendErr("unable to seek through metadata file for target storage folder", err)
+	}
+	_, err = f.Read(sectorLookupBytes)
+	if err != nil {
+		return nil, build.ExtendErr("unable to read metadata file for target storage folder", err)
+	}
+	return sectorLookupBytes, nil
+}
+
+// writeSector will write the given sector into the given file at the given
+// index.
+func writeSector(f file, sectorIndex uint32, data []byte) error {
+	f.Lock()
+	defer f.Unlock()
+
+	_, err := f.Seek(int64(uint64(sectorIndex)*modules.SectorSize), 0)
+	if err != nil {
+		return build.ExtendErr("unable to seek within provided file", err)
+	}
+	_, err = f.Write(data)
+	if err != nil {
+		return build.ExtendErr("unable to read within provided file", err)
+	}
+	return nil
+}
+
+// writeSectorMetadata will take a sector update and write the related metadata
+// to disk.
+func writeSectorMetadata(f file, sectorIndex uint32, id sectorID, count uint16) error {
+	f.Lock()
+	defer f.Unlock()
+
+	writeData := make([]byte, sectorMetadataDiskSize)
+	copy(writeData, id[:])
+	binary.LittleEndian.PutUint16(writeData[12:], count)
+	_, err := f.Seek(sectorMetadataDiskSize*int64(sectorIndex), 0)
+	if err != nil {
+		return build.ExtendErr("unable to seek in given file", err)
+	}
+	_, err = f.Write(writeData)
+	if err != nil {
+		return build.ExtendErr("unable to write in given file", err)
+	}
+	return nil
+}
+
 // sectorID returns the id that should be used when referring to a sector.
 // There are lots of sectors, and to minimize their footprint a reduced size
 // hash is used. Hashes are typically 256bits to provide collision resistance
@@ -75,31 +148,22 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	// Fetch the sector metadata.
 	id := cm.managedSectorID(root)
 	cm.wal.mu.Lock()
-	defer cm.wal.mu.Unlock()
-	sl, exists := cm.sectorLocations[id]
-	if !exists {
+	sl, exists1 := cm.sectorLocations[id]
+	sf, exists2 := cm.storageFolders[sl.storageFolder]
+	cm.wal.mu.Unlock()
+	if !exists1 {
 		return nil, errSectorNotFound
 	}
-
-	// Determine where on disk the sector lies.
-	sectorData := make([]byte, modules.SectorSize)
-	sf, exists := cm.storageFolders[sl.storageFolder]
-	if !exists {
+	if !exists2 {
 		cm.log.Critical("Unable to load storage folder despite having sector metadata")
 		return nil, errSectorNotFound
 	}
-	seekOffset := int64(sl.index) * int64(modules.SectorSize)
 
-	// Seek and read.
-	_, err := sf.sectorFile.Seek(seekOffset, 0)
+	// Read the sector.
+	sectorData, err := readSector(sf.sectorFile, sl.index)
 	if err != nil {
-		sf.failedReads++
-		return nil, build.ExtendErr("unable to seek within storage folder", err)
-	}
-	_, err = sf.sectorFile.Read(sectorData)
-	if err != nil {
-		sf.failedReads++
-		return nil, build.ExtendErr("unable to read within storage folder", err)
+		sf.failedWrites++
+		return nil, build.ExtendErr("unable to fetch sector", err)
 	}
 	sf.successfulReads++
 	return sectorData, nil

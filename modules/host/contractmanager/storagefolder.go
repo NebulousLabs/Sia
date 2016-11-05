@@ -7,8 +7,10 @@ package contractmanager
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync/atomic"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -39,6 +41,12 @@ var (
 	// errMaxStorageFolders indicates that the limit on the number of allowed
 	// storage folders has been reached.
 	errMaxStorageFolders = fmt.Errorf("host can only accept up to %v storage folders", maximumStorageFolders)
+
+	// errNoFreeSectors is returned if there are no free sectors in the usage
+	// array fed to randFreeSector. This error should never be returned, as the
+	// contract manager should have sufficent internal consistency to know in
+	// advance that there are no free sectors.
+	errNoFreeSectors = errors.New("could not find a free sector in the usage array")
 
 	// errNoResize is returned if a new size is provided for a storage folder
 	// that is the same as the current size of the storage folder.
@@ -106,7 +114,16 @@ type storageFolder struct {
 	// makes it easy to do delayed-syncing.
 	metadataFile file
 	sectorFile   file
-	sectors      uint64
+
+	// resizing indicates whether a storage folder remove or storage folder
+	// resize operation is underway. If it is underway, sector operations
+	// cannot be performed on sectors in this storage folder due to active
+	// background processes.
+	//
+	// sectors is a running tally of the number of physical sectors in the
+	// storage folder.
+	resizing bool
+	sectors  uint64
 }
 
 // emptiestStorageFolder takes a set of storage folders and returns the storage
@@ -118,6 +135,11 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	mostFree := float64(-1)
 	winningIndex := -1
 	for i, sf := range sfs {
+		if sf.resizing {
+			// Ignore this storage folder because it's undergoing a resize
+			// operation.
+			continue
+		}
 		totalCapacity := uint64(len(sf.Usage)) * 64
 		freeCapacity := float64(totalCapacity-sf.sectors) / float64(totalCapacity)
 		if freeCapacity > 0 && freeCapacity > mostFree {
@@ -130,6 +152,89 @@ func emptiestStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 		return nil, -1
 	}
 	return sfs[winningIndex], winningIndex
+}
+
+// mostSignificantBit returns the index of the most significant bit of an input
+// value.
+func mostSignificantBit(i uint64) uint64 {
+	if i == 0 {
+		panic("no bits set in input")
+	}
+
+	bval := []uint64{0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7}
+	r := uint64(0)
+	if i&0xffffffff00000000 != 0 {
+		r += 32
+		i = i >> 32
+	}
+	if i&0x00000000ffff0000 != 0 {
+		r += 16
+		i = i >> 16
+	}
+	if i&0x000000000000ff00 != 0 {
+		r += 8
+		i = i >> 8
+	}
+	if i&0x00000000000000f0 != 0 {
+		r += 4
+		i = i >> 4
+	}
+	return r + bval[i]
+}
+
+// randFreeSector will take a usage array and find a random free sector within
+// the usage array. The uint32 indicates the index of the sector within the
+// usage array.
+func randFreeSector(usage []uint64) (uint32, error) {
+	// Pick a random starting location. Scanning the sector in a short amount
+	// of time requires starting from a random place.
+	start, err := crypto.RandIntn(len(usage))
+	if err != nil {
+		panic(err)
+	}
+
+	// Find the first element of the array that is not completely full.
+	var i int
+	for i = start; i < len(usage); i++ {
+		if usage[i] != math.MaxUint64 {
+			break
+		}
+	}
+	// If nothing was found by the end of the array, a wraparound is needed.
+	if i == len(usage) {
+		for i = 0; i < start; i++ {
+			if usage[i] != math.MaxUint64 {
+				break
+			}
+		}
+		// Return an error if no empty sectors were found.
+		if i == start {
+			return 0, errNoFreeSectors
+		}
+	}
+
+	// Get the most significant zero. This is achieved by performing a 'most
+	// significant bit' on the XOR of the actual value. Return the index of the
+	// sector that has been selected.
+	msz := mostSignificantBit(^usage[i])
+	return uint32((uint64(i) * 64) + msz), nil
+}
+
+// usageSectors takes a storage folder usage array and returns a list of active
+// sectors in that usage array by their index.
+func usageSectors(usage []uint64) (usageSectors []uint32) {
+	// Iterate through the usage elements.
+	for i, u := range usage {
+		// Each usage element corresponds to storageFolderGranularity sectors.
+		// Iterate through them and append the ones that are present.
+		for j := uint64(0); j < storageFolderGranularity; j++ {
+			uMask := uint64(1) << j
+			if u&uMask == uMask {
+				usageSectors = append(usageSectors, uint32(i)*storageFolderGranularity+uint32(j))
+			}
+		}
+	}
+	return usageSectors
 }
 
 // StorageFolders will return a list of storage folders in the host, each

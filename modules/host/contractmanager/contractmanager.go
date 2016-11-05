@@ -9,14 +9,30 @@ package contractmanager
 // faster. Windows and other non-linux systems will need to continue doing it
 // using the current implementation.
 
-// TODO: Some of the locking, especially with regards to ReadSector, could be
-// moved to a per-storage-folder basis instead of grabbing the WAL lock, which
-// blocks everything to access just a single resource.
-
 // TODO: Currently the long running storage folder operations are expected to
 // have their progress value's menaing determined by context, but that's really
 // only possible with the WAL, which external callers cannot view. Explicit
 // context should be added to the struct.
+
+// TODO: Need per-storage-folder locking so that sector writes and seeks don't
+// conflict with eachother in the file handle.
+
+// TODO: Set up a stress test across multiple disks that verifies the contract
+// manager is able to hit a throughput which is fully utilizing all of the
+// disks, or at least is coming close. The goal is to catch unexpected
+// performance bottlenecks.
+
+// TODO: Because of the naive balancing method, one slow disk will slow down
+// the whole host until it's at capacity, because it'll continually be selected
+// as the emptiest storage folder even though it might already be under max
+// load and other folders might be idle.
+
+// TODO: The empitest storage folder might not be calculated by looking at the
+// usage, which is the important metric to be using for this purpose. We can
+// probably fix this up by adding functions to manipulate the usage field.
+
+// TODO: Perform a test simulating a multi-disk environment where after a
+// restart one of the disks is unavailable.
 
 import (
 	"path/filepath"

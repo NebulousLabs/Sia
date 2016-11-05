@@ -1714,6 +1714,7 @@ type failureProneFile struct {
 	triggered *bool
 	mu        *sync.Mutex
 	*os.File
+	sync.Mutex
 }
 
 // createFile will return a file which will cause errors on Write calls if
@@ -1721,7 +1722,7 @@ type failureProneFile struct {
 func (d dependencyFailingWrites) createFile(s string) (file, error) {
 	osfile, err := os.Create(s)
 	if err != nil {
-		return osfile, err
+		return nil, err
 	}
 
 	fpf := &failureProneFile{

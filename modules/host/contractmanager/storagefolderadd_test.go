@@ -65,6 +65,7 @@ type limitFile struct {
 	throughput int
 	mu         sync.Mutex
 	*os.File
+	sync.Mutex
 }
 
 // createFile will return a file that will return an error if a write will put
@@ -72,7 +73,7 @@ type limitFile struct {
 func (dependencyLargeFolder) createFile(s string) (file, error) {
 	osFile, err := os.Create(s)
 	if err != nil {
-		return osFile, err
+		return nil, err
 	}
 
 	lf := &limitFile{
@@ -235,6 +236,7 @@ type blockedFile struct {
 	blockLifted chan struct{}
 	writeCalled chan struct{}
 	*os.File
+	sync.Mutex
 }
 
 // Write will block until a signal is given that the block may be lifted. Write
@@ -269,7 +271,13 @@ func (d *dependencyBlockSFOne) createFile(s string) (file, error) {
 	}
 
 	// If not storageFolderOne, return a normal file.
-	return os.Create(s)
+	f, err := os.Create(s)
+	if err != nil {
+		return nil, err
+	}
+	return &lockerFile{
+		File: f,
+	}, nil
 }
 
 // TestAddStorageFolderBlocking adds multiple storage folders concurrently to

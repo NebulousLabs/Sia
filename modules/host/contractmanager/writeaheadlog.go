@@ -240,7 +240,7 @@ func (wal *writeAheadLog) load() error {
 
 	// Try opening the WAL file.
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
-	walFile, err := os.Open(walFileName)
+	walFile, err := wal.cm.dependencies.openFile(walFileName, os.O_RDONLY, 0600)
 	if err == nil {
 		// err == nil indicates that there is a WAL file, which means that the
 		// previous shutdown was not clean. Re-commit the changes in the WAL to

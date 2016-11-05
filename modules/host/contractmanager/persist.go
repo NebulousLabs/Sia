@@ -46,12 +46,12 @@ func (cm *ContractManager) loadSettings() error {
 	// Copy the saved settings into the contract manager.
 	cm.sectorSalt = ss.SectorSalt
 	for i := range ss.StorageFolders {
-		ss.StorageFolders[i].sectorFile, err = os.OpenFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
+		ss.StorageFolders[i].sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
 			return build.ExtendErr("error loading storage folder sector metadata file handle", err)
 		}
 		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
-		ss.StorageFolders[i].metadataFile, err = os.OpenFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
+		ss.StorageFolders[i].metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
 			return build.ExtendErr("error loading storage folder sector file handle", err)
 		}
@@ -67,67 +67,31 @@ func (cm *ContractManager) loadSettings() error {
 func (cm *ContractManager) loadSectorLocations() {
 	// Each storage folder houses separate sector location data.
 	for _, sf := range cm.storageFolders {
-		// The storage folder's file should already be open from where the WAL
-		// was doing repairs. For the sake of speed, read the whole sector
-		// lookup table into memory.
-		sectorLookupBytes := make([]byte, len(sf.Usage)*storageFolderGranularity*sectorMetadataDiskSize)
-		// Seek to the beginning of the file and read the whole lookup table.
-		// In the event of an error, continue directly to the next storage
-		// folder.
-		_, err := sf.metadataFile.Seek(0, 0)
+		// Read the sector lookup table for this storage folder into memory.
+		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.Usage)*storageFolderGranularity)
 		if err != nil {
-			cm.log.Println("Error: difficulty seeking in storge folder file during startup", err)
+			cm.log.Printf("Error: unable to read sector metadata for folder %v: %v\n", sf.Index, err)
 			sf.failedReads++
 			continue
 		}
-		_, err = sf.metadataFile.Read(sectorLookupBytes)
-		if err != nil {
-			cm.log.Println("Error: difficulty reading from storge folder file during startup", err)
-			sf.failedReads++
-			continue
-		}
+		sf.successfulReads++
 
-		// The data is organized into sets of 64 sectors. The storage folder
-		// Usage field is a bitfield that contains flipped bits in every index
-		// that corresponds to an existing sector. If the sector does not
-		// exist, the data is still represented in the sector lookup bytes,
-		// it's just garbage data. The data is not guaranteed to be zerored
-		// out.
-		//
-		// The outer loop iterates through each set of sectors. Each set of
-		// sectors is represeted by one element in the usage array.
-		readHead := 0
-		for i, usage := range sf.Usage {
-			// The inner loop iterates through every sector in a set of
-			// sectors. Each sector is represent by one bit in the usage
-			// element.
-			usageMask := uint64(1)
-			for j := 0; j < 64; j++ {
-				// If the corresponding bit in the usage element is flipped,
-				// there is a real sector here. Otherwise, the data can be
-				// assumed to be garbage.
-				if usage&usageMask == usageMask {
-					// There is valid sector metadata here. The next 14 bytes
-					// contain all information needed to piece together the
-					// full sector location information.
-					var id sectorID
-					copy(id[:], sectorLookupBytes[readHead:readHead+12])
-					count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
-					sl := sectorLocation{
-						index:         uint32(i*64 + j),
-						storageFolder: sf.Index,
-						count:         count,
-					}
-					// Add the sector to the sector location map.
-					cm.sectorLocations[id] = sl
-					sf.sectors += 1
-				}
-
-				// Advance the read head, and then check the next bit of the
-				// usage element.
-				readHead += sectorMetadataDiskSize
-				usageMask = usageMask << 1
+		// Iterate through the sectors that are in-use and read their storage
+		// locations into memory.
+		for _, sectorIndex := range usageSectors(sf.Usage) {
+			readHead := sectorMetadataDiskSize * sectorIndex
+			var id sectorID
+			copy(id[:], sectorLookupBytes[readHead:readHead+12])
+			count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
+			sl := sectorLocation{
+				index:         sectorIndex,
+				storageFolder: sf.Index,
+				count:         count,
 			}
+
+			// Add the sector to the sector location map.
+			cm.sectorLocations[id] = sl
+			sf.sectors += 1
 		}
 	}
 }

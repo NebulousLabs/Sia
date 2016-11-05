@@ -1,88 +1,15 @@
 package contractmanager
 
+// TODO: Lock is being held during disk write in managedAddSector.
+
 import (
 	"encoding/binary"
 	"errors"
-	"math"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 )
-
-var (
-	// errNoFreeSectors is returned if there are no free sectors in the usage
-	// array fed to randFreeSector. This error should never be returned, as the
-	// contract manager should have sufficent internal consistency to know in
-	// advance that there are no free sectors.
-	errNoFreeSectors = errors.New("could not find a free sector in the usage array")
-)
-
-// mostSignificantBit returns the index of the most significant bit of an input
-// value.
-func mostSignificantBit(i uint64) uint64 {
-	if i == 0 {
-		panic("no bits set in input")
-	}
-
-	bval := []uint64{0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7}
-	r := uint64(0)
-	if i&0xffffffff00000000 != 0 {
-		r += 32
-		i = i >> 32
-	}
-	if i&0x00000000ffff0000 != 0 {
-		r += 16
-		i = i >> 16
-	}
-	if i&0x000000000000ff00 != 0 {
-		r += 8
-		i = i >> 8
-	}
-	if i&0x00000000000000f0 != 0 {
-		r += 4
-		i = i >> 4
-	}
-	return r + bval[i]
-}
-
-// randFreeSector will take a usage array and find a random free sector within
-// the usage array. The uint32 indicates the index of the sector within the
-// usage array.
-func randFreeSector(usage []uint64) (uint32, error) {
-	// Pick a random starting location. Scanning the sector in a short amount
-	// of time requires starting from a random place.
-	start, err := crypto.RandIntn(len(usage))
-	if err != nil {
-		panic(err)
-	}
-
-	// Find the first element of the array that is not completely full.
-	var i int
-	for i = start; i < len(usage); i++ {
-		if usage[i] != math.MaxUint64 {
-			break
-		}
-	}
-	// If nothing was found by the end of the array, a wraparound is needed.
-	if i == len(usage) {
-		for i = 0; i < start; i++ {
-			if usage[i] != math.MaxUint64 {
-				break
-			}
-		}
-		// Return an error if no empty sectors were found.
-		if i == start {
-			return 0, errNoFreeSectors
-		}
-	}
-
-	// Get the most significant zero. This is achieved by performing a 'most
-	// significant bit' on the XOR of the actual value. Return the index of the
-	// sector that has been selected.
-	msz := mostSignificantBit(^usage[i])
-	return uint32((uint64(i) * 64) + msz), nil
-}
 
 // commitUpdateSector will commit a sector update to the contract manager,
 // writing in metadata and usage info if the sector still exists, and deleting
@@ -172,6 +99,9 @@ func (wal *writeAheadLog) managedAddSector(id sectorID, data []byte) error {
 						wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
 						return err
 					}
+					// TODO: Need to flip the usage immediately after
+					// requesting the sector, and to un-flip it if the Write
+					// fails.
 
 					// Write the new sector to disk. Any data existing in this location
 					// on disk is either garbage or is from a sector that has been
@@ -326,6 +256,9 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
+
+		// Check that the storage folder is not currently undergoing a move
+		// operation.
 
 		// Grab the number of virtual sectors that have been committed with
 		// this root.

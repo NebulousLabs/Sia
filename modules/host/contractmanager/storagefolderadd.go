@@ -313,12 +313,12 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 // state. commitAddStorageFolder should only be called during WAL recovery.
 func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
 	var err error
-	sf.sectorFile, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
+	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
 		sf.failedReads += 1
 		wal.cm.log.Println("Difficulties opening sector file for ", sf.Path, ":", err)
 	}
-	sf.sectorFile, err = os.OpenFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
+	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
 		sf.failedReads += 1
 		wal.cm.log.Println("Difficulties opening sector metadata file for", sf.Path, ":", err)
