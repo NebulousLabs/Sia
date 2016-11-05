@@ -254,14 +254,14 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 // transaction that transfers them to the wallet. Note that this incurs a
 // transaction fee. It returns the total value of the outputs, minus the fee.
 // TODO: support SiafundOutputs too
-func (w *Wallet) SweepSeed(seed modules.Seed) (payout types.Currency, err error) {
+func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err error) {
 	if err = w.tg.Add(); err != nil {
 		return
 	}
 	defer w.tg.Done()
 
 	if !w.cs.Synced() {
-		return types.Currency{}, errors.New("cannot sweep until blockchain is synced")
+		return types.Currency{}, types.Currency{}, errors.New("cannot sweep until blockchain is synced")
 	}
 
 	// get an address to spend into
@@ -287,45 +287,109 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (payout types.Currency, err error)
 
 	// construct a transaction that spends the outputs
 	// TODO: this may result in transactions that are too large.
-	var txn types.Transaction
-	var swept types.Currency // total value of swept outputs
+	tb := w.StartTransaction()
+	var sweptCoins, sweptFunds types.Currency // total values of swept outputs
 	for _, output := range s.siacoinOutputs {
-		// construct an input for the output
+		// construct a siacoin input that spends the output
 		sk := generateSpendableKey(seed, output.seedIndex)
-		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
+		tb.AddSiacoinInput(types.SiacoinInput{
 			ParentID:         types.SiacoinOutputID(output.id),
-			UnlockConditions: sk.UnlockConditions, // TODO: check timelock, etc.
+			UnlockConditions: sk.UnlockConditions,
 		})
 		// add a signature for the input
-		swept = swept.Add(output.value)
+		sweptCoins = sweptCoins.Add(output.value)
+	}
+	for _, output := range s.siafundOutputs {
+		// construct a siafund input that spends the output
+		sk := generateSpendableKey(seed, output.seedIndex)
+		tb.AddSiafundInput(types.SiafundInput{
+			ParentID:         types.SiafundOutputID(output.id),
+			UnlockConditions: sk.UnlockConditions,
+		})
+		// add a signature for the input
+		sweptFunds = sweptFunds.Add(output.value)
 	}
 
-	// estimate the transaction size. NOTE: this equation doesn't account for
-	// other fields in the transaction, but since we are multiplying by
-	// maxFee, lowballing is ok
-	estTxnSize := len(s.siacoinOutputs) * outputSize
+	// estimate the transaction size and fee. NOTE: this equation doesn't
+	// account for other fields in the transaction, but since we are
+	// multiplying by maxFee, lowballing is ok
+	estTxnSize := (len(s.siacoinOutputs) + len(s.siafundOutputs)) * outputSize
 	estFee := maxFee.Mul64(uint64(estTxnSize))
-	if estFee.Cmp(swept) >= 0 {
-		return types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
+	tb.AddMinerFee(estFee)
+
+	// calculate total siacoin payout
+	if sweptCoins.Cmp(estFee) > 0 {
+		coins = sweptCoins.Sub(estFee)
 	}
-	txn.MinerFees = append(txn.MinerFees, estFee)
+	funds = sweptFunds
 
-	// add the recipient output, equal to the sum of the inputs minus the
-	// transaction fee
-	payout = swept.Sub(estFee)
-	txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
-		Value:      payout,
-		UnlockHash: uc.UnlockHash(),
-	})
+	switch {
+	case coins.IsZero() && funds.IsZero():
+		// if we aren't sweeping any coins or funds, then just return an
+		// error; no reason to proceed
+		return types.Currency{}, types.Currency{}, errors.New("transaction fee exceeds value of swept outputs")
 
-	// add signatures
+	case !coins.IsZero() && funds.IsZero():
+		// if we're sweeping coins but not funds, add a siacoin output for
+		// them
+		tb.AddSiacoinOutput(types.SiacoinOutput{
+			Value:      coins,
+			UnlockHash: uc.UnlockHash(),
+		})
+
+	case coins.IsZero() && !funds.IsZero():
+		// if we're sweeping funds but not coins, add a siafund output for
+		// them. This is tricky because we still need to pay for the
+		// transaction fee, but we can't simply subtract the fee from the
+		// output value like we can with swept coins. Instead, we need to fund
+		// the fee using the existing wallet balance.
+		tb.AddSiafundOutput(types.SiafundOutput{
+			Value:      funds,
+			UnlockHash: uc.UnlockHash(),
+		})
+		err = tb.FundSiacoins(estFee)
+		if err != nil {
+			return types.Currency{}, types.Currency{}, errors.New("couldn't pay transaction fee on swept funds: " + err.Error())
+		}
+
+	case !coins.IsZero() && !funds.IsZero():
+		// if we're sweeping both coins and funds, add a siacoin output and a
+		// siafund output
+		tb.AddSiacoinOutput(types.SiacoinOutput{
+			Value:      coins,
+			UnlockHash: uc.UnlockHash(),
+		})
+		tb.AddSiafundOutput(types.SiafundOutput{
+			Value:      funds,
+			UnlockHash: uc.UnlockHash(),
+		})
+	}
+
+	// add signatures for all coins and funds (manually, since tb doesn't have
+	// access to the signing keys)
+	txn, parents := tb.View()
 	for _, output := range s.siacoinOutputs {
 		sk := generateSpendableKey(seed, output.seedIndex)
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 	}
+	for _, sfo := range s.siafundOutputs {
+		sk := generateSpendableKey(seed, sfo.seedIndex)
+		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk)
+	}
+	// Usually, all the inputs will come from swept outputs. However, there is
+	// an edge case in which inputs will be added from the wallet. To cover
+	// this case, we iterate through the SiacoinInputs and add a signature for
+	// any input that belongs to the wallet.
+	w.mu.RLock()
+	for _, input := range txn.SiacoinInputs {
+		if key, ok := w.keys[input.UnlockConditions.UnlockHash()]; ok {
+			addSignatures(&txn, types.FullCoveredFields, input.UnlockConditions, crypto.Hash(input.ParentID), key)
+		}
+	}
+	w.mu.RUnlock()
 
 	// submit the transaction
-	txnSet := []types.Transaction{txn}
+	txnSet := append(parents, txn)
 	err = w.tpool.AcceptTransactionSet(txnSet)
 	return
 }
