@@ -24,6 +24,17 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// randSector creates a random sector that can be added to the contract
+// manager.
+func randSector() (root crypto.Hash, data []byte, err error) {
+	data, err = crypto.RandBytes(int(modules.SectorSize))
+	if err != nil {
+		return
+	}
+	root = crypto.MerkleRoot(data)
+	return
+}
+
 // TestAddSector tries to add a sector to the contract manager, blocking until
 // the add has completed.
 func TestAddSector(t *testing.T) {
@@ -102,6 +113,13 @@ func TestAddSector(t *testing.T) {
 	if !found {
 		t.Error("usage field does not seem to have been updated")
 	}
+	sectorData, err := cmt.cm.ReadSector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(sectorData, data) {
+		t.Fatal("wrong sector provided")
+	}
 
 	// Try reloading the contract manager and see if all of the stateful checks
 	// still hold.
@@ -155,6 +173,13 @@ func TestAddSector(t *testing.T) {
 	}
 	if !found {
 		t.Error("usage field does not seem to have been updated")
+	}
+	sectorData, err = cmt.cm.ReadSector(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(sectorData, data) {
+		t.Fatal("wrong sector provided")
 	}
 }
 

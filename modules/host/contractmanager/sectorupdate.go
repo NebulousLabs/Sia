@@ -85,6 +85,17 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 				wal.mu.Unlock()
 				return errDiskTrouble
 			}
+			su := sectorUpdate{
+				Count:  count,
+				ID:     id,
+				Folder: sf.index,
+				Index:  sectorIndex,
+			}
+			err = wal.writeSectorMetadata(su)
+			if err != nil {
+				delete(wal.cm.storageFolders[su.Folder].queuedSectors, su.ID)
+				return build.ExtendErr("unable to write sector metadata during addSector call", err)
+			}
 			return nil
 		}()
 		if err == nil {
@@ -261,6 +272,7 @@ func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
 // AddSector will add a sector to the contract manager.
 func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error {
 	var syncChan chan struct{}
+	var su sectorUpdate
 	err := func() error {
 		id := cm.managedSectorID(root)
 		cm.wal.managedLockSector(id)
@@ -280,6 +292,19 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 				return errMaxVirtualSectors
 			}
 			location.count += 1
+
+			// Write the sector metadata to disk.
+			su = sectorUpdate{
+				Count:  location.count,
+				ID:     id,
+				Folder: location.storageFolder,
+				Index:  location.index,
+			}
+			err := cm.wal.writeSectorMetadata(su)
+			if err != nil {
+				delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
+				return build.ExtendErr("unable to write sector metadata during addSector call", err)
+			}
 		} else {
 			var err error
 			location, err = cm.wal.managedAddPhysicalSector(id, sectorData, 1)
@@ -287,27 +312,19 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 				cm.log.Debugln("unable to add sector:", err)
 				return build.ExtendErr("unable to add sector", err)
 			}
-		}
-
-		su := sectorUpdate{
-			Count:  location.count,
-			ID:     id,
-			Folder: location.storageFolder,
-			Index:  location.index,
-		}
-
-		// Write the sector metadata to disk.
-		err := cm.wal.writeSectorMetadata(su)
-		if err != nil {
-			delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
-			return build.ExtendErr("unable to write sector metadata during addSector call", err)
+			su = sectorUpdate{
+				Count:  location.count,
+				ID:     id,
+				Folder: location.storageFolder,
+				Index:  location.index,
+			}
 		}
 
 		// Update the WAL.
 		cm.wal.mu.Lock()
 		defer cm.wal.mu.Unlock()
 		delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
-		err = cm.wal.appendChange(stateChange{
+		err := cm.wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{su},
 		})
 		if err != nil {
