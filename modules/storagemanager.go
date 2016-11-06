@@ -21,7 +21,7 @@ type (
 	StorageFolderMetadata struct {
 		Capacity          uint64 `json:"capacity"`          // bytes
 		CapacityRemaining uint64 `json:"capacityremaining"` // bytes
-		Index             int    `json:"index"`
+		Index             uint16 `json:"index"`
 		Path              string `json:"path"`
 
 		// Below are statistics about the filesystem. FailedReads and

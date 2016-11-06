@@ -55,16 +55,21 @@ func (cm *ContractManager) loadSettings() error {
 	// Copy the saved settings into the contract manager.
 	cm.sectorSalt = ss.SectorSalt
 	for i := range ss.StorageFolders {
-		ss.StorageFolders[i].metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
+		sf := new(storageFolder)
+		sf.index = ss.StorageFolders[i].Index
+		sf.path = ss.StorageFolders[i].Path
+		sf.usage = ss.StorageFolders[i].Usage
+		sf.metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
 			return build.ExtendErr("error loading storage folder sector file handle", err)
 		}
-		ss.StorageFolders[i].sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
+		sf.sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
+			sf.metadataFile.Close()
 			return build.ExtendErr("error loading storage folder sector metadata file handle", err)
 		}
-		ss.StorageFolders[i].queuedSectors = make(map[sectorID]uint32)
-		cm.storageFolders[ss.StorageFolders[i].Index] = &ss.StorageFolders[i]
+		sf.queuedSectors = make(map[sectorID]uint32)
+		cm.storageFolders[sf.index] = sf
 	}
 	return nil
 }
@@ -75,9 +80,9 @@ func (cm *ContractManager) loadSectorLocations() {
 	// Each storage folder houses separate sector location data.
 	for _, sf := range cm.storageFolders {
 		// Read the sector lookup table for this storage folder into memory.
-		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.Usage)*storageFolderGranularity)
+		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
 		if err != nil {
-			cm.log.Printf("Error: unable to read sector metadata for folder %v: %v\n", sf.Index, err)
+			cm.log.Printf("Error: unable to read sector metadata for folder %v: %v\n", sf.index, err)
 			atomic.AddUint64(&sf.atomicFailedReads, 1)
 			continue
 		}
@@ -85,14 +90,14 @@ func (cm *ContractManager) loadSectorLocations() {
 
 		// Iterate through the sectors that are in-use and read their storage
 		// locations into memory.
-		for _, sectorIndex := range usageSectors(sf.Usage) {
+		for _, sectorIndex := range usageSectors(sf.usage) {
 			readHead := sectorMetadataDiskSize * sectorIndex
 			var id sectorID
 			copy(id[:], sectorLookupBytes[readHead:readHead+12])
 			count := binary.LittleEndian.Uint16(sectorLookupBytes[readHead+12 : readHead+14])
 			sl := sectorLocation{
 				index:         sectorIndex,
-				storageFolder: sf.Index,
+				storageFolder: sf.index,
 				count:         count,
 			}
 

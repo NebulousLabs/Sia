@@ -34,6 +34,10 @@ package contractmanager
 // TODO: Perform a test simulating a multi-disk environment where after a
 // restart one of the disks is unavailable.
 
+// TODO: The close order could probably use some cleanup so that the file
+// handles that get picked up during load get released upon close in the event
+// of an error.
+
 import (
 	"path/filepath"
 

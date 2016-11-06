@@ -71,7 +71,7 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 		// field.
 		var err error
 		wal.mu.Lock()
-		sectorIndex, err = randFreeSector(newFolder.Usage)
+		sectorIndex, err = randFreeSector(newFolder.usage)
 		// TODO: Update usage before releasing lock.
 		wal.mu.Unlock()
 		if err != nil {
@@ -124,7 +124,7 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 
 	// Read the sector lookup bytes into memory; we'll need them to figure out
 	// what sectors are in which locations.
-	sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.Usage)*storageFolderGranularity)
+	sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
 	if err != nil {
 		atomic.AddUint64(&sf.atomicFailedReads, 1)
 		return 0, build.ExtendErr("unable to read sector metadata", err)
@@ -136,7 +136,7 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 	var errCount uint64
 	var wg sync.WaitGroup
 	var readHead int
-	for _, usage := range sf.Usage[startingPoint/storageFolderGranularity:] {
+	for _, usage := range sf.usage[startingPoint/storageFolderGranularity:] {
 		// The usage is a bitfield indicating where sectors exist. Iterate
 		// through each bit to check for a sector.
 		usageMask := uint64(1)

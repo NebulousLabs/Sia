@@ -20,10 +20,10 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 	usfMap := make(map[uint16]*storageFolder)
 	for _, sc := range scs {
 		for _, sf := range sc.UnfinishedStorageFolderAdditions {
-			usfMap[sf.Index] = sf
+			usfMap[sf.index] = sf
 		}
 		for _, sf := range sc.StorageFolderAdditions {
-			delete(usfMap, sf.Index)
+			delete(usfMap, sf.index)
 		}
 		for _, index := range sc.ErroredStorageFolderAdditions {
 			delete(usfMap, index)
@@ -49,16 +49,16 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 // running operation is in progress, so that any changes to disk can be
 // reverted in the event of unclean shutdown.
 func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
-	numSectors := uint64(len(sf.Usage)) * 64
-	sectorLookupSize := numSectors * sectorMetadataDiskSize
-	sectorHousingSize := numSectors * modules.SectorSize
-	totalSize := sectorLookupSize + sectorHousingSize
-	sectorLookupName := filepath.Join(sf.Path, metadataFile)
-	sectorHousingName := filepath.Join(sf.Path, sectorFile)
-
 	// Lock the storage folder for the duration of the function.
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
+
+	numSectors := uint64(len(sf.usage)) * 64
+	sectorLookupSize := numSectors * sectorMetadataDiskSize
+	sectorHousingSize := numSectors * modules.SectorSize
+	totalSize := sectorLookupSize + sectorHousingSize
+	sectorLookupName := filepath.Join(sf.path, metadataFile)
+	sectorHousingName := filepath.Join(sf.path, sectorFile)
 
 	// Update the uncommitted state to include the storage folder, returning an
 	// error if any checks fail.
@@ -75,7 +75,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			// The conflicting storage folder may e in the process of being
 			// removed, however we refuse to add a replacement storage folder
 			// until the existing one has been removed entirely.
-			if sf.Path == csf.Path {
+			if sf.path == csf.path {
 				return errRepeatFolder
 			}
 		}
@@ -97,7 +97,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		index = uint16(rand)
 		for iterator = 0; iterator < 65536; iterator++ {
 			// check the list of unique folders we created earlier.
-			_, exists := uniqueFolders[index]
+			_, exists := wal.cm.storageFolders[index]
 			if !exists {
 				break
 			}
@@ -108,7 +108,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			return errMaxStorageFolders
 		}
 		// Assign the empty index to the storage folder.
-		sf.Index = index
+		sf.index = index
 
 		// Create the file that is used with the storage folder.
 		sf.metadataFile, err = wal.cm.dependencies.createFile(sectorLookupName)
@@ -165,7 +165,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			// Signal in the WAL that the unfinished storage folder addition
 			// has failed.
 			err = build.ComposeErrors(err, wal.appendChange(stateChange{
-				ErroredStorageFolderAdditions: []uint16{sf.Index},
+				ErroredStorageFolderAdditions: []uint16{sf.index},
 			}))
 		}
 	}()
@@ -204,16 +204,16 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err = sf.metadataFile.Sync()
+		err := sf.metadataFile.Sync()
 		if err != nil {
-			return build.ExtendErr("could not syncronize allocated sector metadata file", err)
+			wal.cm.log.Println("could not synchronize allocated sector metadata file:", err)
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		err = sf.sectorFile.Sync()
+		err := sf.sectorFile.Sync()
 		if err != nil {
-			return build.ExtendErr("could not syncronize allocated sector data file", err)
+			wal.cm.log.Println("could not synchronize allocated sector data file:", err)
 		}
 	}()
 	wg.Wait()
@@ -226,7 +226,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Storage folder addition has completed successfully, commit the addition
 	// through the WAL.
 	wal.mu.Lock()
-	wal.cm.storageFolders[sf.Index] = sf
+	wal.cm.storageFolders[sf.index] = sf
 	err = wal.appendChange(stateChange{
 		StorageFolderAdditions: []*storageFolder{sf},
 	})
@@ -252,8 +252,8 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 	sfs := findUnfinishedStorageFolderAdditions(scs)
 	for _, sf := range sfs {
 		// Remove any leftover files.
-		sectorLookupName := filepath.Join(sf.Path, metadataFile)
-		sectorHousingName := filepath.Join(sf.Path, sectorFile)
+		sectorLookupName := filepath.Join(sf.path, metadataFile)
+		sectorHousingName := filepath.Join(sf.path, sectorFile)
 		err := os.Remove(sectorLookupName)
 		if err != nil {
 			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
@@ -269,7 +269,7 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 		// Append an error call to the changeset, indicating that the storage
 		// folder add was not completed successfully.
 		err = wal.appendChange(stateChange{
-			ErroredStorageFolderAdditions: []uint16{sf.Index},
+			ErroredStorageFolderAdditions: []uint16{sf.index},
 		})
 		if err != nil {
 			return build.ExtendErr("unable to close out unfinished storage folder addition", err)
@@ -282,15 +282,15 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 // state. commitAddStorageFolder should only be called during WAL recovery.
 func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
 	var err error
-	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
+	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
-		wal.cm.log.Println("Difficulties opening sector file for ", sf.Path, ":", err)
+		wal.cm.log.Println("Difficulties opening sector file for ", sf.path, ":", err)
 	}
-	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.Path, sectorFile), os.O_RDWR, 0700)
+	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
-		wal.cm.log.Println("Difficulties opening sector metadata file for", sf.Path, ":", err)
+		wal.cm.log.Println("Difficulties opening sector metadata file for", sf.path, ":", err)
 	}
-	wal.cm.storageFolders[sf.Index] = sf
+	wal.cm.storageFolders[sf.index] = sf
 }
 
 // AddStorageFolder adds a storage folder to the contract manager.
@@ -328,8 +328,8 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 
 	// Create a storage folder object and add it to the WAL.
 	newSF := &storageFolder{
-		Path:  path,
-		Usage: make([]uint64, size/modules.SectorSize/64),
+		path:  path,
+		usage: make([]uint64, size/modules.SectorSize/64),
 
 		queuedSectors: make(map[sectorID]uint32),
 	}

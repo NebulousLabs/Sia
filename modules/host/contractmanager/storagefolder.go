@@ -222,13 +222,16 @@ func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 	var winningIndex int
 
 	// Go through the folders in random order.
-	ordering := crypto.Perm(len(sfs))
+	ordering, err := crypto.Perm(len(sfs))
+	if err != nil {
+		panic(err)
+	}
 	for _, index := range ordering {
 		sf := sfs[index]
 
 		// Skip past this storage folder if there is not enough room for at
 		// least one sector.
-		if sf.sectors >= len(sf.Usage)*storageFolderGranularity {
+		if sf.sectors >= uint64(len(sf.usage))*storageFolderGranularity {
 			continue
 		}
 
@@ -240,7 +243,7 @@ func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 
 		// Select this storage folder.
 		enoughRoom = true
-		winningIndex = i
+		winningIndex = index
 		break
 	}
 	if !enoughRoom {
@@ -252,19 +255,19 @@ func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 // clearUsage will unset the usage bit at the provided sector index for this
 // storage folder.
 func (sf *storageFolder) clearUsage(sectorIndex uint32) {
-	usageElement := sf.Usage[sectorIndex/storageFolderGranularity]
+	usageElement := sf.usage[sectorIndex/storageFolderGranularity]
 	bitIndex := sectorIndex % storageFolderGranularity
 	usageElement = usageElement & (^(1 << bitIndex))
-	sf.Usage[sectorIndex/storageFolderGranularity] = usageElement
+	sf.usage[sectorIndex/storageFolderGranularity] = usageElement
 }
 
 // setUsage will set the usage bit at the provided sector index for this
 // storage folder.
 func (sf *storageFolder) setUsage(sectorIndex uint32) {
-	usageElement := sf.Usage[sectorIndex/storageFolderGranularity]
+	usageElement := sf.usage[sectorIndex/storageFolderGranularity]
 	bitIndex := sectorIndex % storageFolderGranularity
 	usageElement = usageElement | (1 << bitIndex)
-	sf.Usage[sectorIndex/storageFolderGranularity] = usageElement
+	sf.usage[sectorIndex/storageFolderGranularity] = usageElement
 }
 
 // storageFolderSlice returns the contract manager's storage folders map as a
@@ -279,7 +282,7 @@ func (cm *ContractManager) storageFolderSlice() []*storageFolder {
 
 // ResetStorageFolderHealth will reset the read and write statistics for the
 // input storage folder.
-func (cm *ContractManager) ResetStorageFolderHealth(index int) error {
+func (cm *ContractManager) ResetStorageFolderHealth(index uint16) error {
 	cm.wal.mu.Lock()
 	defer cm.wal.mu.Unlock()
 
@@ -290,7 +293,7 @@ func (cm *ContractManager) ResetStorageFolderHealth(index int) error {
 	atomic.StoreUint64(&sf.atomicFailedReads, 0)
 	atomic.StoreUint64(&sf.atomicFailedWrites, 0)
 	atomic.StoreUint64(&sf.atomicSuccessfulReads, 0)
-	aomtic.StoreUint64(&sf.atomicSuccessfulWrites, 0)
+	atomic.StoreUint64(&sf.atomicSuccessfulWrites, 0)
 	return nil
 }
 
@@ -303,11 +306,12 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 
 	// Iterate over the storage folders that are in memory first, and then
 	// suppliment them with the storage folders that are not in memory.
-	for _, sf := range wal.cm.storageFolders {
+	var smfs []modules.StorageFolderMetadata
+	for _, sf := range cm.storageFolders {
 		// Grab the non-computational data.
 		sfm := modules.StorageFolderMetadata{
-			Capacity:          modules.SectorSize * 64 * uint64(len(sf.Usage)),
-			CapacityRemaining: ((64 * uint64(len(sf.Usage))) - sf.sectors) * modules.SectorSize,
+			Capacity:          modules.SectorSize * 64 * uint64(len(sf.usage)),
+			CapacityRemaining: ((64 * uint64(len(sf.usage))) - sf.sectors) * modules.SectorSize,
 			Index:             sf.index,
 			Path:              sf.path,
 
@@ -317,7 +321,7 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 		sfm.FailedReads = atomic.LoadUint64(&sf.atomicFailedReads)
 		sfm.FailedWrites = atomic.LoadUint64(&sf.atomicFailedWrites)
 		sfm.SuccessfulReads = atomic.LoadUint64(&sf.atomicSuccessfulReads)
-		sfm.SuccessfulWrites = atmoic.LoadUint64(&sf.atomicSuccessfulWrites)
+		sfm.SuccessfulWrites = atomic.LoadUint64(&sf.atomicSuccessfulWrites)
 
 		// Add this storage folder to the list of storage folders.
 		smfs = append(smfs, sfm)

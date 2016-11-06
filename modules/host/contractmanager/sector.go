@@ -155,8 +155,6 @@ func (cm *ContractManager) managedSectorID(sectorRoot crypto.Hash) (id sectorID)
 // that match the input sector root.
 func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	id := cm.managedSectorID(root)
-
-	// Lock the sector.
 	cm.wal.managedLockSector(id)
 	defer cm.wal.managedUnlockSector(id)
 
@@ -201,7 +199,7 @@ func (wal *writeAheadLog) managedLockSector(id sectorID) {
 }
 
 // managedUnlockSector releases a sector lock.
-func (wal *writeAheadLock) managedUnlockSector(id sectorID) {
+func (wal *writeAheadLog) managedUnlockSector(id sectorID) {
 	wal.mu.Lock()
 	defer wal.mu.Unlock()
 
