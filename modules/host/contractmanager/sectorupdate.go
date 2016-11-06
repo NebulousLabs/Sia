@@ -26,7 +26,7 @@ func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
 
 	// Set the usage flag and update the on-disk metadata.
 	sf.setUsage(su.Index)
-	wal.writeSectorMetadata(su)
+	wal.writeSectorMetadata(sf, su)
 }
 
 // managedAddPhysicalSector is a WAL operation to add a physical sector to the
@@ -41,7 +41,9 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 	// Find a committed storage folder that has enough space to receive
 	// this sector. Keep trying new storage folders if some return
 	// errors during disk operations.
+	wal.mu.Lock()
 	storageFolders := wal.cm.storageFolderSlice()
+	wal.mu.Unlock()
 	var sectorIndex uint32
 	var sf *storageFolder
 	var storageFolderIndex int
@@ -91,7 +93,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 				Folder: sf.index,
 				Index:  sectorIndex,
 			}
-			err = wal.writeSectorMetadata(su)
+			err = wal.writeSectorMetadata(sf, su)
 			if err != nil {
 				delete(wal.cm.storageFolders[su.Folder].queuedSectors, su.ID)
 				return build.ExtendErr("unable to write sector metadata during addSector call", err)
@@ -217,17 +219,21 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 
 	// Update the in memory representation of the sector (except the
 	// usage), and write the new metadata to disk if needed.
-	wal.mu.Lock()
 	if location.count != 0 {
+		wal.mu.Lock()
 		wal.cm.sectorLocations[id] = location
-		err = wal.writeSectorMetadata(su)
+		sf := wal.cm.storageFolders[location.storageFolder]
+		wal.mu.Unlock()
+		err = wal.writeSectorMetadata(sf, su)
 		if err != nil {
-			wal.mu.Unlock()
 			return build.ExtendErr("failed to write sector metadata", err)
 		}
 	} else {
+		wal.mu.Lock()
 		delete(wal.cm.sectorLocations, id)
+		wal.mu.Unlock()
 	}
+	wal.mu.Lock()
 	syncChan := wal.syncChan
 	wal.mu.Unlock()
 	<-syncChan
@@ -253,12 +259,7 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 
 // writeSectorMetadata will take a sector update and write the related metadata
 // to disk.
-func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
-	sf, exists := wal.cm.storageFolders[su.Folder]
-	if !exists {
-		wal.cm.log.Critical("Trying to write the metadata of a storage folder that does not exist.")
-		return build.ExtendErr("unable to write sector metadata", errStorageFolderNotFound)
-	}
+func (wal *writeAheadLog) writeSectorMetadata(sf *storageFolder, su sectorUpdate) error {
 	err := writeSectorMetadata(sf.metadataFile, su.Index, su.ID, su.Count)
 	if err != nil {
 		wal.cm.log.Printf("ERROR: unable to write sector metadata to folder %v when adding sector: %v\n", su.Folder, err)
@@ -300,9 +301,14 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 				Folder: location.storageFolder,
 				Index:  location.index,
 			}
-			err := cm.wal.writeSectorMetadata(su)
+			cm.wal.mu.Lock()
+			sf := cm.storageFolders[su.Folder]
+			cm.wal.mu.Unlock()
+			err := cm.wal.writeSectorMetadata(sf, su)
 			if err != nil {
+				cm.wal.mu.Lock()
 				delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
+				cm.wal.mu.Unlock()
 				return build.ExtendErr("unable to write sector metadata during addSector call", err)
 			}
 		} else {
