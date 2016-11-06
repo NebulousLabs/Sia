@@ -60,12 +60,13 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 		// Find a storage folder to house the sector after it is removed from
 		// its current folder.
 		var sfsIndex int
-		newFolder, sfsIndex = emptiestStorageFolder(storageFolders)
+		newFolder, sfsIndex = vacancyStorageFolder(storageFolders)
 		if newFolder == nil {
 			// None of the storage folders have enough room to house the
 			// sector.
 			return errInsufficientStorageForSector
 		}
+		defer newFolder.mu.RUnlock()
 
 		// Find a location for the sector within the file using the Usage
 		// field.

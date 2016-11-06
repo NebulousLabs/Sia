@@ -48,8 +48,8 @@ type (
 		// logged instead of just automatically clearning out the unfinished
 		// storage folder addition.
 		ErroredStorageFolderAdditions    []uint16
-		StorageFolderAdditions           []*storageFolder
-		UnfinishedStorageFolderAdditions []*storageFolder
+		StorageFolderAdditions           []savedStorageFolder
+		UnfinishedStorageFolderAdditions []savedStorageFolder
 
 		// Updates to the sector metadata. Careful ordering of events ensures
 		// that a sector update will not make it into the synced WAL unless the

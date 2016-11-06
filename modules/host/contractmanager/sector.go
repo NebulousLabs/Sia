@@ -188,9 +188,10 @@ func (wal *writeAheadLog) managedLockSector(id sectorID) {
 	if exists {
 		sl.waiting++
 	} else {
-		wal.cm.lockedSectors[id] = &sectorLock{
+		sl = &sectorLock{
 			waiting: 1,
 		}
+		wal.cm.lockedSectors[id] = sl
 	}
 	wal.mu.Unlock()
 

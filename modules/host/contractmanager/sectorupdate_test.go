@@ -69,7 +69,7 @@ func TestAddSector(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -78,7 +78,7 @@ func TestAddSector(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -93,7 +93,7 @@ func TestAddSector(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -124,7 +124,7 @@ func TestAddSector(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -132,7 +132,7 @@ func TestAddSector(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -147,7 +147,7 @@ func TestAddSector(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -345,8 +345,8 @@ func (d *dependencyNoSettingsSave) disrupt(s string) bool {
 		return true
 	}
 	if s == "walRename" && d.triggered {
-		// Prevent the WAL from being renamed, which will the existing WAL from
-		// being overwritten.
+		// Prevent the WAL from being renamed, which will prevent the existing
+		// WAL from being overwritten.
 		return true
 	}
 	if s == "cleanWALFile" {
@@ -407,7 +407,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -416,7 +416,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 		if sf.sectors != 1 {
 			t.Error("the number of sectors is being counted incorrectly")
 		}
@@ -434,7 +434,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -465,7 +465,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -473,7 +473,7 @@ func TestAddSectorRecovery(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 		if sf.sectors != 1 {
 			t.Error("the number of sectors is being counted incorrectly")
 		}
@@ -491,7 +491,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -553,7 +553,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -562,7 +562,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 2 {
@@ -577,7 +577,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -608,7 +608,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -616,7 +616,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 2 {
@@ -631,7 +631,7 @@ func TestAddVirtualSectorSerial(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -702,7 +702,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -711,7 +711,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 2 {
@@ -726,7 +726,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -757,7 +757,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -765,7 +765,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 2 {
@@ -780,7 +780,7 @@ func TestAddVirtualSectorParallel(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -846,7 +846,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -855,7 +855,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 250 {
@@ -870,7 +870,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -901,7 +901,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -909,7 +909,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 250 {
@@ -924,7 +924,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -991,7 +991,7 @@ func TestRemoveSector(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1000,7 +1000,7 @@ func TestRemoveSector(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1015,7 +1015,7 @@ func TestRemoveSector(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1046,7 +1046,7 @@ func TestRemoveSector(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1054,7 +1054,7 @@ func TestRemoveSector(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1069,7 +1069,7 @@ func TestRemoveSector(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1134,7 +1134,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1143,7 +1143,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1158,7 +1158,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1189,7 +1189,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1197,7 +1197,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1212,7 +1212,7 @@ func TestRemoveSectorVirtual(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1279,7 +1279,7 @@ func TestDeleteSector(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1288,7 +1288,7 @@ func TestDeleteSector(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1303,7 +1303,7 @@ func TestDeleteSector(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1334,7 +1334,7 @@ func TestDeleteSector(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1342,7 +1342,7 @@ func TestDeleteSector(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1357,7 +1357,7 @@ func TestDeleteSector(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1429,7 +1429,7 @@ func TestDeleteSectorVirtual(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1438,7 +1438,7 @@ func TestDeleteSectorVirtual(t *testing.T) {
 	}
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1453,7 +1453,7 @@ func TestDeleteSectorVirtual(t *testing.T) {
 	}
 	// Check the usage.
 	found := false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1484,7 +1484,7 @@ func TestDeleteSectorVirtual(t *testing.T) {
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 1 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1492,7 +1492,7 @@ func TestDeleteSectorVirtual(t *testing.T) {
 		t.Fatal("storage folder not being reported correctly")
 	}
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.count != 1 {
@@ -1507,7 +1507,7 @@ func TestDeleteSectorVirtual(t *testing.T) {
 	}
 	// Check the usage.
 	found = false
-	for _, u := range cmt.cm.storageFolders[index].Usage {
+	for _, u := range cmt.cm.storageFolders[index].usage {
 		if u != 0 {
 			found = true
 			break
@@ -1580,37 +1580,17 @@ func TestSectorBalancing(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Verify that that all 20 sectors were accepted, and that they have been
-	// distributed evenly between storage folders.
+	// Verify that that all 20 sectors were accepted.
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 3 {
 		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
 	}
-	if sfs[0].Capacity == sfs[0].CapacityRemaining+modules.SectorSize*10 {
-		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
-		}
-		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
-		}
-	} else if sfs[1].Capacity == sfs[1].CapacityRemaining+modules.SectorSize*10 {
-		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
-		}
-		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
-		}
-	} else {
-		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
-		}
-		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
-		}
+	if sfs[0].Capacity+sfs[1].Capacity+sfs[2].Capacity != sfs[0].CapacityRemaining+sfs[1].CapacityRemaining+sfs[2].CapacityRemaining+modules.SectorSize*20 {
+		t.Error("sectors do not appear to have been added correctly")
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 20 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
@@ -1620,7 +1600,7 @@ func TestSectorBalancing(t *testing.T) {
 	// Check a storage folder at random, verify that the sectors are sane.
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.storageFolder != index {
@@ -1651,31 +1631,12 @@ func TestSectorBalancing(t *testing.T) {
 	if len(sfs) != 3 {
 		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
 	}
-	if sfs[0].Capacity == sfs[0].CapacityRemaining+modules.SectorSize*10 {
-		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
-		}
-		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
-		}
-	} else if sfs[1].Capacity == sfs[1].CapacityRemaining+modules.SectorSize*10 {
-		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
-		}
-		if sfs[2].Capacity != sfs[2].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[2].Capacity, sfs[2].CapacityRemaining)
-		}
-	} else {
-		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
-		}
-		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*5 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
-		}
+	if sfs[0].Capacity+sfs[1].Capacity+sfs[2].Capacity != sfs[0].CapacityRemaining+sfs[1].CapacityRemaining+sfs[2].CapacityRemaining+modules.SectorSize*20 {
+		t.Error("sectors do not appear to have been added correctly")
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
+	// locations, and that the usage information was updated correctly.
 	if len(cmt.cm.sectorLocations) != 20 {
 		t.Fatal("there should be twenty sectors reported in the sectorLocations map:", len(cmt.cm.sectorLocations))
 	}
@@ -1684,7 +1645,7 @@ func TestSectorBalancing(t *testing.T) {
 	}
 	// Check a storage folder at random, verify that the sectors are sane.
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.storageFolder != index {
@@ -1769,7 +1730,7 @@ func TestFailingStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64)
+	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*64*2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1779,14 +1740,14 @@ func TestFailingStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir2, modules.SectorSize*64)
+	err = cmt.cm.AddStorageFolder(storageFolderDir2, modules.SectorSize*64*2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Add 20 sectors.
+	// Add 50 sectors.
 	var wg sync.WaitGroup
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1808,16 +1769,13 @@ func TestFailingStorageFolder(t *testing.T) {
 	if len(sfs) != 2 {
 		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
 	}
-	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*10 {
-		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
-	}
-	if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*10 {
-		t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+	if sfs[0].Capacity+sfs[1].Capacity != sfs[0].CapacityRemaining+sfs[1].CapacityRemaining+modules.SectorSize*50 {
+		t.Error("expecting 20 sectors consumed:", sfs[0].Capacity+sfs[1].Capacity, sfs[0].CapacityRemaining+sfs[1].CapacityRemaining-modules.SectorSize*50)
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
-	if len(cmt.cm.sectorLocations) != 20 {
+	// locations, and that the usage information was updated correctly.
+	if len(cmt.cm.sectorLocations) != 50 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
 	if len(cmt.cm.storageFolders) != 2 {
@@ -1826,7 +1784,7 @@ func TestFailingStorageFolder(t *testing.T) {
 	// Check a storage folder at random, verify that the sectors are sane.
 	var index uint16
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.storageFolder != index {
@@ -1835,7 +1793,7 @@ func TestFailingStorageFolder(t *testing.T) {
 		if sl.count != 1 {
 			t.Error("Sector location should only be reporting one sector")
 		}
-		if sl.index > 64 {
+		if sl.index > 128 {
 			t.Error("sector index within storage folder also being reported incorrectly")
 		}
 	}
@@ -1845,8 +1803,8 @@ func TestFailingStorageFolder(t *testing.T) {
 	*d.triggered = true
 	d.mu.Unlock()
 
-	// Add 20 more sectors.
-	for i := 0; i < 20; i++ {
+	// Add 50 more sectors.
+	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1868,25 +1826,35 @@ func TestFailingStorageFolder(t *testing.T) {
 	if len(sfs) != 2 {
 		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
 	}
-	if sfs[0].Capacity == sfs[0].CapacityRemaining+modules.SectorSize*10 {
-		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*30 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+	if strings.Contains(sfs[0].Path, "storageFolderTwo") {
+		// sfs[0] is the working one, should have strictly more than 50
+		// sectors.
+		if sfs[0].CapacityRemaining+modules.SectorSize*50 >= sfs[0].Capacity {
+			t.Error("expecting more than 50 sectors in sfs0")
 		}
-		if sfs[0].FailedWrites == 0 {
+		if sfs[1].CapacityRemaining+modules.SectorSize*50 <= sfs[1].Capacity {
+			t.Error("expecting less than 50 sectors in sfs1")
+		}
+		if sfs[1].FailedWrites == 0 {
 			t.Error("failed write not reported in storage folder stats")
 		}
 	} else {
-		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*30 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity/modules.SectorSize, sfs[0].CapacityRemaining/modules.SectorSize)
+		// sfs[1] is the working one, should have strictly more than 50
+		// sectors.
+		if sfs[1].CapacityRemaining+modules.SectorSize*50 >= sfs[1].Capacity {
+			t.Error("expecting more than 50 sectors in sfs1")
 		}
-		if sfs[1].FailedWrites == 0 {
+		if sfs[0].CapacityRemaining+modules.SectorSize*50 <= sfs[0].Capacity {
+			t.Error("expecting less than 50 sectors in sfs0")
+		}
+		if sfs[0].FailedWrites == 0 {
 			t.Error("failed write not reported in storage folder stats")
 		}
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
-	if len(cmt.cm.sectorLocations) != 40 {
+	// locations, and that the usage information was updated correctly.
+	if len(cmt.cm.sectorLocations) != 100 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
 	if len(cmt.cm.storageFolders) != 2 {
@@ -1894,7 +1862,7 @@ func TestFailingStorageFolder(t *testing.T) {
 	}
 	// Check a storage folder at random, verify that the sectors are sane.
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.storageFolder != index {
@@ -1903,7 +1871,7 @@ func TestFailingStorageFolder(t *testing.T) {
 		if sl.count != 1 {
 			t.Error("Sector location should only be reporting one sector")
 		}
-		if sl.index > 64 {
+		if sl.index > 128 {
 			t.Error("sector index within storage folder also being reported incorrectly")
 		}
 	}
@@ -1925,19 +1893,30 @@ func TestFailingStorageFolder(t *testing.T) {
 	if len(sfs) != 2 {
 		t.Fatal("There should be two storage folders in the contract manager", len(sfs))
 	}
-	if sfs[0].Capacity == sfs[0].CapacityRemaining+modules.SectorSize*10 {
-		if sfs[1].Capacity != sfs[1].CapacityRemaining+modules.SectorSize*30 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[1].Capacity, sfs[1].CapacityRemaining)
+	if strings.Contains(sfs[0].Path, "storageFolderTwo") {
+		// sfs[0] is the working one, should have strictly more than 50
+		// sectors.
+		if sfs[0].CapacityRemaining+modules.SectorSize*50 >= sfs[0].Capacity {
+			t.Error("expecting more than 50 sectors in sfs0")
+		}
+		if sfs[1].CapacityRemaining+modules.SectorSize*50 <= sfs[1].Capacity {
+			t.Error("expecting less than 50 sectors in sfs1")
 		}
 	} else {
-		if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize*30 {
-			t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		// sfs[1] is the working one, should have strictly more than 50
+		// sectors.
+		if sfs[1].CapacityRemaining+modules.SectorSize*50 >= sfs[1].Capacity {
+			t.Error("expecting more than 50 sectors in sfs1")
+		}
+		if sfs[0].CapacityRemaining+modules.SectorSize*50 <= sfs[0].Capacity {
+			t.Error("expecting less than 50 sectors in sfs0")
 		}
 	}
+
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right
-	// locations, and that the Usage information was updated correctly.
-	if len(cmt.cm.sectorLocations) != 40 {
+	// locations, and that the usage information was updated correctly.
+	if len(cmt.cm.sectorLocations) != 100 {
 		t.Fatal("there should be one sector reported in the sectorLocations map")
 	}
 	if len(cmt.cm.storageFolders) != 2 {
@@ -1945,7 +1924,7 @@ func TestFailingStorageFolder(t *testing.T) {
 	}
 	// Check a storage folder at random, verify that the sectors are sane.
 	for _, sf := range cmt.cm.storageFolders {
-		index = sf.Index
+		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
 		if sl.storageFolder != index {
@@ -1954,7 +1933,7 @@ func TestFailingStorageFolder(t *testing.T) {
 		if sl.count != 1 {
 			t.Error("Sector location should only be reporting one sector")
 		}
-		if sl.index > 64 {
+		if sl.index > 128 {
 			t.Error("sector index within storage folder also being reported incorrectly")
 		}
 	}

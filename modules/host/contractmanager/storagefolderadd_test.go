@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 )
 
 // TestAddStorageFolder tries to add a storage folder to the contract manager,
@@ -585,46 +584,19 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	}
 }
 
-// TestAddStorageFolderFailedCommit utilizes the sync-loop hijacking in
-// TestAddStorageFolderDoubleAddNoCommit to create a commit scheme that syncs
-// the WAL, but does not actually commit the actions. This simulates a disk
-// failure or power failure, resulting in a partial-completion of the storage
-// folder addition.
+// TestAddStorageFolderFailedCommit adds a storage folder without ever saving
+// the settings.
 func TestAddStorageFolderFailedCommit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
-	var d dependencyNoSyncLoop
+	d := new(dependencyNoSettingsSave)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderFailedCommit")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cmt.panicClose()
-
-	// The sync loop will never run, which means naively AddStorageFolder will
-	// never return. To get AddStorageFolder to return before the commit
-	// completes, spin up an alternate sync loop which only performs the
-	// signaling responsibilities of the commit function.
-	//
-	// This new sync-loop will also write the WAL file to disk and sync the
-	// write, but will not properly call the commit() action.
-	closeFakeSyncChan := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-closeFakeSyncChan:
-				return
-			case <-time.After(time.Millisecond * 250):
-				// Signal that the commit operation has completed, even though
-				// it has not.
-				cmt.cm.wal.mu.Lock()
-				close(cmt.cm.wal.syncChan)
-				cmt.cm.wal.syncChan = make(chan struct{})
-				cmt.cm.wal.mu.Unlock()
-			}
-		}
-	}()
 
 	// Add a storage folder to the contract manager tester.
 	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
@@ -633,45 +605,14 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Call AddStorageFolder, knowing that the changes will not be properly
-	// committed.
 	sfSize := modules.SectorSize * storageFolderGranularity * 8
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Perform the sync cycle with the WAL (hijacked sync loop will not), but
-	// skip the part where the changes are actually committed.
-	func() {
-		cmt.cm.wal.mu.Lock()
-		defer cmt.cm.wal.mu.Unlock()
-
-		tmpFilename := filepath.Join(cmt.cm.persistDir, settingsFileTmp)
-		filename := filepath.Join(cmt.cm.persistDir, settingsFile)
-		err = cmt.cm.wal.fileSettingsTmp.Sync()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = cmt.cm.wal.fileSettingsTmp.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = os.Rename(tmpFilename, filename)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cmt.cm.wal.fileSettingsTmp, err = os.Create(filepath.Join(cmt.cm.persistDir, settingsFileTmp))
-		if err != nil {
-			t.Fatal(err)
-		}
-		ss := cmt.cm.savedSettings()
-		err = persist.Save(settingsMetadata, ss, cmt.cm.wal.fileSettingsTmp)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	d.mu.Lock()
+	d.triggered = true
+	d.mu.Unlock()
 
 	// Check that the storage folder has been added.
 	sfs := cmt.cm.StorageFolders()
@@ -686,7 +627,6 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Close the contract manager and replace it with a new contract manager.
 	// The new contract manager should have normal dependencies.
-	close(closeFakeSyncChan)
 	err = cmt.cm.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -704,18 +644,19 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	}
 }
 
-// dependencyNoSyncBadAdd is a mocked dependency that will disable the sync
-// loop and prevent AddStorageFolder from successfully completing.
-type dependencyNoSyncBadAdd struct {
+// dependencySFAddNoFinish is a mocked dependency that will prevent the
+type dependencySFAddNoFinish struct {
 	productionDependencies
 }
 
 // disrupt will disrupt the threadedSyncLoop, causing the loop to terminate as
 // soon as it is created.
-func (dependencyNoSyncBadAdd) disrupt(s string) bool {
-	if s == "threadedSyncLoopStart" || s == "incompleteAddStorageFolder" || s == "cleanWALFile" {
-		// Disrupt threadedSyncLoop. The sync loop will exit immediately
-		// instead of executing commits.
+func (d *dependencySFAddNoFinish) disrupt(s string) bool {
+	if s == "storageFolderAddFinish" {
+		return true
+	}
+	if s == "cleanWALFile" {
+		// Prevent the WAL file from being removed.
 		return true
 	}
 	return false
@@ -729,36 +670,12 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	var d dependencyNoSyncBadAdd
+	d := new(dependencySFAddNoFinish)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderUnfinishedCreate")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cmt.panicClose()
-
-	// The sync loop will never run, which means naively AddStorageFolder will
-	// never return. To get AddStorageFolder to return before the commit
-	// completes, spin up an alternate sync loop which only performs the
-	// signaling responsibilities of the commit function.
-	//
-	// This new sync-loop will also write the WAL file to disk and sync the
-	// write, but will not properly call the commit() action.
-	closeFakeSyncChan := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-closeFakeSyncChan:
-				return
-			case <-time.After(time.Millisecond * 250):
-				// Signal that the commit operation has completed, even though
-				// it has not.
-				cmt.cm.wal.mu.Lock()
-				close(cmt.cm.wal.syncChan)
-				cmt.cm.wal.syncChan = make(chan struct{})
-				cmt.cm.wal.mu.Unlock()
-			}
-		}
-	}()
 
 	// Add a storage folder to the contract manager tester.
 	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
@@ -775,49 +692,14 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Perform the sync cycle with the WAL (hijacked sync loop will not).
-	func() {
-		cmt.cm.wal.mu.Lock()
-		defer cmt.cm.wal.mu.Unlock()
-
-		tmpFilename := filepath.Join(cmt.cm.persistDir, settingsFileTmp)
-		filename := filepath.Join(cmt.cm.persistDir, settingsFile)
-		err = cmt.cm.wal.fileSettingsTmp.Sync()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = cmt.cm.wal.fileSettingsTmp.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = os.Rename(tmpFilename, filename)
-		if err != nil {
-			t.Fatal(err)
-		}
-		cmt.cm.wal.fileSettingsTmp, err = os.Create(filepath.Join(cmt.cm.persistDir, settingsFileTmp))
-		if err != nil {
-			t.Fatal(err)
-		}
-		ss := cmt.cm.savedSettings()
-		err = persist.Save(settingsMetadata, ss, cmt.cm.wal.fileSettingsTmp)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	// Check that the storage folder has been added.
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported")
 	}
-	// But it should not be in the underlying storage folders array.
-	if len(cmt.cm.storageFolders) != 0 {
-		t.Fatal("storage folder added successfuly, despite efforts to cause failure")
-	}
 
 	// Close the contract manager and replace it with a new contract manager.
 	// The new contract manager should have normal dependencies.
-	close(closeFakeSyncChan)
 	err = cmt.cm.Close()
 	if err != nil {
 		t.Fatal(err)

@@ -28,6 +28,15 @@ type (
 	}
 )
 
+// savedStorageFolder returns the persistent version of the storage folder.
+func (sf *storageFolder) savedStorageFolder() savedStorageFolder {
+	return savedStorageFolder{
+		Index: sf.index,
+		Path:  sf.path,
+		Usage: sf.usage,
+	}
+}
+
 // initSettings will set the default settings for the contract manager.
 // initSettings should only be run for brand new contract maangers.
 func (cm *ContractManager) initSettings() error {
@@ -121,11 +130,7 @@ func (cm *ContractManager) savedSettings() savedSettings {
 		}
 
 		// Copy over the storage folder.
-		ss.StorageFolders = append(ss.StorageFolders, savedStorageFolder{
-			Index: sf.index,
-			Path:  sf.path,
-			Usage: sf.usage,
-		})
+		ss.StorageFolders = append(ss.StorageFolders, sf.savedStorageFolder())
 
 		// Re-set all of the usage bits for the queued sectors.
 		for _, sectorIndex := range sf.queuedSectors {

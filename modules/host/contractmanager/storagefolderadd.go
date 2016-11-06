@@ -14,16 +14,16 @@ import (
 // findUnfinishedStorageFolderAdditions will scroll through a set of state
 // changes and figure out which of the unfinished storage folder additions are
 // still unfinished.
-func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
+func findUnfinishedStorageFolderAdditions(scs []stateChange) []savedStorageFolder {
 	// Use a map to figure out what unfinished storage folders exist and use it
 	// to remove the ones that have terminated.
-	usfMap := make(map[uint16]*storageFolder)
+	usfMap := make(map[uint16]savedStorageFolder)
 	for _, sc := range scs {
 		for _, sf := range sc.UnfinishedStorageFolderAdditions {
-			usfMap[sf.index] = sf
+			usfMap[sf.Index] = sf
 		}
 		for _, sf := range sc.StorageFolderAdditions {
-			delete(usfMap, sf.index)
+			delete(usfMap, sf.Index)
 		}
 		for _, index := range sc.ErroredStorageFolderAdditions {
 			delete(usfMap, index)
@@ -31,7 +31,7 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []*storageFolder {
 	}
 
 	// Return the active unifinished storage folders as a slice.
-	var sfs []*storageFolder
+	var sfs []savedStorageFolder
 	for _, sf := range usfMap {
 		sfs = append(sfs, sf)
 	}
@@ -131,7 +131,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		// operation and the completed commitment to the unfinished storage
 		// folder addition (signaled by `<-syncChan` a few lines down).
 		wal.appendChange(stateChange{
-			UnfinishedStorageFolderAdditions: []*storageFolder{sf},
+			UnfinishedStorageFolderAdditions: []savedStorageFolder{sf.savedStorageFolder()},
 		})
 		// Grab the sync channel so we know when the unfinished storage folder
 		// addition has been committed to on disk.
@@ -144,6 +144,11 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Block until the commitment to the unfinished storage folder addition is
 	// complete.
 	<-syncChan
+
+	// Simulate a disk failure at this point.
+	if wal.cm.dependencies.disrupt("storageFolderAddFinish") {
+		return nil
+	}
 
 	// If there's an error in the rest of the function, the storage folder
 	// needs to be removed from the list of unfinished storage folder
@@ -228,8 +233,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	wal.mu.Lock()
 	wal.cm.storageFolders[sf.index] = sf
 	err = wal.appendChange(stateChange{
-		StorageFolderAdditions: []*storageFolder{sf},
+		StorageFolderAdditions: []savedStorageFolder{sf.savedStorageFolder()},
 	})
+	syncChan = wal.syncChan
 	wal.mu.Unlock()
 	if err != nil {
 		return build.ExtendErr("storage folder commitment assignment failed", err)
@@ -237,7 +243,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 
 	// Wait to confirm the storage folder addition has completed until the WAL
 	// entry has synced.
-	syncChan = wal.syncChan
 	<-syncChan
 
 	// Set the progress back to '0'.
@@ -252,8 +257,8 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 	sfs := findUnfinishedStorageFolderAdditions(scs)
 	for _, sf := range sfs {
 		// Remove any leftover files.
-		sectorLookupName := filepath.Join(sf.path, metadataFile)
-		sectorHousingName := filepath.Join(sf.path, sectorFile)
+		sectorLookupName := filepath.Join(sf.Path, metadataFile)
+		sectorHousingName := filepath.Join(sf.Path, sectorFile)
 		err := os.Remove(sectorLookupName)
 		if err != nil {
 			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
@@ -264,12 +269,12 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 		}
 
 		// Delete the storage folder from the storage folders map.
-		delete(wal.cm.storageFolders, sf.index)
+		delete(wal.cm.storageFolders, sf.Index)
 
 		// Append an error call to the changeset, indicating that the storage
 		// folder add was not completed successfully.
 		err = wal.appendChange(stateChange{
-			ErroredStorageFolderAdditions: []uint16{sf.index},
+			ErroredStorageFolderAdditions: []uint16{sf.Index},
 		})
 		if err != nil {
 			return build.ExtendErr("unable to close out unfinished storage folder addition", err)
@@ -280,9 +285,17 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 
 // commitAddStorageFolder integrates a pending AddStorageFolder call into the
 // state. commitAddStorageFolder should only be called during WAL recovery.
-func (wal *writeAheadLog) commitAddStorageFolder(sf *storageFolder) {
+func (wal *writeAheadLog) commitAddStorageFolder(ssf savedStorageFolder) {
+	sf := &storageFolder{
+		index: ssf.Index,
+		path:  ssf.Path,
+		usage: ssf.Usage,
+
+		queuedSectors: make(map[sectorID]uint32),
+	}
+
 	var err error
-	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
+	sf.metadataFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, metadataFile), os.O_RDWR, 0700)
 	if err != nil {
 		wal.cm.log.Println("Difficulties opening sector file for ", sf.path, ":", err)
 	}

@@ -31,11 +31,11 @@ func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
 
 // managedAddPhysicalSector is a WAL operation to add a physical sector to the
 // contract manager.
-func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte) error {
+func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte) (sectorLocation, error) {
 	// Sanity check - data should have modules.SectorSize bytes.
 	if uint64(len(data)) != modules.SectorSize {
 		wal.cm.log.Critical("sector has the wrong size", modules.SectorSize, len(data))
-		return errors.New("malformed sector")
+		return sectorLocation{}, errors.New("malformed sector")
 	}
 
 	// Find a committed storage folder that has enough space to receive
@@ -52,7 +52,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte) err
 		if sf == nil {
 			// None of the storage folders have enough room to house the
 			// sector.
-			return errInsufficientStorageForSector
+			return sectorLocation{}, errInsufficientStorageForSector
 		}
 		// Release the RLock that is grabbed by the vacancyStorageFolder once
 		// we have finished adding the sector.
@@ -98,80 +98,58 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte) err
 	}
 
 	// Update the state to reflect the new sector.
-	wal.mu.Lock()
-	wal.cm.sectorLocations[id] = sectorLocation{
+	sl := sectorLocation{
 		index:         sectorIndex,
 		storageFolder: sf.index,
 		count:         1,
 	}
+	wal.mu.Lock()
+	wal.cm.sectorLocations[id] = sl
 	sf.sectors += 1
 	wal.mu.Unlock()
-	return nil
-}
-
-// managedApplySectorUpdate will apply the provided sector update to the
-// contract manager.
-func (wal *writeAheadLog) managedApplySectorUpdate(su sectorUpdate) error {
-	// Write the sector metadata to disk.
-	err := wal.writeSectorMetadata(su)
-	if err != nil {
-		return build.ExtendErr("unable to write sector metadata during addSector call", err)
-	}
-
-	// Update the WAL, which requires appending a change, then grabbing a sync
-	// channel, then updating the queuedSectors map.
-	var syncChan chan struct{}
-	err = func() error {
-		wal.mu.Lock()
-		defer wal.mu.Unlock()
-
-		err = wal.appendChange(stateChange{
-			SectorUpdates: []sectorUpdate{su},
-		})
-		syncChan = wal.syncChan
-		// The sector usage which was previously only queued has now come into
-		// full effect.
-		delete(wal.cm.storageFolders[su.Folder].queuedSectors, su.ID)
-		return err
-	}()
-	if err != nil {
-		return build.ExtendErr("failed to add a state change", err)
-	}
-
-	// Return after the commitment has been synchronized.
-	<-syncChan
-	return nil
+	return sl, nil
 }
 
 // managedDeleteSector will delete a sector (physical) from the contract manager.
 func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
-	// Grab the number of virtual sectors that have been committed with
-	// this root.
-	wal.mu.Lock()
-	location, exists := wal.cm.sectorLocations[id]
-	if !exists {
-		wal.mu.Unlock()
-		return errSectorNotFound
-	}
-	// Delete the sector from the sector locations map.
-	delete(wal.cm.sectorLocations, id)
-	wal.mu.Unlock()
+	// Write the sector delete to the WAL.
+	var location sectorLocation
+	var syncChan chan struct{}
+	err := func() error {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
 
-	// Inform the WAL of the sector update.
-	err := wal.appendChange(stateChange{
-		SectorUpdates: []sectorUpdate{sectorUpdate{
-			Count: 0,
-			ID: id,
-			Folder: location.storageFolder,
-			Index: location.index,
-		}},
-	})
+		// Grab the number of virtual sectors that have been committed with
+		// this root.
+		var exists bool
+		location, exists = wal.cm.sectorLocations[id]
+		if !exists {
+			wal.mu.Unlock()
+			return errSectorNotFound
+		}
+		// Delete the sector from the sector locations map.
+		delete(wal.cm.sectorLocations, id)
+
+		// Inform the WAL of the sector update.
+		err := wal.appendChange(stateChange{
+			SectorUpdates: []sectorUpdate{{
+				Count:  0,
+				ID:     id,
+				Folder: location.storageFolder,
+				Index:  location.index,
+			}},
+		})
+		if err != nil {
+			return build.ExtendErr("failed to add a state change", err)
+		}
+
+		// Block until the change has been committed.
+		syncChan = wal.syncChan
+		return nil
+	}()
 	if err != nil {
-		return build.ExtendErr("failed to add a state change", err)
+		return build.ExtendErr("failed to write to WAL", err)
 	}
-
-	// Block until the change has been committed.
-	syncChan := wal.syncChan
 	<-syncChan
 
 	// Only update the usage after the sector delete has been committed to disk
@@ -192,49 +170,56 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 // managedRemoveSector will remove a sector (virtual or physical) from the
 // contract manager.
 func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
-	// Grab the number of virtual sectors that have been committed with
-	// this root.
-	wal.mu.Lock()
-	location, exists := wal.cm.sectorLocations[id]
-	wal.mu.Unlock()
-	if !exists {
-		return errSectorNotFound
-	}
-	location.count--
+	// Inform the WAL of the removed sector.
+	var location sectorLocation
+	var su sectorUpdate
+	err := func() error {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
 
-	// Inform the WAL of the sector update.
-	su := sectorUpdate{
-		Count: location.count,
-		ID: id,
-		Folder: location.storageFolder,
-		Index: location.index,
-	}
-	err := wal.appendChange(stateChange{
-		SectorUpdates: []sectorUpdate{su},
-	})
+		// Grab the number of virtual sectors that have been committed with
+		// this root.
+		var exists bool
+		location, exists = wal.cm.sectorLocations[id]
+		if !exists {
+			return errSectorNotFound
+		}
+		location.count--
+
+		// Inform the WAL of the sector update.
+		su = sectorUpdate{
+			Count:  location.count,
+			ID:     id,
+			Folder: location.storageFolder,
+			Index:  location.index,
+		}
+		err := wal.appendChange(stateChange{
+			SectorUpdates: []sectorUpdate{su},
+		})
+		if err != nil {
+			return build.ExtendErr("failed to add a state change", err)
+		}
+		return nil
+	}()
 	if err != nil {
-		return build.ExtendErr("failed to add a state change", err)
+		return err
 	}
 
 	// Update the in memory representation of the sector (except the
 	// usage), and write the new metadata to disk if needed.
+	wal.mu.Lock()
 	if location.count != 0 {
-		wal.mu.Lock()
 		wal.cm.sectorLocations[id] = location
-		wal.mu.Unlock()
 		err = wal.writeSectorMetadata(su)
 		if err != nil {
+			wal.mu.Unlock()
 			return build.ExtendErr("failed to write sector metadata", err)
 		}
 	} else {
-		wal.mu.Lock()
 		delete(wal.cm.sectorLocations, id)
-		wal.mu.Unlock()
 	}
-
-	// Grab the sync channel to know when the update has been durably
-	// committed.
 	syncChan := wal.syncChan
+	wal.mu.Unlock()
 	<-syncChan
 
 	// Only update the usage after the sector removal has been committed to
@@ -259,7 +244,11 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 // writeSectorMetadata will take a sector update and write the related metadata
 // to disk.
 func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
-	sf := wal.cm.storageFolders[su.Folder]
+	sf, exists := wal.cm.storageFolders[su.Folder]
+	if !exists {
+		wal.cm.log.Critical("Trying to write the metadata of a storage folder that does not exist.")
+		return build.ExtendErr("unable to write sector metadata", errStorageFolderNotFound)
+	}
 	err := writeSectorMetadata(sf.metadataFile, su.Index, su.ID, su.Count)
 	if err != nil {
 		wal.cm.log.Printf("ERROR: unable to write sector metadata to folder %v when adding sector: %v\n", su.Folder, err)
@@ -272,41 +261,70 @@ func (wal *writeAheadLog) writeSectorMetadata(su sectorUpdate) error {
 
 // AddSector will add a sector to the contract manager.
 func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error {
-	id := cm.managedSectorID(root)
-	cm.wal.managedLockSector(id)
-	defer cm.wal.managedUnlockSector(id)
+	var syncChan chan struct{}
+	err := func() error {
+		id := cm.managedSectorID(root)
+		cm.wal.managedLockSector(id)
+		defer cm.wal.managedUnlockSector(id)
 
-	// It's okay to be loose with the locks here because the sectorLocations
-	// value for this sector will not be modified - modifying the sector
-	// locations value would require the sector lock.
-	cm.wal.mu.Lock()
-	location, exists := cm.sectorLocations[id]
-	cm.wal.mu.Unlock()
-	if exists {
-		// Update the location count to indicate that a sector has been
-		// added.
-		if location.count == 65535 {
-			// Max virtual sectors reached, do not make change.
-			return errMaxVirtualSectors
-		}
-		location.count += 1
+		// It's okay to be loose with the locks here because the sectorLocations
+		// value for this sector will not be modified - modifying the sector
+		// locations value would require the sector lock.
 		cm.wal.mu.Lock()
-		cm.sectorLocations[id] = location
+		location, exists := cm.sectorLocations[id]
 		cm.wal.mu.Unlock()
-	} else {
-		err := cm.wal.managedAddPhysicalSector(cm.managedSectorID(root), sectorData)
-		if err != nil {
-			cm.log.Debugln("unable to add sector:", err)
-			return build.ExtendErr("unable to add sector", err)
+		if exists {
+			// Update the location count to indicate that a sector has been
+			// added.
+			if location.count == 65535 {
+				// Max virtual sectors reached, do not make change.
+				return errMaxVirtualSectors
+			}
+			location.count += 1
+		} else {
+			var err error
+			location, err = cm.wal.managedAddPhysicalSector(cm.managedSectorID(root), sectorData)
+			if err != nil {
+				cm.log.Debugln("unable to add sector:", err)
+				return build.ExtendErr("unable to add sector", err)
+			}
 		}
+
+		su := sectorUpdate{
+			Count:  location.count,
+			ID:     id,
+			Folder: location.storageFolder,
+			Index:  location.index,
+		}
+
+		// Write the sector metadata to disk.
+		err := cm.wal.writeSectorMetadata(su)
+		if err != nil {
+			delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
+			return build.ExtendErr("unable to write sector metadata during addSector call", err)
+		}
+
+		// Update the WAL.
+		cm.wal.mu.Lock()
+		defer cm.wal.mu.Unlock()
+		delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
+		err = cm.wal.appendChange(stateChange{
+			SectorUpdates: []sectorUpdate{su},
+		})
+		if err != nil {
+			return err
+		}
+		cm.sectorLocations[id] = location
+		syncChan = cm.wal.syncChan
+		return nil
+	}()
+	if err != nil {
+		return err
 	}
 
-	return cm.wal.managedApplySectorUpdate(sectorUpdate{
-		Count:  location.count,
-		ID:     id,
-		Folder: location.storageFolder,
-		Index:  location.index,
-	})
+	// Return after the commitment has been synchronized.
+	<-syncChan
+	return nil
 }
 
 // DeleteSector will delete a sector from the contract manager. If multiple

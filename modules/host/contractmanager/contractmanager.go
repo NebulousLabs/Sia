@@ -104,6 +104,8 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		storageFolders:  make(map[uint16]*storageFolder),
 		sectorLocations: make(map[sectorID]sectorLocation),
 
+		lockedSectors: make(map[sectorID]*sectorLock),
+
 		dependencies: dependencies,
 		persistDir:   persistDir,
 	}
@@ -151,9 +153,6 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	if err != nil {
 		return nil, build.ExtendErr("error while loading the WAL at startup", err)
 	}
-	// The contract manager should not be in a fully consistent state,
-	// containing all transactions, data, and updates that it has externally
-	// comitted to prior to the previous shutdown.
 
 	// The sector location data is loaded last. Any corruption that happened
 	// during unclean shutdown has already been fixed by the WAL.
