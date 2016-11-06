@@ -31,7 +31,7 @@ func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
 
 // managedAddPhysicalSector is a WAL operation to add a physical sector to the
 // contract manager.
-func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte) (sectorLocation, error) {
+func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, count uint16) (sectorLocation, error) {
 	// Sanity check - data should have modules.SectorSize bytes.
 	if uint64(len(data)) != modules.SectorSize {
 		wal.cm.log.Critical("sector has the wrong size", modules.SectorSize, len(data))
@@ -101,7 +101,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte) (se
 	sl := sectorLocation{
 		index:         sectorIndex,
 		storageFolder: sf.index,
-		count:         1,
+		count:         count,
 	}
 	wal.mu.Lock()
 	wal.cm.sectorLocations[id] = sl
@@ -155,15 +155,14 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 	// Only update the usage after the sector delete has been committed to disk
 	// fully.
 	wal.mu.Lock()
+	defer wal.mu.Unlock()
 	sf, exists := wal.cm.storageFolders[location.storageFolder]
 	if !exists {
 		wal.cm.log.Critical("storage folder housing an existing sector does not exist")
-		wal.mu.Unlock()
 		return nil
 	}
 	sf.clearUsage(location.index)
 	sf.sectors--
-	wal.mu.Unlock()
 	return nil
 }
 
@@ -283,7 +282,7 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 			location.count += 1
 		} else {
 			var err error
-			location, err = cm.wal.managedAddPhysicalSector(cm.managedSectorID(root), sectorData)
+			location, err = cm.wal.managedAddPhysicalSector(id, sectorData, 1)
 			if err != nil {
 				cm.log.Debugln("unable to add sector:", err)
 				return build.ExtendErr("unable to add sector", err)

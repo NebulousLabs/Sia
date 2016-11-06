@@ -49,6 +49,7 @@ type (
 		// storage folder addition.
 		ErroredStorageFolderAdditions    []uint16
 		StorageFolderAdditions           []savedStorageFolder
+		StorageFolderRemovals            []uint16
 		UnfinishedStorageFolderAdditions []savedStorageFolder
 
 		// Updates to the sector metadata. Careful ordering of events ensures
