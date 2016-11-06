@@ -76,6 +76,10 @@ type ContractManager struct {
 	sectorLocations map[sectorID]sectorLocation
 	storageFolders  map[uint16]*storageFolder
 
+	// lockedSectors contains a list of sectors that are currently being read
+	// or modified.
+	lockedSectors map[sectorID]*sectorLock
+
 	// Utilities.
 	dependencies
 	log        *persist.Logger

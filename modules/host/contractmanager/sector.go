@@ -3,6 +3,7 @@ package contractmanager
 import (
 	"encoding/binary"
 	"errors"
+	"sync"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -52,6 +53,13 @@ type (
 		// sectors are allowed for each sector. Proper use by the renter should
 		// mean that the host never has more than 3 virtual sectors for any sector.
 		count uint16
+	}
+
+	// sectorLock contains a lock plus a count of the number of threads
+	// currently waiting to access the lock.
+	sectorLock struct {
+		waiting int
+		mu      sync.Mutex
 	}
 )
 
@@ -168,4 +176,41 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	}
 	atomic.AddUint64(&sf.atomicSuccessfulReads, 1)
 	return sectorData, nil
+}
+
+// managedLockSector grabs a sector lock.
+func (wal *writeAheadLog) managedLockSector(id sectorID) {
+	wal.mu.Lock()
+	sl, exists := wal.cm.lockedSectors[id]
+	if exists {
+		sl.waiting++
+	} else {
+		wal.cm.lockedSectors[id] = &sectorLock{
+			waiting: 1,
+		}
+	}
+	wal.mu.Unlock()
+
+	// Block until the sector is available.
+	sl.mu.Lock()
+}
+
+// managedUnlockSector releases a sector lock.
+func (wal *writeAheadLock) managedUnlockSector(id sectorID) {
+	wal.mu.Lock()
+	defer wal.mu.Unlock()
+
+	// Release the lock on the sector.
+	sl, exists := wal.cm.lockedSectors[id]
+	if !exists {
+		wal.cm.log.Critical("Unlock of sector that is not locked.")
+		return
+	}
+	sl.waiting--
+	sl.mu.Unlock()
+
+	// If nobody else is trying to lock the sector, perform garbage collection.
+	if sl.waiting == 0 {
+		delete(wal.cm.lockedSectors, id)
+	}
 }
