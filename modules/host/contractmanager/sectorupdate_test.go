@@ -1355,7 +1355,7 @@ func TestDeleteSector(t *testing.T) {
 		t.Fatal("There should be one storage folder in the contract manager", len(sfs))
 	}
 	if sfs[0].Capacity != sfs[0].CapacityRemaining+modules.SectorSize {
-		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity, sfs[0].CapacityRemaining)
+		t.Error("One sector's worth of capacity should be consumed:", sfs[0].Capacity/modules.SectorSize, sfs[0].CapacityRemaining/modules.SectorSize)
 	}
 	// Break the rules slightly - make the test brittle by looking at the
 	// internals directly to determine that the sector got added to the right

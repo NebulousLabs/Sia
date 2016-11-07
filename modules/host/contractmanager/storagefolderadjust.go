@@ -265,7 +265,60 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 // shrinkStoragefolder will truncate a storage folder, moving all of the
 // sectors in the truncated space to new storage folders.
 func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint32, force bool) error {
-	return errors.New("shrinking a storage folder is not supported")
+	// Retrieve the specified storage folder.
+	cm.wal.mu.Lock()
+	sf, exists := cm.storageFolders[index]
+	if !exists {
+		cm.wal.mu.Unlock()
+		return errStorageFolderNotFound
+	}
+	cm.wal.mu.Unlock()
+
+	// Lock the storage folder for the duration of the operation.
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+
+	// Clear out the sectors in the storage folder.
+	_, err := cm.wal.managedEmptyStorageFolder(index, newSectorCount)
+	if err != nil && !force {
+		return err
+	}
+
+	// Wait for a synchronize to confirm that all of the moves have succeeded
+	// in full.
+	cm.wal.mu.Lock()
+	syncChan := cm.wal.syncChan
+	cm.wal.mu.Unlock()
+	<-syncChan
+
+	// Submit a storage folder truncation to the WAL and wait until the update
+	// is synced.
+	cm.wal.mu.Lock()
+	err = cm.wal.appendChange(stateChange{
+		StorageFolderReducetions: []storageFolderReduction{{
+			Index:          index,
+			NewSectorCount: newSectorCount,
+		}},
+	})
+	syncChan = cm.wal.syncChan
+	cm.wal.mu.Unlock()
+	if err != nil {
+		return err
+	}
+
+	// Wait until the shrink action has been synchronized.
+	<-syncChan
+
+	// Truncate the storage folder.
+	err = sf.metadataFile.Truncate(int64(newSectorCount*sectorMetadataDiskSize))
+	if err != nil {
+		cm.log.Printf("Error: unable to truncate metadata file as storage folder %v is resized\n", sf.path)
+	}
+	err = sf.sectorFile.Truncate(int64(modules.SectorSize*newSectorCount))
+	if err != nil {
+		cm.log.Printf("Error: unable to truncate sector file as storage folder %v is resized\n", sf.path)
+	}
+	return nil
 }
 
 // growStorageFolder will extend the storage folder files so that they may hold

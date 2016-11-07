@@ -257,8 +257,11 @@ func vacancyStorageFolder(sfs []*storageFolder) (*storageFolder, int) {
 func (sf *storageFolder) clearUsage(sectorIndex uint32) {
 	usageElement := sf.usage[sectorIndex/storageFolderGranularity]
 	bitIndex := sectorIndex % storageFolderGranularity
-	usageElement = usageElement & (^(1 << bitIndex))
-	sf.usage[sectorIndex/storageFolderGranularity] = usageElement
+	usageElementUpdated := usageElement & (^(1 << bitIndex))
+	if usageElementUpdated != usageElement {
+		sf.sectors--
+		sf.usage[sectorIndex/storageFolderGranularity] = usageElement
+	}
 }
 
 // setUsage will set the usage bit at the provided sector index for this
@@ -266,8 +269,11 @@ func (sf *storageFolder) clearUsage(sectorIndex uint32) {
 func (sf *storageFolder) setUsage(sectorIndex uint32) {
 	usageElement := sf.usage[sectorIndex/storageFolderGranularity]
 	bitIndex := sectorIndex % storageFolderGranularity
-	usageElement = usageElement | (1 << bitIndex)
-	sf.usage[sectorIndex/storageFolderGranularity] = usageElement
+	usageElementUpdated := usageElement | (1 << bitIndex)
+	if usageElementUpdated != usageElement {
+		sf.sectors++
+		sf.usage[sectorIndex/storageFolderGranularity] = usageElementUpdated
+	}
 }
 
 // storageFolderSlice returns the contract manager's storage folders map as a

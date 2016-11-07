@@ -50,34 +50,33 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 	for {
 		wal.mu.Lock()
 		sf, storageFolderIndex = vacancyStorageFolder(storageFolders)
-		wal.mu.Unlock()
 		if sf == nil {
 			// None of the storage folders have enough room to house the
 			// sector.
+			wal.mu.Unlock()
 			return sectorLocation{}, errInsufficientStorageForSector
 		}
+		var err error
+		sectorIndex, err = randFreeSector(sf.usage)
+		if err != nil {
+			println(len(sf.usage))
+			println(sf.usage[0])
+			println(sf.sectors)
+			wal.mu.Unlock()
+			wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
+			return sectorLocation{}, err
+		}
+		sf.setUsage(sectorIndex)
+		// Mark this usage as uncommitted.
+		sf.queuedSectors[id] = sectorIndex
+		wal.mu.Unlock()
 		// Release the RLock that is grabbed by the vacancyStorageFolder once
 		// we have finished adding the sector.
 		defer sf.mu.RUnlock()
-		err := func() error {
-			// Find a location for the sector within the file using the Usage
-			// field.
-			var err error
-			wal.mu.Lock()
-			sectorIndex, err = randFreeSector(sf.usage)
-			if err != nil {
-				wal.mu.Unlock()
-				wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
-				return err
-			}
-			sf.setUsage(sectorIndex)
-			// Mark this usage as uncommitted.
-			sf.queuedSectors[id] = sectorIndex
-			wal.mu.Unlock()
-
+		err = func() error {
 			// Write the new sector to disk. In the event of an error, clear
 			// the usage.
-			err = writeSector(sf.sectorFile, sectorIndex, data)
+			err := writeSector(sf.sectorFile, sectorIndex, data)
 			if err != nil {
 				wal.cm.log.Printf("ERROR: Unable to write sector for folder %v: %v\n", sf.path, err)
 				atomic.AddUint64(&sf.atomicFailedWrites, 1)
@@ -118,7 +117,6 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 	}
 	wal.mu.Lock()
 	wal.cm.sectorLocations[id] = sl
-	sf.sectors += 1
 	wal.mu.Unlock()
 	return sl, nil
 }
@@ -175,7 +173,6 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		return nil
 	}
 	sf.clearUsage(location.index)
-	sf.sectors--
 	return nil
 }
 
@@ -251,7 +248,6 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 			return nil
 		}
 		sf.clearUsage(location.index)
-		sf.sectors--
 		wal.mu.Unlock()
 	}
 	return nil

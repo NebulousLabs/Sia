@@ -21,6 +21,13 @@ type (
 		Index  uint32
 	}
 
+	// storageFolderReduction is an idempotend update to shrink a storage
+	// folder.
+	storageFolderReduction struct {
+		Index          uint16
+		NewSectorCount uint32
+	}
+
 	// stateChange defines an idempotent change to the state that has not yet
 	// been applied to the contract manager. The state change is a single
 	// transaction in the WAL.
@@ -50,6 +57,7 @@ type (
 		ErroredStorageFolderAdditions    []uint16
 		StorageFolderAdditions           []savedStorageFolder
 		StorageFolderRemovals            []uint16
+		StorageFolderReductions          []storageFolderReduction
 		UnfinishedStorageFolderAdditions []savedStorageFolder
 
 		// Updates to the sector metadata. Careful ordering of events ensures
