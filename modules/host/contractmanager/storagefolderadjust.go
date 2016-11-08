@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -197,6 +198,9 @@ func (wal *writeAheadLog) queueSectorMove(wg *sync.WaitGroup, id sectorID, errCo
 // RemoveStorageFolder will delete a storage folder from the contract manager,
 // moving all of the sectors in the storage folder to new storage folders.
 func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
+	cm.tg.Add()
+	defer cm.tg.Done()
+
 	// Retrieve the specified storage folder.
 	cm.wal.mu.Lock()
 	sf, exists := cm.storageFolders[index]
@@ -229,20 +233,24 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 	err = cm.wal.appendChange(stateChange{
 		StorageFolderRemovals: []uint16{index},
 	})
-	syncChan = cm.wal.syncChan
+	delete(cm.storageFolders, index)
 	cm.wal.mu.Unlock()
 	if err != nil {
 		return err
 	}
 
 	// Wait until the removal action has been synchronized.
+	cm.wal.mu.Lock()
+	syncChan = cm.wal.syncChan
+	cm.wal.mu.Unlock()
 	<-syncChan
 
 	// Remove the storage folder. Close all handles, and remove the files from
 	// disk.
-	cm.wal.mu.Lock()
-	delete(cm.storageFolders, index)
-	cm.wal.mu.Unlock()
+	//
+	// TODO: In the rare event that this doesn't happen until after the deleted
+	// cm.storageFolders settings update has synchronized, clutter may be left
+	// on disk.
 	err = sf.metadataFile.Close()
 	if err != nil {
 		cm.log.Printf("Error: unable to close metadata file as storage folder %v is removed\n", sf.path)
@@ -266,42 +274,42 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 // sectors in the truncated space to new storage folders.
 func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint32, force bool) error {
 	// Retrieve the specified storage folder.
-	cm.wal.mu.Lock()
-	sf, exists := cm.storageFolders[index]
+	wal.mu.Lock()
+	sf, exists := wal.cm.storageFolders[index]
 	if !exists {
-		cm.wal.mu.Unlock()
+		wal.mu.Unlock()
 		return errStorageFolderNotFound
 	}
-	cm.wal.mu.Unlock()
+	wal.mu.Unlock()
 
 	// Lock the storage folder for the duration of the operation.
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
 
 	// Clear out the sectors in the storage folder.
-	_, err := cm.wal.managedEmptyStorageFolder(index, newSectorCount)
+	_, err := wal.managedEmptyStorageFolder(index, newSectorCount)
 	if err != nil && !force {
 		return err
 	}
 
 	// Wait for a synchronize to confirm that all of the moves have succeeded
 	// in full.
-	cm.wal.mu.Lock()
-	syncChan := cm.wal.syncChan
-	cm.wal.mu.Unlock()
+	wal.mu.Lock()
+	syncChan := wal.syncChan
+	wal.mu.Unlock()
 	<-syncChan
 
 	// Submit a storage folder truncation to the WAL and wait until the update
 	// is synced.
-	cm.wal.mu.Lock()
-	err = cm.wal.appendChange(stateChange{
-		StorageFolderReducetions: []storageFolderReduction{{
+	wal.mu.Lock()
+	err = wal.appendChange(stateChange{
+		StorageFolderReductions: []storageFolderReduction{{
 			Index:          index,
 			NewSectorCount: newSectorCount,
 		}},
 	})
-	syncChan = cm.wal.syncChan
-	cm.wal.mu.Unlock()
+	syncChan = wal.syncChan
+	wal.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -310,13 +318,13 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 	<-syncChan
 
 	// Truncate the storage folder.
-	err = sf.metadataFile.Truncate(int64(newSectorCount*sectorMetadataDiskSize))
+	err = sf.metadataFile.Truncate(int64(newSectorCount * sectorMetadataDiskSize))
 	if err != nil {
-		cm.log.Printf("Error: unable to truncate metadata file as storage folder %v is resized\n", sf.path)
+		wal.cm.log.Printf("Error: unable to truncate metadata file as storage folder %v is resized\n", sf.path)
 	}
-	err = sf.sectorFile.Truncate(int64(modules.SectorSize*newSectorCount))
+	err = sf.sectorFile.Truncate(int64(modules.SectorSize * uint64(newSectorCount)))
 	if err != nil {
-		cm.log.Printf("Error: unable to truncate sector file as storage folder %v is resized\n", sf.path)
+		wal.cm.log.Printf("Error: unable to truncate sector file as storage folder %v is resized\n", sf.path)
 	}
 	return nil
 }

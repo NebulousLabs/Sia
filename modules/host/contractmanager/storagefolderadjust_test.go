@@ -72,7 +72,7 @@ func TestRemoveStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Check that the storage folder was properly recovered.
+	// Check that the storage folder was properly eliminated.
 	sfs = cmt.cm.StorageFolders()
 	if len(sfs) != 0 {
 		t.Fatal("Storage folder should have been removed")

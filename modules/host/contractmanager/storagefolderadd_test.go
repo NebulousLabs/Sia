@@ -525,13 +525,15 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The closing of this channel must happen after the call to panicClose.
+	closeFakeSyncChan := make(chan struct{})
+	defer close(closeFakeSyncChan)
 	defer cmt.panicClose()
 
 	// The sync loop will never run, which means naively AddStorageFolder will
 	// never return. To get AddStorageFolder to return before the commit
 	// completes, spin up an alternate sync loop which only performs the
 	// signaling responsibilities of the commit function.
-	closeFakeSyncChan := make(chan struct{})
 	go func() {
 		for {
 			select {
@@ -547,7 +549,6 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 			}
 		}
 	}()
-	defer close(closeFakeSyncChan)
 
 	// Add a storage folder to the contract manager tester.
 	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")

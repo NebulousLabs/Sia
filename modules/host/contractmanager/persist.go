@@ -30,11 +30,13 @@ type (
 
 // savedStorageFolder returns the persistent version of the storage folder.
 func (sf *storageFolder) savedStorageFolder() savedStorageFolder {
-	return savedStorageFolder{
+	ssf := savedStorageFolder{
 		Index: sf.index,
 		Path:  sf.path,
-		Usage: sf.usage,
+		Usage: make([]uint64, len(sf.usage)),
 	}
+	copy(ssf.Usage, sf.usage)
+	return ssf
 }
 
 // initSettings will set the default settings for the contract manager.
@@ -99,6 +101,7 @@ func (cm *ContractManager) loadSectorLocations() {
 
 		// Iterate through the sectors that are in-use and read their storage
 		// locations into memory.
+		sf.sectors = 0 // TODO: HACK
 		for _, sectorIndex := range usageSectors(sf.usage) {
 			readHead := sectorMetadataDiskSize * sectorIndex
 			var id sectorID
@@ -112,7 +115,7 @@ func (cm *ContractManager) loadSectorLocations() {
 
 			// Add the sector to the sector location map.
 			cm.sectorLocations[id] = sl
-			sf.sectors += 1
+			sf.sectors++
 		}
 	}
 }

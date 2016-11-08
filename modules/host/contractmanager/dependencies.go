@@ -74,6 +74,7 @@ type (
 		Name() string
 		Seek(int64, int) (int64, error)
 		Sync() error
+		Truncate(int64) error
 	}
 )
 

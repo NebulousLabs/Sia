@@ -111,7 +111,9 @@ type storageFolder struct {
 	usage []uint64
 
 	// queuedSectors contains a list of sectors which have been queued to be
-	// added to the storage folder where the add has not yet completed.
+	// added to the storage folder where the add has not yet completed. TODO:
+	// Better to consider it 'queuedUsage' - usage available canonically, but
+	// not actively to avoid race condition.
 	//
 	// sectors is a running tally of the number of physical sectors in the
 	// storage folder.
@@ -260,7 +262,7 @@ func (sf *storageFolder) clearUsage(sectorIndex uint32) {
 	usageElementUpdated := usageElement & (^(1 << bitIndex))
 	if usageElementUpdated != usageElement {
 		sf.sectors--
-		sf.usage[sectorIndex/storageFolderGranularity] = usageElement
+		sf.usage[sectorIndex/storageFolderGranularity] = usageElementUpdated
 	}
 }
 

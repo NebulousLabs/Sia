@@ -211,6 +211,12 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	wal.syncChan = make(chan struct{})
 	go wal.threadedSyncLoop(threadsStopped, syncLoopStopped)
 	wal.cm.tg.AfterStop(func() {
+		// Wait for another iteration of the sync loop.
+		wal.mu.Lock()
+		syncChan := wal.syncChan
+		wal.mu.Unlock()
+		<-syncChan
+
 		// Close the threadsStopped channel to let the sync loop know that all
 		// calls to tg.Add() in the contract manager have cleaned up.
 		close(threadsStopped)
@@ -221,11 +227,6 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 		// manager should have completed, so the number of uncommitted changes
 		// should be zero.
 		<-syncLoopStopped // Wait for the sync loop to signal proper termination.
-
-		// Perform a final commit and sync before closing to make sure that all
-		// queued operations are able to get all the way to disk.
-		wal.commit()
-		wal.syncResources()
 
 		// Close the dangling commit resources.
 		err = wal.fileWALTmp.Close()

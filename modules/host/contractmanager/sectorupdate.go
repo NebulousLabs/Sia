@@ -59,9 +59,6 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 		var err error
 		sectorIndex, err = randFreeSector(sf.usage)
 		if err != nil {
-			println(len(sf.usage))
-			println(sf.usage[0])
-			println(sf.sectors)
 			wal.mu.Unlock()
 			wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
 			return sectorLocation{}, err
@@ -122,10 +119,15 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 }
 
 // managedDeleteSector will delete a sector (physical) from the contract manager.
+//
+// TODO: For delete and remove, must mark the sector as deleted in the
+// queuedSectors map, though the usage is still blocking that location from
+// being accessed.
 func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 	// Write the sector delete to the WAL.
 	var location sectorLocation
 	var syncChan chan struct{}
+	var sf *storageFolder
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
@@ -140,6 +142,15 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		}
 		// Delete the sector from the sector locations map.
 		delete(wal.cm.sectorLocations, id)
+
+		// Add this sector to the list of inactive-but-techincally-available
+		// usage bits.
+		sf, exists = wal.cm.storageFolders[location.storageFolder]
+		if !exists {
+			wal.cm.log.Critical("deleting a sector from a storage folder that does not exist?")
+			return errStorageFolderNotFound
+		}
+		sf.queuedSectors[id] = location.index
 
 		// Inform the WAL of the sector update.
 		err := wal.appendChange(stateChange{
@@ -172,6 +183,7 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		wal.cm.log.Critical("storage folder housing an existing sector does not exist")
 		return nil
 	}
+	delete(sf.queuedSectors, id)
 	sf.clearUsage(location.index)
 	return nil
 }
@@ -182,6 +194,7 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 	// Inform the WAL of the removed sector.
 	var location sectorLocation
 	var su sectorUpdate
+	var sf *storageFolder
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
@@ -208,27 +221,26 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 		if err != nil {
 			return build.ExtendErr("failed to add a state change", err)
 		}
+
+		// Update the in memory representation of the sector (except the
+		// usage), and write the new metadata to disk if needed.
+		if location.count != 0 {
+			wal.cm.sectorLocations[id] = location
+			sf = wal.cm.storageFolders[location.storageFolder]
+		} else {
+			delete(wal.cm.sectorLocations, id)
+		}
 		return nil
 	}()
 	if err != nil {
 		return err
 	}
 
-	// Update the in memory representation of the sector (except the
-	// usage), and write the new metadata to disk if needed.
 	if location.count != 0 {
-		wal.mu.Lock()
-		wal.cm.sectorLocations[id] = location
-		sf := wal.cm.storageFolders[location.storageFolder]
-		wal.mu.Unlock()
 		err = wal.writeSectorMetadata(sf, su)
 		if err != nil {
 			return build.ExtendErr("failed to write sector metadata", err)
 		}
-	} else {
-		wal.mu.Lock()
-		delete(wal.cm.sectorLocations, id)
-		wal.mu.Unlock()
 	}
 	wal.mu.Lock()
 	syncChan := wal.syncChan
@@ -250,6 +262,12 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 		sf.clearUsage(location.index)
 		wal.mu.Unlock()
 	}
+
+	// The altered usage must be committed as well.
+	wal.mu.Lock()
+	syncChan = wal.syncChan
+	wal.mu.Unlock()
+	<-syncChan
 	return nil
 }
 
@@ -268,6 +286,9 @@ func (wal *writeAheadLog) writeSectorMetadata(sf *storageFolder, su sectorUpdate
 
 // AddSector will add a sector to the contract manager.
 func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error {
+	cm.tg.Add()
+	defer cm.tg.Done()
+
 	var syncChan chan struct{}
 	var su sectorUpdate
 	err := func() error {
@@ -352,6 +373,8 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 // storage proofs. If the amount of data removed is small, the risk is small.
 // This operation will not destabilize the contract manager.
 func (cm *ContractManager) DeleteSector(root crypto.Hash) error {
+	cm.tg.Add()
+	defer cm.tg.Done()
 	id := cm.managedSectorID(root)
 	cm.wal.managedLockSector(id)
 	defer cm.wal.managedUnlockSector(id)
@@ -362,6 +385,8 @@ func (cm *ContractManager) DeleteSector(root crypto.Hash) error {
 // RemoveSector will remove a sector from the contract manager. If multiple
 // copies of the sector exist, only one will be removed.
 func (cm *ContractManager) RemoveSector(root crypto.Hash) error {
+	cm.tg.Add()
+	defer cm.tg.Done()
 	id := cm.managedSectorID(root)
 	cm.wal.managedLockSector(id)
 	defer cm.wal.managedUnlockSector(id)
