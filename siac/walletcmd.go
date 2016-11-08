@@ -381,7 +381,7 @@ func walletsweepcmd() {
 	if err != nil {
 		die("Could not sweep seed:", err)
 	}
-	fmt.Println("Swept %v and %v SF from seed.", currencyUnits(swept.Coins), swept.Funds)
+	fmt.Printf("Swept %v and %v SF from seed.\n", currencyUnits(swept.Coins), swept.Funds)
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,
