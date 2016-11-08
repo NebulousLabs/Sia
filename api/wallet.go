@@ -65,6 +65,13 @@ type (
 		AllSeeds           []string `json:"allseeds"`
 	}
 
+	// WalletSweepPOST contains the coins and funds discovered by a call to
+	// /wallet/sweep.
+	WalletSweepPOST struct {
+		Coins types.Currency `json:"coins"`
+		Funds types.Currency `json:"funds"`
+	}
+
 	// WalletTransactionGETid contains the transaction returned by a call to
 	// /wallet/transaction/$(id)
 	WalletTransactionGETid struct {
@@ -387,6 +394,30 @@ func (api *API) walletSiafundsHandler(w http.ResponseWriter, req *http.Request, 
 	}
 	WriteJSON(w, WalletSiafundsPOST{
 		TransactionIDs: txids,
+	})
+}
+
+// walletSweepHandler handles API calls to /wallet/sweep.
+func (api *API) walletSweepHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// Get the seed using the ditionary + phrase
+	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	if dictID == "" {
+		dictID = "english"
+	}
+	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/sweep: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	coins, funds, err := api.wallet.SweepSeed(seed)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/sweep: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, WalletSweepPOST{
+		Coins: coins,
+		Funds: funds,
 	})
 }
 

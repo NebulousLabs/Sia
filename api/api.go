@@ -246,6 +246,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.POST("/wallet/siacoins", RequirePassword(api.walletSiacoinsHandler, requiredPassword))
 		router.POST("/wallet/siafunds", RequirePassword(api.walletSiafundsHandler, requiredPassword))
 		router.POST("/wallet/siagkey", RequirePassword(api.walletSiagkeyHandler, requiredPassword))
+		router.POST("/wallet/sweep", RequirePassword(api.walletSweepHandler, requiredPassword))
 		router.GET("/wallet/transaction/:id", api.walletTransactionHandler)
 		router.GET("/wallet/transactions", api.walletTransactionsHandler)
 		router.GET("/wallet/transactions/:addr", api.walletTransactionsAddrHandler)
