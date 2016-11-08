@@ -65,7 +65,7 @@ type (
 		AllSeeds           []string `json:"allseeds"`
 	}
 
-	// WalletSweepPOST contains the coins and funds discovered by a call to
+	// WalletSweepPOST contains the coins and funds returned by a call to
 	// /wallet/sweep.
 	WalletSweepPOST struct {
 		Coins types.Currency `json:"coins"`
@@ -186,20 +186,39 @@ func (api *API) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ 
 
 // walletInitHandler handles API calls to /wallet/init.
 func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// get encryption key and dictionary
 	var encryptionKey crypto.TwofishKey
 	if req.FormValue("encryptionpassword") != "" {
 		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
-	seed, err := api.wallet.Encrypt(encryptionKey)
-	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
-		return
-	}
-
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictID == "" {
 		dictID = "english"
 	}
+
+	var seed modules.Seed
+	var err error
+	if req.FormValue("seed") != "" {
+		// if a seed was provided, initialize with InitFromSeed
+		seed, err = modules.StringToSeed(req.FormValue("seed"), dictID)
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+		err = api.wallet.InitFromSeed(encryptionKey, seed)
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	} else {
+		// otherwise, initialize with Encrypt
+		seed, err = api.wallet.Encrypt(encryptionKey)
+		if err != nil {
+			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+			return
+		}
+	}
+
 	seedStr, err := modules.SeedToString(seed, dictID)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
@@ -208,32 +227,6 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	WriteJSON(w, WalletInitPOST{
 		PrimarySeed: seedStr,
 	})
-}
-
-// walletInitSeedHandler handles API calls to /wallet/initseed.
-func (api *API) walletInitSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	var encryptionKey crypto.TwofishKey
-	if req.FormValue("encryptionpassword") != "" {
-		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
-	}
-
-	// Get the seed using the ditionary + phrase
-	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
-	if dictID == "" {
-		dictID = "english"
-	}
-	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
-	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
-		return
-	}
-
-	err = api.wallet.InitFromSeed(encryptionKey, seed)
-	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/initseed: " + err.Error()}, http.StatusBadRequest)
-		return
-	}
-	WriteSuccess(w)
 }
 
 // walletSeedHandler handles API calls to /wallet/seed.
@@ -397,8 +390,8 @@ func (api *API) walletSiafundsHandler(w http.ResponseWriter, req *http.Request, 
 	})
 }
 
-// walletSweepHandler handles API calls to /wallet/sweep.
-func (api *API) walletSweepHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+// walletSweepSeedHandler handles API calls to /wallet/sweep/seed.
+func (api *API) walletSweepSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Get the seed using the ditionary + phrase
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictID == "" {
@@ -406,13 +399,13 @@ func (api *API) walletSweepHandler(w http.ResponseWriter, req *http.Request, _ h
 	}
 	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
 	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/sweep: " + err.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/sweep/seed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	coins, funds, err := api.wallet.SweepSeed(seed)
 	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/sweep: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/sweep/seed: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
 		return
 	}
 	WriteJSON(w, WalletSweepPOST{

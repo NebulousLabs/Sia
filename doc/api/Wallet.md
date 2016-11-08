@@ -35,14 +35,13 @@ Index
 | [/wallet/addresses](#walletaddresses-get)                       | GET       |
 | [/wallet/backup](#walletbackup-get)                             | GET       |
 | [/wallet/init](#walletinit-post)                                | POST      |
-| [/wallet/initseed](#walletinitseed-post)                        | POST      |
 | [/wallet/lock](#walletlock-post)                                | POST      |
 | [/wallet/seed](#walletseed-post)                                | POST      |
 | [/wallet/seeds](#walletseeds-get)                               | GET       |
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
-| [/wallet/sweep](#walletsweep-post)                              | POST      |
+| [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
@@ -168,36 +167,14 @@ standard success or error response. See
 
 #### /wallet/init [POST]
 
-initializes the wallet. After the wallet has been initialized once, it does not
-need to be initialized again, and future calls to /wallet/init will return an
-error. The encryption password is provided by the api call. If the password is
-blank, then the password will be set to the same as the seed.
-
-###### Query String Parameters
-```
-// Password that will be used to encrypt the wallet. All subsequent calls
-// should use this password. If left blank, the seed that gets returned will
-// also be the encryption password.
-encryptionpassword
-
-// Name of the dictionary that should be used when encoding the seed. 'english'
-// is the most common choice when picking a dictionary.
-dictionary // Optional, default is english.
-```
-
-###### JSON Response
-```javascript
-{
-  // Wallet seed used to generate addresses that the wallet is able to spend.
-  "primaryseed": "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello"
-}
-```
-
-#### /wallet/initseed [POST]
-
-functions like init, but using a preexisting seed. This operation requires
-scanning the blockchain to determine how many keys have been generated from
-the seed.
+initializes the wallet. After the wallet has been initialized once, it does
+not need to be initialized again, and future calls to /wallet/init will return
+an error. The encryption password is provided by the api call. If the password
+is blank, then the password will be set to the same as the seed.  If the seed
+parameter is supplied, the wallet will be initialized using the existing seed.
+This requires scanning the blockchain to determine how many keys have been
+generated from the seed. For this reason, seed may only be supplied if the
+blockchain is synced.
 
 ###### Query String Parameters
 ```
@@ -211,13 +188,18 @@ encryptionpassword
 dictionary // Optional, default is english.
 
 // Dictionary-encoded phrase that corresponds to the seed being used to
-// initialize the wallet.
-seed
+// initialize the wallet. If left blank, a new seed will be generated.
+seed // Optional
 ```
 
 ###### JSON Response
-standard success or error response. See
-[API.md#standard-responses](/doc/API.md#standard-responses).
+```javascript
+{
+  // Wallet seed used to generate addresses that the wallet is able to spend.
+  // If the seed parameter was supplied, it will also be returned here.
+  "primaryseed": "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello"
+}
+```
 
 #### /wallet/seed [POST]
 
@@ -372,7 +354,7 @@ keyfiles
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
-#### /wallet/sweep [POST]
+#### /wallet/sweep/seed [POST]
 
 Function: Scan the blockchain for outputs belonging to a seed and send them to
 an address owned by the wallet.

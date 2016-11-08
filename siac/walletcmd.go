@@ -222,7 +222,7 @@ func walletinitseedcmd() {
 		}
 		qs += fmt.Sprintf("&encryptionpassword=%s", password)
 	}
-	err = post("/wallet/initseed", qs)
+	err = post("/wallet/init", qs)
 	if err != nil {
 		die("Could not initialize wallet from seed:", err)
 	}
@@ -377,7 +377,7 @@ func walletsweepcmd() {
 	}
 
 	var swept api.WalletSweepPOST
-	err = postResp("/wallet/sweep", fmt.Sprintf("seed=%s&dictionary=%s", seed, "english"), &swept)
+	err = postResp("/wallet/sweep/seed", fmt.Sprintf("seed=%s&dictionary=%s", seed, "english"), &swept)
 	if err != nil {
 		die("Could not sweep seed:", err)
 	}
