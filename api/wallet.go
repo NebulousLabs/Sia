@@ -405,7 +405,7 @@ func (api *API) walletSweepSeedHandler(w http.ResponseWriter, req *http.Request,
 
 	coins, funds, err := api.wallet.SweepSeed(seed)
 	if err != nil {
-		WriteError(w, Error{"error when calling /wallet/sweep/seed: " + modules.ErrBadEncryptionKey.Error()}, http.StatusBadRequest)
+		WriteError(w, Error{"error when calling /wallet/sweep/seed: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	WriteJSON(w, WalletSweepPOST{
