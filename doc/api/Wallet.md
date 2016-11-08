@@ -42,6 +42,7 @@ Index
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
+| [/wallet/sweep](#walletsweep-post)                              | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
@@ -370,6 +371,34 @@ keyfiles
 ###### Response
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /wallet/sweep [POST]
+
+Function: Scan the blockchain for outputs belonging to a seed and send them to
+an address owned by the wallet.
+
+###### Query String Parameters
+```
+// Name of the dictionary that should be used when decoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary // Optional, default is english.
+
+// Dictionary-encoded phrase that corresponds to the seed being added to the
+// wallet.
+seed
+```
+
+###### JSON Response
+```javascript
+{
+  // Number of siacoins, in hastings, transferred to the wallet as a result of
+  // the sweep.
+  "coins": "123456", // hastings, big int
+
+  // Number of siafunds transferred to the wallet as a result of the sweep.
+  "funds": "1", // big int
+}
+```
 
 #### /wallet/lock [POST]
 

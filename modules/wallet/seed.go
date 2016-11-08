@@ -250,10 +250,10 @@ func (w *Wallet) LoadSeed(masterKey crypto.TwofishKey, seed modules.Seed) error 
 	return w.loadSeed(masterKey, seed)
 }
 
-// SweepSeed scans the blockchain for outputs generated from seed and create a
-// transaction that transfers them to the wallet. Note that this incurs a
+// SweepSeed scans the blockchain for outputs generated from seed and creates
+// a transaction that transfers them to the wallet. Note that this incurs a
 // transaction fee. It returns the total value of the outputs, minus the fee.
-// TODO: support SiafundOutputs too
+// If only siafunds were found, the fee is deducted from the wallet.
 func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err error) {
 	if err = w.tg.Add(); err != nil {
 		return

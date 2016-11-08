@@ -130,6 +130,14 @@ Run 'wallet send --help' to see a list of available units.`,
 		Run: wrap(walletsendsiafundscmd),
 	}
 
+	walletSweepCmd = &cobra.Command{
+		Use:   "sweep",
+		Short: "Sweep siacoins and siafunds from a seed.",
+		Long: `Sweep siacoins and siafunds from a seed. The outputs belonging to the seed
+will be sent to your wallet.`,
+		Run: wrap(walletsweepcmd),
+	}
+
 	walletBalanceCmd = &cobra.Command{
 		Use:   "balance",
 		Short: "View wallet balance",
@@ -359,6 +367,21 @@ Siafunds:            %v SF
 Siafund Claims:      %v H
 `, encStatus, currencyUnits(status.ConfirmedSiacoinBalance), delta,
 		status.ConfirmedSiacoinBalance, status.SiafundBalance, status.SiacoinClaimBalance)
+}
+
+// walletsweepcmd sweeps coins and funds from a seed.
+func walletsweepcmd() {
+	seed, err := speakeasy.Ask("Seed: ")
+	if err != nil {
+		die("Reading seed failed:", err)
+	}
+
+	var swept api.WalletSweepPOST
+	err = postResp("/wallet/sweep", fmt.Sprintf("seed=%s&dictionary=%s", seed, "english"), &swept)
+	if err != nil {
+		die("Could not sweep seed:", err)
+	}
+	fmt.Println("Swept %v and %v SF from seed.", currencyUnits(swept.Coins), swept.Funds)
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,
