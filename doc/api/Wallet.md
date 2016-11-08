@@ -35,6 +35,7 @@ Index
 | [/wallet/addresses](#walletaddresses-get)                       | GET       |
 | [/wallet/backup](#walletbackup-get)                             | GET       |
 | [/wallet/init](#walletinit-post)                                | POST      |
+| [/wallet/initseed](#walletinitseed-post)                        | POST      |
 | [/wallet/lock](#walletlock-post)                                | POST      |
 | [/wallet/seed](#walletseed-post)                                | POST      |
 | [/wallet/seeds](#walletseeds-get)                               | GET       |
@@ -190,6 +191,32 @@ dictionary // Optional, default is english.
   "primaryseed": "hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello world hello"
 }
 ```
+
+#### /wallet/initseed [POST]
+
+functions like init, but using a preexisting seed. This operation requires
+scanning the blockchain to determine how many keys have been generated from
+the seed.
+
+###### Query String Parameters
+```
+// Password that will be used to encrypt the wallet. All subsequent calls
+// should use this password. If left blank, the seed that gets returned will
+// also be the encryption password.
+encryptionpassword
+
+// Name of the dictionary that should be used when encoding the seed. 'english'
+// is the most common choice when picking a dictionary.
+dictionary // Optional, default is english.
+
+// Dictionary-encoded phrase that corresponds to the seed being used to
+// initialize the wallet.
+seed
+```
+
+###### JSON Response
+standard success or error response. See
+[API.md#standard-responses](/doc/API.md#standard-responses).
 
 #### /wallet/seed [POST]
 

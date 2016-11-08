@@ -230,6 +230,12 @@ type (
 		// unlocked using the encryption password.
 		Encrypted() bool
 
+		// InitFromSeed functions like Encrypt, but using a specified seed.
+		// Unlike Encrypt, the blockchain will be scanned to determine the
+		// seed's progress. For this reason, InitFromSeed should not be called
+		// until the blockchain is fully synced.
+		InitFromSeed(masterKey crypto.TwofishKey, seed Seed) error
+
 		// Lock deletes all keys in memory and prevents the wallet from being
 		// used to spend coins or extract keys until 'Unlock' is called.
 		Lock() error

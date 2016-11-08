@@ -53,6 +53,13 @@ By default the wallet encryption / unlock password is the same as the generated 
 		Run: wrap(walletinitcmd),
 	}
 
+	walletInitSeedCmd = &cobra.Command{
+		Use:   "init-seed",
+		Short: "Initialize and encrypt a new wallet using a pre-existing seed",
+		Long:  `Initialize and encrypt a new wallet using a pre-existing seed.`,
+		Run:   wrap(walletinitseedcmd),
+	}
+
 	walletLoadCmd = &cobra.Command{
 		Use:   "load",
 		Short: "Load a wallet seed, v0.3.3.x wallet, or siag keyset",
@@ -70,7 +77,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 	walletLoadSeedCmd = &cobra.Command{
 		Use:   `seed`,
 		Short: "Add a seed to the wallet",
-		Long:  "Uses the given password to create a new wallet with that as the primary seed",
+		Long:  "Loads an auxiliary seed into the wallet.",
 		Run:   wrap(walletloadseedcmd),
 	}
 
@@ -100,7 +107,7 @@ By default the wallet encryption / unlock password is the same as the generated 
 		Use:   "send",
 		Short: "Send either siacoins or siafunds to an address",
 		Long:  "Send either siacoins or siafunds to an address",
-		// Run field is not set, as the load command itself is not a valid command.
+		// Run field is not set, as the send command itself is not a valid command.
 		// A subcommand must be provided.
 	}
 
@@ -190,6 +197,31 @@ func walletinitcmd() {
 		fmt.Printf("Wallet encrypted with given password\n")
 	} else {
 		fmt.Printf("Wallet encrypted with password:\n%s\n", er.PrimarySeed)
+	}
+}
+
+// walletinitseedcmd initializes the wallet from a preexisting seed.
+func walletinitseedcmd() {
+	seed, err := speakeasy.Ask("Seed: ")
+	if err != nil {
+		die("Reading seed failed:", err)
+	}
+	qs := fmt.Sprintf("&seed=%s&dictionary=%s", seed, "english")
+	if initPassword {
+		password, err := speakeasy.Ask("Wallet password: ")
+		if err != nil {
+			die("Reading password failed:", err)
+		}
+		qs += fmt.Sprintf("&encryptionpassword=%s", password)
+	}
+	err = post("/wallet/initseed", qs)
+	if err != nil {
+		die("Could not initialize wallet from seed:", err)
+	}
+	if initPassword {
+		fmt.Println("Wallet initialized and encrypted with given password.")
+	} else {
+		fmt.Println("Wallet initialized and encrypted with seed.")
 	}
 }
 
