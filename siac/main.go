@@ -246,7 +246,7 @@ func main() {
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd,
+	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletInitCmd, walletInitSeedCmd,
 		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd,
 		walletBalanceCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")

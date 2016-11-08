@@ -203,6 +203,32 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	})
 }
 
+// walletInitSeedHandler handles API calls to /wallet/initseed.
+func (api *API) walletInitSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var encryptionKey crypto.TwofishKey
+	if req.FormValue("encryptionpassword") != "" {
+		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
+	}
+
+	// Get the seed using the ditionary + phrase
+	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	if dictID == "" {
+		dictID = "english"
+	}
+	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/seed: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	err = api.wallet.InitFromSeed(encryptionKey, seed)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/initseed: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteSuccess(w)
+}
+
 // walletSeedHandler handles API calls to /wallet/seed.
 func (api *API) walletSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Get the seed using the ditionary + phrase
