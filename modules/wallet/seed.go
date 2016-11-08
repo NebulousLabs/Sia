@@ -260,6 +260,13 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	}
 	defer w.tg.Done()
 
+	w.mu.RLock()
+	match := seed == w.primarySeed
+	w.mu.RUnlock()
+	if match {
+		return types.Currency{}, types.Currency{}, errors.New("cannot sweep primary seed")
+	}
+
 	if !w.cs.Synced() {
 		return types.Currency{}, types.Currency{}, errors.New("cannot sweep until blockchain is synced")
 	}
