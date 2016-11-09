@@ -14,29 +14,16 @@ package contractmanager
 // only possible with the WAL, which external callers cannot view. Explicit
 // context should be added to the struct.
 
-// TODO: Need per-storage-folder locking so that sector writes and seeks don't
-// conflict with eachother in the file handle.
-
-// TODO: Set up a stress test across multiple disks that verifies the contract
-// manager is able to hit a throughput which is fully utilizing all of the
-// disks, or at least is coming close. The goal is to catch unexpected
-// performance bottlenecks.
-
-// TODO: Because of the naive balancing method, one slow disk will slow down
-// the whole host until it's at capacity, because it'll continually be selected
-// as the emptiest storage folder even though it might already be under max
-// load and other folders might be idle.
-
-// TODO: The empitest storage folder might not be calculated by looking at the
-// usage, which is the important metric to be using for this purpose. We can
-// probably fix this up by adding functions to manipulate the usage field.
-
-// TODO: Perform a test simulating a multi-disk environment where after a
-// restart one of the disks is unavailable.
+// TODO: Add disk failure testing.
 
 // TODO: The close order could probably use some cleanup so that the file
 // handles that get picked up during load get released upon close in the event
 // of an error.
+
+// TODO: Specific test - add two storage folders, maybe add some sectors,
+// close. Then rig one to have a disk failure upon opening. Try to open and
+// close the contract manager and make sure the stats are correct on the good
+// one.
 
 import (
 	"path/filepath"
@@ -59,6 +46,25 @@ type ContractManager struct {
 	// sees uncommitted data, so long as other ACID operations do not return
 	// early. Any changes to the state must be documented in the WAL to prevent
 	// inconsistency.
+
+	// The contract manager is highly concurrent. Most fields are protected by
+	// the mutex in the WAL, but storage folders and sectors can be accessed
+	// individually. A map of locked sectors ensures that each sector is only
+	// accessed by one thread at a time, but allows many sectors across a
+	// single file to be accessed concurrently. Any interaction with a sector
+	// requires a sector lock.
+	//
+	// If sectors are being added to a storage folder, a readlock is required
+	// on the storage folder. Reads and deletes do not require any locks on the
+	// storage folder. If a storage folder operation is happening (add, resize,
+	// remove), a writelock is required on the storage folder lock.
+
+	// The contract manager is expected to be consistent, durable, atomic, and
+	// error-free in the face of unclean shutdown and disk error. Failure of
+	// the controlling disk (containing the settings file and WAL file) is not
+	// tolerated and will cause a panic, but any disk failures for the storage
+	// folders should be tolerated gracefully. Threads should perform complete
+	// cleanup before returning, which can be achieved with threadgroups.
 
 	// sectorSalt is a persistent security field that gets set the first time
 	// the contract manager is initiated and then never gets touched again.
@@ -109,9 +115,6 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		dependencies: dependencies,
 		persistDir:   persistDir,
 	}
-	// The WAL and the contract manager have eachother in their structs,
-	// meaning they are effectively one larger object. I find them easier to
-	// reason about however by considering them as separate objects.
 	cm.wal.cm = cm
 
 	// Perform clean shutdown of already-initialized features if startup fails.
@@ -145,14 +148,21 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	// recovered when the WAL is loaded.
 	err = cm.loadSettings()
 	if err != nil {
+		cm.log.Println("ERROR: Unable to load contract manager settings:", err)
 		return nil, build.ExtendErr("error while loading contract manager atomic data", err)
 	}
 
 	// Load the WAL, repairing any corruption caused by unclean shutdown.
 	err = cm.wal.load()
 	if err != nil {
+		cm.log.Println("ERROR: Unable to load the contract manager write-ahead-log:", err)
 		return nil, build.ExtendErr("error while loading the WAL at startup", err)
 	}
+	// Upon shudown, unload all of the files.
+	//
+	// TODO: Before actually unloading all of the files, determine what you
+	// actually want to do with them. See if ReadAt and WriteAt can be used to
+	// achieve safe parallelism without the seeking and stuff.
 
 	// The sector location data is loaded last. Any corruption that happened
 	// during unclean shutdown has already been fixed by the WAL.
@@ -162,6 +172,7 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	// disk.
 	err = cm.wal.spawnSyncLoop()
 	if err != nil {
+		cm.log.Println("ERROR: Unable to spawn the contract manager synchronization loop:", err)
 		return nil, build.ExtendErr("error while spawning contract manager sync loop", err)
 	}
 	return cm, nil

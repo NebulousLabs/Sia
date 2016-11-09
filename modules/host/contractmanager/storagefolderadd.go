@@ -291,7 +291,7 @@ func (wal *writeAheadLog) commitAddStorageFolder(ssf savedStorageFolder) {
 		path:  ssf.Path,
 		usage: ssf.Usage,
 
-		queuedSectors: make(map[sectorID]uint32),
+		availableSectors: make(map[sectorID]uint32),
 	}
 
 	var err error
@@ -344,7 +344,7 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 		path:  path,
 		usage: make([]uint64, size/modules.SectorSize/64),
 
-		queuedSectors: make(map[sectorID]uint32),
+		availableSectors: make(map[sectorID]uint32),
 	}
 	err = cm.wal.managedAddStorageFolder(newSF)
 	if err != nil {

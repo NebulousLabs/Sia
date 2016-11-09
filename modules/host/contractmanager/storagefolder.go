@@ -1,17 +1,5 @@
 package contractmanager
 
-// storagefolders.go is responsible for managing the folders/files that contain
-// the sectors within the contract manager. Storage folders can be added,
-// resized, or removed.
-
-// TODO: Need to make sure that the sector count accounting (sf.sectors) in the
-// storage folder is accurate - it should probably align with the usage, though
-// setting and clearing the usage during idempotent actions could cause
-// problems. Idempotent actions though I believe only apply when doing
-// recovery. (that's how it should be designed at least)
-//
-// ergo, set + clear should modify the total number of sectors?
-
 import (
 	"errors"
 	"fmt"
@@ -91,11 +79,8 @@ var (
 // sectors are being stored in the folder. What sectors are being stored is
 // managed by the contract manager's sectorLocations map.
 type storageFolder struct {
-	// Certain operations on a storage folder can take a long time (Add,
-	// Remove, and Resize). The fields below indicate progress on any long
-	// running action being performed on them. Determining which action is
-	// being performed can be determined using the context of the WAL state
-	// changes that are currently open.
+	// Progress statistics that can be reported to the user. Typically for long
+	// running actions like adding or resizing a storage folder.
 	atomicProgressNumerator   uint64
 	atomicProgressDenominator uint64
 
@@ -110,19 +95,19 @@ type storageFolder struct {
 	path  string
 	usage []uint64
 
-	// queuedSectors contains a list of sectors which have been queued to be
-	// added to the storage folder where the add has not yet completed. TODO:
-	// Better to consider it 'queuedUsage' - usage available canonically, but
-	// not actively to avoid race condition.
+	// availableSectors indicates sectors which are marked as consumed in the
+	// usage field but are actually available. They cannot be marked as free in
+	// the usage until the action which freed them has synced to disk, but the
+	// settings should mark them as free during syncing.
 	//
-	// sectors is a running tally of the number of physical sectors in the
-	// storage folder.
-	queuedSectors map[sectorID]uint32
-	sectors       uint64
+	// sectors is a count of the number of sectors in use according to the
+	// usage field.
+	availableSectors map[sectorID]uint32
+	sectors          uint64
 
 	// mu needs to be RLocked to safetly write new sectors into the storage
-	// folder. mu needs to be Locked when the folder is being resized or
-	// manipulated.
+	// folder. mu needs to be Locked when the folder is being added, removed,
+	// or resized.
 	mu sync.TryRWMutex
 
 	// An open file handle is kept so that writes can easily be made to the
@@ -291,6 +276,11 @@ func (cm *ContractManager) storageFolderSlice() []*storageFolder {
 // ResetStorageFolderHealth will reset the read and write statistics for the
 // input storage folder.
 func (cm *ContractManager) ResetStorageFolderHealth(index uint16) error {
+	err := cm.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cm.tg.Done()
 	cm.wal.mu.Lock()
 	defer cm.wal.mu.Unlock()
 
@@ -309,6 +299,11 @@ func (cm *ContractManager) ResetStorageFolderHealth(index uint16) error {
 // containing information about the storage folder and any operations currently
 // being executed on the storage folder.
 func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
+	err := cm.tg.Add()
+	if err != nil {
+		return nil
+	}
+	defer cm.tg.Done()
 	cm.wal.mu.Lock()
 	defer cm.wal.mu.Unlock()
 
@@ -336,101 +331,3 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 	}
 	return smfs
 }
-
-/*
-// RemoveStorageFolder removes a storage folder from the host.
-func (sm *StorageManager) RemoveStorageFolder(removalIndex int, force bool) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	sm.resourceLock.RLock()
-	defer sm.resourceLock.RUnlock()
-	if sm.closed {
-		return errStorageManagerClosed
-	}
-
-	// Check that the removal folder exists, and create a shortcut to it.
-	if removalIndex >= len(sm.storageFolders) || removalIndex < 0 {
-		return errBadStorageFolderIndex
-	}
-	removalFolder := sm.storageFolders[removalIndex]
-
-	// Move all of the sectors in the storage folder to other storage folders.
-	usedSize := removalFolder.Size - removalFolder.SizeRemaining
-	offloadErr := sm.offloadStorageFolder(removalFolder, usedSize)
-	// If 'force' is set, we want to ignore 'errIncopmleteOffload' and try to
-	// remove the storage folder anyway. For any other error, we want to halt
-	// and return the error.
-	if force && offloadErr == errIncompleteOffload {
-		offloadErr = nil
-	}
-	if offloadErr != nil {
-		return offloadErr
-	}
-
-	// Remove the storage folder from the host and then save the host.
-	sm.storageFolders = append(sm.storageFolders[0:removalIndex], sm.storageFolders[removalIndex+1:]...)
-	removeErr := sm.dependencies.removeFile(filepath.Join(sm.persistDir, removalFolder.uidString()))
-	saveErr := sm.saveSync()
-	return composeErrors(saveErr, removeErr)
-}
-
-// ResizeStorageFolder changes the amount of disk space that is going to be
-// allocated to a storage folder.
-func (sm *StorageManager) ResizeStorageFolder(storageFolderIndex int, newSize uint64) error {
-	// Lock the host for the duration of the resize operation - it is important
-	// that the host not be manipulated while sectors are being moved around.
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	// The resource lock is required as the sector movements require access to
-	// the logger.
-	sm.resourceLock.RLock()
-	defer sm.resourceLock.RUnlock()
-	if sm.closed {
-		return errStorageManagerClosed
-	}
-
-	// Check that the inputs are valid.
-	if storageFolderIndex >= len(sm.storageFolders) || storageFolderIndex < 0 {
-		return errBadStorageFolderIndex
-	}
-	resizeFolder := sm.storageFolders[storageFolderIndex]
-	if newSize > maximumStorageFolderSize {
-		return errLargeStorageFolder
-	}
-	if newSize < minimumStorageFolderSize {
-		return errSmallStorageFolder
-	}
-	if resizeFolder.Size == newSize {
-		return errNoResize
-	}
-
-	// Sectors do not need to be moved onto or away from the resize folder if
-	// the folder is growing, or if after being shrunk the folder still has
-	// enough storage to house all of the sectors it currently tracks.
-	resizeFolderSizeConsumed := resizeFolder.Size - resizeFolder.SizeRemaining
-	if resizeFolderSizeConsumed <= newSize {
-		resizeFolder.SizeRemaining = newSize - resizeFolderSizeConsumed
-		resizeFolder.Size = newSize
-		return sm.saveSync()
-	}
-
-	// Calculate the number of sectors that need to be offloaded from the
-	// storage folder.
-	offloadSize := resizeFolderSizeConsumed - newSize
-	offloadErr := sm.offloadStorageFolder(resizeFolder, offloadSize)
-	if offloadErr == errIncompleteOffload {
-		// Offloading has not fully succeeded, but may have partially
-		// succeeded. To prevent new sectors from being added to the storage
-		// folder, clamp the size of the storage folder to the current amount
-		// of storage in use.
-		resizeFolder.Size -= resizeFolder.SizeRemaining
-		resizeFolder.SizeRemaining = 0
-		return offloadErr
-	} else if offloadErr != nil {
-		return offloadErr
-	}
-	resizeFolder.Size = newSize
-	resizeFolder.SizeRemaining = 0
-	return sm.saveSync()
-}
-*/

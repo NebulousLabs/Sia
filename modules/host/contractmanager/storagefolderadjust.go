@@ -95,7 +95,7 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 	defer wal.mu.Unlock()
 
 	// Update the state to reflect that the sector has moved.
-	delete(wal.cm.storageFolders[newSU.Folder].queuedSectors, newSU.ID)
+	delete(wal.cm.storageFolders[newSU.Folder].availableSectors, newSU.ID)
 	err = wal.appendChange(stateChange{
 		SectorUpdates: []sectorUpdate{oldSU, newSU},
 	})

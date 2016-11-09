@@ -48,7 +48,12 @@ func (cm *ContractManager) initSettings() error {
 	// Ensure that the initialized defaults have stuck by doing a SaveFileSync
 	// with the new settings values.
 	ss := cm.savedSettings()
-	return build.ExtendErr("error saving contract manager after initialization", persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile)))
+	err := persist.SaveFileSync(settingsMetadata, &ss, filepath.Join(cm.persistDir, settingsFile))
+	if err != nil {
+		cm.log.Println("ERROR: unable to initialize settings file for contract manager:", err)
+		return build.ExtendErr("error saving contract manager after initialization", err)
+	}
+	return nil
 }
 
 // loadSettings will load the contract manager settings.
@@ -60,6 +65,7 @@ func (cm *ContractManager) loadSettings() error {
 		// contract manager has been run. Initialize with default settings.
 		return cm.initSettings()
 	} else if err != nil {
+		cm.log.Println("ERROR: unable to load the contract manager settings file:", err)
 		return build.ExtendErr("error loading the contract manager settings file", err)
 	}
 
@@ -72,14 +78,16 @@ func (cm *ContractManager) loadSettings() error {
 		sf.usage = ss.StorageFolders[i].Usage
 		sf.metadataFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, metadataFile), os.O_RDWR, 0700)
 		if err != nil {
-			return build.ExtendErr("error loading storage folder sector file handle", err)
+			cm.log.Printf("ERROR: unable to open the %v sector metadata file: %v\n", sf.path, err)
+			continue
 		}
 		sf.sectorFile, err = cm.dependencies.openFile(filepath.Join(ss.StorageFolders[i].Path, sectorFile), os.O_RDWR, 0700)
 		if err != nil {
+			cm.log.Printf("ERROR: unable to open the %v sector file: %v\n", sf.path, err)
 			sf.metadataFile.Close()
-			return build.ExtendErr("error loading storage folder sector metadata file handle", err)
+			continue
 		}
-		sf.queuedSectors = make(map[sectorID]uint32)
+		sf.availableSectors = make(map[sectorID]uint32)
 		cm.storageFolders[sf.index] = sf
 	}
 	return nil
@@ -93,7 +101,7 @@ func (cm *ContractManager) loadSectorLocations() {
 		// Read the sector lookup table for this storage folder into memory.
 		sectorLookupBytes, err := readFullMetadata(sf.metadataFile, len(sf.usage)*storageFolderGranularity)
 		if err != nil {
-			cm.log.Printf("Error: unable to read sector metadata for folder %v: %v\n", sf.index, err)
+			cm.log.Printf("ERROR: unable to read sector metadata for folder %v: %v\n", sf.path, err)
 			atomic.AddUint64(&sf.atomicFailedReads, 1)
 			continue
 		}
@@ -101,7 +109,7 @@ func (cm *ContractManager) loadSectorLocations() {
 
 		// Iterate through the sectors that are in-use and read their storage
 		// locations into memory.
-		sf.sectors = 0 // TODO: HACK
+		sf.sectors = 0 // may be non-zero from WAL operations - they will be double counted here if not reset.
 		for _, sectorIndex := range usageSectors(sf.usage) {
 			readHead := sectorMetadataDiskSize * sectorIndex
 			var id sectorID
@@ -128,7 +136,7 @@ func (cm *ContractManager) savedSettings() savedSettings {
 	}
 	for _, sf := range cm.storageFolders {
 		// Unset all of the usage bits in the storage folder for the queued sectors.
-		for _, sectorIndex := range sf.queuedSectors {
+		for _, sectorIndex := range sf.availableSectors {
 			sf.clearUsage(sectorIndex)
 		}
 
@@ -136,7 +144,7 @@ func (cm *ContractManager) savedSettings() savedSettings {
 		ss.StorageFolders = append(ss.StorageFolders, sf.savedStorageFolder())
 
 		// Re-set all of the usage bits for the queued sectors.
-		for _, sectorIndex := range sf.queuedSectors {
+		for _, sectorIndex := range sf.availableSectors {
 			sf.setUsage(sectorIndex)
 		}
 	}

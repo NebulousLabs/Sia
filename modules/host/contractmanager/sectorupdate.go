@@ -65,7 +65,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 		}
 		sf.setUsage(sectorIndex)
 		// Mark this usage as uncommitted.
-		sf.queuedSectors[id] = sectorIndex
+		sf.availableSectors[id] = sectorIndex
 		wal.mu.Unlock()
 		// Release the RLock that is grabbed by the vacancyStorageFolder once
 		// we have finished adding the sector.
@@ -79,7 +79,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 				atomic.AddUint64(&sf.atomicFailedWrites, 1)
 				wal.mu.Lock()
 				sf.clearUsage(sectorIndex)
-				delete(sf.queuedSectors, id)
+				delete(sf.availableSectors, id)
 				wal.mu.Unlock()
 				return errDiskTrouble
 			}
@@ -91,7 +91,7 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 			}
 			err = wal.writeSectorMetadata(sf, su)
 			if err != nil {
-				delete(wal.cm.storageFolders[su.Folder].queuedSectors, su.ID)
+				delete(wal.cm.storageFolders[su.Folder].availableSectors, su.ID)
 				return build.ExtendErr("unable to write sector metadata during addSector call", err)
 			}
 			return nil
@@ -119,10 +119,6 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 }
 
 // managedDeleteSector will delete a sector (physical) from the contract manager.
-//
-// TODO: For delete and remove, must mark the sector as deleted in the
-// queuedSectors map, though the usage is still blocking that location from
-// being accessed.
 func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 	// Write the sector delete to the WAL.
 	var location sectorLocation
@@ -150,7 +146,7 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 			wal.cm.log.Critical("deleting a sector from a storage folder that does not exist?")
 			return errStorageFolderNotFound
 		}
-		sf.queuedSectors[id] = location.index
+		sf.availableSectors[id] = location.index
 
 		// Inform the WAL of the sector update.
 		err := wal.appendChange(stateChange{
@@ -183,13 +179,15 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		wal.cm.log.Critical("storage folder housing an existing sector does not exist")
 		return nil
 	}
-	delete(sf.queuedSectors, id)
+	delete(sf.availableSectors, id)
 	sf.clearUsage(location.index)
 	return nil
 }
 
 // managedRemoveSector will remove a sector (virtual or physical) from the
 // contract manager.
+//
+// TODO: Need to mark the sectors in the available sectors map.
 func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 	// Inform the WAL of the removed sector.
 	var location sectorLocation
@@ -324,7 +322,7 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 			err := cm.wal.writeSectorMetadata(sf, su)
 			if err != nil {
 				cm.wal.mu.Lock()
-				delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
+				delete(cm.storageFolders[su.Folder].availableSectors, su.ID)
 				cm.wal.mu.Unlock()
 				return build.ExtendErr("unable to write sector metadata during addSector call", err)
 			}
@@ -346,7 +344,7 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 		// Update the WAL.
 		cm.wal.mu.Lock()
 		defer cm.wal.mu.Unlock()
-		delete(cm.storageFolders[su.Folder].queuedSectors, su.ID)
+		delete(cm.storageFolders[su.Folder].availableSectors, su.ID)
 		err := cm.wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{su},
 		})
