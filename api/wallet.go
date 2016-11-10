@@ -186,39 +186,20 @@ func (api *API) walletBackupHandler(w http.ResponseWriter, req *http.Request, _ 
 
 // walletInitHandler handles API calls to /wallet/init.
 func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	// get encryption key and dictionary
 	var encryptionKey crypto.TwofishKey
 	if req.FormValue("encryptionpassword") != "" {
 		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
 	}
+	seed, err := api.wallet.Encrypt(encryptionKey)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+
 	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
 	if dictID == "" {
 		dictID = "english"
 	}
-
-	var seed modules.Seed
-	var err error
-	if req.FormValue("seed") != "" {
-		// if a seed was provided, initialize with InitFromSeed
-		seed, err = modules.StringToSeed(req.FormValue("seed"), dictID)
-		if err != nil {
-			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
-			return
-		}
-		err = api.wallet.InitFromSeed(encryptionKey, seed)
-		if err != nil {
-			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
-			return
-		}
-	} else {
-		// otherwise, initialize with Encrypt
-		seed, err = api.wallet.Encrypt(encryptionKey)
-		if err != nil {
-			WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
-			return
-		}
-	}
-
 	seedStr, err := modules.SeedToString(seed, dictID)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/init: " + err.Error()}, http.StatusBadRequest)
@@ -227,6 +208,29 @@ func (api *API) walletInitHandler(w http.ResponseWriter, req *http.Request, _ ht
 	WriteJSON(w, WalletInitPOST{
 		PrimarySeed: seedStr,
 	})
+}
+
+// walletInitSeedHandler handles API calls to /wallet/init/seed.
+func (api *API) walletInitSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var encryptionKey crypto.TwofishKey
+	if req.FormValue("encryptionpassword") != "" {
+		encryptionKey = crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionpassword")))
+	}
+	dictID := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	if dictID == "" {
+		dictID = "english"
+	}
+	seed, err := modules.StringToSeed(req.FormValue("seed"), dictID)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	err = api.wallet.InitFromSeed(encryptionKey, seed)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/init/seed: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteSuccess(w)
 }
 
 // walletSeedHandler handles API calls to /wallet/seed.

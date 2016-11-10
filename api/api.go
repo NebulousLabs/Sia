@@ -239,6 +239,7 @@ func New(requiredUserAgent string, requiredPassword string, cs modules.Consensus
 		router.GET("/wallet/addresses", api.walletAddressesHandler)
 		router.GET("/wallet/backup", RequirePassword(api.walletBackupHandler, requiredPassword))
 		router.POST("/wallet/init", RequirePassword(api.walletInitHandler, requiredPassword))
+		router.POST("/wallet/init/seed", RequirePassword(api.walletInitSeedHandler, requiredPassword))
 		router.POST("/wallet/lock", RequirePassword(api.walletLockHandler, requiredPassword))
 		router.POST("/wallet/seed", RequirePassword(api.walletSeedHandler, requiredPassword))
 		router.GET("/wallet/seeds", RequirePassword(api.walletSeedsHandler, requiredPassword))

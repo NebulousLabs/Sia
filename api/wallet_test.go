@@ -192,25 +192,21 @@ func TestIntegrationWalletInitSeed(t *testing.T) {
 	}()
 	defer st.server.Close()
 
-	// Make a call to /wallet/init and get the seed. Provide no encryption
-	// key so that the encryption key is the seed that gets returned.
+	// Make a call to /wallet/init/seed. Provide no encryption key so that the
+	// encryption key is the seed.
 	var seed modules.Seed
 	rand.Read(seed[:])
 	seedStr, _ := modules.SeedToString(seed, "english")
 	qs := url.Values{}
 	qs.Set("seed", seedStr)
-	var wip WalletInitPOST
-	err = st.postAPI("/wallet/init", qs, &wip)
+	err = st.stdPostAPI("/wallet/init/seed", qs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// returned seed should match supplied
-	if wip.PrimarySeed != seedStr {
-		t.Fatal("seeds do not match")
-	}
+
 	// Use the seed to call /wallet/unlock.
 	unlockValues := url.Values{}
-	unlockValues.Set("encryptionpassword", wip.PrimarySeed)
+	unlockValues.Set("encryptionpassword", seedStr)
 	err = st.stdPostAPI("/wallet/unlock", unlockValues)
 	if err != nil {
 		t.Fatal(err)
