@@ -17,7 +17,7 @@ import (
 // the contract manager is by far the bottleneck when compared to the cost of
 // interacting with massive maps.
 func BenchmarkSectorLocations(b *testing.B) {
-	t.Skip("Long Benchmark")
+	b.Skip("Long Benchmark")
 
 	// Create a bunch of data to insert into the map - metadata equivalent to
 	// storing 96 TiB in the contract manager.
@@ -73,7 +73,7 @@ func BenchmarkSectorLocations(b *testing.B) {
 // dwarfed by the size of the corresponding sectorLocations map that is used to
 // support it.
 func BenchmarkStorageFolders(b *testing.B) {
-	t.Skip("Long Benchmark")
+	b.Skip("Long Benchmark")
 
 	// Create a massive usage array, matching a 96 TiB storage folder on disk.
 	// The array is a bit-array, so 24e6 sectors (96 TiB) is represented by

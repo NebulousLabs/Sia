@@ -117,6 +117,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		}
 		sf.sectorFile, err = wal.cm.dependencies.createFile(sectorHousingName)
 		if err != nil {
+			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
 			return build.ExtendErr("could not create storage folder file", err)
 		}
 		// Establish the progress fields for the add operation in the storage
@@ -223,6 +224,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	}()
 	wg.Wait()
 
+	// TODO: Sync the directory as well (directory data changed as new files
+	// were added)
+
 	// Simulate power failure at this point for some testing scenarios.
 	if wal.cm.dependencies.disrupt("incompleteAddStorageFolder") {
 		return nil
@@ -292,10 +296,13 @@ func (wal *writeAheadLog) commitAddStorageFolder(ssf savedStorageFolder) {
 	sf.metadataFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, metadataFile), os.O_RDWR, 0700)
 	if err != nil {
 		wal.cm.log.Println("Difficulties opening sector file for ", sf.path, ":", err)
+		return
 	}
 	sf.sectorFile, err = wal.cm.dependencies.openFile(filepath.Join(sf.path, sectorFile), os.O_RDWR, 0700)
 	if err != nil {
 		wal.cm.log.Println("Difficulties opening sector metadata file for", sf.path, ":", err)
+		sf.metadataFile.Close()
+		return
 	}
 	wal.cm.storageFolders[sf.index] = sf
 }

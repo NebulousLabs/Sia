@@ -313,18 +313,19 @@ func (cm *ContractManager) StorageFolders() []modules.StorageFolderMetadata {
 	for _, sf := range cm.storageFolders {
 		// Grab the non-computational data.
 		sfm := modules.StorageFolderMetadata{
+			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
+			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
+
+			FailedReads:      atomic.LoadUint64(&sf.atomicFailedReads),
+			FailedWrites:     atomic.LoadUint64(&sf.atomicFailedWrites),
+			SuccessfulReads:  atomic.LoadUint64(&sf.atomicSuccessfulReads),
+			SuccessfulWrites: atomic.LoadUint64(&sf.atomicSuccessfulWrites),
+
 			Capacity:          modules.SectorSize * 64 * uint64(len(sf.usage)),
 			CapacityRemaining: ((64 * uint64(len(sf.usage))) - sf.sectors) * modules.SectorSize,
 			Index:             sf.index,
 			Path:              sf.path,
-
-			ProgressNumerator:   atomic.LoadUint64(&sf.atomicProgressNumerator),
-			ProgressDenominator: atomic.LoadUint64(&sf.atomicProgressDenominator),
 		}
-		sfm.FailedReads = atomic.LoadUint64(&sf.atomicFailedReads)
-		sfm.FailedWrites = atomic.LoadUint64(&sf.atomicFailedWrites)
-		sfm.SuccessfulReads = atomic.LoadUint64(&sf.atomicSuccessfulReads)
-		sfm.SuccessfulWrites = atomic.LoadUint64(&sf.atomicSuccessfulWrites)
 
 		// Add this storage folder to the list of storage folders.
 		smfs = append(smfs, sfm)
