@@ -180,7 +180,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	finalWriteSize := sectorHousingSize % 4e6
 	writeData := make([]byte, 4e6)
 	for i := uint64(0); i < writeCount; i++ {
-		_, err = sf.sectorFile.Write(writeData)
+		_, err = sf.sectorFile.WriteAt(writeData, int64(len(writeData))*int64(i))
 		if err != nil {
 			return build.ExtendErr("could not allocate storage folder", err)
 		}
@@ -188,14 +188,14 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		atomic.AddUint64(&sf.atomicProgressNumerator, 4e6)
 	}
 	writeData = writeData[:finalWriteSize]
-	_, err = sf.sectorFile.Write(writeData)
+	_, err = sf.sectorFile.WriteAt(writeData, int64(writeCount*4e6))
 	if err != nil {
 		return build.ExtendErr("could not allocate sector data file", err)
 	}
 
 	// Write the metadata file.
 	writeData = make([]byte, sectorLookupSize)
-	_, err = sf.metadataFile.Write(writeData)
+	_, err = sf.metadataFile.WriteAt(writeData, 0)
 	if err != nil {
 		return build.ExtendErr("could not allocate sector metadata file", err)
 	}

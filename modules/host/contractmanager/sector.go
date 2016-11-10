@@ -66,15 +66,8 @@ type (
 // readSector will read the sector in the file, starting from the provided
 // location.
 func readSector(f file, sectorIndex uint32) ([]byte, error) {
-	f.Lock()
-	defer f.Unlock()
-
 	b := make([]byte, modules.SectorSize)
-	_, err := f.Seek(int64(uint64(sectorIndex)*modules.SectorSize), 0)
-	if err != nil {
-		return nil, build.ExtendErr("unable to seek within storage folder", err)
-	}
-	_, err = f.Read(b)
+	_, err := f.ReadAt(b, int64(uint64(sectorIndex)*modules.SectorSize))
 	if err != nil {
 		return nil, build.ExtendErr("unable to read within storage folder", err)
 	}
@@ -83,15 +76,8 @@ func readSector(f file, sectorIndex uint32) ([]byte, error) {
 
 // readFullMetadata will read a full sector metadata file into memory.
 func readFullMetadata(f file, numSectors int) ([]byte, error) {
-	f.Lock()
-	defer f.Unlock()
-
 	sectorLookupBytes := make([]byte, numSectors*sectorMetadataDiskSize)
-	_, err := f.Seek(0, 0)
-	if err != nil {
-		return nil, build.ExtendErr("unable to seek through metadata file for target storage folder", err)
-	}
-	_, err = f.Read(sectorLookupBytes)
+	_, err := f.ReadAt(sectorLookupBytes, 0)
 	if err != nil {
 		return nil, build.ExtendErr("unable to read metadata file for target storage folder", err)
 	}
@@ -101,16 +87,9 @@ func readFullMetadata(f file, numSectors int) ([]byte, error) {
 // writeSector will write the given sector into the given file at the given
 // index.
 func writeSector(f file, sectorIndex uint32, data []byte) error {
-	f.Lock()
-	defer f.Unlock()
-
-	_, err := f.Seek(int64(uint64(sectorIndex)*modules.SectorSize), 0)
+	_, err := f.WriteAt(data, int64(uint64(sectorIndex)*modules.SectorSize))
 	if err != nil {
-		return build.ExtendErr("unable to seek within provided file", err)
-	}
-	_, err = f.Write(data)
-	if err != nil {
-		return build.ExtendErr("unable to read within provided file", err)
+		return build.ExtendErr("unable to write within provided file", err)
 	}
 	return nil
 }
@@ -118,17 +97,10 @@ func writeSector(f file, sectorIndex uint32, data []byte) error {
 // writeSectorMetadata will take a sector update and write the related metadata
 // to disk.
 func writeSectorMetadata(f file, sectorIndex uint32, id sectorID, count uint16) error {
-	f.Lock()
-	defer f.Unlock()
-
 	writeData := make([]byte, sectorMetadataDiskSize)
 	copy(writeData, id[:])
 	binary.LittleEndian.PutUint16(writeData[12:], count)
-	_, err := f.Seek(sectorMetadataDiskSize*int64(sectorIndex), 0)
-	if err != nil {
-		return build.ExtendErr("unable to seek in given file", err)
-	}
-	_, err = f.Write(writeData)
+	_, err := f.WriteAt(writeData, sectorMetadataDiskSize*int64(sectorIndex))
 	if err != nil {
 		return build.ExtendErr("unable to write in given file", err)
 	}

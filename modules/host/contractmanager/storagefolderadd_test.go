@@ -84,7 +84,7 @@ func (dependencyLargeFolder) createFile(s string) (file, error) {
 // Write returns an error if the operation will put the total throughput of the
 // file over 8 MiB. The write will write all the way to 8 MiB before returning
 // the error.
-func (l *limitFile) Write(b []byte) (int, error) {
+func (l *limitFile) WriteAt(b []byte, offset int64) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	// If the limit has already been reached, return an error.
@@ -96,14 +96,14 @@ func (l *limitFile) Write(b []byte) (int, error) {
 	// underlying file.
 	if l.throughput+len(b) <= 1<<20 {
 		l.throughput += len(b)
-		return l.File.Write(b)
+		return l.File.WriteAt(b, offset)
 	}
 
 	// If the limit has been reached, write enough bytes to get to 8 MiB, then
 	// return an error.
 	remaining := 1<<20 - l.throughput
 	l.throughput = 1 << 20
-	written, err := l.File.Write(b[:remaining])
+	written, err := l.File.WriteAt(b[:remaining], offset)
 	if err != nil {
 		return written, err
 	}
@@ -241,13 +241,13 @@ type blockedFile struct {
 // Write will block until a signal is given that the block may be lifted. Write
 // will signal when it has been called for the first time, so that the tester
 // knows the function has reached a blocking point.
-func (bf *blockedFile) Write(b []byte) (int, error) {
+func (bf *blockedFile) WriteAt(b []byte, offset int64) (int, error) {
 	if !strings.Contains(bf.File.Name(), "storageFolderOne") || strings.Contains(bf.File.Name(), "siahostmetadata.dat") {
-		return bf.File.Write(b)
+		return bf.File.WriteAt(b, offset)
 	}
 	close(bf.writeCalled)
 	<-bf.blockLifted
-	return bf.File.Write(b)
+	return bf.File.WriteAt(b, offset)
 }
 
 // createFile will return a normal file to all callers except for
@@ -270,13 +270,7 @@ func (d *dependencyBlockSFOne) createFile(s string) (file, error) {
 	}
 
 	// If not storageFolderOne, return a normal file.
-	f, err := os.Create(s)
-	if err != nil {
-		return nil, err
-	}
-	return &lockerFile{
-		File: f,
-	}, nil
+	return os.Create(s)
 }
 
 // TestAddStorageFolderBlocking adds multiple storage folders concurrently to

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -69,12 +68,12 @@ type (
 
 	// file implements all of the methods that can be called on an os.File.
 	file interface {
-		io.ReadWriteCloser
-		sync.Locker
+		io.ReadCloser
 		Name() string
-		Seek(int64, int) (int64, error)
+		ReadAt([]byte, int64) (int, error)
 		Sync() error
 		Truncate(int64) error
+		WriteAt([]byte, int64) (int, error)
 	}
 )
 
@@ -82,13 +81,6 @@ type (
 	// productionDependencies is an empty struct that implements all of the
 	// dependencies using full featured libraries.
 	productionDependencies struct{}
-
-	// lockerFile extends the os.File type to allow the file to be locked and
-	// unlocked.
-	lockerFile struct {
-		*os.File
-		sync.Mutex
-	}
 )
 
 // atLeastOne will return a value that is equal to 1 if debugging is disabled.
@@ -117,13 +109,7 @@ func (productionDependencies) atLeastOne() uint64 {
 // createFile gives the host the ability to create files on the operating
 // system.
 func (productionDependencies) createFile(s string) (file, error) {
-	osFile, err := os.Create(s)
-	if err != nil {
-		return nil, err
-	}
-	return &lockerFile{
-		File: osFile,
-	}, nil
+	return os.Create(s)
 }
 
 // disrupt will always return false when using the production dependencies,
@@ -151,11 +137,5 @@ func (productionDependencies) newLogger(s string) (*persist.Logger, error) {
 
 // openFile opens a file for the contract manager.
 func (productionDependencies) openFile(s string, i int, fm os.FileMode) (file, error) {
-	osFile, err := os.OpenFile(s, i, fm)
-	if err != nil {
-		return nil, err
-	}
-	return &lockerFile{
-		File: osFile,
-	}, nil
+	return os.OpenFile(s, i, fm)
 }

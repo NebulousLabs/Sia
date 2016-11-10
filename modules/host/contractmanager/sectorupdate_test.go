@@ -1721,7 +1721,7 @@ func (d dependencyFailingWrites) createFile(s string) (file, error) {
 
 // Write returns an error if the errors in the dependency have been triggered,
 // and if this file belongs to "storageFolderOne".
-func (fpf *failureProneFile) Write(b []byte) (int, error) {
+func (fpf *failureProneFile) WriteAt(b []byte, offset int64) (int, error) {
 	fpf.mu.Lock()
 	triggered := *fpf.triggered
 	fpf.mu.Unlock()
@@ -1730,7 +1730,7 @@ func (fpf *failureProneFile) Write(b []byte) (int, error) {
 	if triggered && strings.Contains(name, "storageFolderOne") {
 		return 0, errors.New("storage folder is failing")
 	}
-	return fpf.File.Write(b)
+	return fpf.File.WriteAt(b, offset)
 }
 
 // TestFailingStorageFolder checks that the contract manager can continue when
