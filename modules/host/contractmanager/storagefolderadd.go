@@ -169,9 +169,9 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 
 			// Signal in the WAL that the unfinished storage folder addition
 			// has failed.
-			err = build.ComposeErrors(err, wal.appendChange(stateChange{
+			wal.appendChange(stateChange{
 				ErroredStorageFolderAdditions: []uint16{sf.index},
-			}))
+			})
 		}
 	}()
 
@@ -232,14 +232,11 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// through the WAL.
 	wal.mu.Lock()
 	wal.cm.storageFolders[sf.index] = sf
-	err = wal.appendChange(stateChange{
+	wal.appendChange(stateChange{
 		StorageFolderAdditions: []savedStorageFolder{sf.savedStorageFolder()},
 	})
 	syncChan = wal.syncChan
 	wal.mu.Unlock()
-	if err != nil {
-		return build.ExtendErr("storage folder commitment assignment failed", err)
-	}
 
 	// Wait to confirm the storage folder addition has completed until the WAL
 	// entry has synced.
@@ -273,12 +270,9 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 
 		// Append an error call to the changeset, indicating that the storage
 		// folder add was not completed successfully.
-		err = wal.appendChange(stateChange{
+		wal.appendChange(stateChange{
 			ErroredStorageFolderAdditions: []uint16{sf.Index},
 		})
-		if err != nil {
-			return build.ExtendErr("unable to close out unfinished storage folder addition", err)
-		}
 	}
 	return nil
 }

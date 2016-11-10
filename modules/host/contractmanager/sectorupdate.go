@@ -149,7 +149,7 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		sf.availableSectors[id] = location.index
 
 		// Inform the WAL of the sector update.
-		err := wal.appendChange(stateChange{
+		wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{{
 				Count:  0,
 				ID:     id,
@@ -157,9 +157,6 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 				Index:  location.index,
 			}},
 		})
-		if err != nil {
-			return build.ExtendErr("failed to add a state change", err)
-		}
 
 		// Block until the change has been committed.
 		syncChan = wal.syncChan
@@ -213,12 +210,9 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 			Folder: location.storageFolder,
 			Index:  location.index,
 		}
-		err := wal.appendChange(stateChange{
+		wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{su},
 		})
-		if err != nil {
-			return build.ExtendErr("failed to add a state change", err)
-		}
 
 		// Update the in memory representation of the sector (except the
 		// usage), and write the new metadata to disk if needed.
@@ -345,12 +339,9 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 		cm.wal.mu.Lock()
 		defer cm.wal.mu.Unlock()
 		delete(cm.storageFolders[su.Folder].availableSectors, su.ID)
-		err := cm.wal.appendChange(stateChange{
+		cm.wal.appendChange(stateChange{
 			SectorUpdates: []sectorUpdate{su},
 		})
-		if err != nil {
-			return err
-		}
 		cm.sectorLocations[id] = location
 		syncChan = cm.wal.syncChan
 		return nil

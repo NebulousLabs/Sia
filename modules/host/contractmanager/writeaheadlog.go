@@ -142,22 +142,23 @@ func writeWALMetadata(f *os.File) error {
 // The WAL is append only, which means that changes can only be revoked by
 // appending an error. This is common for long running operations like adding a
 // storage folder.
-func (wal *writeAheadLog) appendChange(sc stateChange) error {
+func (wal *writeAheadLog) appendChange(sc stateChange) {
 	// Marshal the change and then write the change to the WAL file. Syncing
 	// happens in the sync loop.
 	changeBytes, err := json.MarshalIndent(sc, "", "\t")
 	if err != nil {
-		return build.ExtendErr("could not marshal state change", err)
+		wal.cm.log.Severe("Unable to marshal state change:", err)
+		panic("unable to append a change to the WAL, crashing to prevent corruption")
 	}
 	_, err = wal.fileWALTmp.Write(changeBytes)
 	if err != nil {
-		return build.ExtendErr("unable to write state change to WAL", err)
+		wal.cm.log.Severe("Unable to write state change to WAL:", err)
+		panic("unable to append a change to the WAL, crashing to prevent corruption")
 	}
 
 	// Update the WAL to include the new storage folder in the uncommitted
 	// changes.
 	wal.uncommittedChanges = append(wal.uncommittedChanges, sc)
-	return nil
 }
 
 // commitChange will commit the provided change to the contract manager,
@@ -186,17 +187,19 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 }
 
 // createWALTmp will open up the temporary WAL file.
-func (wal *writeAheadLog) createWALTmp() (err error) {
+func (wal *writeAheadLog) createWALTmp() {
+	var err error
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 	wal.fileWALTmp, err = os.Create(walTmpName)
 	if err != nil {
-		return build.ExtendErr("unable to create WAL temporary file", err)
+		wal.cm.log.Severe("Unable to create WAL temporary file:", err)
+		panic("unable to create WAL temporary file, crashing to avoid corruption")
 	}
 	err = writeWALMetadata(wal.fileWALTmp)
 	if err != nil {
-		return build.ExtendErr("unable to write WAL metadata", err)
+		wal.cm.log.Severe("Unable to write WAL metadata:", err)
+		panic("unable to create WAL temporary file, crashing to prevent corruption")
 	}
-	return nil
 }
 
 // recoverWAL will read a previous WAL and re-commit all of the changes inside,
@@ -207,6 +210,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	decoder := json.NewDecoder(walFile)
 	err := readWALMetadata(decoder)
 	if err != nil {
+		wal.cm.log.Println("ERROR: error while reading WAL metadata:", err)
 		return build.ExtendErr("walFile metadata mismatch", err)
 	}
 
@@ -228,6 +232,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 		}
 	}
 	if err != io.EOF {
+		wal.cm.log.Println("ERROR: could not load WAL json:", err)
 		return build.ExtendErr("error loading WAL json", err)
 	}
 
@@ -237,6 +242,7 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	// completed.
 	err = wal.cleanupUnfinishedStorageFolderAdditions(scs)
 	if err != nil {
+		wal.cm.log.Println("ERROR: unable to cleanup unfinished storage folder additions:", err)
 		return build.ExtendErr("error performing unfinished storage folder cleanup", err)
 	}
 	return nil
@@ -247,16 +253,14 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 // time the previous shutdown was clean), there will not be a WAL file.
 func (wal *writeAheadLog) load() error {
 	// Create the walTmpFile, which needs to be open before recovery can start.
-	err := wal.createWALTmp()
-	if err != nil {
-		return build.ExtendErr("WAL temporary file creation failed", err)
-	}
+	wal.createWALTmp()
+
 	// Close the WAL tmp file upon shutdown.
 	wal.cm.tg.AfterStop(func() {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
 
-		err = wal.fileWALTmp.Close()
+		err := wal.fileWALTmp.Close()
 		if err != nil {
 			wal.cm.log.Println("Error closing wal file during contract manager shutdown:", err)
 		}

@@ -96,12 +96,9 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 
 	// Update the state to reflect that the sector has moved.
 	delete(wal.cm.storageFolders[newSU.Folder].availableSectors, newSU.ID)
-	err = wal.appendChange(stateChange{
+	wal.appendChange(stateChange{
 		SectorUpdates: []sectorUpdate{oldSU, newSU},
 	})
-	if err != nil {
-		return err
-	}
 	wal.cm.sectorLocations[id] = newLocation
 	oldFolder.clearUsage(oldLocation.index)
 	oldFolder.sectors--
@@ -230,17 +227,12 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 	// Submit a storage folder removal to the WAL and wait until the update is
 	// synced.
 	cm.wal.mu.Lock()
-	err = cm.wal.appendChange(stateChange{
+	cm.wal.appendChange(stateChange{
 		StorageFolderRemovals: []uint16{index},
 	})
 	delete(cm.storageFolders, index)
-	cm.wal.mu.Unlock()
-	if err != nil {
-		return err
-	}
 
 	// Wait until the removal action has been synchronized.
-	cm.wal.mu.Lock()
 	syncChan = cm.wal.syncChan
 	cm.wal.mu.Unlock()
 	<-syncChan
@@ -302,7 +294,7 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 	// Submit a storage folder truncation to the WAL and wait until the update
 	// is synced.
 	wal.mu.Lock()
-	err = wal.appendChange(stateChange{
+	wal.appendChange(stateChange{
 		StorageFolderReductions: []storageFolderReduction{{
 			Index:          index,
 			NewSectorCount: newSectorCount,
@@ -310,9 +302,6 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 	})
 	syncChan = wal.syncChan
 	wal.mu.Unlock()
-	if err != nil {
-		return err
-	}
 
 	// Wait until the shrink action has been synchronized.
 	<-syncChan

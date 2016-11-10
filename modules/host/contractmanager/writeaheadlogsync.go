@@ -180,13 +180,9 @@ func (wal *writeAheadLog) commit() {
 			panic("Unable to properly initialize WAL file, crashing to prevent corruption.")
 		}
 		// Append all of the remaining long running uncommitted changes to the WAL.
-		err = wal.appendChange(stateChange{
+		wal.appendChange(stateChange{
 			UnfinishedStorageFolderAdditions: unfinishedAdditions,
 		})
-		if err != nil {
-			wal.cm.log.Println("ERROR: in-progress action lost due to disk failure:", err)
-			panic("Unable to create new WAL file, crashing to prevent corruption.")
-		}
 	}()
 	wg.Wait()
 }
