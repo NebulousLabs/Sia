@@ -170,7 +170,7 @@ standard success or error response. See
 initializes the wallet. After the wallet has been initialized once, it does
 not need to be initialized again, and future calls to /wallet/init will return
 an error. The encryption password is provided by the api call. If the password
-is blank, then the password will be set to the same as the seed.  If the seed
+is blank, then the password will be set to the same as the seed. If the seed
 parameter is supplied, the wallet will be initialized using the existing seed.
 This requires scanning the blockchain to determine how many keys have been
 generated from the seed. For this reason, seed may only be supplied if the
@@ -378,7 +378,7 @@ seed
   "coins": "123456", // hastings, big int
 
   // Number of siafunds transferred to the wallet as a result of the sweep.
-  "funds": "1", // big int
+  "funds": "1", // siafunds, big int
 }
 ```
 
