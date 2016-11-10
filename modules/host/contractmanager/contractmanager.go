@@ -26,6 +26,7 @@ package contractmanager
 // one.
 
 import (
+	"errors"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -185,6 +186,12 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	if err != nil {
 		cm.log.Println("ERROR: Unable to spawn the contract manager synchronization loop:", err)
 		return nil, build.ExtendErr("error while spawning contract manager sync loop", err)
+	}
+
+	// Simulate an error to make sure the cleanup code is triggered correctly.
+	if cm.dependencies.disrupt("erroredStartup") {
+		err = errors.New("startup disrupted")
+		return nil, err
 	}
 	return cm, nil
 }

@@ -262,11 +262,13 @@ func (wal *writeAheadLog) load() error {
 
 		err := wal.fileWALTmp.Close()
 		if err != nil {
-			wal.cm.log.Println("Error closing wal file during contract manager shutdown:", err)
+			wal.cm.log.Println("ERROR: error closing wal file during contract manager shutdown:", err)
+			return
 		}
 		err = os.Remove(filepath.Join(wal.cm.persistDir, walFileTmp))
 		if err != nil {
-			wal.cm.log.Println("Error removing temporary WAL during contract manager shutdown:", err)
+			wal.cm.log.Println("ERROR: error removing temporary WAL during contract manager shutdown:", err)
+			return
 		}
 	})
 
@@ -303,7 +305,19 @@ func (wal *writeAheadLog) load() error {
 	if err != nil {
 		build.ExtendErr("unable to write to settings temp file", err)
 	}
-	// Renaming process means that the settings tmp file does not need to be
-	// removed upon shutdown.
+	wal.cm.tg.AfterStop(func() {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
+		err := wal.fileSettingsTmp.Close()
+		if err != nil {
+			wal.cm.log.Println("ERROR: unable to close settings temporary file")
+			return
+		}
+		err = os.Remove(filepath.Join(wal.cm.persistDir, settingsFileTmp))
+		if err != nil {
+			wal.cm.log.Println("ERROR: unable to remove settings temporary file")
+			return
+		}
+	})
 	return nil
 }
