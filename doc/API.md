@@ -808,6 +808,7 @@ Wallet
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
+| [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
@@ -897,15 +898,20 @@ standard success or error response. See
 
 #### /wallet/init [POST]
 
-initializes the wallet. After the wallet has been initialized once, it does not
-need to be initialized again, and future calls to /wallet/init will return an
-error. The encryption password is provided by the api call. If the password is
-blank, then the password will be set to the same as the seed.
+initializes the wallet. After the wallet has been initialized once, it does
+not need to be initialized again, and future calls to /wallet/init will return
+an error. The encryption password is provided by the api call. If the password
+is blank, then the password will be set to the same as the seed. If the seed
+parameter is supplied, the wallet will be initialized using the existing seed.
+This requires scanning the blockchain to determine how many keys have been
+generated from the seed. For this reason, seed may only be supplied if the
+blockchain is synced.
 
 ###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-2)
 ```
 encryptionpassword
 dictionary // Optional, default is english.
+seed       // Optional
 ```
 
 ###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-3)
@@ -1020,6 +1026,25 @@ keyfiles
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
+#### /wallet/sweep/seed [POST]
+
+Function: Scan the blockchain for outputs belonging to a seed and send them to
+an address owned by the wallet.
+
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-8)
+```
+dictionary // Optional, default is english.
+seed
+```
+
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-7)
+```javascript
+{
+  "coins": "123456", // hastings, big int
+  "funds": "1",      // siafunds, big int
+}
+```
+
 #### /wallet/lock [POST]
 
 locks the wallet, wiping all secret keys. After being locked, the keys are
@@ -1040,7 +1065,7 @@ gets the transaction associated with a specific transaction id.
 :id
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-7)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-8)
 ```javascript
 {
   "transaction": {
@@ -1075,13 +1100,13 @@ gets the transaction associated with a specific transaction id.
 
 returns a list of transactions related to the wallet in chronological order.
 
-###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-8)
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-9)
 ```
 startheight // block height
 endheight   // block height
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-8)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-9)
 ```javascript
 {
   "confirmedtransactions": [
@@ -1106,7 +1131,7 @@ returns all of the transactions related to a specific address.
 :addr
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-9)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-10)
 ```javascript
 {
   "transactions": [
@@ -1122,7 +1147,7 @@ returns all of the transactions related to a specific address.
 unlocks the wallet. The wallet is capable of knowing whether the correct
 password was provided.
 
-###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-9)
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-10)
 ```
 encryptionpassword
 ```
