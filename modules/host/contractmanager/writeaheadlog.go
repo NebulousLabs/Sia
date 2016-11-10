@@ -249,8 +249,22 @@ func (wal *writeAheadLog) load() error {
 	// Create the walTmpFile, which needs to be open before recovery can start.
 	err := wal.createWALTmp()
 	if err != nil {
-		return err
+		return build.ExtendErr("WAL temporary file creation failed", err)
 	}
+	// Close the WAL tmp file upon shutdown.
+	wal.cm.tg.AfterStop(func() {
+		wal.mu.Lock()
+		defer wal.mu.Unlock()
+
+		err = wal.fileWALTmp.Close()
+		if err != nil {
+			wal.cm.log.Println("Error closing wal file during contract manager shutdown:", err)
+		}
+		err = os.Remove(filepath.Join(wal.cm.persistDir, walFileTmp))
+		if err != nil {
+			wal.cm.log.Println("Error removing temporary WAL during contract manager shutdown:", err)
+		}
+	})
 
 	// Try opening the WAL file.
 	walFileName := filepath.Join(wal.cm.persistDir, walFile)
@@ -259,6 +273,7 @@ func (wal *writeAheadLog) load() error {
 		// err == nil indicates that there is a WAL file, which means that the
 		// previous shutdown was not clean. Re-commit the changes in the WAL to
 		// bring the program back to consistency.
+		wal.cm.log.Println("WARN: WAL file detected, performing recovery after unclean shutdown.")
 		err = wal.recoverWAL(walFile)
 		if err != nil {
 			return build.ExtendErr("failed to recover WAL", err)
@@ -270,9 +285,8 @@ func (wal *writeAheadLog) load() error {
 	} else if !os.IsNotExist(err) {
 		return build.ExtendErr("walFile was not opened successfully", err)
 	}
-	// Final option is that err == os.IsNotExist, which means that there is no
-	// WAL, which most likely means that there was a clean shutdown previously.
-	// No action needs to be taken regarding WAL recovery.
+	// err == os.IsNotExist, suggesting a successful, clean shutdown. No action
+	// is taken.
 
 	// Create the tmp settings file and initialize the first write to it. This
 	// is necessary before kicking off the sync loop.
@@ -285,5 +299,7 @@ func (wal *writeAheadLog) load() error {
 	if err != nil {
 		build.ExtendErr("unable to write to settings temp file", err)
 	}
+	// Renaming process means that the settings tmp file does not need to be
+	// removed upon shutdown.
 	return nil
 }

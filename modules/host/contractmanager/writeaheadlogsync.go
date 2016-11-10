@@ -98,17 +98,16 @@ func (wal *writeAheadLog) syncResources() {
 
 	// Now that all the Sync calls have completed, rename the WAL tmp file to
 	// update the WAL.
-	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-	walFileName := filepath.Join(wal.cm.persistDir, walFile)
-	var err error
 	if !wal.cm.dependencies.disrupt("walRename") {
-		err = os.Rename(walTmpName, walFileName)
-	}
-	if err != nil {
-		// Log that the host is having trouble saving the uncommitted changes.
-		// Crash if the list of uncommitted changes has grown very large.
-		wal.cm.log.Severe("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
-		panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
+		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
+		walFileName := filepath.Join(wal.cm.persistDir, walFile)
+		err := os.Rename(walTmpName, walFileName)
+		if err != nil {
+			// Log that the host is having trouble saving the uncommitted changes.
+			// Crash if the list of uncommitted changes has grown very large.
+			wal.cm.log.Severe("ERROR: could not rename temporary write-ahead-log in contract manager:", err)
+			panic("unable to copy-on-write the WAL temporary file, crashing to prevent data corruption")
+		}
 	}
 
 	// Now that the WAL is sync'd and updated, any calls waiting on ACID
@@ -129,18 +128,10 @@ func (wal *writeAheadLog) syncResources() {
 // commit should only be called from threadedSyncLoop.
 func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
-	//
-	// On the previous commit, a bunch of files were given operations to
-	// perform, but the operations were not synced. They have now had time to
-	// write the data to disk, which means a Sync call here should take
-	// significantly less time than it would have if Sync had been called right
-	// away. This is important to performance, as Sync holds a lock over the
-	// entire contract manager.
 	wal.syncResources()
 
-	// Use helper functions to extract all remaining unfinished long-running
-	// jobs from the WAL. Save these for later, when the WAL tmp file gets
-	// reopened.
+	// Extract any unfinished long-running jobs from the list of WAL items, so
+	// that they may be added to the next WAL file.
 	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
 
 	// Set the list of uncommitted changes to nil, as everything has been
@@ -194,6 +185,7 @@ func (wal *writeAheadLog) commit() {
 		})
 		if err != nil {
 			wal.cm.log.Println("ERROR: in-progress action lost due to disk failure:", err)
+			panic("Unable to create new WAL file, crashing to prevent corruption.")
 		}
 	}()
 	wg.Wait()
@@ -228,31 +220,12 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 		// should be zero.
 		<-syncLoopStopped // Wait for the sync loop to signal proper termination.
 
-		// Close the dangling commit resources.
-		err = wal.fileWALTmp.Close()
-		if err != nil {
-			wal.cm.log.Println("Error closing wal file during contract manager shutdown:", err)
-		}
-		err = os.Remove(filepath.Join(wal.cm.persistDir, walFileTmp))
-		if err != nil {
-			wal.cm.log.Println("Error removing temporary WAL during contract manager shutdown:", err)
-		}
-		// Allow the removal of the WAL file to be disrupted to enable easier
-		// simluations of power failure.
+		// Allow unclean shutdown to be simulated by disrupting the removal of
+		// the WAL file.
 		if !wal.cm.dependencies.disrupt("cleanWALFile") {
 			err = os.Remove(filepath.Join(wal.cm.persistDir, walFile))
 			if err != nil {
 				wal.cm.log.Println("Error removing WAL during contract manager shutdown:", err)
-			}
-		}
-		for _, sf := range wal.cm.storageFolders {
-			err = sf.metadataFile.Close()
-			if err != nil {
-				wal.cm.log.Println("Error closing the storage folder file handle", err)
-			}
-			err = sf.sectorFile.Close()
-			if err != nil {
-				wal.cm.log.Println("Error closing the storage folder file handle", err)
 			}
 		}
 	})

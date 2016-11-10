@@ -159,10 +159,21 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		return nil, build.ExtendErr("error while loading the WAL at startup", err)
 	}
 	// Upon shudown, unload all of the files.
-	//
-	// TODO: Before actually unloading all of the files, determine what you
-	// actually want to do with them. See if ReadAt and WriteAt can be used to
-	// achieve safe parallelism without the seeking and stuff.
+	cm.tg.AfterStop(func() {
+		cm.wal.mu.Lock()
+		defer cm.wal.mu.Unlock()
+
+		for _, sf := range cm.storageFolders {
+			err = sf.metadataFile.Close()
+			if err != nil {
+				cm.log.Println("Error closing the storage folder file handle", err)
+			}
+			err = sf.sectorFile.Close()
+			if err != nil {
+				cm.log.Println("Error closing the storage folder file handle", err)
+			}
+		}
+	})
 
 	// The sector location data is loaded last. Any corruption that happened
 	// during unclean shutdown has already been fixed by the WAL.
