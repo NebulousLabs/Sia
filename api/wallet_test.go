@@ -192,16 +192,30 @@ func TestIntegrationWalletInitSeed(t *testing.T) {
 	}()
 	defer st.server.Close()
 
+	// Make a call to /wallet/init/seed using an invalid seed
+	qs := url.Values{}
+	qs.Set("seed", "foo")
+	err = st.stdPostAPI("/wallet/init/seed", qs)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
 	// Make a call to /wallet/init/seed. Provide no encryption key so that the
 	// encryption key is the seed.
 	var seed modules.Seed
 	rand.Read(seed[:])
 	seedStr, _ := modules.SeedToString(seed, "english")
-	qs := url.Values{}
 	qs.Set("seed", seedStr)
 	err = st.stdPostAPI("/wallet/init/seed", qs)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Try to re-init the wallet using a different encryption key
+	qs.Set("encryptionpassword", "foo")
+	err = st.stdPostAPI("/wallet/init/seed", qs)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 
 	// Use the seed to call /wallet/unlock.
@@ -347,15 +361,32 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 
 	// Sweep the coins we sent
 	var wsp WalletSweepPOST
-	sendSiacoinsValues := url.Values{}
-	sendSiacoinsValues.Set("seed", seedStr)
-	err = st.postAPI("/wallet/sweep/seed", sendSiacoinsValues, &wsp)
+	qs := url.Values{}
+	qs.Set("seed", seedStr)
+	err = st.postAPI("/wallet/sweep/seed", qs, &wsp)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Should have swept more than 80 SC
 	if wsp.Coins.Cmp(types.SiacoinPrecision.Mul64(80)) <= 0 {
 		t.Fatalf("swept fewer coins (%v SC) than expected %v+", wsp.Coins.Div(types.SiacoinPrecision), 80)
+	}
+
+	// Add a block so that the sweep transaction is processed
+	st.miner.AddBlock()
+
+	// Sweep again; should find no coins. An error will be returned because
+	// the found coins cannot cover the transaction fee.
+	err = st.postAPI("/wallet/sweep/seed", qs, &wsp)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	// Call /wallet/sweep/seed with an invalid seed
+	qs.Set("seed", "foo")
+	err = st.postAPI("/wallet/sweep/seed", qs, &wsp)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 
