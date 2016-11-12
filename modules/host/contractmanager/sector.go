@@ -126,6 +126,11 @@ func (cm *ContractManager) managedSectorID(sectorRoot crypto.Hash) (id sectorID)
 // ReadSector will read a sector from the storage manager, returning the bytes
 // that match the input sector root.
 func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
+	err := cm.tg.Add()
+	if err != nil {
+		return nil, err
+	}
+	defer cm.tg.Done()
 	id := cm.managedSectorID(root)
 	cm.wal.managedLockSector(id)
 	defer cm.wal.managedUnlockSector(id)
