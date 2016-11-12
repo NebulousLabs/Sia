@@ -216,25 +216,18 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
 
-		// Grab the number of virtual sectors that have been committed with
-		// this root.
+		// Fetch the metadata related to the sector.
 		var exists bool
 		location, exists = wal.cm.sectorLocations[id]
 		if !exists {
 			wal.mu.Unlock()
 			return errSectorNotFound
 		}
-		// Delete the sector from the sector locations map.
-		delete(wal.cm.sectorLocations, id)
-
-		// Add this sector to the list of inactive-but-techincally-available
-		// usage bits.
 		sf, exists = wal.cm.storageFolders[location.storageFolder]
 		if !exists {
 			wal.cm.log.Critical("deleting a sector from a storage folder that does not exist?")
 			return errStorageFolderNotFound
 		}
-		sf.availableSectors[id] = location.index
 
 		// Inform the WAL of the sector update.
 		wal.appendChange(stateChange{
@@ -246,38 +239,36 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 			}},
 		})
 
+		// Delete the sector and mark the usage as available.
+		delete(wal.cm.sectorLocations, id)
+		sf.availableSectors[id] = location.index
+
 		// Block until the change has been committed.
 		syncChan = wal.syncChan
 		return nil
 	}()
 	if err != nil {
-		return build.ExtendErr("failed to write to WAL", err)
+		return err
 	}
 	<-syncChan
 
 	// Only update the usage after the sector delete has been committed to disk
 	// fully.
 	wal.mu.Lock()
-	defer wal.mu.Unlock()
-	sf, exists := wal.cm.storageFolders[location.storageFolder]
-	if !exists {
-		wal.cm.log.Critical("storage folder housing an existing sector does not exist")
-		return nil
-	}
 	delete(sf.availableSectors, id)
 	sf.clearUsage(location.index)
+	wal.mu.Unlock()
 	return nil
 }
 
 // managedRemoveSector will remove a sector (virtual or physical) from the
 // contract manager.
-//
-// TODO: Need to mark the sectors in the available sectors map.
 func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 	// Inform the WAL of the removed sector.
 	var location sectorLocation
 	var su sectorUpdate
 	var sf *storageFolder
+	var syncChan chan struct{}
 	err := func() error {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
@@ -289,9 +280,14 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 		if !exists {
 			return errSectorNotFound
 		}
-		location.count--
+		sf, exists = wal.cm.storageFolders[location.storageFolder]
+		if !exists {
+			wal.cm.log.Critical("deleting a sector from a storage folder that does not exist?")
+			return errStorageFolderNotFound
+		}
 
 		// Inform the WAL of the sector update.
+		location.count--
 		su = sectorUpdate{
 			Count:  location.count,
 			ID:     id,
@@ -302,30 +298,40 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 			SectorUpdates: []sectorUpdate{su},
 		})
 
-		// Update the in memory representation of the sector (except the
-		// usage), and write the new metadata to disk if needed.
-		if location.count != 0 {
-			wal.cm.sectorLocations[id] = location
-			sf = wal.cm.storageFolders[location.storageFolder]
-		} else {
+		// Update the in-memeory representation of the sector.
+		if location.count == 0 {
+			// Delete the sector and mark it as available.
 			delete(wal.cm.sectorLocations, id)
+			sf.availableSectors[id] = location.index
+		} else {
+			// Reduce the sector usage.
+			wal.cm.sectorLocations[id] = location
 		}
+		syncChan = wal.syncChan
 		return nil
 	}()
 	if err != nil {
 		return err
 	}
+	// synchronize before updating the metadata or clearing the usage.
+	<-syncChan
 
+	// Update the metadata, and the usage.
 	if location.count != 0 {
 		err = wal.writeSectorMetadata(sf, su)
 		if err != nil {
+			// Revert the previous change.
+			wal.mu.Lock()
+			su.Count++
+			location.count++
+			wal.appendChange(stateChange{
+				SectorUpdates: []sectorUpdate{su},
+			})
+			wal.cm.sectorLocations[id] = location
+			wal.mu.Unlock()
 			return build.ExtendErr("failed to write sector metadata", err)
 		}
 	}
-	wal.mu.Lock()
-	syncChan := wal.syncChan
-	wal.mu.Unlock()
-	<-syncChan
 
 	// Only update the usage after the sector removal has been committed to
 	// disk entirely. The usage is not updated until after the commit has
@@ -333,21 +339,10 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 	// the event of unclean shutdown.
 	if location.count == 0 {
 		wal.mu.Lock()
-		sf, exists := wal.cm.storageFolders[location.storageFolder]
-		if !exists {
-			wal.cm.log.Critical("storage folder housing an existing sector does not exist")
-			wal.mu.Unlock()
-			return nil
-		}
 		sf.clearUsage(location.index)
+		delete(sf.availableSectors, id)
 		wal.mu.Unlock()
 	}
-
-	// The altered usage must be committed as well.
-	wal.mu.Lock()
-	syncChan = wal.syncChan
-	wal.mu.Unlock()
-	<-syncChan
 	return nil
 }
 
