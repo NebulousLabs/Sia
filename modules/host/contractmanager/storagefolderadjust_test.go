@@ -232,7 +232,7 @@ func TestRemoveStorageFolderConcurrentAddSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*10)
+	err = cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*15)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestRemoveStorageFolderConcurrentAddSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*storageFolderGranularity*15)
+	err = cmt.cm.AddStorageFolder(storageFolderThree, modules.SectorSize*storageFolderGranularity*25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,17 +255,17 @@ func TestRemoveStorageFolderConcurrentAddSector(t *testing.T) {
 	var adderWG sync.WaitGroup
 	// Spin up 250 of these threads, putting load on the disk and increasing the
 	// change of complications.
-	for i := 0; i < 250; i++ {
+	for i := 0; i < 100; i++ {
 		adderWG.Add(1)
 		go func() {
 			for {
 				root, data, err := randSector()
 				if err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 				err = cmt.cm.AddSector(root, data)
 				if err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 				sliceLock.Lock()
 				roots = append(roots, root)
@@ -290,7 +290,7 @@ func TestRemoveStorageFolderConcurrentAddSector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderFour, modules.SectorSize*storageFolderGranularity*25)
+	err = cmt.cm.AddStorageFolder(storageFolderFour, modules.SectorSize*storageFolderGranularity*50)
 	if err != nil {
 		t.Fatal(err)
 	}

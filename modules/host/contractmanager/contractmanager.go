@@ -25,6 +25,13 @@ package contractmanager
 // close the contract manager and make sure the stats are correct on the good
 // one.
 
+// TODO: Write some code into the production dependencies that will, during
+// testing, arbitrarily write less than the full data to a file until Sync()
+// has been called. That way, disruptions can effectively simulate partial
+// writes even though the disk writes are actually completing.
+
+// TODO: Write some tests that have disks randomly failing.
+
 import (
 	"errors"
 	"path/filepath"

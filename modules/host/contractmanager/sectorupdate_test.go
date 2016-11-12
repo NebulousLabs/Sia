@@ -846,10 +846,11 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Add the sector twice in serial to verify that virtual sector adding is
-	// working correctly.
+	// Add the sector many times in parallel to make sure it is handled
+	// gracefully.
 	var wg sync.WaitGroup
-	for i := 0; i < 250; i++ {
+	parallelAdds := uint16(20)
+	for i := uint16(0); i < parallelAdds; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -883,8 +884,8 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
-		if sl.count != 250 {
-			t.Error("Sector location should only be reporting one sector")
+		if sl.count != parallelAdds {
+			t.Error("Sector location should only be reporting one sector:", sl.count)
 		}
 		if sl.storageFolder != index {
 			t.Error("Sector location is being reported incorrectly - wrong storage folder")
@@ -937,7 +938,7 @@ func TestAddVirtualSectorMassiveParallel(t *testing.T) {
 		index = sf.index
 	}
 	for _, sl := range cmt.cm.sectorLocations {
-		if sl.count != 250 {
+		if sl.count != parallelAdds {
 			t.Error("Sector location should only be reporting one sector:", sl.count)
 		}
 		if sl.storageFolder != index {

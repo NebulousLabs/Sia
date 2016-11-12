@@ -70,38 +70,116 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 	}
 	atomic.AddUint64(&oldFolder.atomicSuccessfulReads, 1)
 
-	// Place the sector into its new folder.
-	newLocation, err := wal.managedAddPhysicalSector(id, sectorData, oldLocation.count)
-	if err != nil {
-		return build.ExtendErr("unable to migrate selected sector", err)
-	}
-
-	// Create the sector updates signalling that the sector has been eliminated
-	// from one folder and added to another.
+	// Create the sector update that will remove the old sector.
 	oldSU := sectorUpdate{
 		Count:  0,
 		ID:     id,
 		Folder: oldLocation.storageFolder,
 		Index:  oldLocation.index,
 	}
-	newSU := sectorUpdate{
-		Count:  newLocation.count,
-		ID:     id,
-		Folder: newLocation.storageFolder,
-		Index:  newLocation.index,
-	}
 
+	// Place the sector into its new folder and add the atomic move to the WAL.
 	wal.mu.Lock()
-	defer wal.mu.Unlock()
+	storageFolders := wal.cm.storageFolderSlice()
+	wal.mu.Unlock()
+	var syncChan chan struct{}
+	for len(storageFolders) >= 1 {
+		var storageFolderIndex int
+		err := func() error {
+			// NOTE: Convention is broken when working with WAL lock here, due
+			// to the complexity required with managing both the WAL lock and
+			// the storage folder lock. Pay close attention when reviewing and
+			// modifying.
 
-	// Update the state to reflect that the sector has moved.
-	delete(wal.cm.storageFolders[newSU.Folder].availableSectors, newSU.ID)
-	wal.appendChange(stateChange{
-		SectorUpdates: []sectorUpdate{oldSU, newSU},
-	})
-	wal.cm.sectorLocations[id] = newLocation
-	oldFolder.clearUsage(oldLocation.index)
-	oldFolder.sectors--
+			// Grab a vacant storage folder.
+			wal.mu.Lock()
+			var sf *storageFolder
+			sf, storageFolderIndex = vacancyStorageFolder(storageFolders)
+			if sf == nil {
+				// None of the storage folders have enough room to house the
+				// sector.
+				wal.mu.Unlock()
+				return errInsufficientStorageForSector
+			}
+			defer sf.mu.RUnlock()
+
+			// Grab a sector from the storage folder. WAL lock cannot be
+			// released between grabbing the storage folder and grabbing a
+			// sector lest another thread request the final available sector in
+			// the storage folder.
+			sectorIndex, err := randFreeSector(sf.usage)
+			if err != nil {
+				wal.mu.Unlock()
+				wal.cm.log.Critical("a storage folder with full usage was returned from emptiestStorageFolder")
+				return err
+			}
+			// Set the usage, but mark it as uncommitted.
+			sf.setUsage(sectorIndex)
+			sf.availableSectors[id] = sectorIndex
+			wal.mu.Unlock()
+
+			// NOTE: The usage has been set, in the event of failure the usage
+			// must be cleared.
+
+			// Try writing the new sector to disk.
+			err = writeSector(sf.sectorFile, sectorIndex, sectorData)
+			if err != nil {
+				wal.cm.log.Printf("ERROR: Unable to write sector for folder %v: %v\n", sf.path, err)
+				atomic.AddUint64(&sf.atomicFailedWrites, 1)
+				wal.mu.Lock()
+				sf.clearUsage(sectorIndex)
+				delete(sf.availableSectors, id)
+				wal.mu.Unlock()
+				return errDiskTrouble
+			}
+
+			// Try writing the sector metadata to disk.
+			su := sectorUpdate{
+				Count:  oldLocation.count,
+				ID:     id,
+				Folder: sf.index,
+				Index:  sectorIndex,
+			}
+			err = wal.writeSectorMetadata(sf, su)
+			if err != nil {
+				wal.cm.log.Printf("ERROR: Unable to write sector metadata for folder %v: %v\n", sf.path, err)
+				atomic.AddUint64(&sf.atomicFailedWrites, 1)
+				wal.mu.Lock()
+				sf.clearUsage(sectorIndex)
+				delete(sf.availableSectors, id)
+				wal.mu.Unlock()
+				return errDiskTrouble
+			}
+
+			// Sector added successfully, update the WAL and the state.
+			sl := sectorLocation{
+				index:         sectorIndex,
+				storageFolder: sf.index,
+				count:         oldLocation.count,
+			}
+			wal.mu.Lock()
+			wal.appendChange(stateChange{
+				SectorUpdates: []sectorUpdate{oldSU, su},
+			})
+			oldFolder.clearUsage(oldLocation.index)
+			delete(wal.cm.sectorLocations, oldSU.ID)
+			delete(sf.availableSectors, id)
+			wal.cm.sectorLocations[id] = sl
+			syncChan = wal.syncChan
+			wal.mu.Unlock()
+			return nil
+		}()
+		if err != nil {
+			// Try the next storage folder.
+			storageFolders = append(storageFolders[:storageFolderIndex], storageFolders[storageFolderIndex+1:]...)
+			continue
+		}
+		// Sector added successfully, break.
+		break
+	}
+	if len(storageFolders) < 1 {
+		return errInsufficientStorageForSector
+	}
 	return nil
 }
 
