@@ -11,6 +11,15 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+type (
+	// storageFolderRemoval indicates a storage folder that has been removed
+	// from the WAL.
+	storageFolderRemoval struct {
+		Index uint16
+		Path  string
+	}
+)
+
 var (
 	// errPartialRelocation is returned during an operation attempting to clear
 	// out the sectors in a storage folder if errors prevented one or more of
@@ -34,16 +43,18 @@ var (
 
 // commitRemoveStorageFolder will finalize a storage folder removal from the
 // contract manager.
-func (wal *writeAheadLog) commitRemoveStorageFolder(index uint16) {
-	sf, exists := wal.cm.storageFolders[index]
-	if !exists {
-		return
+func (wal *writeAheadLog) commitRemoveStorageFolder(sfr storageFolderRemoval) {
+	// Close any open file handles.
+	sf, exists := wal.cm.storageFolders[sfr.Index]
+	if exists {
+		sf.metadataFile.Close()
+		sf.sectorFile.Close()
 	}
-	sf.metadataFile.Close()
-	sf.sectorFile.Close()
-	os.Remove(filepath.Join(sf.path, metadataFile))
-	os.Remove(filepath.Join(sf.path, sectorFile))
-	delete(wal.cm.storageFolders, index)
+
+	// Delete the files.
+	os.Remove(filepath.Join(sfr.Path, metadataFile))
+	os.Remove(filepath.Join(sfr.Path, sectorFile))
+	delete(wal.cm.storageFolders, sfr.Index)
 }
 
 // managedMoveSector will move a sector from its current storage folder to
@@ -306,7 +317,10 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 	// synced.
 	cm.wal.mu.Lock()
 	cm.wal.appendChange(stateChange{
-		StorageFolderRemovals: []uint16{index},
+		StorageFolderRemovals: []storageFolderRemoval{{
+			Index: index,
+			Path:  sf.path,
+		}},
 	})
 	delete(cm.storageFolders, index)
 
@@ -321,6 +335,8 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 	// TODO: In the rare event that this doesn't happen until after the deleted
 	// cm.storageFolders settings update has synchronized, clutter may be left
 	// on disk.
+	//
+	// TODO: Handle these by doing them during the WAL commit.
 	err = sf.metadataFile.Close()
 	if err != nil {
 		cm.log.Printf("Error: unable to close metadata file as storage folder %v is removed\n", sf.path)
@@ -394,10 +410,4 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 		wal.cm.log.Printf("Error: unable to truncate sector file as storage folder %v is resized\n", sf.path)
 	}
 	return nil
-}
-
-// growStorageFolder will extend the storage folder files so that they may hold
-// more sectors.
-func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32) error {
-	return errors.New("growing a storage folder is not supported")
 }

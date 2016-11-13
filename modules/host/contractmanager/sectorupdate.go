@@ -13,7 +13,11 @@ import (
 // writing in metadata and usage info if the sector still exists, and deleting
 // the usage info if the sector does not exist. The update is idempotent.
 func (wal *writeAheadLog) commitUpdateSector(su sectorUpdate) {
-	sf := wal.cm.storageFolders[su.Folder]
+	sf, exists := wal.cm.storageFolders[su.Folder]
+	if !exists {
+		wal.cm.log.Printf("ERROR: unable to locate storage folder for a committed sector update.")
+		return
+	}
 
 	// If the sector is being cleaned from disk, unset the usage flag.
 	if su.Count == 0 {
@@ -154,8 +158,6 @@ func (wal *writeAheadLog) managedAddPhysicalSector(id sectorID, data []byte, cou
 	<-syncChan
 	return nil
 }
-
-// Why do we need the list of available sectors? Because while the write is happening, some data might get saved that says the sector is taken in the usage, when in fact there is garbage on disk. But the copy won't happen until the WAL is synchronized?
 
 // managedAddVirtualSector will add a virtual sector to the contract manager.
 func (wal *writeAheadLog) managedAddVirtualSector(id sectorID, location sectorLocation) error {

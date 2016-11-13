@@ -28,6 +28,9 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []savedStorageFolde
 		for _, index := range sc.ErroredStorageFolderAdditions {
 			delete(usfMap, index)
 		}
+		for _, sfr := range sc.StorageFolderRemovals {
+			delete(usfMap, sfr.Index)
+		}
 	}
 
 	// Return the active unifinished storage folders as a slice.
@@ -36,6 +39,34 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []savedStorageFolde
 		sfs = append(sfs, sf)
 	}
 	return sfs
+}
+
+// cleanupUnfinishedStorageFolderAdditions will purge any unfinished storage
+// folder additions from the previous run.
+func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateChange) {
+	sfs := findUnfinishedStorageFolderAdditions(scs)
+	for _, sf := range sfs {
+		// Remove any leftover files.
+		sectorLookupName := filepath.Join(sf.Path, metadataFile)
+		sectorHousingName := filepath.Join(sf.Path, sectorFile)
+		err := os.Remove(sectorLookupName)
+		if err != nil {
+			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
+		}
+		err = os.Remove(sectorHousingName)
+		if err != nil {
+			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
+		}
+
+		// Delete the storage folder from the storage folders map.
+		delete(wal.cm.storageFolders, sf.Index)
+
+		// Append an error call to the changeset, indicating that the storage
+		// folder add was not completed successfully.
+		wal.appendChange(stateChange{
+			ErroredStorageFolderAdditions: []uint16{sf.Index},
+		})
+	}
 }
 
 // managedAddStorageFolder will add a storage folder to the contract manager.
@@ -203,7 +234,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 
 	// The file creation process is essentially complete at this point, report
 	// complete progress.
-	atomic.StoreUint64(&sf.atomicProgressDenominator, totalSize)
+	atomic.StoreUint64(&sf.atomicProgressNumerator, totalSize)
 
 	// Sync the files.
 	var wg sync.WaitGroup
@@ -249,35 +280,6 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// Set the progress back to '0'.
 	atomic.StoreUint64(&sf.atomicProgressNumerator, 0)
 	atomic.StoreUint64(&sf.atomicProgressDenominator, 0)
-	return nil
-}
-
-// cleanupUnfinishedStorageFolderAdditions will purge any unfinished storage
-// folder additions from the previous run.
-func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateChange) error {
-	sfs := findUnfinishedStorageFolderAdditions(scs)
-	for _, sf := range sfs {
-		// Remove any leftover files.
-		sectorLookupName := filepath.Join(sf.Path, metadataFile)
-		sectorHousingName := filepath.Join(sf.Path, sectorFile)
-		err := os.Remove(sectorLookupName)
-		if err != nil {
-			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
-		}
-		err = os.Remove(sectorHousingName)
-		if err != nil {
-			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
-		}
-
-		// Delete the storage folder from the storage folders map.
-		delete(wal.cm.storageFolders, sf.Index)
-
-		// Append an error call to the changeset, indicating that the storage
-		// folder add was not completed successfully.
-		wal.appendChange(stateChange{
-			ErroredStorageFolderAdditions: []uint16{sf.Index},
-		})
-	}
 	return nil
 }
 

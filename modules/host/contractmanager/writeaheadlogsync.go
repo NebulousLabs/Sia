@@ -130,12 +130,13 @@ func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	wal.syncResources()
 
-	// Extract any unfinished long-running jobs from the list of WAL items, so
-	// that they may be added to the next WAL file.
+	// Extract any unfinished long-running jobs from the list of WAL items.
 	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
+	unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
 
-	// Set the list of uncommitted changes to nil, as everything has been
-	// applied and/or saved to be appended later.
+	// Save the set of uncommitted changes to a new variable and then clear the
+	// WAL variable.
+	uncommittedChanges := wal.uncommittedChanges
 	wal.uncommittedChanges = nil
 
 	// Begin writing to the settings file.
@@ -160,6 +161,19 @@ func (wal *writeAheadLog) commit() {
 		}
 	}()
 
+	// Perform any cleanup actions on the updates.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, sc := range uncommittedChanges {
+			for _, sfe := range sc.StorageFolderExtensions {
+				wal.commitStorageFolderExtension(sfe)
+			}
+
+			// TODO: Virtual sector handling here.
+		}
+	}()
+
 	// Begin writing new changes to the WAL.
 	wg.Add(1)
 	go func() {
@@ -179,9 +193,11 @@ func (wal *writeAheadLog) commit() {
 			wal.cm.log.Severe("Unable to properly initialize WAL file, crashing to prevent corruption:", err)
 			panic("Unable to properly initialize WAL file, crashing to prevent corruption.")
 		}
+
 		// Append all of the remaining long running uncommitted changes to the WAL.
 		wal.appendChange(stateChange{
-			UnfinishedStorageFolderAdditions: unfinishedAdditions,
+			UnfinishedStorageFolderAdditions:  unfinishedAdditions,
+			UnfinishedStorageFolderExtensions: unfinishedExtensions,
 		})
 	}()
 	wg.Wait()

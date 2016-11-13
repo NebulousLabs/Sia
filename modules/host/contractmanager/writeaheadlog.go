@@ -54,11 +54,14 @@ type (
 		// out. The WAL is append-only, which is why an error needs to be
 		// logged instead of just automatically clearning out the unfinished
 		// storage folder addition.
-		ErroredStorageFolderAdditions    []uint16
-		StorageFolderAdditions           []savedStorageFolder
-		StorageFolderRemovals            []uint16
-		StorageFolderReductions          []storageFolderReduction
-		UnfinishedStorageFolderAdditions []savedStorageFolder
+		ErroredStorageFolderAdditions     []uint16
+		ErroredStorageFolderExtensions    []uint16
+		StorageFolderAdditions            []savedStorageFolder
+		StorageFolderExtensions           []storageFolderExtension
+		StorageFolderRemovals             []storageFolderRemoval
+		StorageFolderReductions           []storageFolderReduction
+		UnfinishedStorageFolderAdditions  []savedStorageFolder
+		UnfinishedStorageFolderExtensions []unfinishedStorageFolderExtension
 
 		// Updates to the sector metadata. Careful ordering of events ensures
 		// that a sector update will not make it into the synced WAL unless the
@@ -174,6 +177,11 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 			wal.commitAddStorageFolder(sfa)
 		}
 	}
+	for _, sfe := range sc.StorageFolderExtensions {
+		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+			wal.commitStorageFolderExtension(sfe)
+		}
+	}
 	for _, sfr := range sc.StorageFolderRemovals {
 		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
 			wal.commitRemoveStorageFolder(sfr)
@@ -240,11 +248,8 @@ func (wal *writeAheadLog) recoverWAL(walFile file) error {
 	// task cleanup cannot be handled in the 'commitChange' loop because future
 	// state changes may indicate that the long running task has actually been
 	// completed.
-	err = wal.cleanupUnfinishedStorageFolderAdditions(scs)
-	if err != nil {
-		wal.cm.log.Println("ERROR: unable to cleanup unfinished storage folder additions:", err)
-		return build.ExtendErr("error performing unfinished storage folder cleanup", err)
-	}
+	wal.cleanupUnfinishedStorageFolderAdditions(scs)
+	wal.cleanupUnfinishedStorageFolderExtensions(scs)
 	return nil
 }
 
