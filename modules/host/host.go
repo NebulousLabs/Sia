@@ -73,7 +73,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/host/storagemanager"
+	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -257,7 +257,7 @@ func newHost(dependencies dependencies, cs modules.ConsensusSet, tpool modules.T
 
 	// Add the storage manager to the host, and set up the stop call that will
 	// close the storage manager.
-	h.StorageManager, err = storagemanager.New(filepath.Join(persistDir, "storagemanager"))
+	h.StorageManager, err = contractmanager.New(filepath.Join(persistDir, "contractmanager"))
 	if err != nil {
 		h.log.Println("Could not open the storage manager:", err)
 		return nil, err

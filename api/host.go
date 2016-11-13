@@ -170,7 +170,7 @@ func (api *API) storageFoldersResizeHandler(w http.ResponseWriter, req *http.Req
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
 	}
-	err = api.host.ResizeStorageFolder(folderIndex, newSize)
+	err = api.host.ResizeStorageFolder(uint16(folderIndex), newSize)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return
@@ -195,7 +195,7 @@ func (api *API) storageFoldersRemoveHandler(w http.ResponseWriter, req *http.Req
 	}
 
 	force := req.FormValue("force") == "true"
-	err = api.host.RemoveStorageFolder(folderIndex, force)
+	err = api.host.RemoveStorageFolder(uint16(folderIndex), force)
 	if err != nil {
 		WriteError(w, Error{err.Error()}, http.StatusBadRequest)
 		return

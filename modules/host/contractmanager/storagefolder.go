@@ -295,6 +295,32 @@ func (cm *ContractManager) ResetStorageFolderHealth(index uint16) error {
 	return nil
 }
 
+// TODO: Make this function better.
+func (cm *ContractManager) ResizeStorageFolder(index uint16, newSize uint64) error {
+	err := cm.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cm.tg.Done()
+
+	cm.wal.mu.Lock()
+	sf, exists := cm.storageFolders[index]
+	cm.wal.mu.Unlock()
+	if !exists {
+		return errStorageFolderNotFound
+	}
+
+	oldSize := uint64(len(sf.usage)) * storageFolderGranularity
+	if oldSize == newSize {
+		return errNoResize
+	}
+	newSectorCount := uint32(newSize / storageFolderGranularity)
+	if oldSize > newSize {
+		return cm.wal.shrinkStorageFolder(index, newSectorCount, true)
+	}
+	return cm.wal.growStorageFolder(index, newSectorCount)
+}
+
 // StorageFolders will return a list of storage folders in the host, each
 // containing information about the storage folder and any operations currently
 // being executed on the storage folder.

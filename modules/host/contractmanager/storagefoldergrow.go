@@ -104,11 +104,10 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	// Retrieve the specified storage folder.
 	wal.mu.Lock()
 	sf, exists := wal.cm.storageFolders[index]
+	wal.mu.Unlock()
 	if !exists {
-		wal.mu.Unlock()
 		return errStorageFolderNotFound
 	}
-	wal.mu.Unlock()
 
 	// Lock the storage folder for the duration of the operation.
 	sf.mu.Lock()

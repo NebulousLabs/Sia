@@ -2,7 +2,6 @@ package modules
 
 import (
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -55,14 +54,14 @@ type (
 		// the sector before the expiry height. The same sector can be added
 		// multiple times at different expiry heights, and the storage manager
 		// is expected to only store the data once.
-		AddSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight, sectorData []byte) error
+		AddSector(sectorRoot crypto.Hash, sectorData []byte) error
 
 		// AddSectorBatch is a performance optimization over AddSector when
 		// adding a bunch of virtual sectors. It is necessary because otherwise
 		// potentially thousands or even tens-of-thousands of fsync calls would
 		// need to be made in serial, which would prevent renters from ever
 		// successfully renewing.
-		AddSectorBatch(sectorRoots []crypto.Hash, expiryHeight types.BlockHeight) error
+		AddSectorBatch(sectorRoots []crypto.Hash) error
 
 		// AddStorageFolder adds a storage folder to the manager. The manager
 		// may not check that there is enough space available on-disk to
@@ -88,17 +87,17 @@ type (
 		// RemoveSector will remove a sector from the storage manager. The
 		// height at which the sector expires should be provided, so that the
 		// auto-expiry information for that sector can be properly updated.
-		RemoveSector(sectorRoot crypto.Hash, expiryHeight types.BlockHeight) error
+		RemoveSector(sectorRoot crypto.Hash) error
 
 		// RemoveStorageFolder will remove a storage folder from the manager.
 		// All storage on the folder will be moved to other storage folders,
 		// meaning that no data will be lost. If the manager is unable to save
 		// data, an error will be returned and the operation will be stopped.
-		RemoveStorageFolder(index int, force bool) error
+		RemoveStorageFolder(index uint16, force bool) error
 
 		// ResetStorageFolderHealth will reset the health statistics on a
 		// storage folder.
-		ResetStorageFolderHealth(index int) error
+		ResetStorageFolderHealth(index uint16) error
 
 		// ResizeStorageFolder will grow or shrink a storage folder in the
 		// manager. The manager may not check that there is enough space
@@ -108,7 +107,7 @@ type (
 		// into other storage folders, meaning that no data will be lost. If
 		// the manager is unable to migrate the data, an error will be returned
 		// and the operation will be stopped.
-		ResizeStorageFolder(index int, newSize uint64) error
+		ResizeStorageFolder(index uint16, newSize uint64) error
 
 		// StorageFolders will return a list of storage folders tracked by the
 		// manager.

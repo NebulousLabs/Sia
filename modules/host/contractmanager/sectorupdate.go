@@ -2,6 +2,7 @@ package contractmanager
 
 import (
 	"errors"
+	"sync"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -388,6 +389,43 @@ func (cm *ContractManager) AddSector(root crypto.Hash, sectorData []byte) error 
 	if err != nil {
 		cm.log.Println("ERROR: Unable to add sector:", err)
 		return err
+	}
+	return nil
+}
+
+// AddSectorBatch is a non-ACID call to add a bunch of sectors at once.
+// Necessary for compatibility with old renters.
+//
+// TODO: Make ACID, and definitely improve the performance as well.
+func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
+	// Prevent shutdown until this function completes.
+	err := cm.tg.Add()
+	if err != nil {
+		return err
+	}
+	defer cm.tg.Done()
+
+	// Add each sector in a separate goroutine.
+	var wg sync.WaitGroup
+	for _, root := range sectorRoots {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Hold a sector lock throughout the duration of the function, but release
+			// before syncing.
+			id := cm.managedSectorID(root)
+			cm.wal.managedLockSector(id)
+			defer cm.wal.managedUnlockSector(id)
+
+			// Add the sector as virtual.
+			cm.wal.mu.Lock()
+			location, exists := cm.sectorLocations[id]
+			cm.wal.mu.Unlock()
+			if exists {
+				cm.wal.managedAddVirtualSector(id, location)
+			}
+		}()
 	}
 	return nil
 }
