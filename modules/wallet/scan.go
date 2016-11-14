@@ -43,12 +43,12 @@ var maxScanKeys = func() uint64 {
 
 var errMaxKeys = fmt.Errorf("refused to generate more than %v keys from seed", maxScanKeys)
 
-// A scannedOutput is an output found in the blockchain that was generated
-// from a given seed.
+// A scannedOutput is an output found in the blockchain, along with the
+// information necessary to spend it.
 type scannedOutput struct {
-	id        types.OutputID
-	value     types.Currency
-	seedIndex uint64
+	id           types.OutputID
+	value        types.Currency
+	spendableKey spendableKey
 }
 
 // A seedScanner scans the blockchain for addresses that belong to a given
@@ -82,9 +82,9 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 		if diff.Direction == modules.DiffApply {
 			if index, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists && diff.SiacoinOutput.Value.Cmp(s.dustThreshold) > 0 {
 				s.siacoinOutputs[diff.ID] = scannedOutput{
-					id:        types.OutputID(diff.ID),
-					value:     diff.SiacoinOutput.Value,
-					seedIndex: index,
+					id:           types.OutputID(diff.ID),
+					value:        diff.SiacoinOutput.Value,
+					spendableKey: generateSpendableKey(s.seed, index),
 				}
 			}
 		} else if diff.Direction == modules.DiffRevert {
@@ -101,9 +101,9 @@ func (s *seedScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// sweep every siafund found
 			if index, exists := s.keys[diff.SiafundOutput.UnlockHash]; exists {
 				s.siafundOutputs[diff.ID] = scannedOutput{
-					id:        types.OutputID(diff.ID),
-					value:     diff.SiafundOutput.Value,
-					seedIndex: index,
+					id:           types.OutputID(diff.ID),
+					value:        diff.SiafundOutput.Value,
+					spendableKey: generateSpendableKey(s.seed, index),
 				}
 			}
 		} else if diff.Direction == modules.DiffRevert {
@@ -170,19 +170,11 @@ func newSeedScanner(seed modules.Seed) *seedScanner {
 	}
 }
 
-// A scanned033xOutput is an output found in the blockchain that was spent by a
-// v0.3.3.x wallet.
-type scanned033xOutput struct {
-	id           types.OutputID
-	value        types.Currency
-	spendableKey spendableKey
-}
-
 type v033xScanner struct {
 	dustThreshold  types.Currency
 	keys           map[types.UnlockHash]savedKey033x
-	siacoinOutputs map[types.SiacoinOutputID]scanned033xOutput
-	siafundOutputs map[types.SiafundOutputID]scanned033xOutput
+	siacoinOutputs map[types.SiacoinOutputID]scannedOutput
+	siafundOutputs map[types.SiafundOutputID]scannedOutput
 }
 
 // ProcessConsensusChange scans the blockchain for information relevant to the
@@ -191,7 +183,7 @@ func (s *v033xScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, diff := range cc.SiacoinOutputDiffs {
 		if diff.Direction == modules.DiffApply {
 			if sk, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists && diff.SiacoinOutput.Value.Cmp(s.dustThreshold) > 0 {
-				s.siacoinOutputs[diff.ID] = scanned033xOutput{
+				s.siacoinOutputs[diff.ID] = scannedOutput{
 					id:    types.OutputID(diff.ID),
 					value: diff.SiacoinOutput.Value,
 					spendableKey: spendableKey{
@@ -213,7 +205,7 @@ func (s *v033xScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// do not compare against dustThreshold here; we always want to
 			// sweep every siafund found
 			if sk, exists := s.keys[diff.SiafundOutput.UnlockHash]; exists {
-				s.siafundOutputs[diff.ID] = scanned033xOutput{
+				s.siafundOutputs[diff.ID] = scannedOutput{
 					id:    types.OutputID(diff.ID),
 					value: diff.SiafundOutput.Value,
 					spendableKey: spendableKey{
@@ -247,7 +239,7 @@ func new033xScanner(savedKeys []savedKey033x) *v033xScanner {
 	}
 	return &v033xScanner{
 		keys:           keys,
-		siacoinOutputs: make(map[types.SiacoinOutputID]scanned033xOutput),
-		siafundOutputs: make(map[types.SiafundOutputID]scanned033xOutput),
+		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
+		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
 	}
 }

@@ -303,20 +303,18 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	var sweptCoins, sweptFunds types.Currency // total values of swept outputs
 	for _, output := range s.siacoinOutputs {
 		// construct a siacoin input that spends the output
-		sk := generateSpendableKey(seed, output.seedIndex)
 		tb.AddSiacoinInput(types.SiacoinInput{
 			ParentID:         types.SiacoinOutputID(output.id),
-			UnlockConditions: sk.UnlockConditions,
+			UnlockConditions: output.spendableKey.UnlockConditions,
 		})
 		// add a signature for the input
 		sweptCoins = sweptCoins.Add(output.value)
 	}
 	for _, output := range s.siafundOutputs {
 		// construct a siafund input that spends the output
-		sk := generateSpendableKey(seed, output.seedIndex)
 		tb.AddSiafundInput(types.SiafundInput{
 			ParentID:         types.SiafundOutputID(output.id),
-			UnlockConditions: sk.UnlockConditions,
+			UnlockConditions: output.spendableKey.UnlockConditions,
 		})
 		// add a signature for the input
 		sweptFunds = sweptFunds.Add(output.value)
@@ -381,12 +379,12 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 	// access to the signing keys)
 	txn, parents := tb.View()
 	for _, output := range s.siacoinOutputs {
-		sk := generateSpendableKey(seed, output.seedIndex)
+		sk := output.spendableKey
 		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 	}
-	for _, sfo := range s.siafundOutputs {
-		sk := generateSpendableKey(seed, sfo.seedIndex)
-		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk)
+	for _, output := range s.siafundOutputs {
+		sk := output.spendableKey
+		addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk)
 	}
 	// Usually, all the inputs will come from swept outputs. However, there is
 	// an edge case in which inputs will be added from the wallet. To cover
