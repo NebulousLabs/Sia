@@ -130,13 +130,20 @@ func (wal *writeAheadLog) commit() {
 	// Sync all open, non-WAL files on the host.
 	wal.syncResources()
 
+	// Perform any cleanup actions on the updates.
+	for _, sc := range wal.uncommittedChanges {
+		for _, sfe := range sc.StorageFolderExtensions {
+			wal.commitStorageFolderExtension(sfe)
+		}
+
+		// TODO: Virtual sector handling here.
+	}
+
 	// Extract any unfinished long-running jobs from the list of WAL items.
 	unfinishedAdditions := findUnfinishedStorageFolderAdditions(wal.uncommittedChanges)
 	unfinishedExtensions := findUnfinishedStorageFolderExtensions(wal.uncommittedChanges)
 
-	// Save the set of uncommitted changes to a new variable and then clear the
-	// WAL variable.
-	uncommittedChanges := wal.uncommittedChanges
+	// Clear the set of uncommitted changes.
 	wal.uncommittedChanges = nil
 
 	// Begin writing to the settings file.
@@ -158,19 +165,6 @@ func (wal *writeAheadLog) commit() {
 		if err != nil {
 			wal.cm.log.Severe("writing to settings tmp file has failed:", err)
 			panic("unable to write to temporary settings file, crashing to avoid data corruption")
-		}
-	}()
-
-	// Perform any cleanup actions on the updates.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for _, sc := range uncommittedChanges {
-			for _, sfe := range sc.StorageFolderExtensions {
-				wal.commitStorageFolderExtension(sfe)
-			}
-
-			// TODO: Virtual sector handling here.
 		}
 	}()
 

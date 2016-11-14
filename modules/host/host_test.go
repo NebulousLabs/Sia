@@ -196,7 +196,7 @@ func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*8)
+	err = ht.host.AddStorageFolder(storageFolderOne, modules.SectorSize*64)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func newMockHostTester(d dependencies, name string) (*hostTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*8*2)
+	err = ht.host.AddStorageFolder(storageFolderTwo, modules.SectorSize*64*2)
 	if err != nil {
 		return nil, err
 	}

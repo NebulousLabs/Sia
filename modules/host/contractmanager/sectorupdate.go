@@ -223,8 +223,7 @@ func (wal *writeAheadLog) managedDeleteSector(id sectorID) error {
 		var exists bool
 		location, exists = wal.cm.sectorLocations[id]
 		if !exists {
-			wal.mu.Unlock()
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 		sf, exists = wal.cm.storageFolders[location.storageFolder]
 		if !exists {
@@ -281,7 +280,7 @@ func (wal *writeAheadLog) managedRemoveSector(id sectorID) error {
 		var exists bool
 		location, exists = wal.cm.sectorLocations[id]
 		if !exists {
-			return errSectorNotFound
+			return ErrSectorNotFound
 		}
 		sf, exists = wal.cm.storageFolders[location.storageFolder]
 		if !exists {

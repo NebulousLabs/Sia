@@ -30,7 +30,7 @@ dependencies:
 # tests are run during testing.
 run = Test
 pkgs = ./api ./build ./compatibility ./crypto ./encoding ./modules ./modules/consensus                                  \
-       ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/host/storagemanager \
+       ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager                               \
        ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/proto                      \
        ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./siac ./siad ./sync ./types
 

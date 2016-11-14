@@ -87,11 +87,11 @@ var (
 		panic("unrecognized release constant in host - maximum storage folders")
 	}()
 
-	// maximumSectorsPerStorageFolder sets an upper bound on how large storage
+	// MaximumSectorsPerStorageFolder sets an upper bound on how large storage
 	// folders in the host are allowed to be. There is a hard limit at 4
 	// billion sectors because the sector location map only uses 4 bytes to
 	// indicate the location of a sector.
-	maximumSectorsPerStorageFolder = func() uint64 {
+	MaximumSectorsPerStorageFolder = func() uint64 {
 		if build.Release == "dev" {
 			return 1 << 20 // 4 TiB
 		}
@@ -104,7 +104,7 @@ var (
 		panic("unrecognized release constant in host - maximum storage folder size")
 	}()
 
-	// minimumSectorsPerStorageFolder defines the minimum number of sectors
+	// MinimumSectorsPerStorageFolder defines the minimum number of sectors
 	// that a storage folder is allowed to have. The minimum has been set as a
 	// guide to assist with network health, and to help discourage spammy hosts
 	// with very little storage. Even if the spammy hosts were allowed, they
@@ -114,9 +114,9 @@ var (
 	//
 	// There are plans to continue raising the minimum storage requirements as
 	// the network gains maturity.
-	minimumSectorsPerStorageFolder = func() uint64 {
+	MinimumSectorsPerStorageFolder = func() uint64 {
 		if build.Release == "dev" {
-			return 1 << 3 // 32 MiB
+			return 1 << 6 // 256 MiB
 		}
 		if build.Release == "standard" {
 			// We are at a stage of Sia where we have plenty of hosts. It's
@@ -126,7 +126,7 @@ var (
 			return 1 << 15 // 256 GiB
 		}
 		if build.Release == "testing" {
-			return 1 << 3 // 32 KiB
+			return 1 << 6 // 256 KiB
 		}
 		panic("unrecognized release constant in host - minimum storage folder size")
 	}()

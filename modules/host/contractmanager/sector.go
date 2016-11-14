@@ -31,8 +31,8 @@ var (
 	// the maximum number of virtual sectors for that sector id already exist.
 	errMaxVirtualSectors = errors.New("sector collides with a physical sector that already has the maximum allowed number of virtual sectors")
 
-	// errSectorNotFound is returned when a lookup for a sector fails.
-	errSectorNotFound = errors.New("could not find the desired sector")
+	// ErrSectorNotFound is returned when a lookup for a sector fails.
+	ErrSectorNotFound = errors.New("could not find the desired sector")
 )
 
 // sectorLocation indicates the location of a sector on disk.
@@ -141,11 +141,11 @@ func (cm *ContractManager) ReadSector(root crypto.Hash) ([]byte, error) {
 	sf, exists2 := cm.storageFolders[sl.storageFolder]
 	cm.wal.mu.Unlock()
 	if !exists1 {
-		return nil, errSectorNotFound
+		return nil, ErrSectorNotFound
 	}
 	if !exists2 {
 		cm.log.Critical("Unable to load storage folder despite having sector metadata")
-		return nil, errSectorNotFound
+		return nil, ErrSectorNotFound
 	}
 
 	// Read the sector.

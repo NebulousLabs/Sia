@@ -467,7 +467,7 @@ func TestAddStorageFolderDoubleAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize*2)
-	if err != errRepeatFolder {
+	if err != ErrRepeatFolder {
 		t.Fatal(err)
 	}
 
@@ -561,7 +561,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cmt.cm.AddStorageFolder(storageFolderOne, sfSize*2)
-	if err != errRepeatFolder {
+	if err != ErrRepeatFolder {
 		t.Fatal(err)
 	}
 

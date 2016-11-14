@@ -21,10 +21,10 @@ type (
 )
 
 var (
-	// errPartialRelocation is returned during an operation attempting to clear
+	// ErrPartialRelocation is returned during an operation attempting to clear
 	// out the sectors in a storage folder if errors prevented one or more of
 	// the sectors from being properly migrated to a new storage folder.
-	errPartialRelocation = errors.New("unable to migrate all sectors")
+	ErrPartialRelocation = errors.New("unable to migrate all sectors")
 )
 
 // TODO: Sector operations must return an error if they are requested on a
@@ -180,7 +180,9 @@ func (wal *writeAheadLog) managedMoveSector(id sectorID) error {
 			wal.mu.Unlock()
 			return nil
 		}()
-		if err != nil {
+		if err == errInsufficientStorageForSector {
+			return err
+		} else if err != nil {
 			// Try the next storage folder.
 			storageFolders = append(storageFolders[:storageFolderIndex], storageFolders[storageFolderIndex+1:]...)
 			continue
@@ -261,7 +263,7 @@ func (wal *writeAheadLog) managedEmptyStorageFolder(sfIndex uint16, startingPoin
 	// Return errPartialRelocation if not every sector was migrated out
 	// successfully.
 	if errCount > 0 {
-		return errCount, errPartialRelocation
+		return errCount, ErrPartialRelocation
 	}
 	return 0, nil
 }
@@ -395,6 +397,7 @@ func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint3
 		}},
 	})
 	syncChan = wal.syncChan
+	sf.usage = sf.usage[:newSectorCount/storageFolderGranularity]
 	wal.mu.Unlock()
 
 	// Wait until the shrink action has been synchronized.

@@ -107,7 +107,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			// removed, however we refuse to add a replacement storage folder
 			// until the existing one has been removed entirely.
 			if sf.path == csf.path {
-				return errRepeatFolder
+				return ErrRepeatFolder
 			}
 		}
 
@@ -319,11 +319,11 @@ func (cm *ContractManager) AddStorageFolder(path string, size uint64) error {
 
 	// Check that the storage folder being added meets the size requirements.
 	sectors := size / modules.SectorSize
-	if sectors > maximumSectorsPerStorageFolder {
-		return errLargeStorageFolder
+	if sectors > MaximumSectorsPerStorageFolder {
+		return ErrLargeStorageFolder
 	}
-	if sectors < minimumSectorsPerStorageFolder {
-		return errSmallStorageFolder
+	if sectors < MinimumSectorsPerStorageFolder {
+		return ErrSmallStorageFolder
 	}
 	if (size/modules.SectorSize)%storageFolderGranularity != 0 {
 		return errStorageFolderGranularity

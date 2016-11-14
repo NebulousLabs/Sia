@@ -42,9 +42,9 @@ type (
 // folderIndex determines the index of the storage folder with the provided
 // path.
 func folderIndex(folderPath string, storageFolders []modules.StorageFolderMetadata) (int, error) {
-	for i, sf := range storageFolders {
+	for _, sf := range storageFolders {
 		if sf.Path == folderPath {
-			return i, nil
+			return int(sf.Index), nil
 		}
 	}
 	return -1, errStorageFolderNotFound

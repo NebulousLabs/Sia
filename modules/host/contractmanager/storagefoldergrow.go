@@ -130,9 +130,9 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	currentHousingSize := int64(len(sf.usage)) * int64(modules.SectorSize) * storageFolderGranularity
 	currentMetadataSize := int64(len(sf.usage)) * sectorMetadataDiskSize * storageFolderGranularity
 	newHousingSize := int64(newSectorCount) * int64(modules.SectorSize)
-	newMetadataSize := int64(newSectorCount) * storageFolderGranularity
+	newMetadataSize := int64(newSectorCount) * sectorMetadataDiskSize
 	if newHousingSize <= currentHousingSize || newMetadataSize <= currentMetadataSize {
-		wal.cm.log.Critical("growStorageFolder called when the storage folder is not increasing in size")
+		wal.cm.log.Critical("growStorageFolder called when the storage folder is not increasing in size", newHousingSize, currentHousingSize, newMetadataSize, currentMetadataSize)
 		return errors.New("unable to make the requested change, please notify the devs that there is a bug")
 	}
 	housingWriteSize := newHousingSize - currentHousingSize
