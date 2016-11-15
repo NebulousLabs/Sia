@@ -151,6 +151,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		}
 		sf.sectorFile, err = wal.cm.dependencies.createFile(sectorHousingName)
 		if err != nil {
+			err = build.ComposeErrors(err, sf.metadataFile.Close())
 			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
 			return build.ExtendErr("could not create storage folder file", err)
 		}
@@ -190,7 +191,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 	// additions. Because the WAL is append-only, a stateChange needs to be
 	// appended which indicates that the storage folder was unable to be added
 	// successfully.
-	defer func() {
+	defer func(sf *storageFolder) {
 		if err != nil {
 			wal.mu.Lock()
 			defer wal.mu.Unlock()
@@ -199,6 +200,8 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			delete(wal.cm.storageFolders, sf.index)
 
 			// Remove the leftover files from the failed operation.
+			err = build.ComposeErrors(sf.sectorFile.Close())
+			err = build.ComposeErrors(sf.metadataFile.Close())
 			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
 			err = build.ComposeErrors(err, os.Remove(sectorHousingName))
 
@@ -208,7 +211,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 				ErroredStorageFolderAdditions: []uint16{sf.index},
 			})
 		}
-	}()
+	}(sf)
 
 	// Allocate the files on disk for the storage folder.
 	writeCount := sectorHousingSize / 4e6
