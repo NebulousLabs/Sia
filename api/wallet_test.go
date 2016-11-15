@@ -390,6 +390,49 @@ func TestIntegrationWalletSweepSeedPOST(t *testing.T) {
 	}
 }
 
+// TestIntegrationWalletSweepSiagPOST probes the POST call to
+// /wallet/sweep/siag.
+func TestIntegrationWalletSweepSiagPOST(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	st, err := createServerTester("TestIntegrationWalletSweepSiagPOST")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.server.Close()
+
+	// Sweep coins from the siag test key
+	var wsp WalletSweepPOST
+	qs := url.Values{}
+	key, _ := filepath.Abs("../types/siag0of1of1.siakey") // need absolute path
+	qs.Set("keyfiles", key)
+	err = st.postAPI("/wallet/sweep/siag", qs, &wsp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should find 2000 siafunds
+	if wsp.Funds.Cmp(types.NewCurrency64(2000)) != 0 {
+		t.Fatalf("swept fewer coins (%v SC) than expected %v+", wsp.Coins.Div(types.SiacoinPrecision), 80)
+	}
+
+	// Add a block so that the sweep transaction is processed
+	st.miner.AddBlock()
+
+	// Sweep again; should find no funds. An error will be returned.
+	err = st.postAPI("/wallet/sweep/siag", qs, &wsp)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	// Call /wallet/sweep/siag with an invalid keyfile
+	qs.Set("keyfiles", "foo")
+	err = st.postAPI("/wallet/sweep/siag", qs, &wsp)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 // TestIntegrationWalletTransactionGETid queries the /wallet/transaction/$(id)
 // api call.
 func TestIntegrationWalletTransactionGETid(t *testing.T) {
