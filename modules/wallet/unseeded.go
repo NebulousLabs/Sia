@@ -224,13 +224,21 @@ func (w *Wallet) Sweep033x(filepath033x string) (coins, funds types.Currency, er
 		return types.Currency{}, types.Currency{}, errors.New("cannot sweep until blockchain is synced")
 	}
 
+	// read savedKeys and convert to spendableKeys
 	var savedKeys []savedKey033x
 	err = encoding.ReadFile(filepath033x, &savedKeys)
 	if err != nil {
 		return
 	}
+	keys := make([]spendableKey, len(savedKeys))
+	for i := range savedKeys {
+		keys[i] = spendableKey{
+			UnlockConditions: savedKeys[i].UnlockConditions,
+			SecretKeys:       []crypto.SecretKey{savedKeys[i].SecretKey},
+		}
+	}
 
-	s := new033xScanner(savedKeys)
+	s := newKeyScanner(keys)
 	_, maxFee := w.tpool.FeeEstimation()
 	s.dustThreshold = maxFee.Mul64(outputSize)
 	err = s.scan(w.cs)
@@ -266,7 +274,7 @@ func (w *Wallet) SweepSiag(keyfiles []string) (coins, funds types.Currency, err 
 		return
 	}
 
-	s := newSiagScanner(sk)
+	s := newKeyScanner([]spendableKey{sk})
 	_, maxFee := w.tpool.FeeEstimation()
 	s.dustThreshold = maxFee.Mul64(outputSize)
 	err = s.scan(w.cs)

@@ -174,26 +174,23 @@ func newSeedScanner(seed modules.Seed) *seedScanner {
 	}
 }
 
-type v033xScanner struct {
+type keyScanner struct {
 	dustThreshold  types.Currency
-	keys           map[types.UnlockHash]savedKey033x
+	keys           map[types.UnlockHash]spendableKey
 	siacoinOutputs map[types.SiacoinOutputID]scannedOutput
 	siafundOutputs map[types.SiafundOutputID]scannedOutput
 }
 
 // ProcessConsensusChange scans the blockchain for information relevant to the
 // v033xScanner.
-func (s *v033xScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
+func (s *keyScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	for _, diff := range cc.SiacoinOutputDiffs {
 		if diff.Direction == modules.DiffApply {
 			if sk, exists := s.keys[diff.SiacoinOutput.UnlockHash]; exists && diff.SiacoinOutput.Value.Cmp(s.dustThreshold) > 0 {
 				s.siacoinOutputs[diff.ID] = scannedOutput{
-					id:    types.OutputID(diff.ID),
-					value: diff.SiacoinOutput.Value,
-					spendableKey: spendableKey{
-						UnlockConditions: sk.UnlockConditions,
-						SecretKeys:       []crypto.SecretKey{sk.SecretKey},
-					},
+					id:           types.OutputID(diff.ID),
+					value:        diff.SiacoinOutput.Value,
+					spendableKey: sk,
 				}
 			}
 		} else if diff.Direction == modules.DiffRevert {
@@ -210,12 +207,9 @@ func (s *v033xScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 			// sweep every siafund found
 			if sk, exists := s.keys[diff.SiafundOutput.UnlockHash]; exists {
 				s.siafundOutputs[diff.ID] = scannedOutput{
-					id:    types.OutputID(diff.ID),
-					value: diff.SiafundOutput.Value,
-					spendableKey: spendableKey{
-						UnlockConditions: sk.UnlockConditions,
-						SecretKeys:       []crypto.SecretKey{sk.SecretKey},
-					},
+					id:           types.OutputID(diff.ID),
+					value:        diff.SiafundOutput.Value,
+					spendableKey: sk,
 				}
 			}
 		} else if diff.Direction == modules.DiffRevert {
@@ -228,7 +222,7 @@ func (s *v033xScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 }
 
-func (s *v033xScanner) scan(cs modules.ConsensusSet) error {
+func (s *keyScanner) scan(cs modules.ConsensusSet) error {
 	if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
 		return err
 	}
@@ -236,78 +230,13 @@ func (s *v033xScanner) scan(cs modules.ConsensusSet) error {
 	return nil
 }
 
-func new033xScanner(savedKeys []savedKey033x) *v033xScanner {
-	keys := make(map[types.UnlockHash]savedKey033x)
+func newKeyScanner(savedKeys []spendableKey) *keyScanner {
+	keys := make(map[types.UnlockHash]spendableKey)
 	for _, sk := range savedKeys {
 		keys[sk.UnlockConditions.UnlockHash()] = sk
 	}
-	return &v033xScanner{
+	return &keyScanner{
 		keys:           keys,
-		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
-		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
-	}
-}
-
-type siagScanner struct {
-	dustThreshold  types.Currency
-	sk             spendableKey
-	keyHash        types.UnlockHash
-	siacoinOutputs map[types.SiacoinOutputID]scannedOutput
-	siafundOutputs map[types.SiafundOutputID]scannedOutput
-}
-
-// ProcessConsensusChange scans the blockchain for information relevant to the
-// v033xScanner.
-func (s *siagScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
-	for _, diff := range cc.SiacoinOutputDiffs {
-		if diff.Direction == modules.DiffApply {
-			if s.keyHash == diff.SiacoinOutput.UnlockHash && diff.SiacoinOutput.Value.Cmp(s.dustThreshold) > 0 {
-				s.siacoinOutputs[diff.ID] = scannedOutput{
-					id:           types.OutputID(diff.ID),
-					value:        diff.SiacoinOutput.Value,
-					spendableKey: s.sk,
-				}
-			}
-		} else if diff.Direction == modules.DiffRevert {
-			// NOTE: DiffRevert means the output was either spent or was in a
-			// block that was reverted.
-			if s.keyHash == diff.SiacoinOutput.UnlockHash {
-				delete(s.siacoinOutputs, diff.ID)
-			}
-		}
-	}
-	for _, diff := range cc.SiafundOutputDiffs {
-		if diff.Direction == modules.DiffApply {
-			// do not compare against dustThreshold here; we always want to
-			// sweep every siafund found
-			if s.keyHash == diff.SiafundOutput.UnlockHash {
-				s.siafundOutputs[diff.ID] = scannedOutput{
-					id:           types.OutputID(diff.ID),
-					value:        diff.SiafundOutput.Value,
-					spendableKey: s.sk,
-				}
-			}
-		} else if diff.Direction == modules.DiffRevert {
-			// NOTE: DiffRevert means the output was either spent or was in a
-			// block that was reverted.
-			if s.keyHash == diff.SiafundOutput.UnlockHash {
-				delete(s.siafundOutputs, diff.ID)
-			}
-		}
-	}
-}
-
-func (s *siagScanner) scan(cs modules.ConsensusSet) error {
-	if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
-		return err
-	}
-	cs.Unsubscribe(s)
-	return nil
-}
-
-func newSiagScanner(sk spendableKey) *siagScanner {
-	return &siagScanner{
-		keyHash:        sk.UnlockConditions.UnlockHash(),
 		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
 		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
 	}
