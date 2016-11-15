@@ -48,7 +48,12 @@ func (wal *writeAheadLog) syncResources() {
 		if err != nil {
 			// wal.cm.log.Severe("ERROR: unable to atomically copy the contract manager settings:", err)
 			// panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
+			println(tmpFilename)
+			println(filename)
+			println(wal.fileSettingsTmp.Name())
 			println("ERROR: UNABLE TO ATOMICALLY COPY THE CONTRACT MANAGER SETTINGS AT SHUTDOWN")
+		} else {
+			println("CLEAR: no error while performining filename rename?")
 		}
 	}()
 

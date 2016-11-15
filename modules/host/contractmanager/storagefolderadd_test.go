@@ -590,7 +590,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	// t.Parallel()
 	d := new(dependencyNoSettingsSave)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderFailedCommit")
 	if err != nil {
@@ -615,8 +615,6 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	d.mu.Unlock()
 
 	// Check that the storage folder has been added.
-	t.Log("one")
-	println("one")
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported")
@@ -629,29 +627,21 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Close the contract manager and replace it with a new contract manager.
 	// The new contract manager should have normal dependencies.
-	t.Log("two")
-	println("two")
 	err = cmt.cm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Create the new contract manager using the same persist dir, so that it
 	// will see the uncommitted WAL.
-	t.Log("three")
-	println("three")
 	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the storage folder was properly recovered.
-	t.Log("four")
-	println("four")
 	sfs = cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported", len(sfs))
 	}
-	t.Log("five")
-	println("five")
 }
 
 // dependencySFAddNoFinish is a mocked dependency that will prevent the
@@ -679,7 +669,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	// t.Parallel()
 	d := new(dependencySFAddNoFinish)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderUnfinishedCreate")
 	if err != nil {
@@ -714,6 +704,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	println("CLOSE ONE")
 	// Create the new contract manager using the same persist dir, so that it
 	// will see the uncommitted WAL.
 	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
@@ -726,6 +717,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if len(sfs) != 0 {
 		t.Error("Storage folder add should have failed.")
 	}
+	/*
 	// Check that the storage folder is empty - because the operation failed,
 	// any files that got created should have been removed.
 	files, err := ioutil.ReadDir(storageFolderOne)
@@ -739,6 +731,8 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 			t.Error(file.Name())
 		}
 	}
+	*/
+	println("CLOSE TWO")
 }
 
 // TestAddStorageFolderDoubleAddConcurrent concurrently adds two storage

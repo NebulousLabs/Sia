@@ -108,9 +108,7 @@ type ContractManager struct {
 
 // Close will cleanly shutdown the contract manager.
 func (cm *ContractManager) Close() error {
-	err := cm.tg.Stop()
-	println("CM stop has completed")
-	return build.ExtendErr("error while stopping contract manager", err)
+	return build.ExtendErr("error while stopping contract manager", cm.tg.Stop())
 }
 
 // newContrctManager returns a contract manager that is ready to be used with
@@ -174,12 +172,19 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		defer cm.wal.mu.Unlock()
 
 		for _, sf := range cm.storageFolders {
+			println("closing the metadata and sector files")
+			println(sf.metadataFile.Name())
+			println(sf.sectorFile.Name())
 			err = sf.metadataFile.Close()
 			if err != nil {
+				println("ouch1")
+				println(err.Error())
 				cm.log.Println("Error closing the storage folder file handle", err)
 			}
 			err = sf.sectorFile.Close()
 			if err != nil {
+				println("ouch2")
+				println(err.Error())
 				cm.log.Println("Error closing the storage folder file handle", err)
 			}
 		}

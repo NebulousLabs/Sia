@@ -387,7 +387,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
+	// t.Parallel()
 	d := new(dependencyNoSettingsSave)
 	cmt, err := newMockedContractManagerTester(d, "TestAddSectorRecovery")
 	if err != nil {
@@ -423,8 +423,6 @@ func TestAddSectorRecovery(t *testing.T) {
 	d.mu.Unlock()
 
 	// Check that the sector was successfully added.
-	println("csac")
-	t.Log("checking sector added correctly")
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder in the contract manager", len(sfs))
@@ -473,8 +471,6 @@ func TestAddSectorRecovery(t *testing.T) {
 
 	// Try reloading the contract manager and see if all of the stateful checks
 	// still hold.
-	println("vigorous tiger face")
-	t.Log("vtf")
 	err = cmt.cm.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -485,8 +481,6 @@ func TestAddSectorRecovery(t *testing.T) {
 	}
 
 	// Check that the sector was successfully added.
-	t.Log("hmmm")
-	println("hmmmm")
 	sfs = cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder in the contract manager", len(sfs))
@@ -531,8 +525,6 @@ func TestAddSectorRecovery(t *testing.T) {
 	if !found {
 		t.Error("usage field does not seem to have been updated")
 	}
-	t.Log("closing")
-	println("closing")
 }
 
 // TestAddVirtualSectorSerial adds a sector and a virual sector in serial to

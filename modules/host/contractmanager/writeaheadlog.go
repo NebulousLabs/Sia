@@ -305,11 +305,6 @@ func (wal *writeAheadLog) load() error {
 	if err != nil {
 		return build.ExtendErr("unable to prepare the settings temp file", err)
 	}
-	ss := wal.cm.savedSettings()
-	err = persist.Save(settingsMetadata, ss, wal.fileSettingsTmp)
-	if err != nil {
-		build.ExtendErr("unable to write to settings temp file", err)
-	}
 	wal.cm.tg.AfterStop(func() {
 		wal.mu.Lock()
 		defer wal.mu.Unlock()
@@ -324,5 +319,10 @@ func (wal *writeAheadLog) load() error {
 			return
 		}
 	})
+	ss := wal.cm.savedSettings()
+	err = persist.Save(settingsMetadata, ss, wal.fileSettingsTmp)
+	if err != nil {
+		build.ExtendErr("unable to write to settings temp file", err)
+	}
 	return nil
 }

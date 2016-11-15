@@ -50,6 +50,8 @@ func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateCha
 		// Remove any leftover files.
 		sectorLookupName := filepath.Join(sf.Path, metadataFile)
 		sectorHousingName := filepath.Join(sf.Path, sectorFile)
+		println(sectorLookupName)
+		println(sectorHousingName)
 		err := os.Remove(sectorLookupName)
 		if err != nil {
 			println(err.Error())
