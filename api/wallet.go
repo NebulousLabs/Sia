@@ -129,7 +129,7 @@ func (api *API) walletHandler(w http.ResponseWriter, req *http.Request, _ httpro
 // wallet033xHandler handles API calls to /wallet/033x.
 func (api *API) wallet033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	source := req.FormValue("source")
-	// Check that source is an absolute paths.
+	// Check that source is an absolute path.
 	if !filepath.IsAbs(source) {
 		WriteError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
 		return
@@ -394,6 +394,26 @@ func (api *API) walletSiafundsHandler(w http.ResponseWriter, req *http.Request, 
 	})
 }
 
+// walletSweep033xHandler handles API calls to /wallet/sweep/033x.
+func (api *API) walletSweep033xHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	source := req.FormValue("source")
+	// Check that source is an absolute path.
+	if !filepath.IsAbs(source) {
+		WriteError(w, Error{"error when calling /wallet/033x: source must be an absolute path"}, http.StatusBadRequest)
+		return
+	}
+
+	coins, funds, err := api.wallet.Sweep033x(source)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/sweep/033x: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, WalletSweepPOST{
+		Coins: coins,
+		Funds: funds,
+	})
+}
+
 // walletSweepSeedHandler handles API calls to /wallet/sweep/seed.
 func (api *API) walletSweepSeedHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// Get the seed using the ditionary + phrase
@@ -410,6 +430,29 @@ func (api *API) walletSweepSeedHandler(w http.ResponseWriter, req *http.Request,
 	coins, funds, err := api.wallet.SweepSeed(seed)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/sweep/seed: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, WalletSweepPOST{
+		Coins: coins,
+		Funds: funds,
+	})
+}
+
+// walletSweepSiagHandler handles API calls to /wallet/sweep/siag.
+func (api *API) walletSweepSiagHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// Fetch the list of keyfiles from the post body.
+	keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
+	for _, keypath := range keyfiles {
+		// Check that all key paths are absolute paths.
+		if !filepath.IsAbs(keypath) {
+			WriteError(w, Error{"error when calling /wallet/siagkey: keyfiles contains a non-absolute path"}, http.StatusBadRequest)
+			return
+		}
+	}
+
+	coins, funds, err := api.wallet.SweepSiag(keyfiles)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/sweep/siag: " + err.Error()}, http.StatusBadRequest)
 		return
 	}
 	WriteJSON(w, WalletSweepPOST{
