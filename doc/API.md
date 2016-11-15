@@ -781,7 +781,7 @@ uploads a file to the network from the local filesystem.
 *siapath
 ```
 
-###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-2)
+###### Query String Parameters [(with comments)](/doc/api/Renter.md#query-string-parameters-3)
 ```
 source
 ```
@@ -809,7 +809,9 @@ Wallet
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
+| [/wallet/sweep/033x](#walletsweep033x-post)                     | POST      |
 | [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
+| [/wallet/sweep/siag](#walletsweepsiag-post)                     | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
@@ -1044,18 +1046,54 @@ keyfiles
 standard success or error response. See
 [#standard-responses](#standard-responses).
 
+#### /wallet/sweep/033x [POST]
+
+Function: Scan the blockchain for outputs belonging to a v0.3.3.x wallet and
+send them to an address owned by the wallet.
+
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-9)
+```
+source
+```
+
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-7)
+```javascript
+{
+  "coins": "123456", // hastings, big int
+  "funds": "1",      // siafunds, big int
+}
+```
+
 #### /wallet/sweep/seed [POST]
 
 Function: Scan the blockchain for outputs belonging to a seed and send them to
 an address owned by the wallet.
 
-###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-9)
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-10)
 ```
 dictionary // Optional, default is english.
 seed
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-7)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-8)
+```javascript
+{
+  "coins": "123456", // hastings, big int
+  "funds": "1",      // siafunds, big int
+}
+```
+
+#### /wallet/sweep/siag [POST]
+
+Function: Scan the blockchain for outputs belonging to a siag key and send them
+to an address owned by the wallet.
+
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-11)
+```
+keyfiles
+```
+
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-9)
 ```javascript
 {
   "coins": "123456", // hastings, big int
@@ -1083,7 +1121,7 @@ gets the transaction associated with a specific transaction id.
 :id
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-8)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-10)
 ```javascript
 {
   "transaction": {
@@ -1118,13 +1156,13 @@ gets the transaction associated with a specific transaction id.
 
 returns a list of transactions related to the wallet in chronological order.
 
-###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-10)
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-12)
 ```
 startheight // block height
 endheight   // block height
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-9)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-11)
 ```javascript
 {
   "confirmedtransactions": [
@@ -1149,7 +1187,7 @@ returns all of the transactions related to a specific address.
 :addr
 ```
 
-###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-10)
+###### JSON Response [(with comments)](/doc/api/Wallet.md#json-response-12)
 ```javascript
 {
   "transactions": [
@@ -1165,7 +1203,7 @@ returns all of the transactions related to a specific address.
 unlocks the wallet. The wallet is capable of knowing whether the correct
 password was provided.
 
-###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-11)
+###### Query String Parameters [(with comments)](/doc/api/Wallet.md#query-string-parameters-13)
 ```
 encryptionpassword
 ```

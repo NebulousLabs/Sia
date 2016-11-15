@@ -42,7 +42,9 @@ Index
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
+| [/wallet/sweep/033x](#walletsweep033x-post)                     | POST      |
 | [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
+| [/wallet/sweep/siag](#walletsweepsiag-post)                     | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
@@ -377,6 +379,29 @@ keyfiles
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
+#### /wallet/sweep/033x [POST]
+
+Function: Scan the blockchain for outputs belonging to a v0.3.3.x wallet and
+send them to an address owned by the wallet.
+
+###### Query String Parameters
+```
+// Path on disk to the v0.3.3.x wallet to be swept.
+source
+```
+
+###### JSON Response
+```javascript
+{
+  // Number of siacoins, in hastings, transferred to the wallet as a result of
+  // the sweep.
+  "coins": "123456", // hastings, big int
+
+  // Number of siafunds transferred to the wallet as a result of the sweep.
+  "funds": "1", // siafunds, big int
+}
+```
+
 #### /wallet/sweep/seed [POST]
 
 Function: Scan the blockchain for outputs belonging to a seed and send them to
@@ -391,6 +416,32 @@ dictionary // Optional, default is english.
 // Dictionary-encoded phrase that corresponds to the seed being added to the
 // wallet.
 seed
+```
+
+###### JSON Response
+```javascript
+{
+  // Number of siacoins, in hastings, transferred to the wallet as a result of
+  // the sweep.
+  "coins": "123456", // hastings, big int
+
+  // Number of siafunds transferred to the wallet as a result of the sweep.
+  "funds": "1", // siafunds, big int
+}
+```
+
+#### /wallet/sweep/siag [POST]
+
+Function: Scan the blockchain for outputs belonging to a siag key and send them
+to an address owned by the wallet.
+
+###### Query String Parameters
+```
+// List of filepaths that point to the keyfiles that make up the siag key.
+// There should be at least one keyfile per required signature. The filenames
+// need to be commna separated (no spaces), which means filepaths that contain
+// a comma are not allowed.
+keyfiles
 ```
 
 ###### JSON Response
