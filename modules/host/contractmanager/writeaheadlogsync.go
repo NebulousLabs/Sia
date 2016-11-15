@@ -209,7 +209,8 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 	wal.syncChan = make(chan struct{})
 	go wal.threadedSyncLoop(threadsStopped, syncLoopStopped)
 	wal.cm.tg.AfterStop(func() {
-		// Wait for another iteration of the sync loop.
+		// Wait for another iteration of the sync loop, so that the in-progress
+		// settings can be saved atomically to disk.
 		wal.mu.Lock()
 		syncChan := wal.syncChan
 		wal.mu.Unlock()

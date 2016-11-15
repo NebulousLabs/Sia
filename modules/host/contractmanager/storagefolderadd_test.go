@@ -132,10 +132,10 @@ func TestAddLargeStorageFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*storageFolderGranularity*16) // Total size must exceed the limit of the limitFile.
+	addErr := cmt.cm.AddStorageFolder(storageFolderDir, modules.SectorSize*storageFolderGranularity*16) // Total size must exceed the limit of the limitFile.
 	// Should be a storage folder error, but with all the context adding, I'm
 	// not sure how to check the error type.
-	if err == nil {
+	if addErr == nil {
 		t.Fatal(err)
 	}
 
@@ -151,7 +151,12 @@ func TestAddLargeStorageFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(files) != 0 {
+		t.Log(addErr)
 		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed.")
+		t.Error(len(files))
+		for _, file := range files {
+			t.Error(file.Name())
+		}
 	}
 }
 
@@ -610,6 +615,8 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	d.mu.Unlock()
 
 	// Check that the storage folder has been added.
+	t.Log("one")
+	println("one")
 	sfs := cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported")
@@ -622,21 +629,29 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 
 	// Close the contract manager and replace it with a new contract manager.
 	// The new contract manager should have normal dependencies.
+	t.Log("two")
+	println("two")
 	err = cmt.cm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Create the new contract manager using the same persist dir, so that it
 	// will see the uncommitted WAL.
+	t.Log("three")
+	println("three")
 	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Check that the storage folder was properly recovered.
+	t.Log("four")
+	println("four")
 	sfs = cmt.cm.StorageFolders()
 	if len(sfs) != 1 {
 		t.Fatal("There should be one storage folder reported", len(sfs))
 	}
+	t.Log("five")
+	println("five")
 }
 
 // dependencySFAddNoFinish is a mocked dependency that will prevent the
@@ -719,6 +734,10 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	}
 	if len(files) != 0 {
 		t.Error("there should not be any files in the storage folder because the AddStorageFolder operation failed:", len(files))
+		t.Error(len(files))
+		for _, file := range files {
+			t.Error(file.Name())
+		}
 	}
 }
 

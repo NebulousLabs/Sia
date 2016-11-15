@@ -23,7 +23,7 @@ func TestParallelFileAccess(t *testing.T) {
 
 	// Create the file that will be used in parallel.
 	testdir := build.TempDir(modules.ContractManagerDir, "TestParallelFileAccess")
-	err := os.Mkdir(testdir, 0700)
+	err := os.MkdirAll(testdir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}

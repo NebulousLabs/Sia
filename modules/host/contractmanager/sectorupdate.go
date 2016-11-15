@@ -408,7 +408,7 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 	var wg sync.WaitGroup
 	for _, root := range sectorRoots {
 		wg.Add(1)
-		go func() {
+		go func(root crypto.Hash) {
 			defer wg.Done()
 
 			// Hold a sector lock throughout the duration of the function, but release
@@ -424,7 +424,7 @@ func (cm *ContractManager) AddSectorBatch(sectorRoots []crypto.Hash) error {
 			if exists {
 				cm.wal.managedAddVirtualSector(id, location)
 			}
-		}()
+		}(root)
 	}
 	return nil
 }

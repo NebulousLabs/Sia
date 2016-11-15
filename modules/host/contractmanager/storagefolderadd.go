@@ -46,15 +46,18 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []savedStorageFolde
 func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateChange) {
 	sfs := findUnfinishedStorageFolderAdditions(scs)
 	for _, sf := range sfs {
+		println("doing a storage folder cleanup")
 		// Remove any leftover files.
 		sectorLookupName := filepath.Join(sf.Path, metadataFile)
 		sectorHousingName := filepath.Join(sf.Path, sectorFile)
 		err := os.Remove(sectorLookupName)
 		if err != nil {
+			println(err.Error())
 			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
 		}
 		err = os.Remove(sectorHousingName)
 		if err != nil {
+			println(err.Error())
 			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
 		}
 
