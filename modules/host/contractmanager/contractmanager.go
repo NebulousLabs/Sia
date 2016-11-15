@@ -108,7 +108,9 @@ type ContractManager struct {
 
 // Close will cleanly shutdown the contract manager.
 func (cm *ContractManager) Close() error {
-	return build.ExtendErr("error while stopping contract manager", cm.tg.Stop())
+	err := cm.tg.Stop()
+	println("CM stop has completed")
+	return build.ExtendErr("error while stopping contract manager", err)
 }
 
 // newContrctManager returns a contract manager that is ready to be used with
