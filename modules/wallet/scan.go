@@ -248,6 +248,71 @@ func new033xScanner(savedKeys []savedKey033x) *v033xScanner {
 	}
 }
 
+type siagScanner struct {
+	dustThreshold  types.Currency
+	sk             spendableKey
+	keyHash        types.UnlockHash
+	siacoinOutputs map[types.SiacoinOutputID]scannedOutput
+	siafundOutputs map[types.SiafundOutputID]scannedOutput
+}
+
+// ProcessConsensusChange scans the blockchain for information relevant to the
+// v033xScanner.
+func (s *siagScanner) ProcessConsensusChange(cc modules.ConsensusChange) {
+	for _, diff := range cc.SiacoinOutputDiffs {
+		if diff.Direction == modules.DiffApply {
+			if s.keyHash == diff.SiacoinOutput.UnlockHash && diff.SiacoinOutput.Value.Cmp(s.dustThreshold) > 0 {
+				s.siacoinOutputs[diff.ID] = scannedOutput{
+					id:           types.OutputID(diff.ID),
+					value:        diff.SiacoinOutput.Value,
+					spendableKey: s.sk,
+				}
+			}
+		} else if diff.Direction == modules.DiffRevert {
+			// NOTE: DiffRevert means the output was either spent or was in a
+			// block that was reverted.
+			if s.keyHash == diff.SiacoinOutput.UnlockHash {
+				delete(s.siacoinOutputs, diff.ID)
+			}
+		}
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		if diff.Direction == modules.DiffApply {
+			// do not compare against dustThreshold here; we always want to
+			// sweep every siafund found
+			if s.keyHash == diff.SiafundOutput.UnlockHash {
+				s.siafundOutputs[diff.ID] = scannedOutput{
+					id:           types.OutputID(diff.ID),
+					value:        diff.SiafundOutput.Value,
+					spendableKey: s.sk,
+				}
+			}
+		} else if diff.Direction == modules.DiffRevert {
+			// NOTE: DiffRevert means the output was either spent or was in a
+			// block that was reverted.
+			if s.keyHash == diff.SiafundOutput.UnlockHash {
+				delete(s.siafundOutputs, diff.ID)
+			}
+		}
+	}
+}
+
+func (s *siagScanner) scan(cs modules.ConsensusSet) error {
+	if err := cs.ConsensusSetSubscribe(s, modules.ConsensusChangeBeginning); err != nil {
+		return err
+	}
+	cs.Unsubscribe(s)
+	return nil
+}
+
+func newSiagScanner(sk spendableKey) *siagScanner {
+	return &siagScanner{
+		keyHash:        sk.UnlockConditions.UnlockHash(),
+		siacoinOutputs: make(map[types.SiacoinOutputID]scannedOutput),
+		siafundOutputs: make(map[types.SiafundOutputID]scannedOutput),
+	}
+}
+
 // sweepOutputs sweeps the supplied siacoin and siafund outputs into the wallet.
 func (w *Wallet) sweepOutputs(scos, sfos []scannedOutput) (coins, funds types.Currency, err error) {
 	// get an address to spend into
