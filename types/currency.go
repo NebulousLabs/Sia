@@ -96,6 +96,16 @@ func (x Currency) Div64(y uint64) (c Currency) {
 	return
 }
 
+// Equals returns true if x and y have the same value.
+func (x Currency) Equals(y Currency) bool {
+	return x.Cmp(y) == 0
+}
+
+// Equals64 returns true if x and y have the same value.
+func (x Currency) Equals64(y uint64) bool {
+	return x.Cmp64(y) == 0
+}
+
 // Mul returns a new Currency value c = x * y.
 func (x Currency) Mul(y Currency) (c Currency) {
 	c.i.Mul(&x.i, &y.i)

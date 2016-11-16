@@ -123,7 +123,7 @@ func TestLoadSeed(t *testing.T) {
 	}
 	// Balance of wallet should be 0.
 	siacoinBal, _, _ := w.ConfirmedBalance()
-	if siacoinBal.Cmp64(0) != 0 {
+	if !siacoinBal.Equals64(0) {
 		t.Error("fresh wallet should not have a balance")
 	}
 	err = w.LoadSeed(crypto.TwofishKey(crypto.HashObject(newSeed)), seed)

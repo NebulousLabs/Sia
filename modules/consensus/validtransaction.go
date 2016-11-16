@@ -51,7 +51,7 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 
 		inputSum = inputSum.Add(sco.Value)
 	}
-	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
+	if !inputSum.Equals(t.SiacoinOutputSum()) {
 		return errSiacoinInputOutputMismatch
 	}
 	return nil
@@ -244,10 +244,10 @@ func validFileContractRevisions(tx *bolt.Tx, t types.Transaction) error {
 		for _, output := range fc.ValidProofOutputs {
 			oldPayout = oldPayout.Add(output.Value)
 		}
-		if validPayout.Cmp(oldPayout) != 0 {
+		if !validPayout.Equals(oldPayout) {
 			return errAlteredRevisionPayouts
 		}
-		if missedPayout.Cmp(oldPayout) != 0 {
+		if !missedPayout.Equals(oldPayout) {
 			return errAlteredRevisionPayouts
 		}
 	}
@@ -276,7 +276,7 @@ func validSiafunds(tx *bolt.Tx, t types.Transaction) (err error) {
 	for _, sfo := range t.SiafundOutputs {
 		siafundOutputSum = siafundOutputSum.Add(sfo.Value)
 	}
-	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
+	if !siafundOutputSum.Equals(siafundInputSum) {
 		return errSiafundInputOutputMismatch
 	}
 	return

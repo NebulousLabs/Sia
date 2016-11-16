@@ -23,13 +23,13 @@ func TestSendSiacoins(t *testing.T) {
 	// should be 0.
 	confirmedBal, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut, unconfirmedIn := wt.wallet.UnconfirmedBalance()
-	if confirmedBal.Cmp(types.CalculateCoinbase(1)) != 0 {
+	if !confirmedBal.Equals(types.CalculateCoinbase(1)) {
 		t.Error("unexpected confirmed balance")
 	}
-	if unconfirmedOut.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedOut.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
-	if unconfirmedIn.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedIn.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
 
@@ -43,10 +43,10 @@ func TestSendSiacoins(t *testing.T) {
 	}
 	confirmedBal2, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut2, unconfirmedIn2 := wt.wallet.UnconfirmedBalance()
-	if confirmedBal2.Cmp(confirmedBal) != 0 {
+	if !confirmedBal2.Equals(confirmedBal) {
 		t.Error("confirmed balance changed without introduction of blocks")
 	}
-	if unconfirmedOut2.Cmp(unconfirmedIn2.Add(types.NewCurrency64(5000)).Add(tpoolFee)) != 0 {
+	if !unconfirmedOut2.Equals(unconfirmedIn2.Add(types.NewCurrency64(5000)).Add(tpoolFee)) {
 		t.Error("sending siacoins appears to be ineffective")
 	}
 
@@ -58,13 +58,13 @@ func TestSendSiacoins(t *testing.T) {
 	}
 	confirmedBal3, _, _ := wt.wallet.ConfirmedBalance()
 	unconfirmedOut3, unconfirmedIn3 := wt.wallet.UnconfirmedBalance()
-	if confirmedBal3.Cmp(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(types.NewCurrency64(5000)).Sub(tpoolFee)) != 0 {
+	if !confirmedBal3.Equals(confirmedBal2.Add(types.CalculateCoinbase(2)).Sub(types.NewCurrency64(5000)).Sub(tpoolFee)) {
 		t.Error("confirmed balance did not adjust to the expected value")
 	}
-	if unconfirmedOut3.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedOut3.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
-	if unconfirmedIn3.Cmp(types.ZeroCurrency) != 0 {
+	if !unconfirmedIn3.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
 	}
 }
@@ -177,7 +177,7 @@ func TestIntegrationSortedOutputsSorting(t *testing.T) {
 		if so.ids[i] != expectedIDSorting[i] {
 			t.Error("an id is out of place: ", i)
 		}
-		if so.outputs[i].Value.Cmp64(i) != 0 {
+		if !so.outputs[i].Value.Equals64(i) {
 			t.Error("a value is out of place: ", i)
 		}
 	}

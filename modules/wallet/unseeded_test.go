@@ -37,7 +37,7 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ := w.ConfirmedBalance()
-	if siafundBal.Cmp64(2000) != 0 {
+	if !siafundBal.Equals64(2000) {
 		t.Error("expecting a siafund balance of 2000 from the 1of1 key")
 	}
 
@@ -51,7 +51,7 @@ func TestIntegrationLoad1of1Siag(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ = w.ConfirmedBalance()
-	if siafundBal.Cmp64(1988) != 0 {
+	if !siafundBal.Equals64(1988) {
 		t.Error("expecting balance of 1988 after sending siafunds to the void")
 	}
 }
@@ -87,7 +87,7 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ := w.ConfirmedBalance()
-	if siafundBal.Cmp64(7000) != 0 {
+	if !siafundBal.Equals64(7000) {
 		t.Error("expecting a siafund balance of 7000 from the 2of3 key")
 	}
 
@@ -101,7 +101,7 @@ func TestIntegrationLoad2of3Siag(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, siafundBal, _ = w.ConfirmedBalance()
-	if siafundBal.Cmp64(6988) != 0 {
+	if !siafundBal.Equals64(6988) {
 		t.Error("expecting balance of 6988 after sending siafunds to the void")
 	}
 }

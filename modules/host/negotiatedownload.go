@@ -177,7 +177,7 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 	}
 	toHost := paymentRevision.NewValidProofOutputs[1].Value.Sub(existingRevision.NewValidProofOutputs[1].Value)
 	// Verify that enough money was transferred.
-	if toHost.Cmp(fromRenter) != 0 {
+	if !toHost.Equals(fromRenter) {
 		s := fmt.Sprintf("expected exactly %v to be transferred to the host, but %v was transferred: ", fromRenter, toHost)
 		return extendErr(s, errLowHostValidOutput)
 	}
@@ -223,7 +223,7 @@ func verifyPaymentRevision(existingRevision, paymentRevision types.FileContractR
 	if paymentRevision.NewUnlockHash != existingRevision.NewUnlockHash {
 		return errBadUnlockHash
 	}
-	if paymentRevision.NewMissedProofOutputs[1].Value.Cmp(existingRevision.NewMissedProofOutputs[1].Value) != 0 {
+	if !paymentRevision.NewMissedProofOutputs[1].Value.Equals(existingRevision.NewMissedProofOutputs[1].Value) {
 		return errLowHostMissedOutput
 	}
 	return nil

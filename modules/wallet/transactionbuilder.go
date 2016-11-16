@@ -174,7 +174,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, exactOutput)
 
 	// Create a refund output if needed.
-	if amount.Cmp(fund) != 0 {
+	if !amount.Equals(fund) {
 		refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 		if err != nil {
 			return err
@@ -285,7 +285,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	parentTxn.SiafundOutputs = append(parentTxn.SiafundOutputs, exactOutput)
 
 	// Create a refund output if needed.
-	if amount.Cmp(fund) != 0 {
+	if !amount.Equals(fund) {
 		refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 		if err != nil {
 			return err

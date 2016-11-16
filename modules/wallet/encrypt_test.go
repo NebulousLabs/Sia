@@ -215,7 +215,7 @@ func TestLock(t *testing.T) {
 	}
 	// Compare to the original balance.
 	siacoinBalance2, _, _ := wt.wallet.ConfirmedBalance()
-	if siacoinBalance2.Cmp(siacoinBalance) != 0 {
+	if !siacoinBalance2.Equals(siacoinBalance) {
 		t.Error("siacoin balance reporting changed upon closing the wallet")
 	}
 	// Check that the keys and seeds were wiped.
