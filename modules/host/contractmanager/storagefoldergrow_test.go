@@ -293,9 +293,203 @@ func TestGrowStorageFolderIncompleteWrite(t *testing.T) {
 	}
 }
 
-// TODO: Use an interrupt that will prevent the storage folder from completing
-// the writes, simulating unclean shutdown.
+// dependencyGrowNoFinalize will start to have disk failures after too much
+// data is written and also after 'triggered' ahs been set to true.
+type dependencyGrowNoFinalize struct {
+	productionDependencies
+}
 
-// TODO: Use an interrupt that will preven the storage folder from saving all
-// the way, but get it far enough that the completed post is in the WAL, such
-// that recoverWAL will restore the resize as it as completed.
+// disrupt will prevent the growStorageFolder operation from committing a
+// finalized growStorageFolder operation to the WAL.
+func (dependencyGrowNoFinalize) disrupt(s string) bool {
+	if s == "incompleteGrowStorageFolder" {
+		return true
+	}
+	if s == "cleanWALFile" {
+		return true
+	}
+	return false
+}
+
+// TestGrowStorageFolderShutdownAfterWrite simulates an unclean shutdown that
+// occurs after the storage folder write has completed, but before it has
+// established through the WAL that the write has completed. The result should
+// be that the storage folder grow is not accepted after restart.
+func TestGrowStorageFolderShutdownAfterWrite(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	d := new(dependencyGrowNoFinalize)
+	cmt, err := newMockedContractManagerTester(d, "TestGrowStorageFolderShutdownAfterWrite")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*storageFolderGranularity*3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the index of the storage folder.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("there should only be one storage folder")
+	}
+	sfIndex := sfs[0].Index
+	// Verify that the storage folder has the correct capacity.
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+
+	// Increase the size of the storage folder, to large enough that it will
+	// fail.
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Restart the contract manager.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the storage folder has the correct capacity.
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+	// Verify that the on-disk files are the right size.
+	mfn := filepath.Join(storageFolderOne, metadataFile)
+	sfn := filepath.Join(storageFolderOne, sectorFile)
+	mfi, err := os.Stat(mfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfi, err := os.Stat(sfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint64(mfi.Size()) != sectorMetadataDiskSize*storageFolderGranularity*3 {
+		t.Error("metadata file is the wrong size:", mfi.Size(), sectorMetadataDiskSize*storageFolderGranularity*3)
+	}
+	if uint64(sfi.Size()) != modules.SectorSize*storageFolderGranularity*3 {
+		t.Error("sector file is the wrong size:", sfi.Size(), modules.SectorSize*storageFolderGranularity*3)
+	}
+}
+
+// dependencyLeaveWAL will leave the WAL on disk during shutdown.
+type dependencyLeaveWAL struct {
+	mu sync.Mutex
+	productionDependencies
+	triggered bool
+}
+
+// disrupt will prevent the WAL file from being removed at shutdown.
+func (dlw *dependencyLeaveWAL) disrupt(s string) bool {
+	if s == "cleanWALFile" {
+		return true
+	}
+
+	dlw.mu.Lock()
+	triggered := dlw.triggered
+	dlw.mu.Unlock()
+	if s == "walRename" && triggered {
+		return true
+	}
+
+	return false
+}
+
+// TestGrowStorageFolderWAL completes a storage folder growing, but leaves the
+// WAL behind so that a commit is necessary to finalize things.
+func TestGrowStorageFolderWAL(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	d := new(dependencyLeaveWAL)
+	cmt, err := newMockedContractManagerTester(d, "TestGrowStorageFolderWAL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*storageFolderGranularity*3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the index of the storage folder.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("there should only be one storage folder")
+	}
+	sfIndex := sfs[0].Index
+	// Verify that the storage folder has the correct capacity.
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*3 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+
+	// Increase the size of the storage folder, to large enough that it will
+	// fail.
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	d.triggered = true
+	d.mu.Unlock()
+
+	// Restart the contract manager.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the storage folder has the correct capacity.
+	sfs = cmt.cm.StorageFolders()
+	if sfs[0].Capacity != modules.SectorSize*storageFolderGranularity*25 {
+		t.Error("new storage folder is reporting the wrong capacity", sfs[0].Capacity/modules.SectorSize, storageFolderGranularity*25)
+	}
+	// Verify that the on-disk files are the right size.
+	mfn := filepath.Join(storageFolderOne, metadataFile)
+	sfn := filepath.Join(storageFolderOne, sectorFile)
+	mfi, err := os.Stat(mfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfi, err := os.Stat(sfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint64(mfi.Size()) != sectorMetadataDiskSize*storageFolderGranularity*25 {
+		t.Error("metadata file is the wrong size:", mfi.Size(), sectorMetadataDiskSize*storageFolderGranularity*25)
+	}
+	if uint64(sfi.Size()) != modules.SectorSize*storageFolderGranularity*25 {
+		t.Error("sector file is the wrong size:", sfi.Size(), modules.SectorSize*storageFolderGranularity*25)
+	}
+}
