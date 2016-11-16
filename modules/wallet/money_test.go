@@ -177,7 +177,7 @@ func TestIntegrationSortedOutputsSorting(t *testing.T) {
 		if so.ids[i] != expectedIDSorting[i] {
 			t.Error("an id is out of place: ", i)
 		}
-		if so.outputs[i].Value.Cmp(types.NewCurrency64(i)) != 0 {
+		if so.outputs[i].Value.Cmp64(i) != 0 {
 			t.Error("a value is out of place: ", i)
 		}
 	}

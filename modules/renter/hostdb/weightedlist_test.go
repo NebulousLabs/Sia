@@ -237,7 +237,7 @@ func TestRandomHosts(t *testing.T) {
 	if len(hdb.activeHosts) != 3 {
 		t.Error("wrong number of hosts")
 	}
-	if hdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+	if hdb.hostTree.weight.Cmp64(6) != 0 {
 		t.Error("unexpected weight at initialization")
 		t.Error(hdb.hostTree.weight)
 	}

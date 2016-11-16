@@ -174,10 +174,10 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	if wg.ConfirmedSiacoinBalance.Cmp(types.CalculateCoinbase(1)) != 0 {
 		t.Error("reported wallet balance does not reflect the single block that has been mined")
 	}
-	if wg.UnconfirmedOutgoingSiacoins.Cmp(types.NewCurrency64(0)) != 0 {
+	if wg.UnconfirmedOutgoingSiacoins.Cmp64(0) != 0 {
 		t.Error("there should not be unconfirmed outgoing siacoins")
 	}
-	if wg.UnconfirmedIncomingSiacoins.Cmp(types.NewCurrency64(0)) != 0 {
+	if wg.UnconfirmedIncomingSiacoins.Cmp64(0) != 0 {
 		t.Error("there should not be unconfirmed incoming siacoins")
 	}
 
@@ -209,10 +209,10 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	if wg.ConfirmedSiacoinBalance.Cmp(types.CalculateCoinbase(1)) != 0 {
 		t.Error("reported wallet balance does not reflect the single block that has been mined")
 	}
-	if wg.UnconfirmedOutgoingSiacoins.Cmp(types.NewCurrency64(0)) <= 0 {
+	if wg.UnconfirmedOutgoingSiacoins.Cmp64(0) <= 0 {
 		t.Error("there should be unconfirmed outgoing siacoins")
 	}
-	if wg.UnconfirmedIncomingSiacoins.Cmp(types.NewCurrency64(0)) <= 0 {
+	if wg.UnconfirmedIncomingSiacoins.Cmp64(0) <= 0 {
 		t.Error("there should be unconfirmed incoming siacoins")
 	}
 	if wg.UnconfirmedOutgoingSiacoins.Cmp(wg.UnconfirmedIncomingSiacoins) <= 0 {
@@ -232,10 +232,10 @@ func TestIntegrationWalletGETSiacoins(t *testing.T) {
 	if wg.ConfirmedSiacoinBalance.Cmp(types.CalculateCoinbase(1).Add(types.CalculateCoinbase(2))) >= 0 {
 		t.Error("reported wallet balance does not reflect mining two blocks and eating a miner fee")
 	}
-	if wg.UnconfirmedOutgoingSiacoins.Cmp(types.NewCurrency64(0)) != 0 {
+	if wg.UnconfirmedOutgoingSiacoins.Cmp64(0) != 0 {
 		t.Error("there should not be unconfirmed outgoing siacoins")
 	}
-	if wg.UnconfirmedIncomingSiacoins.Cmp(types.NewCurrency64(0)) != 0 {
+	if wg.UnconfirmedIncomingSiacoins.Cmp64(0) != 0 {
 		t.Error("there should not be unconfirmed incoming siacoins")
 	}
 }

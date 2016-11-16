@@ -905,7 +905,7 @@ func TestTaxHardfork(t *testing.T) {
 
 	// Check that the siafund pool was increased by the faulty float amount.
 	siafundPool := cst.cs.dbGetSiafundPool()
-	if siafundPool.Cmp(types.NewCurrency64(15590e3)) != 0 {
+	if siafundPool.Cmp64(15590e3) != 0 {
 		t.Fatal("siafund pool was not increased correctly")
 	}
 
@@ -957,7 +957,7 @@ func TestTaxHardfork(t *testing.T) {
 
 	// Check that the siafund pool did not change after the submitted revision.
 	siafundPool = cst.cs.dbGetSiafundPool()
-	if siafundPool.Cmp(types.NewCurrency64(15590e3)) != 0 {
+	if siafundPool.Cmp64(15590e3) != 0 {
 		t.Fatal("siafund pool was not increased correctly")
 	}
 }

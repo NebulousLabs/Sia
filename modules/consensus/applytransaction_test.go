@@ -275,7 +275,7 @@ func TestApplyFileContracts(t *testing.T) {
 	if len(pb.FileContractDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(10e3)) != 0 {
+	if cst.cs.siafundPool.Cmp64(10e3) != 0 {
 		t.Error("siafund pool did not update correctly upon creation of a file contract")
 	}
 }
@@ -510,7 +510,7 @@ func TestApplyStorageProofs(t *testing.T) {
 		t.Error("storage proof output not created after applying a storage proof")
 	}
 	sco := cst.cs.db.getDelayedSiacoinOutputs(pb.Height+types.MaturityDelay, spoid0)
-	if sco.Value.Cmp(types.NewCurrency64(290e3)) != 0 {
+	if sco.Value.Cmp64(290e3) != 0 {
 		t.Error("storage proof output was created with the wrong value")
 	}
 
@@ -547,7 +547,7 @@ func TestApplyStorageProofs(t *testing.T) {
 		t.Error("no output created by first output of file contract")
 	}
 	sco = cst.cs.db.getDelayedSiacoinOutputs(pb.Height+types.MaturityDelay, spoid2)
-	if sco.Value.Cmp(types.NewCurrency64(280e3)) != 0 {
+	if sco.Value.Cmp64(280e3) != 0 {
 		t.Error("first siacoin output created has wrong value")
 	}
 	spoid3 := fcid2.StorageProofOutputID(types.ProofValid, 1)
@@ -556,10 +556,10 @@ func TestApplyStorageProofs(t *testing.T) {
 		t.Error("second output not created for storage proof")
 	}
 	sco = cst.cs.db.getDelayedSiacoinOutputs(pb.Height+types.MaturityDelay, spoid3)
-	if sco.Value.Cmp(types.NewCurrency64(300e3)) != 0 {
+	if sco.Value.Cmp64(300e3) != 0 {
 		t.Error("second siacoin output has wrong value")
 	}
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(30e3)) != 0 {
+	if cst.cs.siafundPool.Cmp64(30e3) != 0 {
 		t.Error("siafund pool not being added up correctly")
 	}
 }
@@ -770,7 +770,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if pb.SiafundOutputDiffs[0].ID != sfoid {
 		t.Error("wrong id used when creating a siafund output")
 	}
-	if pb.SiafundOutputDiffs[0].SiafundOutput.ClaimStart.Cmp(types.NewCurrency64(101)) != 0 {
+	if pb.SiafundOutputDiffs[0].SiafundOutput.ClaimStart.Cmp64(101) != 0 {
 		t.Error("claim start set incorrectly when creating a siafund output")
 	}
 
