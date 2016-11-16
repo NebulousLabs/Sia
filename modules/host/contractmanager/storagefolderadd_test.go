@@ -118,7 +118,7 @@ func TestAddLargeStorageFolder(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	var d dependencyLargeFolder
+	d := new(dependencyLargeFolder)
 	cmt, err := newMockedContractManagerTester(d, "TestAddLargeStorageFolder")
 	if err != nil {
 		t.Fatal(err)
@@ -519,7 +519,7 @@ func TestAddStorageFolderDoubleAddNoCommit(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-	var d dependencyNoSyncLoop
+	d := new(dependencyNoSyncLoop)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderDoubleAddNoCommit")
 	if err != nil {
 		t.Fatal(err)
@@ -590,7 +590,7 @@ func TestAddStorageFolderFailedCommit(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// t.Parallel()
+	t.Parallel()
 	d := new(dependencyNoSettingsSave)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderFailedCommit")
 	if err != nil {
@@ -669,7 +669,7 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// t.Parallel()
+	t.Parallel()
 	d := new(dependencySFAddNoFinish)
 	cmt, err := newMockedContractManagerTester(d, "TestAddStorageFolderUnfinishedCreate")
 	if err != nil {
@@ -704,7 +704,6 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	println("CLOSE ONE")
 	// Create the new contract manager using the same persist dir, so that it
 	// will see the uncommitted WAL.
 	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
@@ -717,7 +716,6 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 	if len(sfs) != 0 {
 		t.Error("Storage folder add should have failed.")
 	}
-	/*
 	// Check that the storage folder is empty - because the operation failed,
 	// any files that got created should have been removed.
 	files, err := ioutil.ReadDir(storageFolderOne)
@@ -731,8 +729,6 @@ func TestAddStorageFolderUnfinishedCreate(t *testing.T) {
 			t.Error(file.Name())
 		}
 	}
-	*/
-	println("CLOSE TWO")
 }
 
 // TestAddStorageFolderDoubleAddConcurrent concurrently adds two storage

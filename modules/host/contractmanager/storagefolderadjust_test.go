@@ -344,8 +344,6 @@ func TestRemoveStorageFolderConcurrentAddSector(t *testing.T) {
 		totalConsumed = totalConsumed + (sf.Capacity - sf.CapacityRemaining)
 	}
 	if totalConsumed != uint64(len(roots))*modules.SectorSize {
-		println(len(roots))
-		println(totalConsumed / modules.SectorSize)
 		t.Error("Wrong storage folder consumption being reported.")
 	}
 

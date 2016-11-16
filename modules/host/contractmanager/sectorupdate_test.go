@@ -387,7 +387,7 @@ func TestAddSectorRecovery(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	// t.Parallel()
+	t.Parallel()
 	d := new(dependencyNoSettingsSave)
 	cmt, err := newMockedContractManagerTester(d, "TestAddSectorRecovery")
 	if err != nil {

@@ -96,8 +96,8 @@ type (
 		// uncommittedChanges details a list of operations which have been
 		// suggested or queued to be made to the state, but are not yet
 		// guaranteed to have completed.
-		fileSettingsTmp    *os.File
-		fileWALTmp         *os.File
+		fileSettingsTmp    file
+		fileWALTmp         file
 		syncChan           chan struct{}
 		uncommittedChanges []stateChange
 
@@ -127,7 +127,7 @@ func readWALMetadata(decoder *json.Decoder) error {
 }
 
 // writeWALMetadata writes WAL metadata to the input file.
-func writeWALMetadata(f *os.File) error {
+func writeWALMetadata(f file) error {
 	changeBytes, err := json.MarshalIndent(walMetadata, "", "\t")
 	if err != nil {
 		return build.ExtendErr("could not marshal WAL metadata", err)
@@ -198,7 +198,7 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 func (wal *writeAheadLog) createWALTmp() {
 	var err error
 	walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-	wal.fileWALTmp, err = os.Create(walTmpName)
+	wal.fileWALTmp, err = wal.cm.dependencies.createFile(walTmpName)
 	if err != nil {
 		wal.cm.log.Severe("Unable to create WAL temporary file:", err)
 		panic("unable to create WAL temporary file, crashing to avoid corruption")
@@ -270,7 +270,7 @@ func (wal *writeAheadLog) load() error {
 			wal.cm.log.Println("ERROR: error closing wal file during contract manager shutdown:", err)
 			return
 		}
-		err = os.Remove(filepath.Join(wal.cm.persistDir, walFileTmp))
+		err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, walFileTmp))
 		if err != nil {
 			wal.cm.log.Println("ERROR: error removing temporary WAL during contract manager shutdown:", err)
 			return
@@ -301,7 +301,7 @@ func (wal *writeAheadLog) load() error {
 
 	// Create the tmp settings file and initialize the first write to it. This
 	// is necessary before kicking off the sync loop.
-	wal.fileSettingsTmp, err = os.Create(filepath.Join(wal.cm.persistDir, settingsFileTmp))
+	wal.fileSettingsTmp, err = wal.cm.dependencies.createFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 	if err != nil {
 		return build.ExtendErr("unable to prepare the settings temp file", err)
 	}
@@ -313,7 +313,7 @@ func (wal *writeAheadLog) load() error {
 			wal.cm.log.Println("ERROR: unable to close settings temporary file")
 			return
 		}
-		err = os.Remove(filepath.Join(wal.cm.persistDir, settingsFileTmp))
+		err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 		if err != nil {
 			wal.cm.log.Println("ERROR: unable to remove settings temporary file")
 			return

@@ -44,32 +44,40 @@ func findUnfinishedStorageFolderAdditions(scs []stateChange) []savedStorageFolde
 // cleanupUnfinishedStorageFolderAdditions will purge any unfinished storage
 // folder additions from the previous run.
 func (wal *writeAheadLog) cleanupUnfinishedStorageFolderAdditions(scs []stateChange) {
-	sfs := findUnfinishedStorageFolderAdditions(scs)
-	for _, sf := range sfs {
-		println("doing a storage folder cleanup")
-		// Remove any leftover files.
-		sectorLookupName := filepath.Join(sf.Path, metadataFile)
-		sectorHousingName := filepath.Join(sf.Path, sectorFile)
-		println(sectorLookupName)
-		println(sectorHousingName)
-		err := os.Remove(sectorLookupName)
-		if err != nil {
-			println(err.Error())
-			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
-		}
-		err = os.Remove(sectorHousingName)
-		if err != nil {
-			println(err.Error())
-			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
+	usfs := findUnfinishedStorageFolderAdditions(scs)
+	for _, usf := range usfs {
+		sf, exists := wal.cm.storageFolders[usf.Index]
+		if exists {
+			// Close the storage folder file handles.
+			err := sf.metadataFile.Close()
+			if err != nil {
+				wal.cm.log.Println("Unable to close metadata file for storage folder", sf.path)
+			}
+			err = sf.sectorFile.Close()
+			if err != nil {
+				wal.cm.log.Println("Unable to close sector file for storage folder", sf.path)
+			}
+
+			// Delete the storage folder from the storage folders map.
+			delete(wal.cm.storageFolders, sf.index)
 		}
 
-		// Delete the storage folder from the storage folders map.
-		delete(wal.cm.storageFolders, sf.Index)
+		// Remove any leftover files.
+		sectorLookupName := filepath.Join(usf.Path, metadataFile)
+		sectorHousingName := filepath.Join(usf.Path, sectorFile)
+		err := wal.cm.dependencies.removeFile(sectorLookupName)
+		if err != nil {
+			wal.cm.log.Println("Unable to remove documented sector metadata lookup:", sectorLookupName, err)
+		}
+		err = wal.cm.dependencies.removeFile(sectorHousingName)
+		if err != nil {
+			wal.cm.log.Println("Unable to remove documented sector housing:", sectorHousingName, err)
+		}
 
 		// Append an error call to the changeset, indicating that the storage
 		// folder add was not completed successfully.
 		wal.appendChange(stateChange{
-			ErroredStorageFolderAdditions: []uint16{sf.Index},
+			ErroredStorageFolderAdditions: []uint16{usf.Index},
 		})
 	}
 }
@@ -154,7 +162,7 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 		sf.sectorFile, err = wal.cm.dependencies.createFile(sectorHousingName)
 		if err != nil {
 			err = build.ComposeErrors(err, sf.metadataFile.Close())
-			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
+			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorLookupName))
 			return build.ExtendErr("could not create storage folder file", err)
 		}
 		// Establish the progress fields for the add operation in the storage
@@ -202,10 +210,10 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 			delete(wal.cm.storageFolders, sf.index)
 
 			// Remove the leftover files from the failed operation.
-			err = build.ComposeErrors(sf.sectorFile.Close())
-			err = build.ComposeErrors(sf.metadataFile.Close())
-			err = build.ComposeErrors(err, os.Remove(sectorLookupName))
-			err = build.ComposeErrors(err, os.Remove(sectorHousingName))
+			err = build.ComposeErrors(err, sf.sectorFile.Close())
+			err = build.ComposeErrors(err, sf.metadataFile.Close())
+			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorLookupName))
+			err = build.ComposeErrors(err, wal.cm.dependencies.removeFile(sectorHousingName))
 
 			// Signal in the WAL that the unfinished storage folder addition
 			// has failed.
@@ -294,7 +302,17 @@ func (wal *writeAheadLog) managedAddStorageFolder(sf *storageFolder) error {
 // commitAddStorageFolder integrates a pending AddStorageFolder call into the
 // state. commitAddStorageFolder should only be called during WAL recovery.
 func (wal *writeAheadLog) commitAddStorageFolder(ssf savedStorageFolder) {
-	sf := &storageFolder{
+	sf, exists := wal.cm.storageFolders[ssf.Index]
+	if exists {
+		if sf.metadataFile != nil {
+			sf.metadataFile.Close()
+		}
+		if sf.sectorFile != nil {
+			sf.sectorFile.Close()
+		}
+	}
+
+	sf = &storageFolder{
 		index: ssf.Index,
 		path:  ssf.Path,
 		usage: ssf.Usage,

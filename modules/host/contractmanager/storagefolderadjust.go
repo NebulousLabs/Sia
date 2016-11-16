@@ -2,7 +2,6 @@ package contractmanager
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -52,8 +51,8 @@ func (wal *writeAheadLog) commitRemoveStorageFolder(sfr storageFolderRemoval) {
 	}
 
 	// Delete the files.
-	os.Remove(filepath.Join(sfr.Path, metadataFile))
-	os.Remove(filepath.Join(sfr.Path, sectorFile))
+	wal.cm.dependencies.removeFile(filepath.Join(sfr.Path, metadataFile))
+	wal.cm.dependencies.removeFile(filepath.Join(sfr.Path, sectorFile))
 	delete(wal.cm.storageFolders, sfr.Index)
 }
 
@@ -347,11 +346,11 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 	if err != nil {
 		cm.log.Printf("Error: unable to close sector file as storage folder %v is removed\n", sf.path)
 	}
-	err = os.Remove(filepath.Join(sf.path, metadataFile))
+	err = cm.dependencies.removeFile(filepath.Join(sf.path, metadataFile))
 	if err != nil {
 		cm.log.Printf("Error: unable to remove metadata file as storage folder %v is removed\n", sf.path)
 	}
-	err = os.Remove(filepath.Join(sf.path, sectorFile))
+	err = cm.dependencies.removeFile(filepath.Join(sf.path, sectorFile))
 	if err != nil {
 		cm.log.Printf("Error: unable to reomve sector file as storage folder %v is removed\n", sf.path)
 	}

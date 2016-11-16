@@ -1,7 +1,6 @@
 package contractmanager
 
 import (
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -24,15 +23,6 @@ func (wal *writeAheadLog) syncResources() {
 	go func() {
 		defer wg.Done()
 
-		// For testing, provide a place to interrupt the saving of the sync
-		// file. This makes it easy to simulate certain types of unclean
-		// shutdown.
-		if wal.cm.dependencies.disrupt("settingsSyncRename") {
-			// The current settings file that is being re-written will not be
-			// saved.
-			return
-		}
-
 		tmpFilename := filepath.Join(wal.cm.persistDir, settingsFileTmp)
 		filename := filepath.Join(wal.cm.persistDir, settingsFile)
 		err := wal.fileSettingsTmp.Sync()
@@ -44,16 +34,20 @@ func (wal *writeAheadLog) syncResources() {
 		if err != nil {
 			wal.cm.log.Println("unable to close the temporary contract manager settings file:", err)
 		}
-		err = os.Rename(tmpFilename, filename)
+
+		// For testing, provide a place to interrupt the saving of the sync
+		// file. This makes it easy to simulate certain types of unclean
+		// shutdown.
+		if wal.cm.dependencies.disrupt("settingsSyncRename") {
+			// The current settings file that is being re-written will not be
+			// saved.
+			return
+		}
+
+		err = wal.cm.dependencies.renameFile(tmpFilename, filename)
 		if err != nil {
-			// wal.cm.log.Severe("ERROR: unable to atomically copy the contract manager settings:", err)
-			// panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
-			println(tmpFilename)
-			println(filename)
-			println(wal.fileSettingsTmp.Name())
-			println("ERROR: UNABLE TO ATOMICALLY COPY THE CONTRACT MANAGER SETTINGS AT SHUTDOWN")
-		} else {
-			println("CLEAR: no error while performining filename rename?")
+			wal.cm.log.Severe("ERROR: unable to atomically copy the contract manager settings:", err)
+			panic("unable to atomically copy contract manager settings, crashing to avoid data corruption")
 		}
 	}()
 
@@ -107,7 +101,7 @@ func (wal *writeAheadLog) syncResources() {
 	if !wal.cm.dependencies.disrupt("walRename") {
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
 		walFileName := filepath.Join(wal.cm.persistDir, walFile)
-		err := os.Rename(walTmpName, walFileName)
+		err := wal.cm.dependencies.renameFile(walTmpName, walFileName)
 		if err != nil {
 			// Log that the host is having trouble saving the uncommitted changes.
 			// Crash if the list of uncommitted changes has grown very large.
@@ -161,7 +155,7 @@ func (wal *writeAheadLog) commit() {
 		// Begin writing to the settings file, which will be synced during the
 		// next iteration of the sync loop.
 		var err error
-		wal.fileSettingsTmp, err = os.Create(filepath.Join(wal.cm.persistDir, settingsFileTmp))
+		wal.fileSettingsTmp, err = wal.cm.dependencies.createFile(filepath.Join(wal.cm.persistDir, settingsFileTmp))
 		if err != nil {
 			wal.cm.log.Severe("Unable to open temporary settings file for writing:", err)
 			panic("unable to open temporary settings file for writing, crashing to prevent data corruption")
@@ -182,7 +176,7 @@ func (wal *writeAheadLog) commit() {
 		// Recreate the wal file so that it can receive new updates.
 		var err error
 		walTmpName := filepath.Join(wal.cm.persistDir, walFileTmp)
-		wal.fileWALTmp, err = os.Create(walTmpName)
+		wal.fileWALTmp, err = wal.cm.dependencies.createFile(walTmpName)
 		if err != nil {
 			wal.cm.log.Severe("ERROR: unable to create write-ahead-log:", err)
 			panic("unable to create write-ahead-log in contract manager, crashing to avoid data loss")
@@ -236,7 +230,7 @@ func (wal *writeAheadLog) spawnSyncLoop() (err error) {
 		// Allow unclean shutdown to be simulated by disrupting the removal of
 		// the WAL file.
 		if !wal.cm.dependencies.disrupt("cleanWALFile") {
-			err = os.Remove(filepath.Join(wal.cm.persistDir, walFile))
+			err = wal.cm.dependencies.removeFile(filepath.Join(wal.cm.persistDir, walFile))
 			if err != nil {
 				wal.cm.log.Println("Error removing WAL during contract manager shutdown:", err)
 			}

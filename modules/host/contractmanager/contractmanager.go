@@ -125,6 +125,11 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 	}
 	cm.wal.cm = cm
 
+	dependencies.init()
+	cm.tg.AfterStop(func() {
+		dependencies.destruct()
+	})
+
 	// Perform clean shutdown of already-initialized features if startup fails.
 	var err error
 	defer func() {
@@ -172,19 +177,12 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 		defer cm.wal.mu.Unlock()
 
 		for _, sf := range cm.storageFolders {
-			println("closing the metadata and sector files")
-			println(sf.metadataFile.Name())
-			println(sf.sectorFile.Name())
 			err = sf.metadataFile.Close()
 			if err != nil {
-				println("ouch1")
-				println(err.Error())
 				cm.log.Println("Error closing the storage folder file handle", err)
 			}
 			err = sf.sectorFile.Close()
 			if err != nil {
-				println("ouch2")
-				println(err.Error())
 				cm.log.Println("Error closing the storage folder file handle", err)
 			}
 		}
@@ -212,5 +210,5 @@ func newContractManager(dependencies dependencies, persistDir string) (*Contract
 
 // New returns a new ContractManager.
 func New(persistDir string) (*ContractManager, error) {
-	return newContractManager(productionDependencies{}, persistDir)
+	return newContractManager(new(productionDependencies), persistDir)
 }
