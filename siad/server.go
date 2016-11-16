@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -109,9 +110,43 @@ bwIDAQAB
 -----END PUBLIC KEY-----`
 )
 
-// fetchLatestRelease returns metadata about the most recent GitHub release.
-func fetchLatestRelease() (githubRelease, error) {
-	req, err := http.NewRequest("GET", "https://api.github.com/repos/NebulousLabs/Sia/releases/latest", nil)
+// byVersion sorts LTS releases by their version string, placing the highest
+// version number first.
+type byVersion []githubRelease
+
+func (rs byVersion) Len() int      { return len(rs) }
+func (rs byVersion) Swap(i, j int) { rs[i], rs[j] = rs[j], rs[i] }
+func (rs byVersion) Less(i, j int) bool {
+	// strip "lts-" from the tag names; this assumes the tag names will always
+	// be of the form "lts-v0.0.0".
+	vi, vj := strings.TrimPrefix(rs[i].TagName, "lts-"), strings.TrimPrefix(rs[j].TagName, "lts-")
+	// we want the higher version number to reported as "less" so that it is
+	// placed first inthe slice
+	return build.VersionCmp(vi, vj) >= 0
+}
+
+func latestLTS(releases []githubRelease) (githubRelease, error) {
+	// filter the releases to exclude non-LTS releases
+	var ltsReleases []githubRelease
+	for _, r := range releases {
+		if strings.Contains(r.TagName, "lts") {
+			ltsReleases = append(ltsReleases, r)
+		}
+	}
+	// sort by version
+	sort.Sort(byVersion(ltsReleases))
+
+	// return the latest LTS release
+	if len(ltsReleases) == 0 {
+		return githubRelease{}, errEmptyUpdateResponse
+	}
+	return ltsReleases[0], nil
+}
+
+// fetchLatestLTSRelease returns metadata about the most recent LTS GitHub
+// release.
+func fetchLatestLTSRelease() (githubRelease, error) {
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/NebulousLabs/Sia/releases", nil)
 	if err != nil {
 		return githubRelease{}, err
 	}
@@ -121,15 +156,12 @@ func fetchLatestRelease() (githubRelease, error) {
 		return githubRelease{}, err
 	}
 	defer resp.Body.Close()
-	var release githubRelease
-	err = json.NewDecoder(resp.Body).Decode(&release)
+	var releases []githubRelease
+	err = json.NewDecoder(resp.Body).Decode(&releases)
 	if err != nil {
 		return githubRelease{}, err
 	}
-	if release.TagName == "" && len(release.Assets) == 0 {
-		return githubRelease{}, errEmptyUpdateResponse
-	}
-	return release, nil
+	return latestLTS(releases)
 }
 
 // updateToRelease updates siad and siac to the release specified. siac is
@@ -229,7 +261,7 @@ func updateToRelease(release githubRelease) error {
 
 // daemonUpdateHandlerGET handles the API call that checks for an update.
 func (srv *Server) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	release, err := fetchLatestRelease()
+	release, err := fetchLatestLTSRelease()
 	if err != nil {
 		api.WriteError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
 		return
@@ -246,7 +278,7 @@ func (srv *Server) daemonUpdateHandlerGET(w http.ResponseWriter, _ *http.Request
 // should always check the latest version via daemonUpdateHandlerGET first.
 // TODO: add support for specifying version to update to.
 func (srv *Server) daemonUpdateHandlerPOST(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	release, err := fetchLatestRelease()
+	release, err := fetchLatestLTSRelease()
 	if err != nil {
 		api.WriteError(w, api.Error{Message: "Failed to fetch latest release: " + err.Error()}, http.StatusInternalServerError)
 		return
