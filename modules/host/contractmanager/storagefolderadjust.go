@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
 )
 
 type (
@@ -353,63 +352,6 @@ func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
 	err = cm.dependencies.removeFile(filepath.Join(sf.path, sectorFile))
 	if err != nil {
 		cm.log.Printf("Error: unable to reomve sector file as storage folder %v is removed\n", sf.path)
-	}
-	return nil
-}
-
-// shrinkStoragefolder will truncate a storage folder, moving all of the
-// sectors in the truncated space to new storage folders.
-func (wal *writeAheadLog) shrinkStorageFolder(index uint16, newSectorCount uint32, force bool) error {
-	// Retrieve the specified storage folder.
-	wal.mu.Lock()
-	sf, exists := wal.cm.storageFolders[index]
-	if !exists {
-		wal.mu.Unlock()
-		return errStorageFolderNotFound
-	}
-	wal.mu.Unlock()
-
-	// Lock the storage folder for the duration of the operation.
-	sf.mu.Lock()
-	defer sf.mu.Unlock()
-
-	// Clear out the sectors in the storage folder.
-	_, err := wal.managedEmptyStorageFolder(index, newSectorCount)
-	if err != nil && !force {
-		return err
-	}
-
-	// Wait for a synchronize to confirm that all of the moves have succeeded
-	// in full.
-	wal.mu.Lock()
-	syncChan := wal.syncChan
-	wal.mu.Unlock()
-	<-syncChan
-
-	// Submit a storage folder truncation to the WAL and wait until the update
-	// is synced.
-	wal.mu.Lock()
-	wal.appendChange(stateChange{
-		StorageFolderReductions: []storageFolderReduction{{
-			Index:          index,
-			NewSectorCount: newSectorCount,
-		}},
-	})
-	syncChan = wal.syncChan
-	sf.usage = sf.usage[:newSectorCount/storageFolderGranularity]
-	wal.mu.Unlock()
-
-	// Wait until the shrink action has been synchronized.
-	<-syncChan
-
-	// Truncate the storage folder.
-	err = sf.metadataFile.Truncate(int64(newSectorCount * sectorMetadataDiskSize))
-	if err != nil {
-		wal.cm.log.Printf("Error: unable to truncate metadata file as storage folder %v is resized\n", sf.path)
-	}
-	err = sf.sectorFile.Truncate(int64(modules.SectorSize * uint64(newSectorCount)))
-	if err != nil {
-		wal.cm.log.Printf("Error: unable to truncate sector file as storage folder %v is resized\n", sf.path)
 	}
 	return nil
 }

@@ -21,13 +21,6 @@ type (
 		Index  uint32
 	}
 
-	// storageFolderReduction is an idempotend update to shrink a storage
-	// folder.
-	storageFolderReduction struct {
-		Index          uint16
-		NewSectorCount uint32
-	}
-
 	// stateChange defines an idempotent change to the state that has not yet
 	// been applied to the contract manager. The state change is a single
 	// transaction in the WAL.
@@ -180,6 +173,11 @@ func (wal *writeAheadLog) commitChange(sc stateChange) {
 	for _, sfe := range sc.StorageFolderExtensions {
 		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
 			wal.commitStorageFolderExtension(sfe)
+		}
+	}
+	for _, sfr := range sc.StorageFolderReductions {
+		for i := uint64(0); i < wal.cm.dependencies.atLeastOne(); i++ {
+			wal.commitStorageFolderReduction(sfr)
 		}
 	}
 	for _, sfr := range sc.StorageFolderRemovals {

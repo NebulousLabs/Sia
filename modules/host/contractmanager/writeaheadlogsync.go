@@ -135,6 +135,9 @@ func (wal *writeAheadLog) commit() {
 		for _, sfe := range sc.StorageFolderExtensions {
 			wal.commitStorageFolderExtension(sfe)
 		}
+		for _, sfr := range sc.StorageFolderReductions {
+			wal.commitStorageFolderReduction(sfr)
+		}
 
 		// TODO: Virtual sector handling here.
 	}
