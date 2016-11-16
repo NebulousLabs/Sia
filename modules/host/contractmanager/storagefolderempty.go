@@ -2,20 +2,10 @@ package contractmanager
 
 import (
 	"errors"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/build"
-)
-
-type (
-	// storageFolderRemoval indicates a storage folder that has been removed
-	// from the WAL.
-	storageFolderRemoval struct {
-		Index uint16
-		Path  string
-	}
 )
 
 var (
@@ -24,36 +14,6 @@ var (
 	// the sectors from being properly migrated to a new storage folder.
 	ErrPartialRelocation = errors.New("unable to migrate all sectors")
 )
-
-// TODO: Sector operations must return an error if they are requested on a
-// storage folder that is currently undergoing a modification. This only really
-// applies to Remove and Delete.
-
-// TODO: Definitely test performing all of the operations concurrently in the
-// host while the host has a large number of sectors and a large amount of free
-// space. Pair this with thorough checks to make sure the data being written
-// and read is fully accurate.
-
-// Adjusting a storage folder:
-//	1. Writelock the storage folder.
-//	2. Recycle code from AddSector and DeleteSector to migrate sectors one-at-a-time.
-//	3. Commit a storage folder adjustment to the WAL.
-
-// commitRemoveStorageFolder will finalize a storage folder removal from the
-// contract manager.
-func (wal *writeAheadLog) commitRemoveStorageFolder(sfr storageFolderRemoval) {
-	// Close any open file handles.
-	sf, exists := wal.cm.storageFolders[sfr.Index]
-	if exists {
-		sf.metadataFile.Close()
-		sf.sectorFile.Close()
-	}
-
-	// Delete the files.
-	wal.cm.dependencies.removeFile(filepath.Join(sfr.Path, metadataFile))
-	wal.cm.dependencies.removeFile(filepath.Join(sfr.Path, sectorFile))
-	delete(wal.cm.storageFolders, sfr.Index)
-}
 
 // managedMoveSector will move a sector from its current storage folder to
 // another.
@@ -279,79 +239,4 @@ func (wal *writeAheadLog) queueSectorMove(wg *sync.WaitGroup, id sectorID, errCo
 			atomic.AddUint64(errCount, 1)
 		}
 	}()
-}
-
-// RemoveStorageFolder will delete a storage folder from the contract manager,
-// moving all of the sectors in the storage folder to new storage folders.
-func (cm *ContractManager) RemoveStorageFolder(index uint16, force bool) error {
-	cm.tg.Add()
-	defer cm.tg.Done()
-
-	// Retrieve the specified storage folder.
-	cm.wal.mu.Lock()
-	sf, exists := cm.storageFolders[index]
-	if !exists {
-		cm.wal.mu.Unlock()
-		return errStorageFolderNotFound
-	}
-	cm.wal.mu.Unlock()
-
-	// Lock the storage folder for the duration of the operation.
-	sf.mu.Lock()
-	defer sf.mu.Unlock()
-
-	// Clear out the sectors in the storage folder.
-	_, err := cm.wal.managedEmptyStorageFolder(index, 0)
-	if err != nil && !force {
-		return err
-	}
-
-	// Wait for a synchronize to confirm that all of the moves have succeeded
-	// in full.
-	cm.wal.mu.Lock()
-	syncChan := cm.wal.syncChan
-	cm.wal.mu.Unlock()
-	<-syncChan
-
-	// Submit a storage folder removal to the WAL and wait until the update is
-	// synced.
-	cm.wal.mu.Lock()
-	cm.wal.appendChange(stateChange{
-		StorageFolderRemovals: []storageFolderRemoval{{
-			Index: index,
-			Path:  sf.path,
-		}},
-	})
-	delete(cm.storageFolders, index)
-
-	// Wait until the removal action has been synchronized.
-	syncChan = cm.wal.syncChan
-	cm.wal.mu.Unlock()
-	<-syncChan
-
-	// Remove the storage folder. Close all handles, and remove the files from
-	// disk.
-	//
-	// TODO: In the rare event that this doesn't happen until after the deleted
-	// cm.storageFolders settings update has synchronized, clutter may be left
-	// on disk.
-	//
-	// TODO: Handle these by doing them during the WAL commit.
-	err = sf.metadataFile.Close()
-	if err != nil {
-		cm.log.Printf("Error: unable to close metadata file as storage folder %v is removed\n", sf.path)
-	}
-	err = sf.sectorFile.Close()
-	if err != nil {
-		cm.log.Printf("Error: unable to close sector file as storage folder %v is removed\n", sf.path)
-	}
-	err = cm.dependencies.removeFile(filepath.Join(sf.path, metadataFile))
-	if err != nil {
-		cm.log.Printf("Error: unable to remove metadata file as storage folder %v is removed\n", sf.path)
-	}
-	err = cm.dependencies.removeFile(filepath.Join(sf.path, sectorFile))
-	if err != nil {
-		cm.log.Printf("Error: unable to reomve sector file as storage folder %v is removed\n", sf.path)
-	}
-	return nil
 }
