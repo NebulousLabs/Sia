@@ -126,24 +126,46 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	wal.mu.Unlock()
 	<-syncChan
 
-	// Extend the sector file and metadata file on disk.
+	// Prepare variables for growing the storage folder.
 	currentHousingSize := int64(len(sf.usage)) * int64(modules.SectorSize) * storageFolderGranularity
 	currentMetadataSize := int64(len(sf.usage)) * sectorMetadataDiskSize * storageFolderGranularity
 	newHousingSize := int64(newSectorCount) * int64(modules.SectorSize)
 	newMetadataSize := int64(newSectorCount) * sectorMetadataDiskSize
 	if newHousingSize <= currentHousingSize || newMetadataSize <= currentMetadataSize {
-		wal.cm.log.Critical("growStorageFolder called when the storage folder is not increasing in size", newHousingSize, currentHousingSize, newMetadataSize, currentMetadataSize)
+		wal.cm.log.Critical("growStorageFolder called without size increase", newHousingSize, currentHousingSize, newMetadataSize, currentMetadataSize)
 		return errors.New("unable to make the requested change, please notify the devs that there is a bug")
 	}
 	housingWriteSize := newHousingSize - currentHousingSize
 	metadataWriteSize := newMetadataSize - currentMetadataSize
+
+	// If there's an error in the rest of the function, reset the storage
+	// folders to their original size.
+	var err error
+	defer func(sf *storageFolder, housingSize, metadataSize int64) {
+		if err != nil {
+			wal.mu.Lock()
+			defer wal.mu.Unlock()
+
+			// Remove the leftover files from the failed operation.
+			err = build.ComposeErrors(err, sf.metadataFile.Truncate(housingSize))
+			err = build.ComposeErrors(err, sf.sectorFile.Truncate(metadataSize))
+
+			// Signal in the WAL that the unfinished storage folder addition
+			// has failed.
+			wal.appendChange(stateChange{
+				ErroredStorageFolderExtensions: []uint16{sf.index},
+			})
+		}
+	}(sf, currentMetadataSize, currentHousingSize)
+
+	// Extend the sector file and metadata file on disk.
 	atomic.StoreUint64(&sf.atomicProgressDenominator, uint64(housingWriteSize+metadataWriteSize))
 
 	writeCount := housingWriteSize / 4e6
 	finalWriteSize := housingWriteSize % 4e6
 	writeData := make([]byte, 4e6)
 	for i := int64(0); i < writeCount; i++ {
-		_, err := sf.sectorFile.WriteAt(writeData, currentHousingSize+int64(len(writeData))*i)
+		_, err = sf.sectorFile.WriteAt(writeData, currentHousingSize+int64(len(writeData))*i)
 		if err != nil {
 			return build.ExtendErr("could not allocate storage folder", err)
 		}
@@ -151,7 +173,7 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 		atomic.AddUint64(&sf.atomicProgressNumerator, 4e6)
 	}
 	writeData = writeData[:finalWriteSize]
-	_, err := sf.sectorFile.WriteAt(writeData, currentHousingSize+writeCount*4e6)
+	_, err = sf.sectorFile.WriteAt(writeData, currentHousingSize+writeCount*4e6)
 	if err != nil {
 		return build.ExtendErr("could not allocate sector data file", err)
 	}
@@ -168,23 +190,29 @@ func (wal *writeAheadLog) growStorageFolder(index uint16, newSectorCount uint32)
 	atomic.StoreUint64(&sf.atomicProgressNumerator, uint64(housingWriteSize+metadataWriteSize))
 
 	// Sync the files.
+	var err1, err2 error
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		err := sf.metadataFile.Sync()
+		err1 = sf.metadataFile.Sync()
 		if err != nil {
 			wal.cm.log.Println("could not synchronize allocated sector metadata file:", err)
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		err := sf.sectorFile.Sync()
+		err2 = sf.sectorFile.Sync()
 		if err != nil {
 			wal.cm.log.Println("could not synchronize allocated sector data file:", err)
 		}
 	}()
 	wg.Wait()
+	if err1 != nil || err2 != nil {
+		err = build.ComposeErrors(err1, err2)
+		wal.cm.log.Println("cound not synchronize storage folder extensions:", err)
+		return build.ExtendErr("unable to synchronize storage folder extensions", err)
+	}
 
 	// Simulate power failure at this point for some testing scenarios.
 	if wal.cm.dependencies.disrupt("incompleteGrowStorageFolder") {
