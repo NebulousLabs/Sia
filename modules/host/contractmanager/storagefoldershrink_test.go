@@ -509,6 +509,204 @@ func TestShrinkStorageFolderIncompleteWrite(t *testing.T) {
 	}
 }
 
+// TestShrinkStorageFolderIncopmleteWriteForce checks that shrinkStorageFolder
+// operates as intended when the writing to move sectors cannot complete fully,
+// but the 'force' flag is set.
+// capacity and capacity remaining.
+func TestShrinkStorageFolderIncompleteWriteForce(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	d := new(dependencyIncompleteGrow)
+	cmt, err := newMockedContractManagerTester(d, "TestShrinkStorageFolderIncompleteWriteForce")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cmt.panicClose()
+
+	// Add a storage folder.
+	storageFolderOne := filepath.Join(cmt.persistDir, "storageFolderOne")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderOne, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderOne, modules.SectorSize*storageFolderGranularity*8)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the index of the storage folder.
+	sfs := cmt.cm.StorageFolders()
+	if len(sfs) != 1 {
+		t.Fatal("there should only be one storage folder")
+	}
+	sfIndex := sfs[0].Index
+
+	// Create some sectors and add them to the storage folder.
+	roots := make([]crypto.Hash, 6)
+	datas := make([][]byte, 6)
+	for i := 0; i < len(roots); i++ {
+		root, data, err := randSector()
+		if err != nil {
+			t.Fatal(err)
+		}
+		roots[i] = root
+		datas[i] = data
+	}
+	// Add all of the sectors.
+	var wg sync.WaitGroup
+	wg.Add(len(roots))
+	for i := 0; i < len(roots); i++ {
+		go func(i int) {
+			err := cmt.cm.AddSector(roots[i], datas[i])
+			if err != nil {
+				t.Error(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// Add a second storage folder so that the displaced sectors have somewhere
+	// to go.
+	storageFolderTwo := filepath.Join(cmt.persistDir, "storageFolderTwo")
+	// Create the storage folder dir.
+	err = os.MkdirAll(storageFolderTwo, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cmt.cm.AddStorageFolder(storageFolderTwo, modules.SectorSize*storageFolderGranularity*3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Trigger some failures.
+	d.mu.Lock()
+	d.threshold = 1 << 11
+	d.triggered = true
+	d.mu.Unlock()
+
+	// Decrease the size of the storage folder.
+	err = cmt.cm.ResizeStorageFolder(sfIndex, modules.SectorSize*storageFolderGranularity*2, true)
+	if err != nil {
+		t.Fatal("expected a failure")
+	}
+	// Verify that the capacity and file sizes are correct.
+	sfs = cmt.cm.StorageFolders()
+	capacity := sfs[0].Capacity + sfs[1].Capacity
+	capacityRemaining := sfs[0].CapacityRemaining + sfs[1].CapacityRemaining
+	if capacity != modules.SectorSize*storageFolderGranularity*5 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+	mfn := filepath.Join(storageFolderOne, metadataFile)
+	sfn := filepath.Join(storageFolderOne, sectorFile)
+	mfi, err := os.Stat(mfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfi, err := os.Stat(sfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint64(mfi.Size()) != sectorMetadataDiskSize*storageFolderGranularity*2 {
+		t.Error("metadata file is the wrong size")
+	}
+	if uint64(sfi.Size()) != modules.SectorSize*storageFolderGranularity*2 {
+		t.Error("sector file is the wrong size")
+	}
+
+	// Data was lost. Count the number of sectors that are still available.
+	wg.Add(len(roots))
+	var remainingSectors uint64
+	for i := 0; i < len(roots); i++ {
+		go func(i int) {
+			defer wg.Done()
+
+			data, err := cmt.cm.ReadSector(roots[i])
+			if err != nil {
+				// Sector probably destroyed.
+				return
+			}
+			if !bytes.Equal(data, datas[i]) {
+				t.Error("ReadSector has returned the wrong data")
+			}
+
+			atomic.AddUint64(&remainingSectors, 1)
+		}(i)
+	}
+	wg.Wait()
+
+	// Check that the capacity remaining matches the number of reachable
+	// sectors.
+	if capacityRemaining != capacity-remainingSectors*modules.SectorSize {
+		t.Error(capacityRemaining/modules.SectorSize, capacity/modules.SectorSize, remainingSectors)
+	}
+
+	// Restart the contract manager to see that the change is persistent.
+	err = cmt.cm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmt.cm, err = New(filepath.Join(cmt.persistDir, modules.ContractManagerDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the capacity and file sizes are correct.
+	sfs = cmt.cm.StorageFolders()
+	capacity = sfs[0].Capacity + sfs[1].Capacity
+	capacityRemaining = sfs[0].CapacityRemaining + sfs[1].CapacityRemaining
+	if capacity != modules.SectorSize*storageFolderGranularity*5 {
+		t.Error("new storage folder is reporting the wrong capacity")
+	}
+	mfi, err = os.Stat(mfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sfi, err = os.Stat(sfn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uint64(mfi.Size()) != sectorMetadataDiskSize*storageFolderGranularity*2 {
+		t.Error("metadata file is the wrong size")
+	}
+	if uint64(sfi.Size()) != modules.SectorSize*storageFolderGranularity*2 {
+		t.Error("sector file is the wrong size")
+	}
+
+	// Check that the same number of sectors are still available.
+	wg.Add(len(roots))
+	var nowRemainingSectors uint64
+	for i := 0; i < len(roots); i++ {
+		go func(i int) {
+			defer wg.Done()
+
+			data, err := cmt.cm.ReadSector(roots[i])
+			if err != nil {
+				// Sector probably destroyed.
+				return
+			}
+			if !bytes.Equal(data, datas[i]) {
+				t.Error("ReadSector has returned the wrong data")
+			}
+
+			atomic.AddUint64(&nowRemainingSectors, 1)
+		}(i)
+	}
+	wg.Wait()
+
+	// Check that the capacity remaining matches the number of reachable
+	// sectors.
+	if capacityRemaining != capacity-remainingSectors*modules.SectorSize {
+		t.Error(capacityRemaining/modules.SectorSize, capacity/modules.SectorSize, remainingSectors)
+	}
+	if remainingSectors != nowRemainingSectors {
+		t.Error("available sector set changed after restart", remainingSectors, nowRemainingSectors)
+	}
+}
+
 /*
 // dependencyGrowNoFinalize will start to have disk failures after too much
 // data is written and also after 'triggered' ahs been set to true.

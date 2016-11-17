@@ -25,6 +25,11 @@ func (wal *writeAheadLog) commitStorageFolderReduction(sfr storageFolderReductio
 	// Shrink the sector usage, but only if the sector usage is not already
 	// smaller.
 	if uint32(len(sf.usage)) > sfr.NewSectorCount/storageFolderGranularity {
+		// Unset the usage in all bits
+		for i := sfr.NewSectorCount; i < uint32(len(sf.usage))*storageFolderGranularity; i++ {
+			sf.clearUsage(i)
+		}
+		// Truncate the usage field.
 		sf.usage = sf.usage[:sfr.NewSectorCount/storageFolderGranularity]
 	}
 
